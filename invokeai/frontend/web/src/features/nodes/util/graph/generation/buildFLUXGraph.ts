@@ -327,13 +327,41 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g.upsertMetadata({ ref_images: validFlux2RefImageConfigs }, 'merge');
     }
 
+    if (pidMode !== 'off') {
+      // Inpaint/outpaint are not wired for PiD yet - only txt2img and img2img are supported (Fit and Native).
+      if (generationMode === 'inpaint' || generationMode === 'outpaint') {
+        throw new UnsupportedGenerationModeError(t('toast.pidUnsupportedMode'));
+      }
+      // PiD decodes at 4x the generation resolution. "Scale Before Processing" (Canvas) would silently inflate
+      // the generation size to the model optimal, blowing up the decode - require it off (scaled == original).
+      const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
+      if (scaledSize.width !== originalSize.width || scaledSize.height !== originalSize.height) {
+        throw new UnsupportedGenerationModeError(t('toast.pidScaleBeforeProcessingOff'));
+      }
+    }
+
     if (generationMode === 'txt2img') {
-      canvasOutput = addTextToImage({
-        g,
-        state,
-        denoise: flux2Denoise,
-        l2i: flux2L2i,
-      });
+      if (pidMode !== 'off') {
+        // PiD replaces the VAE decode entirely - drop the unused l2i (and its edges).
+        g.deleteNode(flux2L2i.id);
+        canvasOutput = addPidDecode({
+          g,
+          state,
+          mode: pidMode,
+          denoise: flux2Denoise,
+          decodeNodeType: 'flux2_pid_decode',
+          vaeSource: flux2ModelLoader,
+          positivePrompt,
+          seed,
+        });
+      } else {
+        canvasOutput = addTextToImage({
+          g,
+          state,
+          denoise: flux2Denoise,
+          l2i: flux2L2i,
+        });
+      }
       g.upsertMetadata({ generation_mode: 'flux2_txt2img' });
     } else if (generationMode === 'img2img') {
       assert(manager !== null);
@@ -341,15 +369,56 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         type: 'flux2_vae_encode',
         id: getPrefixedId('flux2_vae_encode'),
       });
-      canvasOutput = await addImageToImage({
-        g,
-        state,
-        manager,
-        l2i: flux2L2i,
-        i2l,
-        denoise: flux2Denoise,
-        vaeSource: flux2ModelLoader,
-      });
+      if (pidMode === 'native') {
+        // PiD replaces the VAE decode. Native: the bbox is the 4x target - generate at bbox / 4, PiD decodes
+        // straight back up to the bbox (no downscale), so the full result composites onto the canvas region.
+        g.deleteNode(flux2L2i.id);
+        canvasOutput = await addPidImageToImageNative({
+          g,
+          state,
+          manager,
+          denoise: flux2Denoise,
+          decodeNodeType: 'flux2_pid_decode',
+          i2l,
+          vaeSource: flux2ModelLoader,
+          positivePrompt,
+          seed,
+        });
+      } else if (pidMode === 'fit') {
+        // PiD replaces the VAE decode. Fit: generate at the bbox, PiD decodes 4x, then downscale back to the bbox.
+        g.deleteNode(flux2L2i.id);
+        const { originalSize } = getOriginalAndScaledSizesForOtherModes(state);
+        const pidDecode = buildPidDecodeChain({
+          g,
+          state,
+          denoise: flux2Denoise,
+          decodeNodeType: 'flux2_pid_decode',
+          vaeSource: flux2ModelLoader,
+          positivePrompt,
+          seed,
+          mode: 'fit',
+          fitSize: originalSize,
+        });
+        canvasOutput = await addImageToImage({
+          g,
+          state,
+          manager,
+          l2i: pidDecode,
+          i2l,
+          denoise: flux2Denoise,
+          vaeSource: flux2ModelLoader,
+        });
+      } else {
+        canvasOutput = await addImageToImage({
+          g,
+          state,
+          manager,
+          l2i: flux2L2i,
+          i2l,
+          denoise: flux2Denoise,
+          vaeSource: flux2ModelLoader,
+        });
+      }
       g.upsertMetadata({ generation_mode: 'flux2_img2img' });
     } else if (generationMode === 'inpaint') {
       assert(manager !== null);
@@ -456,7 +525,15 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       if (pidMode !== 'off') {
         // PiD replaces the VAE decode entirely - drop the unused l2i (and its edges).
         g.deleteNode(fluxL2i.id);
-        canvasOutput = addPidDecode({ g, state, mode: pidMode, denoise: fluxDenoise, positivePrompt, seed });
+        canvasOutput = addPidDecode({
+          g,
+          state,
+          mode: pidMode,
+          denoise: fluxDenoise,
+          decodeNodeType: 'flux_pid_decode',
+          positivePrompt,
+          seed,
+        });
       } else {
         canvasOutput = addTextToImage({
           g,
@@ -481,6 +558,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
           state,
           manager,
           denoise: fluxDenoise,
+          decodeNodeType: 'flux_pid_decode',
           i2l,
           vaeSource: fluxModelLoader,
           positivePrompt,
@@ -494,6 +572,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
           g,
           state,
           denoise: fluxDenoise,
+          decodeNodeType: 'flux_pid_decode',
           positivePrompt,
           seed,
           mode: 'fit',

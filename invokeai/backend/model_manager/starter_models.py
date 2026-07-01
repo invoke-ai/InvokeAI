@@ -164,6 +164,29 @@ pid_decoder_flux_2kto4k = StarterModel(
     variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
     dependencies=[gemma2_2b_encoder],
 )
+# FLUX.2 Klein shares one 32-channel VAE across the 4B and 9B variants, so a single decoder per preset covers both.
+# The 128-channel packed latent is unambiguous (unlike the 16ch FLUX/SD3 case), so no directory-name disambiguation
+# is needed for the config probe.
+pid_decoder_flux2_2k = StarterModel(
+    name="PiD Decoder FLUX.2 (2K)",
+    base=BaseModelType.Flux2,
+    source="nvidia/PiD::checkpoints/PiD_res2k_sr4x_official_flux2_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for FLUX.2 Klein latents, 2K target preset (e.g. 512 -> 2048). ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+pid_decoder_flux2_2kto4k = StarterModel(
+    name="PiD Decoder FLUX.2 (2K to 4K)",
+    base=BaseModelType.Flux2,
+    source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_flux2_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for FLUX.2 Klein latents, 2K-to-4K preset for higher-resolution output. ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
 # endregion
 
 
@@ -1752,6 +1775,8 @@ STARTER_MODELS: list[StarterModel] = [
     gemma2_2b_encoder,
     pid_decoder_flux_2k,
     pid_decoder_flux_2kto4k,
+    pid_decoder_flux2_2k,
+    pid_decoder_flux2_2kto4k,
 ]
 
 sd1_bundle: list[StarterModel] = [

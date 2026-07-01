@@ -8,11 +8,13 @@ import {
   pidDecoderModelSelected,
   pidModeChanged,
   selectGemma2EncoderModel,
+  selectMainModelConfig,
   selectPidDecoderModel,
   selectPidMode,
 } from 'features/controlLayers/store/paramsSlice';
 import type { PidMode } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { getPidDecoderBaseForMainBase } from 'features/parameters/util/pid';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGemma2EncoderModels, usePiDDecoderModels } from 'services/api/hooks/modelsByType';
@@ -22,9 +24,16 @@ const ParamPidDecoderModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectedModel = useAppSelector(selectPidDecoderModel);
-  // PiD decoders are pinned to a backbone; only FLUX-base decoders are valid for the FLUX graph.
-  const fluxOnly = useCallback((config: AnyModelConfig) => config.base === 'flux', []);
-  const [modelConfigs, { isLoading }] = usePiDDecoderModels(fluxOnly);
+  const mainModelConfig = useAppSelector(selectMainModelConfig);
+  // PiD decoders are pinned to a backbone; only decoders whose base matches the main model's PiD decoder base
+  // are valid (e.g. flux2 decoders for a FLUX.2 main model). getPidDecoderBaseForMainBase returns null when the
+  // base has no PiD support, so the filter rejects everything and the combobox shows no options.
+  const decoderBase = useMemo(() => getPidDecoderBaseForMainBase(mainModelConfig?.base), [mainModelConfig?.base]);
+  const baseFilter = useCallback(
+    (config: AnyModelConfig) => decoderBase !== null && config.base === decoderBase,
+    [decoderBase]
+  );
+  const [modelConfigs, { isLoading }] = usePiDDecoderModels(baseFilter);
 
   const _onChange = useCallback(
     (config: AnyModelConfig | null) => {

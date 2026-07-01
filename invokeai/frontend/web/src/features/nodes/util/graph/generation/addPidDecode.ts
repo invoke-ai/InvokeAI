@@ -9,6 +9,7 @@ import {
   getOriginalAndScaledSizesForOtherModes,
   getOriginalAndScaledSizesForTextToImage,
 } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { ImageToLatentsNodes, MainModelLoaderNodes, VaeSourceNodes } from 'features/nodes/util/graph/types';
 import { PID_SCALE } from 'features/parameters/util/optimalDimension';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -18,11 +19,33 @@ const FLUX_GRID_SIZE = 16;
 
 type Size = { width: number; height: number };
 
+/**
+ * The base-specific PiD decode node types. Each replaces its base's VAE decode with the PiD super-res decode.
+ * Only bases whose graph builder actually wires PiD are listed; more are added as their builders gain support.
+ */
+type PidDecodeNodeType = 'flux_pid_decode' | 'flux2_pid_decode';
+
+/**
+ * Denoise nodes whose latents PiD can decode. Narrower than `DenoiseLatentsNodes` so the shared
+ * width/height/denoising_start/denoising_end fields (which only the FLUX-family denoise nodes have) are available.
+ */
+type PidDenoiseNodeType = 'flux_denoise' | 'flux2_denoise';
+
+/** PiD decode node types that expose a `vae` input (used to read the VAE's scaling constants at runtime). */
+const PID_DECODE_NODES_WITH_VAE_INPUT = new Set<PidDecodeNodeType>(['flux2_pid_decode']);
+
 type BuildPidDecodeChainArg = {
   g: Graph;
   state: RootState;
-  /** The FLUX denoise node producing the latents PiD will decode. Its dimensions are set by the CALLER. */
-  denoise: Invocation<'flux_denoise'>;
+  /** The denoise node producing the latents PiD will decode. Its dimensions are set by the CALLER. */
+  denoise: Invocation<PidDenoiseNodeType>;
+  /** Which base-specific PiD decode node to build (e.g. `flux_pid_decode`, `flux2_pid_decode`). */
+  decodeNodeType: PidDecodeNodeType;
+  /**
+   * Optional VAE source. If the chosen decode node has a `vae` input (e.g. `flux2_pid_decode`), it is wired so
+   * the node can read the VAE's scaling/shift constants at runtime. Ignored for nodes without a `vae` input.
+   */
+  vaeSource?: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   /** The positive prompt node - PiD conditions its decode on the same caption. */
   positivePrompt: Invocation<'string'>;
   /** The seed node - reused for PiD's internal decode noise so results are reproducible. */
@@ -49,11 +72,13 @@ export const buildPidDecodeChain = ({
   g,
   state,
   denoise,
+  decodeNodeType,
+  vaeSource,
   positivePrompt,
   seed,
   mode,
   fitSize,
-}: BuildPidDecodeChainArg): Invocation<'img_resize' | 'flux_pid_decode'> => {
+}: BuildPidDecodeChainArg): Invocation<'img_resize' | PidDecodeNodeType> => {
   const params = selectParamsSlice(state);
   const { pidDecoderModel, gemma2EncoderModel, pidSteps } = params;
   assert(pidDecoderModel, 'No PiD decoder model selected');
@@ -70,8 +95,8 @@ export const buildPidDecodeChain = ({
     pid_decoder_model: pidDecoderModel,
   });
   const pidDecode = g.addNode({
-    type: 'flux_pid_decode',
-    id: getPrefixedId('flux_pid_decode'),
+    type: decodeNodeType,
+    id: getPrefixedId(decodeNodeType),
     num_inference_steps: pidSteps,
   });
 
@@ -80,6 +105,10 @@ export const buildPidDecodeChain = ({
   g.addEdge(gemma2Loader, 'gemma2_encoder', pidDecode, 'gemma2_encoder');
   g.addEdge(pidLoader, 'pid_decoder', pidDecode, 'pid_decoder');
   g.addEdge(seed, 'value', pidDecode, 'seed');
+  // Wire the VAE only for decode nodes that read scaling constants from it (currently just flux2_pid_decode).
+  if (vaeSource && PID_DECODE_NODES_WITH_VAE_INPUT.has(decodeNodeType)) {
+    g.addEdge(vaeSource, 'vae', pidDecode as Invocation<'flux2_pid_decode'>, 'vae');
+  }
 
   const commonMetadata = {
     pid_decoder: pidDecoderModel,
@@ -118,7 +147,9 @@ type AddPidDecodeArg = {
   g: Graph;
   state: RootState;
   mode: 'fit' | 'native';
-  denoise: Invocation<'flux_denoise'>;
+  denoise: Invocation<PidDenoiseNodeType>;
+  decodeNodeType: PidDecodeNodeType;
+  vaeSource?: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   positivePrompt: Invocation<'string'>;
   seed: Invocation<'integer'>;
 };
@@ -139,9 +170,11 @@ export const addPidDecode = ({
   state,
   mode,
   denoise,
+  decodeNodeType,
+  vaeSource,
   positivePrompt,
   seed,
-}: AddPidDecodeArg): Invocation<'img_resize' | 'flux_pid_decode'> => {
+}: AddPidDecodeArg): Invocation<'img_resize' | PidDecodeNodeType> => {
   const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
 
   denoise.denoising_start = 0;
@@ -156,19 +189,31 @@ export const addPidDecode = ({
     denoise.height = scaledSize.height;
   }
 
-  return buildPidDecodeChain({ g, state, denoise, positivePrompt, seed, mode, fitSize: originalSize });
+  return buildPidDecodeChain({
+    g,
+    state,
+    denoise,
+    decodeNodeType,
+    vaeSource,
+    positivePrompt,
+    seed,
+    mode,
+    fitSize: originalSize,
+  });
 };
 
 type AddPidImageToImageNativeArg = {
   g: Graph;
   state: RootState;
   manager: CanvasManager;
-  /** The FLUX denoise node. Its dimensions are set here to the 4x target / PID_SCALE. */
-  denoise: Invocation<'flux_denoise'>;
+  /** The denoise node. Its dimensions are set here to the 4x target / PID_SCALE. */
+  denoise: Invocation<PidDenoiseNodeType>;
+  /** Which base-specific PiD decode node to build. */
+  decodeNodeType: PidDecodeNodeType;
   /** The VAE encode node for the init image. */
-  i2l: Invocation<'flux_vae_encode'>;
-  /** The model loader providing the VAE for encoding the init image. */
-  vaeSource: Invocation<'flux_model_loader'>;
+  i2l: Invocation<ImageToLatentsNodes>;
+  /** The model loader / VAE source providing the VAE for encoding the init image (and, if applicable, the decode). */
+  vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   positivePrompt: Invocation<'string'>;
   seed: Invocation<'integer'>;
 };
@@ -189,11 +234,12 @@ export const addPidImageToImageNative = async ({
   state,
   manager,
   denoise,
+  decodeNodeType,
   i2l,
   vaeSource,
   positivePrompt,
   seed,
-}: AddPidImageToImageNativeArg): Promise<Invocation<'img_resize' | 'flux_pid_decode'>> => {
+}: AddPidImageToImageNativeArg): Promise<Invocation<'img_resize' | PidDecodeNodeType>> => {
   const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
   denoise.denoising_end = denoising_end;
@@ -226,5 +272,15 @@ export const addPidImageToImageNative = async ({
   g.addEdge(i2l, 'latents', denoise, 'latents');
 
   // PiD decodes the genSize latents straight up to 4x = the bbox. fitSize is ignored in native mode.
-  return buildPidDecodeChain({ g, state, denoise, positivePrompt, seed, mode: 'native', fitSize: originalSize });
+  return buildPidDecodeChain({
+    g,
+    state,
+    denoise,
+    decodeNodeType,
+    vaeSource,
+    positivePrompt,
+    seed,
+    mode: 'native',
+    fitSize: originalSize,
+  });
 };

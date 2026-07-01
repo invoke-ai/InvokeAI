@@ -309,6 +309,16 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'flux2' && params.pidMode !== 'off') {
+    // PiD decode (any FLUX.2 format) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
   if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
     // GGUF needs sources for VAE + encoder. Each can come from either a standalone
     // model or the Component Source (Diffusers).
@@ -652,7 +662,23 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
 
     const { bbox } = canvas;
-    const gridSize = getGridSize('flux'); // FLUX.2 uses same grid size as FLUX.1
+    // FLUX.2 uses the same 16px grid as FLUX.1. In PiD native mode the bbox is the 4x target, so it must snap to
+    // a larger grid (16 * 4) for bbox / 4 to land on the FLUX grid. getPidScale returns 1 for off/fit.
+    const gridSize = getGridSize('flux2', getPidScale(params.pidMode));
+
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      // PiD decodes at 4x the generation resolution; "Scale Before Processing" would inflate the generation
+      // size and blow up the decode. Require it to be off (None) so generation == bbox.
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {

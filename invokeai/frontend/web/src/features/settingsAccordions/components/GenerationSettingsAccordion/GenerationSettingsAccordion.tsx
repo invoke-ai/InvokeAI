@@ -33,6 +33,7 @@ import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
 import ParamZImageShift from 'features/parameters/components/Core/ParamZImageShift';
 import ParamZImageSeedVarianceSettings from 'features/parameters/components/SeedVariance/ParamZImageSeedVarianceSettings';
+import { getIsPidSupportedBase } from 'features/parameters/util/pid';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -59,6 +60,8 @@ export const GenerationSettingsAccordion = memo(() => {
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
   const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
   const modelSupportsSteps = useAppSelector(selectModelSupportsSteps);
+  // PiD is available for any base whose graph builder wires a PiD decode (currently FLUX and FLUX.2).
+  const isPidSupported = getIsPidSupportedBase(modelConfig?.base);
   const hasExpanderContent = isExternal ? modelSupportsGuidance || modelSupportsSteps : true;
 
   const selectBadges = useMemo(
@@ -121,7 +124,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
               </FormControlGroup>
-              {!isExternal && isFLUX && <PidSettings />}
+              {!isExternal && isPidSupported && <PidSettings />}
               {!isExternal && isZImage && <ParamZImageSeedVarianceSettings />}
             </Flex>
           </Expander>
