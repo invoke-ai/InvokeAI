@@ -29,6 +29,7 @@ import { SettingsDeveloperLogIsEnabled } from 'features/system/components/Settin
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
 import { SettingsGenerationDevices } from 'features/system/components/SettingsModal/SettingsGenerationDevices';
+import { SettingsImageStorageMaintenance } from 'features/system/components/SettingsModal/SettingsImageStorageMaintenance';
 import { SettingsImageSubfolderStrategySelect } from 'features/system/components/SettingsModal/SettingsImageSubfolderStrategySelect';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
@@ -328,6 +329,7 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
                       </NumberInput>
                     </FormControl>
                     <SettingsImageSubfolderStrategySelect />
+                    <SettingsImageStorageMaintenance />
                     <SettingsGenerationDevices />
                   </StickyScrollable>
 

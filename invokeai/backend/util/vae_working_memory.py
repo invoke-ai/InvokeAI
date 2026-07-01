@@ -98,12 +98,10 @@ def estimate_vae_working_memory_qwen_image(
 ) -> int:
     """Estimate the working memory required by the invocation in bytes.
 
-    Without this, the Qwen Image VAE encode/decode passes no working-memory estimate to the model
-    cache, so the cache reserves only its small default and never offloads a large resident
-    transformer (the VAE weights themselves are tiny). The decode then OOMs on its activations. This
-    mirrors the other VAE estimators: peak working memory scales ~linearly with the number of output
-    pixels and the element size. The Qwen Image latents are 5D (B, C, frames, H, W); the trailing two
-    dims are spatial, same as the 2D VAEs. See #8414.
+    The Qwen Image VAE is a video-style autoencoder that operates on 5D tensors of shape
+    (B, C, num_frames, H, W). Tiling is not used, so peak working memory scales with the full
+    spatial output. The two trailing dimensions are the spatial H/W in latent space (decode) or
+    pixel space (encode), matching the convention used by the other estimators here.
     """
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
 
@@ -111,16 +109,36 @@ def estimate_vae_working_memory_qwen_image(
     w = latent_scale_factor_for_operation * image_tensor.shape[-1]
     element_size = next(vae.parameters()).element_size()
 
-    # Calibrated for the Qwen Image VAE, a 3D-conv (video) VAE whose decode allocates large conv3d
-    # feature maps — a ~1MP decode was measured to peak at ~17 GiB of VRAM, far above the 2D SD/FLUX
-    # VAEs the generic 2200/1100 constants were tuned for. The reservation must cover that peak AND be
-    # large enough to make the cache offload an otherwise-resident transformer + text encoder (which
-    # the decode doesn't need): the offload only frees ~(working_mem - free) bytes, so under-reserving
-    # leaves the big models resident and the decode OOMs. Over-reserving is safe here (it just offloads
-    # models the decode doesn't use). Encoding uses ~half the working memory of decoding.
-    # NOTE: this is linear in output pixels; a sufficiently large output (>~1.5MP) can still exceed
-    # the card even after offloading everything — that case needs tiled decode, handled separately.
-    scaling_constant = 13000 if operation == "decode" else 6500
+    # The Qwen Image VAE is much heavier than the SD/SDXL VAE and needs correspondingly larger
+    # constants. These were calibrated by measuring peak *reserved* memory growth (not just allocated
+    # -- reserved is what the cache's `free >= estimate` check compares against) across a resolution
+    # grid in fp16, on both an AMD W7900 (ROCm) and an NVIDIA card (CUDA). See
+    # scripts/calibrate_qwen_vae_working_memory.py.
+    #
+    # Implied constant = reserved_bytes / (h * w * element_size). Per-point maxima (fp16):
+    #              512^2  768^2  1024^2  1536^2  1792^2  2048^2    -> ship (max observed + ~8% headroom)
+    #   ROCm decode  5132   4596   4570    3273    3735    4813    -> 5500
+    #   ROCm encode  5864   5858   5858    3532    4364   (OOM)    -> 6300
+    #   CUDA decode  2660   2519   2690    2671    2281   (OOM)    -> 2900
+    #   CUDA encode  1456   1451   1458    1456    1455    1455    -> 1600
+    #
+    # Why this branches on backend (the only estimator here that does):
+    #  - The Qwen VAE is attention-heavy. With Flash/efficient attention (CUDA) the attention memory
+    #    is O(area) and the curve is flat/linear; the ROCm build falls back to math attention, which
+    #    is O(area^2), so ROCm reserves ~2x (decode) to ~4x (encode) more and goes super-linear above
+    #    ~1792^2. The two backends differ far more than any headroom, so a single constant would
+    #    either under-estimate on ROCm (OOM) or massively over-budget on CUDA (needless eviction).
+    #  - "Encoding is half of decoding" (as the sibling estimators assume) is only true on CUDA. On
+    #    ROCm encode reserves >= decode, so the ROCm encode constant is sized accordingly -- this is
+    #    the path Qwen Image Edit exercises.
+    #  - On ROCm the linear model under-estimates for decodes well above 2048^2, but those OOM on a
+    #    48GB card regardless; on CUDA the curve stays linear so no extra term is needed.
+    is_rocm = torch.version.hip is not None
+    if operation == "decode":
+        scaling_constant = 5500 if is_rocm else 2900
+    else:  # encode
+        scaling_constant = 6300 if is_rocm else 1600
+
     working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)

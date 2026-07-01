@@ -45,9 +45,12 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
     @staticmethod
     def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
-        # Reserve working memory for the encode so the cache offloads any large resident model first;
-        # otherwise the encode's activations OOM (the VAE weights themselves are tiny).
-        estimated_working_memory = estimate_vae_working_memory_qwen_image("encode", image_tensor, vae_info.model)
+        assert isinstance(vae_info.model, AutoencoderKLQwenImage)
+        estimated_working_memory = estimate_vae_working_memory_qwen_image(
+            operation="encode",
+            image_tensor=image_tensor,
+            vae=vae_info.model,
+        )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKLQwenImage)
 

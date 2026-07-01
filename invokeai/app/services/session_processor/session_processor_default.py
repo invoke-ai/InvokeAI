@@ -556,6 +556,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
             return True
         return status in ("canceled", "failed", "completed")
 
+    def _is_image_move_maintenance_active(self) -> bool:
+        image_moves = getattr(self._invoker.services, "image_moves", None)
+        return image_moves is not None and image_moves.is_maintenance_active()
+
     def _process(
         self,
         worker: _SessionWorker,
@@ -585,6 +589,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                     if stop_event.is_set():
                         break
+
+                    if self._is_image_move_maintenance_active():
+                        self._invoker.services.logger.debug("Image storage maintenance is active")
+                        poll_now_event.wait(self._polling_interval)
+                        continue
 
                     # Clear any stale cancel signal from the previous item BEFORE claiming the next
                     # one. Clearing it after dequeue (as before) could wipe a cancel that arrived for
