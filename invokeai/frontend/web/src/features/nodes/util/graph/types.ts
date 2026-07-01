@@ -13,6 +13,7 @@ export type ImageOutputNodes =
   | 'apply_mask_to_image'
   | 'flux_pid_decode'
   | 'flux2_pid_decode'
+  | 'sd3_pid_decode'
   | 'flux_vae_decode'
   | 'flux2_vae_decode'
   | 'sd3_l2i'

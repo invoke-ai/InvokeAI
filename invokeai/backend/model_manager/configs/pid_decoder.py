@@ -128,19 +128,30 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         if not _looks_like_pid_decoder(state_dict):
             raise NotAMatchError("state dict does not look like a PiD decoder (no 'lq_proj.*' keys)")
 
-        cls._validate_base(mod, state_dict)
+        # Whether the caller explicitly pinned a base (e.g. a starter-model install passes base=sd-3).
+        # In the ambiguous 16-channel FLUX.1/SD3 case this override is trusted when the filename is silent.
+        had_base_override = override_fields.get("base") is not None
+        cls._validate_base(mod, state_dict, had_base_override=had_base_override)
 
         variant = override_fields.pop("variant", None) or _variant_from_filename(_name_for_matching(mod))
         return cls(**override_fields, variant=variant)
 
     @classmethod
-    def _validate_base(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+    def _validate_base(
+        cls, mod: ModelOnDisk, state_dict: dict[str | int, Any], *, had_base_override: bool = False
+    ) -> None:
         """Confirm this checkpoint belongs to the config's pinned backbone.
 
         The latent channel count (read from the weights) is authoritative and
         separates FLUX.2 (128ch) from the 16ch family. FLUX.1 and SD3 share an
         identical architecture, so within the 16ch family we fall back to the
         filename / directory name, defaulting to FLUX.1 when it is silent.
+
+        ``had_base_override`` is True when the caller explicitly pinned ``base``
+        (e.g. a starter-model install). In the ambiguous 16ch case, a trusted
+        override wins over the FLUX.1 default — necessary because the HF
+        single-file download renames the parent directory, dropping the
+        ``…official_sd3_distill…`` hint that would otherwise identify SD3.
         """
         expected_base = cls.model_fields["base"].default
         channels = _latent_channels_from_state_dict(state_dict)
@@ -160,8 +171,11 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
                 if named_base in candidate_bases:
                     if named_base is not expected_base:
                         raise NotAMatchError(f"name indicates {named_base}, not {expected_base}")
+                elif had_base_override:
+                    # Name is silent, but the caller explicitly pinned this base → trust it.
+                    return
                 elif expected_base is not BaseModelType.Flux:
-                    # Name gives no usable hint → default the family to FLUX.1.
+                    # Name gives no usable hint and no override → default the family to FLUX.1.
                     raise NotAMatchError("ambiguous 16-channel PiD checkpoint; defaulting to FLUX.1")
             return
 

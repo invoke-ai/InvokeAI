@@ -319,6 +319,16 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'sd-3' && params.pidMode !== 'off') {
+    // PiD decode needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
   if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
     // GGUF needs sources for VAE + encoder. Each can come from either a standalone
     // model or the Component Source (Diffusers).
@@ -718,6 +728,20 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
           }),
         });
       }
+    }
+  }
+
+  if (model?.base === 'sd-3' && params.pidMode !== 'off') {
+    // PiD decode on the Canvas: needs the decoder + Gemma-2 encoder, and "Scale Before Processing" must be off
+    // (PiD decodes at 4x the generation resolution; scaling would inflate the generation size and blow up the decode).
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (canvas.bbox.scaleMethod !== 'none') {
+      reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
     }
   }
 

@@ -11,6 +11,7 @@ export const getPidDecoderBaseForMainBase = (base?: BaseModelType | null): BaseM
   switch (base) {
     case 'flux':
     case 'flux2':
+    case 'sd-3':
       return base;
     default:
       return null;
