@@ -1,11 +1,11 @@
-"""Migration 34: Add workflow-call relationship columns to session_queue."""
+"""Add workflow-call relationship columns to session_queue."""
 
 import sqlite3
 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
-class Migration34Callback:
+class AddWorkflowCallQueueMetadataCallback:
     """Add durable parent/child workflow-call relationship columns to session_queue."""
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
@@ -45,9 +45,9 @@ class Migration34Callback:
             )
 
 
-def build_migration_34() -> Migration:
+def build_migration() -> Migration:
     return Migration(
-        from_version=33,
-        to_version=34,
-        callback=Migration34Callback(),
+        id="2026_07_01_add_workflow_call_queue_metadata",
+        depends_on="migration_33",
+        callback=AddWorkflowCallQueueMetadataCallback(),
     )

@@ -158,6 +158,8 @@ def build_migration_2(image_files: ImageFileStorageBase, logger: Logger) -> Migr
     - Populates the `has_workflow` column in the `images` table (requires `image_files` & `logger` dependencies)
     """
     migration_2 = Migration(
+        id="migration_2",
+        depends_on="migration_1",
         from_version=1,
         to_version=2,
         callback=Migration2Callback(image_files=image_files, logger=logger),

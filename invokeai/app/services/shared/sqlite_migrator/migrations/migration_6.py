@@ -54,6 +54,8 @@ def build_migration_6() -> Migration:
       update with the correct image processor model.
     """
     migration_6 = Migration(
+        id="migration_6",
+        depends_on="migration_5",
         from_version=5,
         to_version=6,
         callback=Migration6Callback(),
