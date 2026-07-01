@@ -10,6 +10,14 @@ export const useLoRAModelDefaultSettings = (modelConfig: LoRAModelConfig) => {
         isEnabled: !isNil(modelConfig?.default_settings?.weight),
         value: modelConfig?.default_settings?.weight ?? DEFAULT_LORA_WEIGHT_CONFIG.initial,
       },
+      weightMin: {
+        isEnabled: !isNil(modelConfig?.default_settings?.weight_min),
+        value: modelConfig?.default_settings?.weight_min ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMin,
+      },
+      weightMax: {
+        isEnabled: !isNil(modelConfig?.default_settings?.weight_max),
+        value: modelConfig?.default_settings?.weight_max ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMax,
+      },
     };
   }, [modelConfig?.default_settings]);
 
