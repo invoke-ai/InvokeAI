@@ -62,6 +62,9 @@ def _strip_net_prefix(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Te
 @ModelLoaderRegistry.register(
     base=BaseModelType.StableDiffusion3, type=ModelType.PiDDecoder, format=ModelFormat.Checkpoint
 )
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXL, type=ModelType.PiDDecoder, format=ModelFormat.Checkpoint
+)
 class PiDDecoderLoader(ModelLoader):
     """Loads a PiD checkpoint into a fully-constructed PidNet of the matching backbone."""
 

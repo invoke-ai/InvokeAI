@@ -329,6 +329,19 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'sdxl' && params.pidMode !== 'off') {
+    // PiD decode needs the decoder + Gemma-2 encoder, and is not compatible with the SDXL Refiner.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (params.refinerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.pidIncompatibleWithRefiner') });
+    }
+  }
+
   if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
     // GGUF needs sources for VAE + encoder. Each can come from either a standalone
     // model or the Component Source (Diffusers).
@@ -739,6 +752,23 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
     if (!params.gemma2EncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (canvas.bbox.scaleMethod !== 'none') {
+      reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+    }
+  }
+
+  if (model?.base === 'sdxl' && params.pidMode !== 'off') {
+    // PiD decode on the Canvas: decoder + Gemma-2 encoder required, "Scale Before Processing" off, and not
+    // compatible with the SDXL Refiner.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (params.refinerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.pidIncompatibleWithRefiner') });
     }
     if (canvas.bbox.scaleMethod !== 'none') {
       reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });

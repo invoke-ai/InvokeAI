@@ -210,6 +210,18 @@ pid_decoder_sd3_2kto4k = StarterModel(
     variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
     dependencies=[gemma2_2b_encoder],
 )
+# SDXL uses a 4-channel latent, which is unambiguous (no FLUX/SD3-style directory-name disambiguation needed).
+# NVIDIA ships only the 2K-to-4K preset for SDXL (no plain 2K checkpoint).
+pid_decoder_sdxl_2kto4k = StarterModel(
+    name="PiD Decoder SDXL (2K to 4K)",
+    base=BaseModelType.StableDiffusionXL,
+    source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_sdxl_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for SDXL latents, 2K-to-4K preset. ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
 # endregion
 
 
@@ -1802,6 +1814,7 @@ STARTER_MODELS: list[StarterModel] = [
     pid_decoder_flux2_2kto4k,
     pid_decoder_sd3_2k,
     pid_decoder_sd3_2kto4k,
+    pid_decoder_sdxl_2kto4k,
 ]
 
 sd1_bundle: list[StarterModel] = [

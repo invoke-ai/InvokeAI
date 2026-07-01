@@ -2,7 +2,7 @@ import type { RootState } from 'app/store/store';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getDenoisingStartAndEnd,
@@ -10,12 +10,9 @@ import {
   getOriginalAndScaledSizesForTextToImage,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageToLatentsNodes, MainModelLoaderNodes, VaeSourceNodes } from 'features/nodes/util/graph/types';
-import { PID_SCALE } from 'features/parameters/util/optimalDimension';
+import { getGridSize, PID_SCALE } from 'features/parameters/util/optimalDimension';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
-
-// FLUX works on a 16px grid (VAE /8 x 2x2 patches), so the generation resolution must be a multiple of 16.
-const FLUX_GRID_SIZE = 16;
 
 type Size = { width: number; height: number };
 
@@ -23,22 +20,60 @@ type Size = { width: number; height: number };
  * The base-specific PiD decode node types. Each replaces its base's VAE decode with the PiD super-res decode.
  * Only bases whose graph builder actually wires PiD are listed; more are added as their builders gain support.
  */
-type PidDecodeNodeType = 'flux_pid_decode' | 'flux2_pid_decode' | 'sd3_pid_decode';
+type PidDecodeNodeType = 'flux_pid_decode' | 'flux2_pid_decode' | 'sd3_pid_decode' | 'sdxl_pid_decode';
 
 /**
- * Denoise nodes whose latents PiD can decode. Narrower than `DenoiseLatentsNodes` so the shared
- * width/height/denoising_start/denoising_end fields (which only the FLUX-family denoise nodes have) are available.
+ * Denoise nodes whose latents PiD can decode. The FLUX-family nodes carry their own width/height; `denoise_latents`
+ * (SD1.5/SD2/SDXL) does not - it is sized via a separate `noise` node, so callers using it must pass `noise`.
  */
-type PidDenoiseNodeType = 'flux_denoise' | 'flux2_denoise' | 'sd3_denoise';
+type PidDenoiseNodeType = 'flux_denoise' | 'flux2_denoise' | 'sd3_denoise' | 'denoise_latents';
 
 /** PiD decode node types that expose a `vae` input (used to read the VAE's scaling constants at runtime). */
-const PID_DECODE_NODES_WITH_VAE_INPUT = new Set<PidDecodeNodeType>(['flux2_pid_decode']);
+const PID_DECODE_NODES_WITH_VAE_INPUT = new Set<PidDecodeNodeType>(['flux2_pid_decode', 'sdxl_pid_decode']);
+
+/**
+ * Sets the generation dimensions for a PiD graph. The FLUX-family denoise nodes carry width/height directly;
+ * `denoise_latents` (SD1.5/SD2/SDXL) is sized via its `noise` node instead (mirrors {@link addTextToImage}).
+ */
+const setPidGenDimensions = (
+  denoise: Invocation<PidDenoiseNodeType>,
+  noise: Invocation<'noise'> | undefined,
+  width: number,
+  height: number
+): void => {
+  if (denoise.type === 'denoise_latents') {
+    assert(noise, 'PiD with denoise_latents (SD1.5/SD2/SDXL) requires a noise node');
+    noise.width = width;
+    noise.height = height;
+  } else {
+    denoise.width = width;
+    denoise.height = height;
+  }
+};
+
+/** Reads back the generation dimensions set by {@link setPidGenDimensions} (from the noise node for `denoise_latents`). */
+const getPidGenDimensions = (denoise: Invocation<PidDenoiseNodeType>, noise: Invocation<'noise'> | undefined): Size => {
+  if (denoise.type === 'denoise_latents') {
+    assert(
+      noise?.width !== undefined && noise.height !== undefined,
+      'PiD native decode requires the noise dimensions to be set by the caller'
+    );
+    return { width: noise.width, height: noise.height };
+  }
+  assert(
+    denoise.width !== undefined && denoise.height !== undefined,
+    'PiD native decode requires the denoise dimensions to be set by the caller'
+  );
+  return { width: denoise.width, height: denoise.height };
+};
 
 type BuildPidDecodeChainArg = {
   g: Graph;
   state: RootState;
   /** The denoise node producing the latents PiD will decode. Its dimensions are set by the CALLER. */
   denoise: Invocation<PidDenoiseNodeType>;
+  /** The noise node, required when `denoise` is a `denoise_latents` node (SD1.5/SD2/SDXL) - it carries the size. */
+  noise?: Invocation<'noise'>;
   /** Which base-specific PiD decode node to build (e.g. `flux_pid_decode`, `flux2_pid_decode`). */
   decodeNodeType: PidDecodeNodeType;
   /**
@@ -72,6 +107,7 @@ export const buildPidDecodeChain = ({
   g,
   state,
   denoise,
+  noise,
   decodeNodeType,
   vaeSource,
   positivePrompt,
@@ -118,15 +154,12 @@ export const buildPidDecodeChain = ({
 
   if (mode === 'native') {
     // PiD's 4x output IS the result (the caller generated at target / 4) - no downscale.
-    assert(
-      denoise.width !== undefined && denoise.height !== undefined,
-      'PiD native decode requires the denoise dimensions to be set by the caller'
-    );
+    const genSize = getPidGenDimensions(denoise, noise);
     g.upsertMetadata({
       ...commonMetadata,
       pid_mode: mode,
-      width: denoise.width * PID_SCALE,
-      height: denoise.height * PID_SCALE,
+      width: genSize.width * PID_SCALE,
+      height: genSize.height * PID_SCALE,
     });
     return pidDecode;
   }
@@ -148,6 +181,7 @@ type AddPidDecodeArg = {
   state: RootState;
   mode: 'fit' | 'native';
   denoise: Invocation<PidDenoiseNodeType>;
+  noise?: Invocation<'noise'>;
   decodeNodeType: PidDecodeNodeType;
   vaeSource?: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   positivePrompt: Invocation<'string'>;
@@ -170,29 +204,37 @@ export const addPidDecode = ({
   state,
   mode,
   denoise,
+  noise,
   decodeNodeType,
   vaeSource,
   positivePrompt,
   seed,
 }: AddPidDecodeArg): Invocation<'img_resize' | PidDecodeNodeType> => {
   const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
+  // Round the generation resolution to the main model's native grid (16 for FLUX-family, 8 for SDXL). The bbox is
+  // pre-snapped to grid * PID_SCALE by the UI/readiness, so target / PID_SCALE lands exactly on the grid.
+  const gridSize = getGridSize(selectMainModelConfig(state)?.base);
 
   denoise.denoising_start = 0;
   denoise.denoising_end = 1;
   if (mode === 'native') {
-    // The user-facing dimensions are the 4x target; generate at target / PID_SCALE (kept on the FLUX grid).
-    denoise.width = Math.max(roundDownToMultiple(originalSize.width / PID_SCALE, FLUX_GRID_SIZE), FLUX_GRID_SIZE);
-    denoise.height = Math.max(roundDownToMultiple(originalSize.height / PID_SCALE, FLUX_GRID_SIZE), FLUX_GRID_SIZE);
+    // The user-facing dimensions are the 4x target; generate at target / PID_SCALE (kept on the model grid).
+    setPidGenDimensions(
+      denoise,
+      noise,
+      Math.max(roundDownToMultiple(originalSize.width / PID_SCALE, gridSize), gridSize),
+      Math.max(roundDownToMultiple(originalSize.height / PID_SCALE, gridSize), gridSize)
+    );
   } else {
     // Generate at the normal resolution; PiD will 4x it and we downscale back to it.
-    denoise.width = scaledSize.width;
-    denoise.height = scaledSize.height;
+    setPidGenDimensions(denoise, noise, scaledSize.width, scaledSize.height);
   }
 
   return buildPidDecodeChain({
     g,
     state,
     denoise,
+    noise,
     decodeNodeType,
     vaeSource,
     positivePrompt,
@@ -208,6 +250,8 @@ type AddPidImageToImageNativeArg = {
   manager: CanvasManager;
   /** The denoise node. Its dimensions are set here to the 4x target / PID_SCALE. */
   denoise: Invocation<PidDenoiseNodeType>;
+  /** The noise node, required when `denoise` is a `denoise_latents` node (SD1.5/SD2/SDXL) - it carries the size. */
+  noise?: Invocation<'noise'>;
   /** Which base-specific PiD decode node to build. */
   decodeNodeType: PidDecodeNodeType;
   /** The VAE encode node for the init image. */
@@ -234,6 +278,7 @@ export const addPidImageToImageNative = async ({
   state,
   manager,
   denoise,
+  noise,
   decodeNodeType,
   i2l,
   vaeSource,
@@ -245,14 +290,14 @@ export const addPidImageToImageNative = async ({
   denoise.denoising_end = denoising_end;
 
   const { originalSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
+  const gridSize = getGridSize(selectMainModelConfig(state)?.base);
 
-  // The bbox is the 4x target; generate at target / PID_SCALE (kept on the FLUX grid).
+  // The bbox is the 4x target; generate at target / PID_SCALE (kept on the model grid).
   const genSize = {
-    width: Math.max(roundDownToMultiple(originalSize.width / PID_SCALE, FLUX_GRID_SIZE), FLUX_GRID_SIZE),
-    height: Math.max(roundDownToMultiple(originalSize.height / PID_SCALE, FLUX_GRID_SIZE), FLUX_GRID_SIZE),
+    width: Math.max(roundDownToMultiple(originalSize.width / PID_SCALE, gridSize), gridSize),
+    height: Math.max(roundDownToMultiple(originalSize.height / PID_SCALE, gridSize), gridSize),
   };
-  denoise.width = genSize.width;
-  denoise.height = genSize.height;
+  setPidGenDimensions(denoise, noise, genSize.width, genSize.height);
 
   const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
   const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, rect, {
@@ -276,6 +321,7 @@ export const addPidImageToImageNative = async ({
     g,
     state,
     denoise,
+    noise,
     decodeNodeType,
     vaeSource,
     positivePrompt,

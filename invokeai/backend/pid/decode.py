@@ -80,6 +80,10 @@ _PER_BACKBONE: dict[BaseModelType, dict] = {
         "lq_latent_channels": 16,
         "latent_spatial_down_factor": 8,
     },
+    BaseModelType.StableDiffusionXL: {
+        "lq_latent_channels": 4,
+        "latent_spatial_down_factor": 8,
+    },
 }
 
 # Distilled-student schedule (`student_t_list` from shared_config).

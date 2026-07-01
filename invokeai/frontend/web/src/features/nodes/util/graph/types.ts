@@ -14,6 +14,7 @@ export type ImageOutputNodes =
   | 'flux_pid_decode'
   | 'flux2_pid_decode'
   | 'sd3_pid_decode'
+  | 'sdxl_pid_decode'
   | 'flux_vae_decode'
   | 'flux2_vae_decode'
   | 'sd3_l2i'

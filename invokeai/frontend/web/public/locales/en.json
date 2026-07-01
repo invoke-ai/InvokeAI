@@ -1686,6 +1686,7 @@
             "noPidDecoderModelSelected": "No PiD decoder model selected",
             "noGemma2EncoderModelSelected": "No Gemma-2 encoder model selected (required by PiD)",
             "pidScaleBeforeProcessingMustBeOff": "Turn off Scale Before Processing (set it to None) to use PiD decode",
+            "pidIncompatibleWithRefiner": "PiD decode is not compatible with the SDXL Refiner. Disable one of them.",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
             "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
             "noFlux2KleinVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 Klein models require a standalone VAE",
