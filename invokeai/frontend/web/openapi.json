@@ -823,6 +823,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1141,6 +1144,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1457,6 +1463,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -1825,6 +1834,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -2217,6 +2229,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -3431,6 +3446,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -4154,6 +4172,78 @@
         ]
       }
     },
+    "/api/v1/image_moves/start": {
+      "post": {
+        "tags": ["image_moves"],
+        "summary": "Start Image Move",
+        "operationId": "start_image_move",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_moves/recover": {
+      "post": {
+        "tags": ["image_moves"],
+        "summary": "Start Image Move Recovery",
+        "operationId": "start_image_move_recovery",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_moves/status": {
+      "get": {
+        "tags": ["image_moves"],
+        "summary": "Get Image Move Status",
+        "operationId": "get_image_move_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/images/upload": {
       "post": {
         "tags": ["images"],
@@ -4803,7 +4893,7 @@
       "head": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_full_head",
         "parameters": [
           {
@@ -4843,7 +4933,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_full",
         "parameters": [
           {
@@ -4885,7 +4975,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Thumbnail",
-        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_thumbnail",
         "parameters": [
           {
@@ -6917,7 +7007,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Item Ids",
-        "description": "Gets all queue item ids that match the given parameters. Non-admin users only see their own items.",
+        "description": "Gets all queue item ids that match the given parameters.\n\nIDs for every user's items are returned (item ids carry no sensitive data on their own).\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
         "operationId": "get_queue_item_ids",
         "security": [
           {
@@ -9575,7 +9665,7 @@
       "post": {
         "tags": ["recall"],
         "summary": "Update Recall Parameters",
-        "description": "Update recallable parameters that can be recalled on the frontend.\n\nThis endpoint allows updating parameters such as prompt, model, steps, and other\ngeneration settings. These parameters are stored in client state and can be\naccessed by the frontend to populate UI elements.\n\nArgs:\n    queue_id: The queue ID to associate these parameters with\n    parameters: The RecallParameter object containing the parameters to update\n    strict: When true, parameters not included in the request body are reset\n        to their defaults (cleared on the frontend).  Defaults to false,\n        which preserves the existing behaviour of only updating the\n        parameters that are explicitly provided.\n\nReturns:\n    A dictionary containing the updated parameters and status\n\nExample:\n    POST /api/v1/recall/{queue_id}?strict=true\n    {\n        \"positive_prompt\": \"a beautiful landscape\",\n        \"model\": \"sd-1.5\",\n        \"steps\": 20\n    }\n    # In strict mode, all other parameters (reference_images, loras, etc.)\n    # are cleared.  In non-strict mode (default) they would be left as-is.",
+        "description": "Update recallable parameters that can be recalled on the frontend.\n\nThis endpoint allows updating parameters such as prompt, model, steps, and other\ngeneration settings. These parameters are stored in client state and can be\naccessed by the frontend to populate UI elements.\n\nArgs:\n    queue_id: The queue ID to associate these parameters with\n    parameters: The RecallParameter object containing the parameters to update\n    strict: When true, parameters not included in the request body are reset\n        to their defaults (cleared on the frontend).  Defaults to false,\n        which preserves the existing behaviour of only updating the\n        parameters that are explicitly provided.\n    append: When true, recalled reference images (``ip_adapters`` and\n        ``reference_images``) are appended to whatever reference images the\n        frontend already has, instead of replacing the whole list.  Mutually\n        exclusive with ``strict`` (which clears omitted parameters).\n\nReturns:\n    A dictionary containing the updated parameters and status\n\nExample:\n    POST /api/v1/recall/{queue_id}?strict=true\n    {\n        \"positive_prompt\": \"a beautiful landscape\",\n        \"model\": \"sd-1.5\",\n        \"steps\": 20\n    }\n    # In strict mode, all other parameters (reference_images, loras, etc.)\n    # are cleared.  In non-strict mode (default) they would be left as-is.",
         "operationId": "update_recall_parameters",
         "security": [
           {
@@ -9605,6 +9695,18 @@
               "title": "Strict"
             },
             "description": "When true, parameters not included in the request are reset to their defaults (cleared)."
+          },
+          {
+            "name": "append",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, recalled reference images (ip_adapters and reference_images) are appended to the frontend's existing reference-image list instead of replacing it. Mutually exclusive with strict.",
+              "default": false,
+              "title": "Append"
+            },
+            "description": "When true, recalled reference images (ip_adapters and reference_images) are appended to the frontend's existing reference-image list instead of replacing it. Mutually exclusive with strict."
           }
         ],
         "requestBody": {
@@ -11385,6 +11487,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -14343,7 +14448,8 @@
           }
         },
         "type": "object",
-        "title": "CacheStats"
+        "title": "CacheStats",
+        "description": "Collect statistics on cache performance."
       },
       "CalculateImageTilesEvenSplitInvocation": {
         "category": "tiles",
@@ -33464,6 +33570,101 @@
           "$ref": "#/components/schemas/MaskOutput"
         }
       },
+      "ImageMoveJobResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "The image move job id."
+          },
+          "state": {
+            "type": "string",
+            "enum": ["planned", "moving", "moved", "committed", "error"],
+            "title": "State",
+            "description": "The image move job state."
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "The last error recorded for the job, if any."
+          }
+        },
+        "type": "object",
+        "required": ["id", "state"],
+        "title": "ImageMoveJobResponse"
+      },
+      "ImageMoveStatusResponse": {
+        "properties": {
+          "is_running": {
+            "type": "boolean",
+            "title": "Is Running",
+            "description": "Whether an image move background operation is currently running."
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["move_all", "recovery"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation",
+            "description": "The active background operation, if any."
+          },
+          "active_job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Job Id",
+            "description": "The active journal job id, if any."
+          },
+          "latest_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageMoveJobResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest journal job, if any."
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error",
+            "description": "The last background worker error, if any."
+          },
+          "needs_move_count": {
+            "type": "integer",
+            "title": "Needs Move Count",
+            "description": "The number of images that do not match the current subfolder strategy."
+          }
+        },
+        "type": "object",
+        "required": ["is_running", "needs_move_count"],
+        "title": "ImageMoveStatusResponse"
+      },
       "ImageMultiplyInvocation": {
         "category": "image",
         "class": "invocation",
@@ -46543,9 +46744,7 @@
           "weight": {
             "anyOf": [
               {
-                "type": "number",
-                "maximum": 2.0,
-                "minimum": -1.0
+                "type": "number"
               },
               {
                 "type": "null"
@@ -46553,6 +46752,30 @@
             ],
             "title": "Weight",
             "description": "Default weight for this model"
+          },
+          "weight_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Min",
+            "description": "Minimum weight slider value for this model"
+          },
+          "weight_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Max",
+            "description": "Maximum weight slider value for this model"
           }
         },
         "additionalProperties": false,
@@ -47699,6 +47922,182 @@
         ],
         "title": "Main_Checkpoint_Flux2_Config",
         "description": "Model config for FLUX.2 checkpoint models (e.g. Klein)."
+      },
+      "Main_Checkpoint_QwenImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image",
+            "title": "Base",
+            "default": "qwen-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImageVariantType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_Checkpoint_QwenImage_Config",
+        "description": "Model config for Qwen Image single-file checkpoint models (safetensors, etc).\n\nCovers both raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled checkpoints.\nThe loader dequantizes fp8 weights back to bf16 at load time; the\n`default_settings.fp8_storage` toggle can then optionally re-cast to fp8 for\nVRAM savings."
       },
       "Main_Checkpoint_SD1_Config": {
         "properties": {
@@ -54681,6 +55080,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -55250,6 +55652,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                   },
                   {
@@ -55704,6 +56109,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -56006,6 +56414,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -56759,6 +57170,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -65233,6 +65647,30 @@
             "type": "integer",
             "title": "Total",
             "description": "Total number of queue items"
+          },
+          "user_pending": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Pending",
+            "description": "Number of the requesting user's queue items with status 'pending' (None for admins/global callers)"
+          },
+          "user_in_progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User In Progress",
+            "description": "Number of the requesting user's queue items with status 'in_progress' (None for admins/global callers)"
           }
         },
         "type": "object",

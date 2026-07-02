@@ -26,7 +26,7 @@ import { useGetAppDepsQuery, useGetAppVersionQuery, useGetRuntimeConfigQuery } f
 
 type AboutModalProps = {
   /* The button to open the Settings Modal */
-  children: ReactElement;
+  children: ReactElement<{ onClick?: () => void }>;
 };
 
 const AboutModal = ({ children }: AboutModalProps) => {
