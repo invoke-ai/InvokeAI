@@ -42,6 +42,61 @@ const legacyStoredValues = {
 };
 
 describe('normalizeGenerateSettings', () => {
+  it('normalizes persisted reference images and drops invalid entries', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      referenceImages: [
+        {
+          id: 'ref-1',
+          isEnabled: true,
+          config: {
+            type: 'qwen_image_reference_image',
+            image: {
+              height: 768,
+              imageName: 'reference.png',
+              imageUrl: '/api/v1/images/i/reference.png/full',
+              queuedAt: '2026-01-01T00:00:00.000Z',
+              sourceQueueItemId: 'backend-gallery',
+              thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
+              width: 512,
+            },
+          },
+        },
+        { id: 'broken', isEnabled: true, config: { type: 'qwen_image_reference_image', image: { imageName: 3 } } },
+      ],
+    });
+
+    expect(normalized?.referenceImages).toHaveLength(1);
+    expect(normalized?.referenceImages[0]).toMatchObject({
+      id: 'ref-1',
+      isEnabled: true,
+      config: { type: 'qwen_image_reference_image', image: { imageName: 'reference.png' } },
+    });
+  });
+
+  it('keeps more than five valid persisted reference images for provider-specific caps', () => {
+    const referenceImages = Array.from({ length: 6 }, (_, index) => ({
+      id: `ref-${index}`,
+      isEnabled: true,
+      config: {
+        type: 'external_reference_image',
+        image: {
+          height: 768,
+          imageName: `reference-${index}.png`,
+          imageUrl: `/api/v1/images/i/reference-${index}.png/full`,
+          queuedAt: '2026-01-01T00:00:00.000Z',
+          sourceQueueItemId: 'backend-gallery',
+          thumbnailUrl: `/api/v1/images/i/reference-${index}.png/thumbnail`,
+          width: 512,
+        },
+      },
+    }));
+
+    const normalized = normalizeGenerateSettings({ ...legacyStoredValues, referenceImages });
+
+    expect(normalized?.referenceImages).toHaveLength(6);
+  });
+
   it('upgrades legacy persisted values without losing the core fields', () => {
     const normalized = normalizeGenerateSettings(legacyStoredValues);
 

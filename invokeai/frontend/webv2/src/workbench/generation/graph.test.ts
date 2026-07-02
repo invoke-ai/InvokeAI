@@ -31,6 +31,13 @@ const flux2Klein9bModel: MainModelConfig = {
   type: 'main',
   variant: 'klein_9b',
 };
+const fluxKontextModel: MainModelConfig = {
+  base: 'flux',
+  format: 'diffusers',
+  key: 'flux-kontext',
+  name: 'FLUX Kontext dev',
+  type: 'main',
+};
 const incompatibleFlux2Source: MainModelConfig = {
   base: 'flux2',
   format: 'diffusers',
@@ -68,6 +75,18 @@ const sd1Lora: LoraModelConfig = { base: 'sd-1', key: 'sd1-lora', name: 'SD 1.5 
 const sd2Lora: LoraModelConfig = { base: 'sd-2', key: 'sd2-lora', name: 'SD 2 LoRA', type: 'lora' };
 const sdxlLora: LoraModelConfig = { base: 'sdxl', key: 'sdxl-lora', name: 'SDXL LoRA', type: 'lora' };
 const fluxLora: LoraModelConfig = { base: 'flux', key: 'flux-lora', name: 'FLUX LoRA', type: 'lora' };
+const sd1IpAdapter: ComponentModelConfig = {
+  base: 'sd-1',
+  key: 'sd1-ip-adapter',
+  name: 'SD 1 IP Adapter',
+  type: 'ip_adapter',
+};
+const fluxRedux: ComponentModelConfig = {
+  base: 'flux',
+  key: 'flux-redux',
+  name: 'FLUX Redux',
+  type: 'flux_redux',
+};
 const vae: VaeModelConfig = { base: 'sd-1', key: 'vae-model', name: 'Custom VAE', type: 'vae' };
 const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
 const flux2Vae: VaeModelConfig = { base: 'flux2', key: 'flux2-vae', name: 'FLUX.2 VAE', type: 'vae' };
@@ -88,6 +107,16 @@ const createSettings = (model: GenerateModelConfig, overrides: Partial<GenerateS
   shouldRandomizeSeed: false,
   ...overrides,
 });
+
+const refImage = {
+  height: 768,
+  imageName: 'reference.png',
+  imageUrl: '/api/v1/images/i/reference.png/full',
+  queuedAt: '2026-01-01T00:00:00.000Z',
+  sourceQueueItemId: 'backend-gallery',
+  thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
+  width: 512,
+};
 
 const compile = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}) =>
   compileGenerateGraph(createSettings(model, overrides), model, 'gallery', { useCpuNoise: true }).backendGraph;
@@ -301,6 +330,115 @@ describe('compileGenerateGraph', () => {
 
     expect(getEdge(graph, 'canvas_output', 'negative_prompt')?.source.node_id).toBe('negative_prompt');
     expect(getEdge(graph, 'canvas_output', 'seed')).toBeUndefined();
+  });
+
+  it('wires external provider reference images when supported', () => {
+    const graph = compile(
+      { ...externalModel, capabilities: { modes: ['txt2img'], supports_reference_images: true } },
+      {
+        referenceImages: [
+          { id: 'ref-1', isEnabled: true, config: { type: 'external_reference_image', image: refImage } },
+        ],
+      }
+    );
+
+    expect(graph.nodes.canvas_output?.reference_images).toEqual([{ image_name: 'reference.png' }]);
+  });
+
+  it('wires SD IP Adapter reference images into denoise', () => {
+    const graph = compile(sd1Model, {
+      referenceImages: [
+        {
+          id: 'ref-1',
+          isEnabled: true,
+          config: {
+            beginEndStepPct: [0.1, 0.8],
+            clipVisionModel: 'ViT-H',
+            image: refImage,
+            method: 'style',
+            model: sd1IpAdapter,
+            type: 'ip_adapter',
+            weight: 0.6,
+          },
+        },
+      ],
+    });
+    const adapter = getNodeByType(graph, 'ip_adapter');
+
+    expect(adapter).toMatchObject({
+      begin_step_percent: 0.1,
+      clip_vision_model: 'ViT-H',
+      end_step_percent: 0.8,
+      image: { image_name: 'reference.png' },
+      ip_adapter_model: sd1IpAdapter,
+      method: 'style',
+      weight: 0.6,
+    });
+    expect(getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toContain('ip_adapter_collector');
+  });
+
+  it('wires FLUX Redux reference images into denoise', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      referenceImages: [
+        {
+          id: 'ref-redux',
+          isEnabled: true,
+          config: { image: refImage, imageInfluence: 'medium', model: fluxRedux, type: 'flux_redux' },
+        },
+      ],
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+    });
+    const redux = getNodeByType(graph, 'flux_redux');
+
+    expect(redux).toMatchObject({ image: { image_name: 'reference.png' }, redux_model: fluxRedux });
+    expect(getEdge(graph, 'denoise_latents', 'redux_conditioning')?.source.node_id).toContain('flux_redux_collector');
+  });
+
+  it('wires FLUX Kontext reference images into denoise', () => {
+    const graph = compile(fluxKontextModel, {
+      clipEmbedModel: clipEmbed,
+      referenceImages: [
+        {
+          id: 'ref-kontext',
+          isEnabled: true,
+          config: { image: refImage, model: fluxKontextModel, type: 'flux_kontext_reference_image' },
+        },
+      ],
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+    });
+
+    expect(getNodeByType(graph, 'flux_kontext')).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')?.source.node_id).toContain('flux_kontext_collect');
+  });
+
+  it('wires FLUX.2 built-in reference images into denoise', () => {
+    const graph = compile(flux2Model, {
+      referenceImages: [
+        { id: 'ref-flux2', isEnabled: true, config: { image: refImage, type: 'flux2_reference_image' } },
+      ],
+    });
+
+    expect(getNodeByType(graph, 'flux_kontext')).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')?.source.node_id).toContain(
+      'flux2_kontext_collect'
+    );
+  });
+
+  it('wires Qwen Image Edit reference images into text encoder and denoise latents', () => {
+    const graph = compile(
+      { ...qwenImageModel, variant: 'edit' },
+      {
+        referenceImages: [
+          { id: 'ref-qwen', isEnabled: true, config: { image: refImage, type: 'qwen_image_reference_image' } },
+        ],
+      }
+    );
+
+    expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
   });
 });
 

@@ -1,20 +1,9 @@
 /* eslint-disable react/react-compiler, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
+import type { SelectValueChangeDetails } from '@chakra-ui/react';
 import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@workbench/generation/types';
 
-import {
-  Badge,
-  Box,
-  createListCollection,
-  HStack,
-  Icon,
-  InputGroup,
-  NumberInput,
-  Portal,
-  Select,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
-import { IconButton, Field, Tooltip } from '@workbench/components/ui';
+import { Badge, Box, createListCollection, HStack, Icon, InputGroup, NumberInput, Stack, Text } from '@chakra-ui/react';
+import { Field, IconButton, Select, Tooltip } from '@workbench/components/ui';
 import { getDefaultGenerateSettings, getGenerationDimensions } from '@workbench/generation/baseGenerationPolicies';
 import {
   ASPECT_RATIO_MAP,
@@ -205,7 +194,7 @@ export const GenerateDimensionFields = ({
     onCommit(patch);
   };
 
-  const setAspectRatioId = ({ value }: Select.ValueChangeDetails<AspectRatioOption>) => {
+  const setAspectRatioId = ({ value }: SelectValueChangeDetails<AspectRatioOption>) => {
     const id = value[0];
 
     if (!isAspectRatioId(id)) {
@@ -284,49 +273,30 @@ export const GenerateDimensionFields = ({
     <GenerateCollapsibleSection label={t('widgets.generate.dimensions')} badges={badges} defaultOpen>
       <Field label={t('widgets.generate.aspectRatio')} p="2">
         <HStack gap="1">
-          <Select.Root
+          <Select
             collection={aspectRatioCollection}
+            contentProps={{ maxH: '18rem' }}
             flex="1"
+            renderItem={(option) => (
+              <HStack as="span" gap="2">
+                <AspectRatioPreview boxSize="6" ratio={option.ratio} />
+                <Text as="span" fontSize="xs">
+                  {option.id}
+                </Text>
+              </HStack>
+            )}
             size="xs"
             value={[settings.aspectRatioId]}
+            valueText={
+              <HStack as="span" gap="2" minW="0">
+                <AspectRatioPreview boxSize="5" ratio={activeAspectRatioPreviewRatio} />
+                <Text as="span" fontSize="xs" truncate>
+                  {settings.aspectRatioId}
+                </Text>
+              </HStack>
+            }
             onValueChange={setAspectRatioId}
-          >
-            <Select.HiddenSelect />
-            <Select.Control>
-              <Select.Trigger>
-                <Select.ValueText>
-                  <HStack as="span" gap="2" minW="0">
-                    <AspectRatioPreview boxSize="5" ratio={activeAspectRatioPreviewRatio} />
-                    <Text as="span" fontSize="xs" truncate>
-                      {settings.aspectRatioId}
-                    </Text>
-                  </HStack>
-                </Select.ValueText>
-              </Select.Trigger>
-              <Select.IndicatorGroup>
-                <Select.Indicator />
-              </Select.IndicatorGroup>
-            </Select.Control>
-            <Portal>
-              <Select.Positioner>
-                <Select.Content maxH="18rem">
-                  {aspectRatioOptions.map((option) => (
-                    <Select.Item key={option.id} item={option}>
-                      <Select.ItemText>
-                        <HStack as="span" gap="2">
-                          <AspectRatioPreview boxSize="6" ratio={option.ratio} />
-                          <Text as="span" fontSize="xs">
-                            {option.id}
-                          </Text>
-                        </HStack>
-                      </Select.ItemText>
-                      <Select.ItemIndicator />
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Positioner>
-            </Portal>
-          </Select.Root>
+          />
           <Tooltip
             content={
               settings.aspectRatioIsLocked

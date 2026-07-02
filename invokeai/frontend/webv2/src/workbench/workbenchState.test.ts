@@ -39,6 +39,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   positivePromptHeightPx: 96,
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
+  referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
   seamlessYAxis: false,

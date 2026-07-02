@@ -1,7 +1,15 @@
 import type { KnownModelBase } from '@workbench/models/baseIdentity';
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
-import type { GenerateModelConfig, GenerateSettings, MainModelConfig, VaePrecision } from './types';
+import type {
+  GenerateModelConfig,
+  GenerateReferenceImage,
+  GenerateReferenceImageAsset,
+  GenerateReferenceImageConfig,
+  GenerateSettings,
+  MainModelConfig,
+  VaePrecision,
+} from './types';
 
 import {
   getCompatibleDiffusersComponentSource,
@@ -17,6 +25,7 @@ import {
 } from './componentCompatibility';
 import {
   clampDimension,
+  DEFAULT_REFERENCE_IMAGE_LIMIT,
   deriveAspectRatioId,
   isLoraCompatibleWithModel,
   MAX_DIMENSION,
@@ -518,6 +527,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     positivePromptHeightPx: 96,
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
+    referenceImages: [],
     scheduler: defaults.scheduler,
     seamlessXAxis: false,
     seamlessYAxis: false,
@@ -944,9 +954,166 @@ const isSelectedComponentCompatible = (
   return !slotPolicy.filter || slotPolicy.filter(value as ModelConfig, getComponentPolicyContext(model, settings));
 };
 
+type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
+
+const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
+  Boolean(
+    model &&
+    model.type !== 'external_image_generator' &&
+    model.base === 'flux' &&
+    model.name.toLowerCase().includes('kontext')
+  );
+
+/**
+ * Whether the model can consume reference images at all. Kept strict so the UI
+ * only offers reference images where `getGenerationValidationReasons` would
+ * accept them (e.g. Qwen Image requires the `edit` variant).
+ */
+export const isReferenceImageSupported = (model: GenerateModelConfig | undefined): boolean => {
+  if (!model) {
+    return false;
+  }
+
+  if (model.type === 'external_image_generator') {
+    return model.capabilities?.supports_reference_images === true;
+  }
+
+  if (model.base === 'qwen-image') {
+    return model.variant === 'edit';
+  }
+
+  return ['flux', 'flux2', 'sd-1', 'sdxl'].includes(model.base);
+};
+
+export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): number => {
+  if (!model || !isReferenceImageSupported(model)) {
+    return 0;
+  }
+
+  if (model.type === 'external_image_generator' && typeof model.capabilities?.max_reference_images === 'number') {
+    return Math.max(0, model.capabilities.max_reference_images);
+  }
+
+  return DEFAULT_REFERENCE_IMAGE_LIMIT;
+};
+
+export const createReferenceImageId = (): string =>
+  `reference_image_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+export const getDefaultReferenceImageConfig = (
+  model: GenerateModelConfig | undefined,
+  models: readonly ReferenceModelCandidate[],
+  image: GenerateReferenceImageAsset | null = null
+): GenerateReferenceImageConfig => {
+  const modelBase: string | undefined = model?.base;
+
+  if (model?.type === 'external_image_generator') {
+    return { image, type: 'external_reference_image' };
+  }
+
+  if (modelBase === 'flux2') {
+    return { image, type: 'flux2_reference_image' };
+  }
+
+  if (modelBase === 'qwen-image') {
+    return { image, type: 'qwen_image_reference_image' };
+  }
+
+  if (isFluxKontextModel(model)) {
+    return { image, model, type: 'flux_kontext_reference_image' };
+  }
+
+  const adapterModel =
+    models.find((candidate) => candidate.type === 'ip_adapter' && candidate.base === modelBase) ?? null;
+
+  return {
+    beginEndStepPct: [0, 1],
+    clipVisionModel: modelBase === 'flux' ? 'ViT-L' : 'ViT-H',
+    image,
+    method: 'full',
+    model: adapterModel,
+    type: 'ip_adapter',
+    weight: 1,
+  };
+};
+
+const getReferenceImageConfigSupported = (
+  model: GenerateModelConfig,
+  referenceImage: GenerateReferenceImage
+): boolean => {
+  switch (referenceImage.config.type) {
+    case 'external_reference_image':
+      return model.type === 'external_image_generator' && model.capabilities?.supports_reference_images === true;
+    case 'flux2_reference_image':
+      return model.type !== 'external_image_generator' && model.base === 'flux2';
+    case 'qwen_image_reference_image':
+      return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
+    case 'flux_kontext_reference_image':
+      return isFluxKontextModel(model);
+    case 'flux_redux':
+      return model.type !== 'external_image_generator' && model.base === 'flux';
+    case 'ip_adapter':
+      return model.type !== 'external_image_generator' && ['sd-1', 'sdxl', 'flux'].includes(model.base);
+  }
+};
+
+export const isReferenceImageCompatibleWithModel = (
+  model: GenerateModelConfig,
+  referenceImage: GenerateReferenceImage
+): boolean => {
+  if (!getReferenceImageConfigSupported(model, referenceImage)) {
+    return false;
+  }
+
+  const config = referenceImage.config;
+
+  if ((config.type === 'ip_adapter' || config.type === 'flux_redux') && config.model) {
+    return config.model.base === model.base;
+  }
+
+  if (config.type === 'flux_kontext_reference_image' && config.model) {
+    return config.model.key === model.key;
+  }
+
+  return true;
+};
+
+/**
+ * Reference images carried over to `model`: dropped entirely when the model
+ * does not support reference images, and re-targeted to a default config for
+ * the new model (keeping the image and enabled state) when incompatible.
+ * Returns the input array untouched when nothing changes.
+ */
+export const getCompatibleReferenceImages = (
+  referenceImages: GenerateReferenceImage[],
+  model: GenerateModelConfig,
+  models: readonly ReferenceModelCandidate[]
+): GenerateReferenceImage[] => {
+  if (referenceImages.length === 0) {
+    return referenceImages;
+  }
+
+  if (!isReferenceImageSupported(model)) {
+    return [];
+  }
+
+  let didChange = false;
+  const next = referenceImages.map((referenceImage) => {
+    if (isReferenceImageCompatibleWithModel(model, referenceImage)) {
+      return referenceImage;
+    }
+
+    didChange = true;
+    return { ...referenceImage, config: getDefaultReferenceImageConfig(model, models, referenceImage.config.image) };
+  });
+
+  return didChange ? next : referenceImages;
+};
+
 export const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
-  model: GenerateModelConfig
+  model: GenerateModelConfig,
+  models: readonly ReferenceModelCandidate[]
 ): GenerateSettingsCompatibilityResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
   const clearedLabels: string[] = [];
@@ -966,6 +1133,13 @@ export const getSettingsWithCompatibleModelSelections = (
   if (compatibleLoras.length !== settings.loras.length) {
     nextSettings.loras = compatibleLoras;
     addClearedLabel(clearedLabels, 'LoRAs');
+  }
+
+  const compatibleReferenceImages = getCompatibleReferenceImages(settings.referenceImages, model, models);
+
+  if (compatibleReferenceImages !== settings.referenceImages) {
+    nextSettings.referenceImages = compatibleReferenceImages;
+    addClearedLabel(clearedLabels, 'Reference Images');
   }
 
   const policy = getComponentSectionPolicy(model, nextSettings);
@@ -1051,6 +1225,18 @@ export const getGenerationModelAvailabilityReasons = (
     }
   }
 
+  for (const referenceImage of settings.referenceImages) {
+    if (!referenceImage.isEnabled) {
+      continue;
+    }
+
+    const config = referenceImage.config;
+
+    if ('model' in config && config.model && !hasModelKey(models, config.model.key, config.model.type)) {
+      reasons.push(`Reference Image model "${config.model.name}" is no longer installed.`);
+    }
+  }
+
   return reasons;
 };
 
@@ -1073,12 +1259,61 @@ const getDimensionValidationReasons = (model: GenerateModelConfig, settings: Gen
   return reasons;
 };
 
+const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
+  const reasons: string[] = [];
+  const enabled = settings.referenceImages.filter((referenceImage) => referenceImage.isEnabled);
+  const maxReferenceImages =
+    model.type === 'external_image_generator' && typeof model.capabilities?.max_reference_images === 'number'
+      ? model.capabilities.max_reference_images
+      : DEFAULT_REFERENCE_IMAGE_LIMIT;
+
+  if (enabled.length > maxReferenceImages) {
+    reasons.push(`Generate supports at most ${maxReferenceImages} reference images for ${model.name}.`);
+  }
+
+  enabled.forEach((referenceImage, index) => {
+    const prefix = `Reference Image #${index + 1}`;
+
+    if (!getReferenceImageConfigSupported(model, referenceImage)) {
+      reasons.push(`${prefix} is not supported by ${model.base} model.`);
+      return;
+    }
+
+    if (!referenceImage.config.image) {
+      reasons.push(`${prefix} needs an image.`);
+    }
+
+    if (referenceImage.config.type === 'ip_adapter') {
+      if (!referenceImage.config.model || referenceImage.config.model.base !== model.base) {
+        reasons.push(`${prefix} needs a compatible IP Adapter model.`);
+      }
+    }
+
+    if (referenceImage.config.type === 'flux_redux') {
+      if (!referenceImage.config.model || referenceImage.config.model.base !== model.base) {
+        reasons.push(`${prefix} needs a compatible FLUX Redux model.`);
+      }
+    }
+
+    if (referenceImage.config.type === 'flux_kontext_reference_image') {
+      if (!referenceImage.config.model || referenceImage.config.model.key !== model.key) {
+        reasons.push(`${prefix} needs the selected FLUX Kontext model.`);
+      }
+    }
+  });
+
+  return reasons;
+};
+
 export const getGenerationValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
   if (!isSupportedGenerateModel(model)) {
     return ['Generate needs a supported model before it can be invoked.'];
   }
 
-  const reasons = getDimensionValidationReasons(model, settings);
+  const reasons = [
+    ...getDimensionValidationReasons(model, settings),
+    ...getReferenceImageValidationReasons(model, settings),
+  ];
 
   if (model.type === 'external_image_generator') {
     if (model.capabilities?.modes && !model.capabilities.modes.includes('txt2img')) {

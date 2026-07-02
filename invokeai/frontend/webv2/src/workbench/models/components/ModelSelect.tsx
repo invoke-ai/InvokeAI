@@ -3,6 +3,7 @@ import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
 import {
   Badge,
+  Box,
   HStack,
   Icon,
   Input,
@@ -34,11 +35,12 @@ const EMPTY_BASES: ReadonlySet<string> = new Set();
  */
 export const ModelSelect = ({
   className,
+  disabled,
   excludeKeys,
   filter,
   id,
   invalid,
-  isClearable = true,
+  isClearable = false,
   modelTypes,
   onChange,
   placeholder,
@@ -47,6 +49,7 @@ export const ModelSelect = ({
   value,
 }: {
   className?: string;
+  disabled?: boolean;
   /** Hide specific models (e.g. the current model and already-linked ones). */
   excludeKeys?: ReadonlySet<string>;
   /** Extra predicate, e.g. base-architecture compatibility. */
@@ -100,6 +103,13 @@ export const ModelSelect = ({
     setSearchTerm('');
     setSelectedBases(EMPTY_BASES);
   };
+
+  useEffect(() => {
+    if (disabled) {
+      closeAndReset();
+    }
+  }, [disabled]);
+
   const toggleBase = (base: string) => {
     setSelectedBases((prev) => {
       const next = new Set(prev);
@@ -146,9 +156,10 @@ export const ModelSelect = ({
 
   optionRefs.current = [];
   let optionIndex = 0;
+  const canClear = isClearable && Boolean(value);
 
   return (
-    <HStack className={className} gap="1" w="full">
+    <Box className={className} minW="0" w="full">
       <Popover.Root
         ids={id ? { trigger: id } : undefined}
         open={isOpen}
@@ -162,6 +173,11 @@ export const ModelSelect = ({
           strategy: 'fixed',
         }}
         onOpenChange={(event) => {
+          if (disabled) {
+            setIsOpen(false);
+            return;
+          }
+
           if (event.open) {
             setSearchTerm('');
             setSelectedBases(EMPTY_BASES);
@@ -173,29 +189,54 @@ export const ModelSelect = ({
           closeAndReset();
         }}
       >
-        <Popover.Trigger asChild>
-          <Button
-            aria-invalid={invalid ? true : undefined}
-            aria-haspopup="listbox"
-            className={className}
-            colorPalette={invalid ? 'red' : isOpen ? 'accent' : 'bg'}
-            justifyContent="space-between"
-            minW="0"
-            size={size}
-            variant="outline"
-            w="full"
-            px="2"
-          >
-            {selectedModel ? (
-              <ModelButtonContent model={selectedModel} />
-            ) : (
-              <Text as="span" color="fg.subtle" fontSize="xs" minW="0" truncate>
-                {placeholder ?? `Select ${scopeLabel}…`}
-              </Text>
-            )}
-            <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />
-          </Button>
-        </Popover.Trigger>
+        <Box minW="0" position="relative" w="full">
+          <Popover.Trigger asChild>
+            <Button
+              aria-invalid={invalid ? true : undefined}
+              aria-haspopup="listbox"
+              className={className}
+              colorPalette={invalid ? 'red' : isOpen ? 'accent' : 'bg'}
+              disabled={disabled}
+              justifyContent="space-between"
+              minW="0"
+              pe={canClear ? '7' : '2'}
+              ps="2"
+              size={size}
+              variant="outline"
+              w="full"
+            >
+              {selectedModel ? (
+                <ModelButtonContent model={selectedModel} />
+              ) : (
+                <Text as="span" color="fg.subtle" fontSize="xs" minW="0" truncate>
+                  {placeholder ?? `Select ${scopeLabel}…`}
+                </Text>
+              )}
+              {canClear ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}
+            </Button>
+          </Popover.Trigger>
+          {canClear ? (
+            <CloseButton
+              aria-label="Clear selected model"
+              disabled={disabled}
+              insetEnd="1"
+              position="absolute"
+              size="2xs"
+              top="50%"
+              transform="translateY(-50%)"
+              zIndex="1"
+              onClick={(event) => {
+                event.stopPropagation();
+                clearSelection();
+              }}
+              onMouseDown={(event) => {
+                event.stopPropagation();
+              }}
+            >
+              <XIcon />
+            </CloseButton>
+          ) : null}
+        </Box>
         <Portal>
           <Popover.Positioner>
             <Popover.Content
@@ -352,12 +393,7 @@ export const ModelSelect = ({
           </Popover.Positioner>
         </Portal>
       </Popover.Root>
-      {isClearable && value ? (
-        <CloseButton aria-label="Clear selected model" size="2xs" onClick={clearSelection}>
-          <XIcon />
-        </CloseButton>
-      ) : null}
-    </HStack>
+    </Box>
   );
 };
 

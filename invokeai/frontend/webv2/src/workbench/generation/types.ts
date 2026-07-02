@@ -36,6 +36,8 @@ export type ExternalImageGeneratorModelConfig = ModelIdentifierConfig & {
     modes?: string[];
     supports_seed?: boolean;
     supports_negative_prompt?: boolean;
+    supports_reference_images?: boolean;
+    max_reference_images?: number | null;
   } | null;
   default_settings?: {
     width?: number | null;
@@ -65,6 +67,45 @@ export interface GenerateLora {
   isEnabled: boolean;
   model: LoraModelConfig;
   weight: number;
+}
+
+export type GenerateReferenceImageAsset = GeneratedImageContract;
+
+export type ClipVisionModel = 'ViT-H' | 'ViT-G' | 'ViT-L';
+
+export type IPAdapterMethod = 'full' | 'style' | 'composition' | 'style_strong' | 'style_precise';
+
+export type FluxReduxImageInfluence = 'lowest' | 'low' | 'medium' | 'high' | 'highest';
+
+export type GenerateReferenceImageConfig =
+  | {
+      type: 'ip_adapter';
+      image: GenerateReferenceImageAsset | null;
+      model: ComponentModelConfig | null;
+      weight: number;
+      beginEndStepPct: [number, number];
+      method: IPAdapterMethod;
+      clipVisionModel: ClipVisionModel;
+    }
+  | {
+      type: 'flux_redux';
+      image: GenerateReferenceImageAsset | null;
+      model: ComponentModelConfig | null;
+      imageInfluence: FluxReduxImageInfluence;
+    }
+  | {
+      type: 'flux_kontext_reference_image';
+      image: GenerateReferenceImageAsset | null;
+      model: MainModelConfig | null;
+    }
+  | { type: 'flux2_reference_image'; image: GenerateReferenceImageAsset | null }
+  | { type: 'qwen_image_reference_image'; image: GenerateReferenceImageAsset | null }
+  | { type: 'external_reference_image'; image: GenerateReferenceImageAsset | null };
+
+export interface GenerateReferenceImage {
+  id: string;
+  isEnabled: boolean;
+  config: GenerateReferenceImageConfig;
 }
 
 export type VaePrecision = 'fp16' | 'fp32';
@@ -115,6 +156,7 @@ export interface GenerateSettings {
   vae: VaeModelConfig | null;
   vaePrecision: VaePrecision;
   loras: GenerateLora[];
+  referenceImages: GenerateReferenceImage[];
   t5EncoderModel: ComponentModelConfig | null;
   clipEmbedModel: ComponentModelConfig | null;
   clipLEmbedModel: ComponentModelConfig | null;

@@ -130,6 +130,7 @@ export const GenerateWidgetView = () => {
       isLoadingModels={status === 'idle' || status === 'loading'}
       loadError={error}
       loraModels={loraModels}
+      models={models}
       projectId={projectId}
       selectedModel={selectedModel}
       settings={settings}

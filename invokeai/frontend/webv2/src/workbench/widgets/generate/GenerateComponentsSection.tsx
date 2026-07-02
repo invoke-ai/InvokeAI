@@ -57,6 +57,7 @@ const ComponentPicker = ({
     <Field label={slot.label} helpText={slot.helpText}>
       <ModelSelect
         filter={slot.filter ? filter : undefined}
+        isClearable
         modelTypes={modelTypes}
         placeholder={slot.placeholder ?? 'Model default'}
         size="xs"

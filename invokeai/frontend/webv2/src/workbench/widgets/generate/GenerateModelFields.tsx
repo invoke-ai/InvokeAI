@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings, VaeModelConfig } from '@workbench/generation/types';
+import type { ModelConfig } from '@workbench/models/types';
 import type { ChangeEvent } from 'react';
 
 import { HStack, Icon, InputGroup, NativeSelect, NumberInput, Stack } from '@chakra-ui/react';
@@ -30,6 +31,7 @@ const formatClearedSettings = (labels: readonly string[]) =>
 
 interface GenerateModelFieldsProps {
   settings: GenerateSettings;
+  models: readonly ModelConfig[];
   selectedModel: GenerateModelConfig | undefined;
   vaeModels: VaeModelConfig[];
   onCommit: (patch: Partial<GenerateSettings>) => void;
@@ -57,6 +59,7 @@ const settingsMatchModelDefaults = (settings: GenerateSettings, modelDefaultSett
   settings.loras.every((lora, index) => lora.isEnabled === modelDefaultSettings.loras[index]?.isEnabled);
 
 export const GenerateModelFields = ({
+  models,
   onCommit,
   onCommitSettings,
   selectedModel,
@@ -94,7 +97,7 @@ export const GenerateModelFields = ({
     };
 
   const selectModel = (model: GenerateModelConfig) => {
-    const result = getSettingsWithCompatibleModelSelections(settings, model);
+    const result = getSettingsWithCompatibleModelSelections(settings, model, models);
 
     onCommitSettings(result.settings);
 

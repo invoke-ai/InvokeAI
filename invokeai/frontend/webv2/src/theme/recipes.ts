@@ -53,7 +53,11 @@ const dropdownContent = {
 
 const dropdownItem = {
   _highlighted: { bg: 'bg.subtle' },
-  _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' },
+  _focusVisible: {
+    outline: '2px solid',
+    outlineColor: 'accent.solid',
+    outlineOffset: '-2px',
+  },
 };
 
 const dropdownGroupLabel = {
@@ -223,15 +227,27 @@ export const rowRecipe = defineRecipe({
     transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
     w: 'full',
     _hover: { bg: 'bg.muted' },
-    _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' },
+    _focusVisible: {
+      outline: '2px solid',
+      outlineColor: 'accent.solid',
+      outlineOffset: '-2px',
+    },
     _disabled: { cursor: 'not-allowed', opacity: 0.5 },
   },
   variants: {
     active: {
       none: {},
       muted: { bg: 'bg.muted' },
-      brand: { bg: 'brand.subtle', color: 'brand.fg', _hover: { bg: 'brand.subtle' } },
-      accent: { bg: 'accent.solid', color: 'accent.contrast', _hover: { bg: 'accent.solid' } },
+      brand: {
+        bg: 'brand.subtle',
+        color: 'brand.fg',
+        _hover: { bg: 'brand.subtle' },
+      },
+      accent: {
+        bg: 'accent.solid',
+        color: 'accent.contrast',
+        _hover: { bg: 'accent.solid' },
+      },
     },
   },
   defaultVariants: { active: 'none' },
@@ -270,8 +286,7 @@ export const fieldLabelRecipe = defineRecipe({
     color: 'fg.muted',
     fontSize: '2xs',
     fontWeight: '600',
-    letterSpacing: '0.02em',
-    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
   },
 });
 
@@ -295,7 +310,11 @@ export const themeCardRecipe = defineSlotRecipe({
       transition:
         'border-color var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease, transform var(--wb-motion-duration-fast) ease',
       _hover: { borderColor: 'border.emphasized' },
-      _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '2px' },
+      _focusVisible: {
+        outline: '2px solid',
+        outlineColor: 'accent.solid',
+        outlineOffset: '2px',
+      },
     },
     preview: {
       borderColor: 'border.subtle',
@@ -306,7 +325,12 @@ export const themeCardRecipe = defineSlotRecipe({
       overflow: 'hidden',
     },
     swatch: { flex: '1' },
-    body: { alignItems: 'flex-start', display: 'flex', flexDirection: 'column', gap: '0.5' },
+    body: {
+      alignItems: 'flex-start',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.5',
+    },
     name: { color: 'fg', fontSize: 'sm', fontWeight: '600' },
     description: { color: 'fg.subtle', fontSize: '2xs', lineHeight: '1.3' },
     indicator: {

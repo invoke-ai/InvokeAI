@@ -165,9 +165,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
   const galleryImagesRef = useRef(gallery.images);
   const selectedImageNameRef = useRef(gallery.selectedImageName);
   const lastPublishedTotalRef = useRef<number | null>(null);
+  const knownTotalImagesRef = useRef(knownTotalImages);
 
   galleryImagesRef.current = gallery.images;
   selectedImageNameRef.current = gallery.selectedImageName;
+  knownTotalImagesRef.current = knownTotalImages;
 
   // After a deletion that takes out the previewed image, move the selection to
   // the image that now occupies the old index, else the one before it.
@@ -228,27 +230,32 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
   // Publish the backend total into widget values so the manifest footer can
   // render page navigation without its own fetch, and clamp the page when the
   // query shrinks (e.g. after deletions).
+  //
+  // The effect reacts only to this instance's fetched `total` — the published
+  // state (`knownTotalImages`) is read through a ref on purpose. Several
+  // gallery views can be mounted at once (e.g. the bottom status chip plus an
+  // expanded gallery), and if each instance re-published whenever the shared
+  // state disagreed with its own in-flight total, two instances mid-refetch
+  // would dispatch in a loop until React aborts with "maximum update depth".
   useEffect(() => {
-    if (total === knownTotalImages) {
-      lastPublishedTotalRef.current = null;
-      return;
-    }
-
     if (typeof total !== 'number' || !Number.isFinite(total)) {
       return;
     }
 
+    const lastPublishedTotal = lastPublishedTotalRef.current;
+
+    lastPublishedTotalRef.current = total;
+
     if (
       shouldPublishGalleryTotal({
-        knownTotalImages,
-        lastPublishedTotal: lastPublishedTotalRef.current,
+        knownTotalImages: knownTotalImagesRef.current,
+        lastPublishedTotal,
         total,
       })
     ) {
-      lastPublishedTotalRef.current = total;
       dispatch({ totalImages: total, type: 'setGalleryPageInfo' });
     }
-  }, [dispatch, knownTotalImages, total]);
+  }, [dispatch, total]);
 
   useEffect(() => {
     if (settings.paginationMode !== 'paginated' || total === null) {
