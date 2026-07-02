@@ -1416,7 +1416,9 @@ export const zStatefulFieldValue = z.union([
   zControlNetMetadataFieldValue,
   zIPAdapterMetadataFieldValue,
   zT2IAdapterMetadataFieldValue,
-  zMetadataExtraFieldValue,
+  // NOTE: `zMetadataExtraFieldValue` is intentionally NOT part of this union. It is `z.any()`, which
+  // would collapse the whole union (and `StatefulFieldValue`/`FieldValue`) to `any`. Extras are only
+  // ever handled via the scoped `zFieldInputInstanceWithExtras` union below.
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
@@ -1449,11 +1451,28 @@ const zStatefulFieldInputInstance = z.union([
   zControlNetMetadataFieldInputInstance,
   zIPAdapterMetadataFieldInputInstance,
   zT2IAdapterMetadataFieldInputInstance,
-  zMetadataExtraFieldInputInstance,
+  // NOTE: `zMetadataExtraFieldInputInstance` is intentionally NOT part of this union. Its value is
+  // `z.any()`, so including it here would make it a catch-all that preserves any malformed/stale
+  // input value for *any* node during workflow parsing (inputs are parsed without their template).
+  // Extras are scoped to nodes that accept them via `zFieldInputInstanceWithExtras` below.
 ]);
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
 export type FieldInputInstance = z.infer<typeof zFieldInputInstance>;
+
+/**
+ * Like {@link zFieldInputInstance}, but additionally accepts the `MetadataExtraField` catch-all for
+ * undeclared "extra" inputs. Because the `MetadataExtraField` value is `z.any()`, it matches almost
+ * anything and MUST only be used for node types known to accept extras (pydantic `extra='allow'`,
+ * e.g. `core_metadata`). Applied conditionally in `zInvocationNodeData` based on the node type — see
+ * `nodeAcceptsExtraInputs`. The `MetadataExtraField` branch is placed before the stateless branch so
+ * that genuine extra values are preserved rather than coerced to `undefined`.
+ */
+export const zFieldInputInstanceWithExtras = z.union([
+  zStatefulFieldInputInstance,
+  zMetadataExtraFieldInputInstance,
+  zStatelessFieldInputInstance,
+]);
 // #endregion
 
 // #region StatefulFieldInputTemplate & FieldInputTemplate

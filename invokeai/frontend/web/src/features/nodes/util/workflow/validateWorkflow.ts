@@ -2,6 +2,7 @@ import { parseify } from 'common/util/serialize';
 import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
+import { nodeAcceptsExtraInputs } from 'features/nodes/types/extraInputs';
 import {
   isBoardFieldInputInstance,
   isImageFieldCollectionInputInstance,
@@ -100,6 +101,11 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       const fieldTemplate = template.inputs[input.name];
 
       if (!fieldTemplate) {
+        if (nodeAcceptsExtraInputs(node.data.type)) {
+          // Undeclared extras on `extra='allow'` nodes (e.g. `core_metadata`) are expected and are
+          // preserved intentionally, so they must not be reported as missing-template warnings.
+          continue;
+        }
         const message = t('nodes.missingFieldTemplate');
         warnings.push({
           message,
