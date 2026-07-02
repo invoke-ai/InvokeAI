@@ -15,7 +15,7 @@ import { selectNodes, selectNodesSlice } from 'features/nodes/store/selectors';
 import {
   CONNECTOR_INPUT_HANDLE,
   CONNECTOR_OUTPUT_HANDLE,
-  resolveConnectorSourceFieldType,
+  resolveConnectorInferredFieldType,
 } from 'features/nodes/store/util/connectorTopology';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
@@ -49,7 +49,7 @@ export const useConnection = () => {
 
         const resolvedSourceType =
           handleType === 'source'
-            ? resolveConnectorSourceFieldType(nodeId, nodes, selectNodesSlice(store.getState()).edges, templates)
+            ? resolveConnectorInferredFieldType(nodeId, nodes, selectNodesSlice(store.getState()).edges, templates)
             : null;
         $pendingConnection.set({
           nodeId,
