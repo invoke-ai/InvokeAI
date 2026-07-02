@@ -209,16 +209,17 @@ export const getInfill = (
 
 export const CANVAS_OUTPUT_PREFIX = 'canvas_output';
 
-export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNodes>) => {
-  return (
-    modelLoader.type === 'flux_model_loader' ||
-    modelLoader.type === 'flux2_klein_model_loader' ||
-    modelLoader.type === 'sd3_model_loader' ||
-    modelLoader.type === 'cogview4_model_loader' ||
-    modelLoader.type === 'qwen_image_model_loader' ||
-    modelLoader.type === 'z_image_model_loader' ||
-    modelLoader.type === 'anima_model_loader'
-  );
+// Only the classic SD/SDXL loaders expose a `unet` output; every other main-model loader (FLUX,
+// FLUX.2, SD3, CogView4, Qwen-Image, Z-Image, Krea-2, Anima) is transformer-based and has no `unet`.
+// Defining the predicate by this small allow-list means any newly added transformer loader is treated
+// as unet-less automatically, and the negated branch narrows `modelLoader` to the unet-bearing loaders
+// so `addEdge(modelLoader, 'unet', ...)` type-checks.
+type MainModelLoaderWithUnetNodes = 'main_model_loader' | 'sdxl_model_loader';
+
+export const isMainModelWithoutUnet = (
+  modelLoader: Invocation<MainModelLoaderNodes>
+): modelLoader is Invocation<Exclude<MainModelLoaderNodes, MainModelLoaderWithUnetNodes>> => {
+  return modelLoader.type !== 'main_model_loader' && modelLoader.type !== 'sdxl_model_loader';
 };
 
 export const isCanvasOutputNodeId = (nodeId: string) => nodeId.split(':')[0] === CANVAS_OUTPUT_PREFIX;
