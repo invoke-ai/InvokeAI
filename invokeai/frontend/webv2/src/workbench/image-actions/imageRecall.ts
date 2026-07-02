@@ -8,6 +8,7 @@ import type {
 } from '@workbench/generation/types';
 
 import {
+  getCompatibleReferenceImages,
   getGenerationDimensions,
   getGenerationUiPolicy,
   getSettingsWithModelDefaults,
@@ -22,6 +23,7 @@ import {
   isModelIdentifierConfig,
   clampDimension,
   deriveAspectRatioId,
+  normalizeReferenceImages,
   SEED_MAX,
 } from '@workbench/generation/settings';
 
@@ -56,7 +58,8 @@ type RecalledField =
   | 'scheduler'
   | 'seamless'
   | 'clipSkip'
-  | 'components';
+  | 'components'
+  | 'referenceImages';
 
 export interface ImageRecallResult {
   fields: RecalledField[];
@@ -311,6 +314,9 @@ const hasComponentModels = (metadata: unknown, models: readonly ComponentModelCo
   getMetadataComponent(metadata, 'qwen3_encoder', models) !== undefined ||
   getMetadataComponent(metadata, 'qwen_image_qwen_vl_encoder', models) !== undefined;
 
+const getMetadataReferenceImages = (metadata: unknown) =>
+  isRecord(metadata) ? normalizeReferenceImages(metadata.ref_images) : [];
+
 const withDimensions = (
   values: GenerateWidgetValues,
   size: Partial<Pick<GenerateWidgetValues, 'height' | 'width'>>
@@ -357,10 +363,20 @@ export const getImageRecallCapabilities = ({
   const hasSize = hasMetadataSize(metadata, currentValues.model);
   const hasSettings = hasGenerationSettings(metadata);
   const hasComponents = hasComponentModels(metadata, models);
+  const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasAnyMetadata =
-    hasModel || hasVae || hasPrompts || hasSeed || hasSize || hasSettings || hasClipSkip || hasComponents;
-  const hasNonSeedMetadata = hasModel || hasVae || hasPrompts || hasSize || hasSettings || hasClipSkip || hasComponents;
+    hasModel ||
+    hasVae ||
+    hasPrompts ||
+    hasSeed ||
+    hasSize ||
+    hasSettings ||
+    hasClipSkip ||
+    hasComponents ||
+    hasReferenceImages;
+  const hasNonSeedMetadata =
+    hasModel || hasVae || hasPrompts || hasSize || hasSettings || hasClipSkip || hasComponents || hasReferenceImages;
 
   return {
     all: hasAnyMetadata,
@@ -430,6 +446,16 @@ export const buildImageRecallSettings = ({
     if (vae !== undefined) {
       values = { ...values, vae };
       fields.push('vae');
+    }
+
+    // Recalled reference images must fit the effective model — when the
+    // metadata model was not recalled (e.g. uninstalled), `values.model` is
+    // still the current one and incompatible configs are re-targeted or dropped.
+    const referenceImages = getCompatibleReferenceImages(getMetadataReferenceImages(metadata), values.model, models);
+
+    if (referenceImages.length > 0) {
+      values = { ...values, referenceImages };
+      fields.push('referenceImages');
     }
   }
 

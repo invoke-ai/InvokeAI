@@ -209,7 +209,7 @@ export interface GalleryImagesPage {
   total: number;
 }
 
-const getGalleryImagesByNames = async (imageNames: string[]): Promise<GalleryImage[]> => {
+export const getGalleryImagesByNames = async (imageNames: string[]): Promise<GalleryImage[]> => {
   if (imageNames.length === 0) {
     return [];
   }
@@ -431,11 +431,15 @@ export const downloadGalleryArchive = async ({
   throw new Error('Timed out preparing the download archive.');
 };
 
-export const uploadGalleryImage = async (file: File, boardId: string): Promise<GalleryImage> => {
+export const uploadGalleryImage = async (
+  file: File,
+  boardId: string,
+  options: { isIntermediate?: boolean } = {}
+): Promise<GalleryImage> => {
   const query = toSearchParams({
     board_id: boardId === 'none' || isDateBoardId(boardId) ? undefined : boardId,
     image_category: 'user',
-    is_intermediate: false,
+    is_intermediate: options.isIntermediate ?? false,
   });
   const body = new FormData();
   body.append('file', file);

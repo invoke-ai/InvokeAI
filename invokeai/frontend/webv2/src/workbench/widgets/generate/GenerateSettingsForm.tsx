@@ -5,6 +5,7 @@ import type {
   LoraModelConfig,
   VaeModelConfig,
 } from '@workbench/generation/types';
+import type { ModelConfig } from '@workbench/models/types';
 
 import { Stack, Text } from '@chakra-ui/react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -25,6 +26,7 @@ import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { getSettingsWithLatestPromptFields } from './generateFormViewModel';
 import { GenerateModelFields } from './GenerateModelFields';
 import { GeneratePromptFields } from './promptFields';
+import { GenerateReferenceImagesSection } from './reference-images/GenerateReferenceImagesSection';
 
 const GENERATE_INPUT_DEBOUNCE_MS = 250;
 
@@ -33,6 +35,7 @@ interface GenerateSettingsFormProps {
   loadError: string | null;
   settings: GenerateSettings;
   loraModels: LoraModelConfig[];
+  models: readonly ModelConfig[];
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   supportedModels: GenerateModelConfig[];
@@ -45,6 +48,7 @@ export const GenerateSettingsForm = ({
   isLoadingModels,
   loadError,
   loraModels,
+  models,
   onCommitSettings,
   onPatchSettings,
   projectId,
@@ -235,6 +239,14 @@ export const GenerateSettingsForm = ({
         onCommitImmediate={commitPatchImmediately}
       />
 
+      <GenerateReferenceImagesSection
+        models={models}
+        selectedModel={selectedModel}
+        settings={draftSettings}
+        onCommit={commit}
+        onCommitImmediate={commitPatchImmediately}
+      />
+
       <GenerateDimensionFields
         projectId={projectId}
         selectedModel={selectedModel}
@@ -243,6 +255,7 @@ export const GenerateSettingsForm = ({
       />
 
       <GenerateModelFields
+        models={models}
         selectedModel={selectedModel}
         settings={draftSettings}
         vaeModels={vaeModels}

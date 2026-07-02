@@ -311,6 +311,7 @@ const SingleImageMenuItems = ({
   const handleRecallDimensions = useRecallImageDataHandler(actions, image, 'dimensions');
   const handleRecallClipSkip = useRecallImageDataHandler(actions, image, 'clipSkip');
   const handleSelectForCompare = useSelectForCompareHandler(actions, image);
+  const handleUseAsReferenceImage = useUseAsReferenceImageHandler(actions, image);
 
   return (
     <>
@@ -369,7 +370,13 @@ const SingleImageMenuItems = ({
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem disabled icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" />
-      <ContextMenuItem disabled icon={ImageIcon} label="Use as Reference Image" value="use-as-reference-image" />
+      <ContextMenuItem
+        disabled={!actions.canUseAsReferenceImage}
+        icon={ImageIcon}
+        label="Use as Reference Image"
+        value="use-as-reference-image"
+        onClick={handleUseAsReferenceImage}
+      />
       <ContextMenuItem disabled icon={TypeIcon} label="Use as Prompt Template" value="use-as-prompt-template" />
       <ContextMenuItem
         icon={ImagesIcon}
@@ -402,6 +409,9 @@ const useRecallImageDataHandler = (actions: ImageActions, image: GalleryImage, k
 
 const useSelectForCompareHandler = (actions: ImageActions, image: GalleryImage) =>
   useCallback(() => actions.selectForCompare(image), [actions, image]);
+
+const useUseAsReferenceImageHandler = (actions: ImageActions, image: GalleryImage) =>
+  useCallback(() => actions.useAsReferenceImage(image), [actions, image]);
 
 const OpenInNewTabQuickMenuItem = ({ image }: { image: GalleryImage }) => {
   const handleClick = useCallback(() => window.open(image.imageUrl, '_blank', 'noopener'), [image.imageUrl]);

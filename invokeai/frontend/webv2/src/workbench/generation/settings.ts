@@ -3,6 +3,9 @@ import type {
   ComponentModelConfig,
   GenerateLora,
   GenerateModelConfig,
+  GenerateReferenceImage,
+  GenerateReferenceImageAsset,
+  GenerateReferenceImageConfig,
   GenerateSettings,
   GenerateWidgetValues,
   LoraModelConfig,
@@ -160,6 +163,146 @@ const isGenerateLora = (value: unknown): value is GenerateLora =>
   hasFiniteNumber(value, 'weight') &&
   typeof value.isEnabled === 'boolean';
 
+export const DEFAULT_REFERENCE_IMAGE_LIMIT = 5;
+
+const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
+  'external_reference_image',
+  'flux2_reference_image',
+  'flux_kontext_reference_image',
+  'flux_redux',
+  'ip_adapter',
+  'qwen_image_reference_image',
+]);
+
+const isClipVisionModel = (value: unknown): value is 'ViT-H' | 'ViT-G' | 'ViT-L' =>
+  value === 'ViT-H' || value === 'ViT-G' || value === 'ViT-L';
+
+const isIPAdapterMethod = (
+  value: unknown
+): value is 'full' | 'style' | 'composition' | 'style_strong' | 'style_precise' =>
+  value === 'full' ||
+  value === 'style' ||
+  value === 'composition' ||
+  value === 'style_strong' ||
+  value === 'style_precise';
+
+const isFluxReduxImageInfluence = (value: unknown): value is 'lowest' | 'low' | 'medium' | 'high' | 'highest' =>
+  value === 'lowest' || value === 'low' || value === 'medium' || value === 'high' || value === 'highest';
+
+export const isReferenceImageAsset = (value: unknown): value is GenerateReferenceImageAsset =>
+  isRecord(value) &&
+  typeof value.imageName === 'string' &&
+  typeof value.imageUrl === 'string' &&
+  typeof value.thumbnailUrl === 'string' &&
+  typeof value.queuedAt === 'string' &&
+  typeof value.sourceQueueItemId === 'string' &&
+  hasFiniteNumber(value, 'width') &&
+  hasFiniteNumber(value, 'height');
+
+const cloneReferenceImageAsset = (image: GenerateReferenceImageAsset): GenerateReferenceImageAsset => ({ ...image });
+
+const normalizeReferenceImageAsset = (value: unknown): GenerateReferenceImageAsset | null =>
+  value === null ? null : isReferenceImageAsset(value) ? cloneReferenceImageAsset(value) : null;
+
+const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageConfig | null => {
+  if (!isRecord(value) || typeof value.type !== 'string' || !REFERENCE_IMAGE_CONFIG_TYPES.has(value.type)) {
+    return null;
+  }
+
+  const image = normalizeReferenceImageAsset(value.image);
+
+  if (value.image !== null && image === null) {
+    return null;
+  }
+
+  switch (value.type) {
+    case 'external_reference_image':
+    case 'flux2_reference_image':
+    case 'qwen_image_reference_image':
+      return { image, type: value.type };
+    case 'flux_kontext_reference_image':
+      return { image, model: getMainModelOrNull(value.model), type: value.type };
+    case 'flux_redux':
+      return {
+        image,
+        imageInfluence: isFluxReduxImageInfluence(value.imageInfluence) ? value.imageInfluence : 'highest',
+        model: getModelIdentifierOrNull(value.model),
+        type: value.type,
+      };
+    case 'ip_adapter':
+      return {
+        beginEndStepPct:
+          Array.isArray(value.beginEndStepPct) &&
+          value.beginEndStepPct.length === 2 &&
+          value.beginEndStepPct.every((item) => typeof item === 'number' && Number.isFinite(item))
+            ? [value.beginEndStepPct[0], value.beginEndStepPct[1]]
+            : [0, 1],
+        clipVisionModel: isClipVisionModel(value.clipVisionModel) ? value.clipVisionModel : 'ViT-H',
+        image,
+        method: isIPAdapterMethod(value.method) ? value.method : 'full',
+        model: getModelIdentifierOrNull(value.model),
+        type: value.type,
+        weight: hasFiniteNumber(value, 'weight') ? (value.weight as number) : 1,
+      };
+  }
+
+  return null;
+};
+
+export const normalizeReferenceImages = (value: unknown): GenerateReferenceImage[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const images: GenerateReferenceImage[] = [];
+
+  for (const item of value) {
+    if (!isRecord(item) || typeof item.id !== 'string') {
+      continue;
+    }
+
+    const config = normalizeReferenceImageConfig(item.config);
+
+    if (!config) {
+      continue;
+    }
+
+    images.push({ config, id: item.id, isEnabled: item.isEnabled !== false });
+  }
+
+  return images;
+};
+
+const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): GenerateReferenceImageConfig => {
+  switch (config.type) {
+    case 'external_reference_image':
+    case 'flux2_reference_image':
+    case 'qwen_image_reference_image':
+      return { ...config, image: config.image ? cloneReferenceImageAsset(config.image) : null };
+    case 'flux_kontext_reference_image':
+      return {
+        ...config,
+        image: config.image ? cloneReferenceImageAsset(config.image) : null,
+        model: config.model ? { ...config.model } : null,
+      };
+    case 'flux_redux':
+    case 'ip_adapter':
+      return {
+        ...config,
+        image: config.image ? cloneReferenceImageAsset(config.image) : null,
+        model: config.model ? { ...config.model } : null,
+      };
+  }
+};
+
+export const cloneReferenceImages = (
+  referenceImages: readonly GenerateReferenceImage[] = []
+): GenerateReferenceImage[] =>
+  referenceImages.map((referenceImage) => ({
+    ...referenceImage,
+    config: cloneReferenceImageConfig(referenceImage.config),
+  }));
+
 export const getDefaultLoraWeight = (model: LoraModelConfig): number => {
   const weight = model.default_settings?.weight;
 
@@ -245,9 +388,60 @@ export const cloneGenerateWidgetValues = (
   model: { ...values.model },
   qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
+  referenceImages: cloneReferenceImages(values.referenceImages),
   t5EncoderModel: values.t5EncoderModel ? { ...values.t5EncoderModel } : null,
   vae: values.vae ? { ...values.vae } : null,
 });
+
+const syncReferenceImageConfigWithModels = (
+  config: GenerateReferenceImageConfig,
+  modelsByKey: Map<string, unknown>
+): GenerateReferenceImageConfig => {
+  switch (config.type) {
+    case 'flux_kontext_reference_image': {
+      const model = syncModelIdentifierWithModels(config.model, modelsByKey);
+
+      return model === config.model ? config : { ...config, model: isMainModelConfig(model) ? model : config.model };
+    }
+    case 'flux_redux':
+    case 'ip_adapter': {
+      const model = syncModelIdentifierWithModels(config.model, modelsByKey);
+
+      return model === config.model ? config : { ...config, model };
+    }
+    case 'external_reference_image':
+    case 'flux2_reference_image':
+    case 'qwen_image_reference_image':
+      return config;
+  }
+};
+
+export const syncReferenceImagesWithModels = (
+  referenceImages: GenerateReferenceImage[],
+  models: readonly unknown[]
+): GenerateReferenceImage[] => {
+  const modelsByKey = new Map<string, unknown>();
+
+  for (const model of models) {
+    if (isModelIdentifierConfig(model)) {
+      modelsByKey.set(model.key, model);
+    }
+  }
+
+  let didSync = false;
+  const synced = referenceImages.map((referenceImage) => {
+    const config = syncReferenceImageConfigWithModels(referenceImage.config, modelsByKey);
+
+    if (config === referenceImage.config) {
+      return referenceImage;
+    }
+
+    didSync = true;
+    return { ...referenceImage, config };
+  });
+
+  return didSync ? synced : referenceImages;
+};
 
 export const syncGenerateWidgetValuesWithModels = (
   values: GenerateWidgetValues,
@@ -279,6 +473,7 @@ export const syncGenerateWidgetValuesWithModels = (
     modelKey: model.key,
     qwen3EncoderModel: syncModelIdentifierWithModels(values.qwen3EncoderModel, modelsByKey),
     qwenVLEncoderModel: syncModelIdentifierWithModels(values.qwenVLEncoderModel, modelsByKey),
+    referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
     t5EncoderModel: syncModelIdentifierWithModels(values.t5EncoderModel, modelsByKey),
     vae: isVaeModelConfig(vae) ? vae : values.vae,
   };
@@ -292,6 +487,7 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.clipGEmbedModel === values.clipGEmbedModel &&
     nextValues.qwen3EncoderModel === values.qwen3EncoderModel &&
     nextValues.qwenVLEncoderModel === values.qwenVLEncoderModel &&
+    nextValues.referenceImages === values.referenceImages &&
     nextValues.componentSourceModel === values.componentSourceModel &&
     nextValues.modelKey === values.modelKey
     ? values
@@ -381,6 +577,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       MAX_POSITIVE_PROMPT_HEIGHT_PX,
       DEFAULT_POSITIVE_PROMPT_HEIGHT_PX
     ),
+    referenceImages: normalizeReferenceImages(values.referenceImages),
     scheduler: values.scheduler as string,
     seamlessXAxis: typeof values.seamlessXAxis === 'boolean' ? values.seamlessXAxis : false,
     seamlessYAxis: typeof values.seamlessYAxis === 'boolean' ? values.seamlessYAxis : false,
@@ -429,6 +626,8 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     hasFiniteNumber(values, 'positivePromptHeightPx') &&
     Array.isArray(values.loras) &&
     values.loras.every(isGenerateLora) &&
+    Array.isArray(values.referenceImages) &&
+    normalizeReferenceImages(values.referenceImages).length === values.referenceImages.length &&
     typeof values.seamlessXAxis === 'boolean' &&
     typeof values.seamlessYAxis === 'boolean' &&
     isVaePrecision(values.vaePrecision) &&

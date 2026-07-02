@@ -12,7 +12,13 @@ import {
   type GalleryBoard,
   type GalleryImage,
 } from '@workbench/gallery/api';
-import { isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
+import {
+  createReferenceImageId,
+  getDefaultReferenceImageConfig,
+  getMaxReferenceImages,
+  isReferenceImageSupported,
+  isSupportedGenerateModel,
+} from '@workbench/generation/baseGenerationPolicies';
 import { isVaeModelConfig } from '@workbench/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -34,6 +40,8 @@ import {
  * a refresh action so any mounted gallery widget refetches affected backend data.
  */
 export interface ImageActions {
+  /** Whether the generate widget's current model can accept another reference image. */
+  canUseAsReferenceImage: boolean;
   copyImage: (image: GalleryImage) => Promise<void>;
   deleteImages: (imageNames: string[]) => Promise<void>;
   downloadImage: (image: GalleryImage) => Promise<void>;
@@ -44,6 +52,7 @@ export interface ImageActions {
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
+  useAsReferenceImage: (image: GalleryImage) => void;
 }
 
 export const saveBlobToDisk = (blob: Blob, fileName: string): void => {
@@ -255,6 +264,35 @@ export const useImageActions = ({
           onStarredChange?.(imageNames, !starred);
           recordError(error);
         }
+      },
+      canUseAsReferenceImage: Boolean(
+        currentGenerateValues &&
+        currentGenerateValues.referenceImages.length < getMaxReferenceImages(currentGenerateValues.model)
+      ),
+      useAsReferenceImage: (image) => {
+        const latestGenerateValues = getLatestGenerateValues();
+        const currentValues = getCurrentGenerateValues({ generateValues: latestGenerateValues, supportedModels });
+
+        if (
+          !currentValues ||
+          !isReferenceImageSupported(currentValues.model) ||
+          currentValues.referenceImages.length >= getMaxReferenceImages(currentValues.model)
+        ) {
+          return;
+        }
+
+        const referenceImage = {
+          config: getDefaultReferenceImageConfig(currentValues.model, models, image),
+          id: createReferenceImageId(),
+          isEnabled: true,
+        };
+
+        dispatch({
+          projectId,
+          type: 'patchGenerateSettings',
+          values: { referenceImages: [...currentValues.referenceImages, referenceImage] },
+        });
+        openWorkbenchWidget('generate', { preferredRegions: ['left'] });
       },
     };
   }, [

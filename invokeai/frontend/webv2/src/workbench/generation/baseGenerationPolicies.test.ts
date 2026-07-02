@@ -19,9 +19,11 @@ import {
   getGenerationModelAvailabilityReasons,
   getGenerationModelPolicy,
   getGenerationValidationReasons,
+  getMaxReferenceImages,
   getPromptPolicy,
   getSettingsWithCompatibleModelSelections,
   getSettingsWithModelDefaults,
+  isReferenceImageSupported,
   isSupportedGenerateModel,
   SUPPORTED_GENERATE_BASES,
 } from './baseGenerationPolicies';
@@ -69,6 +71,27 @@ const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name
 const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
 const sd1Lora: LoraModelConfig = { base: 'sd-1', key: 'sd1-lora', name: 'SD 1 LoRA', type: 'lora' };
 const sdxlLora: LoraModelConfig = { base: 'sdxl', key: 'sdxl-lora', name: 'SDXL LoRA', type: 'lora' };
+const sd1IpAdapter: ComponentModelConfig = {
+  base: 'sd-1',
+  key: 'sd1-ip-adapter',
+  name: 'SD 1 IP Adapter',
+  type: 'ip_adapter',
+};
+const sdxlIpAdapter: ComponentModelConfig = {
+  base: 'sdxl',
+  key: 'sdxl-ip-adapter',
+  name: 'SDXL IP Adapter',
+  type: 'ip_adapter',
+};
+const referenceImage = {
+  height: 768,
+  imageName: 'reference.png',
+  imageUrl: '/api/v1/images/i/reference.png/full',
+  queuedAt: '2026-01-01T00:00:00.000Z',
+  sourceQueueItemId: 'backend-gallery',
+  thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
+  width: 512,
+};
 const externalModel: GenerateModelConfig = {
   base: 'external',
   capabilities: { modes: ['txt2img'], supports_negative_prompt: false, supports_seed: false },
@@ -401,7 +424,7 @@ describe('component policies', () => {
       vae: sdxlVae,
     });
 
-    const result = getSettingsWithCompatibleModelSelections(settings, model);
+    const result = getSettingsWithCompatibleModelSelections(settings, model, []);
 
     expect(result.settings.modelKey).toBe(model.key);
     expect(result.settings.loras.map((lora) => lora.model.key)).toEqual(['sdxl-lora']);
@@ -416,7 +439,7 @@ describe('component policies', () => {
   it('reconciles dimensions to the new model grid when the selected model changes', () => {
     const model = createModel('cogview4');
     const settings = createSettings(createModel('sdxl'), { height: 520, width: 520 });
-    const result = getSettingsWithCompatibleModelSelections(settings, model);
+    const result = getSettingsWithCompatibleModelSelections(settings, model, []);
 
     expect(result.settings.width).toBe(512);
     expect(result.settings.height).toBe(512);
@@ -462,10 +485,280 @@ describe('component policies', () => {
       vae: flux2Vae,
     });
 
-    const result = getSettingsWithCompatibleModelSelections(settings, model);
+    const result = getSettingsWithCompatibleModelSelections(settings, model, []);
 
     expect(result.settings.qwen3EncoderModel).toBeNull();
     expect(result.settings.vae).toEqual(flux2Vae);
     expect(result.clearedLabels).toEqual(['Qwen3 Encoder']);
+  });
+
+  it('requires enabled IP Adapter reference images to have an image and compatible adapter model', () => {
+    const model = createModel('sd-1');
+
+    expect(
+      getGenerationValidationReasons(
+        model,
+        createSettings(model, {
+          referenceImages: [
+            {
+              id: 'ref-1',
+              isEnabled: true,
+              config: {
+                beginEndStepPct: [0, 1],
+                clipVisionModel: 'ViT-H',
+                image: null,
+                method: 'full',
+                model: sd1IpAdapter,
+                type: 'ip_adapter',
+                weight: 1,
+              },
+            },
+          ],
+        })
+      )
+    ).toContain('Reference Image #1 needs an image.');
+
+    expect(
+      getGenerationValidationReasons(
+        model,
+        createSettings(model, {
+          referenceImages: [
+            {
+              id: 'ref-1',
+              isEnabled: true,
+              config: {
+                beginEndStepPct: [0, 1],
+                clipVisionModel: 'ViT-H',
+                image: referenceImage,
+                method: 'full',
+                model: null,
+                type: 'ip_adapter',
+                weight: 1,
+              },
+            },
+          ],
+        })
+      )
+    ).toContain('Reference Image #1 needs a compatible IP Adapter model.');
+  });
+
+  it('clears reference images when switching to a model without reference image support', () => {
+    const settings = createSettings(createModel('sdxl'), {
+      referenceImages: [
+        {
+          id: 'ref-1',
+          isEnabled: true,
+          config: {
+            beginEndStepPct: [0, 1],
+            clipVisionModel: 'ViT-H',
+            image: referenceImage,
+            method: 'full',
+            model: sdxlIpAdapter,
+            type: 'ip_adapter',
+            weight: 1,
+          },
+        },
+      ],
+    });
+
+    const result = getSettingsWithCompatibleModelSelections(settings, createModel('cogview4'), [sdxlIpAdapter]);
+
+    expect(result.settings.referenceImages).toEqual([]);
+    expect(result.clearedLabels).toContain('Reference Images');
+  });
+
+  it('re-targets reference image configs to the new model base, keeping the image and enabled state', () => {
+    const settings = createSettings(createModel('sdxl'), {
+      referenceImages: [
+        {
+          id: 'ref-1',
+          isEnabled: false,
+          config: {
+            beginEndStepPct: [0, 1],
+            clipVisionModel: 'ViT-H',
+            image: referenceImage,
+            method: 'style',
+            model: sdxlIpAdapter,
+            type: 'ip_adapter',
+            weight: 0.5,
+          },
+        },
+      ],
+    });
+
+    const result = getSettingsWithCompatibleModelSelections(settings, createModel('sd-1'), [
+      sd1IpAdapter,
+      sdxlIpAdapter,
+    ]);
+
+    expect(result.settings.referenceImages).toEqual([
+      {
+        id: 'ref-1',
+        isEnabled: false,
+        config: {
+          beginEndStepPct: [0, 1],
+          clipVisionModel: 'ViT-H',
+          image: referenceImage,
+          method: 'full',
+          model: sd1IpAdapter,
+          type: 'ip_adapter',
+          weight: 1,
+        },
+      },
+    ]);
+    expect(result.clearedLabels).toContain('Reference Images');
+  });
+
+  it('re-targets reference images across a flux2 -> sdxl -> flux2 round trip', () => {
+    const flux2Model = createModel('flux2');
+    const sdxlModel = createModel('sdxl');
+    const settings = createSettings(flux2Model, {
+      referenceImages: [
+        { id: 'ref-1', isEnabled: true, config: { image: referenceImage, type: 'flux2_reference_image' } },
+      ],
+    });
+
+    const toSdxl = getSettingsWithCompatibleModelSelections(settings, sdxlModel, [sdxlIpAdapter]);
+
+    expect(toSdxl.settings.referenceImages[0]?.config).toMatchObject({
+      image: referenceImage,
+      model: sdxlIpAdapter,
+      type: 'ip_adapter',
+    });
+
+    const backToFlux2 = getSettingsWithCompatibleModelSelections(toSdxl.settings, flux2Model, [sdxlIpAdapter]);
+
+    expect(backToFlux2.settings.referenceImages).toEqual([
+      { id: 'ref-1', isEnabled: true, config: { image: referenceImage, type: 'flux2_reference_image' } },
+    ]);
+  });
+
+  it('keeps compatible reference images untouched when the selected model changes', () => {
+    const referenceImages: GenerateSettings['referenceImages'] = [
+      {
+        id: 'ref-1',
+        isEnabled: true,
+        config: {
+          beginEndStepPct: [0, 1],
+          clipVisionModel: 'ViT-H',
+          image: referenceImage,
+          method: 'full',
+          model: sdxlIpAdapter,
+          type: 'ip_adapter',
+          weight: 1,
+        },
+      },
+    ];
+    const settings = createSettings(createModel('sdxl'), { referenceImages });
+
+    const result = getSettingsWithCompatibleModelSelections(settings, createModel('sdxl', { key: 'sdxl-other' }), [
+      sdxlIpAdapter,
+    ]);
+
+    expect(result.settings.referenceImages).toBe(referenceImages);
+    expect(result.clearedLabels).not.toContain('Reference Images');
+  });
+
+  it('reports reference image support per model', () => {
+    expect(isReferenceImageSupported(createModel('sdxl'))).toBe(true);
+    expect(isReferenceImageSupported(createModel('cogview4'))).toBe(false);
+    expect(isReferenceImageSupported(createModel('qwen-image'))).toBe(false);
+    expect(isReferenceImageSupported(createModel('qwen-image', { variant: 'edit' }))).toBe(true);
+    expect(isReferenceImageSupported(externalModel)).toBe(false);
+    expect(
+      isReferenceImageSupported({
+        ...externalModel,
+        capabilities: { ...externalModel.capabilities, supports_reference_images: true },
+      })
+    ).toBe(true);
+    expect(isReferenceImageSupported(undefined)).toBe(false);
+  });
+
+  it('derives the reference image limit from external provider capabilities', () => {
+    expect(getMaxReferenceImages(createModel('sdxl'))).toBe(5);
+    expect(getMaxReferenceImages(createModel('cogview4'))).toBe(0);
+    expect(
+      getMaxReferenceImages({
+        ...externalModel,
+        capabilities: { ...externalModel.capabilities, max_reference_images: 14, supports_reference_images: true },
+      })
+    ).toBe(14);
+    expect(
+      getMaxReferenceImages({
+        ...externalModel,
+        capabilities: { ...externalModel.capabilities, supports_reference_images: true },
+      })
+    ).toBe(5);
+  });
+
+  it('rejects unsupported reference image configs for the selected model', () => {
+    const model = createModel('sd-3');
+
+    expect(
+      getGenerationValidationReasons(
+        model,
+        createSettings(model, {
+          referenceImages: [
+            { id: 'ref-1', isEnabled: true, config: { image: referenceImage, type: 'flux2_reference_image' } },
+          ],
+        })
+      )
+    ).toContain('Reference Image #1 is not supported by sd-3 model.');
+  });
+
+  it('reports missing reference image model dependencies', () => {
+    const model = createModel('sd-1');
+
+    expect(
+      getGenerationModelAvailabilityReasons(
+        model,
+        createSettings(model, {
+          referenceImages: [
+            {
+              id: 'ref-1',
+              isEnabled: true,
+              config: {
+                beginEndStepPct: [0, 1],
+                clipVisionModel: 'ViT-H',
+                image: referenceImage,
+                method: 'full',
+                model: sd1IpAdapter,
+                type: 'ip_adapter',
+                weight: 1,
+              },
+            },
+          ],
+        }),
+        [model as never]
+      )
+    ).toContain('Reference Image model "SD 1 IP Adapter" is no longer installed.');
+  });
+
+  it('ignores missing reference image model dependencies when the reference image is disabled', () => {
+    const model = createModel('sd-1');
+
+    expect(
+      getGenerationModelAvailabilityReasons(
+        model,
+        createSettings(model, {
+          referenceImages: [
+            {
+              id: 'ref-1',
+              isEnabled: false,
+              config: {
+                beginEndStepPct: [0, 1],
+                clipVisionModel: 'ViT-H',
+                image: referenceImage,
+                method: 'full',
+                model: sd1IpAdapter,
+                type: 'ip_adapter',
+                weight: 1,
+              },
+            },
+          ],
+        }),
+        [model as never]
+      )
+    ).toEqual([]);
   });
 });

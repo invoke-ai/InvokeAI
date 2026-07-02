@@ -11,6 +11,9 @@ import type {
   ComponentModelConfig,
   GenerateLora,
   GenerateModelConfig,
+  GenerateReferenceImage,
+  GenerateReferenceImageAsset,
+  GenerateReferenceImageConfig,
   GenerateSettings,
   MainModelConfig,
 } from './types';
@@ -85,6 +88,167 @@ const getCompatibleComponentSource = (
 
 const getCompatibleVae = (settings: GenerateSettings, bases: readonly string[]) =>
   settings.vae && isVaeForBases(bases)(settings.vae) ? settings.vae : null;
+
+const toImageField = (image: GenerateReferenceImageAsset) => ({ image_name: image.imageName });
+
+const getEnabledReferenceImages = <T extends GenerateReferenceImageConfig['type']>(
+  settings: GenerateSettings,
+  type: T
+): Array<GenerateReferenceImage & { config: Extract<GenerateReferenceImageConfig, { type: T }> }> =>
+  settings.referenceImages.filter(
+    (
+      referenceImage
+    ): referenceImage is GenerateReferenceImage & { config: Extract<GenerateReferenceImageConfig, { type: T }> } =>
+      referenceImage.isEnabled && referenceImage.config.type === type && referenceImage.config.image !== null
+  );
+
+const addReferenceImageMetadata = (
+  graph: BackendGraphContract,
+  outputNode: BackendInvocationContract,
+  settings: GenerateSettings
+) => {
+  const enabled = settings.referenceImages.filter(
+    (referenceImage) => referenceImage.isEnabled && referenceImage.config.image
+  );
+
+  if (enabled.length === 0) {
+    return;
+  }
+
+  const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+
+  if (metadata) {
+    metadata.ref_images = enabled;
+    return;
+  }
+
+  outputNode.ref_images = enabled;
+};
+
+const addIPAdapterReferenceImages = (
+  graph: BackendGraphContract,
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  denoise: BackendInvocationContract
+) => {
+  const refs = getEnabledReferenceImages(settings, 'ip_adapter').filter((ref) => ref.config.model?.base === model.base);
+
+  if (refs.length === 0) {
+    return;
+  }
+
+  const collector = addNode(graph, { id: createId('ip_adapter_collector'), type: 'collect' });
+
+  for (const ref of refs) {
+    const { beginEndStepPct, clipVisionModel, image, method, model: adapterModel, weight } = ref.config;
+
+    if (!image || !adapterModel) {
+      continue;
+    }
+
+    const node = addNode(graph, {
+      begin_step_percent: beginEndStepPct[0],
+      clip_vision_model: clipVisionModel,
+      end_step_percent: beginEndStepPct[1],
+      id: createId('ip_adapter'),
+      image: toImageField(image),
+      ip_adapter_model: adapterModel,
+      method,
+      type: model.base === 'flux' ? 'flux_ip_adapter' : 'ip_adapter',
+      weight,
+    });
+
+    addEdge(graph, node, 'ip_adapter', collector, 'item');
+  }
+
+  addEdge(graph, collector, 'collection', denoise, 'ip_adapter');
+};
+
+const FLUX_REDUX_INFLUENCE = {
+  lowest: { downsampling_factor: 5, weight: 1 },
+  low: { downsampling_factor: 4, weight: 1 },
+  medium: { downsampling_factor: 3, weight: 1 },
+  high: { downsampling_factor: 2, weight: 1 },
+  highest: { downsampling_factor: 1, weight: 1 },
+} as const;
+
+const addFluxReduxReferenceImages = (
+  graph: BackendGraphContract,
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  denoise: BackendInvocationContract
+) => {
+  const refs = getEnabledReferenceImages(settings, 'flux_redux').filter((ref) => ref.config.model?.base === model.base);
+
+  if (refs.length === 0) {
+    return;
+  }
+
+  const collector = addNode(graph, { id: createId('flux_redux_collector'), type: 'collect' });
+
+  for (const ref of refs) {
+    const { image, imageInfluence, model: reduxModel } = ref.config;
+
+    if (!image || !reduxModel) {
+      continue;
+    }
+
+    const node = addNode(graph, {
+      id: createId('flux_redux'),
+      image: toImageField(image),
+      redux_model: reduxModel,
+      type: 'flux_redux',
+      ...FLUX_REDUX_INFLUENCE[imageInfluence],
+    });
+
+    addEdge(graph, node, 'redux_cond', collector, 'item');
+  }
+
+  addEdge(graph, collector, 'collection', denoise, 'redux_conditioning');
+};
+
+const addFluxKontextReferenceImages = (
+  graph: BackendGraphContract,
+  settings: GenerateSettings,
+  denoise: BackendInvocationContract,
+  type: 'flux2_reference_image' | 'flux_kontext_reference_image'
+) => {
+  const refs = getEnabledReferenceImages(settings, type);
+
+  if (refs.length === 0) {
+    return;
+  }
+
+  let prevCollect: BackendInvocationContract | null = null;
+
+  for (const ref of refs) {
+    const { image } = ref.config;
+
+    if (!image) {
+      continue;
+    }
+
+    const kontext = addNode(graph, {
+      id: createId('flux_kontext'),
+      image: toImageField(image),
+      type: 'flux_kontext',
+    });
+    const collect = addNode(graph, {
+      id: createId(type === 'flux2_reference_image' ? 'flux2_kontext_collect' : 'flux_kontext_collect'),
+      type: 'collect',
+    });
+
+    addEdge(graph, kontext, 'kontext_cond', collect, 'item');
+    if (prevCollect) {
+      addEdge(graph, prevCollect, 'collection', collect, 'collection');
+    }
+    prevCollect = collect;
+  }
+
+  if (prevCollect) {
+    addEdge(graph, prevCollect, 'collection', denoise, 'kontext_conditioning');
+  }
+};
 
 const getDiffusersSource = (settings: GenerateSettings, model: MainModelConfig): MainModelConfig | undefined =>
   getCompatibleComponentSource(settings, model) ?? (model.format === 'diffusers' ? model : undefined);
@@ -322,11 +486,13 @@ const buildSDGraph = (
 
   addEdge(graph, unetSource, 'unet', denoise, 'unet');
   addEdge(graph, noise, 'noise', denoise, 'noise');
+  addIPAdapterReferenceImages(graph, settings, model, denoise);
   addEdge(graph, denoise, 'latents', output, 'latents');
   addEdge(graph, seamless ?? vaeLoader ?? modelLoader, 'vae', output, 'vae');
   addMetadata(graph, output, settings, model, model.base === 'sdxl' ? 'sdxl_txt2img' : 'txt2img', projectSettings, {
     scheduler,
   });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };
@@ -450,6 +616,11 @@ const buildFluxGraph = (
   addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_text_conditioning');
   addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
+  if (model.name.toLowerCase().includes('kontext')) {
+    addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
+  }
+  addIPAdapterReferenceImages(graph, settings, model, denoise);
+  addFluxReduxReferenceImages(graph, settings, model, denoise);
   addEdge(graph, denoise, 'latents', output, 'latents');
   addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {
     clip_embed_model: clipEmbedModel,
@@ -458,6 +629,7 @@ const buildFluxGraph = (
     t5_encoder: t5EncoderModel,
     vae: vaeModel,
   });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };
@@ -521,6 +693,7 @@ const buildFlux2Graph = (
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_text_conditioning');
   addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
+  addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
   addEdge(graph, denoise, 'latents', output, 'latents');
   addMetadata(graph, output, settings, model, 'flux2_txt2img', projectSettings, {
     qwen3_encoder: qwen3EncoderModel ?? undefined,
@@ -528,6 +701,7 @@ const buildFlux2Graph = (
     scheduler,
     vae: vaeModel ?? undefined,
   });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };
@@ -626,6 +800,49 @@ const buildQwenImageGraph = (
   }
 
   addEdge(graph, seed, 'value', denoise, 'seed');
+  const qwenReferenceImages =
+    model.variant === 'edit' ? getEnabledReferenceImages(settings, 'qwen_image_reference_image') : [];
+
+  if (qwenReferenceImages.length > 0) {
+    let prevCollect: BackendInvocationContract | null = null;
+
+    for (const { config } of qwenReferenceImages) {
+      if (!config.image) {
+        continue;
+      }
+
+      const imageNode = addNode(graph, {
+        id: createId('qwen_ref_img'),
+        image: toImageField(config.image),
+        type: 'image',
+      });
+      const collectNode = addNode(graph, { id: createId('qwen_ref_img_collect'), type: 'collect' });
+
+      addEdge(graph, imageNode, 'image', collectNode, 'item');
+      if (prevCollect) {
+        addEdge(graph, prevCollect, 'collection', collectNode, 'collection');
+      }
+      prevCollect = collectNode;
+    }
+
+    if (prevCollect) {
+      addEdge(graph, prevCollect, 'collection', posCond, 'reference_images');
+    }
+
+    const firstImage = qwenReferenceImages[0]?.config.image;
+    if (firstImage) {
+      const refI2l = addNode(graph, { id: createId('qwen_ref_i2l'), type: 'qwen_image_i2l' });
+      const refImageNode = addNode(graph, {
+        id: createId('qwen_ref_img_for_vae'),
+        image: toImageField(firstImage),
+        type: 'image',
+      });
+
+      addEdge(graph, refImageNode, 'image', refI2l, 'image');
+      addEdge(graph, modelLoader, 'vae', refI2l, 'vae');
+      addEdge(graph, refI2l, 'latents', denoise, 'reference_latents');
+    }
+  }
   addEdge(graph, denoise, 'latents', output, 'latents');
   addMetadata(graph, output, settings, model, 'qwen_image_txt2img', projectSettings, {
     qwen_image_component_source: sourceModel,
@@ -633,6 +850,7 @@ const buildQwenImageGraph = (
     qwen_image_vae: vaeModel ?? undefined,
     scheduler: undefined,
   });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };
@@ -832,7 +1050,18 @@ const buildExternalGraph = (
   if (model.capabilities?.supports_seed === true) {
     addEdge(graph, seed, 'value', output, 'seed');
   }
+  if (model.capabilities?.supports_reference_images === true) {
+    const referenceImages = getEnabledReferenceImages(settings, 'external_reference_image')
+      .map((referenceImage) => referenceImage.config.image)
+      .filter((image): image is GenerateReferenceImageAsset => image !== null)
+      .map(toImageField);
+
+    if (referenceImages.length > 0) {
+      (output as Record<string, unknown>).reference_images = referenceImages;
+    }
+  }
   addMetadata(graph, output, settings, model, null, projectSettings, { scheduler: undefined });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };

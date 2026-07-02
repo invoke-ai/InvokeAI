@@ -53,6 +53,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   positivePromptHeightPx: 96,
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
+  referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
   seamlessYAxis: false,
@@ -126,6 +127,82 @@ describe('image recall', () => {
     expect(result?.fields).toContain('vae');
     expect(result?.fields).toContain('prompts');
     expect(result?.fields).toContain('seed');
+  });
+
+  it('recalls reference images from metadata, re-targeting configs to the effective model', () => {
+    // The metadata model is not installed, so the current SDXL model stays
+    // selected and the Qwen reference config is rebuilt for SDXL.
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        ref_images: [
+          {
+            id: 'ref-1',
+            isEnabled: true,
+            config: {
+              image: {
+                height: 770,
+                imageName: 'reference.png',
+                imageUrl: '/api/v1/images/i/reference.png/full',
+                queuedAt: '2026-01-01T00:00:00.000Z',
+                sourceQueueItemId: 'backend-gallery',
+                thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
+                width: 513,
+              },
+              type: 'qwen_image_reference_image',
+            },
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toHaveLength(1);
+    expect(result?.values.referenceImages[0]?.config).toMatchObject({
+      image: { imageName: 'reference.png' },
+      type: 'ip_adapter',
+    });
+    expect(result?.fields).toContain('referenceImages');
+  });
+
+  it('drops recalled reference images when the effective model does not support them', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: animaModel, modelKey: animaModel.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        positive_prompt: 'a recalled prompt',
+        ref_images: [
+          {
+            id: 'ref-1',
+            isEnabled: true,
+            config: {
+              image: {
+                height: 770,
+                imageName: 'reference.png',
+                imageUrl: '/api/v1/images/i/reference.png/full',
+                queuedAt: '2026-01-01T00:00:00.000Z',
+                sourceQueueItemId: 'backend-gallery',
+                thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
+                width: 513,
+              },
+              type: 'qwen_image_reference_image',
+            },
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [animaModel],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('prompts');
+    expect(result?.values.referenceImages).toEqual([]);
+    expect(result?.fields).not.toContain('referenceImages');
   });
 
   it('remixes without changing the current seed state', () => {
