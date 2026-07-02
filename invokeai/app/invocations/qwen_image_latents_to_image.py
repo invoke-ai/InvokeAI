@@ -19,6 +19,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.krea2.vae_compat import as_qwen_image_vae
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
 
 
 @invocation(
@@ -40,9 +41,15 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
+        assert isinstance(vae_info.model, AutoencoderKLQwenImage)
+        estimated_working_memory = estimate_vae_working_memory_qwen_image(
+            operation="decode",
+            image_tensor=latents,
+            vae=vae_info.model,
+        )
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
-            vae_info.model_on_device() as (_, vae),
+            vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae),
         ):
             context.util.signal_progress("Running VAE")
             # A native-layout qwen_image_vae single file is classified with the Anima base and loaded

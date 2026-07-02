@@ -18,6 +18,7 @@ from invokeai.backend.krea2.vae_compat import as_qwen_image_vae
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
 
 
 @invocation(
@@ -44,10 +45,14 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
     @staticmethod
     def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
-        with vae_info.model_on_device() as (_, vae):
-            # A native-layout qwen_image_vae single file is classified with the Anima base and loaded
-            # as AutoencoderKLWan; reinterpret it as AutoencoderKLQwenImage (identical weights).
-            vae = as_qwen_image_vae(vae)
+        assert isinstance(vae_info.model, AutoencoderKLQwenImage)
+        estimated_working_memory = estimate_vae_working_memory_qwen_image(
+            operation="encode",
+            image_tensor=image_tensor,
+            vae=vae_info.model,
+        )
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+            assert isinstance(vae, AutoencoderKLQwenImage)
 
             vae.disable_tiling()
 

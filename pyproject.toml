@@ -35,7 +35,7 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
-  "compel==2.1.1",
+  "compel>=2.4.0,<3",
   # WIP (Krea-2 support): Krea2Pipeline/Krea2Transformer2DModel only exist in diffusers main (>=0.39 dev).
   # This unpins diffusers from 0.37.0 to a git build for testing. Re-pin to the stable release that
   # contains Krea-2 before merging, then un-draft the PR.
@@ -56,7 +56,7 @@ dependencies = [
   "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
-  "transformers>=4.56.0",
+  "transformers>=5.5,<5.6",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
