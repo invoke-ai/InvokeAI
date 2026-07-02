@@ -41,7 +41,10 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
-        assert isinstance(vae_info.model, AutoencoderKLQwenImage)
+        # NOTE: vae_info.model may be an AutoencoderKLWan (a native-layout qwen_image_vae single file is
+        # classified with the Anima base); it is reinterpreted as AutoencoderKLQwenImage inside the
+        # model_on_device context below. The working-memory estimate only reads tensor shape + element
+        # size, so it is safe to run on either class here.
         estimated_working_memory = estimate_vae_working_memory_qwen_image(
             operation="decode",
             image_tensor=latents,

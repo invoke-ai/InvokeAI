@@ -167,6 +167,12 @@ class Krea2VariantType(str, Enum):
     NOTE: the value is ``krea2_turbo`` (not ``turbo``) to avoid colliding with
     ``ZImageVariantType.Turbo`` in the variant-string adapter and frontend label maps."""
 
+    Base = "krea2_base"
+    """Krea-2-Raw - undistilled base model. Runs with more steps (~28) and CFG enabled (~4.5),
+    using resolution-aware timestep shifting (``is_distilled=false`` in model_index.json).
+
+    NOTE: the value is ``krea2_base`` (not ``base``) for the same disambiguation reason as ``Turbo``."""
+
 
 class QwenImageVariantType(str, Enum):
     """Qwen Image model variants."""

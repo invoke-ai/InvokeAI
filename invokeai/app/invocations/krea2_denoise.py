@@ -144,16 +144,25 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
 
     def _is_distilled(self, context: InvocationContext) -> bool:
-        """Read is_distilled from the model's model_index.json (pipeline-level flag)."""
+        """Whether the transformer is the distilled Turbo checkpoint (fixed mu) vs. Raw (dynamic mu).
+
+        Prefer the classified variant (works for diffusers, single-file and GGUF alike); fall back to
+        the pipeline-level ``is_distilled`` flag in model_index.json, then default to distilled.
+        """
+        from invokeai.backend.model_manager.taxonomy import Krea2VariantType
+
         try:
-            model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
-            model_index = model_path / "model_index.json"
+            config = context.models.get_config(self.transformer.transformer)
+            variant = getattr(config, "variant", None)
+            if variant is not None:
+                return variant != Krea2VariantType.Base
+            model_index = context.models.get_absolute_path(config) / "model_index.json"
             if model_index.is_file():
                 with open(model_index) as f:
                     return bool(json.load(f).get("is_distilled", False))
         except Exception:
             pass
-        # Only the distilled Turbo checkpoint is currently supported.
+        # Default to the distilled Turbo behavior.
         return True
 
     def _run_diffusion(self, context: InvocationContext):

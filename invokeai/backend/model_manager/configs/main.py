@@ -102,8 +102,10 @@ class MainModelDefaultSettings(BaseModel):
             case BaseModelType.QwenImage:
                 return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
             case BaseModelType.Krea2:
-                # Krea-2-Turbo is distilled: 8 steps, CFG disabled (guidance_scale=0).
-                # cfg_scale has a floor of 1 (ge=1); 1.0 means "no guidance" for the Krea-2 denoise loop.
+                # Krea-2-Raw (Base, undistilled) needs more steps and CFG; Turbo (distilled) uses 8
+                # steps with CFG disabled. cfg_scale has a floor of 1 (ge=1); 1.0 means "no guidance".
+                if variant == Krea2VariantType.Base:
+                    return cls(steps=28, cfg_scale=4.5, width=1024, height=1024)
                 return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
@@ -198,6 +200,20 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
                 return True
 
     return False
+
+
+def _get_krea2_variant_from_name(name: str) -> Krea2VariantType:
+    """Guess the Krea-2 variant from a single-file/GGUF filename.
+
+    Turbo and Raw (Base) share the identical transformer architecture, so a single-file checkpoint
+    cannot be distinguished from its weights. Filenames containing "raw" or "base" (e.g.
+    "Krea-2-Raw", "krea2_base_q4") indicate the undistilled Base model; everything else defaults to
+    the distilled Turbo. The user can override the variant in the model manager.
+    """
+    lowered = name.lower()
+    if "raw" in lowered or "base" in lowered:
+        return Krea2VariantType.Base
+    return Krea2VariantType.Turbo
 
 
 def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -1376,9 +1392,18 @@ class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
     @classmethod
     def _get_variant(cls, mod: ModelOnDisk) -> Krea2VariantType:
-        """Determine the Krea-2 variant. Only the distilled Turbo checkpoint is currently supported."""
-        # The distilled (Turbo) checkpoint sets is_distilled=true in model_index.json. Base (midtrain)
-        # support is not yet implemented, so everything currently maps to Turbo.
+        """Determine the Krea-2 variant from the pipeline-level ``is_distilled`` flag.
+
+        Krea-2-Turbo sets ``is_distilled=true`` in model_index.json (distilled, 8 steps, CFG off);
+        Krea-2-Raw sets ``is_distilled=false`` (undistilled Base, more steps, CFG on). The transformer
+        architectures are identical, so this flag is the only reliable discriminator.
+        """
+        try:
+            config = get_config_dict_or_raise(mod.path / "model_index.json")
+            if config.get("is_distilled", True) is False:
+                return Krea2VariantType.Base
+        except Exception:
+            pass
         return Krea2VariantType.Turbo
 
 
@@ -1399,7 +1424,7 @@ class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
 
-        variant = override_fields.pop("variant", None) or Krea2VariantType.Turbo
+        variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
 
         return cls(**override_fields, variant=variant)
 
@@ -1431,7 +1456,7 @@ class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
 
         cls._validate_looks_like_gguf_quantized(mod)
 
-        variant = override_fields.pop("variant", None) or Krea2VariantType.Turbo
+        variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
 
         return cls(**override_fields, variant=variant)
 

@@ -45,14 +45,18 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
     @staticmethod
     def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
-        assert isinstance(vae_info.model, AutoencoderKLQwenImage)
+        # NOTE: vae_info.model may be an AutoencoderKLWan (a native-layout qwen_image_vae single file is
+        # classified with the Anima base); it is reinterpreted as AutoencoderKLQwenImage inside the
+        # model_on_device context below. The working-memory estimate only reads tensor shape + element
+        # size, so it is safe to run on either class here.
         estimated_working_memory = estimate_vae_working_memory_qwen_image(
             operation="encode",
             image_tensor=image_tensor,
             vae=vae_info.model,
         )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
-            assert isinstance(vae, AutoencoderKLQwenImage)
+            # Reinterpret an Anima-classified Wan VAE as AutoencoderKLQwenImage (identical weights).
+            vae = as_qwen_image_vae(vae)
 
             vae.disable_tiling()
 

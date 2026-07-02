@@ -259,6 +259,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   turbo: 'Z-Image Turbo',
   zbase: 'Z-Image Base',
   krea2_turbo: 'Krea-2 Turbo',
+  krea2_base: 'Krea-2 Raw',
   large: 'CLIP L',
   gigantic: 'CLIP G',
   generate: 'Qwen Image',
@@ -302,4 +303,5 @@ export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-3',
   'z-image',
   'anima',
+  'krea-2',
 ];

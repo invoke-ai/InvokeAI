@@ -805,6 +805,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -829,6 +832,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -845,6 +851,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -922,6 +931,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
@@ -959,6 +971,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -1126,6 +1144,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1150,6 +1171,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -1166,6 +1190,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -1243,6 +1270,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
@@ -1280,6 +1310,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -1447,6 +1483,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1471,6 +1510,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -1487,6 +1529,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -1564,6 +1609,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
@@ -1601,6 +1649,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -1818,6 +1872,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1842,6 +1899,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -1858,6 +1918,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -1935,6 +1998,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
@@ -1972,6 +2038,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -2213,6 +2285,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -2237,6 +2312,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -2253,6 +2331,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -2330,6 +2411,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
@@ -2367,6 +2451,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -3428,6 +3518,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -3452,6 +3545,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -3468,6 +3564,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -3545,6 +3644,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
@@ -3582,6 +3684,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -11471,6 +11579,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
           },
           {
@@ -11495,6 +11606,9 @@
             "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
           },
           {
@@ -11511,6 +11625,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
           },
           {
             "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -11588,6 +11705,9 @@
             "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
           },
           {
@@ -11625,6 +11745,12 @@
           },
           {
             "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
           },
           {
             "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -12006,6 +12132,7 @@
           "external",
           "qwen-image",
           "anima",
+          "krea-2",
           "unknown"
         ],
         "title": "BaseModelType",
@@ -18918,7 +19045,11 @@
                   "anima_txt2img",
                   "anima_img2img",
                   "anima_inpaint",
-                  "anima_outpaint"
+                  "anima_outpaint",
+                  "krea2_txt2img",
+                  "krea2_img2img",
+                  "krea2_inpaint",
+                  "krea2_outpaint"
                 ],
                 "type": "string"
               },
@@ -29092,6 +29223,27 @@
                   "$ref": "#/components/schemas/IterateInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2LoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2LoRALoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2ModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2SeedVarianceInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2TextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/LaMaInfillInvocation"
                 },
                 {
@@ -29639,6 +29791,15 @@
                 },
                 {
                   "$ref": "#/components/schemas/IterateInvocationOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2ModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/LatentsCollectionOutput"
@@ -36675,6 +36836,27 @@
                 "$ref": "#/components/schemas/IterateInvocation"
               },
               {
+                "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2SeedVarianceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2TextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/LaMaInfillInvocation"
               },
               {
@@ -37179,6 +37361,15 @@
               },
               {
                 "$ref": "#/components/schemas/IterateInvocationOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ModelLoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/LatentsCollectionOutput"
@@ -37802,6 +37993,27 @@
               },
               {
                 "$ref": "#/components/schemas/IterateInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2SeedVarianceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/LaMaInfillInvocation"
@@ -38616,6 +38828,27 @@
           "iterate": {
             "$ref": "#/components/schemas/IterateInvocationOutput"
           },
+          "krea2_conditioning_rebalance": {
+            "$ref": "#/components/schemas/Krea2ConditioningOutput"
+          },
+          "krea2_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "krea2_lora_collection_loader": {
+            "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
+          },
+          "krea2_lora_loader": {
+            "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
+          },
+          "krea2_model_loader": {
+            "$ref": "#/components/schemas/Krea2ModelLoaderOutput"
+          },
+          "krea2_seed_variance": {
+            "$ref": "#/components/schemas/Krea2ConditioningOutput"
+          },
+          "krea2_text_encoder": {
+            "$ref": "#/components/schemas/Krea2ConditioningOutput"
+          },
           "l2i": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -39107,6 +39340,13 @@
           "invokeai_img_val_thresholds",
           "ip_adapter",
           "iterate",
+          "krea2_conditioning_rebalance",
+          "krea2_denoise",
+          "krea2_lora_collection_loader",
+          "krea2_lora_loader",
+          "krea2_model_loader",
+          "krea2_seed_variance",
+          "krea2_text_encoder",
           "l2i",
           "latents",
           "latents_collection",
@@ -39699,6 +39939,27 @@
               },
               {
                 "$ref": "#/components/schemas/IterateInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2SeedVarianceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/LaMaInfillInvocation"
@@ -40586,6 +40847,27 @@
               },
               {
                 "$ref": "#/components/schemas/IterateInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2LoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2SeedVarianceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/LaMaInfillInvocation"
@@ -42811,6 +43093,964 @@
         "type": "object"
       },
       "JsonValue": {},
+      "Krea2ConditioningField": {
+        "description": "A Krea-2 conditioning tensor primitive value",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "Krea2ConditioningField",
+        "type": "object"
+      },
+      "Krea2ConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output a Krea-2 conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/Krea2ConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "krea2_conditioning_output",
+            "default": "krea2_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "Krea2ConditioningOutput",
+        "type": "object"
+      },
+      "Krea2ConditioningRebalanceInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Per-layer rebalancing of Krea-2 text conditioning (improves prompt adherence).\n\nKrea-2 conditioning stacks 12 Qwen3-VL hidden-state layers per token. Weighting those layers\nindividually (and applying an overall multiplier) lets you push the model harder toward the prompt,\ncounteracting the quality-dilution from distillation. Ported from the ComfyUI\n`ConditioningKrea2Rebalance` node. This is an optional pass between the text encoder and denoise.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Krea2ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Conditioning"
+          },
+          "per_layer_weights": {
+            "default": "1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0",
+            "description": "Comma-separated gains for the 12 tapped encoder layers (exactly 12 values).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0",
+            "orig_required": false,
+            "title": "Per Layer Weights",
+            "type": "string"
+          },
+          "multiplier": {
+            "default": 4.0,
+            "description": "Overall multiplier applied to the conditioning after per-layer weighting.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 4.0,
+            "orig_required": false,
+            "title": "Multiplier",
+            "type": "number"
+          },
+          "type": {
+            "const": "krea2_conditioning_rebalance",
+            "default": "krea2_conditioning_rebalance",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["conditioning", "krea2", "krea-2"],
+        "title": "Conditioning Rebalance - Krea-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Krea2ConditioningOutput"
+        }
+      },
+      "Krea2DenoiseInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run the denoising process with a Krea-2 model.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoise_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DenoiseMaskField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Krea-2 model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Krea2ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "negative_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Krea2ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "cfg_scale": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              }
+            ],
+            "default": 1.0,
+            "description": "Classifier-Free Guidance scale",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "CFG Scale"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 8,
+            "description": "Number of steps to run",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 8,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "shift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override the resolution-aware timestep shift (mu). Leave unset to use the model default (mu=1.15 for the distilled Turbo checkpoint).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Shift"
+          },
+          "type": {
+            "const": "krea2_denoise",
+            "default": "krea2_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "krea2", "krea-2"],
+        "title": "Denoise - Krea-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "Krea2LoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Applies a collection of LoRAs to a Krea-2 transformer and/or Qwen3-VL encoder.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA models and weights. May be a single LoRA or collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3-VL Encoder"
+          },
+          "type": {
+            "const": "krea2_lora_collection_loader",
+            "default": "krea2_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "krea2", "krea-2"],
+        "title": "Apply LoRA Collection - Krea-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
+        }
+      },
+      "Krea2LoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Apply a LoRA model to a Krea-2 transformer and/or Qwen3-VL text encoder.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["krea-2"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 0.75,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Krea-2 Transformer"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3-VL Encoder"
+          },
+          "type": {
+            "const": "krea2_lora_loader",
+            "default": "krea2_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "krea2", "krea-2"],
+        "title": "Apply LoRA - Krea-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
+        }
+      },
+      "Krea2LoRALoaderOutput": {
+        "class": "output",
+        "description": "Krea-2 LoRA Loader Output",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Krea-2 Transformer",
+            "ui_hidden": false
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "output",
+            "title": "Qwen3-VL Encoder",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "krea2_lora_loader_output",
+            "default": "krea2_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen3_vl_encoder", "type", "type"],
+        "title": "Krea2LoRALoaderOutput",
+        "type": "object"
+      },
+      "Krea2ModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a Krea-2 model, outputting its submodels.\n\nBy default the VAE (Qwen-Image VAE) and Qwen3-VL text encoder are extracted from the Krea-2\ndiffusers pipeline. Standalone overrides may be supplied (e.g. when the transformer is a\nsingle-file checkpoint that has no bundled VAE / encoder).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Krea-2 model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Transformer",
+            "ui_model_base": ["krea-2"],
+            "ui_model_type": ["main"]
+          },
+          "vae_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone VAE model. Krea-2 uses the Qwen-Image VAE (16-channel). If not provided, the VAE is loaded from the Krea-2 (diffusers) model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_type": ["vae"]
+          },
+          "qwen3_vl_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3-VL Encoder model. If not provided, the encoder is loaded from the Krea-2 (diffusers) model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3-VL Encoder",
+            "ui_model_type": ["qwen3_vl_encoder"]
+          },
+          "type": {
+            "const": "krea2_model_loader",
+            "default": "krea2_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "krea2", "krea-2"],
+        "title": "Main Model - Krea-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Krea2ModelLoaderOutput"
+        }
+      },
+      "Krea2ModelLoaderOutput": {
+        "class": "output",
+        "description": "Krea-2 base model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "qwen3_vl_encoder": {
+            "$ref": "#/components/schemas/Qwen3VLEncoderField",
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "output",
+            "title": "Qwen3-VL Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "krea2_model_loader_output",
+            "default": "krea2_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen3_vl_encoder", "vae", "type", "type"],
+        "title": "Krea2ModelLoaderOutput",
+        "type": "object"
+      },
+      "Krea2SeedVarianceInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Inject per-seed diversity into Krea-2 text conditioning.\n\nDistilled few-step models (like Krea-2-Turbo) suffer from low seed variance \u2014 different seeds give\nnear-identical images. This adds seeded uniform noise to a random subset of the text-embedding\nvalues, trading some prompt adherence for variety (the same idea as the Z-Image-Turbo\n`SeedVarianceEnhancer`). Optional pass between the text encoder and denoise; the defaults are\naggressive and may need tuning for Krea-2.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Krea2ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Conditioning"
+          },
+          "strength": {
+            "default": 20.0,
+            "description": "Magnitude of the uniform noise added to the embeddings (noise in [-strength, +strength]).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 20.0,
+            "orig_required": false,
+            "title": "Strength",
+            "type": "number"
+          },
+          "randomize_percent": {
+            "default": 50.0,
+            "description": "Percentage of embedding values that get perturbed (Bernoulli mask).",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "orig_default": 50.0,
+            "orig_required": false,
+            "title": "Randomize Percent",
+            "type": "number"
+          },
+          "variance_seed": {
+            "default": 0,
+            "description": "Seed for the variance noise (vary this to get variety).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Variance Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "krea2_seed_variance",
+            "default": "krea2_seed_variance",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["conditioning", "krea2", "krea-2", "variance"],
+        "title": "Seed Variance - Krea-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Krea2ConditioningOutput"
+        }
+      },
+      "Krea2TextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a text prompt for Krea-2 using the Qwen3-VL text encoder.\n\nThe encoder taps 12 decoder hidden-state layers and stacks them per token, producing a 4D\nconditioning tensor (B, seq, 12, hidden) that the Krea-2 transformer's text-fusion stage consumes.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt describing the desired image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3-VL Encoder"
+          },
+          "type": {
+            "const": "krea2_text_encoder",
+            "default": "krea2_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "krea2", "krea-2"],
+        "title": "Prompt - Krea-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Krea2ConditioningOutput"
+        }
+      },
+      "Krea2VariantType": {
+        "type": "string",
+        "enum": ["krea2_turbo", "krea2_base"],
+        "title": "Krea2VariantType",
+        "description": "Krea 2 model variants."
+      },
       "LaMaInfillInvocation": {
         "category": "inpaint",
         "class": "invocation",
@@ -45567,6 +46807,158 @@
         "title": "LoRA_LyCORIS_Flux2_Config",
         "description": "Model config for FLUX.2 (Klein) LoRA models in LyCORIS format."
       },
+      "LoRA_LyCORIS_Krea2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "krea-2",
+            "title": "Base",
+            "default": "krea-2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_Krea2_Config",
+        "description": "Model config for Krea-2 LoRA models in LyCORIS (single-file diffusers PEFT) format."
+      },
       "LoRA_LyCORIS_QwenImage_Config": {
         "properties": {
           "key": {
@@ -47923,6 +49315,175 @@
         "title": "Main_Checkpoint_Flux2_Config",
         "description": "Model config for FLUX.2 checkpoint models (e.g. Klein)."
       },
+      "Main_Checkpoint_Krea2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "krea-2",
+            "title": "Base",
+            "default": "krea-2"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Krea2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_Checkpoint_Krea2_Config",
+        "description": "Model config for Krea-2 single-file checkpoint models (safetensors, etc)."
+      },
       "Main_Checkpoint_QwenImage_Config": {
         "properties": {
           "key": {
@@ -49434,6 +50995,167 @@
         "title": "Main_Diffusers_Flux2_Config",
         "description": "Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."
       },
+      "Main_Diffusers_Krea2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "krea-2",
+            "title": "Base",
+            "default": "krea-2"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Krea2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_Krea2_Config",
+        "description": "Model config for Krea-2 diffusers models (Krea-2-Turbo)."
+      },
       "Main_Diffusers_QwenImage_Config": {
         "properties": {
           "key": {
@@ -50931,6 +52653,175 @@
         ],
         "title": "Main_GGUF_Flux2_Config",
         "description": "Model config for GGUF-quantized FLUX.2 checkpoint models (e.g. Klein)."
+      },
+      "Main_GGUF_Krea2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "krea-2",
+            "title": "Base",
+            "default": "krea-2"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Krea2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_GGUF_Krea2_Config",
+        "description": "Model config for GGUF-quantized Krea-2 transformer models (single-file)."
       },
       "Main_GGUF_QwenImage_Config": {
         "properties": {
@@ -54788,6 +56679,7 @@
           "t5_encoder",
           "qwen3_encoder",
           "qwen_vl_encoder",
+          "qwen3_vl_encoder",
           "bnb_quantized_int8b",
           "bnb_quantized_nf4b",
           "gguf_quantized",
@@ -55062,6 +56954,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -55086,6 +56981,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
               },
               {
@@ -55102,6 +57000,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -55179,6 +57080,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
@@ -55216,6 +57120,12 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -55634,6 +57544,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                   },
                   {
@@ -55658,6 +57571,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                   },
                   {
@@ -55674,6 +57590,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                   },
                   {
                     "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -55751,6 +57670,9 @@
                     "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                   },
                   {
@@ -55788,6 +57710,12 @@
                   },
                   {
                     "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -56091,6 +58019,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -56115,6 +58046,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
               },
               {
@@ -56131,6 +58065,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -56208,6 +58145,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
@@ -56245,6 +58185,12 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -56398,6 +58344,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -56422,6 +58371,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
               },
               {
@@ -56438,6 +58390,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -56515,6 +58470,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
@@ -56552,6 +58510,12 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -56963,6 +58927,9 @@
                 "$ref": "#/components/schemas/Qwen3VariantType"
               },
               {
+                "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -57101,6 +59068,7 @@
           "t5_encoder",
           "qwen3_encoder",
           "qwen_vl_encoder",
+          "qwen3_vl_encoder",
           "spandrel_image_to_image",
           "siglip",
           "flux_redux",
@@ -57154,6 +59122,9 @@
                   "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                 },
                 {
@@ -57178,6 +59149,9 @@
                   "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                 },
                 {
@@ -57194,6 +59168,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
@@ -57271,6 +59248,9 @@
                   "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                 },
                 {
@@ -57308,6 +59288,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -59961,6 +61947,315 @@
         ],
         "title": "Qwen3Encoder_Qwen3Encoder_Config",
         "description": "Configuration for Qwen3 Encoder models in a diffusers-like format.\n\nThe model weights are expected to be in a folder called text_encoder inside the model directory,\ncompatible with Qwen2VLForConditionalGeneration or similar architectures used by Z-Image."
+      },
+      "Qwen3VLEncoderField": {
+        "description": "Field for the Qwen3-VL text encoder used by Krea-2 models.",
+        "properties": {
+          "tokenizer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load tokenizer submodel"
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load text_encoder submodel"
+          },
+          "loras": {
+            "description": "LoRAs to apply on model loading",
+            "items": {
+              "$ref": "#/components/schemas/LoRAField"
+            },
+            "title": "Loras",
+            "type": "array"
+          }
+        },
+        "required": ["tokenizer", "text_encoder"],
+        "title": "Qwen3VLEncoderField",
+        "type": "object"
+      },
+      "Qwen3VLEncoder_Checkpoint_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_vl_encoder",
+            "title": "Type",
+            "default": "qwen3_vl_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "Qwen3VLEncoder_Checkpoint_Config",
+        "description": "Configuration for a single-file Qwen3-VL text encoder checkpoint (e.g. ComfyUI ``qwen3vl_4b_*``).\n\nDistinguished from the text-only ``Qwen3Encoder`` checkpoint (Z-Image) by the presence of the\nQwen3-VL visual tower. The tokenizer is not bundled in single-file checkpoints and is pulled from\nHuggingFace (``Qwen/Qwen3-VL-4B-Instruct``) by the loader."
+      },
+      "Qwen3VLEncoder_Qwen3VLEncoder_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_vl_encoder",
+            "title": "Type",
+            "default": "qwen3_vl_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "qwen3_vl_encoder",
+            "title": "Format",
+            "default": "qwen3_vl_encoder"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "Qwen3VLEncoder_Qwen3VLEncoder_Config",
+        "description": "Configuration for standalone Qwen3-VL text encoder models (diffusers-like directory format).\n\nUsed by Krea-2, whose text conditioning comes from a Qwen3-VL model (``Qwen3VLModel``). The model\nweights are expected either in a ``text_encoder`` subfolder of the model directory or directly at the\nroot (standalone download). This is distinct from the text-only ``Qwen3Encoder`` (Z-Image / FLUX.2\nKlein) and the Qwen2.5-VL ``QwenVLEncoder`` (Qwen Image)."
       },
       "Qwen3VariantType": {
         "type": "string",
@@ -66440,6 +68735,9 @@
                 "$ref": "#/components/schemas/Qwen3VariantType"
               },
               {
+                "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -66598,6 +68896,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
                 "type": "null"
@@ -67530,6 +69831,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
                 "type": "null"
