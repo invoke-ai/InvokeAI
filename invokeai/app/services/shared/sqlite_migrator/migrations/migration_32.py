@@ -84,6 +84,8 @@ def build_migration_32() -> Migration:
     broken by migration 22 rebuilding the models table.
     """
     return Migration(
+        id="migration_32",
+        depends_on="migration_31",
         from_version=31,
         to_version=32,
         callback=Migration32Callback(),

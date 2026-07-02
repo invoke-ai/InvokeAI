@@ -31,6 +31,8 @@ class Migration19Callback:
 
 def build_migration_19(app_config: InvokeAIAppConfig) -> Migration:
     return Migration(
+        id="migration_19",
+        depends_on="migration_18",
         from_version=18,
         to_version=19,
         callback=Migration19Callback(app_config),
