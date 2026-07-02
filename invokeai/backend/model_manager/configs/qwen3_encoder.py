@@ -173,9 +173,7 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         # Reject T5 encoders: they share the token_embd.weight key with Qwen3 GGUFs but use the ``enc.``
         # block prefix, and must be classified as T5Encoder (Qwen3 encoders never have ``enc.blk.*`` keys).
         if _has_t5_encoder_keys(state_dict):
-            raise NotAMatchError(
-                "state dict looks like a T5 encoder (has 'enc.blk.*' keys), not a Qwen3 encoder"
-            )
+            raise NotAMatchError("state dict looks like a T5 encoder (has 'enc.blk.*' keys), not a Qwen3 encoder")
         # Reject Qwen2.5-VL / Qwen2-VL encoders: they carry a visual tower and must be
         # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
         if _has_qwen_vl_visual_tower(state_dict):
@@ -320,9 +318,7 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # Reject T5 encoders: they share the token_embd.weight key with Qwen3 GGUFs but use the ``enc.``
         # block prefix, and must be classified as T5Encoder (Qwen3 encoders never have ``enc.blk.*`` keys).
         if _has_t5_encoder_keys(state_dict):
-            raise NotAMatchError(
-                "state dict looks like a T5 encoder (has 'enc.blk.*' keys), not a Qwen3 encoder"
-            )
+            raise NotAMatchError("state dict looks like a T5 encoder (has 'enc.blk.*' keys), not a Qwen3 encoder")
         # Reject Qwen2.5-VL / Qwen2-VL encoders: they carry a visual tower and must be
         # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
         if _has_qwen_vl_visual_tower(state_dict):

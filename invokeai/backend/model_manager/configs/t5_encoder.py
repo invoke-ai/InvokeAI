@@ -113,9 +113,9 @@ class T5Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # llama.cpp T5 encoders use the ``enc.`` prefix on their transformer blocks and final norm. This
         # distinguishes them from decoder-only GGUF models (e.g. Qwen3, which uses bare ``blk.*``).
         state_dict = mod.load_state_dict()
-        if not state_dict_has_any_keys_starting_with(state_dict, "enc.blk.") and not state_dict_has_any_keys_ending_with(
-            state_dict, "enc.output_norm.weight"
-        ):
+        if not state_dict_has_any_keys_starting_with(
+            state_dict, "enc.blk."
+        ) and not state_dict_has_any_keys_ending_with(state_dict, "enc.output_norm.weight"):
             raise NotAMatchError("state dict does not look like a T5 encoder (no 'enc.blk.*' keys)")
 
     @classmethod
