@@ -1,0 +1,95 @@
+---
+title: دوكر (Docker)
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components'
+
+import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
+
+<SystemRequirementsLink />
+
+:::note[أنظمة التشغيل ودعم GPU]
+  <Tabs syncKey="operatingSystem">
+    <TabItem label="ويندوز" icon="seti:windows">
+      يتضمن Docker Desktop على ويندوز [دعم GPU](https://www.docker.com/blog/wsl-2-gpu-support-for-docker-desktop-on-nvidia-gpus/).
+    </TabItem>
+    <TabItem label="ماك" icon="apple">
+      لا يمكن لـ Docker الوصول إلى GPU على macOS، لذا ستكون سرعات التوليد لديك بطيئة. استخدم [المشغل](../../start-here/installation) بدلاً من ذلك.
+    </TabItem>
+    <TabItem label="لينكس" icon="linux">
+      قم بتهيئة Docker للوصول إلى GPU الخاص بجهازك.
+      اتبع وثائق [NVIDIA](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) أو [AMD](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html).
+    </TabItem>
+  </Tabs>
+:::
+
+## خلاصة
+
+تأكد من أن إعداد Docker الخاص بك قادر على استخدام GPU الخاص بك. ثم:
+
+```bash
+docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
+```
+
+بمجرد بدء تشغيل الحاوية، افتح [http://localhost:9090](http://localhost:9090) في متصفحك، وقم بتثبيت بعض النماذج، وابدأ التوليد.
+
+## البناء بنفسك
+
+جميع مواد Docker موجودة داخل دليل [docker](https://github.com/invoke-ai/InvokeAI/tree/main/docker) في مستودع Git.
+
+```bash
+cd docker
+cp .env.sample .env
+docker compose up
+```
+
+نقوم أيضاً بتوفير البرنامج النصي المساعد `run.sh`. راجع ملف `docker/README.md` للحصول على تعليمات مفصلة حول كيفية تخصيص إعداد Docker لاحتياجاتك.
+
+### المتطلبات الأساسية
+
+#### تثبيت [Docker](https://github.com/santisbon/guides#docker)
+
+على تطبيق [Docker Desktop](https://docs.docker.com/get-docker/)، اذهب إلى `Preferences` -> `Resources` -> `Advanced`. قم بزيادة CPUs والذاكرة لتجنب هذه [المشكلة](https://github.com/invoke-ai/InvokeAI/issues/342). قد تحتاج أيضاً إلى زيادة Swap وحجم صورة القرص.
+
+### الإعداد
+
+قم بإعداد متغيرات البيئة الخاصة بك. في دليل `docker`، انسخ `.env.sample` وسمِّه `.env`. قم بإجراء التغييرات حسب الحاجة.
+
+يمكن تعيين أي متغيرات بيئة يدعمها InvokeAI هنا — يرجى مراجعة [وثائق التكوين](/configuration/invokeai-yaml/) لمزيد من التفاصيل.
+
+على الأقل، قد ترغب في تعيين متغير البيئة `INVOKEAI_ROOT`
+للإشارة إلى الموقع الذي ترغب في تخزين نماذج InvokeAI والتكوين والمخرجات فيه.
+
+| متغير البيئة | القيمة الافتراضية | الوصف |
+| --- | --- | --- |
+| `INVOKEAI_ROOT` | `~/invokeai` | **مطلوب** - موقع دليل InvokeAI الجذر الخاص بك. سيتم إنشاؤه إذا لم يكن موجوداً. |
+| `HUGGING_FACE_HUB_TOKEN` |  | سيعمل InvokeAI بدونه، لكن بعض التكاملات مع HuggingFace (مثل التنزيل من المستودعات الخاصة) قد لا تعمل |
+| `GPU_DRIVER` | `cuda` | يمكنك تغييره اختيارياً إلى `rocm` لبناء الصورة لوحدات AMD GPU. ملاحظة: استخدم البرنامج النصي `build.sh` لبناء الصورة حتى يسري هذا التغيير. |
+
+#### بناء الصورة
+
+استخدم الأمر القياسي `docker compose build` من داخل دليل `docker`.
+
+إذا كنت تستخدم AMD GPU:
+أ: قم بتعيين متغير البيئة `GPU_DRIVER=rocm` في ملف `docker-compose.yml` واستمر في استخدام `docker compose build` كالمعتاد، أو
+ب: قم بتعيين `GPU_DRIVER=rocm` في ملف `.env` واستخدم البرنامج النصي `build.sh`، المقدم للراحة
+
+#### تشغيل الحاوية
+
+استخدم الأمر القياسي `docker compose up`، وبشكل عام [CLI](https://docs.docker.com/compose/reference/) الخاص بـ `docker compose` كالمعتاد.
+
+بمجرد بدء تشغيل الحاوية (وتكوين دليل InvokeAI الجذر إذا كان هذا تثبيتاً جديداً)، يمكنك الوصول إلى InvokeAI على [http://localhost:9090](http://localhost:9090)
+
+## استكشاف الأخطاء وإصلاحها / الأسئلة الشائعة
+
+<details>
+  <summary>"أنا أشغل Windows تحت WSL2، وأرى خطأ 'no such file or directory'."</summary>
+
+  قد يحتوي ملف `docker-entrypoint.sh` الخاص بك على نهايات أسطر Windows (CRLF)، اعتماداً على كيفية استنساخك للمستودع.
+  لحل هذا، قم بتغيير نهايات الأسطر في ملف `docker-entrypoint.sh` إلى `LF`. يمكنك فعل ذلك في VSCode
+  (`Ctrl+P` وابحث عن "line endings")، أو باستخدام أداة `dos2unix` في WSL.
+  أخيراً، يمكنك حذف `docker-entrypoint.sh` متبوعاً بـ `git pull; git checkout docker/docker-entrypoint.sh`
+  لإعادة ضبط الملف إلى أحدث إصدار له.
+  لمزيد من المعلومات حول هذه المشكلة، راجع [وثائق Docker Desktop](https://docs.docker.com/desktop/troubleshoot/topics/#avoid-unexpected-syntax-errors-use-unix-style-line-endings-for-files-in-containers)
+
+</details>

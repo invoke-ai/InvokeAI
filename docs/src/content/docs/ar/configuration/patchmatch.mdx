@@ -1,0 +1,126 @@
+---
+title: باتش ماتش
+---
+
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
+
+باتش ماتش (PatchMatch) هي خوارزمية تُستخدم لملء الصور. يمكنها تحسين نتائج التوسيع الخارجي (outpainting) بشكل كبير. PyPatchMatch هو غلاف بايثون حول تطبيق بلغة C++ للخوارزمية.
+
+تستخدم بيانات الصورة المحيطة بالمنطقة المستهدفة كمرجع لتوليد بيانات صورة جديدة ذات طابع وجودة مماثلين.
+
+## لماذا استخدام باتش ماتش
+
+في سياق توليد الصور، يشير مصطلح "التوسيع الخارجي" (outpainting) إلى ملء منطقة شفافة باستخدام بيانات صورة مولّدة بالذكاء الاصطناعي. لكن الذكاء الاصطناعي لا يمكنه التوليد دون بعض البيانات الأولية. نحتاج أولاً إلى ملء المنطقة الشفافة بـ _شيء_ ما.
+
+الخطوة الأولى في "التوسيع الخارجي" إذن، هي ملء المنطقة الشفافة بشيء ما. بشكل عام، تحصل على نتائج أفضل عندما يكون هذا الملء الأولي مشابهاً لبقية الصورة.
+
+نظراً لأن باتش ماتش يولّد بيانات صورة شديدة التشابه ببقية الصورة، فهو يعمل بشكل جيد جداً كخطوة أولى في التوسيع الخارجي، وعادةً ما ينتج نتائج أفضل من طرق الملء الأخرى التي تدعمها Invoke (مثل LaMA، وcv2 infill، والبلاط العشوائي).
+
+### ملاحظة حول الأداء
+
+باتش ماتش يعتمد على وحدة المعالجة المركزية (CPU)، ويزداد الوقت المستغرق بشكل تناسبي مع زيادة مساحة الملء. بينما تختلف الأرقام بالتأكيد حسب مواصفات النظام، يمكنك توقع تباطؤ ملحوظ عند البدء في ملء مساحات بحجم 512×512 بكسل. قد تستغرق المساحات بحجم 1024×1024 بكسل عدة ثوانٍ للملء.
+
+## التثبيت
+
+لسوء الحظ، قد يكون التثبيت صعباً بعض الشيء، حيث يتطلب بعض الأشياء التي لا يستطيع `pip` تثبيتها لك.
+
+<Steps>
+  1. تأكد من تثبيت التبعيات اللازمة لنظامك (انظر أدناه).
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="ويندوز" icon="seti:windows">
+          أنت محظوظ! على منصات ويندوز، سيتم تثبيت PyPatchMatch تلقائياً على أنظمة ويندوز دون أي تدخل إضافي.
+        </TabItem>
+        <TabItem label="ماك" icon="apple">
+          يجب تثبيت opencv ليتمكن pypatchmatch من البناء:
+
+          ```bash
+          brew install opencv
+          ```
+
+          في المرة التالية التي تشغل فيها `invoke`، بعد تثبيت opencv بنجاح، سيتم بناء pypatchmatch.
+        </TabItem>
+        <TabItem label="لينكس" icon="linux">
+          قبل تثبيت PyPatchMatch، عليك اتخاذ الخطوات التالية:
+
+          <Tabs syncKey="linuxDistro">
+            <TabItem label="ديبيان">
+              <Steps>
+                1. تثبيت أدوات `build-essential`:
+
+                    ```sh
+                    sudo apt update # تحديث قوائم الحزم
+                    sudo apt install build-essential
+                    ```
+
+                2. تثبيت `opencv`:
+
+                    ```sh
+                    sudo apt install python3-opencv libopencv-dev
+                    ```
+
+                3. تفعيل البيئة التي تستخدمها لـ invokeai، إما باستخدام `conda` أو بيئة افتراضية.
+              </Steps>
+            </TabItem>
+            <TabItem label="آرتش">
+              <Steps>
+                1. تثبيت حزمة `base-devel`:
+
+                    ```sh
+                    sudo pacman -Syu
+                    sudo pacman -S --needed base-devel
+                    ```
+
+                2. تثبيت `opencv` و `blas` والتبعيات المطلوبة:
+
+                    ```sh
+                    sudo pacman -S opencv blas fmt glew vtk hdf5
+                    ```
+
+                    أو لدعم CUDA
+
+                    ```sh
+                    sudo pacman -S opencv-cuda blas fmt glew vtk hdf5
+                    ```
+
+                3. إصلاح تسمية ملف تكوين حزمة `opencv`:
+
+                    ```sh
+                    cd /usr/lib/pkgconfig/
+                    ln -sf opencv4.pc opencv.pc
+                    ```
+              </Steps>
+            </TabItem>
+          </Tabs>
+        </TabItem>
+      </Tabs>
+
+  2. تثبيت pypatchmatch:
+
+      ```sh
+      pip install pypatchmatch
+      ```
+
+  3. تأكد من تثبيت pypatchmatch. في موجه الأوامر اكتب `python`، ثم عند السطر `>>>` اكتب `from patchmatch import patch_match`: يجب أن يبدو كالتالي:
+
+      ```py
+        Python 3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0] on linux
+        Type "help", "copyright", "credits" or "license" for more information.
+        >>> from patchmatch import patch_match
+        Compiling and loading c extensions from "/home/lstein/Projects/InvokeAI/.invokeai-env/src/pypatchmatch/patchmatch".
+        rm -rf build/obj libpatchmatch.so
+        mkdir: created directory 'build/obj'
+        mkdir: created directory 'build/obj/csrc/'
+        [dep] csrc/masked_image.cpp ...
+        [dep] csrc/nnf.cpp ...
+        [dep] csrc/inpaint.cpp ...
+        [dep] csrc/pyinterface.cpp ...
+        [CC] csrc/pyinterface.cpp ...
+        [CC] csrc/inpaint.cpp ...
+        [CC] csrc/nnf.cpp ...
+        [CC] csrc/masked_image.cpp ...
+        [link] libpatchmatch.so ...
+      ```
+
+      إذا لم ترَ أي أخطاء، فأنت جاهز للانطلاق!
+</Steps>

@@ -1,0 +1,1227 @@
+---
+title: دليل واجهة برمجة التطبيقات متعدد المستخدمين
+description: كيفية المصادقة والتفاعل مع واجهة برمجة تطبيقات InvokeAI في الوضع متعدد المستخدمين.
+sidebar:
+  order: 5
+---
+import { Steps } from '@astrojs/starlight/components'
+
+## نظرة عامة
+
+يشرح هذا الدليل كيفية التفاعل مع واجهة برمجة تطبيقات InvokeAI في كل من وضع المستخدم الفردي والمتعدد المستخدمين. يعتمد سلوك واجهة برمجة التطبيقات على إعداد التكوين `multiuser`.
+
+### وضع المستخدم الفردي مقابل وضع متعدد المستخدمين
+
+**وضع المستخدم الفردي** (`multiuser: false` أو الخيار غير موجود):
+
+- لا حاجة للمصادقة
+- جميع نقاط نهاية واجهة برمجة التطبيقات قابلة للوصول بدون رموز مميزة
+- وصول مباشر لواجهة برمجة التطبيقات مثل إصدارات InvokeAI السابقة
+- جميع المحتويات مرئية في عرض موحد
+
+**وضع متعدد المستخدمين** (`multiuser: true`):
+
+- مصادقة رمز JWT مطلوبة
+- وصول محدد بنطاق المستخدم إلى الموارد
+- تفويض قائم على الدور (مسؤول مقابل مستخدم عادي)
+- عزل البيانات بين المستخدمين
+
+## المصادقة (وضع متعدد المستخدمين فقط)
+
+### تدفق المصادقة
+
+عند تمكين الوضع متعدد المستخدمين، تتطلب معظم نقاط نهاية واجهة برمجة التطبيقات مصادقة باستخدام رموز JWT الحاملة. نقاط نهاية المصادقة غير المصادقة هي `GET /api/v1/auth/status` و `POST /api/v1/auth/setup` و `POST /api/v1/auth/login`.
+
+**عملية المصادقة:**
+
+<Steps>
+1. **الحصول على الرمز**: إرسال بيانات الاعتماد إلى `/api/v1/auth/login`
+2. **تخزين الرمز**: حفظ رمز JWT بشكل آمن
+3. **استخدام الرمز**: تضمين الرمز في رأس `Authorization` لجميع الطلبات
+4. **التحديث**: إعادة المصادقة عندما ينتهي الرمز
+</Steps>
+
+:::note[وضع المستخدم الفردي]
+عند التشغيل في وضع المستخدم الفردي (`multiuser: false`)، نقاط نهاية المصادقة غير متاحة ورؤوس المصادقة غير مطلوبة.
+:::
+
+### نقطة نهاية تسجيل الدخول
+
+**نقطة النهاية:** `POST /api/v1/auth/login`
+
+**الطلب:**
+
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123",
+  "remember_me": false
+}
+```
+
+**الاستجابة (نجاح):**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "user_id": "abc123",
+    "email": "user@example.com",
+    "display_name": "John Doe",
+    "is_admin": false,
+    "is_active": true,
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-01-15T10:00:00Z",
+    "last_login_at": "2024-01-15T15:30:00Z"
+  },
+  "expires_in": 86400
+}
+```
+
+**الاستجابة (خطأ):**
+
+```json
+{
+  "detail": "بريد إلكتروني أو كلمة مرور غير صحيحة"
+}
+```
+
+**رموز الحالة:**
+
+- `200 OK` — المصادقة ناجحة
+- `401 Unauthorized` — بيانات اعتماد غير صالحة
+- `403 Forbidden` — الحساب معطل
+- `422 Unprocessable Entity` — تنسيق طلب غير صالح
+
+### استخدام الرمز المميز
+
+قم بتضمين رمز JWT في رأس `Authorization` باستخدام مخطط `Bearer`:
+
+**رأس HTTP:**
+
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**مثال طلب HTTP:**
+
+```http
+GET /api/v1/boards HTTP/1.1
+Host: localhost:9090
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+```
+
+### انتهاء صلاحية الرمز المميز
+
+للرموز المميزة عمر محدود:
+
+- **افتراضي**: 24 ساعة (86400 ثانية)
+- **تذكرني**: 7 أيام (604800 ثانية)
+
+**معالجة انتهاء الصلاحية:**
+
+```python
+import requests
+import time
+
+def api_request(url, token, max_retries=1):
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 401:  # الرمز منتهي
+        # إعادة المصادقة والمحاولة
+        new_token = login()
+        headers = {"Authorization": f"Bearer {new_token}"}
+        response = requests.get(url, headers=headers)
+
+    return response
+```
+
+### نقطة نهاية تسجيل الخروج
+
+**نقطة النهاية:** `POST /api/v1/auth/logout`
+
+**الطلب:**
+
+```http
+POST /api/v1/auth/logout HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**الاستجابة:**
+
+```json
+{
+  "success": true
+}
+```
+
+**ملاحظة:** مع رموز JWT، تسجيل الخروج هو في الأساس من جانب العميل (حذف الرمز). قد يتم إضافة إبطال جلسة الخادم في الإصدارات المستقبلية.
+
+## أمثلة على الكود
+
+### Python
+
+**باستخدام مكتبة `requests`:**
+
+```python
+import requests
+import json
+
+class InvokeAIClient:
+    def __init__(self, base_url="http://localhost:9090"):
+        self.base_url = base_url
+        self.token = None
+
+    def login(self, email, password, remember_me=False):
+        """المصادقة وتخزين الرمز المميز."""
+        url = f"{self.base_url}/api/v1/auth/login"
+        payload = {
+            "email": email,
+            "password": password,
+            "remember_me": remember_me
+        }
+
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+
+        data = response.json()
+        self.token = data["token"]
+        return data["user"]
+
+    def _get_headers(self):
+        """الحصول على الرؤوس مع رمز المصادقة."""
+        if not self.token:
+            raise Exception("غير مصادق. قم باستدعاء login() أولاً.")
+
+        return {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json"
+        }
+
+    def get_boards(self):
+        """الحصول على لوحات المستخدم."""
+        url = f"{self.base_url}/api/v1/boards/"
+        response = requests.get(url, headers=self._get_headers())
+        response.raise_for_status()
+        return response.json()
+
+    def create_board(self, board_name):
+        """إنشاء لوحة جديدة."""
+        url = f"{self.base_url}/api/v1/boards/"
+        response = requests.post(
+            url,
+            params={"board_name": board_name},
+            headers=self._get_headers()
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def logout(self):
+        """تسجيل الخروج ومسح الرمز المميز."""
+        url = f"{self.base_url}/api/v1/auth/logout"
+        response = requests.post(url, headers=self._get_headers())
+        self.token = None
+        return response.json()
+
+# الاستخدام
+client = InvokeAIClient()
+user = client.login("user@example.com", "SecurePassword123")
+print(f"تم تسجيل الدخول باسم: {user['display_name']}")
+
+boards = client.get_boards()
+print(f"المستخدم لديه {len(boards['items'])} لوحة")
+
+new_board = client.create_board("لوحتي الجديدة")
+print(f"تم إنشاء اللوحة: {new_board['board_name']}")
+
+client.logout()
+```
+
+**معالجة الأخطاء:**
+
+```python
+import requests
+from requests.exceptions import HTTPError
+
+def safe_api_call(client, method, *args, **kwargs):
+    """إجراء استدعاء واجهة برمجة تطبيقات مع معالجة الأخطاء."""
+    try:
+        func = getattr(client, method)
+        return func(*args, **kwargs)
+
+    except HTTPError as e:
+        if e.response.status_code == 401:
+            print("فشلت المصادقة أو الرمز منتهي")
+            # إعادة المصادقة
+            client.login(email, password)
+            # إعادة المحاولة
+            return func(*args, **kwargs)
+        elif e.response.status_code == 403:
+            print("تم رفض الإذن")
+        elif e.response.status_code == 404:
+            print("الموارد غير موجودة")
+        else:
+            print(f"خطأ في واجهة برمجة التطبيقات: {e.response.status_code}")
+            print(e.response.text)
+
+        raise
+
+# الاستخدام
+try:
+    boards = safe_api_call(client, "get_boards")
+except Exception as e:
+    print(f"فشل في الحصول على اللوحات: {e}")
+```
+
+### JavaScript/TypeScript
+
+**باستخدام واجهة برمجة تطبيقات `fetch`:**
+
+```javascript
+class InvokeAIClient {
+  constructor(baseUrl = 'http://localhost:9090') {
+    this.baseUrl = baseUrl;
+    this.token = null;
+  }
+
+  async login(email, password, rememberMe = false) {
+    const response = await fetch(`${this.baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        remember_me: rememberMe,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`فشل تسجيل الدخول: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    this.token = data.token;
+
+    // تخزين الرمز في localStorage
+    localStorage.setItem('invokeai_token', data.token);
+
+    return data.user;
+  }
+
+  getHeaders() {
+    if (!this.token) {
+      throw new Error('غير مصادق. قم باستدعاء login() أولاً.');
+    }
+
+    return {
+      'Authorization': `Bearer ${this.token}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  async getBoards() {
+    const response = await fetch(`${this.baseUrl}/api/v1/boards/`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`فشل في الحصول على اللوحات: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createBoard(boardName) {
+    const url = new URL(`${this.baseUrl}/api/v1/boards/`);
+    url.searchParams.set('board_name', boardName);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`فشل في إنشاء اللوحة: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async logout() {
+    const response = await fetch(`${this.baseUrl}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+
+    this.token = null;
+    localStorage.removeItem('invokeai_token');
+
+    return response.json();
+  }
+}
+
+// الاستخدام
+(async () => {
+  const client = new InvokeAIClient();
+
+  try {
+    const user = await client.login('user@example.com', 'SecurePassword123');
+    console.log(`تم تسجيل الدخول باسم: ${user.display_name}`);
+
+    const boards = await client.getBoards();
+    console.log(`المستخدم لديه ${boards.items.length} لوحة`);
+
+    const newBoard = await client.createBoard('لوحتي الجديدة');
+    console.log(`تم إنشاء اللوحة: ${newBoard.board_name}`);
+
+    await client.logout();
+  } catch (error) {
+    console.error('خطأ:', error.message);
+  }
+})();
+```
+
+**TypeScript مع الأنواع:**
+
+```typescript
+interface LoginRequest {
+  email: string;
+  password: string;
+  remember_me?: boolean;
+}
+
+interface User {
+  user_id: string;
+  email: string;
+  display_name: string;
+  is_admin: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface LoginResponse {
+  token: string;
+  user: User;
+  expires_in: number;
+}
+
+interface Board {
+  board_id: string;
+  board_name: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  cover_image_name?: string;
+}
+
+class InvokeAIClient {
+  private baseUrl: string;
+  private token: string | null = null;
+
+  constructor(baseUrl: string = 'http://localhost:9090') {
+    this.baseUrl = baseUrl;
+  }
+
+  async login(
+    email: string,
+    password: string,
+    rememberMe: boolean = false
+  ): Promise<User> {
+    const response = await fetch(`${this.baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, remember_me: rememberMe }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'فشل تسجيل الدخول');
+    }
+
+    const data: LoginResponse = await response.json();
+    this.token = data.token;
+    return data.user;
+  }
+
+  private getHeaders(): HeadersInit {
+    if (!this.token) {
+      throw new Error('غير مصادق');
+    }
+    return {
+      'Authorization': `Bearer ${this.token}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  async getBoards(): Promise<{ items: Board[] }> {
+    const response = await fetch(`${this.baseUrl}/api/v1/boards/`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('فشل في الحصول على اللوحات');
+    }
+
+    return response.json();
+  }
+}
+```
+
+### cURL
+
+**تسجيل الدخول:**
+
+```bash
+# تسجيل الدخول واستخراج الرمز
+TOKEN=$(curl -X POST http://localhost:9090/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "SecurePassword123",
+    "remember_me": false
+  }' | jq -r '.token')
+
+echo "الرمز: $TOKEN"
+```
+
+**الحصول على اللوحات:**
+
+```bash
+curl -X GET http://localhost:9090/api/v1/boards/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+**إنشاء لوحة:**
+
+```bash
+curl -X POST "http://localhost:9090/api/v1/boards/?board_name=My%20API%20Board" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## تغييرات نقاط نهاية واجهة برمجة التطبيقات
+
+### المصادقة مطلوبة
+
+جميع نقاط النهاية تتطلب الآن مصادقة باستثناء:
+
+- `GET /api/v1/auth/status` — التحقق مما إذا كان إعداد متعدد المستخدمين مطلوباً
+- `POST /api/v1/auth/setup` — إعداد المسؤول الأولي
+- `POST /api/v1/auth/login` — تسجيل دخول المستخدم
+- `GET /api/v1/images/i/{image_name}/full` — ملف الصورة كامل الدقة
+- `GET /api/v1/images/i/{image_name}/thumbnail` — صورة مصغرة
+- `GET /api/v1/workflows/i/{workflow_id}/thumbnail` — صورة مصغرة لسير العمل
+
+نقاط نهاية الصورة والصورة المصغرة غير مصادقة عن قصد لأن المتصفحات تحمل هذه الموارد عبر علامات `<img src>`، التي لا يمكنها إرسال رؤوس `Authorization`. يعتمد الأمن على حقيقة أن معرفات الصور وسير العمل هي UUIDs وبالتالي لا يمكن تخمينها.
+
+### الموارد المحددة بنطاق المستخدم
+
+يتم الآن تصفية الموارد حسب المستخدم المصادق:
+
+**اللوحات:**
+
+```python
+# قبل (مستخدم فردي)
+GET /api/v1/boards/?all=true  # يرجع جميع اللوحات
+
+# بعد (متعدد المستخدمين)
+GET /api/v1/boards/?all=true  # يرجع اللوحات التي يمكن للمستخدم الحالي الوصول إليها، بما في ذلك لوحاته الخاصة بالإضافة إلى اللوحات المشتركة/العامة؛ يمكن للمسؤولين رؤية جميع اللوحات
+```
+
+**الصور:**
+
+```python
+# يتم تصفية الصور حسب ملكية اللوحة
+GET /api/v1/images/  # يعرض فقط الصور على لوحات المستخدم
+```
+
+**سير العمل:**
+
+```python
+# يرجع سير عمل المستخدم + سير العمل العامة
+GET /api/v1/workflows/
+```
+
+**قائمة الانتظار:**
+
+```python
+# المستخدمون العاديون يرون عناصر قائمة الانتظار الخاصة بهم كاملة وقد يرون تفاصيل محجوبة لعناصر المستخدمين الآخرين في نقاط نهاية حالة قائمة الانتظار
+GET /api/v1/queue/...  # بيانات قائمة الانتظار، منقاة للمشاهدين غير المسؤولين
+
+# المسؤولون يرون جميع عناصر قائمة الانتظار كاملة
+GET /api/v1/queue/...  # بيانات قائمة الانتظار كاملة
+```
+
+### نقاط نهاية المسؤول
+
+بعض نقاط النهاية تتطلب صلاحيات المسؤول:
+
+**إدارة المستخدمين:**
+
+```python
+GET    /api/v1/auth/users           # قائمة المستخدمين (المسؤول فقط)
+POST   /api/v1/auth/users           # إنشاء مستخدم (المسؤول فقط)
+GET    /api/v1/auth/users/{id}      # الحصول على مستخدم (المسؤول فقط)
+PATCH  /api/v1/auth/users/{id}      # تحديث مستخدم (المسؤول فقط)
+DELETE /api/v1/auth/users/{id}      # حذف مستخدم (المسؤول فقط)
+```
+
+**إدارة النماذج (عمليات الكتابة):**
+
+```python
+POST   /api/v2/models/install          # تثبيت نموذج (المسؤول فقط)
+DELETE /api/v2/models/i/{key}          # حذف نموذج (المسؤول فقط)
+PATCH  /api/v2/models/i/{key}          # تحديث نموذج (المسؤول فقط)
+PUT    /api/v2/models/convert/{key}    # تحويل نموذج (المسؤول فقط)
+```
+
+**إدارة النماذج (عمليات القراءة):**
+
+```python
+GET /api/v2/models/                    # قائمة النماذج (جميع المستخدمين)
+GET /api/v2/models/i/{key}             # الحصول على تفاصيل النموذج (جميع المستخدمين)
+```
+
+### استجابات الخطأ
+
+**401 غير مصرح:**
+
+```json
+{
+  "detail": "بيانات اعتماد المصادقة غير صالحة"
+}
+```
+
+يحدث عندما:
+
+- الرمز المميز مفقود
+- الرمز المميز غير صالح
+- الرمز المميز منتهي الصلاحية
+- توقيع الرمز المميز غير صالح
+
+**403 ممنوع:**
+
+```json
+{
+  "detail": "صلاحيات المسؤول مطلوبة"
+}
+```
+
+يحدث عندما:
+
+- يحاول المستخدم عملية خاصة بالمسؤول فقط
+- الحساب معطل
+- أذونات غير كافية
+
+**404 غير موجود:**
+
+```json
+{
+  "detail": "الموارد غير موجودة"
+}
+```
+
+يحدث عندما:
+
+- المورد غير موجود
+- المستخدم ليس لديه حق الوصول إلى المورد
+
+## نقاط نهاية واجهة برمجة التطبيقات متعددة المستخدمين
+
+### نقاط نهاية المصادقة
+
+#### التحقق مما إذا كان إعداد المسؤول الأولي مطلوباً
+
+**نقطة النهاية:** `GET /api/v1/auth/status`
+
+**الوصف:** يرجع SetupStatusResponse يشير إلى ما إذا كان الإعداد مطلوباً وحالة الوضع متعدد المستخدمين.
+
+**الطلب:** لا توجد معاملات
+
+**الاستجابة (الإعداد الأولي لم يكتمل بعد):**
+```json
+{
+  "setup_required": true,
+  "multiuser_enabled": true,
+  "strict_password_checking": true,
+  "admin_email": "admin@example.com"
+}
+```
+
+**الاستجابة (الإعداد مكتمل بالفعل، أو تم تعطيل متعدد المستخدمين):**
+```json
+{
+  "setup_required": false,
+  "multiuser_enabled": true,
+  "strict_password_checking": true,
+  "admin_email": null
+}
+```
+
+:::note
+يتم ملء `admin_email` فقط بينما `setup_required` هو `true` (للمساعدة في تحديد موقع حساب المسؤول المسبق التعبئة أثناء الإعداد الأولي). بمجرد إنشاء مسؤول — وعندما يكون الوضع متعدد المستخدمين معطلاً — يتم إرجاعه كـ `null` لتجنب تسريب هوية المسؤول على النشرات العامة.
+:::
+
+
+#### إعداد المسؤول
+
+**نقطة النهاية:** `POST /api/v1/auth/setup`
+
+**الوصف:** إنشاء حساب المسؤول الأولي (يعمل فقط إذا لم يكن هناك مسؤول موجود)
+
+**الطلب:**
+
+```json
+{
+  "email": "admin@example.com",
+  "display_name": "Administrator",
+  "password": "SecureAdminPass123"
+}
+```
+
+**الاستجابة:**
+
+```json
+{
+  "success": true,
+  "user": {
+    "user_id": "abc123",
+    "email": "admin@example.com",
+    "display_name": "Administrator",
+    "is_admin": true,
+    "is_active": true
+  }
+}
+```
+
+
+#### الحصول على المستخدم الحالي
+
+**نقطة النهاية:** `GET /api/v1/auth/me`
+
+**الوصف:** الحصول على معلومات المستخدم المصادق حالياً
+
+**الطلب:**
+
+```http
+GET /api/v1/auth/me
+Authorization: Bearer <token>
+```
+
+**الاستجابة:**
+
+```json
+{
+  "user_id": "abc123",
+  "email": "user@example.com",
+  "display_name": "John Doe",
+  "is_admin": false,
+  "is_active": true,
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:00:00Z",
+  "last_login_at": "2024-01-15T15:30:00Z"
+}
+```
+
+### نقاط نهاية إدارة المستخدمين (للمسؤول فقط)
+
+#### قائمة المستخدمين
+
+**نقطة النهاية:** `GET /api/v1/auth/users`
+
+**الطلب:**
+
+```http
+GET /api/v1/auth/users
+Authorization: Bearer <admin_token>
+```
+
+**الاستجابة:**
+
+```json
+[
+  {
+    "user_id": "abc123",
+    "email": "user@example.com",
+    "display_name": "John Doe",
+    "is_admin": false,
+    "is_active": true,
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-04-25T17:23:00Z",
+    "last_login_at": "2024-01-15T15:30:00Z"
+  }
+]
+```
+
+#### إنشاء مستخدم
+
+**نقطة النهاية:** `POST /api/v1/auth/users`
+
+**الطلب:**
+
+```json
+{
+  "email": "newuser@example.com",
+  "display_name": "New User",
+  "password": "TempPassword123",
+  "is_admin": false
+}
+```
+
+**الاستجابة:**
+
+```json
+{
+  "user_id": "xyz789",
+  "email": "newuser@example.com",
+  "display_name": "New User",
+  "is_admin": false,
+  "is_active": true,
+  "created_at": "2024-01-15T16:00:00Z"
+}
+```
+
+#### تحديث مستخدم
+
+**نقطة النهاية:** `PATCH /api/v1/auth/users/{user_id}`
+
+**الطلب:**
+
+```json
+{
+  "display_name": "Updated Name",
+  "is_active": true,
+  "is_admin": false
+}
+```
+
+**الاستجابة:**
+
+```json
+{
+  "user_id": "xyz789",
+  "email": "newuser@example.com",
+  "display_name": "Updated Name",
+  "is_admin": false,
+  "is_active": true
+}
+```
+
+#### حذف مستخدم
+
+**نقطة النهاية:** `DELETE /api/v1/auth/users/{user_id}`
+
+**الاستجابة:**
+
+يرجع `204 No Content` عند النجاح.
+
+عند حدوث خطأ، يرجع `422 Unprocessable Content` و JSON التالي:
+
+```json
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string"
+    }
+  ]
+}
+```
+
+#### قائمة لوحات الصور
+
+**نقطة النهاية:** `GET /api/v1/boards/`
+
+**الاستجابة:**
+
+```json
+{
+  "limit": 0,
+  "offset": 0,
+  "total": 0,
+  "items": [
+    {
+      "board_id": "8b31a33d-0acb-46fe-8612-83601481cf2c",
+      "board_name": "Testing Board",
+      "user_id": "string",
+      "created_at": "2026-05-07T03:04:00.738Z",
+      "updated_at": "2026-05-07T03:04:00.738Z",
+      "deleted_at": "2026-05-07T03:04:00.738Z",
+      "cover_image_name": "string",
+      "archived": false,
+      "board_visibility": "private",
+      "image_count": 0,
+      "asset_count": 0,
+      "owner_username": "string"
+    }
+  ]
+}
+```
+
+يرجع هذا استجابة مقسمة إلى صفحات. راجع صفحة swagger (`http://localhost:9090/docs#/boards/list_boards`) للحصول على التفاصيل.
+سيكون حقل `board_visibility` واحداً من:
+
+- `private` — خاص للمالك والمسؤول
+- `shared` — قراءة/كتابة للمالك والمسؤول، قراءة فقط للجميع
+- `public` — قراءة/كتابة للجميع
+
+#### الحصول على لوحة واحدة
+
+**نقطة النهاية:** `GET /api/v1/boards/{board_id}`
+
+**الاستجابة:**
+
+```json
+{
+  "board_id": "8b31a33d-0acb-46fe-8612-83601481cf2c",
+  "board_name": "Testing Board",
+  "user_id": "3c59a0ba-f4c7-4275-b96f-82179e8aaff8",
+  "created_at": "2026-03-09 16:10:47.095",
+  "updated_at": "2026-03-09 16:10:55",
+  "deleted_at": null,
+  "cover_image_name": "08689e4b-f084-4c49-83a8-4fc1edb167c4.png",
+  "archived": false,
+  "board_visibility": "shared",
+  "image_count": 55,
+  "asset_count": 0,
+  "owner_username": null
+}
+```
+
+
+## أفضل الممارسات
+
+### تخزين الرمز المميز
+
+**افعل:**
+
+- تخزين الرموز بشكل آمن (سلسلة المفاتيح، تخزين آمن)
+- استخدام HTTPS لنقل الرموز
+- مسح الرموز عند تسجيل الخروج
+- التعامل مع انتهاء صلاحية الرمز بلطف
+
+**لا تفعل:**
+
+- تخزين الرموز في معاملات URL
+- تسجيل الرموز في نص عادي
+- مشاركة الرموز بين المستخدمين
+- تخزين الرموز في التحكم في الإصدارات
+
+### معالجة الأخطاء
+
+تعامل دائماً مع أخطاء المصادقة:
+
+```python
+def make_request(client, func, *args, **kwargs):
+    max_retries = 3
+    retry_count = 0
+
+    while retry_count < max_retries:
+        try:
+            return func(*args, **kwargs)
+        except AuthenticationError:
+            if retry_count >= max_retries - 1:
+                raise
+            # إعادة المصادقة
+            client.login(email, password)
+            retry_count += 1
+        except Exception as e:
+            logger.error(f"فشل الطلب: {e}")
+            raise
+```
+
+### تحديد المعدل
+
+كن حذراً من حدود معدل واجهة برمجة التطبيقات:
+
+- تنفيذ تراجع أسي لإعادة المحاولات
+- تخزين البيانات التي يتم الوصول إليها بشكل متكرر مؤقتاً
+- تجميع الطلبات عندما يكون ذلك ممكناً
+- لا تضرب نقطة نهاية تسجيل الدخول بشكل متكرر
+
+### إدارة الاتصال
+
+```python
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+def create_session():
+    """إنشاء جلسة مع منطق إعادة المحاولة."""
+    session = requests.Session()
+
+    retry = Retry(
+        total=3,
+        backoff_factor=0.3,
+        status_forcelist=[500, 502, 503, 504],
+    )
+
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+
+    return session
+```
+
+## دليل الهجرة
+
+### تحديث الكود الموجود
+
+**قبل (وضع المستخدم الفردي):**
+
+```python
+import requests
+
+def get_boards():
+    response = requests.get("http://localhost:9090/api/v1/boards/")
+    return response.json()
+```
+
+**بعد (وضع متعدد المستخدمين):**
+
+```python
+import requests
+
+class APIClient:
+    def __init__(self):
+        self.token = None
+
+    def login(self, email, password):
+        response = requests.post(
+            "http://localhost:9090/api/v1/auth/login",
+            json={"email": email, "password": password}
+        )
+        self.token = response.json()["token"]
+
+    def get_boards(self):
+        headers = {"Authorization": f"Bearer {self.token}"}
+        response = requests.get(
+            "http://localhost:9090/api/v1/boards/",
+            headers=headers
+        )
+        return response.json()
+
+# الاستخدام
+client = APIClient()
+client.login("user@example.com", "password")
+boards = client.get_boards()
+```
+
+### التوافق مع الإصدارات السابقة
+
+يدعم InvokeAI كلاً من وضع المستخدم الفردي والمتعدد المستخدمين عبر خيار التكوين `multiuser`.
+
+**التكوين:**
+
+```yaml
+# invokeai.yaml
+
+# وضع المستخدم الفردي (لا مصادقة)
+multiuser: false  # أو حذف الخيار تماماً
+
+# وضع متعدد المستخدمين (مصادقة مطلوبة)
+multiuser: true
+```
+
+**التحقق من الوضع برمجياً:**
+
+```python
+def is_multiuser_enabled(base_url):
+     response = requests.get(f"{base_url}/api/v1/auth/status")
+     response.raise_for_status()
+     return response.json()["multiuser_enabled"]
+
+# مثال استخدام
+base_url = "http://localhost:9090"
+if is_multiuser_enabled(base_url):
+    print("وضع متعدد المستخدمين: المصادقة مطلوبة")
+    # استخدام استدعاءات واجهة برمجة التطبيقات المصادق عليها
+else:
+    print("وضع المستخدم الفردي: لا حاجة للمصادقة")
+    # استخدام استدعاءات واجهة برمجة التطبيقات المباشرة
+```
+
+**عميل متكيف:**
+
+```python
+class AdaptiveInvokeAIClient:
+    def __init__(self, base_url="http://localhost:9090"):
+        self.base_url = base_url
+        self.token = None
+        self.multiuser_mode = self._check_multiuser_mode()
+
+    def _check_multiuser_mode(self):
+        """الكشف عن تمكين الوضع متعدد المستخدمين."""
+        try:
+            response = requests.get(f"{self.base_url}/api/v1/boards/")
+            return response.status_code == 401
+        except:
+            return False
+
+    def login(self, email, password):
+        """تسجيل الدخول (مطلوب فقط في الوضع متعدد المستخدمين)."""
+        if not self.multiuser_mode:
+            print("وضع المستخدم الفردي: تسجيل الدخول غير مطلوب")
+            return
+
+        response = requests.post(
+            f"{self.base_url}/api/v1/auth/login",
+            json={"email": email, "password": password}
+        )
+        self.token = response.json()["token"]
+
+    def _get_headers(self):
+        """الحصول على الرؤوس (مع رمز المصادقة إذا كان في وضع متعدد المستخدمين)."""
+        if self.multiuser_mode and self.token:
+            return {"Authorization": f"Bearer {self.token}"}
+        return {}
+
+    def get_boards(self):
+        """الحصول على اللوحات (يعمل في كلا الوضعين)."""
+        response = requests.get(
+            f"{self.base_url}/api/v1/boards/",
+            headers=self._get_headers()
+        )
+        return response.json()
+```
+
+## توثيق OpenAPI/Swagger
+
+يوفر InvokeAI توثيق OpenAPI لجميع نقاط النهاية.
+
+**الوصول إلى واجهة Swagger UI:**
+
+```
+http://localhost:9090/docs
+```
+
+**تنزيل مخطط OpenAPI:**
+
+```bash
+curl http://localhost:9090/openapi.json > invokeai_openapi.json
+```
+
+**توليد كود العميل:**
+
+استخدم أدوات مثل `openapi-generator` لتوليد مكتبات العميل:
+
+```bash
+# توليد عميل Python
+openapi-generator generate \
+  -i http://localhost:9090/openapi.json \
+  -g python \
+  -o ./invokeai-client
+
+# توليد عميل TypeScript
+openapi-generator generate \
+  -i http://localhost:9090/openapi.json \
+  -g typescript-fetch \
+  -o ./invokeai-client-ts
+```
+
+## اعتبارات الأمان
+
+### HTTPS
+
+استخدم دائماً HTTPS في الإنتاج:
+
+```python
+# التطوير
+client = InvokeAIClient("http://localhost:9090")
+
+# الإنتاج
+client = InvokeAIClient("https://invoke.example.com")
+```
+
+### أمان الرمز المميز
+
+حماية رموز JWT:
+
+```python
+# لا تقم أبداً بتسجيل الرموز
+logger.info(f"تم تسجيل دخول المستخدم")  # جيد
+logger.info(f"الرمز: {token}")  # سيء!
+
+# استخدم متغيرات البيئة لبيانات الاعتماد
+import os
+email = os.environ.get("INVOKEAI_EMAIL")
+password = os.environ.get("INVOKEAI_PASSWORD")
+```
+
+### التحقق من صحة الإدخال
+
+تحقق دائماً من صحة إدخال المستخدم:
+
+```python
+import re
+
+def validate_email(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def validate_password(password):
+    """التحقق من أن كلمة المرور تفي بالمتطلبات."""
+    if len(password) < 8:
+        return False, "يجب أن تكون كلمة المرور 8 أحرف على الأقل"
+    if not any(c.isupper() for c in password):
+        return False, "يجب أن تحتوي كلمة المرور على أحرف كبيرة"
+    if not any(c.islower() for c in password):
+        return False, "يجب أن تحتوي كلمة المرور على أحرف صغيرة"
+    if not any(c.isdigit() for c in password):
+        return False, "يجب أن تحتوي كلمة المرور على أرقام"
+    return True, ""
+```
+
+## استكشاف الأخطاء وإصلاحها
+
+### المشكلات الشائعة
+
+**المشكلة: "بيانات اعتماد المصادقة غير صالحة"**
+
+- الرمز منتهي — أعد المصادقة
+- الرمز مشوه — تحقق من سلسلة الرمز
+- توقيع الرمز غير صالح — تحقق من أن المفتاح السري لم يتغير
+
+**المشكلة: "صلاحيات المسؤول مطلوبة"**
+
+- المستخدم ليس مسؤولاً
+- استخدم حساب مسؤول لهذه العملية
+
+**المشكلة: الرمز لا يتم إرساله**
+
+- تحقق من وجود رأس `Authorization`
+- تحقق من تضمين بادئة `Bearer`
+- تحقق من أن الرمز لم يتم اقتطاعه
+
+**المشكلة: أخطاء CORS**
+
+قم بتكوين CORS في InvokeAI:
+
+```yaml
+# invokeai.yaml
+allow_origins:
+  - "http://localhost:3000"
+  - "https://myapp.example.com"
+allow_credentials: true
+allow_methods:
+  - "*"
+allow_headers:
+  - "*"
+```
+
+## موارد إضافية
+
+- [دليل المستخدم](./user-guide/) — للمستخدمين النهائيين
+- [دليل المسؤول](./admin-guide/) — للمسؤولين
+- [مستودع GitHub](https://github.com/invoke-ai/InvokeAI) — الكود المصدري
+
+---
+
+**أسئلة؟** قم بزيارة [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy) أو تحقق من [الأسئلة الشائعة](/troubleshooting/faq/).

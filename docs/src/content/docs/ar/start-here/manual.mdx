@@ -1,0 +1,193 @@
+---
+title: التثبيت اليدوي
+lastUpdated: 2026-02-18
+---
+
+import { LinkCard, Tabs, TabItem, Steps, LinkButton } from '@astrojs/starlight/components'
+import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
+
+<SystemRequirementsLink />
+
+## هل أنت في المكان الصحيح؟
+
+<LinkCard
+  title="دليل التثبيت المحلي"
+  description="إذا كنت ترغب في استخدام Invoke محليًا، فمن الأفضل استخدام المُشغّل بدلاً من ذلك."
+  href="../installation"
+/>
+
+<LinkCard
+  title="دليل تثبيت المطور"
+  description="إذا كنت ترغب في المساهمة في InvokeAI أو تشغيل التطبيق على الفرع الرئيسي، اتبع دليل تثبيت المطور بدلاً من ذلك."
+  href="../../development"
+/>
+
+## دليل خطوة بخطوة
+
+سنستخدم [`uv`](https://github.com/astral-sh/uv) لتثبيت بايثون وإنشاء بيئة افتراضية، ثم تثبيت حزمة `invokeai`. `uv` هو بديل حديث وسريع جدًا لـ `pip`.
+
+تختلف الأوامر التالية حسب إصدار Invoke المُثبّت والنظام الذي يُثبّت عليه.
+
+<Steps>
+
+  1. ثبّت `uv` كما هو موصوف في [وثائقه](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer). نقترح استخدام طريقة المثبّت المستقل.
+
+      شغّل `uv --version` لتأكيد أن `uv` مُثبّت ويعمل. بعد التثبيت، قد تحتاج إلى إعادة تشغيل الطرفية للوصول إلى `uv`.
+
+  2. أنشئ دليلاً لتثبيتك، عادةً في مجلدك الرئيسي (مثلاً `~/invokeai` أو `$Home/invokeai`):
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          ```ps
+          mkdir $Home/invokeai
+          cd $Home/invokeai
+          ```
+        </TabItem>
+        <TabItem label="Linux/MacOS" icon="linux">
+          ```bash
+          mkdir ~/invokeai
+          cd ~/invokeai
+          ```
+        </TabItem>
+      </Tabs>
+
+  3. أنشئ بيئة افتراضية في ذلك الدليل:
+
+      ```sh
+      uv venv --relocatable --prompt invoke --python 3.12 --python-preference only-managed .venv
+      ```
+
+      ينشئ هذا الأمر بيئة افتراضية محمولة في `.venv` كاملة مع بايثون 3.12 محمول. لا يهم إذا كان نظامك لا يحتوي على بايثون مُثبّت، أو لديه إصدار مختلف - سيتولى `uv` كل شيء.
+
+  4. فعّل البيئة الافتراضية:
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          ```ps
+          .venv\Scripts\activate
+          ```
+        </TabItem>
+        <TabItem label="Linux/MacOS" icon="linux">
+          ```bash
+          source .venv/bin/activate
+          ```
+        </TabItem>
+      </Tabs>
+
+  5. اختر إصدارًا لتثبيته.
+
+      <LinkButton
+        icon="github"
+        iconPlacement="start"
+        href="https://github.com/invoke-ai/InvokeAI/releases"
+        rel="noopener noreferrer"
+      >
+        عرض الإصدارات
+      </LinkButton>
+
+  6. حدد معرف الحزمة لاستخدامه عند التثبيت. هذا لتحسين الأداء.
+
+      - إذا كان لديك بطاقة Nvidia 20xx أو أقدم، استخدم `invokeai[xformers]`.
+      - إذا كان لديك بطاقة Nvidia 30xx أو أحدث، أو ليس لديك بطاقة Nvidia، استخدم `invokeai`.
+
+  7. حدد الواجهة الخلفية لـ torch لاستخدامها في التثبيت، إن وجدت. هذا ضروري للحصول على الإصدار الصحيح من torch المُثبّت. يتم ذلك باستخدام [دعم torch المدمج في UV.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
+
+      :::note[اختيار واجهة Torch الخلفية]
+        اختر واجهة torch الخلفية فقط عندما تنطبق على نظامك. في جميع الحالات الأخرى، لا تستخدم واجهة torch خلفية.
+      :::
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          <Tabs synkKey="windowsGpuType">
+            <TabItem label="Nvidia GPU">
+              استخدم:
+              ```sh
+              --torch-backend=cu128
+              ```
+            </TabItem>
+            <TabItem label="أخرى / لا GPU">
+              لا تستخدم واجهة torch خلفية.
+            </TabItem>
+          </Tabs>
+        </TabItem>
+
+        <TabItem label="Linux/MacOS" icon="linux">
+          <Tabs syncKey="unixGpuType">
+            <TabItem label="لينكس + Nvidia GPU">
+              استخدم:
+              ```sh
+              --torch-backend=cu128
+              ```
+            </TabItem>
+            <TabItem label="لينكس + لا GPU">
+              استخدم:
+              ```sh
+              --torch-backend=cpu
+              ```
+            </TabItem>
+            <TabItem label="لينكس + AMD GPU">
+              استخدم:
+              ```sh
+              --torch-backend=rocm6.3
+              ```
+            </TabItem>
+            <TabItem label="جميع الحالات الأخرى">
+              لا تستخدم واجهة torch خلفية.
+            </TabItem>
+          </Tabs>
+        </TabItem>
+      </Tabs>
+
+  8. ثبّت حزمة `invokeai`. استبدل معرف الحزمة والإصدار.
+
+      <Tabs synckKey="torchBackend">
+        <TabItem label="بدون واجهة torch خلفية">
+          ```sh
+          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --force-reinstall
+          ```
+        </TabItem>
+        <TabItem label="مع واجهة torch خلفية">
+          ```sh
+          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --torch-backend=<VERSION> --force-reinstall
+          ```
+        </TabItem>
+
+      </Tabs>
+
+  9. قم بإلغاء التنشيط وإعادة تنشيط البيئة الافتراضية حتى تصبح الأوامر الخاصة بـ invokeai متاحة في البيئة:
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          ```ps
+          deactivate
+          .venv\Scripts\activate
+          ```
+        </TabItem>
+        <TabItem label="Linux/MacOS" icon="linux">
+          ```bash
+          deactivate && source .venv/bin/activate
+          ```
+        </TabItem>
+      </Tabs>
+
+  10. شغّل التطبيق، مع تحديد الدليل الذي أنشأته سابقًا كدليل جذر:
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          ```ps
+          invokeai-web --root ~/invokeai
+          ```
+        </TabItem>
+        <TabItem label="Linux/MacOS" icon="linux">
+          ```bash
+          invokeai-web --root $Home/invokeai
+          ```
+        </TabItem>
+      </Tabs>
+</Steps>
+
+إذا كنت تُشغّل Invoke على خادم بدون واجهة رسومية، قد ترغب في تثبيت وتشغيل Invoke من سطر الأوامر.
+
+لا نخطط للحفاظ على نصوص برمجية للقيام بذلك مستقبلاً، بل نركز موارد التطوير لدينا على [المُشغّل](../installation) بواجهة رسومية.
+
+يمكنك إنشاء نصوصك البرمجية الخاصة لذلك بنسخ الأوامر القليلة في هذا الدليل. [وثائق واجهة `pip`](https://docs.astral.sh/uv/reference/cli/#uv-pip-install) الخاصة بـ `uv` قد تكون مفيدة.

@@ -1,0 +1,522 @@
+---
+title: واجهة برمجة تطبيقات استدعاء المعلمات
+---
+
+## نظرة عامة
+
+واجهة برمجة تطبيقات استدعاء المعلمات هي نقطة نهاية REST على الخادم الخلفي لـ InvokeAI
+تسمح للعمليات الخارجية بتعيين معلمات توليد قابلة للاستدعاء على
+الواجهة الأمامية. تشمل المعلمات المدعومة:
+
+- معلمات النص والأرقام الأساسية (الاستدعاءات، النموذج، الخطوات، CFG، الأبعاد، البذرة، ...)
+- LoRAs
+- طبقات التحكم (ControlNet، T2I Adapter، Control LoRA) مع صور تحكم اختيارية
+- محولات IP وصور مرجعية لـ FLUX Redux مع صور اختيارية
+- صور مرجعية بدون نموذج (FLUX.2 Klein، FLUX Kontext، Qwen Image Edit)
+
+عند تحديث المعلمات عبر API، يقوم الخادم الخلفي بتخزينها في
+استمرارية حالة العميل لقائمة الانتظار المستهدفة ويبث حدث WebSocket
+`recall_parameters_updated`. أي عميل واجهة أمامية مشترك في قائمة الانتظار تلك يطبق
+القيم الجديدة فورًا — بدون حاجة إلى إعادة تحميل يدوي.
+
+حالات الاستخدام النموذجية:
+
+- متصفح صور خارجي يريد "استدعاء" أو "إعادة مزج" معلمات
+  التوليد المحفوظة في بيانات وصفية لصورة PNG.
+- برنامج نصي يسبق تحميل المعلمات قبل تشغيل المستخدم للتوليد.
+- الاختبار الآلي أو سير العمل الدفعي الذي يريد إعادة استخدام تكوينات
+  النماذج والمحولات الموجودة.
+
+## كيف يعمل
+
+1. **طلب API** — عميلك يُرسل طلب POST مع جسم JSON من المعلمات إلى
+   `/api/v1/recall/{queue_id}`.
+2. **التخزين** — يتم تخزين المعلمات غير الفارغة تحت
+   مفاتيح `recall_*` في خدمة استمرارية حالة العميل، محددة النطاق
+   لـ `queue_id` المعطى.
+3. **الحل** — يتم حل النماذج من أسماء قابلة للقراءة البشرية إلى
+   مفاتيح النماذج الداخلية المستخدمة من قبل الواجهة الأمامية، ويتم التحقق من
+   أسماء ملفات الصور مقابل `{INVOKEAI_ROOT}/outputs/images`.
+4. **البث** — يتم إرسال حدث `recall_parameters_updated` على
+   غرفة websocket لـ `queue_id`.
+5. **تحديث الواجهة الأمامية** — أي عميل متصل مشترك في قائمة الانتظار تلك
+   يطبق التحديث على مخزن Redux الخاص به، بحيث تمتلئ حقول واجهة المستخدم و LoRAs
+   وطبقات التحكم ومحولات IP والصور المرجعية فورًا.
+
+## نقطة النهاية
+
+**الرابط الأساسي:** `http://localhost:9090/api/v1/recall/{queue_id}`
+
+عادة ما يكون معرف قائمة الانتظار هو `default`.
+
+### POST — تحديث معلمات الاستدعاء
+
+يقوم بتحديث معلمات الاستدعاء لـ `queue_id` المعطى.
+
+```http
+POST /api/v1/recall/{queue_id}
+Content-Type: application/json
+
+{
+  "positive_prompt": "منظر طبيعي جميل",
+  "negative_prompt": "ضبابي، جودة منخفضة",
+  "model": "sd-1.5",
+  "steps": 20,
+  "cfg_scale": 7.5,
+  "width": 512,
+  "height": 512,
+  "seed": 12345
+}
+```
+
+جميع المعلمات اختيارية — أرسل فقط الحقول التي تريد تحديثها.
+
+### GET — استرداد معلمات الاستدعاء
+
+```http
+GET /api/v1/recall/{queue_id}
+```
+
+```json
+{
+  "status": "success",
+  "queue_id": "queue_123",
+  "note": "استخدم الواجهة الأمامية للوصول إلى معلمات الاستدعاء المخزنة، أو عيّن معلمات محددة باستخدام POST"
+}
+```
+
+## مخطط الطلب
+
+### المعلمات الأساسية
+
+| المعامل | النوع | الوصف |
+|-----------|------|-------------|
+| `positive_prompt` | string | نص الاستدعاء الإيجابي |
+| `negative_prompt` | string | نص الاستدعاء السلبي |
+| `model` | string | اسم/معرف النموذج الرئيسي |
+| `refiner_model` | string | اسم/معرف نموذج المُحسّن |
+| `vae_model` | string | اسم/معرف نموذج VAE |
+| `scheduler` | string | اسم المجدول |
+| `steps` | integer | عدد خطوات التوليد (≥1) |
+| `refiner_steps` | integer | عدد خطوات المُحسّن (≥0) |
+| `cfg_scale` | number | مقياس CFG للتوجيه |
+| `cfg_rescale_multiplier` | number | مضاعف إعادة قياس CFG |
+| `refiner_cfg_scale` | number | مقياس CFG للمُحسّن |
+| `guidance` | number | مقياس التوجيه |
+| `width` | integer | عرض الصورة بالبكسل (≥64) |
+| `height` | integer | ارتفاع الصورة بالبكسل (≥64) |
+| `seed` | integer | البذرة العشوائية (≥0) |
+| `denoise_strength` | number | قوة إزالة الضوضاء (0–1) |
+| `refiner_denoise_start` | number | بداية إزالة الضوضاء للمُحسّن (0–1) |
+| `clip_skip` | integer | طبقات تخطي CLIP (≥0) |
+| `seamless_x` | boolean | تفعيل التثليث السلس X |
+| `seamless_y` | boolean | تفعيل التثليث السلس Y |
+| `refiner_positive_aesthetic_score` | number | درجة الجمالية الإيجابية للمُحسّن |
+| `refiner_negative_aesthetic_score` | number | درجة الجمالية السلبية للمُحسّن |
+
+### معلمات المجموعات
+
+```typescript
+{
+  // LoRAs
+  loras?: Array<{
+    model_name: string;     // اسم نموذج LoRA
+    weight?: number;        // الافتراضي: 0.75، النطاق: -10 إلى 10
+    is_enabled?: boolean;   // الافتراضي: true
+  }>;
+
+  // طبقات التحكم (ControlNet، T2I Adapter، Control LoRA)
+  control_layers?: Array<{
+    model_name: string;            // اسم نموذج محول التحكم
+    image_name?: string;           // اسم ملف صورة اختياري من outputs/images
+    weight?: number;               // الافتراضي: 1.0، النطاق: -1 إلى 2
+    begin_step_percent?: number;   // الافتراضي: 0.0، النطاق: 0 إلى 1
+    end_step_percent?: number;     // الافتراضي: 1.0، النطاق: 0 إلى 1
+    control_mode?: "balanced" | "more_prompt" | "more_control"; // ControlNet فقط
+  }>;
+
+  // محولات IP (تشمل FLUX Redux)
+  ip_adapters?: Array<{
+    model_name: string;            // اسم نموذج محول IP / FLUX Redux
+    image_name?: string;           // اسم ملف صورة مرجعية اختياري من outputs/images
+    weight?: number;               // الافتراضي: 1.0، النطاق: -1 إلى 2
+    begin_step_percent?: number;   // الافتراضي: 0.0، النطاق: 0 إلى 1
+    end_step_percent?: number;     // الافتراضي: 1.0، النطاق: 0 إلى 1
+    method?: "full" | "style" | "composition"; // الافتراضي: "full"
+    image_influence?: "lowest" | "low" | "medium" | "high" | "highest"; // FLUX Redux فقط
+  }>;
+
+  // صور مرجعية بدون نموذج (FLUX.2 Klein، FLUX Kontext، Qwen Image Edit)
+  reference_images?: Array<{
+    image_name: string;            // اسم ملف الصورة المرجعية من outputs/images
+  }>;
+}
+```
+
+## حل اسم النموذج
+
+يقوم الخادم الخلفي بحل أسماء النماذج إلى مفاتيحها الداخلية:
+
+1. **النماذج الرئيسية** — يتم حلها من الاسم إلى مفتاح النموذج.
+2. **LoRAs** — يتم البحث عنها في قاعدة بيانات نموذج LoRA.
+3. **محولات التحكم** — تُجرّب بالترتيب: ControlNet ← T2I Adapter ← Control LoRA.
+4. **محولات IP** — يتم البحث عنها في قاعدة بيانات محول IP؛ التراجع إلى FLUX Redux.
+
+يتم تخطي النماذج التي لا يمكن حلها مع تحذير في السجلات —
+يتم تطبيق باقي المعلمات still.
+
+## معالجة ملفات الصور
+
+عند تقديم `image_name`، يقوم الخادم الخلفي بـ:
+
+1. حل `{INVOKEAI_ROOT}/outputs/images/{image_name}` عبر خدمة
+   ملفات الصور (والتي تتحقق أيضًا من المسار).
+2. فتح الصورة لاستخراج العرض/الارتفاع.
+3. تضمين بيانات الصورة الوصفية في الحدث المرسل إلى الواجهة الأمامية.
+4. تسجيل ما إذا تم العثور على الصورة.
+
+يجب الإشارة إلى الصور باسم ملفها كما يظهر في دليل
+outputs/images:
+
+- ✅ `"image_name": "example.png"`
+- ✅ `"image_name": "my_control_image_20240110.jpg"`
+- ❌ `"image_name": "outputs/images/example.png"` (بدون بادئة)
+- ❌ `"image_name": "/full/path/to/example.png"` (بدون مسارات مطلقة)
+
+يتم تسجيل الصور المفقودة كتحذيرات ولكنها **لا** تفشل الطلب —
+يتم تطبيق المعلمات المتبقية still.
+
+## تفاصيل الميزة
+
+### LoRAs
+
+- يتم مسح LoRAs الموجودة قبل إضافة الجديدة.
+- يتم جلب وتطبيق تكوين نموذج كل LoRA بالوزن المحدد.
+- تظهر LoRAs في لوحة اختيار LoRA.
+
+### طبقات التحكم
+
+- مدعومة بالكامل مع صور اختيارية من `outputs/images`.
+- يشمل التكوين النموذج والأوزان ونسب الخطوة ووضع التحكم
+  ومرجع الصورة.
+- يتم تسجيل توفر الصورة في وحدة تحكم الواجهة الأمامية.
+
+### محولات IP / FLUX Redux
+
+- يتم التحقق من الصور المرجعية المحملة من `outputs/images` وتمريرها.
+- يشمل التكوين النموذج والأوزان ونسب الخطوة والطريقة ومرجع
+  الصورة.
+- يستخدم FLUX Redux `image_influence` بدلاً من الوزن الرقمي.
+
+### الصور المرجعية بدون نموذج
+
+تُستخدم من قبل البنى التي تستهلك صورة مرجعية مباشرة، بدون
+نموذج محول منفصل:
+
+- **FLUX.2 Klein** — دعم صور مرجعية مدمج.
+- **FLUX Kontext** — صورة مرجعية مرتبطة بالنموذج الرئيسي.
+- **Qwen Image Edit** — صورة مرجعية مرتبطة بالنموذج الرئيسي.
+
+نظرًا لعدم وجود نموذج محول لحله، تحمل هذه الإدخالات فقط
+`image_name`. عندما تستقبلها الواجهة الأمامية، تختار النوع
+المناسب (`flux2_reference_image`، `flux_kontext_reference_image`،
+أو `qwen_image_reference_image`) بناءً على النموذج الرئيسي
+المحدد حاليًا، مطابقة لسلوك السحب والإفلات اليدوي.
+
+## أمثلة الاستخدام
+
+### cURL
+
+```bash
+# المعلمات الأساسية
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "positive_prompt": "مدينة سايبربانك ليلاً",
+    "negative_prompt": "مظلم، غير واضح",
+    "model": "sd-1.5",
+    "steps": 30
+  }'
+
+# مجرد البذرة
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{"seed": 99999}'
+```
+
+### LoRAs فقط
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "loras": [
+      {"model_name": "add-detail-xl", "weight": 0.8, "is_enabled": true},
+      {"model_name": "sd_xl_offset_example-lora_1.0", "weight": 0.5}
+    ]
+  }'
+```
+
+### طبقات تحكم مع صورة
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "control_layers": [
+      {
+        "model_name": "controlnet-canny-sdxl-1.0",
+        "image_name": "my_control_image.png",
+        "weight": 0.75,
+        "begin_step_percent": 0.0,
+        "end_step_percent": 0.8,
+        "control_mode": "balanced"
+      }
+    ]
+  }'
+```
+
+### محولات IP مع صورة مرجعية
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ip_adapters": [
+      {
+        "model_name": "ip-adapter-plus-face_sd15",
+        "image_name": "reference_face.png",
+        "weight": 0.7,
+        "method": "composition"
+      }
+    ]
+  }'
+```
+
+### صور مرجعية بدون نموذج (FLUX.2 Klein / FLUX Kontext / Qwen Image Edit)
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "FLUX.2 Klein",
+    "reference_images": [
+      {"image_name": "style_reference.png"}
+    ]
+  }'
+```
+
+### تكوين كامل
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "positive_prompt": "تحفة، صورة مفصلة بأسلوب محدد",
+    "negative_prompt": "ضبابي، جودة منخفضة",
+    "model": "FLUX Schnell",
+    "steps": 25,
+    "cfg_scale": 8.0,
+    "width": 1024,
+    "height": 768,
+    "seed": 42,
+    "loras": [
+      {"model_name": "add-detail-xl", "weight": 0.6}
+    ],
+    "control_layers": [
+      {
+        "model_name": "controlnet-depth-sdxl-1.0",
+        "image_name": "depth_map.png",
+        "weight": 1.0,
+        "end_step_percent": 0.7
+      }
+    ],
+    "ip_adapters": [
+      {
+        "model_name": "ip-adapter-plus-face_sd15",
+        "image_name": "style_reference.png",
+        "weight": 0.5,
+        "method": "style"
+      }
+    ]
+  }'
+```
+
+### Python
+
+```python
+import requests
+
+API_URL = "http://localhost:9090/api/v1/recall/default"
+
+params = {
+    "positive_prompt": "غابة هادئة",
+    "negative_prompt": "أشخاص، مبانٍ",
+    "steps": 25,
+    "cfg_scale": 7.0,
+    "seed": 42,
+}
+
+response = requests.post(API_URL, json=params)
+result = response.json()
+print(f"الحالة: {result['status']}")
+print(f"تم تحديث {result['updated_count']} معامل")
+```
+
+### JavaScript
+
+```javascript
+const API_URL = 'http://localhost:9090/api/v1/recall/default';
+
+fetch(API_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    positive_prompt: 'غروب شمس جميل',
+    steps: 20,
+    width: 768,
+    height: 768,
+    seed: 12345,
+  }),
+})
+  .then((res) => res.json())
+  .then((data) => console.log(data));
+```
+
+## تنسيق الاستجابة
+
+```json
+{
+  "status": "success",
+  "queue_id": "default",
+  "updated_count": 15,
+  "parameters": {
+    "positive_prompt": "...",
+    "steps": 25,
+    "loras": [
+      {"model_key": "abc123...", "weight": 0.6, "is_enabled": true}
+    ],
+    "control_layers": [
+      {
+        "model_key": "controlnet-xyz...",
+        "weight": 1.0,
+        "image": {"image_name": "depth_map.png", "width": 1024, "height": 768}
+      }
+    ],
+    "ip_adapters": [
+      {
+        "model_key": "ip-adapter-xyz...",
+        "weight": 0.5,
+        "image": {"image_name": "style_reference.png", "width": 1024, "height": 1024}
+      }
+    ],
+    "reference_images": [
+      {"image": {"image_name": "style_reference.png", "width": 1024, "height": 1024}}
+    ]
+  }
+}
+```
+
+## أحداث WebSocket
+
+تصدر تحديثات المعلمات حدث `recall_parameters_updated` إلى غرفة
+قائمة الانتظار. عملاء الواجهة الأمامية المتصلون يقومون تلقائيًا بـ:
+
+1. تطبيق المعلمات القياسية (الاستدعاءات، الخطوات، الأبعاد، إلخ).
+2. تحميل وإضافة LoRAs إلى قائمة LoRA.
+3. تطبيق تكوينات طبقة التحكم.
+4. تطبيق تكوينات محول IP / FLUX Redux مع صورهم.
+5. إلحاق الصور المرجعية بدون نموذج، باستخدام نوع التكوين الذي
+   يطابق النموذج الرئيسي المحدد حاليًا.
+
+## معالجة الأخطاء
+
+- **400 Bad Request** — معاملات أو قيم معاملات غير صالحة.
+- **500 Internal Server Error** — فشل تخزين أو استرجاع من جانب الخادم.
+
+تتضمن الأخطاء رسائل مفصلة. الصور المفقودة وأسماء النماذج
+غير محلولة **ليست** أخطاء — يتم تسجيلها ويتم تطبيق
+المعلمات المتبقية still.
+
+## التسجيل
+
+### الخادم الخلفي
+
+```
+INFO: تم حل اسم نموذج ControlNet 'controlnet-canny-sdxl-1.0' إلى المفتاح 'controlnet-xyz...'
+INFO: تم العثور على ملف الصورة: depth_map.png (1024x768)
+INFO: تم تحديث 12 معامل استدعاء لقائمة الانتظار default
+INFO: تم حل 1 LoRA
+INFO: تم حل 1 طبقة تحكم
+INFO: تم حل 1 محول IP
+INFO: تم حل 1 صورة مرجعية
+```
+
+### الواجهة الأمامية
+
+عيّن `localStorage.ROARR_FILTER = 'debug'` في المتصفح لرؤية جميع رسائل
+التصحيح تحت مساحة الاسم `events`.
+
+```
+INFO: تم تطبيق 5 معاملات استدعاء على المخزن
+INFO: تم تطبيق 1 محول IP، استبدال القائمة الموجودة
+INFO: تم تطبيق 1 صورة مرجعية بدون نموذج
+DEBUG: تم بناء حالة صورة محول IP: ip-adapter-xyz... (الوزن: 0.7)
+DEBUG: صورة محول IP: outputs/images/depth_map.png (1024x768)
+```
+
+## تفاصيل التنفيذ
+
+- يتم تخزين المعلمات في خدمة استمرارية حالة العميل تحت
+  مفاتيح `recall_*`، محددة النطاق لـ `queue_id`.
+- يعمل التحقق من الصحة الرقمية في طبقة FastAPI (مثل `steps ≥ 1`، `width ≥ 64`).
+- تتم معالجة وتخزين وبث المعلمات غير الفارغة فقط.
+- يتم حل مفتاح النموذج **بعد** تخزين المعلمات الخام، لذلك
+  اسم النموذج غير القابل للحل يسقط ببساطة من البث ولكنه لا
+  يفسد الحالة المحفوظة.
+- تحتوي حمولة البث على مفاتيح النموذج المُحلّة وبيانات الصور الوصفية
+  (العرض/الارتفاع) حتى تتمكن الواجهة الأمامية من ملء مخزنها دون
+  جولات إضافية.
+
+## استكشاف الأخطاء وإصلاحها
+
+### لم يتم العثور على الصورة
+
+إذا رأيت "لم يتم العثور على ملف الصورة" في السجلات:
+
+1. تحقق من تطابق اسم الملف تمامًا (حساس لحالة الأحرف).
+2. تأكد من أن الصورة موجودة في `{INVOKEAI_ROOT}/outputs/images/`.
+3. تحقق من أن اسم الملف لا يتضمن البادئة `outputs/images/`.
+
+### لم يتم العثور على النموذج
+
+إذا رأيت "لم يتم العثور على النموذج":
+
+1. تحقق من تطابق اسم النموذج تمامًا (حساس لحالة الأحرف).
+2. تأكد من تثبيت النموذج.
+3. تحقق من الاسم عبر لوحة مدير النماذج.
+
+### لم يتم استلام الحدث
+
+1. تحقق من وحدة تحكم المتصفح بحثًا عن أخطاء اتصال المقبس.
+2. تحقق من أن `queue_id` يطابق قائمة انتظار الواجهة الأمامية (عادةً `default`).
+3. تحقق من سجلات الخادم الخلفي بحثًا عن أخطاء إصدار الأحداث.
+
+## القيود
+
+- **توفر النموذج** — يجب تثبيت النماذج المشار إليها في الحمولة.
+- **توفر الصورة** — يجب أن توجد الصور في `outputs/images`؛ عناوين
+  URL البعيدة غير مدعومة.
+- **إنشاء الطبقات التلقائي للوحة** — طبقات التحكم ومحولات IP مع
+  الصور تملأ حالة الاستدعاء، ولكن إنشاء طبقة لوحة من
+  بينها لا يزال يتم عبر واجهة المستخدم.
+
+## التحسينات المستقبلية
+
+تحسينات محتملة لم تُنفذ بعد:
+
+1. إنشاء طبقات لوحة تلقائيًا من صور طبقة التحكم في الحمولة.
+2. إنشاء طبقات صور مرجعية تلقائيًا من صور محول IP في الحمولة.
+3. دعم عناوين URL للصور البعيدة بالإضافة إلى أسماء ملفات `outputs/images` المحلية.
+4. إمكانية رفع الصور (قبول base64 أو رفع ملف مباشرة عبر API).
+5. عمليات دفعية تستهدف عدة `queue_id` في طلب واحد.

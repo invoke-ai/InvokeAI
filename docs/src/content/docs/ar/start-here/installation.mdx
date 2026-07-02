@@ -1,0 +1,89 @@
+---
+title: تثبيت بسيط
+lastUpdated: 2026-02-18
+---
+
+import { LinkCard, Tabs, TabItem, Steps } from '@astrojs/starlight/components'
+import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
+
+export const alternateLaunchers = [
+  {
+    title: 'Stability Matrix',
+    description: 'احصل على أحدث إصدار من Stability Matrix لمنصتك.',
+    href: 'https://github.com/LykosAI/StabilityMatrix'
+  },
+  {
+    title: 'LynxHub',
+    description: 'احصل على أحدث إصدار من LynxHub لمنصتك.',
+    href: 'https://github.com/KindaBrazy/LynxHub'
+  },
+]
+
+<SystemRequirementsLink />
+
+## مشغل Invoke
+
+مشغل Invoke هو المشغل الرسمي لتثبيت وتحديث وإدارة تثبيت Invoke الخاص بك.
+
+### تنزيل المشغل وإعداده
+
+يدير المشغل تثبيت Invoke. اتبع هذه التعليمات لتنزيل المشغل وإعداده.
+
+<Tabs syncKey="operatingSystem">
+  <TabItem label="Windows" icon="seti:windows">
+    <Steps>
+      1. [تنزيل لـ Windows]
+      2. شغِّل ملف `EXE` لتثبيت المشغل وبدء تشغيله.
+      3. سيتم إنشاء اختصار على سطح المكتب؛ استخدمه لتشغيل المشغل مستقبلاً.
+      4. يمكنك حذف ملف `EXE` الذي نزّلته.
+    </Steps>
+  </TabItem>
+  <TabItem label="MacOS" icon="apple">
+    <Steps>
+      1. [تنزيل لـ MacOS]
+      2. افتح ملف `DMG` واسحب التطبيق إلى مجلد `Applications`.
+      3. شغِّل المشغل من `Applications`.
+      4. يمكنك حذف ملف `DMG` الذي نزّلته.
+    </Steps>
+  </TabItem>
+  <TabItem label="Linux" icon="linux">
+    <Steps>
+      1. [تنزيل لـ Linux]
+      2. قد تحتاج لتعديل خصائص ملف `AppImage` وجعله قابلاً للتنفيذ.
+      3. اختيارياً: انقل الملف إلى موقع لا يتطلب صلاحيات مدير، وأضف اختصار سطح مكتب له.
+      4. شغِّل المشغل بالنقر المزدوج على `AppImage` أو الاختصار الذي أنشأته.
+    </Steps>
+  </TabItem>
+</Tabs>
+
+### تثبيت Invoke
+
+شغِّل المشغل الذي أعددته للتو إذا لم تكن قد فعلت ذلك بالفعل. انقر على **تثبيت** واتبع التعليمات لتثبيت (أو تحديث) Invoke.
+
+إذا كان لديك تثبيت Invoke موجود، يمكنك تحديده والسماح للمشغل بإدارة التثبيت. ستتمكن من تحديث التثبيت أو تشغيله.
+
+### التحديث
+
+يتحقق المشغل من وجود تحديثات لنفسه _و_ لـ Invoke.
+
+عند اكتشاف المشغل لتحديث متاح لنفسه، ستظهر نافذة منبثقة صغيرة. انقر عليها وسيقوم المشغل بتحديث نفسه تلقائياً.
+
+عند اكتشاف المشغل لتحديث لـ Invoke، ستظهر تنبيه أخضر صغير في المشغل. انقر عليه واتبع التعليمات لتحديث Invoke.
+
+## مشغلات بديلة
+
+:::caution
+التثبيتات من المشغلات البديلة لا تدار من قبل Invoke، لذا لا يمكننا ضمان أنها ستعمل بشكل صحيح. إذا كنت تريد تجربة أكثر استقراراً، نوصي باستخدام [مشغل Invoke الرسمي](#مشغل-invoke).
+:::
+
+{alternateLaunchers.map(({title, description, href}) => (
+  <LinkCard
+    title={title}
+    description={description}
+    href={href}
+  />
+))}
+
+[تنزيل لـ Windows]: https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition.Setup.latest.exe
+[تنزيل لـ MacOS]: https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest-arm64.dmg
+[تنزيل لـ Linux]: https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest.AppImage

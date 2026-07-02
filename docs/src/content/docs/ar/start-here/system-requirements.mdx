@@ -1,0 +1,139 @@
+---
+title: متطلبات الأجهزة
+sidebar:
+  order: 1
+lastUpdated: 2026-02-18
+---
+
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
+
+يعمل Invoke على ويندوز 10+ وماك 14+ ولينكس (أوبونتو 20.04+ مُختبرة جيدًا).
+
+## المتطلبات
+
+تتفاوت متطلبات الأجهزة بشكل كبير حسب الموديل وحجم الصورة المُخرجة.
+
+المتطلبات أدناه إرشادات تقريبية لأفضل أداء. بطاقات GPU ذات ذاكرة VRAM أقل تعمل عادةً، وإن كانت أبطأ قليلاً. اتبع [دليل VRAM المنخفض] لتحسين الأداء.
+
+- جميع حواسيب Mac المزودة بمعالجات Apple Silicon (M1، M2، إلخ) تعمل، لكن يُوصى بذاكرة 16 جيجابايت فأكثر.
+- بطاقات AMD GPU مدعومة على لينكس فقط. متطلبات VRAM مماثلة لبطاقات Nvidia GPU.
+
+### ويندوز/لينكس
+
+| عائلة الموديل | أفضل دقة | GPU (سلسلة) | VRAM (الحد الأدنى) | RAM (الحد الأدنى) | ملاحظات |
+|---|---:|---:|---|---:|---|
+| SD1.5 | 512x512 | Nvidia 10xx+ | 4GB | 8GB |  |
+| SDXL | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB |  |
+| FLUX.1 | 1024x1024 | Nvidia 20xx+ | 10GB | 32GB |  |
+| FLUX.2 Klein 4B | 1024x1024 | Nvidia 30xx+ | 12GB | 16GB | FP8 يعمل مع 8GB+؛ Diffusers + مشفر |
+| FLUX.2 Klein 9B | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 يعمل مع 12GB+؛ Diffusers + مشفر |
+| Z-Image Turbo | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB | Q4_K 8GB؛ Q8/BF16 16GB+ |
+
+:::tip[`tmpfs` على لينكس]
+  إذا كان دليلك المؤقت مُثبّتًا كـ `tmpfs`، تأكد من وجود مساحة كافية.
+:::
+
+## بايثون
+
+:::tip[المُشغّل يُثبّت بايثون لك]
+  لست بحاجة لفعل ذلك إذا كنت تُثبّت باستخدام [مُشغّل Invoke](../installation).
+:::
+
+يتطلب Invoke بايثون `3.11` إلى `3.12`. إذا لم يكن لديك أحد هذه الإصدارات مُثبّتة، نقترح تثبيت `3.12`، حيث سيكون مدعومًا لفترة أطول.
+
+تحقق من تثبيت إصدار محدث من بايثون على نظامك بتشغيل `python3 --version` في الطرفية (لينكس، ماك) أو cmd/powershell (ويندوز).
+
+:::tip[تثبيت بايثون]{icon="seti:python"}
+  <Tabs syncKey="operatingSystem">
+    <TabItem label="Windows" icon="seti:windows">
+      <Steps>
+        1. ثبّت بايثون باستخدام [مثبّت رسمي].
+        2. يتضمن المثبّت خيارًا لإضافة بايثون إلى PATH. تأكد من تفعيل هذا الخيار. إذا فاتك ذلك، أعد تشغيل المثبّت، واختر تعديل التثبيت الموجود، وحدد هذا المربع.
+        3. قد تحتاج إلى تثبيت [Microsoft Visual C++ Redistributable].
+      </Steps>
+    </TabItem>
+    <TabItem label="MacOS" icon="apple">
+      <Steps>
+        1. ثبّت بايثون باستخدام [مثبّت رسمي].
+        2. إذا فشل تثبيت الموديلات بسبب خطأ في الشهادة، قد تحتاج إلى تشغيل هذا الأمر (مع تغيير إصدار بايثون ليتوافق مع ما لديك): `/Applications/Python\ 3.11/Install\ Certificates.command`
+        3. إذا لم تكن قد فعلت ذلك مسبقًا، ستحتاج إلى تثبيت أدوات سطر أوامر XCode بتشغيل `xcode-select --install` في الطرفية.
+      </Steps>
+    </TabItem>
+    <TabItem label="Linux" icon="linux">
+      <Steps>
+        1. تختلف طريقة تثبيت بايثون حسب نظامك. نوصي [باستخدام `uv` لإدارة تثبيت بايثون].
+        2. ستحتاج إلى تثبيت `libglib2.0-0` و`libgl1-mesa-glx` لكي يعمل OpenCV. على سبيل المثال، على نظام Debian: `sudo apt update && sudo apt install -y libglib2.0-0 libgl1-mesa-glx`
+      </Steps>
+    </TabItem>
+  </Tabs>
+:::
+
+## برامج التشغيل
+
+إذا كان لديك بطاقة Nvidia أو AMD GPU، قد تحتاج إلى تثبيت برامج التشغيل أو حزم الدعم الأخرى يدويًا لكي تعمل الأشياء بشكل جيد أو على الإطلاق.
+
+### Nvidia
+
+شغّل `nvidia-smi` في سطر أوامر نظامك للتحقق من تثبيت برامج التشغيل و CUDA. إذا فشل هذا الأمر، أو لم يُبلغ عن إصدارات، فستحتاج إلى تثبيت برامج التشغيل.
+
+انتقل إلى [تنزيلات CUDA Toolkit] واتبع التعليمات بعناية لنظامك لتثبيت كل شيء.
+
+تأكد من أن `nvidia-smi` يعرض إصدارات برنامج التشغيل و CUDA بعد التثبيت.
+
+#### لينكس - عبر Nvidia Container Runtime
+
+بديل لتثبيت CUDA محليًا هو استخدام [Nvidia Container Runtime] لتشغيل التطبيق في حاوية.
+
+#### ويندوز - مكتبات Nvidia cuDNN DLL
+
+مكتبة cuDNN قديمة قد تُعيق الأداء بشكل كبير على بطاقات السلسلة 30 وسلسلة 40. تحقق مع المجتمع على discord لمقارنة `it/s` إذا كنت تعتقد أنك قد تحتاج هذا الإصلاح.
+
+أولاً، حدد موقع وجهة ملفات DLL واعمل نسخة احتياطية سريعة:
+
+1. ابحث عن مجلد تثبيت InvokeAI، مثلاً `C:\Users\Username\InvokeAI\`.
+1. افتح مجلد `.venv`، مثلاً `C:\Users\Username\InvokeAI\.venv` (قد تحتاج إلى إظهار الملفات المخفية لرؤيته).
+1. انتقل أعمق إلى حزمة `torch`، مثلاً `C:\Users\Username\InvokeAI\.venv\Lib\site-packages\torch`.
+1. انسخ مجلد `lib` داخل `torch` واعمل منه نسخة احتياطية في مكان آخر.
+
+بعد ذلك، قم بتنزيل ونسخ ملفات cuDNN DLL المُحدّثة:
+
+1. انتقل إلى [وثائق Cuda].
+1. أنشئ حسابًا إذا لزم الأمر وسجّل الدخول.
+1. اختر أحدث إصدار من cuDNN يعمل مع بنية GPU الخاصة بك. استشر [مصفوفة دعم cuDNN] لتحديد الإصدار المناسب لبطاقة GPU الخاصة بك.
+1. نزّل أحدث إصدار واستخرج محتوياته.
+1. ابحث عن مجلد `bin`، مثلاً `cudnn-windows-x86_64-SOME_VERSION\bin`.
+1. انسخ والصق ملفات `.dll` في مجلد `lib` الذي حددته سابقًا. استبدل الملفات عندما يُطلب منك ذلك.
+
+إذا لم يُحسّن ذلك أداءك بعد إعادة تشغيل التطبيق، إما استعد نسختك الاحتياطية أو أعد تشغيل المثبّت لإعادة `torch` إلى حالته الأصلية.
+
+### AMD
+
+:::tip[لينكس فقط]{icon="linux"}
+  بطاقات AMD GPU مدعومة على لينكس فقط، بسبب أن ROCm (المكافئ من AMD لـ CUDA) مدعوم على لينكس فقط.
+:::
+
+:::caution[مطبات محتملة]
+  على الرغم من أن التطبيق يعمل على بطاقات AMD GPU، إلا أن هناك مطبات عرضية تتعلق بدعم torch غير المنتظم.
+:::
+
+شغّل `rocm-smi` في سطر أوامر نظامك للتحقق من تثبيت برامج التشغيل و ROCm. إذا فشل هذا الأمر، أو لم يُبلغ عن إصدارات، فستحتاج إلى تثبيتها.
+
+انتقل إلى [وثائق ROCm] واتبع التعليمات بعناية لنظامك لتثبيت كل شيء.
+
+تأكد من أن `rocm-smi` يعرض إصدارات برنامج التشغيل بعد التثبيت.
+
+#### لينكس - عبر حاوية Docker
+
+بديل لتثبيت ROCm محليًا هو استخدام [حاوية ROCm docker] لتشغيل التطبيق في حاوية.
+
+[دليل VRAM المنخفض]: ../../configuration/low-vram-mode
+[Nvidia Container Runtime]: https://developer.nvidia.com/container-runtime
+[مثبّت رسمي]: https://www.python.org/downloads/
+[استخدام `uv` لإدارة تثبيت بايثون]: https://docs.astral.sh/uv/concepts/python-versions/#installing-a-python-version
+[Microsoft Visual C++ Redistributable]: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
+[مُشغّل Invoke]: ../installation
+[تنزيلات CUDA Toolkit]: https://developer.nvidia.com/cuda-downloads
+[وثائق Cuda]: https://developer.nvidia.com/cudnn
+[مصفوفة دعم cuDNN]: https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html
+[وثائق ROCm]: https://rocmdocs.amd.com
+[حاوية ROCm docker]: https://rocmdocs.amd.com/en/latest/Deep_learning/Deep_learning.html#docker-containers
