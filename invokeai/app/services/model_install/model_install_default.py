@@ -203,11 +203,6 @@ class ModelInstallService(ModelInstallServiceBase):
     def _restore_incomplete_installs(self) -> None:
         path = self._app_config.models_path
         seen_sources: set[str] = set()
-        # Collect sources already tracked by active jobs (including those being downloaded right now).
-        # We must not re-queue these or delete their tmpdirs.
-        with self._lock:
-            active_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
-            active_sources.update(str(j.source) for j in self._download_cache.values() if not j.in_terminal_state)
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
             marker = self._read_install_marker(tmpdir)
             if not marker:
@@ -224,10 +219,6 @@ class ModelInstallService(ModelInstallServiceBase):
                 access_token = marker.get("access_token")
                 if isinstance(source, (HFModelSource, URLModelSource)) and isinstance(access_token, str):
                     source.access_token = access_token
-                if source_str in active_sources:
-                    # This tmpdir belongs to an install already in progress; leave it alone.
-                    self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
-                    continue
                 if source_str in seen_sources:
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                     self._safe_rmtree(tmpdir, self._logger)
@@ -249,7 +240,20 @@ class ModelInstallService(ModelInstallServiceBase):
             if files_meta:
                 job._resume_metadata = {f.get("url"): f for f in files_meta if f.get("url")}
             job.status = InstallStatus(status) if status else InstallStatus.WAITING
-            self._install_jobs.append(job)
+
+            # Atomically check that no other thread (e.g. import_model) has already
+            # queued this source, then append. Without this, a TOCTOU race against
+            # foreground import_model calls can enqueue the same source twice and
+            # cause a FileNotFoundError when the second download tries to rename
+            # the .downloading file the first one already moved.
+            with self._lock:
+                already_active = any(
+                    str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state
+                ) or any(str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state)
+                if already_active:
+                    self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
+                    continue
+                self._install_jobs.append(job)
 
             if job.paused:
                 continue
