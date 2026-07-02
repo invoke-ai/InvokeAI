@@ -46,6 +46,20 @@ def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(v, GGMLTensor) for v in state_dict.values())
 
 
+def _has_t5_encoder_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict looks like a llama.cpp T5 encoder.
+
+    T5 encoder GGUFs (e.g. city96/t5-v1_1-xxl-encoder-gguf) also carry a ``token_embd.weight`` tensor,
+    which makes them satisfy the Qwen3 GGUF key heuristic. But their transformer blocks use the ``enc.``
+    prefix (``enc.blk.*``, ``enc.output_norm.weight``), which a Qwen3 encoder never has. We use this to
+    keep the T5 and Qwen3 encoder configs mutually exclusive.
+    """
+    for key in state_dict.keys():
+        if isinstance(key, str) and (key.startswith("enc.blk.") or key == "enc.output_norm.weight"):
+            return True
+    return False
+
+
 def _has_qwen_vl_visual_tower(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict bundles a Qwen2.5-VL / Qwen2-VL vision tower.
 
@@ -156,6 +170,10 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _has_qwen3_keys(state_dict):
             raise NotAMatchError("state dict does not look like a Qwen3 model")
+        # Reject T5 encoders: they share the token_embd.weight key with Qwen3 GGUFs but use the ``enc.``
+        # block prefix, and must be classified as T5Encoder (Qwen3 encoders never have ``enc.blk.*`` keys).
+        if _has_t5_encoder_keys(state_dict):
+            raise NotAMatchError("state dict looks like a T5 encoder (has 'enc.blk.*' keys), not a Qwen3 encoder")
         # Reject Qwen2.5-VL / Qwen2-VL encoders: they carry a visual tower and must be
         # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
         if _has_qwen_vl_visual_tower(state_dict):
@@ -297,6 +315,10 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _has_qwen3_keys(state_dict):
             raise NotAMatchError("state dict does not look like a Qwen3 model")
+        # Reject T5 encoders: they share the token_embd.weight key with Qwen3 GGUFs but use the ``enc.``
+        # block prefix, and must be classified as T5Encoder (Qwen3 encoders never have ``enc.blk.*`` keys).
+        if _has_t5_encoder_keys(state_dict):
+            raise NotAMatchError("state dict looks like a T5 encoder (has 'enc.blk.*' keys), not a Qwen3 encoder")
         # Reject Qwen2.5-VL / Qwen2-VL encoders: they carry a visual tower and must be
         # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
         if _has_qwen_vl_visual_tower(state_dict):

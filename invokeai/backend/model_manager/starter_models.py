@@ -101,6 +101,24 @@ t5_8b_quantized_encoder = StarterModel(
     format=ModelFormat.BnbQuantizedLlmInt8b,
 )
 
+t5_gguf_q3_k_s_encoder = StarterModel(
+    name="t5_gguf_q3_k_s_encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q3_K_S.gguf",
+    description="T5-XXL text encoder, GGUF Q3_K_S quantized (used in FLUX pipelines). Smallest size for low VRAM, lower quality. ~2.1GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+t5_gguf_q6_k_encoder = StarterModel(
+    name="t5_gguf_q6_k_encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q6_K.gguf",
+    description="T5-XXL text encoder, GGUF Q6_K quantized (used in FLUX pipelines). Near-lossless quality. ~3.9GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
 clip_l_encoder = StarterModel(
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
@@ -1642,6 +1660,8 @@ STARTER_MODELS: list[StarterModel] = [
     swinir,
     t5_base_encoder,
     t5_8b_quantized_encoder,
+    t5_gguf_q3_k_s_encoder,
+    t5_gguf_q6_k_encoder,
     clip_l_encoder,
     siglip,
     flux_redux,
