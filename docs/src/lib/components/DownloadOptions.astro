@@ -1,5 +1,5 @@
 ---
-import { LinkCard, Icon, LinkButton } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Icon, LinkButton } from '@astrojs/starlight/components';
 import { type StarlightIcon } from '@astrojs/starlight/types';
 import { withBase } from '../base-path';
 
@@ -111,26 +111,19 @@ const hostedOptions = {
     }
   </div>
 
-  <!-- Hosted -->
-  <div class="download-options__separator download-options__separator--text">
-    <span align="center">Commercial Hosted Service Options</span>
-  </div>
-
   <!-- Hosted Options -->
-  <div class="download-options__grid download-options--launcher">
-    {
-      Object.entries(hostedOptions).map(
-        ([key, { headline, description, href }]) => (
-          <div class="download-option" data-platform={key}>
-            <h3>{headline}</h3>
-	    <a href={href}>{description}</a>
-            </div>
-          </div>
-        ),
-      )
-    }
+  <div class="download-options__hosted">
+    <h3>Hosted Options</h3>
+    <p>For users who want to run Invoke on a hosted GPU service instead of their own hardware.</p>
+
+    <CardGrid>
+      {
+        Object.entries(hostedOptions).map(([key, { headline, href, description }]) => (
+          <LinkCard title={headline} {href} {description} />
+        ))
+      }
+    </CardGrid>
   </div>
-  
 </div>
 
 <style is:global>
@@ -173,13 +166,21 @@ const hostedOptions = {
     }
   }
 
-  .download-options__separator--text > span {
-    border-radius: 0;
-    border: none;
-    width: auto;
-    aspect-ratio: auto;
-    padding: 0 0.75rem;
-    white-space: nowrap;
+  .download-options__hosted {
+    margin: 0;
+    border-radius: var(--radius);
+    background: var(--sl-color-black);
+    border: 1px solid var(--sl-color-gray-5);
+    padding: 1.5rem;
+
+    h3 {
+      margin-top: 0;
+    }
+
+    > p {
+      margin-top: 0.5rem;
+      color: var(--sl-color-gray-2);
+    }
   }
 
   .download-options--launcher {
