@@ -67,6 +67,8 @@ def build_migration_11(app_config: InvokeAIAppConfig, logger: Logger) -> Migrati
     - Renames "models/.cache" to "models/.convert_cache".
     """
     migration_11 = Migration(
+        id="migration_11",
+        depends_on="migration_10",
         from_version=10,
         to_version=11,
         callback=Migration11Callback(app_config=app_config, logger=logger),

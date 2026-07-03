@@ -4172,6 +4172,78 @@
         ]
       }
     },
+    "/api/v1/image_moves/start": {
+      "post": {
+        "tags": ["image_moves"],
+        "summary": "Start Image Move",
+        "operationId": "start_image_move",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_moves/recover": {
+      "post": {
+        "tags": ["image_moves"],
+        "summary": "Start Image Move Recovery",
+        "operationId": "start_image_move_recovery",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_moves/status": {
+      "get": {
+        "tags": ["image_moves"],
+        "summary": "Get Image Move Status",
+        "operationId": "get_image_move_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/images/upload": {
       "post": {
         "tags": ["images"],
@@ -4821,7 +4893,7 @@
       "head": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_full_head",
         "parameters": [
           {
@@ -4861,7 +4933,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_full",
         "parameters": [
           {
@@ -4903,7 +4975,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Thumbnail",
-        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_thumbnail",
         "parameters": [
           {
@@ -33498,6 +33570,101 @@
           "$ref": "#/components/schemas/MaskOutput"
         }
       },
+      "ImageMoveJobResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "The image move job id."
+          },
+          "state": {
+            "type": "string",
+            "enum": ["planned", "moving", "moved", "committed", "error"],
+            "title": "State",
+            "description": "The image move job state."
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "The last error recorded for the job, if any."
+          }
+        },
+        "type": "object",
+        "required": ["id", "state"],
+        "title": "ImageMoveJobResponse"
+      },
+      "ImageMoveStatusResponse": {
+        "properties": {
+          "is_running": {
+            "type": "boolean",
+            "title": "Is Running",
+            "description": "Whether an image move background operation is currently running."
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["move_all", "recovery"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation",
+            "description": "The active background operation, if any."
+          },
+          "active_job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Job Id",
+            "description": "The active journal job id, if any."
+          },
+          "latest_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageMoveJobResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest journal job, if any."
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error",
+            "description": "The last background worker error, if any."
+          },
+          "needs_move_count": {
+            "type": "integer",
+            "title": "Needs Move Count",
+            "description": "The number of images that do not match the current subfolder strategy."
+          }
+        },
+        "type": "object",
+        "required": ["is_running", "needs_move_count"],
+        "title": "ImageMoveStatusResponse"
+      },
       "ImageMultiplyInvocation": {
         "category": "image",
         "class": "invocation",
@@ -46584,9 +46751,7 @@
           "weight": {
             "anyOf": [
               {
-                "type": "number",
-                "maximum": 2.0,
-                "minimum": -1.0
+                "type": "number"
               },
               {
                 "type": "null"
@@ -46594,6 +46759,30 @@
             ],
             "title": "Weight",
             "description": "Default weight for this model"
+          },
+          "weight_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Min",
+            "description": "Minimum weight slider value for this model"
+          },
+          "weight_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Max",
+            "description": "Maximum weight slider value for this model"
           }
         },
         "additionalProperties": false,
