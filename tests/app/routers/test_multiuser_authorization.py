@@ -1334,14 +1334,37 @@ class TestQueueStatusScoping:
         assert status_obj.session_id is None
         assert status_obj.batch_id is None
 
-    def test_session_queue_status_no_user_fields(self):
-        """SessionQueueStatus should not have user_pending/user_in_progress fields anymore.
-        Non-admin users now get their own counts in the main pending/in_progress fields."""
+    def test_session_queue_status_has_user_fields(self):
+        """SessionQueueStatus carries per-user counts (user_pending/user_in_progress) alongside
+        the global aggregate counts. The frontend badge needs both to render "own / total" for
+        non-admin users in multiuser mode. The per-user fields are optional (None for admins
+        and single-user/global callers)."""
         from invokeai.app.services.session_queue.session_queue_common import SessionQueueStatus
 
         fields = set(SessionQueueStatus.model_fields.keys())
-        assert "user_pending" not in fields
-        assert "user_in_progress" not in fields
+        assert "user_pending" in fields
+        assert "user_in_progress" in fields
+
+        # Per-user fields default to None (global/admin caller) and aggregate counts stay global.
+        status_obj = SessionQueueStatus(
+            queue_id="default",
+            item_id=None,
+            session_id=None,
+            batch_id=None,
+            pending=5,
+            in_progress=1,
+            completed=0,
+            failed=0,
+            canceled=0,
+            total=6,
+        )
+        assert status_obj.user_pending is None
+        assert status_obj.user_in_progress is None
+
+        # A non-admin caller's status carries their own subset of the global counts.
+        scoped = status_obj.model_copy(update={"user_pending": 2, "user_in_progress": 1})
+        assert scoped.pending == 5  # global, unchanged
+        assert scoped.user_pending == 2  # this user's share
 
 
 # ===========================================================================
@@ -1820,6 +1843,44 @@ class TestWebSocketAuth:
 
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
         assert "default" in rooms_emitted_to
+
+    def test_recall_parameters_emitted_once_to_owner_and_admin_rooms(self, socketio: Any) -> None:
+        """RecallParametersUpdatedEvent must be delivered to the owner + admin rooms
+        in a SINGLE emit call (room list), not two separate emits.
+
+        A socket that is in both rooms — e.g. the system user in single-user mode,
+        who is also an admin — would otherwise receive the event twice. That is
+        harmless for the idempotent scalar recall fields but doubles every entry
+        for the append-mode reference-image recall, which pushes rather than
+        replaces. python-socketio deduplicates recipients across a room list, so
+        a single emit to [user_room, "admin"] delivers exactly once per socket.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import RecallParametersUpdatedEvent
+
+        event = RecallParametersUpdatedEvent.build(
+            queue_id="default",
+            user_id="owner-recall",
+            parameters={"reference_images": [{"image": {"image_name": "cat.png"}}], "append": True},
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("recall_parameters_updated", event)))
+
+        # Exactly one emit, targeting the union of the owner and admin rooms.
+        assert mock_emit.call_count == 1, (
+            "recall event must be emitted once to a room list, not once per room — "
+            "two emits double-deliver to a socket in both rooms"
+        )
+        room = mock_emit.call_args.kwargs.get("room")
+        assert isinstance(room, list)
+        assert set(room) == {"user:owner-recall", "admin"}
+        # And never to the shared queue room, which would leak to other users.
+        assert "default" not in room
 
 
 class TestCustomNodesAuthorization:

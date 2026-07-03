@@ -35,7 +35,7 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
-  "compel==2.1.1",
+  "compel>=2.4.0,<3",
   "diffusers[torch]==0.37.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
@@ -46,10 +46,14 @@ dependencies = [
   "safetensors",
   "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
-  "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
+  # >=2.10 so the rocm extra can use torch 2.10.0+rocm7.1, while macOS stays on 2.7.x — newer macOS torch
+  # wheels exercise MPS on CI runners (no usable Metal GPU) and fail with MPS OOM.
+  "torch>=2.7.0,<3.0; sys_platform != 'darwin'",
+  "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
-  "transformers>=4.56.0",
+  "transformers>=5.5,<5.6",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
@@ -93,9 +97,10 @@ dependencies = [
 "cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
 "cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
 "rocm" = [
-  "torch==2.7.1+rocm6.3",
-  "torchvision==0.22.1+rocm6.3",
-  "pytorch-triton-rocm",
+  # ROCm wheels are x86_64-linux-only; gate by platform so macOS/win resolution is unaffected.
+  "torch==2.10.0+rocm7.1; sys_platform == 'linux'",
+  "torchvision==0.25.0+rocm7.1; sys_platform == 'linux'",
+  "triton-rocm==3.6.0; sys_platform == 'linux'",
 ]
 
 "onnx" = ["onnxruntime"]
@@ -124,6 +129,9 @@ dependencies = [
 override-dependencies = ["opencv-python; sys_platform=='never'"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
+# We do not publish or support ARM Linux builds; restrict resolution to
+# x86_64 Linux, Windows, and macOS. (ROCm in particular is x86_64-only.)
+environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'x86_64')"]
 
 [tool.uv.sources]
 torch = [
@@ -136,8 +144,8 @@ torchvision = [
   { index = "torch-cuda", extra = "cuda" },
   { index = "torch-rocm", extra = "rocm" },
 ]
-pytorch-triton-rocm = [
-  { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
+triton-rocm = [
+  { index = "torch-rocm", marker = "sys_platform == 'linux'" },
 ]
 
 [[tool.uv.index]]
@@ -152,7 +160,7 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.3"
+url = "https://download.pytorch.org/whl/rocm7.1"
 explicit = true
 
 [project.scripts]
