@@ -55,6 +55,8 @@ def build_migration_25(app_config: InvokeAIAppConfig, logger: Logger) -> Migrati
     """
 
     return Migration(
+        id="migration_25",
+        depends_on="migration_24",
         from_version=24,
         to_version=25,
         callback=Migration25Callback(app_config=app_config, logger=logger),

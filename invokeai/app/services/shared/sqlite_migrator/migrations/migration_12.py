@@ -27,6 +27,8 @@ def build_migration_12(app_config: InvokeAIAppConfig) -> Migration:
     This migration removes the now-unused model convert cache directory.
     """
     migration_12 = Migration(
+        id="migration_12",
+        depends_on="migration_11",
         from_version=11,
         to_version=12,
         callback=Migration12Callback(app_config),
