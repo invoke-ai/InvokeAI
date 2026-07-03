@@ -47,6 +47,8 @@ def build_migration_29() -> Migration:
     supporting 'private', 'shared', and 'public' visibility levels.
     """
     return Migration(
+        id="migration_29",
+        depends_on="migration_28",
         from_version=28,
         to_version=29,
         callback=Migration29Callback(),
