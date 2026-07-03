@@ -45,6 +45,28 @@ describe('zInvocationNodeData: extra-input scoping', () => {
     expect(parsed.inputs.unet?.value).toBeUndefined();
   });
 
+  it('drops a stale array-of-records value on a NON-extra node (would match a metadata passthrough instance)', () => {
+    // The metadata pass-through instances (LoRA/ControlNet/...) accept `array(record(string, any))`.
+    // On a non-extra node they must NOT be used, so a stale array-of-objects value is coerced away.
+    const parsed = zInvocationNodeData.parse(
+      buildNodeData('some_stateless_node', {
+        metadata: { name: 'metadata', label: '', description: '', value: [{ foo: 'bar' }] },
+      })
+    );
+    expect(parsed.inputs.metadata).toBeDefined();
+    expect(parsed.inputs.metadata?.value).toBeUndefined();
+  });
+
+  it('preserves a metadata passthrough value (loras) on core_metadata', () => {
+    const loras = [{ model: { key: 'k', hash: 'h', name: 'n', base: 'z-image', type: 'lora' }, weight: 0.75 }];
+    const parsed = zInvocationNodeData.parse(
+      buildNodeData('core_metadata', {
+        loras: { name: 'loras', label: '', description: '', value: loras },
+      })
+    );
+    expect(parsed.inputs.loras?.value).toEqual(loras);
+  });
+
   it('preserves an undeclared extra value on core_metadata (extra=allow)', () => {
     const parsed = zInvocationNodeData.parse(
       buildNodeData('core_metadata', {

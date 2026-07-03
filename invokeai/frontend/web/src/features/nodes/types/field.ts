@@ -1447,32 +1447,57 @@ const zStatefulFieldInputInstance = z.union([
   zIntegerGeneratorFieldInputInstance,
   zStringGeneratorFieldInputInstance,
   zImageGeneratorFieldInputInstance,
+  // NOTE: the metadata pass-through instances (LoRA/ControlNet/IPAdapter/T2IAdapter) and the
+  // `MetadataExtraField` catch-all are intentionally NOT part of this union - see
+  // `zMetadataFieldInputInstances` / `zMetadataExtraFieldInputInstance` below and
+  // `zFieldInputInstanceWithExtras`.
+]);
+
+/**
+ * The metadata pass-through instances accept opaque `array(record(string, any)) | nullish` values.
+ * That is greedy enough to match a stale array-of-objects value on ANY field, so they must not be
+ * parsed for arbitrary nodes - inputs are parsed without their template (see `zInvocationNodeData`),
+ * and a preserved stale value would leak into the backend graph via `buildNodesGraph`. These fields
+ * are only declared on nodes that accept extras (pydantic `extra='allow'`, currently `core_metadata`),
+ * so they are scoped to `zFieldInputInstanceWithExtras`.
+ */
+const zMetadataFieldInputInstances = [
   zLoRAMetadataFieldInputInstance,
   zControlNetMetadataFieldInputInstance,
   zIPAdapterMetadataFieldInputInstance,
   zT2IAdapterMetadataFieldInputInstance,
-  // NOTE: `zMetadataExtraFieldInputInstance` is intentionally NOT part of this union. Its value is
-  // `z.any()`, so including it here would make it a catch-all that preserves any malformed/stale
-  // input value for *any* node during workflow parsing (inputs are parsed without their template).
-  // Extras are scoped to nodes that accept them via `zFieldInputInstanceWithExtras` below.
-]);
+] as const;
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
-export type FieldInputInstance = z.infer<typeof zFieldInputInstance>;
 
 /**
- * Like {@link zFieldInputInstance}, but additionally accepts the `MetadataExtraField` catch-all for
- * undeclared "extra" inputs. Because the `MetadataExtraField` value is `z.any()`, it matches almost
- * anything and MUST only be used for node types known to accept extras (pydantic `extra='allow'`,
- * e.g. `core_metadata`). Applied conditionally in `zInvocationNodeData` based on the node type — see
- * `nodeAcceptsExtraInputs`. The `MetadataExtraField` branch is placed before the stateless branch so
- * that genuine extra values are preserved rather than coerced to `undefined`.
+ * Like {@link zFieldInputInstance}, but additionally accepts the metadata pass-through instances and
+ * the `MetadataExtraField` catch-all. Both groups accept very permissive values, so this union MUST
+ * only be used for node types known to accept extras (see `nodeAcceptsExtraInputs`). It is applied
+ * conditionally in `zInvocationNodeData` based on the node type. The metadata/extra branches are
+ * placed before the stateless branch so that genuine values are preserved rather than coerced to
+ * `undefined` by the stateless catch.
  */
 export const zFieldInputInstanceWithExtras = z.union([
   zStatefulFieldInputInstance,
+  ...zMetadataFieldInputInstances,
   zMetadataExtraFieldInputInstance,
   zStatelessFieldInputInstance,
 ]);
+
+/**
+ * The `FieldInputInstance` TYPE must describe every instance shape the app constructs - including the
+ * metadata pass-through instances built for `core_metadata` fields (e.g. via `buildFieldInputInstance`)
+ * - even though the runtime `zFieldInputInstance` schema excludes them for scoping reasons. The
+ * `MetadataExtraField` instance is excluded here too: its value is `z.any()`, which would collapse the
+ * whole instance value type to `any`.
+ */
+const _zFieldInputInstanceType = z.union([
+  zStatefulFieldInputInstance,
+  ...zMetadataFieldInputInstances,
+  zStatelessFieldInputInstance,
+]);
+export type FieldInputInstance = z.infer<typeof _zFieldInputInstanceType>;
 // #endregion
 
 // #region StatefulFieldInputTemplate & FieldInputTemplate

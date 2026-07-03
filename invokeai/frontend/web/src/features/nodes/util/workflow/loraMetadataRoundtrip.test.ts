@@ -15,9 +15,14 @@
  * inputs holding them fell through to `zStatelessFieldInputInstance`,
  * whose `value` is `z.undefined().catch(undefined)` — coercing the value
  * to undefined.
+ *
+ * These metadata pass-through instances are only declared on nodes that
+ * accept extras (`core_metadata`), so they round-trip via the scoped
+ * `zFieldInputInstanceWithExtras` union rather than the global one - see
+ * PR #9162.
  */
 
-import { zFieldInputInstance } from 'features/nodes/types/field';
+import { zFieldInputInstanceWithExtras } from 'features/nodes/types/field';
 import { describe, expect, it } from 'vitest';
 
 describe('issue #9151: metadata-field roundtrip', () => {
@@ -41,7 +46,7 @@ describe('issue #9151: metadata-field roundtrip', () => {
       ],
     };
 
-    const parsed = zFieldInputInstance.parse(inputInstance);
+    const parsed = zFieldInputInstanceWithExtras.parse(inputInstance);
     expect(parsed.value).toEqual(inputInstance.value);
   });
 
@@ -59,7 +64,7 @@ describe('issue #9151: metadata-field roundtrip', () => {
       ],
     };
 
-    expect(zFieldInputInstance.parse(inputInstance).value).toEqual(inputInstance.value);
+    expect(zFieldInputInstanceWithExtras.parse(inputInstance).value).toEqual(inputInstance.value);
   });
 
   it('preserves an IPAdapterMetadataField[] value', () => {
@@ -80,7 +85,7 @@ describe('issue #9151: metadata-field roundtrip', () => {
       ],
     };
 
-    expect(zFieldInputInstance.parse(inputInstance).value).toEqual(inputInstance.value);
+    expect(zFieldInputInstanceWithExtras.parse(inputInstance).value).toEqual(inputInstance.value);
   });
 
   it('preserves a T2IAdapterMetadataField[] value', () => {
@@ -96,7 +101,7 @@ describe('issue #9151: metadata-field roundtrip', () => {
       ],
     };
 
-    expect(zFieldInputInstance.parse(inputInstance).value).toEqual(inputInstance.value);
+    expect(zFieldInputInstanceWithExtras.parse(inputInstance).value).toEqual(inputInstance.value);
   });
 
   it('null is still accepted (no loras applied case)', () => {
@@ -107,6 +112,6 @@ describe('issue #9151: metadata-field roundtrip', () => {
       value: null,
     };
 
-    expect(zFieldInputInstance.parse(inputInstance).value).toBeNull();
+    expect(zFieldInputInstanceWithExtras.parse(inputInstance).value).toBeNull();
   });
 });
