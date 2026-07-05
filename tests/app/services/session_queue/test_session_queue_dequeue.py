@@ -10,6 +10,7 @@ from pydantic_core import to_jsonable_python
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_sqlite import (
+    AFFINITY_MAX_LOOKAHEAD,
     ROUND_ROBIN_DEQUEUE_QUERY,
     SqliteSessionQueue,
 )
@@ -48,17 +49,23 @@ def _insert_queue_item(
     queue_id: str,
     user_id: str,
     priority: int = 0,
+    session_json: str = _EMPTY_SESSION_JSON,
+    item_id: Optional[int] = None,
 ) -> int:
-    """Directly insert a minimal queue item and return its item_id."""
+    """Directly insert a minimal queue item and return its item_id.
+
+    Pass an explicit item_id to create gaps in the id sequence (e.g. to test the affinity
+    lookahead window without inserting filler rows).
+    """
     session_id = str(uuid.uuid4())
     batch_id = str(uuid.uuid4())
     with session_queue._db.transaction() as cursor:
         cursor.execute(
             """--sql
-            INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO session_queue (item_id, queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (queue_id, _EMPTY_SESSION_JSON, session_id, batch_id, None, priority, None, None, None, None, user_id),
+            (item_id, queue_id, session_json, session_id, batch_id, None, priority, None, None, None, None, user_id),
         )
         return cursor.lastrowid  # type: ignore[return-value]
 
@@ -291,3 +298,182 @@ def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker) -> None:
     # FIFO order: user_a, user_a, user_b
     user_ids = _dequeue_user_ids(queue, 3)
     assert user_ids == ["user_a", "user_a", "user_b"]
+
+
+# ---------------------------------------------------------------------------
+# Device-affinity tests
+# ---------------------------------------------------------------------------
+
+_WARM_MODEL_KEY = "aaaaaaaa-1111-2222-3333-444444444444"
+
+
+def _session_with_model_key(*model_keys: str) -> str:
+    """A valid session JSON whose text contains the given model key(s).
+
+    Affinity scoring matches model keys as substrings of the raw session JSON, so embedding the
+    keys in the (free-form) session id is sufficient and keeps the session parseable.
+    """
+    session = to_jsonable_python(GraphExecutionState(graph=Graph()).model_dump())
+    session["id"] = " ".join(model_keys)
+    return json.dumps(session)
+
+
+def _install_fake_cache(invoker: Invoker, device: str, resident_keys: set[str]) -> None:
+    """Wire a fake per-device model cache holding `resident_keys` onto the mock invoker."""
+    from unittest.mock import MagicMock
+
+    cache = MagicMock()
+    cache.cached_model_keys.return_value = resident_keys
+    model_manager = MagicMock()
+    model_manager.load.ram_caches = {device: cache}
+    invoker.services.model_manager = model_manager
+
+
+def test_affinity_prefers_warm_model_within_user(session_queue_round_robin: SqliteSessionQueue) -> None:
+    """Among one user's equal-priority items, the item whose model is warm on the claiming
+    device is dequeued first, ahead of an older item that would need a model load."""
+    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    queue_id = "default"
+    cold_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a")
+    warm_id = _insert_queue_item(
+        session_queue_round_robin, queue_id, "user_a", session_json=_session_with_model_key(_WARM_MODEL_KEY)
+    )
+
+    first = session_queue_round_robin.dequeue(device="cuda:0")
+    second = session_queue_round_robin.dequeue(device="cuda:0")
+    assert first is not None and first.item_id == warm_id
+    assert second is not None and second.item_id == cold_id
+
+
+def test_affinity_never_overrides_round_robin_user_choice(session_queue_round_robin: SqliteSessionQueue) -> None:
+    """Affinity must not steal the turn from the fairness-chosen user, even when another
+    user's pending item has a warm model."""
+    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    queue_id = "default"
+    a_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a")
+    _insert_queue_item(
+        session_queue_round_robin, queue_id, "user_b", session_json=_session_with_model_key(_WARM_MODEL_KEY)
+    )
+
+    # Neither user has been served; the epoch tie breaks by item_id, so it is user_a's turn.
+    first = session_queue_round_robin.dequeue(device="cuda:0")
+    assert first is not None and first.item_id == a_id
+
+
+def test_affinity_never_overrides_priority(session_queue_round_robin: SqliteSessionQueue) -> None:
+    """A warm low-priority item must not jump ahead of a cold higher-priority item."""
+    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    queue_id = "default"
+    hi_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a", priority=10)
+    _insert_queue_item(
+        session_queue_round_robin, queue_id, "user_a", session_json=_session_with_model_key(_WARM_MODEL_KEY)
+    )
+
+    first = session_queue_round_robin.dequeue(device="cuda:0")
+    assert first is not None and first.item_id == hi_id
+
+
+def test_affinity_noop_without_device_or_matching_cache(session_queue_round_robin: SqliteSessionQueue) -> None:
+    """With no device, or a device with no registered cache, ordering is unchanged."""
+    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    queue_id = "default"
+    first_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a")
+    _insert_queue_item(
+        session_queue_round_robin, queue_id, "user_a", session_json=_session_with_model_key(_WARM_MODEL_KEY)
+    )
+
+    # Unknown device -> no cache -> fairness order (oldest item first).
+    first = session_queue_round_robin.dequeue(device="cuda:7")
+    assert first is not None and first.item_id == first_id
+
+
+def test_affinity_applies_in_fifo_mode(session_queue_fifo: SqliteSessionQueue) -> None:
+    """Single-user installs (FIFO query, but default session_queue_mode=round_robin) also
+    benefit: warm items are preferred within the same priority."""
+    _install_fake_cache(session_queue_fifo._SqliteSessionQueue__invoker, "cuda:1", {_WARM_MODEL_KEY})
+    queue_id = "default"
+    cold_id = _insert_queue_item(session_queue_fifo, queue_id, "user_a")
+    warm_id = _insert_queue_item(
+        session_queue_fifo, queue_id, "user_a", session_json=_session_with_model_key(_WARM_MODEL_KEY)
+    )
+
+    first = session_queue_fifo.dequeue(device="cuda:1")
+    second = session_queue_fifo.dequeue(device="cuda:1")
+    assert first is not None and first.item_id == warm_id
+    assert second is not None and second.item_id == cold_id
+
+
+def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker) -> None:
+    """An admin who explicitly sets session_queue_mode=FIFO is promised strict insertion
+    order, so affinity reordering must not apply."""
+    mock_invoker.services.configuration = InvokeAIAppConfig(
+        use_memory_db=True,
+        node_cache_size=0,
+        session_queue_mode="FIFO",
+    )
+    db = mock_invoker.services.board_records._db
+    queue = SqliteSessionQueue(db=db)
+    queue.start(mock_invoker)
+    _install_fake_cache(mock_invoker, "cuda:0", {_WARM_MODEL_KEY})
+
+    queue_id = "default"
+    cold_id = _insert_queue_item(queue, queue_id, "user_a")
+    warm_id = _insert_queue_item(queue, queue_id, "user_a", session_json=_session_with_model_key(_WARM_MODEL_KEY))
+
+    first = queue.dequeue(device="cuda:0")
+    second = queue.dequeue(device="cuda:0")
+    assert first is not None and first.item_id == cold_id
+    assert second is not None and second.item_id == warm_id
+
+
+def test_affinity_prefers_more_matching_keys(session_queue_round_robin: SqliteSessionQueue) -> None:
+    """An item matching two resident models outranks an older item matching one — this also
+    exercises the multi-key score expression and its parameter binding order."""
+    other_key = "bbbbbbbb-5555-6666-7777-888888888888"
+    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY, other_key})
+    queue_id = "default"
+    one_match_id = _insert_queue_item(
+        session_queue_round_robin, queue_id, "user_a", session_json=_session_with_model_key(_WARM_MODEL_KEY)
+    )
+    two_match_id = _insert_queue_item(
+        session_queue_round_robin,
+        queue_id,
+        "user_a",
+        session_json=_session_with_model_key(_WARM_MODEL_KEY, other_key),
+    )
+
+    first = session_queue_round_robin.dequeue(device="cuda:0")
+    second = session_queue_round_robin.dequeue(device="cuda:0")
+    assert first is not None and first.item_id == two_match_id
+    assert second is not None and second.item_id == one_match_id
+
+
+def test_affinity_lookahead_window_bounds_deferral(session_queue_round_robin: SqliteSessionQueue) -> None:
+    """A warm item further than AFFINITY_MAX_LOOKAHEAD past the fairness candidate must not be
+    swapped in — this is the bound that prevents unbounded starvation of cold items."""
+    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    queue_id = "default"
+    cold_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a", item_id=100)
+    in_window_id = _insert_queue_item(
+        session_queue_round_robin,
+        queue_id,
+        "user_a",
+        session_json=_session_with_model_key(_WARM_MODEL_KEY),
+        item_id=100 + AFFINITY_MAX_LOOKAHEAD,
+    )
+    _insert_queue_item(
+        session_queue_round_robin,
+        queue_id,
+        "user_a",
+        session_json=_session_with_model_key(_WARM_MODEL_KEY),
+        item_id=100 + AFFINITY_MAX_LOOKAHEAD + 1,
+    )
+
+    # The warm item at the window edge is eligible; the one just past it is not.
+    first = session_queue_round_robin.dequeue(device="cuda:0")
+    assert first is not None and first.item_id == in_window_id
+
+    # With the in-window warm item gone, the out-of-window warm item is still not eligible
+    # relative to the cold candidate, so the cold item finally runs.
+    second = session_queue_round_robin.dequeue(device="cuda:0")
+    assert second is not None and second.item_id == cold_id

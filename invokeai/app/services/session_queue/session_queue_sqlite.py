@@ -84,6 +84,17 @@ ROUND_ROBIN_DEQUEUE_QUERY = """--sql
     LIMIT 1
     """
 
+# Upper bound on how many resident model keys the device-affinity scoring query binds. Real
+# per-device caches hold at most a handful of models; this only guards the SQL parameter count.
+MAX_AFFINITY_MODEL_KEYS = 50
+
+# How far past the fairness-chosen candidate (in item_id distance) the device-affinity swap may
+# look for a warm-model item. This bounds two things at once: the scoring query's cost (at most
+# this many session blobs are scanned per dequeue) and how long a cold item can be deferred — the
+# starved candidate's item_id never changes, so newly enqueued warm items eventually fall outside
+# the window and the cold item runs after at most ~this many swaps.
+AFFINITY_MAX_LOOKAHEAD = 32
+
 # FIFO dequeue (single-user mode, or round_robin explicitly disabled): strict priority then
 # insertion order.
 FIFO_DEQUEUE_QUERY = """--sql
@@ -283,6 +294,18 @@ class SqliteSessionQueue(SessionQueueBase):
 
         query = ROUND_ROBIN_DEQUEUE_QUERY if use_round_robin else FIFO_DEQUEUE_QUERY
 
+        # Snapshot the claiming device's warm models BEFORE taking the dequeue lock: the lookup
+        # touches the ModelCache lock, which other threads may hold across long operations (VRAM
+        # transfers, cache clears). A slightly stale snapshot is fine for a heuristic; stalling
+        # every worker's dequeue is not. An explicitly configured session_queue_mode=FIFO is a
+        # request for strict insertion order, so it opts out of affinity reordering entirely
+        # (the setting defaults to round_robin, which keeps affinity active for single-user
+        # installs even though they use the FIFO query).
+        if config.session_queue_mode == "round_robin":
+            resident_model_keys = self._get_device_resident_model_keys(device)
+        else:
+            resident_model_keys = set()
+
         # Hold the dequeue lock across the select-then-claim so concurrent workers (multi-GPU)
         # cannot select and claim the same pending item. `_set_queue_item_status` already no-ops
         # if the item was concurrently moved to a terminal state (e.g. canceled), so we only need
@@ -294,9 +317,73 @@ class SqliteSessionQueue(SessionQueueBase):
             if result is None:
                 return None
             queue_item = SessionQueueItem.queue_item_from_dict(dict(result))
+            queue_item = self._apply_device_affinity(queue_item, resident_model_keys)
             # Record the claiming worker's device so the UI can label the item by GPU.
             queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress", device=device)
         return queue_item
+
+    def _apply_device_affinity(self, candidate: SessionQueueItem, resident_keys: set[str]) -> SessionQueueItem:
+        """Swap the fairness-chosen candidate for a nearby same-user, same-priority pending item
+        whose models are already cached on the claiming device, if one exists.
+
+        Cross-device model reloads are expensive (tens of seconds for large models), so when a user
+        has queued a mix of models, preferring an item whose models are warm on the freeing GPU cuts
+        thrash. Fairness is preserved by construction: round-robin decides *which user* is served and
+        priority ordering decides *which tier* of their items is eligible; this heuristic only
+        reorders within that user's equal-priority pending items, and only within
+        AFFINITY_MAX_LOOKAHEAD of the candidate's item_id, so a cold item's deferral is bounded.
+        The caller passes an empty key set to disable affinity (legacy single-device mode, explicit
+        FIFO mode, or cache introspection unavailable).
+        """
+        if not resident_keys:
+            return candidate
+        # Model keys are UUID strings that appear verbatim in the session JSON, so residency can be
+        # scored with substring matches — no need to parse each candidate's session. Sort for
+        # deterministic parameter binding; cap to bound the query if a cache is unexpectedly large.
+        keys = sorted(resident_keys)[:MAX_AFFINITY_MODEL_KEYS]
+        score = " + ".join(["(instr(sq.session, ?) > 0)"] * len(keys))
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                SELECT
+                    sq.*,
+                    u.display_name AS user_display_name,
+                    u.email AS user_email,
+                    ({score}) AS affinity
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
+                WHERE sq.status = 'pending'
+                    AND sq.user_id IS ?
+                    AND sq.priority = ?
+                    AND sq.item_id <= ?
+                ORDER BY affinity DESC, sq.item_id ASC
+                LIMIT 1
+                """,
+                (*keys, candidate.user_id, candidate.priority, candidate.item_id + AFFINITY_MAX_LOOKAHEAD),
+            )
+            row = cast(Union[sqlite3.Row, None], cursor.fetchone())
+        if row is None:
+            return candidate
+        row_dict = dict(row)
+        if not row_dict.pop("affinity", 0) or row_dict["item_id"] == candidate.item_id:
+            # No warm-model item for this user (or the candidate already is one) — keep the
+            # fairness-chosen candidate.
+            return candidate
+        return SessionQueueItem.queue_item_from_dict(row_dict)
+
+    def _get_device_resident_model_keys(self, device: Optional[str]) -> set[str]:
+        """Best-effort lookup of the model keys currently cached for the given generation device."""
+        if device is None:
+            return set()
+        try:
+            cache = self.__invoker.services.model_manager.load.ram_caches.get(device)
+            if cache is None:
+                return set()
+            return set(cache.cached_model_keys())
+        except Exception:
+            # Affinity is purely an optimization — dequeue must never fail because cache
+            # introspection did (e.g. model manager not fully started, or mocked in tests).
+            return set()
 
     def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:
         with self._db.transaction() as cursor:

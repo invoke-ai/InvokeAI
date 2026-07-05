@@ -505,6 +505,29 @@ class ModelCache:
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
 
+    def cached_model_keys(self) -> set[str]:
+        """Return the base model keys of every model currently resident in this cache.
+
+        Used by the session queue's device-affinity heuristic to prefer pending items whose
+        models are already warm on the claiming device. Two properties matter to that caller:
+
+        - Entries keyed by `get_model_cache_key` (model key plus optional ``:submodel`` suffix)
+          are reported with the suffix stripped so they match plain model keys. Entries keyed by
+          filesystem path (`load_model_from_path`) are excluded: a path — or the bare Windows
+          drive letter that splitting ``C:\\...`` on ``:`` would leave — is not a model key, and
+          such short strings would corrupt substring-based affinity scoring.
+        - Non-blocking: the cache lock is held across long operations (VRAM transfers, cache
+          clears), and this feeds an opportunistic scheduling heuristic — returning an empty set
+          when the lock is contended is better than stalling a worker's dequeue.
+        """
+        if not self._lock.acquire(blocking=False):
+            return set()
+        try:
+            base_keys = (key.split(":", 1)[0] for key in self._cached_models)
+            return {k for k in base_keys if len(k) >= 16 and "/" not in k and "\\" not in k}
+        finally:
+            self._lock.release()
+
     @synchronized
     def _get_cache_snapshot(self) -> dict[str, CacheEntrySnapshot]:
         overview: dict[str, CacheEntrySnapshot] = {}
