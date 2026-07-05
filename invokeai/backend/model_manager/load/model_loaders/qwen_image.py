@@ -444,7 +444,15 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         # `model.language_model.X`. Apply the same conversion mapping that
         # `Qwen2_5_VLForConditionalGeneration.from_pretrained` would, since
         # `load_state_dict` does not.
-        key_mapping = Qwen2_5_VLForConditionalGeneration._checkpoint_conversion_mapping
+        #
+        # transformers ≤4.x exposed this as `_checkpoint_conversion_mapping`, but 5.x
+        # dropped it (returns `{}`), so we fall back to the legacy mapping ourselves.
+        # The negative lookahead keeps already-converted checkpoints untouched, so the
+        # remap is safe to apply to both legacy and new-layout single-file checkpoints.
+        key_mapping = Qwen2_5_VLForConditionalGeneration._checkpoint_conversion_mapping or {
+            r"^visual": "model.visual",
+            r"^model(?!\.(language_model|visual))": "model.language_model",
+        }
         if key_mapping:
             remapped_sd: dict[str, torch.Tensor] = {}
             for old_key, tensor in sd.items():
