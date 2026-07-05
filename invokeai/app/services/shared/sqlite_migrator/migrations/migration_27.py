@@ -360,6 +360,8 @@ def build_migration_27() -> Migration:
     (including a JWT secret) to the database schema.
     """
     return Migration(
+        id="migration_27",
+        depends_on="migration_26",
         from_version=26,
         to_version=27,
         callback=Migration27Callback(),
