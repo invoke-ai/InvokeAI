@@ -257,6 +257,19 @@ class PhysicalFileMapper:
             filenames.append(os.path.basename(filepath))
         return filenames
 
+    def get_all_image_filenames_recursive(self):  # noqa D102
+        """Return the set of all image filenames found anywhere under outputs_path.
+
+        When an image_subfolder_strategy is configured, images are written to
+        subdirectories of outputs/images (e.g. by date, type or hash). This walks
+        the entire tree so that images stored in subfolders are not mistaken for
+        missing files. Thumbnails are stored as .webp and so are excluded by the
+        .png glob; the images-archive directory is a sibling of outputs/images and
+        is therefore not traversed.
+        """
+        filepaths = glob.glob(os.path.join(self.outputs_path, "**", "*.png"), recursive=True)
+        return {os.path.basename(filepath) for filepath in filepaths}
+
     def get_all_thumbnails_with_full_path(self, thumbnails_directory):  # noqa D102
         return glob.glob(thumbnails_directory + "/*.webp", recursive=False)
 
@@ -370,9 +383,13 @@ class InvokeAIDatabaseMaintenanceApp:
         db_mapper.backup(config.TIMESTAMP_STRING)
         db_mapper.connect()
         db_files = db_mapper.get_all_image_files()
+        # Build an index of every image present anywhere under outputs/images, including any
+        # subfolders created by an image_subfolder_strategy. A db entry is only orphaned if its
+        # file is absent from this entire tree, not just the top-level outputs/images directory.
+        disk_image_filenames = file_mapper.get_all_image_filenames_recursive()
         for db_file in db_files:
             try:
-                if not file_mapper.image_file_exists(db_file):
+                if db_file not in disk_image_filenames:
                     print(f"Found orphaned image db entry {db_file}. Cleaning ...", end="")
                     db_mapper.remove_image_file_record(db_file)
                     print("Cleaned!")
