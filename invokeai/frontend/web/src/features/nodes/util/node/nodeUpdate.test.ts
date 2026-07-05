@@ -66,7 +66,7 @@ const currentImageCollectionTemplate = {
         cardinality: 'COLLECTION',
         batch: false,
       },
-      default: [],
+      default: undefined,
     },
     images: {
       name: 'images',
@@ -96,14 +96,14 @@ describe('updateNode', () => {
     }
     collectionInput.value = images;
 
-    const updated = updateNode(node, currentImageCollectionTemplate);
+    const updated = updateNode(node, currentImageCollectionTemplate, { connectedInputNames: new Set() });
 
     expect(updated.data.version).toBe('1.0.2');
     expect(updated.data.inputs.images?.value).toEqual(images);
     expect(updated.data.inputs.collection?.value).toEqual([]);
   });
 
-  it('does not move old image_collection direct collection values when collection is connected', () => {
+  it('preserves old image_collection direct collection values when collection is connected', () => {
     const node = buildInvocationNode({ x: 0, y: 0 }, oldImageCollectionTemplate);
     const images = [{ image_name: 'stale' }];
     const collectionInput = node.data.inputs.collection;
@@ -117,6 +117,6 @@ describe('updateNode', () => {
     });
 
     expect(updated.data.inputs.images?.value).toBeUndefined();
-    expect(updated.data.inputs.collection?.value).toEqual([]);
+    expect(updated.data.inputs.collection?.value).toEqual(images);
   });
 });

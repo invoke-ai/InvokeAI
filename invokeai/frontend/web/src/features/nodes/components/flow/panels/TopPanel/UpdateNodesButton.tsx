@@ -4,9 +4,8 @@ import { useAppStore } from 'app/store/storeHooks';
 import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
 import { $templates, nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
-import { NodeUpdateError } from 'features/nodes/types/error';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
+import { getConnectedInputNames, getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,11 +35,7 @@ const useUpdateNodes = () => {
         return;
       }
       try {
-        const connectedInputNames = new Set(
-          edges.flatMap((edge) =>
-            edge.type === 'default' && edge.target === node.id && edge.targetHandle ? [edge.targetHandle] : []
-          )
-        );
+        const connectedInputNames = getConnectedInputNames(node.id, edges);
         const updatedNode = updateNode(node, template, { connectedInputNames });
         store.dispatch(
           nodesChanged([
@@ -48,10 +43,8 @@ const useUpdateNodes = () => {
             { type: 'add', item: updatedNode },
           ])
         );
-      } catch (e) {
-        if (e instanceof NodeUpdateError) {
-          unableToUpdateCount++;
-        }
+      } catch {
+        unableToUpdateCount++;
       }
     });
 

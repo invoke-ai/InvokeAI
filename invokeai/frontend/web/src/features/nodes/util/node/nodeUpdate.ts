@@ -7,8 +7,24 @@ import { zParsedSemver } from 'features/nodes/types/semver';
 
 import { buildInvocationNode } from './buildInvocationNode';
 
-type UpdateNodeOptions = {
-  connectedInputNames?: Set<string>;
+export type ConnectedInputEdge = { type?: string; target: string; targetHandle?: string | null };
+
+export type UpdateNodeOptions = {
+  connectedInputNames: Set<string>;
+};
+
+export const getConnectedInputNames = (nodeId: string, edges: ConnectedInputEdge[]): Set<string> =>
+  new Set(
+    edges.flatMap((edge) =>
+      edge.type === 'default' && edge.target === nodeId && edge.targetHandle ? [edge.targetHandle] : []
+    )
+  );
+
+export const getUpdatedFieldName = (node: InvocationNode, fieldName: string): string => {
+  if (node.data.type === 'image_collection' && fieldName === 'collection' && node.data.inputs.images) {
+    return 'images';
+  }
+  return fieldName;
 };
 
 export const getNeedsUpdate = (data: InvocationNodeData, template: InvocationTemplate): boolean => {
@@ -33,8 +49,14 @@ const getMayUpdateNode = (node: InvocationNode, template: InvocationTemplate): b
   return satisfies(node.data.version, `^${templateMajor}`);
 };
 
-const migrateImageCollectionInputValues = (node: InvocationNode, options?: UpdateNodeOptions) => {
+export const migrateImageCollectionInputValues = (
+  node: InvocationNode,
+  options: UpdateNodeOptions & { sourceVersion?: string }
+) => {
   if (node.data.type !== 'image_collection') {
+    return;
+  }
+  if (options.sourceVersion && options.sourceVersion !== '1.0.1') {
     return;
   }
 
@@ -47,9 +69,11 @@ const migrateImageCollectionInputValues = (node: InvocationNode, options?: Updat
     return;
   }
 
-  if (!options?.connectedInputNames?.has('collection')) {
-    images.value = collection.value;
+  if (options.connectedInputNames.has('collection')) {
+    return;
   }
+
+  images.value = collection.value;
   collection.value = [];
 };
 
@@ -67,7 +91,7 @@ const migrateImageCollectionInputValues = (node: InvocationNode, options?: Updat
 export const updateNode = (
   node: InvocationNode,
   template: InvocationTemplate,
-  options?: UpdateNodeOptions
+  options: UpdateNodeOptions
 ): InvocationNode => {
   const mayUpdate = getMayUpdateNode(node, template);
 
@@ -82,9 +106,10 @@ export const updateNode = (
   // being valid. We rely on the template's major version to be majorly incremented if this kind of
   // merge would result in an invalid node.
   const clone = deepClone(node);
+  const sourceVersion = clone.data.version;
   clone.data.version = template.version;
   defaultsDeep(clone, defaults); // mutates!
-  migrateImageCollectionInputValues(clone, options);
+  migrateImageCollectionInputValues(clone, { ...options, sourceVersion });
 
   // Remove any fields that are not in the template
   clone.data.inputs = pick(clone.data.inputs, keys(defaults.data.inputs));
