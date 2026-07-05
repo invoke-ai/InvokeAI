@@ -5,7 +5,8 @@ import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { getDefaultForm } from 'features/nodes/types/workflow';
+import { getDefaultForm, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
+import { getConnectedInputNames, migrateImageCollectionInputValues } from 'features/nodes/util/node/nodeUpdate';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import type { NonNullableGraph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -102,6 +103,21 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
       sourceHandle: edge.source.field,
       target: edge.destination.node_id,
       targetHandle: edge.destination.field,
+    });
+  });
+
+  workflow.nodes.filter(isWorkflowInvocationNode).forEach((node) => {
+    if (
+      node.data.type === 'image_collection' &&
+      node.data.inputs.collection &&
+      !node.data.inputs.images &&
+      templates.image_collection?.inputs.images
+    ) {
+      node.data.inputs.images = buildFieldInputInstance(node.id, templates.image_collection.inputs.images);
+    }
+
+    migrateImageCollectionInputValues(node, {
+      connectedInputNames: getConnectedInputNames(node.id, workflow.edges),
     });
   });
 

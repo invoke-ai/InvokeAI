@@ -1,8 +1,10 @@
 import { get } from 'es-toolkit/compat';
+import { addElement } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
 import { img_resize, main_model_loader, workflow_return } from 'features/nodes/store/util/testUtils';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { getDefaultForm } from 'features/nodes/types/workflow';
+import { buildNodeFieldElement, getDefaultForm, isNodeFieldElement } from 'features/nodes/types/workflow';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { describe, expect, it, vi } from 'vitest';
@@ -16,6 +18,53 @@ vi.mock('app/logging/logger', () => ({
     error: vi.fn(),
   }),
 }));
+
+const imageCollectionTemplate = {
+  title: 'Image Collection Primitive',
+  type: 'image_collection',
+  version: '1.0.2',
+  tags: ['primitives', 'image', 'collection'],
+  description: 'A collection of image primitive values',
+  outputType: 'image_collection_output',
+  inputs: {
+    collection: {
+      name: 'collection',
+      title: 'Collection',
+      required: false,
+      description: 'An optional image collection to append to',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      type: { name: 'ImageField', cardinality: 'COLLECTION', batch: false },
+      default: undefined,
+    },
+    images: {
+      name: 'images',
+      title: 'Images',
+      required: false,
+      description: 'The images to append to the collection',
+      fieldKind: 'input',
+      input: 'direct',
+      ui_hidden: false,
+      type: { name: 'ImageField', cardinality: 'COLLECTION', batch: false },
+      default: undefined,
+    },
+  },
+  outputs: {
+    collection: {
+      fieldKind: 'output',
+      name: 'collection',
+      title: 'Collection',
+      description: 'The output images',
+      type: { name: 'ImageField', cardinality: 'COLLECTION', batch: false },
+      ui_hidden: false,
+    },
+  },
+  useCache: true,
+  nodePack: 'invokeai',
+  classification: 'stable',
+  category: 'primitives',
+} satisfies InvocationTemplate;
 
 //TODO(psyche): Test workflow validation for form builder fields
 describe('validateWorkflow', () => {
@@ -119,6 +168,32 @@ describe('validateWorkflow', () => {
     new Promise((resolve) => {
       resolve(false);
     });
+  const addLegacyImageCollectionNode = (workflow: WorkflowV3, id: string, images = [{ image_name: `${id}.png` }]) => {
+    workflow.nodes.push({
+      id,
+      type: 'invocation',
+      data: {
+        id,
+        type: 'image_collection',
+        version: '1.0.1',
+        label: '',
+        notes: '',
+        isOpen: true,
+        isIntermediate: true,
+        useCache: true,
+        nodePack: 'invokeai',
+        inputs: {
+          collection: {
+            name: 'collection',
+            label: '',
+            description: '',
+            value: images,
+          },
+        },
+      },
+      position: { x: 0, y: 0 },
+    });
+  };
   it('should reset images that are inaccessible', async () => {
     const validationResult = await validateWorkflow({
       workflow: getWorkflow(),
@@ -326,5 +401,86 @@ describe('validateWorkflow', () => {
 
     expect(validationResult.workflow.edges).toEqual([unresolvedEdge]);
     expect(validationResult.warnings).toEqual([]);
+  });
+
+  it('should migrate image_collection direct values when its old collection edge is invalid', async () => {
+    const workflow = getWorkflow();
+    const images = [{ image_name: 'legacy.png' }];
+    addLegacyImageCollectionNode(workflow, 'image-collection', images);
+    workflow.edges.push({
+      id: 'missing-source-edge',
+      type: 'default',
+      source: 'missing-node',
+      sourceHandle: 'collection',
+      target: 'image-collection',
+      targetHandle: 'collection',
+    });
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.edges).toEqual([]);
+    expect(get(validationResult.workflow, 'nodes[2].data.inputs.images.value')).toEqual(images);
+    expect(get(validationResult.workflow, 'nodes[2].data.inputs.collection.value')).toEqual([]);
+  });
+
+  it('should preserve image_collection collection values when its old collection edge is valid', async () => {
+    const workflow = getWorkflow();
+    const images = [{ image_name: 'shadowed.png' }];
+    addLegacyImageCollectionNode(workflow, 'source-collection', []);
+    addLegacyImageCollectionNode(workflow, 'target-collection', images);
+    workflow.edges.push({
+      id: 'valid-edge',
+      type: 'default',
+      source: 'source-collection',
+      sourceHandle: 'collection',
+      target: 'target-collection',
+      targetHandle: 'collection',
+    });
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.edges).toHaveLength(1);
+    expect(get(validationResult.workflow, 'nodes[3].data.inputs.images.value')).toBeUndefined();
+    expect(get(validationResult.workflow, 'nodes[3].data.inputs.collection.value')).toEqual(images);
+  });
+
+  it('should remap image_collection form and exposed collection fields to images', async () => {
+    const workflow = getWorkflow();
+    const images = [{ image_name: 'legacy.png' }];
+    addLegacyImageCollectionNode(workflow, 'image-collection', images);
+    workflow.exposedFields = [{ nodeId: 'image-collection', fieldName: 'collection' }];
+    const element = buildNodeFieldElement('image-collection', 'collection', {
+      name: 'ImageField',
+      cardinality: 'COLLECTION',
+      batch: false,
+    });
+    addElement({ form: workflow.form, element, parentId: workflow.form.rootElementId });
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.exposedFields).toEqual([{ nodeId: 'image-collection', fieldName: 'images' }]);
+    const updatedElement = validationResult.workflow.form.elements[element.id];
+    if (!updatedElement || !isNodeFieldElement(updatedElement)) {
+      throw new Error('Expected a node field form element');
+    }
+    expect(updatedElement.data.fieldIdentifier.fieldName).toBe('images');
   });
 });

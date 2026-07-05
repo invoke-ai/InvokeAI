@@ -13890,10 +13890,16 @@ export type components = {
             use_cache?: boolean;
             /**
              * Collection
-             * @description The collection of image values
+             * @description An optional image collection to append to
              * @default null
              */
             collection?: components["schemas"]["ImageField"][] | null;
+            /**
+             * Images
+             * @description The images to append to the collection
+             * @default null
+             */
+            images?: components["schemas"]["ImageField"][] | null;
             /**
              * type
              * @default image_collection
