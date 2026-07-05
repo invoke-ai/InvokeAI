@@ -63,13 +63,27 @@ describe('buildHotkeysData', () => {
     expect(starImage.hotkeys).toEqual(['period']);
   });
 
-  it('canonicalizes legacy bracket overrides from persisted custom hotkeys', () => {
+  it('preserves custom punctuation glyph hotkeys without retargeting them to physical keys', () => {
     const hotkeysData = buildHotkeysData(t, {
       'canvas.decrementToolWidth': ['['],
       'canvas.incrementToolWidth': [']'],
     });
 
-    expect(hotkeysData.canvas.hotkeys.decrementToolWidth?.hotkeys).toEqual(['bracketleft']);
-    expect(hotkeysData.canvas.hotkeys.incrementToolWidth?.hotkeys).toEqual(['bracketright']);
+    expect(hotkeysData.canvas.hotkeys.decrementToolWidth?.hotkeys).toEqual(['[']);
+    expect(hotkeysData.canvas.hotkeys.incrementToolWidth?.hotkeys).toEqual([']']);
+  });
+
+  it('formats physical hotkeys with the browser keyboard layout map when available', () => {
+    const hotkeysData = buildHotkeysData(
+      t,
+      {},
+      new Map([
+        ['BracketLeft', 'х'],
+        ['BracketRight', 'ъ'],
+      ])
+    );
+
+    expect(hotkeysData.canvas.hotkeys.decrementToolWidth?.platformKeys).toEqual([['х']]);
+    expect(hotkeysData.canvas.hotkeys.incrementToolWidth?.platformKeys).toEqual([['ъ']]);
   });
 });

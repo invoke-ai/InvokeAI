@@ -2,11 +2,15 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Flex, IconButton, Kbd, Text, Tooltip } from '@invoke-ai/ui-library';
 import type { AppThunkDispatch } from 'app/store/store';
 import {
-  formatHotkeyKeyForDisplay,
+  areHotkeyStringsEquivalent,
+  formatHotkeyStringForPlatform,
   getHotkeyKeyFromEvent,
+  getHotkeyStringAliases,
+  IS_MAC_OS,
   normalizeHotkeyKey,
 } from 'features/system/components/HotkeysModal/hotkeyStrings';
 import type { Hotkey, HotkeyConflictInfo } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { useKeyboardLayoutMap } from 'features/system/components/HotkeysModal/useKeyboardLayoutMap';
 import { hotkeyChanged, hotkeyReset } from 'features/system/store/hotkeysSlice';
 import type { TFunction } from 'i18next';
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -101,25 +105,30 @@ const HotkeyItem = memo(
   }: HotkeyItemProps) => {
     const [recordedKey, setRecordedKey] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
+    const keyboardLayoutMap = useKeyboardLayoutMap();
 
-    // Memoize key parts to avoid repeated split calls
-    const keyParts = useMemo(() => keyString.split('+'), [keyString]);
-    const displayKeyParts = useMemo(() => keyParts.map((key) => formatHotkeyKeyForDisplay(key)), [keyParts]);
+    const displayKeyParts = useMemo(
+      () => formatHotkeyStringForPlatform(keyString, IS_MAC_OS, keyboardLayoutMap),
+      [keyboardLayoutMap, keyString]
+    );
 
     // Check if the recorded key conflicts with another hotkey
     const conflict = useMemo(() => {
       if (!recordedKey) {
         return null;
       }
-      const existingHotkey = conflictMap.get(recordedKey);
-      if (!existingHotkey) {
-        return null;
+      for (const recordedKeyAlias of getHotkeyStringAliases(recordedKey)) {
+        const existingHotkey = conflictMap.get(recordedKeyAlias);
+        if (!existingHotkey) {
+          continue;
+        }
+        // Don't flag conflict if it's the same hotkey we're editing
+        if (existingHotkey.fullId === currentHotkeyId) {
+          continue;
+        }
+        return existingHotkey;
       }
-      // Don't flag conflict if it's the same hotkey we're editing
-      if (existingHotkey.fullId === currentHotkeyId) {
-        return null;
-      }
-      return existingHotkey;
+      return null;
     }, [recordedKey, conflictMap, currentHotkeyId]);
 
     // Start recording when entering edit mode
@@ -231,7 +240,9 @@ const HotkeyItem = memo(
     const renderHotkeyKeys = () => {
       if (isEditing) {
         const displayKey = recordedKey ?? keyString;
-        const parts = displayKey.split('+').map((key) => formatHotkeyKeyForDisplay(key));
+        const parts = recordedKey
+          ? formatHotkeyStringForPlatform(displayKey, IS_MAC_OS, keyboardLayoutMap)
+          : displayKeyParts;
         const hasConflict = conflict !== null;
 
         return (
@@ -499,8 +510,8 @@ export const HotkeyListItem = memo(({ lastItem, hotkey, sx, conflictMap, t, disp
         return;
       }
 
-      // Skip saving hotkey if it already exists in the list
-      if (hotkeyKeys.includes(newHotkey)) {
+      // Skip saving hotkey if it already exists in the list, including legacy glyph aliases.
+      if (hotkeyKeys.some((hotkeyKey, i) => i !== index && areHotkeyStringsEquivalent(hotkeyKey, newHotkey))) {
         setEditingIndex(null);
         return;
       }
