@@ -2,6 +2,7 @@ import { deepClone } from 'common/util/deepClone';
 import { satisfies } from 'compare-versions';
 import { defaultsDeep, keys, pick } from 'es-toolkit/compat';
 import { NodeUpdateError } from 'features/nodes/types/error';
+import { nodeAcceptsExtraInputs } from 'features/nodes/types/extraInputs';
 import type { InvocationNode, InvocationNodeData, InvocationTemplate } from 'features/nodes/types/invocation';
 import { zParsedSemver } from 'features/nodes/types/semver';
 
@@ -57,7 +58,15 @@ export const updateNode = (node: InvocationNode, template: InvocationTemplate): 
   clone.data.version = template.version;
   defaultsDeep(clone, defaults); // mutates!
 
-  // Remove any fields that are not in the template
-  clone.data.inputs = pick(clone.data.inputs, keys(defaults.data.inputs));
+  // Remove any fields that are not in the template. Nodes that accept extras (pydantic
+  // `extra='allow'`, e.g. `core_metadata`) may carry undeclared inputs that are not in the template
+  // but must be preserved across the update, so keep those keys too.
+  const allowedKeys = keys(defaults.data.inputs);
+  if (nodeAcceptsExtraInputs(clone.data.type)) {
+    const extraKeys = keys(clone.data.inputs).filter((key) => !(key in defaults.data.inputs));
+    clone.data.inputs = pick(clone.data.inputs, [...allowedKeys, ...extraKeys]);
+  } else {
+    clone.data.inputs = pick(clone.data.inputs, allowedKeys);
+  }
   return clone;
 };

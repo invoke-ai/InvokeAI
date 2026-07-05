@@ -2,7 +2,9 @@ import type { Edge, Node } from '@xyflow/react';
 import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
-import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputTemplate } from './field';
+import { nodeAcceptsExtraInputs } from './extraInputs';
+import type { FieldInputInstance } from './field';
+import { zFieldInputInstance, zFieldInputInstanceWithExtras, zFieldInputTemplate, zFieldOutputTemplate } from './field';
 import { zSemVer } from './semver';
 
 // #region InvocationTemplate
@@ -24,18 +26,43 @@ export type InvocationTemplate = z.infer<typeof _zInvocationTemplate>;
 // #endregion
 
 // #region NodeData
-export const zInvocationNodeData = z.object({
-  id: z.string().trim().min(1),
-  version: zSemVer,
-  nodePack: z.string().min(1).default('invokeai'),
-  label: z.string(),
-  notes: z.string(),
-  type: z.string().trim().min(1),
-  inputs: z.record(z.string(), zFieldInputInstance),
-  isOpen: z.boolean(),
-  isIntermediate: z.boolean(),
-  useCache: z.boolean(),
-});
+export const zInvocationNodeData = z
+  .object({
+    id: z.string().trim().min(1),
+    version: zSemVer,
+    nodePack: z.string().min(1).default('invokeai'),
+    label: z.string(),
+    notes: z.string(),
+    type: z.string().trim().min(1),
+    // Parsed per-input in the transform below so that the input-instance schema can be chosen based
+    // on the node type (extras are only accepted for nodes that declare `extra='allow'`).
+    inputs: z.record(z.string(), z.unknown()),
+    isOpen: z.boolean(),
+    isIntermediate: z.boolean(),
+    useCache: z.boolean(),
+  })
+  .transform((data, ctx) => {
+    // Undeclared "extra" inputs (pydantic `extra='allow'`, e.g. `core_metadata`) carry arbitrary
+    // values that must round-trip. Only nodes known to accept extras get the permissive
+    // `MetadataExtraField` catch-all; every other node uses the strict instance union so stale or
+    // malformed saved values are coerced away (via the stateless branch) rather than preserved and
+    // later leaked into the backend graph by `buildNodesGraph`.
+    const instanceSchema = nodeAcceptsExtraInputs(data.type) ? zFieldInputInstanceWithExtras : zFieldInputInstance;
+    const inputs: Record<string, FieldInputInstance> = {};
+    for (const [name, rawInput] of Object.entries(data.inputs)) {
+      const result = instanceSchema.safeParse(rawInput);
+      if (!result.success) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Invalid input "${name}": ${result.error.message}`,
+          path: ['inputs', name],
+        });
+        return z.NEVER;
+      }
+      inputs[name] = result.data;
+    }
+    return { ...data, inputs };
+  });
 
 export const zNotesNodeData = z.object({
   id: z.string().trim().min(1),

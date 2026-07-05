@@ -1,6 +1,7 @@
 import { get } from 'es-toolkit/compat';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
 import { img_resize, main_model_loader } from 'features/nodes/store/util/testUtils';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { getDefaultForm } from 'features/nodes/types/workflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
@@ -273,5 +274,104 @@ describe('validateWorkflow', () => {
 
     expect(validationResult.workflow.edges).toEqual([unresolvedEdge]);
     expect(validationResult.warnings).toEqual([]);
+  });
+
+  // Regression for PR #9162: `core_metadata` accepts undeclared extras (pydantic `extra='allow'`).
+  // These must round-trip without producing "missing field template" load warnings.
+  const core_metadata: InvocationTemplate = {
+    title: 'Core Metadata',
+    type: 'core_metadata',
+    version: '2.1.0',
+    tags: ['metadata'],
+    description: 'Collects core generation metadata into a MetadataField',
+    outputType: 'metadata_output',
+    // Empty inputs: every input on the node below is an undeclared extra, which is exactly what
+    // core_metadata accepts. This keeps the template minimal while exercising the extra path.
+    inputs: {},
+    outputs: {},
+    useCache: true,
+    nodePack: 'invokeai',
+    classification: 'internal',
+    category: 'metadata',
+  };
+
+  const getCoreMetadataWorkflow = (): WorkflowV3 => ({
+    name: '',
+    author: '',
+    description: '',
+    version: '',
+    contact: '',
+    tags: '',
+    notes: '',
+    exposedFields: [],
+    form: getDefaultForm(),
+    meta: { version: '4.0.0', category: 'user' },
+    nodes: [
+      {
+        id: 'core_metadata-1',
+        type: 'invocation',
+        data: {
+          id: 'core_metadata-1',
+          type: 'core_metadata',
+          version: '2.1.0',
+          label: '',
+          notes: '',
+          isOpen: true,
+          isIntermediate: true,
+          useCache: true,
+          nodePack: 'invokeai',
+          inputs: {
+            generation_mode: { name: 'generation_mode', label: '', description: '', value: 'z_image_txt2img' },
+            // Undeclared extra - not in the template. Must be preserved without a warning.
+            z_image_seed_variance_enabled: {
+              name: 'z_image_seed_variance_enabled',
+              label: '',
+              description: '',
+              value: false,
+            },
+          },
+        },
+        position: { x: 0, y: 0 },
+      },
+    ],
+    edges: [],
+  });
+
+  it('should not warn about undeclared extras on core_metadata and should preserve them', async () => {
+    const validationResult = await validateWorkflow({
+      workflow: getCoreMetadataWorkflow(),
+      templates: { core_metadata },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.warnings).toEqual([]);
+    expect(get(validationResult, 'workflow.nodes[0].data.inputs.z_image_seed_variance_enabled.value')).toBe(false);
+  });
+
+  it('should still warn about undeclared inputs on nodes that do NOT accept extras', async () => {
+    const workflow = getWorkflow();
+    // main_model_loader does not accept extras - an undeclared input must produce a warning.
+    const node = workflow.nodes[0];
+    if (!node || node.type !== 'invocation') {
+      throw new Error('expected an invocation node');
+    }
+    node.data.inputs.bogus_extra = {
+      name: 'bogus_extra',
+      label: '',
+      description: '',
+      value: 'should-warn',
+    };
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.warnings.length).toBe(1);
   });
 });

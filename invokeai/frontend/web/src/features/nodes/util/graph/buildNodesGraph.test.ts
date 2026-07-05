@@ -1,6 +1,7 @@
 import { deepClone } from 'common/util/deepClone';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
 import { add, buildEdge, buildNode, img_resize, sub, templates } from 'features/nodes/store/util/testUtils';
+import { zInvocationNodeData } from 'features/nodes/types/invocation';
 import { describe, expect, it } from 'vitest';
 
 import { buildNodesGraph } from './buildNodesGraph';
@@ -190,5 +191,38 @@ describe('buildNodesGraph', () => {
       },
     ]);
     expect(graph.nodes[target.id]).not.toHaveProperty('a');
+  });
+
+  it('does not serialize a stale array-of-records value on a connection-only input of a non-extra node', () => {
+    // Regression for PR #9162: the metadata pass-through instances accept opaque
+    // `array(record(string, any)) | nullish` values. Because workflow inputs are parsed without
+    // their field template, a stale array-of-objects value on a connection-only input of a
+    // non-extra node could match a metadata pass-through instance, survive parsing, and be emitted
+    // into the backend graph. `img_resize.metadata` is a connection-only MetadataField input.
+    const parsedData = zInvocationNodeData.parse({
+      id: 'img_resize-1',
+      type: 'img_resize',
+      version: img_resize.version,
+      label: '',
+      notes: '',
+      nodePack: 'invokeai',
+      isOpen: true,
+      isIntermediate: false,
+      useCache: true,
+      inputs: {
+        metadata: { name: 'metadata', label: '', description: '', value: [{ foo: 'bar' }] },
+      },
+    });
+
+    // The stale value must be coerced away by the stateless branch, not preserved by a metadata
+    // pass-through instance.
+    expect(parsedData.inputs.metadata?.value).toBeUndefined();
+
+    const node = { id: 'img_resize-1', type: 'invocation' as const, position: { x: 0, y: 0 }, data: parsedData };
+    const graph = buildNodesGraph(buildState([node], []), templates);
+
+    // ...and therefore must not reach the backend graph as a direct input value.
+    const graphNode = graph.nodes['img_resize-1'] as Record<string, unknown> | undefined;
+    expect(graphNode?.metadata).toBeUndefined();
   });
 });
