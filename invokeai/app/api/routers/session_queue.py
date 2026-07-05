@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
@@ -97,6 +98,8 @@ async def enqueue_batch(
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution for the current user."""
+    assert_image_move_maintenance_inactive()
+
     try:
         return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
             queue_id=queue_id, batch=batch, prepend=prepend, user_id=current_user.user_id
@@ -442,7 +445,9 @@ async def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it."""
+    """Gets the status of the session queue. Returns global counts; non-admin users additionally
+    get their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the
+    current item's identifiers unless they own it."""
     try:
         user_id = None if current_user.is_admin else current_user.user_id
         queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=user_id)

@@ -56,6 +56,53 @@ def test_dynamicprompts_works_for_user(client: TestClient, user1_token: str):
     assert "prompts" in response.json()
 
 
+def test_dynamicprompts_unknown_wildcard_returns_error_without_hanging(client: TestClient, user1_token: str):
+    """An unknown wildcard used as a variant value would otherwise loop forever in the combinatorial generator.
+
+    The endpoint must instead return promptly with a clear error and the original prompt echoed back.
+    """
+    r = client.post(
+        "/api/v1/utilities/dynamicprompts",
+        json={"prompt": "{__random__8chan|fenster|stuff}"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    assert body["error"] is not None
+    assert "random" in body["error"]
+    assert body["prompts"] == ["{__random__8chan|fenster|stuff}"]
+
+
+def test_dynamicprompts_bare_unknown_wildcard_still_generates(client: TestClient, user1_token: str):
+    """A wildcard used as plain literal text (not a variant value) does not hang and must not error."""
+    r = client.post(
+        "/api/v1/utilities/dynamicprompts",
+        json={"prompt": "a photo, __my_style__"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    assert body["error"] is None
+    assert body["prompts"]  # non-empty
+    assert all(p == "a photo, __my_style__" for p in body["prompts"])
+
+
+def test_dynamicprompts_random_generator_ignores_unknown_wildcard(client: TestClient, user1_token: str):
+    """The random generator handles unknown wildcards gracefully, so the guard must not fire for it."""
+    r = client.post(
+        "/api/v1/utilities/dynamicprompts",
+        json={"prompt": "{__random__8chan|fenster|stuff}", "combinatorial": False, "seed": 0},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    assert body["error"] is None
+    assert body["prompts"]  # non-empty; the random generator expanded the variant
+
+
+# ----------------------------- image_to_prompt: ownership / read-access -----------------------------
+
+
 def test_image_to_prompt_forbidden_for_non_owner(
     client: TestClient, user1_token: str, user2_token: str, mock_invoker: Invoker
 ):
