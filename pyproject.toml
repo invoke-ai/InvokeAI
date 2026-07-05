@@ -36,10 +36,7 @@ dependencies = [
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
   "compel>=2.4.0,<3",
-  # WIP (Krea-2 support): Krea2Pipeline/Krea2Transformer2DModel only exist in diffusers main (>=0.39 dev).
-  # This unpins diffusers from 0.37.0 to a git build for testing. Re-pin to the stable release that
-  # contains Krea-2 before merging, then un-draft the PR.
-  "diffusers[torch] @ git+https://github.com/huggingface/diffusers.git",
+  "diffusers[torch]==0.39.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
