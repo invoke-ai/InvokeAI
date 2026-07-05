@@ -39,6 +39,67 @@ from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
+# Round-robin dequeue (multiuser fairness): pick the next pending item from the user who was
+# least-recently served.
+#
+# The "whose turn is it" ordering key is each candidate user's most recent started_at. We compute
+# it with a *correlated* MAX subquery rather than a GROUP BY over all started rows: the candidate
+# set is one row per user with pending work, and each MAX(started_at) WHERE user_id = ? is
+# satisfied by an indexed seek (idx_session_queue_user_started_at) instead of scanning the full
+# retained queue history. This keeps dequeue cost proportional to the number of active users, not
+# to total history (which is unbounded by default). MAX() ignores NULL started_at values, so users
+# with only pending items fall back to the epoch via COALESCE and are served first.
+#
+# Kept as a module constant so the scaling test can EXPLAIN QUERY PLAN the exact production SQL.
+ROUND_ROBIN_DEQUEUE_QUERY = """--sql
+    WITH user_next_item AS (
+        -- For each user, select their single best pending item (highest priority, then oldest).
+        SELECT
+            user_id,
+            item_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY user_id
+                ORDER BY priority DESC, item_id ASC
+            ) AS rn
+        FROM session_queue
+        WHERE status = 'pending'
+    )
+    SELECT
+        sq.*,
+        u.display_name AS user_display_name,
+        u.email AS user_email
+    FROM session_queue sq
+    LEFT JOIN users u ON sq.user_id = u.user_id
+    JOIN user_next_item uni ON sq.item_id = uni.item_id AND uni.rn = 1
+    ORDER BY
+        COALESCE(
+            (
+                SELECT MAX(served.started_at)
+                FROM session_queue served
+                WHERE served.user_id = sq.user_id
+            ),
+            '1970-01-01'
+        ) ASC,
+        sq.item_id ASC
+    LIMIT 1
+    """
+
+# FIFO dequeue (single-user mode, or round_robin explicitly disabled): strict priority then
+# insertion order.
+FIFO_DEQUEUE_QUERY = """--sql
+    SELECT
+        sq.*,
+        u.display_name as user_display_name,
+        u.email as user_email
+    FROM session_queue sq
+    LEFT JOIN users u ON sq.user_id = u.user_id
+    WHERE sq.status = 'pending'
+    ORDER BY
+        sq.priority DESC,
+        sq.item_id ASC
+    LIMIT 1
+    """
+
 
 class SqliteSessionQueue(SessionQueueBase):
     __invoker: Invoker
@@ -217,27 +278,18 @@ class SqliteSessionQueue(SessionQueueBase):
         return enqueue_result
 
     def dequeue(self, device: Optional[str] = None) -> Optional[SessionQueueItem]:
+        config = self.__invoker.services.configuration
+        use_round_robin = config.multiuser and config.session_queue_mode == "round_robin"
+
+        query = ROUND_ROBIN_DEQUEUE_QUERY if use_round_robin else FIFO_DEQUEUE_QUERY
+
         # Hold the dequeue lock across the select-then-claim so concurrent workers (multi-GPU)
         # cannot select and claim the same pending item. `_set_queue_item_status` already no-ops
         # if the item was concurrently moved to a terminal state (e.g. canceled), so we only need
         # to guard against two dequeues racing for the same pending row.
         with self._dequeue_lock:
             with self._db.transaction() as cursor:
-                cursor.execute(
-                    """--sql
-                    SELECT
-                        sq.*,
-                        u.display_name as user_display_name,
-                        u.email as user_email
-                    FROM session_queue sq
-                    LEFT JOIN users u ON sq.user_id = u.user_id
-                    WHERE sq.status = 'pending'
-                    ORDER BY
-                        sq.priority DESC,
-                        sq.item_id ASC
-                    LIMIT 1
-                    """
-                )
+                cursor.execute(query)
                 result = cast(Union[sqlite3.Row, None], cursor.fetchone())
             if result is None:
                 return None
