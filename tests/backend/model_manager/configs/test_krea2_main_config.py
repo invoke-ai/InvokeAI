@@ -141,9 +141,7 @@ class TestKrea2GGUFVariantDetection:
 
         # Filename says Raw, but an explicit Turbo override must not be overwritten.
         mod = self._make_mock_mod("Krea-2-Raw-Q4_K_M.gguf")
-        config = Main_GGUF_Krea2_Config.from_model_on_disk(
-            mod, {**_REQUIRED_FIELDS, "variant": Krea2VariantType.Turbo}
-        )
+        config = Main_GGUF_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "variant": Krea2VariantType.Turbo})
         assert config.variant == Krea2VariantType.Turbo
 
 
@@ -193,18 +191,14 @@ class TestKrea2DiffusersVariantDetection:
         from invokeai.backend.model_manager.configs.main import Main_Diffusers_Krea2_Config
 
         with TemporaryDirectory() as tmpdir:
-            mod = self._make_mock_mod_with_model_index(
-                tmpdir, {"_class_name": "Krea2Pipeline", "is_distilled": False}
-            )
+            mod = self._make_mock_mod_with_model_index(tmpdir, {"_class_name": "Krea2Pipeline", "is_distilled": False})
             assert Main_Diffusers_Krea2_Config._get_variant(mod) == Krea2VariantType.Base
 
     def test_is_distilled_true_is_turbo(self) -> None:
         from invokeai.backend.model_manager.configs.main import Main_Diffusers_Krea2_Config
 
         with TemporaryDirectory() as tmpdir:
-            mod = self._make_mock_mod_with_model_index(
-                tmpdir, {"_class_name": "Krea2Pipeline", "is_distilled": True}
-            )
+            mod = self._make_mock_mod_with_model_index(tmpdir, {"_class_name": "Krea2Pipeline", "is_distilled": True})
             assert Main_Diffusers_Krea2_Config._get_variant(mod) == Krea2VariantType.Turbo
 
     def test_is_distilled_absent_defaults_to_turbo(self) -> None:
