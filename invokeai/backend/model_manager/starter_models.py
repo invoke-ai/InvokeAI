@@ -12,6 +12,7 @@ from invokeai.backend.model_manager.configs.external_api import (
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
+    Krea2VariantType,
     ModelFormat,
     ModelType,
     QwenImageVariantType,
@@ -1086,6 +1087,19 @@ z_image_controlnet_tile = StarterModel(
 # endregion
 
 # region Krea-2
+# Standalone Qwen3-VL text encoder used by Krea-2 (distinct from the Qwen2.5-VL encoder above). Pair
+# with single-file / GGUF Krea-2 transformers, which ship only the transformer. The Qwen-Image VAE
+# dependency reuses the `qwen_image_vae` starter defined in the Qwen Image region.
+qwen3_vl_encoder_4b = StarterModel(
+    name="Qwen3-VL 4B Encoder (Diffusers)",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen3-VL-4B-Instruct",
+    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2, in HuggingFace folder layout "
+    "(includes tokenizer). Use with single-file / GGUF Krea-2 transformers. (~8GB)",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Qwen3VLEncoder,
+)
+
 krea2_turbo = StarterModel(
     name="Krea-2 Turbo",
     base=BaseModelType.Krea2,
@@ -1093,6 +1107,44 @@ krea2_turbo = StarterModel(
     description="Krea-2 Turbo - distilled 12B parameter text-to-image model (8 steps, CFG disabled). "
     "Full diffusers pipeline including the Qwen-Image VAE and Qwen3-VL text encoder. ~26GB",
     type=ModelType.Main,
+    variant=Krea2VariantType.Turbo,
+)
+
+krea2_raw = StarterModel(
+    name="Krea-2 Raw",
+    base=BaseModelType.Krea2,
+    source="krea/Krea-2-Raw",
+    description="Krea-2 Raw - undistilled 12B base model (28 steps, CFG enabled). Full diffusers pipeline "
+    "including the Qwen-Image VAE and Qwen3-VL text encoder. Primarily a base for finetuning / LoRA "
+    "training; Turbo is recommended for standard inference. ~26GB",
+    type=ModelType.Main,
+    variant=Krea2VariantType.Base,
+)
+
+krea2_turbo_gguf_q4_k_m = StarterModel(
+    name="Krea-2 Turbo (Q4_K_M GGUF)",
+    base=BaseModelType.Krea2,
+    source="https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF/resolve/main/krea2_turbo-Q4_K_M.gguf",
+    description="Krea-2 Turbo transformer quantized to GGUF Q4_K_M for lower VRAM (~7GB transformer). "
+    "GGUF ships only the transformer, so the Qwen-Image VAE and Qwen3-VL encoder are installed as "
+    "dependencies.",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=Krea2VariantType.Turbo,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+
+krea2_turbo_gguf_q8_0 = StarterModel(
+    name="Krea-2 Turbo (Q8_0 GGUF)",
+    base=BaseModelType.Krea2,
+    source="https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF/resolve/main/krea2_turbo-Q8_0.gguf",
+    description="Krea-2 Turbo transformer quantized to GGUF Q8_0 (near-full quality, ~13GB transformer). "
+    "GGUF ships only the transformer, so the Qwen-Image VAE and Qwen3-VL encoder are installed as "
+    "dependencies.",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=Krea2VariantType.Turbo,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
 )
 # endregion
 
@@ -1702,6 +1754,10 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_controlnet_union,
     z_image_controlnet_tile,
     krea2_turbo,
+    krea2_raw,
+    krea2_turbo_gguf_q4_k_m,
+    krea2_turbo_gguf_q8_0,
+    qwen3_vl_encoder_4b,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,

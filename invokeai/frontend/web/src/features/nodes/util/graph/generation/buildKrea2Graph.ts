@@ -164,6 +164,16 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     cfg_scale,
     model: Graph.getModelMetadataField(modelConfig),
     steps,
+    // Standalone submodels (used for single-file / GGUF transformers) - recorded so they recall.
+    vae: krea2VaeModel ?? undefined,
+    qwen3_vl_encoder: krea2Qwen3VlEncoderModel ?? undefined,
+    // Conditioning enhancer settings (default off) - recorded so they recall.
+    krea2_seed_variance_enabled: krea2SeedVarianceEnabled,
+    krea2_seed_variance_strength: krea2SeedVarianceStrength,
+    krea2_seed_variance_randomize_percent: krea2SeedVarianceRandomizePercent,
+    krea2_rebalance_enabled: krea2RebalanceEnabled,
+    krea2_rebalance_multiplier: krea2RebalanceMultiplier,
+    krea2_rebalance_weights: krea2RebalanceWeights,
   });
   // Only record a negative prompt when CFG is enabled (cfg_scale > 1). Krea-2-Turbo runs with CFG
   // disabled by default, in which case there is no negative conditioning - recording it would surface a
