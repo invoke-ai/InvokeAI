@@ -130,9 +130,9 @@ You cannot:
 - Cancel other users' generation jobs
 
 :::tip[The generation queue]
-When two or more users are accessing InvokeAI at the same time, their image generation jobs will be placed on the session queue on a first-come, first-serve basis. This means that you will have to wait for other users' image rendering jobs to complete before yours will start.
+When two or more users are accessing InvokeAI at the same time, their image generation jobs share a single session queue. By default the server schedules jobs **round-robin** across users: each user gets one turn before anyone gets a second turn. This means a user who enqueues a large batch can no longer monopolize the queue — your jobs are interleaved with theirs rather than waiting for their entire batch to drain first. (An administrator can switch the server back to strict first-come, first-serve ordering; see the admin guide.)
 
-While other users' jobs are running you will see the shared image generation progress bar, and the queue badge will show a single number — the count of your own jobs that are pending or in progress. It does not show other users' counts.
+While other users' jobs are running you will see the shared image generation progress bar, and the queue badge shows **`your jobs / all jobs`** — for example `2/5` means 2 of the 5 pending-or-in-progress jobs are yours. (In single-user mode the badge shows just a single total.)
 
 Open the Queue tab to see where your job sits in relation to the other queued tasks.
 :::
