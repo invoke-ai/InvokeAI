@@ -73,7 +73,7 @@
     {
       "category": "WEB",
       "default": null,
-      "description": "SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.",
+      "description": "SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.",
       "env_var": "INVOKEAI_SSL_CERTFILE",
       "literal_values": [],
       "name": "ssl_certfile",
@@ -84,7 +84,7 @@
     {
       "category": "WEB",
       "default": null,
-      "description": "SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.",
+      "description": "SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.",
       "env_var": "INVOKEAI_SSL_KEYFILE",
       "literal_values": [],
       "name": "ssl_keyfile",
@@ -588,6 +588,20 @@
       "name": "max_queue_size",
       "required": false,
       "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": "round_robin",
+      "description": "Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.",
+      "env_var": "INVOKEAI_SESSION_QUEUE_MODE",
+      "literal_values": [
+        "FIFO",
+        "round_robin"
+      ],
+      "name": "session_queue_mode",
+      "required": false,
+      "type": "typing.Literal['FIFO', 'round_robin']",
       "validation": {}
     },
     {
