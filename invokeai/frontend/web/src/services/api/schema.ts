@@ -1001,6 +1001,57 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/image_moves/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Image Move */
+        post: operations["start_image_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/image_moves/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Image Move Recovery */
+        post: operations["start_image_move_recovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/image_moves/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Image Move Status */
+        get: operations["get_image_move_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/upload": {
         parameters: {
             query?: never;
@@ -1147,7 +1198,8 @@ export type paths = {
          *
          *     This endpoint is intentionally unauthenticated because browsers load images
          *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability.
+         *     providing security through unguessability. Returns 409 while image storage
+         *     maintenance is active.
          */
         get: operations["get_image_full"];
         put?: never;
@@ -1160,7 +1212,8 @@ export type paths = {
          *
          *     This endpoint is intentionally unauthenticated because browsers load images
          *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability.
+         *     providing security through unguessability. Returns 409 while image storage
+         *     maintenance is active.
          */
         head: operations["get_image_full_head"];
         patch?: never;
@@ -1179,7 +1232,8 @@ export type paths = {
          *
          *     This endpoint is intentionally unauthenticated because browsers load images
          *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability.
+         *     providing security through unguessability. Returns 409 while image storage
+         *     maintenance is active.
          */
         get: operations["get_image_thumbnail"];
         put?: never;
@@ -2143,7 +2197,9 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it.
+         * @description Gets the status of the session queue. Returns global counts; non-admin users additionally
+         *     get their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the
+         *     current item's identifiers unless they own it.
          */
         get: operations["get_queue_status"];
         put?: never;
@@ -14306,6 +14362,55 @@ export type components = {
              */
             type: "image_mask_to_tensor";
         };
+        /** ImageMoveJobResponse */
+        ImageMoveJobResponse: {
+            /**
+             * Id
+             * @description The image move job id.
+             */
+            id: number;
+            /**
+             * State
+             * @description The image move job state.
+             * @enum {string}
+             */
+            state: "planned" | "moving" | "moved" | "committed" | "error";
+            /**
+             * Error Message
+             * @description The last error recorded for the job, if any.
+             */
+            error_message?: string | null;
+        };
+        /** ImageMoveStatusResponse */
+        ImageMoveStatusResponse: {
+            /**
+             * Is Running
+             * @description Whether an image move background operation is currently running.
+             */
+            is_running: boolean;
+            /**
+             * Operation
+             * @description The active background operation, if any.
+             */
+            operation?: ("move_all" | "recovery") | null;
+            /**
+             * Active Job Id
+             * @description The active journal job id, if any.
+             */
+            active_job_id?: number | null;
+            /** @description The latest journal job, if any. */
+            latest_job?: components["schemas"]["ImageMoveJobResponse"] | null;
+            /**
+             * Last Error
+             * @description The last background worker error, if any.
+             */
+            last_error?: string | null;
+            /**
+             * Needs Move Count
+             * @description The number of images that do not match the current subfolder strategy.
+             */
+            needs_move_count: number;
+        };
         /**
          * Multiply Images
          * @description Multiplies two images together using `PIL.ImageChops.multiply()`.
@@ -16211,6 +16316,7 @@ export type components = {
          *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
          *         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
          *         max_queue_size: Maximum number of items in the session queue.
+         *         session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
          *         clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
          *         max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
          *         allow_nodes: List of nodes to allow. Omit to allow all.
@@ -16553,6 +16659,13 @@ export type components = {
              * @default 10000
              */
             max_queue_size?: number;
+            /**
+             * Session Queue Mode
+             * @description Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.
+             * @default round_robin
+             * @enum {string}
+             */
+            session_queue_mode?: "FIFO" | "round_robin";
             /**
              * Clear Queue On Startup
              * @description Empties session queue on startup. If true, disables `max_queue_history`.
@@ -19374,6 +19487,16 @@ export type components = {
              * @description Default weight for this model
              */
             weight?: number | null;
+            /**
+             * Weight Min
+             * @description Minimum weight slider value for this model
+             */
+            weight_min?: number | null;
+            /**
+             * Weight Max
+             * @description Maximum weight slider value for this model
+             */
+            weight_max?: number | null;
         };
         /** MDControlListOutput */
         MDControlListOutput: {
@@ -35039,6 +35162,66 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    start_image_move: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMoveStatusResponse"];
+                };
+            };
+        };
+    };
+    start_image_move_recovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMoveStatusResponse"];
+                };
+            };
+        };
+    };
+    get_image_move_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMoveStatusResponse"];
+                };
             };
         };
     };
