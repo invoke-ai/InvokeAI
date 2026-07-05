@@ -49,6 +49,11 @@ const oldImageCollectionTemplate = {
   category: 'primitives',
 } satisfies InvocationTemplate;
 
+const oldestImageCollectionTemplate = {
+  ...oldImageCollectionTemplate,
+  version: '1.0.0',
+} satisfies InvocationTemplate;
+
 const currentImageCollectionTemplate = {
   ...oldImageCollectionTemplate,
   version: '1.0.2',
@@ -90,6 +95,22 @@ describe('updateNode', () => {
   it('moves old image_collection direct collection values to the new images field', () => {
     const node = buildInvocationNode({ x: 0, y: 0 }, oldImageCollectionTemplate);
     const images = [{ image_name: 'first' }, { image_name: 'second' }];
+    const collectionInput = node.data.inputs.collection;
+    if (!collectionInput) {
+      throw new Error('Expected collection input');
+    }
+    collectionInput.value = images;
+
+    const updated = updateNode(node, currentImageCollectionTemplate, { connectedInputNames: new Set() });
+
+    expect(updated.data.version).toBe('1.0.2');
+    expect(updated.data.inputs.images?.value).toEqual(images);
+    expect(updated.data.inputs.collection?.value).toEqual([]);
+  });
+
+  it('moves 1.0.0 image_collection direct collection values to the new images field', () => {
+    const node = buildInvocationNode({ x: 0, y: 0 }, oldestImageCollectionTemplate);
+    const images = [{ image_name: 'first' }];
     const collectionInput = node.data.inputs.collection;
     if (!collectionInput) {
       throw new Error('Expected collection input');

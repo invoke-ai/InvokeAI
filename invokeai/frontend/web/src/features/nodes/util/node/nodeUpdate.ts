@@ -1,5 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
-import { satisfies } from 'compare-versions';
+import { compare, satisfies } from 'compare-versions';
 import { defaultsDeep, keys, pick } from 'es-toolkit/compat';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import type { InvocationNode, InvocationNodeData, InvocationTemplate } from 'features/nodes/types/invocation';
@@ -56,7 +56,7 @@ export const migrateImageCollectionInputValues = (
   if (node.data.type !== 'image_collection') {
     return;
   }
-  if (options.sourceVersion && options.sourceVersion !== '1.0.1') {
+  if (options.sourceVersion && compare(options.sourceVersion, '1.0.2', '>=')) {
     return;
   }
 
