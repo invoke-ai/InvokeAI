@@ -7,9 +7,9 @@ import { zParsedSemver } from 'features/nodes/types/semver';
 
 import { buildInvocationNode } from './buildInvocationNode';
 
-export type ConnectedInputEdge = { type?: string; target: string; targetHandle?: string | null };
+type ConnectedInputEdge = { type?: string; target: string; targetHandle?: string | null };
 
-export type UpdateNodeOptions = {
+type UpdateNodeOptions = {
   connectedInputNames: Set<string>;
 };
 
