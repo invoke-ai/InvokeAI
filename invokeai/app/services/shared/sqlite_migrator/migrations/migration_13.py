@@ -23,6 +23,8 @@ def build_migration_13() -> Migration:
     - Adds `archived` columns to the board table.
     """
     migration_13 = Migration(
+        id="migration_13",
+        depends_on="migration_12",
         from_version=12,
         to_version=13,
         callback=Migration13Callback(),

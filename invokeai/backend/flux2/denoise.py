@@ -195,13 +195,17 @@ def denoise(
                             preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(
                                 preview_img, 0.0
                             )
+                        # Extract only the generated image portion for preview (exclude reference images)
+                        callback_latents = (
+                            preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
+                        )
                         step_callback(
                             PipelineIntermediateState(
                                 step=user_step,
                                 order=2,
                                 total_steps=total_steps,
                                 timestep=int(t_curr * 1000),
-                                latents=preview_img,
+                                latents=callback_latents,
                             ),
                         )
             else:
