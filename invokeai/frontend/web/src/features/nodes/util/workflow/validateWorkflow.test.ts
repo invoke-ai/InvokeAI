@@ -182,6 +182,7 @@ describe('validateWorkflow', () => {
         isIntermediate: true,
         useCache: true,
         nodePack: 'invokeai',
+        dynamicInputTemplates: {},
         inputs: {
           collection: {
             name: 'collection',
