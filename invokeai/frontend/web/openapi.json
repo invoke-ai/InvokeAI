@@ -847,10 +847,10 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -1183,10 +1183,10 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -1519,10 +1519,10 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -1905,10 +1905,10 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -2315,10 +2315,10 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -3545,10 +3545,10 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -11603,10 +11603,10 @@
             "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
           },
           {
-            "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+            "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
           },
           {
-            "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+            "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
           },
           {
             "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -56038,10 +56038,10 @@
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -56625,10 +56625,10 @@
                     "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                   },
                   {
-                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                   },
                   {
-                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -57097,10 +57097,10 @@
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -57419,10 +57419,10 @@
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
@@ -58190,10 +58190,10 @@
                   "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                 },
                 {
-                  "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                  "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                 },
                 {
-                  "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                  "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
