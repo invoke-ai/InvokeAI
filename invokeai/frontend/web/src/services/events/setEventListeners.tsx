@@ -362,6 +362,24 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
+    // Sanitized companion event sent to non-owner queue subscribers in multiuser mode. The
+    // backend sets user_id="redacted" and clears identifiers/error fields. We must not run
+    // payload-driven cache mutations or per-session side effects (node state reset, progress
+    // clear, completion bookkeeping) — those belong to the owner. Just invalidate queue tags
+    // so the non-owner's queue list and badge counts refetch with sanitized data.
+    if (data.user_id === 'redacted') {
+      log.trace({ data }, `Sanitized queue_item_status_changed for item ${data.item_id}`);
+      const tags: ApiTagDescription[] = [
+        'SessionQueueStatus',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: data.item_id },
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ];
+      dispatch(queueApi.util.invalidateTags(tags));
+      return;
+    }
+
     if (!workflowExecutionCoordinator.onQueueItemStatusChanged(data)) {
       return;
     }
@@ -731,6 +749,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
         const hasIpAdapters = data.parameters.ip_adapters !== undefined;
         const hasRefImages = data.parameters.reference_images !== undefined;
+        // Append mode (POST /api/v1/recall/{queue_id}?append=true): add the
+        // recalled reference images to the existing list instead of replacing
+        // it. The backend passes the flag inside the parameters dict.
+        const append = data.parameters.append === true;
 
         if (hasIpAdapters || hasRefImages) {
           const allRefImagePromises: Promise<RefImageState | null>[] = [];
@@ -874,9 +896,21 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
           }
 
           // Single dispatch after all IP adapter + reference image promises settle.
-          // Always replace:true so stale entries from a previous recall are cleared.
+          // replace:true (the default) clears stale entries from a previous
+          // recall; append mode instead pushes onto the existing list and
+          // deliberately dispatches nothing when no valid states resolved, so
+          // a failed append can never wipe the user's current reference images.
           Promise.all(allRefImagePromises).then((results) => {
             const validStates = results.filter((state): state is RefImageState => state !== null);
+            if (append) {
+              if (validStates.length > 0) {
+                dispatch(refImagesRecalled({ entities: validStates, replace: false }));
+                log.info(
+                  `Appended ${validStates.length} reference image(s) (IP adapters + model-free) to existing list`
+                );
+              }
+              return;
+            }
             dispatch(refImagesRecalled({ entities: validStates, replace: true }));
             if (validStates.length > 0) {
               log.info(
@@ -949,7 +983,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       title: t('gallery.bulkDownloadReady'),
       status: 'success',
       description: (
-        // eslint-disable-next-line react/jsx-no-bind -- not a component render; no re-render cost
         <Text as="button" onClick={handleDownload} textDecoration="underline" cursor="pointer">
           {t('gallery.clickToDownload')}
         </Text>

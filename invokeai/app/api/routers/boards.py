@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy, BoardVisibility
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
@@ -118,6 +119,7 @@ async def delete_board(
 
     try:
         if include_images is True:
+            assert_image_move_maintenance_inactive()
             deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
                 board_id=board_id,
                 categories=None,
@@ -142,6 +144,8 @@ async def delete_board(
                 deleted_board_images=deleted_board_images,
                 deleted_images=[],
             )
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete board")
 

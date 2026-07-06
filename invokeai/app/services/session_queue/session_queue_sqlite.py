@@ -38,6 +38,67 @@ from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
+# Round-robin dequeue (multiuser fairness): pick the next pending item from the user who was
+# least-recently served.
+#
+# The "whose turn is it" ordering key is each candidate user's most recent started_at. We compute
+# it with a *correlated* MAX subquery rather than a GROUP BY over all started rows: the candidate
+# set is one row per user with pending work, and each MAX(started_at) WHERE user_id = ? is
+# satisfied by an indexed seek (idx_session_queue_user_started_at) instead of scanning the full
+# retained queue history. This keeps dequeue cost proportional to the number of active users, not
+# to total history (which is unbounded by default). MAX() ignores NULL started_at values, so users
+# with only pending items fall back to the epoch via COALESCE and are served first.
+#
+# Kept as a module constant so the scaling test can EXPLAIN QUERY PLAN the exact production SQL.
+ROUND_ROBIN_DEQUEUE_QUERY = """--sql
+    WITH user_next_item AS (
+        -- For each user, select their single best pending item (highest priority, then oldest).
+        SELECT
+            user_id,
+            item_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY user_id
+                ORDER BY priority DESC, item_id ASC
+            ) AS rn
+        FROM session_queue
+        WHERE status = 'pending'
+    )
+    SELECT
+        sq.*,
+        u.display_name AS user_display_name,
+        u.email AS user_email
+    FROM session_queue sq
+    LEFT JOIN users u ON sq.user_id = u.user_id
+    JOIN user_next_item uni ON sq.item_id = uni.item_id AND uni.rn = 1
+    ORDER BY
+        COALESCE(
+            (
+                SELECT MAX(served.started_at)
+                FROM session_queue served
+                WHERE served.user_id = sq.user_id
+            ),
+            '1970-01-01'
+        ) ASC,
+        sq.item_id ASC
+    LIMIT 1
+    """
+
+# FIFO dequeue (single-user mode, or round_robin explicitly disabled): strict priority then
+# insertion order.
+FIFO_DEQUEUE_QUERY = """--sql
+    SELECT
+        sq.*,
+        u.display_name as user_display_name,
+        u.email as user_email
+    FROM session_queue sq
+    LEFT JOIN users u ON sq.user_id = u.user_id
+    WHERE sq.status = 'pending'
+    ORDER BY
+        sq.priority DESC,
+        sq.item_id ASC
+    LIMIT 1
+    """
+
 
 class SqliteSessionQueue(SessionQueueBase):
     __invoker: Invoker
@@ -210,22 +271,13 @@ class SqliteSessionQueue(SessionQueueBase):
         return enqueue_result
 
     def dequeue(self) -> Optional[SessionQueueItem]:
+        config = self.__invoker.services.configuration
+        use_round_robin = config.multiuser and config.session_queue_mode == "round_robin"
+
+        query = ROUND_ROBIN_DEQUEUE_QUERY if use_round_robin else FIFO_DEQUEUE_QUERY
+
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT
-                    sq.*,
-                    u.display_name as user_display_name,
-                    u.email as user_email
-                FROM session_queue sq
-                LEFT JOIN users u ON sq.user_id = u.user_id
-                WHERE sq.status = 'pending'
-                ORDER BY
-                    sq.priority DESC,
-                    sq.item_id ASC
-                LIMIT 1
-                """
-            )
+            cursor.execute(query)
             result = cast(Union[sqlite3.Row, None], cursor.fetchone())
         if result is None:
             return None
@@ -860,7 +912,24 @@ class SqliteSessionQueue(SessionQueueBase):
         acting_user_id: Optional[str] = None,
     ) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
-            # When user_id is provided (non-admin), only count that user's items
+            # Aggregate counts are always global (across all users). This lets a non-admin's
+            # badge show "own / total" — their share of the whole queue — and lets the queue
+            # list surface (redacted) entries belonging to other users.
+            cursor.execute(
+                """--sql
+                SELECT status, count(*)
+                FROM session_queue
+                WHERE queue_id = ?
+                GROUP BY status
+                """,
+                (queue_id,),
+            )
+            counts_result = cast(list[sqlite3.Row], cursor.fetchall())
+
+            # When user_id is provided, additionally compute that user's own counts so the
+            # caller can render the per-user portion of the badge. These are returned in the
+            # separate user_pending/user_in_progress fields and never replace the global counts.
+            user_counts_result: list[sqlite3.Row] = []
             if user_id is not None:
                 cursor.execute(
                     """--sql
@@ -871,28 +940,25 @@ class SqliteSessionQueue(SessionQueueBase):
                     """,
                     (queue_id, user_id),
                 )
-            else:
-                cursor.execute(
-                    """--sql
-                    SELECT status, count(*)
-                    FROM session_queue
-                    WHERE queue_id = ?
-                    GROUP BY status
-                    """,
-                    (queue_id,),
-                )
-            counts_result = cast(list[sqlite3.Row], cursor.fetchall())
+                user_counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
         current_item = self.get_current(queue_id=queue_id)
         total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 
+        user_pending: Optional[int] = None
+        user_in_progress: Optional[int] = None
+        if user_id is not None:
+            user_counts: dict[str, int] = {row[0]: row[1] for row in user_counts_result}
+            user_pending = user_counts.get("pending", 0)
+            user_in_progress = user_counts.get("in_progress", 0)
+
         # Redaction is decided from the same current_item snapshot used to embed identifiers,
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
-        # stale identifiers in the result. user_id (count filter) and acting_user_id
-        # (redaction) are independent: callers that need global counts but per-user redaction
-        # pass only acting_user_id; non-admin API callers pass user_id and inherit the same
-        # redaction by default.
+        # stale identifiers in the result. The aggregate counts stay global; only the current
+        # item's identifiers are gated. acting_user_id (event path) takes precedence over
+        # user_id (API path) when deciding the redaction owner; either being None means an
+        # admin/global caller who may see the current item.
         owner_user_id = user_id if acting_user_id is None else acting_user_id
         show_current_item = current_item is not None and (
             owner_user_id is None or current_item.user_id == owner_user_id
@@ -909,6 +975,8 @@ class SqliteSessionQueue(SessionQueueBase):
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
             total=total,
+            user_pending=user_pending,
+            user_in_progress=user_in_progress,
         )
 
     def get_batch_status(self, queue_id: str, batch_id: str, user_id: Optional[str] = None) -> BatchStatus:
