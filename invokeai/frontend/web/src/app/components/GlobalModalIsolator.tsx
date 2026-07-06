@@ -1,6 +1,9 @@
 import { GlobalImageHotkeys } from 'app/components/GlobalImageHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import { CanvasPasteModal } from 'features/controlLayers/components/CanvasPasteModal';
+import { CanvasWorkflowIntegrationModal } from 'features/controlLayers/components/CanvasWorkflowIntegration/CanvasWorkflowIntegrationModal';
+import { LoadCanvasProjectConfirmationAlertDialog } from 'features/controlLayers/components/LoadCanvasProjectConfirmationAlertDialog';
+import { SaveCanvasProjectDialog } from 'features/controlLayers/components/SaveCanvasProjectDialog';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { CropImageModal } from 'features/cropper/components/CropImageModal';
 import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteImageModal';
@@ -51,7 +54,10 @@ export const GlobalModalIsolator = memo(() => {
       <SaveWorkflowAsDialog />
       <CanvasManagerProviderGate>
         <CanvasPasteModal />
+        <CanvasWorkflowIntegrationModal />
       </CanvasManagerProviderGate>
+      <SaveCanvasProjectDialog />
+      <LoadCanvasProjectConfirmationAlertDialog />
       <LoadWorkflowFromGraphModal />
       <CropImageModal />
     </>

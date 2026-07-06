@@ -4,6 +4,9 @@ Test the model installer
 
 import gc
 import platform
+import shutil
+import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict
@@ -23,6 +26,7 @@ from invokeai.app.services.events.events_common import (
 )
 from invokeai.app.services.model_install import (
     HFModelSource,
+    ModelInstallService,
     ModelInstallServiceBase,
 )
 from invokeai.app.services.model_install.model_install_common import (
@@ -33,10 +37,12 @@ from invokeai.app.services.model_install.model_install_common import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelRepoVariant,
+    ModelSourceType,
     ModelType,
 )
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
@@ -213,6 +219,50 @@ def test_inplace_install(
     assert Path(job.config_out.path).exists()
 
 
+def test_external_install(mm2_installer: ModelInstallServiceBase) -> None:
+    config = ModelRecordChanges(name="ChatGPT Image", description="External model", key="chatgpt_image")
+    job = mm2_installer.heuristic_import("external://openai/gpt-image-1", config=config)
+
+    mm2_installer.wait_for_installs()
+
+    assert job.status == InstallStatus.COMPLETED
+    assert job.config_out is not None
+    assert isinstance(job.config_out, ExternalApiModelConfig)
+    assert job.config_out.provider_id == "openai"
+    assert job.config_out.provider_model_id == "gpt-image-1"
+    assert job.config_out.base == BaseModelType.External
+    assert job.config_out.type == ModelType.ExternalImageGenerator
+    assert job.config_out.source_type == ModelSourceType.External
+
+
+def test_external_install_is_idempotent(mm2_installer: ModelInstallServiceBase) -> None:
+    first_job = mm2_installer.heuristic_import(
+        "external://openai/gpt-image-1",
+        config=ModelRecordChanges(name="Initial name"),
+    )
+    mm2_installer.wait_for_installs()
+
+    second_job = mm2_installer.heuristic_import(
+        "external://openai/gpt-image-1",
+        config=ModelRecordChanges(name="Updated name"),
+    )
+    mm2_installer.wait_for_installs()
+
+    assert first_job.status == InstallStatus.COMPLETED
+    assert second_job.status == InstallStatus.COMPLETED
+    assert first_job.config_out is not None
+    assert second_job.config_out is not None
+    assert first_job.config_out.key == second_job.config_out.key
+
+    external_models = mm2_installer.record_store.search_by_attr(
+        base_model=BaseModelType.External,
+        model_type=ModelType.ExternalImageGenerator,
+    )
+    assert len(external_models) == 1
+    assert isinstance(external_models[0], ExternalApiModelConfig)
+    assert external_models[0].name == "Updated name"
+
+
 def test_delete_install(
     mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
 ) -> None:
@@ -271,6 +321,68 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert isinstance(bus.events[2], ModelInstallDownloadsCompleteEvent)  # download completed
     assert isinstance(bus.events[3], ModelInstallStartedEvent)  # install started
     assert isinstance(bus.events[4], ModelInstallCompleteEvent)  # install completed
+
+
+def test_import_waits_for_startup_restore(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    restore_started = threading.Event()
+    release_restore = threading.Event()
+    imported = threading.Event()
+
+    def _blocked_restore() -> None:
+        restore_started.set()
+        assert release_restore.wait(timeout=5)
+
+    monkeypatch.setattr(installer, "_restore_incomplete_installs", _blocked_restore)
+
+    try:
+        installer.start()
+        assert restore_started.wait(timeout=5)
+
+        import_thread = threading.Thread(
+            target=lambda: (
+                installer.import_model(LocalModelSource(path=embedding_file)),
+                imported.set(),
+            )
+        )
+        import_thread.start()
+
+        time.sleep(0.1)
+        assert not imported.is_set()
+
+        release_restore.set()
+        import_thread.join(timeout=5)
+        assert imported.is_set()
+        installer.wait_for_installs(timeout=5)
+    finally:
+        release_restore.set()
+        installer.stop()
+
+
+def test_huggingface_blob_url_uses_resolve_download_url(mm2_installer: ModelInstallServiceBase) -> None:
+    source = URLModelSource(
+        url=Url("https://huggingface.co/h94/IP-Adapter/blob/main/sdxl_models/ip-adapter.safetensors")
+    )
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    files, metadata = mm2_installer._remote_files_from_source(source)
+
+    assert metadata is None
+    assert len(files) == 1
+    assert str(files[0].url) == "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter.safetensors"
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
@@ -341,6 +453,67 @@ def test_huggingface_repo_id(mm2_installer: ModelInstallServiceBase, mm2_app_con
     print(downloading_events[-1])
     print(job.download_parts)
     assert job.total_bytes == sum(x["total_bytes"] for x in downloading_events[-1].parts)
+
+
+def test_restore_paused_hf_install_preserves_access_token(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+
+    access_token = "hf_test_access_token"
+    tmpdir = mm2_app_config.models_path / f"tmpinstall_resume_token_{uuid.uuid4().hex}"
+    tmpdir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        paused_job = ModelInstallJob(
+            id=99999,
+            source=HFModelSource(
+                repo_id="stabilityai/sdxl-turbo",
+                variant=ModelRepoVariant.Default,
+                access_token=access_token,
+            ),
+            config_in=ModelRecordChanges(),
+            local_path=tmpdir,
+        )
+        paused_job._install_tmpdir = tmpdir
+        paused_job.status = InstallStatus.PAUSED
+
+        mm2_installer._write_install_marker(paused_job, status=InstallStatus.PAUSED)
+
+        marker = mm2_installer._read_install_marker(tmpdir)
+        assert marker is not None
+        assert marker["access_token"] == access_token
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+        restored_jobs = restored_installer.list_jobs()
+        assert len(restored_jobs) == 1
+
+        restored_job = restored_jobs[0]
+        assert restored_job.paused
+        assert isinstance(restored_job.source, HFModelSource)
+        assert restored_job.source.access_token == access_token
+
+        captured: dict[str, str | None] = {}
+
+        def _capture_resume(job: ModelInstallJob) -> None:
+            assert isinstance(job.source, HFModelSource)
+            captured["access_token"] = job.source.access_token
+
+        monkeypatch.setattr(restored_installer, "_resume_remote_download", _capture_resume)
+        restored_installer.resume_job(restored_job)
+        assert captured["access_token"] == access_token
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:

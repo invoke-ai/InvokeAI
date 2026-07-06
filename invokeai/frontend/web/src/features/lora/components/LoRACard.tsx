@@ -20,10 +20,10 @@ import {
 } from 'features/controlLayers/store/lorasSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
-
-const MARKS = [-1, 0, 1, 2];
+import { isLoRAModelConfig } from 'services/api/types';
 
 export const LoRACard = memo((props: { id: string }) => {
   const selectLoRA = useMemo(() => buildSelectLoRA(props.id), [props.id]);
@@ -38,6 +38,7 @@ export const LoRACard = memo((props: { id: string }) => {
 LoRACard.displayName = 'LoRACard';
 
 const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: loraConfig } = useGetModelConfigQuery(lora.model.key);
 
@@ -56,6 +57,20 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
     dispatch(loraDeleted({ id: lora.id }));
   }, [dispatch, lora.id]);
 
+  const loraDefaults = loraConfig && isLoRAModelConfig(loraConfig) ? loraConfig.default_settings : null;
+  const sliderMin = loraDefaults?.weight_min ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMin;
+  const sliderMax = loraDefaults?.weight_max ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMax;
+  const numberInputMin = Math.min(sliderMin, DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin);
+  const numberInputMax = Math.max(sliderMax, DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax);
+
+  const marks = useMemo(() => {
+    if (sliderMin >= sliderMax) {
+      return [sliderMin, sliderMax];
+    }
+    const mid = (sliderMin + sliderMax) / 2;
+    return [sliderMin, mid, sliderMax];
+  }, [sliderMin, sliderMax]);
+
   return (
     <Card variant="lora">
       <CardHeader>
@@ -66,7 +81,7 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
           <Flex alignItems="center" gap={2}>
             <Switch size="sm" onChange={handleSetLoraToggle} isChecked={lora.isEnabled} />
             <IconButton
-              aria-label="Remove LoRA"
+              aria-label={t('lora.removeLoRA')}
               variant="ghost"
               size="sm"
               onClick={handleRemoveLora}
@@ -80,19 +95,19 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
           <CompositeSlider
             value={lora.weight}
             onChange={handleChange}
-            min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
-            max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
+            min={sliderMin}
+            max={sliderMax}
             step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
             fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
-            marks={MARKS}
+            marks={marks}
             defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
             isDisabled={!lora.isEnabled}
           />
           <CompositeNumberInput
             value={lora.weight}
             onChange={handleChange}
-            min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
-            max={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
+            min={numberInputMin}
+            max={numberInputMax}
             step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
             fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
             w={20}

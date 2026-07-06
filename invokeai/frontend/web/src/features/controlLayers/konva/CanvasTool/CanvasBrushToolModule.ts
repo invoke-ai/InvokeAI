@@ -211,6 +211,11 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
+    // When transparency is locked on a raster layer, use 'source-atop' to only paint on existing opaque pixels
+    const isTransparencyLocked =
+      selectedEntity.state.type === 'raster_layer' && selectedEntity.state.isTransparencyLocked;
+    const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
+
     if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
       // If the pen is down and pressure sensitivity is enabled, add the point with pressure
       await selectedEntity.bufferRenderer.setBuffer({
@@ -220,6 +225,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
         clip: this.parent.getClip(selectedEntity.state),
+        globalCompositeOperation,
       });
     } else {
       // Else, add the point without pressure
@@ -230,6 +236,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
         clip: this.parent.getClip(selectedEntity.state),
+        globalCompositeOperation,
       });
     }
   };
@@ -268,6 +275,11 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
+    // When transparency is locked on a raster layer, use 'source-atop' to only paint on existing opaque pixels
+    const isTransparencyLocked =
+      selectedEntity.state.type === 'raster_layer' && selectedEntity.state.isTransparencyLocked;
+    const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
+
     if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
       // We need to get the last point of the last line to create a straight line if shift is held
       const lastLinePoint = getLastPointOfLastLineWithPressure(
@@ -304,6 +316,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         // When shift is held, the line may extend beyond the clip region. Clip only if we are clipping to bbox. If we
         // are clipping to stage, we don't need to clip at all.
         clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntity.state),
+        globalCompositeOperation,
       });
     } else {
       const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
@@ -329,6 +342,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         // When shift is held, the line may extend beyond the clip region. Clip only if we are clipping to bbox. If we
         // are clipping to stage, we don't need to clip at all.
         clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntity.state),
+        globalCompositeOperation,
       });
     }
   };

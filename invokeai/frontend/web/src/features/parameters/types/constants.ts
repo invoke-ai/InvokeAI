@@ -37,7 +37,15 @@ export const CLIP_SKIP_MAP: { [key in BaseModelType]?: { maxClip: number; marker
     maxClip: 0,
     markers: [],
   },
+  'qwen-image': {
+    maxClip: 0,
+    markers: [],
+  },
   'z-image': {
+    maxClip: 0,
+    markers: [],
+  },
+  anima: {
     maxClip: 0,
     markers: [],
   },
@@ -61,6 +69,7 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'dpmpp_3m_k', label: 'DPM++ 3M Karras' },
   { value: 'dpmpp_sde', label: 'DPM++ SDE' },
   { value: 'dpmpp_sde_k', label: 'DPM++ SDE Karras' },
+  { value: 'er_sde', label: 'ER-SDE' },
   { value: 'euler', label: 'Euler' },
   { value: 'euler_k', label: 'Euler Karras' },
   { value: 'euler_a', label: 'Euler Ancestral' },

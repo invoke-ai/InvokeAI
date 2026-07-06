@@ -95,7 +95,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
           fontFamily: '"Inter Variable", sans-serif',
           fontSize: width / 16,
           fontStyle: '600',
-          text: t('common.loadingImage', 'Loading Image'),
+          text: t('common.loadingImage'),
           listening: false,
           perfectDrawEnabled: false,
         }),
@@ -116,23 +116,20 @@ export class CanvasObjectImage extends CanvasModuleBase {
 
     if (!this.konva.image) {
       this.konva.placeholder.group.visible(false);
-      this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
+      this.konva.placeholder.text.text(t('common.loadingImage'));
     }
 
     const imageDTO = await getImageDTOSafe(imageName);
     if (imageDTO === null) {
       // ImageDTO not found (or network error)
-      this.onFailedToLoadImage(t('controlLayers.unableToFindImage', 'Unable to find image'));
+      this.onFailedToLoadImage(t('controlLayers.errors.unableToFindImage'));
       return;
     }
 
     const imageElementResult = await withResultAsync(() => loadImage(imageDTO.image_url));
     if (imageElementResult.isErr()) {
       // Image loading failed (e.g. the URL to the "physical" image is invalid)
-      this.onFailedToLoadImage(
-        t('controlLayers.unableToLoadImage', 'Unable to load image'),
-        parseify(imageElementResult.error)
-      );
+      this.onFailedToLoadImage(t('controlLayers.errors.unableToLoadImage'), parseify(imageElementResult.error));
       return;
     }
 
@@ -149,16 +146,13 @@ export class CanvasObjectImage extends CanvasModuleBase {
 
     if (!this.konva.image) {
       this.konva.placeholder.group.visible(false);
-      this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
+      this.konva.placeholder.text.text(t('common.loadingImage'));
     }
 
     const imageElementResult = await withResultAsync(() => loadImage(dataURL));
     if (imageElementResult.isErr()) {
       // Image loading failed (e.g. the URL to the "physical" image is invalid)
-      this.onFailedToLoadImage(
-        t('controlLayers.unableToLoadImage', 'Unable to load image'),
-        parseify(imageElementResult.error)
-      );
+      this.onFailedToLoadImage(t('controlLayers.errors.unableToLoadImage'), parseify(imageElementResult.error));
       return;
     }
 

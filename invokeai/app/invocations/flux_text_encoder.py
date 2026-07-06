@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Iterator, Literal, Optional, Tuple, Union
+from typing import Iterator, Literal, Optional, Tuple
 
 import torch
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
@@ -28,7 +28,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     "flux_text_encoder",
     title="Prompt - FLUX",
     tags=["prompt", "conditioning", "flux"],
-    category="conditioning",
+    category="prompt",
     version="1.1.2",
 )
 class FluxTextEncoderInvocation(BaseInvocation):

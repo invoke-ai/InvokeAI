@@ -163,6 +163,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
             else:
                 raise e
 
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
 
@@ -253,15 +254,34 @@ class ZImageCheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
+        # Filter out keys that don't belong to the ZImageTransformer2DModel.
+        # Merged checkpoints (e.g. LoRA-baked models) may bundle text encoder weights
+        # (text_encoders.*) or other non-transformer keys alongside the transformer weights.
+        # Also filter FP8 quantization metadata (scale_weight, scaled_fp8).
+        valid_prefixes = (
+            "all_x_embedder.",
+            "all_final_layer.",
+            "layers.",
+            "noise_refiner.",
+            "context_refiner.",
+            "t_embedder.",
+            "cap_embedder.",
+            "rope_embedder.",
+        )
+        valid_exact = {"x_pad_token", "cap_pad_token"}
+        keys_to_remove = [
+            k
+            for k in sd.keys()
+            if not (k.startswith(valid_prefixes) or k in valid_exact)
+            or k.endswith(".scale_weight")
+            or k == "scaled_fp8"
+        ]
+        for k in keys_to_remove:
+            del sd[k]
+
         # Handle memory management and dtype conversion
         new_sd_size = sum([ten.nelement() * model_dtype.itemsize for ten in sd.values()])
         self._ram_cache.make_room(new_sd_size)
-
-        # Filter out FP8 scale_weight and scaled_fp8 metadata keys
-        # These are quantization metadata that shouldn't be loaded into the model
-        keys_to_remove = [k for k in sd.keys() if k.endswith(".scale_weight") or k == "scaled_fp8"]
-        for k in keys_to_remove:
-            del sd[k]
 
         # Convert to target dtype
         for k in sd.keys():
@@ -750,7 +770,13 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 # For rotary embeddings, this is inv_freq which is computed from config
                 if buffer_name == "inv_freq":
                     # Compute inv_freq from config (same logic as Qwen3RotaryEmbedding.__init__)
-                    base = qwen_config.rope_theta
+                    # NB: transformers 5.x moved rope_theta into the rope_parameters/rope_scaling dict
+                    rope_params = (
+                        getattr(qwen_config, "rope_parameters", None)
+                        or getattr(qwen_config, "rope_scaling", None)
+                        or {}
+                    )
+                    base = rope_params.get("rope_theta") or getattr(qwen_config, "rope_theta", 1000000.0)
                     inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
                     parent.register_buffer(buffer_name, inv_freq.to(model_dtype), persistent=False)
                 else:
@@ -966,7 +992,13 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
 
                 if buffer_name == "inv_freq":
                     # Compute inv_freq from config - keep on CPU, cache system will move to GPU as needed
-                    base = qwen_config.rope_theta
+                    # NB: transformers 5.x moved rope_theta into the rope_parameters/rope_scaling dict
+                    rope_params = (
+                        getattr(qwen_config, "rope_parameters", None)
+                        or getattr(qwen_config, "rope_scaling", None)
+                        or {}
+                    )
+                    base = rope_params.get("rope_theta") or getattr(qwen_config, "rope_theta", 1000000.0)
                     inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
                     parent.register_buffer(buffer_name, inv_freq.to(dtype=compute_dtype), persistent=False)
                 else:

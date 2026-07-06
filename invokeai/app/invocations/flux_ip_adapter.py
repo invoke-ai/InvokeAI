@@ -24,7 +24,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
     "flux_ip_adapter",
     title="FLUX IP-Adapter",
     tags=["ip_adapter", "control"],
-    category="ip_adapter",
+    category="conditioning",
     version="1.0.0",
 )
 class FluxIPAdapterInvocation(BaseInvocation):

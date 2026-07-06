@@ -30,7 +30,7 @@ ZImageVAE = Union[AutoencoderKL, FluxAutoEncoder]
     "z_image_i2l",
     title="Image to Latents - Z-Image",
     tags=["image", "latents", "vae", "i2l", "z-image"],
-    category="image",
+    category="latents",
     version="1.1.0",
     classification=Classification.Prototype,
 )

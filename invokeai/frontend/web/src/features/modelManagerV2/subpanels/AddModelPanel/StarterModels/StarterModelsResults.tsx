@@ -21,6 +21,9 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
 
   const filteredResults = useMemo(() => {
     return results.starter_models.filter((result) => {
+      if (result.source.startsWith('external://')) {
+        return false;
+      }
       const trimmedSearchTerm = searchTerm.trim().toLowerCase();
       const matchStrings = [
         result.name.toLowerCase(),
@@ -61,7 +64,7 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
                 </Flex>
               </Tooltip>
             </Flex>
-            <Flex gap={2}>
+            <Flex gap={2} flexWrap="wrap" justifyContent="flex-end" flex={1} minW={0}>
               {map(results.starter_bundles, (bundle) => (
                 <StarterBundleButton
                   key={bundle.name}

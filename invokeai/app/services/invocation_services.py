@@ -22,7 +22,9 @@ if TYPE_CHECKING:
     from invokeai.app.services.config import InvokeAIAppConfig
     from invokeai.app.services.download import DownloadQueueServiceBase
     from invokeai.app.services.events.events_base import EventServiceBase
+    from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+    from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
     from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
     from invokeai.app.services.images.images_base import ImageServiceABC
     from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
     from invokeai.app.services.urls.urls_base import UrlServiceBase
+    from invokeai.app.services.users.users_base import UserServiceBase
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -64,6 +67,7 @@ class InvocationServices:
         model_relationships: "ModelRelationshipsServiceABC",
         model_relationship_records: "ModelRelationshipRecordStorageBase",
         download_queue: "DownloadQueueServiceBase",
+        external_generation: "ExternalGenerationServiceBase",
         performance_statistics: "InvocationStatsServiceBase",
         session_queue: "SessionQueueBase",
         session_processor: "SessionProcessorBase",
@@ -77,6 +81,8 @@ class InvocationServices:
         style_preset_image_files: "StylePresetImageFileStorageBase",
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
         client_state_persistence: "ClientStatePersistenceABC",
+        users: "UserServiceBase",
+        image_moves: "ImageMoveService | None" = None,
     ):
         self.asset_files = asset_files
         self.board_images = board_images
@@ -95,8 +101,10 @@ class InvocationServices:
         self.model_relationships = model_relationships
         self.model_relationship_records = model_relationship_records
         self.download_queue = download_queue
+        self.external_generation = external_generation
         self.performance_statistics = performance_statistics
         self.session_queue = session_queue
+        self.image_moves = image_moves
         self.session_processor = session_processor
         self.invocation_cache = invocation_cache
         self.names = names
@@ -108,3 +116,4 @@ class InvocationServices:
         self.style_preset_image_files = style_preset_image_files
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence
+        self.users = users

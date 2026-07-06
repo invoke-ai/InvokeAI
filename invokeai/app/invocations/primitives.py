@@ -12,6 +12,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    AnimaConditioningField,
     Asset3DField,
     BoundingBoxField,
     CogView4ConditioningField,
@@ -25,6 +26,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
     OutputField,
+    QwenImageConditioningField,
     SD3ConditioningField,
     TensorField,
     UIComponent,
@@ -289,15 +291,28 @@ class ImageInvocation(BaseInvocation):
     title="Image Collection Primitive",
     tags=["primitives", "image", "collection"],
     category="primitives",
-    version="1.0.1",
+    version="1.0.2",
 )
 class ImageCollectionInvocation(BaseInvocation):
     """A collection of image primitive values"""
 
-    collection: list[ImageField] = InputField(description="The collection of image values")
+    collection: Optional[list[ImageField]] = InputField(
+        default=None,
+        description="An optional image collection to append to",
+        input=Input.Connection,
+        title="Collection",
+        ui_order=0,
+    )
+    images: Optional[list[ImageField]] = InputField(
+        default=None,
+        description="The images to append to the collection",
+        input=Input.Direct,
+        title="Images",
+        ui_order=1,
+    )
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
-        return ImageCollectionOutput(collection=self.collection)
+        return ImageCollectionOutput(collection=[*(self.collection or []), *(self.images or [])])
 
 
 # endregion
@@ -483,6 +498,28 @@ class ZImageConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "ZImageConditioningOutput":
         return cls(conditioning=ZImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("qwen_image_conditioning_output")
+class QwenImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Qwen Image Edit conditioning tensor."""
+
+    conditioning: QwenImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "QwenImageConditioningOutput":
+        return cls(conditioning=QwenImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("anima_conditioning_output")
+class AnimaConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output an Anima text conditioning tensor."""
+
+    conditioning: AnimaConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "AnimaConditioningOutput":
+        return cls(conditioning=AnimaConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")

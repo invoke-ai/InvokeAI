@@ -30,6 +30,23 @@ def move_defs_to_top_level(openapi_schema: dict[str, Any], component_schema: dic
         openapi_schema["components"]["schemas"][schema_key] = json_schema
 
 
+def normalize_path_defaults(node: Any) -> None:
+    """Recursively normalize `default` strings on schema nodes whose `format` is `path` to use forward slashes.
+
+    Pydantic stringifies `Path` defaults using the host OS's separator, so a default declared as
+    `Path("models/.convert_cache")` serializes to `models\\.convert_cache` on Windows. That OS-dependent drift
+    pollutes diffs whenever schema is regenerated on Windows. We force POSIX form for path-typed defaults.
+    """
+    if isinstance(node, dict):
+        if node.get("format") == "path" and isinstance(node.get("default"), str):
+            node["default"] = node["default"].replace("\\", "/")
+        for v in node.values():
+            normalize_path_defaults(v)
+    elif isinstance(node, list):
+        for v in node:
+            normalize_path_defaults(v)
+
+
 def get_openapi_func(
     app: FastAPI, post_transform: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None
 ) -> Callable[[], dict[str, Any]]:
@@ -93,7 +110,7 @@ def get_openapi_func(
         openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
             "type": "object",
             "properties": dict(sorted(invocation_output_map_properties.items())),
-            "required": invocation_output_map_required,
+            "required": sorted(invocation_output_map_required),
         }
 
         # Some models don't end up in the schemas as standalone definitions because they aren't used directly in the API.
@@ -125,6 +142,8 @@ def get_openapi_func(
 
         if post_transform is not None:
             openapi_schema = post_transform(openapi_schema)
+
+        normalize_path_defaults(openapi_schema)
 
         openapi_schema["components"]["schemas"] = dict(sorted(openapi_schema["components"]["schemas"].items()))
 

@@ -73,11 +73,13 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         # Convert siblings dicts to SimpleNamespace objects matching HfApi.model_info() shape
         siblings = []
         for s in data.get("siblings", []):
-            siblings.append(SimpleNamespace(
-                rfilename=s.get("rfilename"),
-                size=s.get("size") or (s.get("lfs", {}) or {}).get("size"),
-                lfs=s.get("lfs"),
-            ))
+            siblings.append(
+                SimpleNamespace(
+                    rfilename=s.get("rfilename"),
+                    size=s.get("size") or (s.get("lfs", {}) or {}).get("size"),
+                    lfs=s.get("lfs"),
+                )
+            )
         return SimpleNamespace(id=data["id"], siblings=siblings)
 
     def from_id(self, id: str, variant: Optional[ModelRepoVariant] = None) -> AnyModelRepoMetadata:

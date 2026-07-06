@@ -134,19 +134,14 @@ export class CanvasGradientToolModule extends CanvasModuleBase {
     };
 
     if (settings.gradientType === 'linear') {
-      const bboxCenter = {
-        x: bboxInLayer.x + bboxInLayer.width / 2,
-        y: bboxInLayer.y + bboxInLayer.height / 2,
-      };
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const halfWidth = (Math.abs(bboxInLayer.width * cos) + Math.abs(bboxInLayer.height * sin)) / 2;
-      const halfHeight = (Math.abs(bboxInLayer.width * sin) + Math.abs(bboxInLayer.height * cos)) / 2;
+      // Always render linear gradients on a rect that fully covers the bbox.
+      // Angle-dependent rect sizing can undershoot on non-square bboxes (e.g. 90deg on tall bboxes),
+      // leaving uncovered bands when the result is clipped back to bbox.
       rect = {
-        x: bboxCenter.x - halfWidth,
-        y: bboxCenter.y - halfHeight,
-        width: Math.max(halfWidth * 2, 1),
-        height: Math.max(halfHeight * 2, 1),
+        x: bboxInLayer.x,
+        y: bboxInLayer.y,
+        width: Math.max(bboxInLayer.width, 1),
+        height: Math.max(bboxInLayer.height, 1),
       };
     }
 

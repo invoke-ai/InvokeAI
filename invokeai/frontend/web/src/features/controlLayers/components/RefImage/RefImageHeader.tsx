@@ -12,6 +12,7 @@ import {
 } from 'features/controlLayers/store/refImagesSlice';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCircleBold, PiCircleFill, PiTrashBold, PiWarningBold } from 'react-icons/pi';
 
 import { RefImageWarningTooltipContent } from './RefImageWarningTooltipContent';
@@ -24,6 +25,7 @@ const textSx: SystemStyleObject = {
 };
 
 export const RefImageHeader = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
   const selectRefImageNumber = useMemo(
@@ -58,7 +60,7 @@ export const RefImageHeader = memo(() => {
             size="sm"
             variant="link"
             alignSelf="stretch"
-            aria-label="warnings"
+            aria-label={t('common.warnings')}
             tooltip={<RefImageWarningTooltipContent warnings={warnings} />}
             icon={<PiWarningBold />}
             colorScheme="warning"
@@ -70,20 +72,24 @@ export const RefImageHeader = memo(() => {
           </Text>
         )}
         <IconButton
-          tooltip={entity.isEnabled ? 'Disable Reference Image' : 'Enable Reference Image'}
+          tooltip={
+            entity.isEnabled ? t('controlLayers.disableReferenceImage') : t('controlLayers.enableReferenceImage')
+          }
           size="xs"
           variant="link"
           alignSelf="stretch"
-          aria-label={entity.isEnabled ? 'Disable ref image' : 'Enable ref image'}
+          aria-label={
+            entity.isEnabled ? t('controlLayers.disableReferenceImage') : t('controlLayers.enableReferenceImage')
+          }
           onClick={toggleIsEnabled}
           icon={entity.isEnabled ? <PiCircleFill /> : <PiCircleBold />}
         />
         <IconButton
-          tooltip="Delete Reference Image"
+          tooltip={t('controlLayers.deleteReferenceImage')}
           size="xs"
           variant="link"
           alignSelf="stretch"
-          aria-label="Delete ref image"
+          aria-label={t('controlLayers.deleteReferenceImage')}
           onClick={deleteRefImage}
           icon={<PiTrashBold />}
           colorScheme="error"

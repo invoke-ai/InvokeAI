@@ -32,16 +32,19 @@ class StylePresetChanges(BaseModel, extra="forbid"):
     name: Optional[str] = Field(default=None, description="The style preset's new name.")
     preset_data: Optional[PresetData] = Field(default=None, description="The updated data for style preset.")
     type: Optional[PresetType] = Field(description="The updated type of the style preset")
+    is_public: Optional[bool] = Field(default=None, description="Whether the preset is visible to other users.")
 
 
 class StylePresetWithoutId(BaseModel):
     name: str = Field(description="The name of the style preset.")
     preset_data: PresetData = Field(description="The preset data")
     type: PresetType = Field(description="The type of style preset")
+    is_public: bool = Field(default=False, description="Whether the preset is visible to other users.")
 
 
 class StylePresetRecordDTO(StylePresetWithoutId):
     id: str = Field(description="The style preset ID.")
+    user_id: str = Field(description="The user who owns this style preset.")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "StylePresetRecordDTO":

@@ -10,7 +10,7 @@ from invokeai.backend.image_util.normal_bae.nets.NNET import NNET
     "normal_map",
     title="Normal Map",
     tags=["controlnet", "normal"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class NormalMapInvocation(BaseInvocation, WithMetadata, WithBoard):

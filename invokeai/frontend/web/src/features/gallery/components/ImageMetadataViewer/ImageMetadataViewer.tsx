@@ -133,7 +133,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
 
         <TabPanels>
           <TabPanel>
-            {isLoading && <IAINoContentFallbackWithSpinner label="Loading metadata..." />}
+            {isLoading && <IAINoContentFallbackWithSpinner label={t('gallery.loadingMetadata')} />}
             {metadata && !isLoading && (
               <ScrollableContent>
                 <ImageMetadataActions metadata={metadata} />

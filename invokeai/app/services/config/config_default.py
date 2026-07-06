@@ -22,6 +22,7 @@ from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 INIT_FILE = Path("invokeai.yaml")
+API_KEYS_FILE = Path("api_keys.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
@@ -29,7 +30,19 @@ ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = "4.0.2"
+SESSION_QUEUE_MODE = Literal["FIFO", "round_robin"]
+IMAGE_SUBFOLDER_STRATEGY = Literal["flat", "date", "type", "hash"]
+CONFIG_SCHEMA_VERSION = "4.0.3"
+EXTERNAL_PROVIDER_CONFIG_FIELDS = (
+    "external_alibabacloud_api_key",
+    "external_alibabacloud_base_url",
+    "external_gemini_api_key",
+    "external_gemini_base_url",
+    "external_openai_api_key",
+    "external_openai_base_url",
+    "external_seedream_api_key",
+    "external_seedream_base_url",
+)
 
 
 class URLRegexTokenPair(BaseModel):
@@ -59,8 +72,8 @@ class InvokeAIAppConfig(BaseSettings):
         allow_credentials: Allow CORS credentials.
         allow_methods: Methods allowed for CORS.
         allow_headers: Headers allowed for CORS.
-        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.
-        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
+        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
@@ -69,6 +82,7 @@ class InvokeAIAppConfig(BaseSettings):
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
         outputs_dir: Path to directory for outputs.
+        image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
         custom_nodes_dir: Path to directory for custom nodes.
         style_presets_dir: Path to directory for style presets.
         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
@@ -101,7 +115,9 @@ class InvokeAIAppConfig(BaseSettings):
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
-        clear_queue_on_startup: Empties session queue on startup.
+        session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
+        clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
+        max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
         allow_nodes: List of nodes to allow. Omit to allow all.
         deny_nodes: List of nodes to deny. Omit to deny none.
         node_cache_size: How many cached nodes to keep in memory.
@@ -110,6 +126,16 @@ class InvokeAIAppConfig(BaseSettings):
         scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.
         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
+        multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+        strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
+        external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.
+        external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
+        external_gemini_api_key: API key for Gemini image generation.
+        external_openai_api_key: API key for OpenAI image generation.
+        external_gemini_base_url: Base URL override for Gemini image generation.
+        external_openai_base_url: Base URL override for OpenAI image generation.
+        external_seedream_api_key: API key for Seedream image generation.
+        external_seedream_base_url: Base URL override for Seedream image generation.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -129,8 +155,8 @@ class InvokeAIAppConfig(BaseSettings):
     allow_credentials:             bool = Field(default=True,               description="Allow CORS credentials.")
     allow_methods:            list[str] = Field(default=["*"],              description="Methods allowed for CORS.")
     allow_headers:            list[str] = Field(default=["*"],              description="Headers allowed for CORS.")
-    ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.")
-    ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.")
+    ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
+    ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
 
     # MISC FEATURES
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
@@ -143,6 +169,7 @@ class InvokeAIAppConfig(BaseSettings):
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
+    image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
     workflow_thumbnails_dir: Path = Field(default=Path("workflow_thumbnails"), description="Path to directory for workflow thumbnails.")
@@ -168,7 +195,7 @@ class InvokeAIAppConfig(BaseSettings):
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
     model_cache_keep_alive_min:   float = Field(default=0, ge=0,            description="How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.")
     device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
-    enable_partial_loading:        bool = Field(default=False,              description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
+    enable_partial_loading:        bool = Field(default=True,               description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
     keep_ram_copy_of_weights:      bool = Field(default=True,               description="Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.")
     # Deprecated CACHE configs
     ram:                Optional[float] = Field(default=None, gt=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
@@ -189,7 +216,9 @@ class InvokeAIAppConfig(BaseSettings):
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
-    clear_queue_on_startup:        bool = Field(default=False,              description="Empties session queue on startup.")
+    session_queue_mode: SESSION_QUEUE_MODE = Field(default="round_robin",   description="Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.")
+    clear_queue_on_startup:        bool = Field(default=False,              description="Empties session queue on startup. If true, disables `max_queue_history`.")
+    max_queue_history:      Optional[int] = Field(default=None, ge=0,        description="Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.")
 
     # NODES
     allow_nodes:    Optional[list[str]] = Field(default=None,               description="List of nodes to allow. Omit to allow all.")
@@ -202,6 +231,30 @@ class InvokeAIAppConfig(BaseSettings):
     scan_models_on_startup:        bool = Field(default=False,              description="Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.")
     unsafe_disable_picklescan:     bool = Field(default=False,              description="UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.")
     allow_unknown_models:          bool = Field(default=True,              description="Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.")
+
+    # MULTIUSER
+    multiuser:                     bool = Field(default=False,              description="Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.")
+    strict_password_checking:      bool = Field(default=False,              description="Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.")
+
+    # EXTERNAL PROVIDERS
+    external_alibabacloud_api_key: Optional[str] = Field(default=None, description="API key for Alibaba Cloud DashScope image generation.")
+    external_alibabacloud_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Alibaba Cloud DashScope image generation."
+    )
+    external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
+    external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
+    external_gemini_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Gemini image generation."
+    )
+    external_openai_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for OpenAI image generation."
+    )
+    external_seedream_api_key: Optional[str] = Field(
+        default=None, description="API key for Seedream image generation."
+    )
+    external_seedream_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Seedream image generation."
+    )
 
     # fmt: on
 
@@ -260,7 +313,7 @@ class InvokeAIAppConfig(BaseSettings):
             file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
-            file.write("# Put user settings here - see https://invoke-ai.github.io/InvokeAI/configuration/:\n")
+            file.write("# Put user settings here - see https://invoke.ai/configuration/invokeai-yaml/:\n")
             if len(config_dict) > 0:
                 file.write(yaml.dump(config_dict, sort_keys=False))
 
@@ -281,6 +334,13 @@ class InvokeAIAppConfig(BaseSettings):
     def config_file_path(self) -> Path:
         """Path to invokeai.yaml, resolved to an absolute path.."""
         resolved_path = self._resolve(self._config_file or INIT_FILE)
+        assert resolved_path is not None
+        return resolved_path
+
+    @property
+    def api_keys_file_path(self) -> Path:
+        """Path to api_keys.yaml, resolved to an absolute path.."""
+        resolved_path = self._resolve(API_KEYS_FILE)
         assert resolved_path is not None
         return resolved_path
 
@@ -449,6 +509,20 @@ def migrate_v4_0_1_to_4_0_2_config_dict(config_dict: dict[str, Any]) -> dict[str
     return parsed_config_dict
 
 
+def migrate_v4_0_2_to_4_0_3_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v4.0.2 config dictionary to a v4.0.3 config dictionary.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.2 config file.
+
+    Returns:
+        A config dict with the settings migrated to v4.0.3.
+    """
+    parsed_config_dict: dict[str, Any] = copy.deepcopy(config_dict)
+    parsed_config_dict["schema_version"] = "4.0.3"
+    return parsed_config_dict
+
+
 def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     """Load and migrate a config file to the latest version.
 
@@ -474,6 +548,9 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     if loaded_config_dict["schema_version"] == "4.0.1":
         migrated = True
         loaded_config_dict = migrate_v4_0_1_to_4_0_2_config_dict(loaded_config_dict)
+    if loaded_config_dict["schema_version"] == "4.0.2":
+        migrated = True
+        loaded_config_dict = migrate_v4_0_2_to_4_0_3_config_dict(loaded_config_dict)
 
     if migrated:
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
@@ -496,6 +573,36 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
 
 
+def load_external_api_keys(api_keys_file_path: Path) -> dict[str, str]:
+    """Load external provider config (API keys and base URLs) from a dedicated YAML file."""
+    if not api_keys_file_path.exists():
+        return {}
+
+    with open(api_keys_file_path, "rt", encoding=locale.getpreferredencoding()) as file:
+        loaded_api_keys: Any = yaml.safe_load(file)
+
+    if loaded_api_keys is None:
+        return {}
+
+    if not isinstance(loaded_api_keys, dict):
+        raise RuntimeError(f"Failed to load api keys file {api_keys_file_path}: expected a mapping")
+
+    parsed_api_keys: dict[str, str] = {}
+    for field_name in EXTERNAL_PROVIDER_CONFIG_FIELDS:
+        value = loaded_api_keys.get(field_name)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise RuntimeError(
+                f"Failed to load api keys file {api_keys_file_path}: value for '{field_name}' must be a string"
+            )
+        stripped_value = value.strip()
+        if stripped_value:
+            parsed_api_keys[field_name] = stripped_value
+
+    return parsed_api_keys
+
+
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
     """Get the global singleton app config.
@@ -512,6 +619,7 @@ def get_config() -> InvokeAIAppConfig:
     """
     # This object includes environment variables, as parsed by pydantic-settings
     config = InvokeAIAppConfig()
+    env_fields_set = set(config.model_fields_set)
 
     args = InvokeAIArgs.args
 
@@ -572,5 +680,12 @@ def get_config() -> InvokeAIAppConfig:
         # We should never write env vars to the config file
         default_config = DefaultInvokeAIAppConfig()
         default_config.write_file(config.config_file_path, as_example=False)
+
+    api_keys_from_file = load_external_api_keys(config.api_keys_file_path)
+    if api_keys_from_file:
+        # API keys file should take precedence over invokeai.yaml, but not over environment variables.
+        api_keys_to_apply = {key: value for key, value in api_keys_from_file.items() if key not in env_fields_set}
+        if api_keys_to_apply:
+            config.update_config(api_keys_to_apply, clobber=True)
 
     return config

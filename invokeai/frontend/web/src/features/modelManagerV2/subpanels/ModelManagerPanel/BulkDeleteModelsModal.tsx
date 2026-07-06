@@ -38,13 +38,10 @@ export const BulkDeleteModelsModal = memo(
                 <Text>
                   {t('modelManager.deleteModelsConfirm', {
                     count: modelCount,
-                    defaultValue: `Are you sure you want to delete ${modelCount} model(s)? This action cannot be undone.`,
                   })}
                 </Text>
                 <Text fontWeight="semibold" color="error.400">
-                  {t('modelManager.deleteWarning', {
-                    defaultValue: 'Models in your Invoke models directory will be permanently deleted from disk.',
-                  })}
+                  {t('modelManager.deleteWarning')}
                 </Text>
               </Flex>
             </AlertDialogBody>

@@ -17,6 +17,8 @@ import {
   PiXCircle,
 } from 'react-icons/pi';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { useAutoAddBoard } from 'services/api/hooks/useAutoAddBoard';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 
 export const FloatingLeftPanelButtons = memo(() => {
   return (
@@ -71,6 +73,8 @@ const InvokeIconButton = memo(() => {
   const { t } = useTranslation();
   const queue = useInvoke();
   const shift = useShiftModifier();
+  const autoAddBoard = useAutoAddBoard();
+  const { canWriteImages } = useBoardAccess(autoAddBoard);
 
   return (
     <InvokeButtonTooltip prepend={shift} placement="end">
@@ -78,7 +82,7 @@ const InvokeIconButton = memo(() => {
         aria-label={t('queue.queueBack')}
         onClick={shift ? queue.enqueueFront : queue.enqueueBack}
         isLoading={queue.isLoading}
-        isDisabled={queue.isDisabled}
+        isDisabled={queue.isDisabled || !canWriteImages}
         icon={<InvokeIconButtonIcon />}
         colorScheme="invokeYellow"
         flexGrow={1}

@@ -1,7 +1,12 @@
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
-import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  positivePromptAddedToHistory,
+  selectNegativePrompt,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
 import { useCallback } from 'react';
@@ -21,15 +26,16 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   }
   const base = model.base;
 
-  const { g, seed, positivePrompt } = await buildMultidiffusionUpscaleGraph(state);
+  const { g, seed, positivePrompt, negativePrompt } = await buildMultidiffusionUpscaleGraph(state);
 
   const batchConfig = prepareLinearUIBatch({
     state,
     g,
-    base,
+    base: base as BaseModelType,
     prepend,
     seedNode: seed,
     positivePromptNode: positivePrompt,
+    negativePromptNode: negativePrompt,
     origin: 'upscaling',
     destination: 'gallery',
   });
@@ -40,7 +46,12 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
+  dispatch(
+    positivePromptAddedToHistory({
+      positivePrompt: selectPositivePrompt(state),
+      negativePrompt: selectNegativePrompt(state),
+    })
+  );
 
   return { batchConfig, enqueueResult };
 };

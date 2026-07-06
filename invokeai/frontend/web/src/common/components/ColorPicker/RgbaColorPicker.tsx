@@ -3,9 +3,8 @@ import { Box, Button, CompositeNumberInput, Flex, FormControl, FormLabel, Input 
 import { RGBA_COLOR_SWATCHES } from 'common/components/ColorPicker/swatches';
 import { hexToRGBA, rgbaColorToString, rgbaToHex } from 'common/util/colorCodeTransformers';
 import type { ChangeEvent, CSSProperties } from 'react';
-import { memo, useCallback, useEffect, useState } from 'react';
-import { RgbaColorPicker as ColorfulRgbaColorPicker } from 'react-colorful';
-import type { RgbaColor } from 'react-colorful/dist/types';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { type RgbaColor, RgbaColorPicker as ColorfulRgbaColorPicker } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -41,9 +40,15 @@ const RgbaColorPicker = (props: Props) => {
   const handleChangeB = useCallback((b: number) => onChange({ ...color, b }), [color, onChange]);
   const handleChangeA = useCallback((a: number) => onChange({ ...color, a }), [color, onChange]);
   const [mode, setMode] = useState<'rgb' | 'hex'>('rgb');
-  const [hex, setHex] = useState<string>(rgbaToHex(color, true));
+  const [hexValue, setHexValue] = useState(rgbaToHex(color, true));
+  const didUpdateFromHex = useRef(false);
+
   useEffect(() => {
-    setHex(rgbaToHex(color, true));
+    if (didUpdateFromHex.current) {
+      didUpdateFromHex.current = false;
+      return;
+    }
+    setHexValue(rgbaToHex(color, true));
   }, [color]);
   const onToggleMode = useCallback(() => setMode((m) => (m === 'rgb' ? 'hex' : 'rgb')), []);
   const onChangeHex = useCallback(
@@ -53,11 +58,12 @@ const RgbaColorPicker = (props: Props) => {
         value = `#${value}`;
       }
       const cleaned = value.replace(/[^#0-9a-fA-F]/g, '').slice(0, 9);
-      setHex(cleaned);
+      setHexValue(cleaned);
       const hexBody = cleaned.replace('#', '');
       if (hexBody.length === 6 || hexBody.length === 8) {
         const a = hexBody.length === 8 ? parseInt(hexBody.slice(6, 8), 16) / 255 : color.a;
         const next = hexToRGBA(hexBody.slice(0, 6).padEnd(6, '0'), a);
+        didUpdateFromHex.current = true;
         onChange(next);
       }
     },
@@ -67,7 +73,6 @@ const RgbaColorPicker = (props: Props) => {
     (a: number) => {
       const next = { ...color, a: Math.max(0, Math.min(1, a)) };
       onChange(next);
-      setHex(rgbaToHex(next, true));
     },
     [color, onChange]
   );
@@ -85,7 +90,7 @@ const RgbaColorPicker = (props: Props) => {
               h={10}
               whiteSpace="nowrap"
               onClick={onToggleMode}
-              aria-label="Toggle RGB/HEX"
+              aria-label={t('common.toggleRgbHex')}
             >
               RGB
             </Button>
@@ -144,13 +149,13 @@ const RgbaColorPicker = (props: Props) => {
               h={10}
               whiteSpace="nowrap"
               onClick={onToggleMode}
-              aria-label="Toggle RGB/HEX"
+              aria-label={t('common.toggleRgbHex')}
             >
               HEX
             </Button>
             <FormControl gap={0}>
-              <FormLabel>{t('common.hex', { defaultValue: 'Hex' })}</FormLabel>
-              <Input value={hex} onChange={onChangeHex} placeholder="#RRGGBB or #RRGGBBAA" w="10rem" />
+              <FormLabel>{t('common.hex')}</FormLabel>
+              <Input value={hexValue} onChange={onChangeHex} placeholder="#RRGGBB or #RRGGBBAA" w="10rem" />
             </FormControl>
             <FormControl gap={0}>
               <FormLabel>{t('common.alpha')[0]}</FormLabel>

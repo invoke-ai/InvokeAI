@@ -1,7 +1,9 @@
 """DyPE extension for FLUX denoising pipeline."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
+
+import torch
 
 from invokeai.backend.flux.dype.base import DyPEConfig
 from invokeai.backend.flux.dype.embed import DyPEEmbedND
@@ -59,9 +61,7 @@ class DyPEExtension:
     def update_step_state(
         self,
         embedder: DyPEEmbedND,
-        timestep: float,
-        timestep_index: int,
-        total_steps: int,
+        sigma: float,
     ) -> None:
         """Update the step state in the DyPE embedder.
 
@@ -70,15 +70,37 @@ class DyPEExtension:
 
         Args:
             embedder: The DyPE embedder to update
-            timestep: Current timestep value (sigma/noise level)
-            timestep_index: Current step index (0-based)
-            total_steps: Total number of denoising steps
+            sigma: Current noise level for the active denoising step
         """
         embedder.set_step_state(
-            sigma=timestep,
+            sigma=sigma,
             height=self.target_height,
             width=self.target_width,
         )
+
+    @staticmethod
+    def resolve_step_sigma(
+        fallback_sigma: float,
+        step_index: int,
+        scheduler_sigmas: Sequence[float] | torch.Tensor | None,
+    ) -> float:
+        """Resolve the actual sigma for the current denoising step.
+
+        Diffusers schedulers may expose both normalized timesteps and the underlying
+        sigma sequence. DyPE should follow the noise schedule, so prefer
+        ``scheduler.sigmas`` when available and fall back to the provided value
+        otherwise.
+        """
+        if scheduler_sigmas is None:
+            return fallback_sigma
+
+        if step_index >= len(scheduler_sigmas):
+            return fallback_sigma
+
+        sigma = scheduler_sigmas[step_index]
+        if isinstance(sigma, torch.Tensor):
+            return float(sigma.item())
+        return float(sigma)
 
     @staticmethod
     def restore_model(model: "Flux", original_embedder: object) -> None:

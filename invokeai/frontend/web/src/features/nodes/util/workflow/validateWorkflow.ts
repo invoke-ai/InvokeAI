@@ -1,6 +1,7 @@
 import { parseify } from 'common/util/serialize';
 import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { Templates } from 'features/nodes/store/types';
+import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import {
   isBoardFieldInputInstance,
   isImageFieldCollectionInputInstance,
@@ -15,7 +16,12 @@ import {
   isNodeFieldElement,
   isWorkflowInvocationNode,
 } from 'features/nodes/types/workflow';
-import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
+import {
+  getConnectedInputNames,
+  getNeedsUpdate,
+  getUpdatedFieldName,
+  updateNode,
+} from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
 import type { JsonObject } from 'type-fest';
 
@@ -57,6 +63,96 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
   // Now we can validate the graph
   const { nodes, edges } = _workflow;
   const warnings: WorkflowWarning[] = [];
+  const validEdges: WorkflowV3['edges'] = [];
+
+  for (const edge of edges) {
+    // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
+    const sourceNode = nodes.find(({ id }) => id === edge.source);
+    const targetNode = nodes.find(({ id }) => id === edge.target);
+    const sourceTemplate = sourceNode ? templates[sourceNode.data.type] : undefined;
+    const targetTemplate = targetNode ? templates[targetNode.data.type] : undefined;
+    const issues: string[] = [];
+
+    if (!sourceNode) {
+      // The edge's source/output node does not exist
+      issues.push(
+        t('nodes.sourceNodeDoesNotExist', {
+          node: edge.source,
+        })
+      );
+    }
+
+    if (sourceNode?.type === 'invocation' && !sourceTemplate) {
+      // The edge's source/output node template does not exist
+      issues.push(
+        t('nodes.missingTemplate', {
+          node: edge.source,
+          type: sourceNode?.data.type,
+        })
+      );
+    }
+
+    if (sourceNode && sourceTemplate && edge.type === 'default' && !(edge.sourceHandle in sourceTemplate.outputs)) {
+      // The edge's source/output node field does not exist
+      issues.push(
+        t('nodes.sourceNodeFieldDoesNotExist', {
+          node: edge.source,
+          field: edge.sourceHandle,
+        })
+      );
+    }
+
+    if (!targetNode) {
+      // The edge's target/input node does not exist
+      issues.push(
+        t('nodes.targetNodeDoesNotExist', {
+          node: edge.target,
+        })
+      );
+    }
+
+    if (targetNode?.type === 'invocation' && !targetTemplate) {
+      // The edge's target/input node template does not exist
+      issues.push(
+        t('nodes.missingTemplate', {
+          node: edge.target,
+          type: targetNode?.data.type,
+        })
+      );
+    }
+
+    if (targetNode && targetTemplate && edge.type === 'default' && !(edge.targetHandle in targetTemplate.inputs)) {
+      // The edge's target/input node field does not exist
+      issues.push(
+        t('nodes.targetNodeFieldDoesNotExist', {
+          node: edge.target,
+          field: edge.targetHandle,
+        })
+      );
+    }
+
+    if (!issues.length && edge.type === 'default') {
+      const connectionError = validateConnection(edge, nodes, validEdges, templates, null, true);
+      if (connectionError) {
+        issues.push(connectionError);
+      }
+    }
+
+    if (issues.length) {
+      const source = edge.type === 'default' ? `${edge.source}.${edge.sourceHandle}` : edge.source;
+      const target = edge.type === 'default' ? `${edge.target}.${edge.targetHandle}` : edge.target;
+      warnings.push({
+        message: t('nodes.deletedInvalidEdge', { source, target }),
+        issues,
+        data: edge,
+      });
+    } else {
+      validEdges.push(edge);
+    }
+  }
+
+  // Remove invalid edges before node updates so migrations only trust surviving connections.
+  _workflow.edges = validEdges;
 
   for (const node of nodes) {
     if (!isWorkflowInvocationNode(node)) {
@@ -80,7 +176,8 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
     // This node needs to be updated, based on comparison of its version to the template version
     if (getNeedsUpdate(node.data, template)) {
       try {
-        const updatedNode = updateNode(node, template);
+        const connectedInputNames = getConnectedInputNames(node.id, validEdges);
+        const updatedNode = updateNode(node, template, { connectedInputNames });
         node.data = updatedNode.data;
       } catch {
         const message = t('nodes.unableToUpdateNode', {
@@ -149,89 +246,24 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
     }
   }
 
-  // Stash invalid edges here to be deleted later
-  const edgesToDelete = new Set<string>();
-
-  for (const edge of edges) {
-    // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
-    const sourceNode = nodes.find(({ id }) => id === edge.source);
-    const targetNode = nodes.find(({ id }) => id === edge.target);
-    const sourceTemplate = sourceNode ? templates[sourceNode.data.type] : undefined;
-    const targetTemplate = targetNode ? templates[targetNode.data.type] : undefined;
-    const issues: string[] = [];
-
-    if (!sourceNode) {
-      // The edge's source/output node does not exist
-      issues.push(
-        t('nodes.sourceNodeDoesNotExist', {
-          node: edge.source,
-        })
-      );
+  _workflow.exposedFields = _workflow.exposedFields.map((fieldIdentifier) => {
+    const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === fieldIdentifier.nodeId);
+    if (!node) {
+      return fieldIdentifier;
     }
+    return { ...fieldIdentifier, fieldName: getUpdatedFieldName(node, fieldIdentifier.fieldName) };
+  });
 
-    if (!sourceTemplate) {
-      // The edge's source/output node template does not exist
-      issues.push(
-        t('nodes.missingTemplate', {
-          node: edge.source,
-          type: sourceNode?.data.type,
-        })
-      );
+  for (const element of Object.values(_workflow.form.elements)) {
+    if (!isNodeFieldElement(element)) {
+      continue;
     }
-
-    if (sourceNode && sourceTemplate && edge.type === 'default' && !(edge.sourceHandle in sourceTemplate.outputs)) {
-      // The edge's source/output node field does not exist
-      issues.push(
-        t('nodes.sourceNodeFieldDoesNotExist', {
-          node: edge.source,
-          field: edge.sourceHandle,
-        })
-      );
+    const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === element.data.fieldIdentifier.nodeId);
+    if (!node) {
+      continue;
     }
-
-    if (!targetNode) {
-      // The edge's target/input node does not exist
-      issues.push(
-        t('nodes.targetNodeDoesNotExist', {
-          node: edge.target,
-        })
-      );
-    }
-
-    if (!targetTemplate) {
-      // The edge's target/input node template does not exist
-      issues.push(
-        t('nodes.missingTemplate', {
-          node: edge.target,
-          type: targetNode?.data.type,
-        })
-      );
-    }
-
-    if (targetNode && targetTemplate && edge.type === 'default' && !(edge.targetHandle in targetTemplate.inputs)) {
-      // The edge's target/input node field does not exist
-      issues.push(
-        t('nodes.targetNodeFieldDoesNotExist', {
-          node: edge.target,
-          field: edge.targetHandle,
-        })
-      );
-    }
-
-    if (issues.length) {
-      edgesToDelete.add(edge.id);
-      const source = edge.type === 'default' ? `${edge.source}.${edge.sourceHandle}` : edge.source;
-      const target = edge.type === 'default' ? `${edge.source}.${edge.targetHandle}` : edge.target;
-      warnings.push({
-        message: t('nodes.deletedInvalidEdge', { source, target }),
-        issues,
-        data: edge,
-      });
-    }
+    element.data.fieldIdentifier.fieldName = getUpdatedFieldName(node, element.data.fieldIdentifier.fieldName);
   }
-
-  // Remove invalid edges
-  _workflow.edges = edges.filter(({ id }) => !edgesToDelete.has(id));
 
   // Migrated exposed fields to form elements if they exist and the form does not
   // Note: If the form is invalid per its zod schema, it will be reset to a default, empty form!

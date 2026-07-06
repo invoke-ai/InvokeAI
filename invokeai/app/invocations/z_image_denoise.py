@@ -21,6 +21,7 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     ZImageConditioningField,
 )
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.z_image_control import ZImageControlField
@@ -49,8 +50,8 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
     "z_image_denoise",
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
-    category="image",
-    version="1.4.0",
+    category="latents",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
@@ -62,6 +63,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
         default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.noise, input=Input.Connection
     )
     # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -104,11 +108,20 @@ class ZImageDenoiseInvocation(BaseInvocation):
         description=FieldDescriptions.vae + " Required for control conditioning.",
         input=Input.Connection,
     )
+    # Shift override for the sigma schedule. If None, shift is auto-calculated from image dimensions.
+    shift: Optional[float] = InputField(
+        default=None,
+        ge=0.0,
+        description="Override the timestep shift (mu) for the sigma schedule. "
+        "Leave blank to auto-calculate based on image dimensions (recommended). "
+        "Lower values (~0.5) produce less noise shifting, higher values (~1.15) produce more.",
+        title="Shift",
+    )
     # Scheduler selection for the denoising process
     scheduler: ZIMAGE_SCHEDULER_NAME_VALUES = InputField(
         default="euler",
-        description="Scheduler (sampler) for the denoising process. Euler is the default and recommended for "
-        "Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.",
+        description="Scheduler (sampler) for the denoising process. Euler is the default and recommended. "
+        "Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).",
         ui_choice_labels=ZIMAGE_SCHEDULER_LABELS,
     )
 
@@ -225,34 +238,36 @@ class ZImageDenoiseInvocation(BaseInvocation):
         """Calculate timestep shift based on image sequence length.
 
         Based on diffusers ZImagePipeline.calculate_shift method.
-        """
-        m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
-        b = base_shift - m * base_image_seq_len
-        mu = image_seq_len * m + b
-        return mu
-
-    def _get_sigmas(self, mu: float, num_steps: int) -> list[float]:
-        """Generate sigma schedule with time shift.
-
-        Based on FlowMatchEulerDiscreteScheduler with shift.
-        Generates num_steps + 1 sigma values (including terminal 0.0).
+        Returns a linear shift value (exp(mu) from the original formula).
         """
         import math
 
-        def time_shift(mu: float, sigma: float, t: float) -> float:
-            """Apply time shift to a single timestep value."""
+        m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
+        b = base_shift - m * base_image_seq_len
+        mu = image_seq_len * m + b
+        # Convert from exponential mu to linear shift value
+        return math.exp(mu)
+
+    def _get_sigmas(self, shift: float, num_steps: int) -> list[float]:
+        """Generate sigma schedule with linear time shift.
+
+        Uses linear time shift: shift / (shift + (1/t - 1)).
+        The shift value is used directly as a multiplier.
+        Generates num_steps + 1 sigma values (including terminal 0.0).
+        """
+
+        def time_shift(shift: float, t: float) -> float:
+            """Apply linear time shift to a single timestep value."""
             if t <= 0:
                 return 0.0
             if t >= 1:
                 return 1.0
-            return math.exp(mu) / (math.exp(mu) + (1 / t - 1) ** sigma)
+            return shift / (shift + (1 / t - 1))
 
-        # Generate linearly spaced values from 1 to 0 (excluding endpoints for safety)
-        # then apply time shift
         sigmas = []
         for i in range(num_steps + 1):
             t = 1.0 - i / num_steps  # Goes from 1.0 to 0.0
-            sigma = time_shift(mu, 1.0, t)
+            sigma = time_shift(shift, t)
             sigmas.append(sigma)
 
         return sigmas
@@ -313,11 +328,14 @@ class ZImageDenoiseInvocation(BaseInvocation):
             # Concatenate all negative embeddings
             neg_prompt_embeds = torch.cat([tc.prompt_embeds for tc in neg_text_conditionings], dim=0)
 
-        # Calculate shift based on image sequence length
-        mu = self._calculate_shift(img_seq_len)
+        # Calculate shift based on image sequence length, or use override
+        if self.shift is not None:
+            shift = self.shift
+        else:
+            shift = self._calculate_shift(img_seq_len)
 
         # Generate sigma schedule with time shift
-        sigmas = self._get_sigmas(mu, self.steps)
+        sigmas = self._get_sigmas(shift, self.steps)
 
         # Apply denoising_start and denoising_end clipping
         if self.denoising_start > 0 or self.denoising_end < 1:
@@ -334,22 +352,27 @@ class ZImageDenoiseInvocation(BaseInvocation):
         if init_latents is not None:
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
-        # Generate initial noise
-        num_channels_latents = 16  # Z-Image uses 16 latent channels
-        noise = self._get_noise(
-            batch_size=1,
-            num_channels_latents=num_channels_latents,
-            height=self.height,
-            width=self.width,
-            dtype=inference_dtype,
-            device=device,
-            seed=self.seed,
-        )
+        # Generate initial noise.
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: torch.Tensor | None
+        if should_ignore_noise:
+            noise = None
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
 
         # Prepare input latent image
         if init_latents is not None:
             if self.add_noise:
-                # Noise the init_latents by the appropriate amount for the first timestep.
+                assert noise is not None
+                # Noise the init latents using the first sigma from the clipped
+                # InvokeAI schedule.
+                #
+                # Known limitation: if the selected scheduler later starts from a
+                # different first effective sigma/timestep than sigmas[0], the
+                # img2img preblend below may not match that scheduler exactly.
+                # This is an existing pipeline limitation and affects both
+                # internally generated noise and externally supplied noise.
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -357,6 +380,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            assert noise is not None
             latents = noise
 
         # Short-circuit if no denoising steps
@@ -369,6 +393,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         if inpaint_mask is not None:
             if init_latents is None:
                 raise ValueError("Initial latents are required when using an inpaint mask (image-to-image inpainting)")
+            assert noise is not None
             inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
@@ -387,15 +412,16 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 num_train_timesteps=1000,
                 shift=1.0,
             )
-            # Set timesteps - LCM should use num_inference_steps (it has its own sigma schedule),
+            # Set timesteps - LCM uses its own sigma schedule (num_inference_steps),
             # while other schedulers can use custom sigmas if supported
             is_lcm = self.scheduler == "lcm"
             set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
             if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
-                # Convert sigmas list to tensor for scheduler
                 scheduler.set_timesteps(sigmas=sigmas, device=device)
             else:
-                # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
+                # LCM or a scheduler without custom-sigma support computes its own
+                # schedule from num_inference_steps. That can diverge from sigmas[0]
+                # used in the img2img preblend above.
                 scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
 
             # For Heun scheduler, the number of actual steps may differ
@@ -532,6 +558,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     transformer=transformer,
                     regional_attn_mask=regional_extension.regional_attn_mask,
                     img_seq_len=img_seq_len,
+                    positive_cap_feats=pos_prompt_embeds,
                 )
             )
 
@@ -644,10 +671,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                                     ),
                                 )
                     else:
-                        # For LCM and other first-order schedulers
+                        # For first-order schedulers (Euler, LCM)
                         user_step += 1
-                        # Only call step_callback if we haven't exceeded total_steps
-                        # (LCM scheduler may have more internal steps than user-facing steps)
                         if user_step <= total_steps:
                             pbar.update(1)
                             step_callback(
@@ -750,6 +775,24 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     )
 
         return latents
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "Z-Image", self.width, self.height)
+            return noise
+
+        return self._get_noise(
+            batch_size=1,
+            num_channels_latents=16,
+            height=self.height,
+            width=self.width,
+            dtype=inference_dtype,
+            device=device,
+            seed=self.seed,
+        )
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

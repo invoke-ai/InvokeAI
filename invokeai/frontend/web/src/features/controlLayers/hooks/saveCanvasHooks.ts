@@ -45,7 +45,7 @@ import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
-import type { ImageDTO } from 'services/api/types';
+import { type ImageDTO, isExternalApiModelConfig } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('canvas');
@@ -90,7 +90,7 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
       metadata.negative_prompt = selectNegativePrompt(state);
       metadata.seed = selectSeed(state);
       const model = selectMainModelConfig(state);
-      if (model) {
+      if (model && !isExternalApiModelConfig(model)) {
         metadata.model = Graph.getModelMetadataField(model);
       }
     }
