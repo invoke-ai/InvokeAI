@@ -173,6 +173,7 @@ const createCoordinatorHarness = () => {
 
   return {
     clearCanvasWorkflowIntegrationProcessing,
+    completedInvocationKeysByItemId,
     coordinator,
     nodeExecutionStates,
     onInvocationComplete,
@@ -204,6 +205,29 @@ describe(createWorkflowExecutionCoordinator.name, () => {
 
     expect(nodeExecutionStates['node-1']?.status).toBe(zNodeStatus.enum.IN_PROGRESS);
     expect(nodeExecutionStates['node-1']?.outputs).toEqual([]);
+  });
+
+  it('does not reset node execution states when a workflow-call parent queue item resumes', () => {
+    const { completedInvocationKeysByItemId, coordinator, nodeExecutionStates } = createCoordinatorHarness();
+    nodeExecutionStates['call-node'] = {
+      nodeId: 'call-node',
+      status: zNodeStatus.enum.COMPLETED,
+      progress: null,
+      progressImage: null,
+      outputs: [
+        {
+          type: 'workflow_return_output',
+          values: { result: [3] },
+        } as unknown as S['InvocationCompleteEvent']['result'],
+      ],
+      error: null,
+    };
+    completedInvocationKeysByItemId.set(1, new Set(['prepared-call-node']));
+
+    coordinator.onQueueItemStatusChanged(buildQueueStatusEvent({ item_id: 1, status: 'in_progress' }));
+
+    expect(nodeExecutionStates['call-node']?.status).toBe(zNodeStatus.enum.COMPLETED);
+    expect(nodeExecutionStates['call-node']?.outputs).toHaveLength(1);
   });
 
   it('does not let a late invocation_complete from an old workflow item overwrite the active workflow item', () => {
