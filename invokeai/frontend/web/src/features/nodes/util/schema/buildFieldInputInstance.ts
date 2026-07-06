@@ -11,6 +11,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   VideoField: undefined,
   IntegerField: 0,
   ModelIdentifierField: undefined,
+  LoRAField: [],
   SchedulerField: 'dpmpp_3m_k',
   SavedWorkflowField: '',
   StringField: '',
