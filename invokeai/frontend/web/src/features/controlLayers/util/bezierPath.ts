@@ -1,6 +1,8 @@
 import type { CanvasBezierPointState, Coordinate } from 'features/controlLayers/store/types';
 
 type RenderableBezierPoint = Pick<CanvasBezierPointState, 'anchor' | 'inHandle' | 'outHandle'>;
+type BezierPointHandleType = 'inHandle' | 'outHandle';
+export type BezierPointType = CanvasBezierPointState['type'];
 type BezierPathSegmentHit = {
   segmentIndex: number;
   t: number;
@@ -16,6 +18,88 @@ const lerpCoordinate = (a: Coordinate, b: Coordinate, t: number): Coordinate => 
 });
 const normalizeHandle = (anchor: Coordinate, handle: Coordinate): Coordinate | null =>
   anchor.x === handle.x && anchor.y === handle.y ? null : handle;
+const mirrorHandle = (anchor: Coordinate, handle: Coordinate): Coordinate => ({
+  x: anchor.x + (anchor.x - handle.x),
+  y: anchor.y + (anchor.y - handle.y),
+});
+const getOppositeHandleType = (handleType: BezierPointHandleType): BezierPointHandleType =>
+  handleType === 'inHandle' ? 'outHandle' : 'inHandle';
+const getCollinearOppositeHandle = (anchor: Coordinate, handle: Coordinate, length: number): Coordinate | null => {
+  const sourceLength = getDistance(anchor, handle);
+  if (sourceLength === 0 || length === 0) {
+    return null;
+  }
+
+  const scale = length / sourceLength;
+  return {
+    x: anchor.x + (anchor.x - handle.x) * scale,
+    y: anchor.y + (anchor.y - handle.y) * scale,
+  };
+};
+
+const getPreferredHandleType = (
+  point: CanvasBezierPointState,
+  preferredHandleType?: BezierPointHandleType | null
+): BezierPointHandleType | null => {
+  if (preferredHandleType && point[preferredHandleType]) {
+    return preferredHandleType;
+  }
+  if (point.outHandle) {
+    return 'outHandle';
+  }
+  if (point.inHandle) {
+    return 'inHandle';
+  }
+  return null;
+};
+
+const syncOppositeHandleForPointType = (point: CanvasBezierPointState, sourceHandleType: BezierPointHandleType) => {
+  const sourceHandle = point[sourceHandleType];
+  const oppositeHandleType = getOppositeHandleType(sourceHandleType);
+  if (point.type === 'corner') {
+    return;
+  }
+  if (!sourceHandle) {
+    point[oppositeHandleType] = null;
+    return;
+  }
+  if (point.type === 'symmetric') {
+    point[oppositeHandleType] = normalizeHandle(point.anchor, mirrorHandle(point.anchor, sourceHandle));
+    return;
+  }
+
+  const oppositeHandle = point[oppositeHandleType];
+  const oppositeLength = oppositeHandle
+    ? getDistance(point.anchor, oppositeHandle)
+    : getDistance(point.anchor, sourceHandle);
+  point[oppositeHandleType] = normalizeHandle(
+    point.anchor,
+    getCollinearOppositeHandle(point.anchor, sourceHandle, oppositeLength) ?? point.anchor
+  );
+};
+
+export const setBezierPointType = (
+  point: CanvasBezierPointState,
+  type: BezierPointType,
+  preferredHandleType?: BezierPointHandleType | null
+) => {
+  point.type = type;
+  const sourceHandleType = getPreferredHandleType(point, preferredHandleType);
+  if (!sourceHandleType) {
+    return;
+  }
+
+  syncOppositeHandleForPointType(point, sourceHandleType);
+};
+
+export const setBezierPointHandle = (
+  point: CanvasBezierPointState,
+  handleType: BezierPointHandleType,
+  handle: Coordinate
+) => {
+  point[handleType] = normalizeHandle(point.anchor, handle);
+  syncOppositeHandleForPointType(point, handleType);
+};
 
 const getSegmentData = (from: RenderableBezierPoint, to: RenderableBezierPoint): string => {
   const controlPoint1 = from.outHandle ?? from.anchor;

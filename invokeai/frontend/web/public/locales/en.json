@@ -2950,7 +2950,10 @@
         },
         "vectorEdit": {
             "title": "Edit Vector Layer",
-            "discard": "Discard",
+            "pointType": "Point Type",
+            "corner": "Corner",
+            "smooth": "Smooth",
+            "symmetric": "Symmetric",
             "traceAll": "Trace All Paths"
         },
         "lasso": {
@@ -2990,16 +2993,15 @@
                 "fineGrid": "Fine grid",
                 "commitText": "Commit",
                 "finishPath": "Finish path",
-                "acceptPathEdit": "Accept edits",
+                "applyPathEdit": "Apply edits",
                 "newLine": "New line",
                 "cancelText": "Cancel",
                 "cancelPath": "Cancel path",
-                "discardPathEdit": "Discard edits",
+                "cancelPathEdit": "Cancel edits",
                 "dragText": "Drag text",
                 "snapRotation": "Snap rotation",
                 "nudgeSelection": "Nudge selection",
                 "insertPathPoint": "Insert point",
-                "unlockPathHandles": "Unlock handles",
                 "deletePathPoint": "Delete point"
             }
         },

@@ -5,10 +5,13 @@ import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/C
 import { addCoords, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
 import type { CanvasBezierPathState, CanvasEntityIdentifier, Coordinate } from 'features/controlLayers/store/types';
 import { getBezierPathState } from 'features/controlLayers/store/util';
+import type { BezierPointType } from 'features/controlLayers/util/bezierPath';
 import {
   anchorsToBezierPoints,
   buildBezierPathData,
   findNearestBezierPathSegment,
+  setBezierPointHandle,
+  setBezierPointType,
   splitBezierSegmentAt,
 } from 'features/controlLayers/util/bezierPath';
 import Konva from 'konva';
@@ -75,12 +78,6 @@ const DEFAULT_CONFIG: CanvasPathToolModuleConfig = {
 };
 
 const getDistance = (a: Coordinate, b: Coordinate) => Math.hypot(a.x - b.x, a.y - b.y);
-const normalizeHandle = (anchor: Coordinate, handle: Coordinate): Coordinate | null =>
-  anchor.x === handle.x && anchor.y === handle.y ? null : handle;
-const mirrorHandle = (anchor: Coordinate, handle: Coordinate): Coordinate => ({
-  x: anchor.x + (anchor.x - handle.x),
-  y: anchor.y + (anchor.y - handle.y),
-});
 
 export class CanvasPathToolModule extends CanvasModuleBase {
   readonly type = 'path_tool';
@@ -220,6 +217,28 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
   acceptEditSession = () => {
     this.$editSession.set(null);
+    this.render();
+  };
+
+  setActivePointType = (pointType: BezierPointType) => {
+    const session = this.$editSession.get();
+    const activeEntity = this.getEditSessionAdapter();
+    if (!session || !activeEntity || !session.activePathId || session.activePointIndex === null) {
+      return;
+    }
+
+    const nextPaths = deepClone(activeEntity.state.paths);
+    const path = nextPaths.find((candidate) => candidate.id === session.activePathId);
+    const bezierPoint = path?.points[session.activePointIndex];
+    if (!path || !bezierPoint) {
+      return;
+    }
+
+    setBezierPointType(bezierPoint, pointType, session.activeHandle);
+    this.manager.stateApi.replaceVectorPaths({
+      entityIdentifier: session.entityIdentifier,
+      paths: nextPaths,
+    });
     this.render();
   };
 
@@ -632,6 +651,11 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     if (activePath && session.activePointIndex !== null) {
       const handleHit = this.findHandleHit(activePath, session.activePointIndex, point, handleHitRadius);
       if (handleHit) {
+        const activePoint = activePath.points[session.activePointIndex];
+        if (!activePoint) {
+          return;
+        }
+
         this.$editSession.set({
           ...session,
           activePathId: activePath.id,
@@ -751,21 +775,9 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         bezierPoint.outHandle = { x: bezierPoint.outHandle.x + dx, y: bezierPoint.outHandle.y + dy };
       }
     } else if (session.dragTarget.type === 'pullHandles') {
-      const outHandle = normalizeHandle(bezierPoint.anchor, point);
-      bezierPoint.type = 'smooth';
-      bezierPoint.outHandle = outHandle;
-      bezierPoint.inHandle = outHandle
-        ? normalizeHandle(bezierPoint.anchor, mirrorHandle(bezierPoint.anchor, outHandle))
-        : null;
+      setBezierPointHandle(bezierPoint, 'outHandle', point);
     } else {
-      bezierPoint[session.dragTarget.type] = normalizeHandle(bezierPoint.anchor, point);
-      if (bezierPoint.type === 'smooth' && !evt.shiftKey) {
-        const oppositeHandleType = session.dragTarget.type === 'inHandle' ? 'outHandle' : 'inHandle';
-        const handle = bezierPoint[session.dragTarget.type];
-        bezierPoint[oppositeHandleType] = handle
-          ? normalizeHandle(bezierPoint.anchor, mirrorHandle(bezierPoint.anchor, handle))
-          : null;
-      }
+      setBezierPointHandle(bezierPoint, session.dragTarget.type, point);
     }
 
     this.manager.stateApi.replaceVectorPaths({

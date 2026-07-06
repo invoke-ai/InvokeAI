@@ -439,7 +439,7 @@ const zCanvasEntityBase = z.object({
   isLocked: z.boolean(),
 });
 
-const zBezierPointType = z.enum(['smooth', 'corner']);
+const zBezierPointType = z.enum(['smooth', 'corner', 'symmetric']);
 
 const zCanvasBezierPointState = z.object({
   anchor: zCoordinate,

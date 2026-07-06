@@ -22,16 +22,15 @@ type CanvasToolModifierHintId =
   | 'modFineGrid'
   | 'enterCommitText'
   | 'enterFinishPath'
-  | 'enterAcceptPathEdit'
+  | 'enterApplyPathEdit'
   | 'shiftEnterNewLine'
   | 'escCancelText'
   | 'escCancelPath'
-  | 'escDiscardPathEdit'
+  | 'escCancelPathEdit'
   | 'modDragText'
   | 'shiftSnapRotation'
   | 'arrowKeysNudgeSelection'
   | 'shiftInsertPathPoint'
-  | 'shiftUnlockPathHandles'
   | 'modDeletePathPoint';
 
 type CanvasToolModifierHint = {
@@ -113,10 +112,10 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     keys: ['enter'],
     labelKey: 'controlLayers.modifierHints.labels.finishPath',
   },
-  enterAcceptPathEdit: {
-    id: 'enterAcceptPathEdit',
+  enterApplyPathEdit: {
+    id: 'enterApplyPathEdit',
     keys: ['enter'],
-    labelKey: 'controlLayers.modifierHints.labels.acceptPathEdit',
+    labelKey: 'controlLayers.modifierHints.labels.applyPathEdit',
   },
   shiftEnterNewLine: {
     id: 'shiftEnterNewLine',
@@ -133,10 +132,10 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     keys: ['esc'],
     labelKey: 'controlLayers.modifierHints.labels.cancelPath',
   },
-  escDiscardPathEdit: {
-    id: 'escDiscardPathEdit',
+  escCancelPathEdit: {
+    id: 'escCancelPathEdit',
     keys: ['esc'],
-    labelKey: 'controlLayers.modifierHints.labels.discardPathEdit',
+    labelKey: 'controlLayers.modifierHints.labels.cancelPathEdit',
   },
   modDragText: {
     id: 'modDragText',
@@ -157,11 +156,6 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     id: 'shiftInsertPathPoint',
     keys: ['shift'],
     labelKey: 'controlLayers.modifierHints.labels.insertPathPoint',
-  },
-  shiftUnlockPathHandles: {
-    id: 'shiftUnlockPathHandles',
-    keys: ['shift'],
-    labelKey: 'controlLayers.modifierHints.labels.unlockPathHandles',
   },
   modDeletePathPoint: {
     id: 'modDeletePathPoint',
@@ -211,10 +205,9 @@ export const getCanvasToolModifierHintIds = ({
       isEditingPathSession
         ? [
             'shiftInsertPathPoint',
-            'shiftUnlockPathHandles',
             'modDeletePathPoint',
-            'enterAcceptPathEdit',
-            'escDiscardPathEdit',
+            'enterApplyPathEdit',
+            'escCancelPathEdit',
             'spacePan',
             'altPickColor',
           ]
