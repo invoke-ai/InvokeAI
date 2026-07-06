@@ -9,6 +9,7 @@ import { IntegerFieldCollectionInputComponent } from 'features/nodes/components/
 import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorFieldComponent';
 import { LoRAFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/LoRAFieldCollectionInputComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
+import SavedWorkflowFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/SavedWorkflowFieldInputComponent';
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
 import { StringGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorFieldComponent';
 import { IntegerFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInput';
@@ -50,6 +51,8 @@ import {
   isLoRAFieldCollectionInputTemplate,
   isModelIdentifierFieldInputInstance,
   isModelIdentifierFieldInputTemplate,
+  isSavedWorkflowFieldInputInstance,
+  isSavedWorkflowFieldInputTemplate,
   isSchedulerFieldInputInstance,
   isSchedulerFieldInputTemplate,
   isStringFieldCollectionInputInstance,
@@ -231,6 +234,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <ModelIdentifierFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isSavedWorkflowFieldInputTemplate(template)) {
+    if (!isSavedWorkflowFieldInputInstance(field)) {
+      return null;
+    }
+    return <SavedWorkflowFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isColorFieldInputTemplate(template)) {

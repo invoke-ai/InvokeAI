@@ -192,6 +192,10 @@ const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zSavedWorkflowFieldType = zFieldTypeBase.extend({
+  name: z.literal('SavedWorkflowField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zFloatGeneratorFieldType = zFieldTypeBase.extend({
   name: z.literal('FloatGeneratorField'),
   originalType: zStatelessFieldType.optional(),
@@ -221,6 +225,7 @@ const zStatefulFieldType = z.union([
   zLoRAFieldType,
   zColorFieldType,
   zSchedulerFieldType,
+  zSavedWorkflowFieldType,
   zFloatGeneratorFieldType,
   zIntegerGeneratorFieldType,
   zStringGeneratorFieldType,
@@ -750,6 +755,28 @@ export type SchedulerFieldInputInstance = z.infer<typeof zSchedulerFieldInputIns
 export type SchedulerFieldInputTemplate = z.infer<typeof zSchedulerFieldInputTemplate>;
 export const isSchedulerFieldInputInstance = buildInstanceTypeGuard(zSchedulerFieldInputInstance);
 export const isSchedulerFieldInputTemplate = buildTemplateTypeGuard<SchedulerFieldInputTemplate>('SchedulerField');
+// #endregion
+
+// #region SavedWorkflowField
+const zSavedWorkflowFieldValue = z.string();
+const zSavedWorkflowFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zSavedWorkflowFieldValue,
+});
+const zSavedWorkflowFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zSavedWorkflowFieldType,
+  originalType: zFieldType.optional(),
+  default: zSavedWorkflowFieldValue,
+  maxLength: z.number().int().gte(0).optional(),
+  minLength: z.number().int().gte(0).optional(),
+});
+const zSavedWorkflowFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zSavedWorkflowFieldType,
+});
+export type SavedWorkflowFieldInputInstance = z.infer<typeof zSavedWorkflowFieldInputInstance>;
+export type SavedWorkflowFieldInputTemplate = z.infer<typeof zSavedWorkflowFieldInputTemplate>;
+export const isSavedWorkflowFieldInputInstance = buildInstanceTypeGuard(zSavedWorkflowFieldInputInstance);
+export const isSavedWorkflowFieldInputTemplate =
+  buildTemplateTypeGuard<SavedWorkflowFieldInputTemplate>('SavedWorkflowField');
 // #endregion
 
 // #region FloatGeneratorField
@@ -1346,6 +1373,7 @@ export const zStatefulFieldValue = z.union([
   zLoRAFieldCollectionValue,
   zColorFieldValue,
   zSchedulerFieldValue,
+  zSavedWorkflowFieldValue,
   zFloatGeneratorFieldValue,
   zIntegerGeneratorFieldValue,
   zStringGeneratorFieldValue,
@@ -1375,6 +1403,7 @@ const zStatefulFieldInputInstance = z.union([
   zLoRAFieldCollectionInputInstance,
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
+  zSavedWorkflowFieldInputInstance,
   zFloatGeneratorFieldInputInstance,
   zIntegerGeneratorFieldInputInstance,
   zStringGeneratorFieldInputInstance,
@@ -1403,7 +1432,7 @@ const zStatefulFieldInputTemplate = z.union([
   zLoRAFieldCollectionInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
-  zStatelessFieldInputTemplate,
+  zSavedWorkflowFieldInputTemplate,
   zFloatGeneratorFieldInputTemplate,
   zIntegerGeneratorFieldInputTemplate,
   zStringGeneratorFieldInputTemplate,
@@ -1432,6 +1461,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zLoRAFieldCollectionOutputTemplate,
   zColorFieldOutputTemplate,
   zSchedulerFieldOutputTemplate,
+  zSavedWorkflowFieldOutputTemplate,
   zFloatGeneratorFieldOutputTemplate,
   zIntegerGeneratorFieldOutputTemplate,
   zStringGeneratorFieldOutputTemplate,
