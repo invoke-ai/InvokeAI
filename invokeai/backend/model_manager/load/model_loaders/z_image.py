@@ -722,8 +722,15 @@ class ZImageSDNQCheckpointModel(ModelLoader):
 
         sd = sdnq_sd_loader(transformer_path, compute_dtype=compute_dtype)
         # Diffusers-format Z-Image keys already match ZImageTransformer2DModel.state_dict(),
-        # so no BFL→diffusers conversion is needed here.
-        model.load_state_dict(sd, assign=True, strict=False)
+        # so no BFL→diffusers conversion is needed here. The transformer has no tied/shared weights,
+        # so we expect a complete state dict — any missing key would leave a required parameter on a
+        # meta tensor and fail later during device movement or inference. Fail fast here with the
+        # offending key list instead (mirrors the SDNQ text-encoder path).
+        missing, unexpected = model.load_state_dict(sd, assign=True, strict=False)
+        if unexpected:
+            raise ValueError(f"Unexpected keys loading SDNQ Z-Image transformer: {unexpected}")
+        if missing:
+            raise ValueError(f"Missing keys loading SDNQ Z-Image transformer: {missing}")
         return model
 
 

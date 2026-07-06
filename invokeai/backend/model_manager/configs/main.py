@@ -1234,6 +1234,14 @@ class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Conf
             },
         )
 
+        # Reject SDNQ-quantized pipelines so Main_SDNQ_Diffusers_ZImage_Config matches them instead.
+        # Without this both configs accept the same ZImagePipeline folder and identification can
+        # latch onto the plain diffusers one (which would then mis-read packed uint8 weights as bf16
+        # and crash at inference). It also breaks the self-contained SDNQ path, since a pipeline
+        # mis-identified as plain diffusers would force the user to select separate VAE/Qwen3 sources.
+        if (mod.path / "transformer").is_dir() and _is_sdnq_folder(mod.path / "transformer"):
+            raise NotAMatchError("transformer is SDNQ-quantized; use Main_SDNQ_Diffusers_ZImage_Config")
+
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
