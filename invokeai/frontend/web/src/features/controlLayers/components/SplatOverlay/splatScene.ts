@@ -3,14 +3,17 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js';
 
-const FLOOR_Y = -0.5; // TripoSplat normalizes the object into ~[-0.5, 0.5]; its base rests on the floor here
-const BG_COLOR = 0x3a3a40; // neutral studio grey, live preview only (capture is transparent)
+// Cap the drawing buffer's largest dimension so deep stage zooms don't allocate absurd buffers.
+const MAX_DRAWING_BUFFER_DIM = 4096;
 
 /**
- * A grounded three.js + Spark viewport for a single 3D Gaussian splat: orbit/zoom/pan camera, a floor grid,
- * origin axes, and a clickable corner navigation gizmo (ViewHelper). The grid/axes/gizmo/background are
- * shown only in the live preview; on capture they're hidden and the background is transparent so the baked
- * layer is the object alone.
+ * A transparent three.js + Spark viewport for a single 3D Gaussian splat, designed to sit directly on the
+ * canvas: orbit/zoom/pan camera and a clickable corner navigation gizmo (ViewHelper, shown only while the
+ * pointer is over the viewport). The background is always transparent so the canvas shows through — the
+ * live view is the compositing preview. Capture renders the object alone at a given pixel size.
+ *
+ * The element hosting this scene is CSS-scaled by the canvas stage transform, so the drawing buffer is
+ * sized at (layout px × devicePixelRatio × stage scale) to stay crisp at any zoom — see setStageScale.
  *
  * The corner gizmo requires the renderer's `autoClear` to be off (it draws over the main render via a corner
  * viewport), so the main pass clears manually each frame.
@@ -27,13 +30,13 @@ export class SplatScene {
   private readonly viewHelper: ViewHelper;
   private readonly clock: THREE.Clock;
   private readonly splatRoot: THREE.Group;
-  private readonly grid: THREE.GridHelper;
-  private readonly axes: THREE.AxesHelper;
   private readonly resizeObserver: ResizeObserver;
   private readonly onPointerDown: (e: PointerEvent) => void;
   private readonly onPointerUp: (e: PointerEvent) => void;
   private pointerDownPos: { x: number; y: number } | null = null;
   private mesh: SplatMesh | null = null;
+  private stageScale = 1;
+  private gizmoVisible = false;
   private disposed = false;
 
   constructor(container: HTMLElement) {
@@ -64,13 +67,6 @@ export class SplatScene {
     this.splatRoot.rotation.x = Math.PI;
     this.scene.add(this.splatRoot);
 
-    this.grid = new THREE.GridHelper(6, 12, 0x8a8a8a, 0x555560);
-    this.grid.position.y = FLOOR_Y;
-    this.scene.add(this.grid);
-    this.axes = new THREE.AxesHelper(0.4);
-    this.axes.position.y = FLOOR_Y;
-    this.scene.add(this.axes);
-
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
@@ -87,7 +83,7 @@ export class SplatScene {
     };
     this.onPointerUp = (e) => {
       const down = this.pointerDownPos;
-      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5) {
+      if (down && this.gizmoVisible && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5) {
         this.viewHelper.handleClick(e);
       }
     };
@@ -111,15 +107,43 @@ export class SplatScene {
     } else {
       this.controls.update();
     }
-    this.renderer.setClearColor(BG_COLOR, 1);
+    this.renderer.setClearColor(0x000000, 0); // transparent — the canvas beneath is the background
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
-    this.viewHelper.render(this.renderer);
+    if (this.gizmoVisible) {
+      this.viewHelper.render(this.renderer);
+    }
   };
+
+  /**
+   * The canvas stage scale currently applied (via CSS transform) to this viewport's container. Folded into
+   * the renderer's pixel ratio so the drawing buffer matches on-screen pixels — crisp at any zoom.
+   */
+  setStageScale = (scale: number): void => {
+    const next = Math.max(0.001, scale || 1);
+    if (next === this.stageScale) {
+      return;
+    }
+    this.stageScale = next;
+    this.resize();
+  };
+
+  /** Show/hide the corner navigation gizmo (shown only while the pointer is over the viewport). */
+  setGizmoVisible = (visible: boolean): void => {
+    this.gizmoVisible = visible;
+  };
+
+  private effectivePixelRatio(w: number, h: number): number {
+    const dpr = window.devicePixelRatio || 1;
+    // Quantize so wheel-zooming the stage doesn't reallocate the drawing buffer on every tick.
+    const quantized = Math.max(0.25, Math.round(dpr * this.stageScale * 4) / 4);
+    return Math.min(quantized, MAX_DRAWING_BUFFER_DIM / Math.max(w, h, 1));
+  }
 
   resize = (): void => {
     const w = this.container.clientWidth || 1;
     const h = this.container.clientHeight || 1;
+    this.renderer.setPixelRatio(this.effectivePixelRatio(w, h));
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -165,14 +189,12 @@ export class SplatScene {
   }
 
   /**
-   * Capture the object alone (no grid/axes/gizmo/background) at the given pixel size, from the user's current
-   * camera (WYSIWYG). Renders at pixelRatio 1 so the blob's intrinsic size equals width×height. The live
-   * render loop is paused during capture to avoid it overwriting the frame before toBlob reads it.
+   * Capture the object alone (no gizmo, transparent background) at the given pixel size, from the user's
+   * current camera (WYSIWYG). Renders at pixelRatio 1 so the blob's intrinsic size equals width×height. The
+   * live render loop is paused during capture to avoid it overwriting the frame before toBlob reads it.
    */
   async capture(width: number, height: number): Promise<Blob | null> {
     this.renderer.setAnimationLoop(null);
-    this.grid.visible = false;
-    this.axes.visible = false;
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
@@ -183,10 +205,7 @@ export class SplatScene {
     const blob = await new Promise<Blob | null>((resolve) => {
       this.renderer.domElement.toBlob(resolve, 'image/png');
     });
-    // Restore the live preview.
-    this.grid.visible = true;
-    this.axes.visible = true;
-    this.renderer.setPixelRatio(window.devicePixelRatio || 1);
+    // Restore the live preview (resize() also restores the stage-scale-aware pixel ratio).
     this.resize();
     if (!this.disposed) {
       this.renderer.setAnimationLoop(this.tick);
@@ -211,10 +230,6 @@ export class SplatScene {
       this.disposeMesh(this.mesh);
       this.mesh = null;
     }
-    this.grid.geometry.dispose();
-    (this.grid.material as THREE.Material).dispose();
-    this.axes.geometry.dispose();
-    (this.axes.material as THREE.Material).dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

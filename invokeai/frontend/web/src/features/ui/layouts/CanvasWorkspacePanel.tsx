@@ -84,6 +84,7 @@ export const CanvasWorkspacePanel = memo(() => {
               <InvokeCanvasComponent />
               <CanvasManagerProviderGate>
                 <CanvasTextOverlay />
+                <CanvasSplatOverlay />
                 <Flex
                   position="absolute"
                   flexDir="column"
@@ -110,7 +111,6 @@ export const CanvasWorkspacePanel = memo(() => {
                 </Flex>
                 <CanvasBusySpinner position="absolute" insetInlineEnd={2} bottom={2} />
               </CanvasManagerProviderGate>
-              <CanvasSplatOverlay />
             </Flex>
           )}
         </ContextMenu>
