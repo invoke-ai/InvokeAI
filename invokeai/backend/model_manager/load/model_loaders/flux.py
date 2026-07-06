@@ -531,7 +531,7 @@ class T5EncoderSDNQLoader(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5TokenizerFast.from_pretrained(
+                return T5Tokenizer.from_pretrained(
                     Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
                 )
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
@@ -1758,7 +1758,7 @@ class FluxSDNQDiffusersModel(ModelLoader):
             case SubModelType.Tokenizer:
                 return CLIPTokenizer.from_pretrained(submodel_path, local_files_only=True)
             case SubModelType.Tokenizer2:
-                return T5TokenizerFast.from_pretrained(submodel_path, max_length=512, local_files_only=True)
+                return T5Tokenizer.from_pretrained(submodel_path, max_length=512, local_files_only=True)
             case SubModelType.VAE:
                 return self._load_vae(submodel_path)
             case _:

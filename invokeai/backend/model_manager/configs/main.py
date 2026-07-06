@@ -2044,7 +2044,7 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
                         model_type=ModelType.CLIPEmbed,
                         variant=None,
                     )
-                case "T5TokenizerFast":
+                case "T5TokenizerFast" | "T5Tokenizer":
                     submodels[SubModelType.Tokenizer2] = SubmodelDefinition(
                         path_or_prefix=(mod.path / key).resolve().as_posix(),
                         model_type=ModelType.T5Encoder,
