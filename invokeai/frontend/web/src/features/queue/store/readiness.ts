@@ -320,15 +320,24 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   }
 
   if (model?.base === 'z-image') {
-    // Check if VAE source is available (either separate VAE or Qwen3 Source)
-    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
-    }
-    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
-    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
+    // encoder as submodels of the main model, so no separate component source is required. Single-
+    // file / GGUF Z-Image models don't have submodels and still need a standalone VAE + Qwen3 (or a
+    // diffusers Qwen3 Source model).
+    const mainIsSelfContainedPipeline =
+      (model as { format?: unknown }).format === 'sdnq_quantized' &&
+      Boolean((model as { submodels?: unknown }).submodels);
+    if (!mainIsSelfContainedPipeline) {
+      // Check if VAE source is available (either separate VAE or Qwen3 Source)
+      const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+      }
+      // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+      const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
     }
   }
 
@@ -780,15 +789,24 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'z-image') {
-    // Check if VAE source is available (either separate VAE or Qwen3 Source)
-    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
-    }
-    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
-    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
+    // encoder as submodels of the main model, so no separate component source is required. Single-
+    // file / GGUF Z-Image models don't have submodels and still need a standalone VAE + Qwen3 (or a
+    // diffusers Qwen3 Source model).
+    const mainIsSelfContainedPipeline =
+      (model as { format?: unknown }).format === 'sdnq_quantized' &&
+      Boolean((model as { submodels?: unknown }).submodels);
+    if (!mainIsSelfContainedPipeline) {
+      // Check if VAE source is available (either separate VAE or Qwen3 Source)
+      const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+      }
+      // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+      const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
     }
   }
 

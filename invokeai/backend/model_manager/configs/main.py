@@ -360,6 +360,20 @@ def _is_flux2_model(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
+def _has_flux2_diffusers_transformer_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check for the bare diffusers-style FLUX.2 transformer layout.
+
+    A FLUX.2 single-file SDNQ checkpoint can ship its keys in the bare diffusers layout
+    (``transformer_blocks.*``, ``context_embedder.*``) rather than the BFL / ComfyUI layout that
+    ``_has_main_keys`` recognizes. The FLUX.2 single-file loader looks for exactly these keys, so we
+    must treat their presence as "looks like a main model" for identification purposes.
+    """
+    for key in state_dict.keys():
+        if isinstance(key, str) and (key.startswith("transformer_blocks.") or key.startswith("context_embedder.")):
+            return True
+    return False
+
+
 def _filename_suggests_base(name: str) -> bool:
     """Check if a model name/filename suggests it is a Base (undistilled) variant.
 
@@ -1514,6 +1528,8 @@ class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
 
         cls._validate_looks_like_main_model(mod)
 
+        cls._validate_is_not_flux2(mod)
+
         cls._validate_looks_like_sdnq_quantized(mod)
 
         variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
@@ -1535,6 +1551,18 @@ class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
         has_main_model_keys = _has_main_keys(mod.load_state_dict())
         if not has_main_model_keys:
             raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_is_not_flux2(cls, mod: ModelOnDisk) -> None:
+        """Reject FLUX.2 SDNQ checkpoints so they route to Main_SDNQ_Flux2_Config instead.
+
+        This config only checks for generic main-model keys plus SDNQ keys, so without this guard a
+        prefixed FLUX.2 SDNQ state dict could be accepted as base=flux and later loaded by the
+        FLUX.1 loader.
+        """
+        state_dict = mod.load_state_dict()
+        if _is_flux2_model(state_dict):
+            raise NotAMatchError("model is a FLUX.2 model, not FLUX.1; use Main_SDNQ_Flux2_Config")
 
     @classmethod
     def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
@@ -1569,9 +1597,16 @@ class Main_SDNQ_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
 
     @classmethod
     def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
-        has_main_model_keys = _has_main_keys(mod.load_state_dict())
-        if not has_main_model_keys:
-            raise NotAMatchError("state dict does not look like a main model")
+        state_dict = mod.load_state_dict()
+        # Accept both layouts a FLUX.2 SDNQ single-file checkpoint can use:
+        # - BFL / ComfyUI checkpoint layout (double_blocks., model.diffusion_model., ...), which
+        #   the shared _has_main_keys() helper recognizes; and
+        # - the bare diffusers layout (transformer_blocks., context_embedder.), which the FLUX.2
+        #   single-file loader consumes but _has_main_keys() does not know about. Without this a
+        #   bare-diffusers FLUX.2 SDNQ checkpoint would be rejected here and never identified.
+        if _has_main_keys(state_dict) or _has_flux2_diffusers_transformer_keys(state_dict):
+            return
+        raise NotAMatchError("state dict does not look like a main model")
 
     @classmethod
     def _validate_is_flux2(cls, mod: ModelOnDisk) -> None:

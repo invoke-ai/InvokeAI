@@ -153,3 +153,55 @@ class TestSDNQLoader:
         """Test that loading from empty directory raises ValueError."""
         with pytest.raises(ValueError, match="No safetensors files found"):
             sdnq_sd_loader(tmp_path)
+
+    def test_uint4_group_size_from_scale_overrides_config(self, tmp_path: Path):
+        """A uint4 tensor whose actual group size differs from the config value must dequantize.
+
+        SDNQ dynamic-mixed models (e.g. FLUX.2 Klein 4B) quantize some layers with a group size
+        that differs from the nominal ``group_size`` in quantization_config.json. Here the config
+        advertises group_size=128, but the scale tensor has 4 groups over 256 in-features, i.e. a
+        real group size of 64. The loader must trust the scale tensor's group dimension; otherwise
+        ``num_groups = in_features // 128 = 2`` disagrees with scale.shape[1] == 4 and the per-group
+        reshape/broadcast inside dequantize_uint4_per_group fails.
+        """
+        import json
+
+        from safetensors.torch import save_file
+
+        out_features = 32
+        in_features = 256
+        actual_group_size = 64
+        num_groups = in_features // actual_group_size  # 4
+
+        # uint4 packs 2 values per byte -> packed last dim is in_features // 2.
+        packed_weight = torch.randint(0, 256, (out_features, in_features // 2), dtype=torch.uint8)
+        # Per-group scale/zero_point shaped [out_features, num_groups, 1] (64-wide groups).
+        scale = torch.rand(out_features, num_groups, 1, dtype=torch.float32) * 0.01
+        zero_point = torch.rand(out_features, num_groups, 1, dtype=torch.float32) * 0.01
+
+        model_dir = tmp_path / "mixed_group_model"
+        model_dir.mkdir()
+        save_file(
+            {
+                "layer.weight": packed_weight,
+                "layer.scale": scale,
+                "layer.zero_point": zero_point,
+            },
+            str(model_dir / "model.safetensors"),
+        )
+        # Config advertises group_size=128, which is WRONG for this 64-wide-group tensor.
+        (model_dir / "quantization_config.json").write_text(
+            json.dumps({"weights_dtype": "uint4", "group_size": 128}),
+            encoding="utf-8",
+        )
+
+        sd = sdnq_sd_loader(model_dir)
+
+        layer_weight = sd["layer.weight"]
+        assert isinstance(layer_weight, SDNQTensor)
+        # Group size must be derived from the scale tensor (256 / 4 = 64), not the config's 128.
+        assert layer_weight._group_size == actual_group_size
+
+        # Dequantization must succeed and produce the original (unpacked) shape.
+        dequantized = layer_weight.get_dequantized_tensor()
+        assert dequantized.shape == torch.Size([out_features, in_features])

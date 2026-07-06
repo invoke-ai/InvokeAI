@@ -254,30 +254,33 @@ def sdnq_sd_loader(
                     per_tensor_dtype=per_tensor_dtype_map.get(key),
                 )
 
-                # Determine group_size for this tensor
-                # If config has group_size=0, infer from scale tensor shape
-                if config_group_size > 0:
-                    tensor_group_size = config_group_size
-                elif len(scale.shape) >= 2 and scale.shape[1] > 0:
-                    # Scale shape is [out_features, num_groups, ...] or [out_features, num_groups]
-                    # We'll compute group_size after determining original_shape
-                    tensor_group_size = None  # Will be computed below
-                else:
-                    tensor_group_size = 128  # Default fallback
-
-                # Determine original shape (need quant_type and scale to handle uint4 packing)
+                # Determine original shape (need quant_type and scale to handle uint4 packing).
+                # For the per-group uint4/int5 types this derives in_features from the packed byte
+                # count, so it does not depend on group_size.
                 original_shape = _get_original_shape(
-                    weight, quant_config, key, quant_type, scale=scale, group_size=tensor_group_size or 128
+                    weight, quant_config, key, quant_type, scale=scale, group_size=config_group_size or 128
                 )
 
-                # Compute group_size from original_shape and scale if not set
-                if tensor_group_size is None and len(original_shape) == 2 and len(scale.shape) >= 2:
-                    out_features, in_features = original_shape
+                # Determine group_size for this tensor.
+                #
+                # The scale tensor's group dimension is authoritative and takes precedence over the
+                # nominal ``group_size`` from quantization_config.json. SDNQ dynamic-mixed-precision
+                # models (e.g. FLUX.2 Klein 4B) quantize some layers with a group size that differs
+                # from the global config value, so trusting ``config_group_size`` whenever it is > 0
+                # can yield a group size that disagrees with scale.shape[1]. That mismatch makes
+                # ``num_groups = in_features // group_size`` wrong and breaks the reshape/broadcast
+                # in dequantize_uint4_per_group / dequantize_int5_per_group. We therefore derive the
+                # per-tensor group size from ``in_features / num_groups`` whenever the scale exposes a
+                # usable group dimension, and only fall back to the config value (then the SDNQ
+                # default of 128) when it doesn't.
+                tensor_group_size: int | None = None
+                if len(original_shape) == 2 and len(scale.shape) >= 2 and scale.shape[1] > 0:
+                    _, in_features = original_shape
                     num_groups = scale.shape[1]
-                    if num_groups > 0:
+                    if in_features % num_groups == 0:
                         tensor_group_size = in_features // num_groups
-                    else:
-                        tensor_group_size = 128  # Fallback
+                if tensor_group_size is None:
+                    tensor_group_size = config_group_size if config_group_size > 0 else 128
 
                 # Log quantization info for debugging
                 logger.debug(

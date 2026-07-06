@@ -87,6 +87,13 @@ class ZImageModelLoaderInvocation(BaseInvocation):
         # Transformer always comes from the main model
         transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
 
+        # SDNQ Z-Image pipeline installs are self-contained: a single install ships the transformer,
+        # Qwen3 encoder and VAE as submodels of the main model. When the user hasn't selected a
+        # standalone VAE / Qwen3 Encoder or a separate Qwen3 Source, fall back to the main model
+        # itself for those submodels. This lets a freshly installed SDNQ Z-Image pipeline generate
+        # without the user having to manually re-select the same model as a component source.
+        self_contained_source = self._get_self_contained_source(context)
+
         # Determine VAE source
         if self.vae_model is not None:
             # Use standalone FLUX VAE
@@ -95,6 +102,9 @@ class ZImageModelLoaderInvocation(BaseInvocation):
             # Extract from Diffusers Z-Image model
             self._validate_diffusers_format(context, self.qwen3_source_model, "Qwen3 Source")
             vae = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.VAE})
+        elif self_contained_source is not None:
+            # Extract from the self-contained SDNQ main model
+            vae = self_contained_source.model_copy(update={"submodel_type": SubModelType.VAE})
         else:
             raise ValueError(
                 "No VAE source provided. Either set 'VAE' to a FLUX VAE model, "
@@ -111,6 +121,10 @@ class ZImageModelLoaderInvocation(BaseInvocation):
             self._validate_diffusers_format(context, self.qwen3_source_model, "Qwen3 Source")
             qwen3_tokenizer = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             qwen3_encoder = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        elif self_contained_source is not None:
+            # Extract from the self-contained SDNQ main model
+            qwen3_tokenizer = self_contained_source.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            qwen3_encoder = self_contained_source.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:
             raise ValueError(
                 "No Qwen3 Encoder source provided. Either set 'Qwen3 Encoder' to a standalone model, "
@@ -122,6 +136,17 @@ class ZImageModelLoaderInvocation(BaseInvocation):
             qwen3_encoder=Qwen3EncoderField(tokenizer=qwen3_tokenizer, text_encoder=qwen3_encoder),
             vae=VAEField(vae=vae),
         )
+
+    def _get_self_contained_source(self, context: InvocationContext) -> Optional[ModelIdentifierField]:
+        """Return the main model as a submodel source when it is a self-contained pipeline that
+        ships its own VAE / Qwen3 submodels. SDNQ-quantized Z-Image pipeline installs expose these
+        submodels (transformer / vae / text_encoder / tokenizer), so the single install can supply
+        every component. Returns None for single-file / GGUF main models that don't have submodels
+        and therefore still require an explicit VAE / Qwen3 source."""
+        config = context.models.get_config(self.model)
+        if config.format == ModelFormat.SDNQQuantized and getattr(config, "submodels", None):
+            return self.model
+        return None
 
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str
