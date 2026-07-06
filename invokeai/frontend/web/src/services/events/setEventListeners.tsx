@@ -361,7 +361,33 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
   });
 
+  /**
+   * The queue counts (SessionQueueStatus) are kept fresh via tag invalidation, but invalidation alone is
+   * racy: the api uses invalidationBehavior 'immediately', and RTK Query drops a forced refetch when the
+   * query is already in flight. For sessions that complete near-instantly (e.g. fully served by the
+   * invocation cache), the terminal event's invalidation often arrives while the refetch triggered by the
+   * session's own enqueue/pending events is still in flight — it gets dropped, the stale mid-run counts
+   * land, and the UI shows a phantom queue item (pulsing progress bar) until the next queue activity.
+   *
+   * To close the race: capture any in-flight status fetch *before* invalidating; on terminal statuses,
+   * if one was in flight (meaning our invalidation was dropped), invalidate once more after it settles.
+   */
+  const getInFlightQueueStatusFetch = () => dispatch(queueApi.util.getRunningQueryThunk('getQueueStatus', undefined));
+  const reinvalidateQueueStatusAfter = (inFlightFetch: ReturnType<typeof getInFlightQueueStatusFetch>) => {
+    if (!inFlightFetch) {
+      return;
+    }
+    void Promise.resolve(inFlightFetch)
+      .catch(() => undefined)
+      .then(() => {
+        dispatch(queueApi.util.invalidateTags(['SessionQueueStatus']));
+      });
+  };
+
   socket.on('queue_item_status_changed', (data) => {
+    const isTerminalStatus = data.status === 'completed' || data.status === 'failed' || data.status === 'canceled';
+    const inFlightQueueStatusFetch = isTerminalStatus ? getInFlightQueueStatusFetch() : undefined;
+
     // Sanitized companion event sent to non-owner queue subscribers in multiuser mode. The
     // backend sets user_id="redacted" and clears identifiers/error fields. We must not run
     // payload-driven cache mutations or per-session side effects (node state reset, progress
@@ -377,6 +403,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       ];
       dispatch(queueApi.util.invalidateTags(tags));
+      reinvalidateQueueStatusAfter(inFlightQueueStatusFetch);
       return;
     }
 
@@ -452,6 +479,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });
     }
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
+    reinvalidateQueueStatusAfter(inFlightQueueStatusFetch);
 
     if (status === 'completed' || status === 'failed' || status === 'canceled') {
       if (status === 'failed' && error_type) {
