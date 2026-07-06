@@ -11,6 +11,7 @@ from typing import Optional
 
 import pytest
 
+from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
@@ -45,6 +46,48 @@ def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str) -> int:
             ("default", session_json, session.id, batch_id, None, 0, None, None, None, None, user_id),
         )
         return cursor.lastrowid  # type: ignore[return-value]
+
+
+def _insert_waiting_workflow_call_parent(
+    session_queue: SqliteSessionQueue, user_id: str
+) -> tuple[int, GraphExecutionState]:
+    parent_graph = Graph()
+    parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    parent_session = GraphExecutionState(graph=parent_graph)
+    invocation = parent_session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+
+    frame = parent_session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
+    child_session = parent_session.create_child_workflow_execution_state(Graph(), frame)
+    parent_session.begin_waiting_on_workflow_call(frame)
+    parent_session.attach_waiting_workflow_call_child_session(child_session)
+
+    batch_id = str(uuid.uuid4())
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, field_values,
+                priority, workflow, origin, destination, retried_from_item_id, user_id, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                parent_session.model_dump_json(warnings=False, exclude_none=True),
+                parent_session.id,
+                batch_id,
+                None,
+                0,
+                None,
+                None,
+                None,
+                None,
+                user_id,
+                "waiting",
+            ),
+        )
+        return cursor.lastrowid, child_session  # type: ignore[return-value]
 
 
 def _last_status_event_for_item(event_bus: TestEventService, item_id: int) -> QueueItemStatusChangedEvent:
@@ -208,3 +251,33 @@ def test_event_preserves_identifiers_when_current_item_is_the_changed_item(
     assert a_event.queue_status.item_id == a_item_id
     assert a_event.queue_status.session_id == in_progress.session_id
     assert a_event.queue_status.batch_id == in_progress.batch_id
+
+
+def test_workflow_call_child_enqueue_event_redacts_other_users_current_item_identifiers(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """The child enqueue path emits QueueItemStatusChangedEvent without going through
+    _set_queue_item_status, so it must apply the same per-owner current-item redaction."""
+    user_a = "user-a"
+    user_b = "user-b"
+
+    b_item_id = _insert_queue_item(session_queue, user_id=user_b)
+    parent_item_id, child_session = _insert_waiting_workflow_call_parent(session_queue, user_id=user_a)
+
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == b_item_id
+    assert in_progress.user_id == user_b
+
+    event_bus: TestEventService = mock_invoker.services.events
+    event_bus.events.clear()
+
+    parent_queue_item = session_queue.get_queue_item(parent_item_id)
+    child_queue_item = session_queue.enqueue_workflow_call_child(parent_queue_item, child_session)
+
+    child_event = _last_status_event_for_item(event_bus, child_queue_item.item_id)
+    assert child_event.user_id == user_a
+    assert child_event.queue_status.item_id is None, "must not leak other user's current item_id"
+    assert child_event.queue_status.session_id is None, "must not leak other user's current session_id"
+    assert child_event.queue_status.batch_id is None, "must not leak other user's current batch_id"
+    assert child_event.queue_status.in_progress == 1
+    assert child_event.queue_status.waiting == 1
