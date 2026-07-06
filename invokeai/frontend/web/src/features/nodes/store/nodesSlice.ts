@@ -42,6 +42,7 @@ import type {
   IntegerFieldCollectionValue,
   IntegerFieldValue,
   IntegerGeneratorFieldValue,
+  LoRAFieldCollectionValue,
   ModelIdentifierFieldValue,
   SchedulerFieldValue,
   StatefulFieldValue,
@@ -64,6 +65,7 @@ import {
   zIntegerFieldCollectionValue,
   zIntegerFieldValue,
   zIntegerGeneratorFieldValue,
+  zLoRAFieldCollectionValue,
   zModelIdentifierFieldValue,
   zSchedulerFieldValue,
   zStatefulFieldValue,
@@ -521,6 +523,9 @@ const slice = createSlice({
     fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
       fieldValueReducer(state, action, zImageFieldCollectionValue);
     },
+    fieldLoRACollectionValueChanged: (state, action: FieldValueAction<LoRAFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zLoRAFieldCollectionValue);
+    },
     fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
       fieldValueReducer(state, action, zColorFieldValue);
     },
@@ -733,6 +738,7 @@ export const {
   fieldImageValueChanged,
   fieldImageCollectionValueChanged,
   fieldLabelChanged,
+  fieldLoRACollectionValueChanged,
   fieldModelIdentifierValueChanged,
   fieldIntegerValueChanged,
   fieldFloatValueChanged,
@@ -862,6 +868,7 @@ const isHighFrequencyFieldChangeAction = isAnyOf(
   fieldFloatValueChanged,
   fieldFloatCollectionValueChanged,
   fieldIntegerCollectionValueChanged,
+  fieldLoRACollectionValueChanged,
   fieldStringValueChanged,
   fieldStringCollectionValueChanged,
   fieldFloatGeneratorValueChanged,
