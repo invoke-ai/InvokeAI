@@ -17,6 +17,7 @@ import type {
   IntegerFieldInputTemplate,
   IntegerGeneratorFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
+  SavedWorkflowFieldInputTemplate,
   SchedulerFieldInputTemplate,
   StatefulFieldType,
   StatelessFieldInputTemplate,
@@ -423,6 +424,28 @@ const buildSchedulerFieldInputTemplate: FieldInputTemplateBuilder<SchedulerField
   return template;
 };
 
+const buildSavedWorkflowFieldInputTemplate: FieldInputTemplateBuilder<SavedWorkflowFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SavedWorkflowFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? '',
+  };
+
+  if (schemaObject.minLength !== undefined) {
+    template.minLength = schemaObject.minLength;
+  }
+
+  if (schemaObject.maxLength !== undefined) {
+    template.maxLength = schemaObject.maxLength;
+  }
+
+  return template;
+};
+
 const buildFloatGeneratorFieldInputTemplate: FieldInputTemplateBuilder<FloatGeneratorFieldInputTemplate> = ({
   // schemaObject,
   baseField,
@@ -490,6 +513,7 @@ const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplate
   IntegerField: buildIntegerFieldInputTemplate,
   ModelIdentifierField: buildModelIdentifierFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,
+  SavedWorkflowField: buildSavedWorkflowFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   StylePresetField: buildStylePresetFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,

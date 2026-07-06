@@ -283,15 +283,28 @@ class ImageInvocation(BaseInvocation):
     title="Image Collection Primitive",
     tags=["primitives", "image", "collection"],
     category="primitives",
-    version="1.0.1",
+    version="1.0.2",
 )
 class ImageCollectionInvocation(BaseInvocation):
     """A collection of image primitive values"""
 
-    collection: list[ImageField] = InputField(description="The collection of image values")
+    collection: Optional[list[ImageField]] = InputField(
+        default=None,
+        description="An optional image collection to append to",
+        input=Input.Connection,
+        title="Collection",
+        ui_order=0,
+    )
+    images: Optional[list[ImageField]] = InputField(
+        default=None,
+        description="The images to append to the collection",
+        input=Input.Direct,
+        title="Images",
+        ui_order=1,
+    )
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
-        return ImageCollectionOutput(collection=self.collection)
+        return ImageCollectionOutput(collection=[*(self.collection or []), *(self.images or [])])
 
 
 # endregion
