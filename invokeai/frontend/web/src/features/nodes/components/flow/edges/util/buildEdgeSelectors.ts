@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
-import { resolveConnectorSource, resolveConnectorSourceFieldType } from 'features/nodes/store/util/connectorTopology';
+import { resolveConnectorInferredFieldType, resolveConnectorSource } from 'features/nodes/store/util/connectorTopology';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isConnectorNode } from 'features/nodes/types/invocation';
 
@@ -35,7 +35,7 @@ export const buildSelectEdgeColor = (
     }
 
     const sourceType = isConnectorNode(sourceNode)
-      ? resolveConnectorSourceFieldType(sourceNode.id, nodes, edges, templates)
+      ? resolveConnectorInferredFieldType(sourceNode.id, nodes, edges, templates)
       : templates[sourceNode.data.type]?.outputs[sourceHandleId]?.type;
 
     return sourceType ? getFieldColor(sourceType) : colorTokenToCssVar('base.500');
