@@ -8,6 +8,7 @@ import torch
 from PIL import Image, ImageFilter
 
 from invokeai.app.invocations.image import ImageField, OklabUnsharpMaskInvocation, OklchImageHueAdjustmentInvocation
+from invokeai.app.invocations.primitives import ImageCollectionInvocation
 from invokeai.backend.image_util.color_conversion import (
     linear_srgb_from_oklab,
     linear_srgb_from_oklch,
@@ -45,6 +46,37 @@ def _max_abs_diff_uint8(left: Image.Image, right: Image.Image) -> int:
     left_arr = numpy.asarray(left, dtype=numpy.int16)
     right_arr = numpy.asarray(right, dtype=numpy.int16)
     return int(numpy.abs(left_arr - right_arr).max())
+
+
+def test_image_collection_invocation_preserves_existing_collection_values() -> None:
+    images = [ImageField(image_name="first"), ImageField(image_name="second")]
+
+    output = ImageCollectionInvocation(collection=images).invoke(MagicMock())
+
+    assert output.collection == images
+
+
+def test_image_collection_invocation_appends_direct_images_after_chained_collection() -> None:
+    chained_images = [ImageField(image_name="chained")]
+    direct_images = [ImageField(image_name="direct_1"), ImageField(image_name="direct_2")]
+
+    output = ImageCollectionInvocation(collection=chained_images, images=direct_images).invoke(MagicMock())
+
+    assert output.collection == [*chained_images, *direct_images]
+
+
+def test_image_collection_invocation_supports_empty_direct_images() -> None:
+    chained_images = [ImageField(image_name="chained")]
+
+    output = ImageCollectionInvocation(collection=chained_images, images=None).invoke(MagicMock())
+
+    assert output.collection == chained_images
+
+
+def test_image_collection_invocation_outputs_empty_collection_when_inputs_are_empty() -> None:
+    output = ImageCollectionInvocation(collection=None, images=None).invoke(MagicMock())
+
+    assert output.collection == []
 
 
 def test_oklab_unsharp_mask_invocation_preserves_alpha_and_sharpens_lightness_only() -> None:

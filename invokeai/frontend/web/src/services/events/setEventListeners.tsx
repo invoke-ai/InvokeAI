@@ -26,6 +26,8 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getControlLayerState, getReferenceImageState } from 'features/controlLayers/store/util';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
+import { fieldValueReset } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast, toastApi } from 'features/toast/toast';
@@ -38,6 +40,7 @@ import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
+import { getUpdatedQueueStatusOnQueueItemStatusChanged } from 'services/events/queueStatusEvents';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import { createWorkflowExecutionCoordinator } from 'services/events/workflowExecutionCoordinator';
 import type { Socket } from 'socket.io-client';
@@ -122,6 +125,65 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     clearAllProgressEvents();
     $loadingModelsCount.set(0);
     setIsConnected(false);
+  });
+
+  const invalidateWorkflowLibrary = () => {
+    dispatch(
+      api.util.invalidateTags([
+        { type: 'Workflow', id: LIST_TAG },
+        'WorkflowTags',
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
+      ])
+    );
+  };
+
+  const clearSavedWorkflowSelection = (workflowId: string) => {
+    const nodes = selectNodesSlice(getState()).nodes;
+
+    for (const node of nodes) {
+      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflow') {
+        continue;
+      }
+
+      if (node.data.inputs.workflow_id?.value !== workflowId) {
+        continue;
+      }
+
+      dispatch(
+        fieldValueReset({
+          nodeId: node.id,
+          fieldName: 'workflow_id',
+          value: '',
+        })
+      );
+    }
+  };
+
+  socket.on('workflow_created', (data) => {
+    log.debug({ data }, 'Workflow created');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_updated', (data) => {
+    log.debug({ data }, 'Workflow updated');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_deleted', (data) => {
+    log.debug({ data }, 'Workflow deleted');
+    invalidateWorkflowLibrary();
+    clearSavedWorkflowSelection(data.workflow_id);
+  });
+
+  socket.on('workflow_access_revoked', (data) => {
+    log.debug({ data }, 'Workflow access revoked');
+    invalidateWorkflowLibrary();
+    const currentUser = getState().auth.user;
+    if (currentUser?.is_admin || currentUser?.user_id === data.user_id) {
+      return;
+    }
+    clearSavedWorkflowSelection(data.workflow_id);
   });
 
   socket.on('invocation_started', (data) => {
@@ -444,6 +506,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         })
       );
     }
+    dispatch(
+      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) =>
+        getUpdatedQueueStatusOnQueueItemStatusChanged(draft, data)
+      )
+    );
 
     // Invalidate caches for things we cannot easily update
     // Invalidate SessionQueueStatus to refetch with user-specific counts

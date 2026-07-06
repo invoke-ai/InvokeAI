@@ -94,14 +94,18 @@ class AnimaLoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - Anima",
     tags=["lora", "model", "anima"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class AnimaLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to an Anima transformer."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None,
+        description="LoRA models and weights. May be a single LoRA or collection.",
+        title="LoRAs",
+        ui_model_base=[BaseModelType.Anima],
+        ui_model_type=ModelType.LoRA,
     )
 
     transformer: Optional[TransformerField] = InputField(
