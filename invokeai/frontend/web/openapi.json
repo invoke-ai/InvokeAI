@@ -32524,11 +32524,34 @@
               }
             ],
             "default": null,
-            "description": "The collection of image values",
+            "description": "An optional image collection to append to",
             "field_kind": "input",
-            "input": "any",
-            "orig_required": true,
-            "title": "Collection"
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Collection",
+            "ui_order": 0
+          },
+          "images": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The images to append to the collection",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Images",
+            "ui_order": 1
           },
           "type": {
             "const": "image_collection",
@@ -32542,7 +32565,7 @@
         "tags": ["primitives", "image", "collection"],
         "title": "Image Collection Primitive",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "output": {
           "$ref": "#/components/schemas/ImageCollectionOutput"
         }
