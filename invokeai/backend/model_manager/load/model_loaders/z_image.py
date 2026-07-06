@@ -28,6 +28,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.qwen3.qwen3_tokenizer import load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -533,10 +534,6 @@ class ZImageControlCheckpointModel(ModelLoader):
 class Qwen3EncoderCheckpointLoader(ModelLoader):
     """Class to load single-file Qwen3 Encoder models for Z-Image (safetensors format)."""
 
-    # Default HuggingFace model to load tokenizer from when using single-file Qwen3 encoder
-    # Must be Qwen3 (not Qwen2.5) to match Z-Image's text encoder architecture and special tokens
-    DEFAULT_TOKENIZER_SOURCE = "Qwen/Qwen3-4B"
-
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -558,18 +555,14 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         )
 
     def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
-        """Load tokenizer with local_files_only fallback for offline support.
+        """Load the Qwen3 tokenizer from the vendored, bundled copy.
 
-        First tries to load from local cache (offline), falling back to network download
-        if the tokenizer hasn't been cached yet. This ensures offline operation after
-        the initial download.
+        Single-file / GGUF checkpoints do not ship tokenizer files. The Qwen3 BPE
+        tokenizer is identical across the 0.6B / 4B / 8B variants, so we load the
+        self-contained copy vendored in the package — fully offline, no HuggingFace
+        download required.
         """
-        try:
-            # Try loading from local cache first (supports offline usage)
-            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE, local_files_only=True)
-        except OSError:
-            # Not in cache yet, download from HuggingFace
-            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
+        return load_bundled_qwen3_tokenizer()
 
     def _load_from_singlefile(
         self,
@@ -790,10 +783,6 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
 class Qwen3EncoderGGUFLoader(ModelLoader):
     """Class to load GGUF-quantized Qwen3 Encoder models for Z-Image."""
 
-    # Default HuggingFace model to load tokenizer from when using GGUF Qwen3 encoder
-    # Must be Qwen3 (not Qwen2.5) to match Z-Image's text encoder architecture and special tokens
-    DEFAULT_TOKENIZER_SOURCE = "Qwen/Qwen3-4B"
-
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -815,18 +804,14 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         )
 
     def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
-        """Load tokenizer with local_files_only fallback for offline support.
+        """Load the Qwen3 tokenizer from the vendored, bundled copy.
 
-        First tries to load from local cache (offline), falling back to network download
-        if the tokenizer hasn't been cached yet. This ensures offline operation after
-        the initial download.
+        Single-file / GGUF checkpoints do not ship tokenizer files. The Qwen3 BPE
+        tokenizer is identical across the 0.6B / 4B / 8B variants, so we load the
+        self-contained copy vendored in the package — fully offline, no HuggingFace
+        download required.
         """
-        try:
-            # Try loading from local cache first (supports offline usage)
-            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE, local_files_only=True)
-        except OSError:
-            # Not in cache yet, download from HuggingFace
-            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
+        return load_bundled_qwen3_tokenizer()
 
     def _load_from_gguf(
         self,
