@@ -20,6 +20,7 @@ import { getVideoDTOSafe } from 'services/api/endpoints/videos';
 import type { ImageDTO, S, VideoDTO } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
+import { getTagsToInvalidateForBoardAffectingMutation } from 'services/api/util/tagInvalidation';
 import { getUpdatedNodeExecutionStateOnInvocationComplete } from 'services/events/nodeExecutionState';
 import { $lastProgressEvent } from 'services/events/stores';
 import stableHash from 'stable-hash';
@@ -281,7 +282,12 @@ export const buildOnInvocationComplete = (
     // their video right away; the *gallery grid* scroll-to-selection is delayed by one refetch
     // because `useKeepSelectedImageInView` re-runs when `imageNames` updates and only then can
     // it find the new name in the list. Worth a follow-up if the scroll lag becomes noticeable.
-    dispatch(galleryApi.util.invalidateTags(['GalleryItemNameList', 'GalleryItemList']));
+    //
+    // The board-affecting helper also invalidates each board's `Board` tag (listAllBoards →
+    // video_count and cover_video_name), `BoardVideosTotal`, and `VirtualBoards`, so board
+    // counts and cover thumbnails don't lag behind the gallery grid until the next mutation.
+    const affectedBoards = [...new Set(nonIntermediate.map((v) => v.board_id ?? 'none'))];
+    dispatch(galleryApi.util.invalidateTags(getTagsToInvalidateForBoardAffectingMutation(affectedBoards)));
 
     const autoSwitch = selectAutoSwitch(getState());
     if (!autoSwitch) {

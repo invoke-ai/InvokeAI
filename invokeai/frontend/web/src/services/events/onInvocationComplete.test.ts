@@ -117,6 +117,8 @@ vi.mock('services/events/stores', () => ({
 
 // Import AFTER the mocks above are declared (vi.mock is hoisted; explicit ordering here
 // is for the human reader).
+import { getVideoDTOSafe } from 'services/api/endpoints/videos';
+
 import { buildOnInvocationComplete } from './onInvocationComplete';
 
 // Build a synthetic InvocationCompleteEvent whose result contains a single ImageField output.
@@ -219,5 +221,66 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
       return Array.isArray(payload) && payload.includes('GalleryItemNameList');
     });
     expect(galleryInvalidation, 'denylisted passthrough nodes must not trigger a gallery refetch').toBeUndefined();
+  });
+
+  it('invalidates board tags/totals in addition to the gallery cache when a video output completes', async () => {
+    // A generated video landing on a board must also refresh that board's DTO (video_count,
+    // cover_video_name via the ``Board`` tag), its ``BoardVideosTotal``, and the virtual board
+    // groupings — otherwise the boards list shows stale counts/covers until some unrelated
+    // mutation happens to refetch them.
+    vi.mocked(getVideoDTOSafe).mockResolvedValueOnce({
+      video_name: 'fresh-video.mp4',
+      video_url: 'mock://fresh-video.mp4',
+      thumbnail_url: 'mock://thumb/fresh-video.mp4',
+      width: 832,
+      height: 480,
+      duration_seconds: 3.4,
+      frame_count: 81,
+      is_intermediate: false,
+      is_starred: false,
+      board_id: 'board-123',
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      session_id: 'test-session',
+      node_id: 'test-node',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    const dispatched: unknown[] = [];
+    const dispatch = vi.fn((action: unknown) => {
+      dispatched.push(action);
+      return { unwrap: () => Promise.resolve(undefined) };
+    });
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const videoEvent = buildImageCompleteEvent();
+    videoEvent.invocation.type = 'wan_l2v';
+    // ``isVideoField`` accepts any object with a non-empty ``video_name`` string.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (videoEvent as any).result = { video: { video_name: 'fresh-video.mp4' } };
+
+    await handler(videoEvent);
+
+    const galleryInvalidation = dispatched.find((action): action is { type: string; payload: unknown[] } => {
+      if (!action || typeof action !== 'object') {
+        return false;
+      }
+      const payload = (action as { payload?: unknown }).payload;
+      return Array.isArray(payload) && payload.includes('GalleryItemNameList');
+    });
+
+    expect(galleryInvalidation, 'video completion must invalidate the polymorphic gallery cache').toBeDefined();
+    // The same invalidation must cover the board caches for the video's board.
+    expect(galleryInvalidation?.payload).toContainEqual({ type: 'Board', id: 'board-123' });
+    expect(galleryInvalidation?.payload).toContainEqual({ type: 'BoardVideosTotal', id: 'board-123' });
+    expect(galleryInvalidation?.payload).toContain('VirtualBoards');
   });
 });
