@@ -82,7 +82,7 @@ class TestDeleteIntermediatesSubfolder:
 
         # Should return only intermediate images with their subfolders
         assert len(pairs) == 2
-        names_and_subs = {(name, sub) for name, sub in pairs}
+        names_and_subs = set(pairs)
         assert ("tmp1.png", "intermediate") in names_and_subs
         assert ("tmp2.png", "intermediate") in names_and_subs
 
