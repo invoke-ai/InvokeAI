@@ -853,7 +853,8 @@ class BiRefNet(nn.Module):
         alpha = F.interpolate(alpha.float(), size=(H, W), mode='bilinear', align_corners=True)[0, 0]
         a = (alpha.clamp(0, 1) * 255).to(torch.uint8).cpu().numpy()
         rgba = image.copy()
-        rgba.putalpha(Image.fromarray(a, mode="L"))
+        # No explicit mode: Pillow infers "L" from the 2D uint8 array (mode= is deprecated, removed in Pillow 13)
+        rgba.putalpha(Image.fromarray(a))
         return rgba
 
 

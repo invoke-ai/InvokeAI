@@ -427,8 +427,8 @@ def _image_to_pil(image) -> Image.Image:
             )
             t = t[0]
         arr = (t.clamp(0, 1) * 255).to(torch.uint8).numpy()
-        mode = "RGBA" if arr.shape[-1] == 4 else "RGB"
-        return Image.fromarray(arr, mode=mode)
+        # No explicit mode: Pillow infers RGB/RGBA from the uint8 HWC shape (mode= is deprecated, removed in Pillow 13)
+        return Image.fromarray(arr)
     raise TypeError(f"unsupported image type: {type(image)}")
 
 
