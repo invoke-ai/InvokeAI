@@ -411,17 +411,106 @@ class _ExecutionMaterializer:
         self._state._try_resolve_if_node(exec_node_id)
         self._state._enqueue_if_ready(exec_node_id)
 
-    def _get_collect_iteration_mappings(self, parent_node_ids: list[str]) -> list[tuple[str, str]]:
-        all_iteration_mappings: list[tuple[str, str]] = []
-        for source_node_id in parent_node_ids:
-            prepared_nodes = self._get_prepared_nodes_for_source(source_node_id)
-            all_iteration_mappings.extend((source_node_id, prepared_id) for prepared_id in prepared_nodes)
-        return all_iteration_mappings
+    def _get_collect_iteration_group_key(self, edge: Edge) -> tuple[int, ...]:
+        path = self._state._get_iteration_path(edge.source.node_id)
+        if edge.destination.field == ITEM_FIELD:
+            return path[:-1]
+        return path
+
+    def _get_ordered_prepared_nodes_for_source(self, source_node_id: str) -> list[str]:
+        return sorted(
+            self._get_prepared_nodes_for_source(source_node_id),
+            key=lambda exec_node_id: (self._state._get_iteration_path(exec_node_id), exec_node_id),
+        )
+
+    def _get_collect_iteration_mapping_groups(
+        self, input_edges: list[Edge]
+    ) -> list[tuple[tuple[int, ...], list[tuple[str, str]]]]:
+        grouped_mappings: dict[tuple[int, ...], list[tuple[str, str]]] = {}
+        for edge in input_edges:
+            prepared_nodes = self._get_ordered_prepared_nodes_for_source(edge.source.node_id)
+            for prepared_id in prepared_nodes:
+                prepared_edge = Edge(
+                    source=EdgeConnection(node_id=prepared_id, field=edge.source.field),
+                    destination=edge.destination,
+                )
+                group_key = self._get_collect_iteration_group_key(prepared_edge)
+                grouped_mappings.setdefault(group_key, []).append((edge.source.node_id, prepared_id))
+
+        final_group_keys = sorted(
+            group_key
+            for group_key in grouped_mappings
+            if not any(
+                group_key != other_group_key and other_group_key[: len(group_key)] == group_key
+                for other_group_key in grouped_mappings
+            )
+        )
+
+        return [
+            (
+                group_key,
+                [
+                    mapping
+                    for source_group_key, mappings in sorted(grouped_mappings.items())
+                    if group_key[: len(source_group_key)] == source_group_key
+                    for mapping in mappings
+                ],
+            )
+            for group_key in final_group_keys
+        ]
+
+    def _get_parent_iteration_mappings_without_iterators(
+        self, parent_node_ids: list[str]
+    ) -> list[list[tuple[str, str]]]:
+        parent_prepared_nodes = {
+            node_id: self._get_ordered_prepared_nodes_for_source(node_id) for node_id in parent_node_ids
+        }
+        iteration_paths = sorted(
+            {
+                self._state._get_iteration_path(prepared_id)
+                for prepared_nodes in parent_prepared_nodes.values()
+                for prepared_id in prepared_nodes
+                if self._state._get_iteration_path(prepared_id) != ()
+            }
+        )
+        if not iteration_paths:
+            iteration_paths = [()]
+
+        mappings: list[list[tuple[str, str]]] = []
+        for iteration_path in iteration_paths:
+            mapping: list[tuple[str, str]] = []
+            for node_id, prepared_nodes in parent_prepared_nodes.items():
+                matching_prepared_node = next(
+                    (
+                        prepared_id
+                        for prepared_id in prepared_nodes
+                        if self._state._get_iteration_path(prepared_id) == iteration_path
+                    ),
+                    None,
+                )
+                if matching_prepared_node is None:
+                    matching_prepared_node = next(
+                        (
+                            prepared_id
+                            for prepared_id in prepared_nodes
+                            if self._state._get_iteration_path(prepared_id) == ()
+                        ),
+                        None,
+                    )
+                if matching_prepared_node is None:
+                    break
+                mapping.append((node_id, matching_prepared_node))
+            if len(mapping) == len(parent_node_ids):
+                mappings.append(mapping)
+        return mappings
 
     def _get_parent_iteration_mappings(self, next_node_id: str, graph: nx.DiGraph) -> list[list[tuple[str, str]]]:
         parent_node_ids = [source_id for source_id, _ in graph.in_edges(next_node_id)]
         iterator_graph = self.iterator_graph(graph)
         iterator_nodes = self.get_node_iterators(next_node_id, iterator_graph)
+        if not iterator_nodes:
+            return self._get_parent_iteration_mappings_without_iterators(parent_node_ids)
+
         iterator_nodes_prepared = [list(self._state.source_prepared_mapping[node_id]) for node_id in iterator_nodes]
         iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
 
@@ -439,7 +528,12 @@ class _ExecutionMaterializer:
             if all(prepared_id is not None for _, prepared_id in mapping)
         ]
 
-    def create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
+    def create_execution_node(
+        self,
+        node_id: str,
+        iteration_node_map: list[tuple[str, str]],
+        iteration_path: Optional[tuple[int, ...]] = None,
+    ) -> list[str]:
         """Prepares an iteration node and connects all edges, returning the new node id"""
 
         node = self._state.graph.get_node(node_id)
@@ -451,6 +545,8 @@ class _ExecutionMaterializer:
         new_nodes: list[str] = []
         for iteration_index in iteration_indexes:
             new_node = self._create_execution_node_copy(node, node_id, iteration_index)
+            if iteration_path is not None:
+                self._state._prepared_registry().set_iteration_path(new_node.id, iteration_path)
             self._attach_execution_edges(new_node.id, new_edges)
             self._initialize_execution_node(new_node.id)
             new_nodes.append(new_node.id)
@@ -578,12 +674,12 @@ class _ExecutionMaterializer:
         new_node_ids: list[str] = []
 
         if isinstance(next_node, CollectInvocation):
-            next_node_parents = [source_id for source_id, _ in g.in_edges(next_node_id)]
-            create_results = self.create_execution_node(
-                next_node_id, self._get_collect_iteration_mappings(next_node_parents)
-            )
-            if create_results is not None:
-                new_node_ids.extend(create_results)
+            for iteration_path, iteration_mappings in self._get_collect_iteration_mapping_groups(
+                self._state.graph._get_input_edges(next_node_id)
+            ):
+                create_results = self.create_execution_node(next_node_id, iteration_mappings, iteration_path)
+                if create_results is not None:
+                    new_node_ids.extend(create_results)
         else:
             for iteration_mappings in self._get_parent_iteration_mappings(next_node_id, g):
                 create_results = self.create_execution_node(next_node_id, iteration_mappings)
