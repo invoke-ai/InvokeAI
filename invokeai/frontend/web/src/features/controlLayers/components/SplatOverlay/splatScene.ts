@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js';
 
+import { remapPointerForViewHelper } from './viewHelperPointer';
+
 // Cap the drawing buffer's largest dimension so deep stage zooms don't allocate absurd buffers.
 const MAX_DRAWING_BUFFER_DIM = 4096;
 
@@ -85,7 +87,15 @@ export class SplatScene {
     this.onPointerUp = (e) => {
       const down = this.pointerDownPos;
       if (down && this.gizmoVisible && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5) {
-        this.viewHelper.handleClick(e);
+        // ViewHelper's own hit test breaks while the stage transform CSS-scales this viewport (it mixes
+        // visual and layout coordinates) — remap so axis clicks land at any stage zoom.
+        const el = this.renderer.domElement;
+        const remapped = remapPointerForViewHelper(
+          { rect: el.getBoundingClientRect(), offsetWidth: el.offsetWidth, offsetHeight: el.offsetHeight },
+          e.clientX,
+          e.clientY
+        );
+        this.viewHelper.handleClick(remapped as PointerEvent);
       }
     };
     this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
