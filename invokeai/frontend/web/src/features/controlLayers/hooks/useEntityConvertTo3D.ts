@@ -1,4 +1,6 @@
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { logger } from 'app/logging/logger';
+import randomInt from 'common/util/randomInt';
 import { withResultAsync } from 'common/util/result';
 import {
   $splatOverlay,
@@ -71,6 +73,10 @@ export const useEntityConvertTo3D = (entityIdentifier: CanvasEntityIdentifier | 
             type: 'image_to_3d',
             image: { image_name: imageDTO.image_name },
             remove_background: removeBackground,
+            // Random per conversion so re-converting the same layer is a fresh roll: a fixed seed would hit
+            // the invocation cache and return the identical splat (and full determinism isn't available
+            // anyway — TripoSplat's decode stage draws from the unseeded global RNG).
+            seed: randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX),
           });
           const output = await canvasManager.stateApi.runGraphAndReturnOutput({
             graph,
