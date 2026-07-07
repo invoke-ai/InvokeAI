@@ -11,14 +11,62 @@ const MAX_DRAWING_BUFFER_DIM = 4096;
 // Object-rotation speed in rotate-object mode, radians per screen px (~0.46°/px: 200px ≈ a quarter turn).
 const OBJECT_ROTATE_SPEED = 0.008;
 
+// Pivot marker: shown while a gesture is active, at the point the gesture rotates around.
+const PIVOT_MARKER_COLOR = 0x66b2ff; // ≈ invokeBlue.300, matches the overlay chrome
+const PIVOT_MARKER_SCREEN_SCALE = 0.008; // world size per unit of camera distance ≈ constant screen size
+const PIVOT_FADE_RATE = 8; // opacity lerp rate per second (~0.3s fade)
+const WORLD_ORIGIN = new THREE.Vector3(0, 0, 0);
+
+const buildPivotMarker = (): {
+  group: THREE.Group;
+  materials: (THREE.MeshBasicMaterial | THREE.LineBasicMaterial)[];
+} => {
+  const dotMaterial = new THREE.MeshBasicMaterial({
+    color: PIVOT_MARKER_COLOR,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: PIVOT_MARKER_COLOR,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), dotMaterial);
+  const cross = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-2.4, 0, 0),
+      new THREE.Vector3(2.4, 0, 0),
+      new THREE.Vector3(0, -2.4, 0),
+      new THREE.Vector3(0, 2.4, 0),
+      new THREE.Vector3(0, 0, -2.4),
+      new THREE.Vector3(0, 0, 2.4),
+    ]),
+    lineMaterial
+  );
+  // Drawn on top (no depth test, late render order): the pivot usually sits inside the splat body,
+  // which would otherwise occlude it.
+  dot.renderOrder = 999;
+  cross.renderOrder = 999;
+  const group = new THREE.Group();
+  group.add(dot, cross);
+  group.visible = false;
+  return { group, materials: [dotMaterial, lineMaterial] };
+};
+
 /**
  * A transparent three.js + Spark viewport for a single 3D Gaussian splat, designed to sit directly on the
  * canvas: orbit/zoom/pan camera and a clickable corner navigation gizmo (ViewHelper, shown only while the
  * pointer is over the viewport). A toggleable rotate-object mode (setRotateObjectMode) makes left-drag
  * rotate the object itself (all three axes) instead of orbiting — OrbitControls keeps the horizon level,
- * so poses like a diagonal lean are unreachable by camera orbit alone. The background is always
- * transparent so the canvas shows through — the live view is the compositing preview. Capture renders the
- * object alone at a given pixel size.
+ * so poses like a diagonal lean are unreachable by camera orbit alone. While any gesture is active, a
+ * crosshair marker fades in at the point the gesture rotates around (the orbit target, or the object
+ * origin in rotate-object mode); it is never rendered into captures. The background is always transparent
+ * so the canvas shows through — the live view is the compositing preview. Capture renders the object alone
+ * at a given pixel size.
  *
  * The element hosting this scene is CSS-scaled by the canvas stage transform, so the drawing buffer is
  * sized at (layout px × devicePixelRatio × stage scale) to stay crisp at any zoom — see setStageScale.
@@ -49,6 +97,10 @@ export class SplatScene {
   private pointerDownPos: { x: number; y: number } | null = null;
   private objectRotate: { pointerId: number; lastX: number; lastY: number } | null = null;
   private rotateObjectMode = false;
+  private readonly pivotMarker: THREE.Group;
+  private readonly pivotMaterials: (THREE.MeshBasicMaterial | THREE.LineBasicMaterial)[];
+  private pivotOpacity = 0;
+  private pivotTargetOpacity = 0;
   private mesh: SplatMesh | null = null;
   private stageScale = 1;
   private gizmoVisible = false;
@@ -92,6 +144,15 @@ export class SplatScene {
     this.viewHelper = new ViewHelper(this.camera, this.renderer.domElement);
     this.viewHelper.center = this.controls.target; // snap orbits around the same point as OrbitControls
 
+    // Pivot marker: fades in while the user orbits/pans/zooms (or rotates the object) so the rotation
+    // center is visible; tick() keeps it positioned, screen-sized, and faded.
+    const pivot = buildPivotMarker();
+    this.pivotMarker = pivot.group;
+    this.pivotMaterials = pivot.materials;
+    this.scene.add(this.pivotMarker);
+    this.controls.addEventListener('start', this.showPivotMarker);
+    this.controls.addEventListener('end', this.hidePivotMarker);
+
     // Only treat a near-stationary pointerup as a gizmo click (so orbiting doesn't accidentally snap).
     this.onPointerDown = (e) => {
       this.pointerDownPos = { x: e.clientX, y: e.clientY };
@@ -125,6 +186,7 @@ export class SplatScene {
       e.preventDefault();
       e.stopPropagation();
       this.objectRotate = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY };
+      this.showPivotMarker();
       window.addEventListener('pointermove', this.onObjectRotateMove);
       window.addEventListener('pointerup', this.onObjectRotateEnd);
       window.addEventListener('pointercancel', this.onObjectRotateEnd);
@@ -151,6 +213,7 @@ export class SplatScene {
         return;
       }
       this.objectRotate = null;
+      this.hidePivotMarker();
       window.removeEventListener('pointermove', this.onObjectRotateMove);
       window.removeEventListener('pointerup', this.onObjectRotateEnd);
       window.removeEventListener('pointercancel', this.onObjectRotateEnd);
@@ -183,6 +246,24 @@ export class SplatScene {
     } else {
       this.controls.update();
     }
+    // Pivot marker: track the active gesture's rotation center at a constant screen size, fading around
+    // interactions.
+    this.pivotOpacity += (this.pivotTargetOpacity - this.pivotOpacity) * Math.min(1, delta * PIVOT_FADE_RATE);
+    if (this.pivotTargetOpacity === 0 && this.pivotOpacity < 0.02) {
+      this.pivotOpacity = 0;
+    }
+    this.pivotMarker.visible = this.pivotOpacity > 0;
+    if (this.pivotMarker.visible) {
+      // Orbit/pan/zoom rotate around controls.target; rotate-object mode spins the object about its origin.
+      const pivot = this.objectRotate ? WORLD_ORIGIN : this.controls.target;
+      this.pivotMarker.position.copy(pivot);
+      this.pivotMarker.scale.setScalar(
+        Math.max(1e-6, this.camera.position.distanceTo(pivot) * PIVOT_MARKER_SCREEN_SCALE)
+      );
+      for (const material of this.pivotMaterials) {
+        material.opacity = this.pivotOpacity * 0.9;
+      }
+    }
     this.renderer.setClearColor(0x000000, 0); // transparent — the canvas beneath is the background
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
@@ -212,6 +293,14 @@ export class SplatScene {
   /** When enabled, left-drag rotates the object itself (any axis) instead of orbiting the camera. */
   setRotateObjectMode = (enabled: boolean): void => {
     this.rotateObjectMode = enabled;
+  };
+
+  private showPivotMarker = (): void => {
+    this.pivotTargetOpacity = 1;
+  };
+
+  private hidePivotMarker = (): void => {
+    this.pivotTargetOpacity = 0;
   };
 
   /** Whether the pointer is over the ViewHelper's corner viewport (compared in the element's layout space). */
@@ -290,6 +379,7 @@ export class SplatScene {
    */
   async capture(width: number, height: number): Promise<Blob | null> {
     this.renderer.setAnimationLoop(null);
+    this.pivotMarker.visible = false; // never bake the pivot marker into the layer; tick() restores it
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
@@ -323,6 +413,17 @@ export class SplatScene {
     window.removeEventListener('pointermove', this.onObjectRotateMove);
     window.removeEventListener('pointerup', this.onObjectRotateEnd);
     window.removeEventListener('pointercancel', this.onObjectRotateEnd);
+    this.controls.removeEventListener('start', this.showPivotMarker);
+    this.controls.removeEventListener('end', this.hidePivotMarker);
+    this.scene.remove(this.pivotMarker);
+    this.pivotMarker.traverse((obj) => {
+      if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
+        obj.geometry.dispose();
+      }
+    });
+    for (const material of this.pivotMaterials) {
+      material.dispose();
+    }
     this.controls.dispose();
     this.viewHelper.dispose();
     if (this.mesh) {
