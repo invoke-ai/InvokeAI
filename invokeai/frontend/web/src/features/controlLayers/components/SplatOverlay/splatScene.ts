@@ -27,6 +27,7 @@ export class SplatScene {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.PerspectiveCamera;
   private readonly controls: OrbitControls;
+  private readonly spark: SparkRenderer;
   private readonly viewHelper: ViewHelper;
   private readonly clock: THREE.Clock;
   private readonly splatRoot: THREE.Group;
@@ -60,8 +61,8 @@ export class SplatScene {
     this.renderer.domElement.style.display = 'block';
     container.appendChild(this.renderer.domElement);
 
-    const spark = new SparkRenderer({ renderer: this.renderer });
-    this.scene.add(spark);
+    this.spark = new SparkRenderer({ renderer: this.renderer });
+    this.scene.add(this.spark);
 
     this.splatRoot = new THREE.Group();
     this.splatRoot.rotation.x = Math.PI;
@@ -230,6 +231,9 @@ export class SplatScene {
       this.disposeMesh(this.mesh);
       this.mesh = null;
     }
+    // SparkRenderer owns sort/LOD web workers and GPU-side state that only its dispose() releases.
+    this.scene.remove(this.spark);
+    this.spark.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

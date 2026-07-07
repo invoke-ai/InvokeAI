@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import { withResultAsync } from 'common/util/result';
 import {
   $splatOverlay,
+  clearSplatGenerationAbort,
   clearSplatOverlay,
   setSplatGenerationAbort,
 } from 'features/controlLayers/components/SplatOverlay/state';
@@ -53,9 +54,13 @@ export const useEntityConvertTo3D = (entityIdentifier: CanvasEntityIdentifier | 
         return;
       }
 
+      // Only one overlay session can exist; replacing a session must abort its backend run first, or the
+      // old run becomes uncancelable and its late completion would write into the new session's state.
+      clearSplatOverlay();
+      const sessionId = getPrefixedId('splat_session');
       const controller = new AbortController();
       setSplatGenerationAbort(controller);
-      $splatOverlay.set({ status: 'loading', rect });
+      $splatOverlay.set({ status: 'loading', sessionId, rect });
 
       void (async () => {
         const result = await withResultAsync(async () => {
@@ -78,17 +83,24 @@ export const useEntityConvertTo3D = (entityIdentifier: CanvasEntityIdentifier | 
           return buildV1Url(`assets/i/${output.asset.asset_name}`);
         });
 
-        setSplatGenerationAbort(null);
+        clearSplatGenerationAbort(controller);
+
+        // Every write below is gated on the overlay still showing *this* session — the user may have
+        // cancelled (state null) or started another conversion (different sessionId) while we generated.
+        const current = $splatOverlay.get();
+        const isCurrentSession = current?.status === 'loading' && current.sessionId === sessionId;
 
         if (result.isErr()) {
           log.error({ error: String(result.error) }, 'Failed to convert image to 3D');
-          clearSplatOverlay();
+          if (isCurrentSession) {
+            clearSplatOverlay();
+          }
           return;
         }
 
-        // Don't clobber the overlay if the user cancelled while we were generating.
-        if ($splatOverlay.get()?.status === 'loading') {
-          $splatOverlay.set({ status: 'ready', assetUrl: result.value, rect });
+        if (isCurrentSession) {
+          // Use the overlay's *current* rect, not the one captured at start — the frame is movable while loading.
+          $splatOverlay.set({ status: 'ready', sessionId, assetUrl: result.value, rect: current.rect });
         }
       })();
     },

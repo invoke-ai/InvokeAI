@@ -7,5 +7,7 @@ two files import correctly as a package:
   - triposplat.py:  `from model import (...)`            -> `from .model import (...)`
   - model.py:       `from triposplat import _build_gaussians` -> `from .triposplat import _build_gaussians`
 
+`triposplat_model.py` is NOT vendored — it is InvokeAI's RawModel wrapper around the pipeline.
+
 Import `TripoSplatPipeline` from `.triposplat` lazily (it pulls in torch/torchvision).
 """

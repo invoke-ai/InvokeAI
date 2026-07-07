@@ -3,8 +3,8 @@ import { atom } from 'nanostores';
 export type SplatRect = { x: number; y: number; width: number; height: number };
 
 type SplatOverlayState =
-  | { status: 'loading'; rect: SplatRect }
-  | { status: 'ready'; assetUrl: string; rect: SplatRect };
+  | { status: 'loading'; sessionId: string; rect: SplatRect }
+  | { status: 'ready'; sessionId: string; assetUrl: string; rect: SplatRect };
 
 /**
  * Transient state for the in-canvas 3D (Gaussian-splat) overlay. `null` means the overlay is closed.
@@ -27,6 +27,13 @@ let activeGenerationAbort: AbortController | null = null;
 
 export const setSplatGenerationAbort = (controller: AbortController | null): void => {
   activeGenerationAbort = controller;
+};
+
+/** Clears the abort slot only if it still holds `controller` — a newer session may have taken it over. */
+export const clearSplatGenerationAbort = (controller: AbortController): void => {
+  if (activeGenerationAbort === controller) {
+    activeGenerationAbort = null;
+  }
 };
 
 export const clearSplatOverlay = (): void => {
