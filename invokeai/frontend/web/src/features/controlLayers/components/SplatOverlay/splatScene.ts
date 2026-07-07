@@ -45,6 +45,7 @@ export class SplatScene {
   private readonly onObjectRotateStart: (e: PointerEvent) => void;
   private readonly onObjectRotateMove: (e: PointerEvent) => void;
   private readonly onObjectRotateEnd: (e: PointerEvent) => void;
+  private readonly onContextMenu: (e: MouseEvent) => void;
   private pointerDownPos: { x: number; y: number } | null = null;
   private objectRotate: { pointerId: number; lastX: number; lastY: number } | null = null;
   private rotateObjectMode = false;
@@ -155,6 +156,15 @@ export class SplatScene {
       window.removeEventListener('pointercancel', this.onObjectRotateEnd);
     };
     container.addEventListener('pointerdown', this.onObjectRotateStart, true);
+
+    // Right-drag pans the camera, and contextmenu fires on right-button RELEASE — without this, every pan
+    // ends by popping the canvas context menu. preventDefault kills the browser menu; stopPropagation keeps
+    // the event from bubbling to the app's canvas context-menu trigger.
+    this.onContextMenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    container.addEventListener('contextmenu', this.onContextMenu);
 
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(container);
@@ -309,6 +319,7 @@ export class SplatScene {
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
     this.container.removeEventListener('pointerdown', this.onObjectRotateStart, true);
+    this.container.removeEventListener('contextmenu', this.onContextMenu);
     window.removeEventListener('pointermove', this.onObjectRotateMove);
     window.removeEventListener('pointerup', this.onObjectRotateEnd);
     window.removeEventListener('pointercancel', this.onObjectRotateEnd);
