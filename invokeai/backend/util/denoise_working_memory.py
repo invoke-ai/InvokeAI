@@ -132,7 +132,8 @@ def model_activation_width(model: Any) -> int:
             block_out = getattr(cfg, "block_out_channels", None)
             if block_out:
                 return int(block_out[0])
-            for attr in ("inner_dim", "hidden_size", "joint_attention_dim", "cross_attention_dim", "d_model"):
+            # "dim" (probed last, most generic name) covers Z-Image-shaped configs.
+            for attr in ("inner_dim", "hidden_size", "joint_attention_dim", "cross_attention_dim", "d_model", "dim"):
                 v = getattr(cfg, attr, None)
                 if isinstance(v, int) and v > 0:
                     return v

@@ -4,7 +4,10 @@ import json
 import logging
 import types
 
+import pytest
 import torch
+from accelerate import init_empty_weights
+from diffusers import Flux2Transformer2DModel, QwenImageTransformer2DModel, ZImageTransformer2DModel
 
 from invokeai.backend.util.denoise_working_memory import (
     ACTIVATION_MULTIPLIER,
@@ -65,6 +68,7 @@ def test_model_activation_width_transformer_hidden_dims():
     assert model_activation_width(_model(inner_dim=1536)) == 1536
     assert model_activation_width(_model(hidden_size=3072)) == 3072
     assert model_activation_width(_model(joint_attention_dim=2432)) == 2432
+    assert model_activation_width(_model(dim=3840)) == 3840  # Z-Image-shaped config
 
 
 def test_model_activation_width_from_heads_times_head_dim():
@@ -84,6 +88,32 @@ def test_model_activation_width_direct_attribute():
 
 def test_model_activation_width_fallback():
     assert model_activation_width(object()) == DEFAULT_ACTIVATION_WIDTH
+
+
+# --- width extraction from the REAL GGUF-shipped transformer classes ---
+#
+# The GGUF loaders build these exact diffusers classes under init_empty_weights() and swap in
+# quantized weight tensors with load_state_dict(assign=True), so the structural config ints the
+# width probe reads are untouched by quantization. If a diffusers attribute rename (or a new arch)
+# breaks the probe, it silently falls back to DEFAULT_ACTIVATION_WIDTH: memory-safe (the cache
+# floors the reserve) but the resolution-scaled partial-load headroom safeguard degenerates to the
+# flat floor for exactly the models that need it. These tests make that regression loud.
+
+
+@pytest.mark.parametrize(
+    ("build", "expected_width"),
+    [
+        pytest.param(lambda: QwenImageTransformer2DModel(), 3584, id="qwen"),  # config.joint_attention_dim
+        pytest.param(lambda: ZImageTransformer2DModel(), 3840, id="z_image"),  # config/direct-attr "dim"
+        pytest.param(lambda: Flux2Transformer2DModel(), 15360, id="flux2_klein"),  # config.joint_attention_dim
+    ],
+)
+def test_model_activation_width_resolves_for_gguf_transformers(build, expected_width):
+    with init_empty_weights():
+        model = build()  # meta device: structural config only, no weight allocation
+    width = model_activation_width(model)
+    assert width != DEFAULT_ACTIVATION_WIDTH, "width probe fell back to the default — headroom safeguard inert"
+    assert width == expected_width
 
 
 # --- the estimate object ---
