@@ -126,8 +126,7 @@ dependencies = [
 [tool.uv]
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
-# Force transformers>=5.1.0 past compel==2.1.1's ~=4.25 (<5.0) constraint.
-override-dependencies = ["opencv-python; sys_platform=='never'", "transformers>=5.1.0"]
+override-dependencies = ["opencv-python; sys_platform=='never'"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
 # We do not publish or support ARM Linux builds; restrict resolution to
