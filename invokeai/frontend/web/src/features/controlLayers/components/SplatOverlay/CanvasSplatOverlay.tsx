@@ -40,8 +40,20 @@ const CORNERS: { corner: RectCorner; cursor: string }[] = [
 type RotateMode = 'orbit' | 'object';
 
 const CONTROL_HINTS: Record<RotateMode, string[]> = {
-  orbit: ['Drag to orbit view', 'Right-drag to pan', 'Scroll to zoom', 'Edges to move', 'Corners to resize'],
-  object: ['Drag to rotate object', 'Right-drag to pan', 'Scroll to zoom', 'Edges to move', 'Corners to resize'],
+  orbit: [
+    'Drag to orbit view',
+    'Right-drag to pan (moves the rotation point)',
+    'Scroll to zoom',
+    'Edges to move',
+    'Corners to resize',
+  ],
+  object: [
+    'Drag to rotate object',
+    'Right-drag to pan (moves the rotation point)',
+    'Scroll to zoom',
+    'Edges to move',
+    'Corners to resize',
+  ],
 };
 
 type DragState = {
