@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
@@ -36,6 +37,12 @@ class SessionQueueAndProcessorStatus(BaseModel):
 
     queue: SessionQueueStatus
     processor: SessionProcessorStatus
+
+
+def _get_workflow_call_root_queue_item(queue_item: SessionQueueItem) -> SessionQueueItem:
+    if queue_item.root_item_id is None:
+        return queue_item
+    return ApiDependencies.invoker.services.session_queue.get_queue_item(queue_item.root_item_id)
 
 
 def sanitize_queue_item_for_user(
@@ -72,6 +79,11 @@ def sanitize_queue_item_for_user(
     sanitized_item.priority = 0
     sanitized_item.field_values = None
     sanitized_item.retried_from_item_id = None
+    sanitized_item.workflow_call_id = None
+    sanitized_item.parent_item_id = None
+    sanitized_item.parent_session_id = None
+    sanitized_item.root_item_id = None
+    sanitized_item.workflow_call_depth = None
     sanitized_item.workflow = None
     sanitized_item.error_type = None
     sanitized_item.error_message = None
@@ -97,6 +109,8 @@ async def enqueue_batch(
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution for the current user."""
+    assert_image_move_maintenance_inactive()
+
     try:
         return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
             queue_id=queue_id, batch=batch, prepend=prepend, user_id=current_user.user_id
@@ -318,20 +332,32 @@ async def retry_items_by_id(
 ) -> RetryItemsResult:
     """Retries the given queue items. Users can only retry their own items unless they are an admin."""
     try:
-        # Check authorization: user must own all items or be an admin
-        if not current_user.is_admin:
-            for item_id in item_ids:
-                try:
-                    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
-                    if queue_item.user_id != current_user.user_id:
-                        raise HTTPException(
-                            status_code=403, detail=f"You do not have permission to retry queue item {item_id}"
-                        )
-                except SessionQueueItemNotFoundError:
-                    # Skip items that don't exist - they will be handled by retry_items_by_id
-                    continue
+        # Check queue membership for all items and ownership for non-admins.
+        valid_item_ids: list[int] = []
+        for item_id in item_ids:
+            try:
+                queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+                if queue_item.queue_id != queue_id:
+                    raise HTTPException(
+                        status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}"
+                    )
+                root_queue_item = _get_workflow_call_root_queue_item(queue_item)
+                if root_queue_item.queue_id != queue_id:
+                    raise HTTPException(
+                        status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}"
+                    )
+                if not current_user.is_admin and root_queue_item.user_id != current_user.user_id:
+                    raise HTTPException(
+                        status_code=403, detail=f"You do not have permission to retry queue item {item_id}"
+                    )
+                valid_item_ids.append(item_id)
+            except SessionQueueItemNotFoundError:
+                # Skip items that don't exist - they will be handled by retry_items_by_id
+                continue
 
-        return ApiDependencies.invoker.services.session_queue.retry_items_by_id(queue_id=queue_id, item_ids=item_ids)
+        return ApiDependencies.invoker.services.session_queue.retry_items_by_id(
+            queue_id=queue_id, item_ids=valid_item_ids
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -442,7 +468,9 @@ async def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it."""
+    """Gets the status of the session queue. Returns global counts; non-admin users additionally
+    get their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the
+    current item's identifiers unless they own it."""
     try:
         user_id = None if current_user.is_admin else current_user.user_id
         queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=user_id)
@@ -513,9 +541,15 @@ async def delete_queue_item(
     try:
         # Get the queue item to check ownership
         queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+        if queue_item.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
 
-        # Check authorization: user must own the item or be an admin
-        if queue_item.user_id != current_user.user_id and not current_user.is_admin:
+        root_queue_item = _get_workflow_call_root_queue_item(queue_item)
+        if root_queue_item.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+
+        # The queue service deletes the entire chain, so authorization must use the root owner.
+        if root_queue_item.user_id != current_user.user_id and not current_user.is_admin:
             raise HTTPException(status_code=403, detail="You do not have permission to delete this queue item")
 
         ApiDependencies.invoker.services.session_queue.delete_queue_item(item_id)
@@ -543,6 +577,8 @@ async def cancel_queue_item(
     try:
         # Get the queue item to check ownership
         queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+        if queue_item.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
 
         # Check authorization: user must own the item or be an admin
         if queue_item.user_id != current_user.user_id and not current_user.is_admin:
