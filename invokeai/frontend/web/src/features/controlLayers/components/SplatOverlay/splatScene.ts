@@ -15,7 +15,6 @@ const OBJECT_ROTATE_SPEED = 0.008;
 const PIVOT_MARKER_COLOR = 0x66b2ff; // ≈ invokeBlue.300, matches the overlay chrome
 const PIVOT_MARKER_SCREEN_SCALE = 0.008; // world size per unit of camera distance ≈ constant screen size
 const PIVOT_FADE_RATE = 8; // opacity lerp rate per second (~0.3s fade)
-const WORLD_ORIGIN = new THREE.Vector3(0, 0, 0);
 
 const buildPivotMarker = (): {
   group: THREE.Group;
@@ -62,9 +61,10 @@ const buildPivotMarker = (): {
  * canvas: orbit/zoom/pan camera and a clickable corner navigation gizmo (ViewHelper, shown only while the
  * pointer is over the viewport). A toggleable rotate-object mode (setRotateObjectMode) makes left-drag
  * rotate the object itself (all three axes) instead of orbiting — OrbitControls keeps the horizon level,
- * so poses like a diagonal lean are unreachable by camera orbit alone. While any gesture is active, a
- * crosshair marker fades in at the point the gesture rotates around (the orbit target, or the object
- * origin in rotate-object mode); it is never rendered into captures. The background is always transparent
+ * so poses like a diagonal lean are unreachable by camera orbit alone. Every gesture — orbit, pan, zoom,
+ * and rotate-object — pivots around the same point (the orbit target, movable by panning), and while a
+ * gesture is active a crosshair marker fades in at that point; it is never rendered into captures. The
+ * background is always transparent
  * so the canvas shows through — the live view is the compositing preview. Capture renders the object alone
  * at a given pixel size.
  *
@@ -201,12 +201,17 @@ export class SplatScene {
       rot.lastX = e.clientX;
       rot.lastY = e.clientY;
       // Rotate about the camera's current screen axes so the object follows the pointer from any view
-      // angle; successive two-axis increments compose to reach any orientation, including roll.
+      // angle; successive two-axis increments compose to reach any orientation, including roll. The
+      // rotation is applied about the orbit target — the same pivot that pan moves and orbit uses — so
+      // after panning, the object swings around the panned point instead of always spinning in place.
       const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
       const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
-      const q = new THREE.Quaternion();
-      this.splatRoot.quaternion.premultiply(q.setFromAxisAngle(up, dx * OBJECT_ROTATE_SPEED));
-      this.splatRoot.quaternion.premultiply(q.setFromAxisAngle(right, dy * OBJECT_ROTATE_SPEED));
+      const q = new THREE.Quaternion()
+        .setFromAxisAngle(right, dy * OBJECT_ROTATE_SPEED)
+        .multiply(new THREE.Quaternion().setFromAxisAngle(up, dx * OBJECT_ROTATE_SPEED));
+      const pivot = this.controls.target;
+      this.splatRoot.quaternion.premultiply(q);
+      this.splatRoot.position.sub(pivot).applyQuaternion(q).add(pivot);
     };
     this.onObjectRotateEnd = (e) => {
       if (!this.objectRotate || e.pointerId !== this.objectRotate.pointerId) {
@@ -254,8 +259,8 @@ export class SplatScene {
     }
     this.pivotMarker.visible = this.pivotOpacity > 0;
     if (this.pivotMarker.visible) {
-      // Orbit/pan/zoom rotate around controls.target; rotate-object mode spins the object about its origin.
-      const pivot = this.objectRotate ? WORLD_ORIGIN : this.controls.target;
+      // Every gesture — orbit, pan, zoom, and rotate-object — pivots around the same controls.target.
+      const pivot = this.controls.target;
       this.pivotMarker.position.copy(pivot);
       this.pivotMarker.scale.setScalar(
         Math.max(1e-6, this.camera.position.distanceTo(pivot) * PIVOT_MARKER_SCREEN_SCALE)
