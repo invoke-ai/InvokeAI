@@ -3,6 +3,7 @@ import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types'
 type WorkflowLibraryListItemState = {
   showUnsupportedBadge: boolean;
   unsupportedMessageKey: null;
+  showCallableBadge: boolean;
   showSharedBadge: boolean;
   showDefaultIcon: boolean;
 };
@@ -13,6 +14,7 @@ export const getWorkflowLibraryListItemState = (
   return {
     showUnsupportedBadge: false,
     unsupportedMessageKey: null,
+    showCallableBadge: workflow.call_saved_workflow_compatibility?.is_callable === true,
     showSharedBadge: workflow.is_public && workflow.category !== 'default',
     showDefaultIcon: workflow.category === 'default',
   };

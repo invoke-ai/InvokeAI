@@ -17,6 +17,27 @@ describe('workflowLibraryListItemState', () => {
     ).toEqual({
       showUnsupportedBadge: false,
       unsupportedMessageKey: null,
+      showCallableBadge: false,
+      showSharedBadge: false,
+      showDefaultIcon: false,
+    });
+  });
+
+  it('marks callable workflows with a positive callable badge', () => {
+    expect(
+      getWorkflowLibraryListItemState({
+        category: 'user',
+        is_public: false,
+        call_saved_workflow_compatibility: {
+          is_callable: true,
+          reason: 'ok',
+          message: null,
+        },
+      })
+    ).toEqual({
+      showUnsupportedBadge: false,
+      unsupportedMessageKey: null,
+      showCallableBadge: true,
       showSharedBadge: false,
       showDefaultIcon: false,
     });
@@ -36,6 +57,7 @@ describe('workflowLibraryListItemState', () => {
     ).toEqual({
       showUnsupportedBadge: false,
       unsupportedMessageKey: null,
+      showCallableBadge: true,
       showSharedBadge: true,
       showDefaultIcon: false,
     });
@@ -55,6 +77,7 @@ describe('workflowLibraryListItemState', () => {
     ).toEqual({
       showUnsupportedBadge: false,
       unsupportedMessageKey: null,
+      showCallableBadge: true,
       showSharedBadge: false,
       showDefaultIcon: true,
     });

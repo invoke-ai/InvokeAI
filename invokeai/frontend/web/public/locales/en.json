@@ -2490,6 +2490,7 @@
         "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
+        "callable": "Callable",
         "savedWorkflowUnsupportedDescription": "This workflow cannot currently be used by Call Saved Workflow.",
         "savedWorkflowCompatibility": {
             "missingWorkflowReturn": "The workflow must contain a Workflow Return node.",

@@ -133,6 +133,18 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.shared')}
                 </Badge>
               )}
+              {listItemState.showCallableBadge && (
+                <Badge
+                  color="invokeBlue.400"
+                  borderColor="invokeBlue.700"
+                  borderWidth={1}
+                  bg="transparent"
+                  flexShrink={0}
+                  variant="subtle"
+                >
+                  {t('workflows.callable')}
+                </Badge>
+              )}
               {listItemState.showUnsupportedBadge && (
                 <Tooltip
                   label={
