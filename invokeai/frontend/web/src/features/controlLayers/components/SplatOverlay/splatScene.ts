@@ -3,21 +3,22 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js';
 
-import { remapPointerForViewHelper } from './viewHelperPointer';
+import { remapPointerForViewHelper, VIEW_HELPER_DIM } from './viewHelperPointer';
 
 // Cap the drawing buffer's largest dimension so deep stage zooms don't allocate absurd buffers.
 const MAX_DRAWING_BUFFER_DIM = 4096;
 
-// Object-rotation speed for Alt+drag, radians per screen px (~0.46°/px: a 200px drag is ~a quarter turn).
+// Object-rotation speed in rotate-object mode, radians per screen px (~0.46°/px: 200px ≈ a quarter turn).
 const OBJECT_ROTATE_SPEED = 0.008;
 
 /**
  * A transparent three.js + Spark viewport for a single 3D Gaussian splat, designed to sit directly on the
  * canvas: orbit/zoom/pan camera and a clickable corner navigation gizmo (ViewHelper, shown only while the
- * pointer is over the viewport). Alt+drag rotates the object itself (all three axes) — OrbitControls keeps
- * the horizon level, so poses like a diagonal lean are unreachable by camera orbit alone. The background is
- * always transparent so the canvas shows through — the live view is the compositing preview. Capture
- * renders the object alone at a given pixel size.
+ * pointer is over the viewport). A toggleable rotate-object mode (setRotateObjectMode) makes left-drag
+ * rotate the object itself (all three axes) instead of orbiting — OrbitControls keeps the horizon level,
+ * so poses like a diagonal lean are unreachable by camera orbit alone. The background is always
+ * transparent so the canvas shows through — the live view is the compositing preview. Capture renders the
+ * object alone at a given pixel size.
  *
  * The element hosting this scene is CSS-scaled by the canvas stage transform, so the drawing buffer is
  * sized at (layout px × devicePixelRatio × stage scale) to stay crisp at any zoom — see setStageScale.
@@ -46,6 +47,7 @@ export class SplatScene {
   private readonly onObjectRotateEnd: (e: PointerEvent) => void;
   private pointerDownPos: { x: number; y: number } | null = null;
   private objectRotate: { pointerId: number; lastX: number; lastY: number } | null = null;
+  private rotateObjectMode = false;
   private mesh: SplatMesh | null = null;
   private stageScale = 1;
   private gizmoVisible = false;
@@ -111,10 +113,12 @@ export class SplatScene {
     this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
     this.renderer.domElement.addEventListener('pointerup', this.onPointerUp);
 
-    // Alt+drag rotates the object itself about its center, on the camera's screen axes. Registered on the
-    // container in the capture phase so it claims the gesture before OrbitControls' own pointerdown runs.
+    // In rotate-object mode, left-drag rotates the object itself about its center on the camera's screen
+    // axes. Registered on the container in the capture phase so it claims the gesture before OrbitControls'
+    // own pointerdown runs; wheel-zoom and right-drag pan still reach OrbitControls, and clicks on the
+    // corner gizmo pass through so view snapping keeps working.
     this.onObjectRotateStart = (e) => {
-      if (!e.altKey || e.button !== 0 || this.disposed || this.objectRotate) {
+      if (!this.rotateObjectMode || e.button !== 0 || this.disposed || this.objectRotate || this.isOverGizmo(e)) {
         return;
       }
       e.preventDefault();
@@ -194,6 +198,25 @@ export class SplatScene {
   setGizmoVisible = (visible: boolean): void => {
     this.gizmoVisible = visible;
   };
+
+  /** When enabled, left-drag rotates the object itself (any axis) instead of orbiting the camera. */
+  setRotateObjectMode = (enabled: boolean): void => {
+    this.rotateObjectMode = enabled;
+  };
+
+  /** Whether the pointer is over the ViewHelper's corner viewport (compared in the element's layout space). */
+  private isOverGizmo(e: PointerEvent): boolean {
+    if (!this.gizmoVisible) {
+      return false;
+    }
+    const el = this.renderer.domElement;
+    const rect = el.getBoundingClientRect();
+    const scaleX = rect.width / (el.offsetWidth || 1) || 1;
+    const scaleY = rect.height / (el.offsetHeight || 1) || 1;
+    const layoutX = (e.clientX - rect.left) / scaleX;
+    const layoutY = (e.clientY - rect.top) / scaleY;
+    return layoutX >= el.offsetWidth - VIEW_HELPER_DIM && layoutY >= el.offsetHeight - VIEW_HELPER_DIM;
+  }
 
   private effectivePixelRatio(w: number, h: number): number {
     const dpr = window.devicePixelRatio || 1;

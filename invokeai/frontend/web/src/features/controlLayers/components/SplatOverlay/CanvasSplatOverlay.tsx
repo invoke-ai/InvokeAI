@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Spinner, Text } from '@invoke-ai/ui-library';
+import { Box, Button, ButtonGroup, Flex, Spinner, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -37,6 +37,13 @@ const CORNERS: { corner: RectCorner; cursor: string }[] = [
   { corner: 'se', cursor: 'nwse-resize' },
 ];
 
+type RotateMode = 'orbit' | 'object';
+
+const CONTROL_HINTS: Record<RotateMode, string[]> = {
+  orbit: ['Drag to orbit view', 'Scroll to zoom', 'Edges to move', 'Corners to resize'],
+  object: ['Drag to rotate object', 'Scroll to zoom', 'Edges to move', 'Corners to resize'],
+};
+
 type DragState = {
   pointerId: number;
   mode: 'move' | RectCorner;
@@ -46,11 +53,11 @@ type DragState = {
 
 /**
  * The in-canvas 3D (Gaussian-splat) overlay: a transparent three.js viewport pinned to a world-space
- * footprint rect, so the splat composites live over the actual canvas content. Drag inside the frame to
- * orbit the view; Alt+drag to rotate the object itself (any axis, including roll); drag the frame edges to
- * move it; drag the corners to resize (shift = keep aspect). The stage stays interactive outside the
- * frame, so you can pan/zoom the canvas for precise placement. Commit bakes the current framing to a new
- * raster layer at the current rect.
+ * footprint rect, so the splat composites live over the actual canvas content. Dragging inside the frame
+ * either orbits the view or rotates the object itself (any axis, including roll) — a toolbar toggle picks
+ * the mode. Drag the frame edges to move it; drag the corners to resize (shift = keep aspect). The stage
+ * stays interactive outside the frame, so you can pan/zoom the canvas for precise placement. Commit bakes
+ * the current framing to a new raster layer at the current rect.
  */
 export const CanvasSplatOverlay = memo(() => {
   const canvasManager = useCanvasManager();
@@ -60,10 +67,23 @@ export const CanvasSplatOverlay = memo(() => {
   const sceneRef = useRef<SplatScene | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const [isCommitting, setIsCommitting] = useState(false);
+  const [rotateMode, setRotateMode] = useState<RotateMode>('orbit');
+  // The scene remounts on asset/session changes, so the current mode is kept in a ref and re-applied
+  // whenever a scene arrives.
+  const rotateModeRef = useRef<RotateMode>(rotateMode);
 
   const onSceneReady = useCallback((scene: SplatScene | null) => {
     sceneRef.current = scene;
+    scene?.setRotateObjectMode(rotateModeRef.current === 'object');
   }, []);
+
+  const applyRotateMode = useCallback((mode: RotateMode) => {
+    rotateModeRef.current = mode;
+    setRotateMode(mode);
+    sceneRef.current?.setRotateObjectMode(mode === 'object');
+  }, []);
+  const onOrbitMode = useCallback(() => applyRotateMode('orbit'), [applyRotateMode]);
+  const onObjectMode = useCallback(() => applyRotateMode('object'), [applyRotateMode]);
 
   const getWorldPoint = useCallback(
     (e: ReactPointerEvent<HTMLElement>) => {
@@ -160,13 +180,15 @@ export const CanvasSplatOverlay = memo(() => {
     })();
   }, [dispatch]);
 
-  // This component stays mounted across open/close (it just renders null when closed), so `isCommitting`
-  // would persist between sessions. Reset it whenever we're not in an active "ready" session — i.e. after
-  // a successful commit (status -> null) or when a new conversion starts (status -> loading).
+  // This component stays mounted across open/close (it just renders null when closed), so per-session UI
+  // state would persist between sessions. Reset it whenever we're not in an active "ready" session — i.e.
+  // after a successful commit (status -> null) or when a new conversion starts (status -> loading).
   const status = state?.status;
   useEffect(() => {
     if (status !== 'ready') {
       setIsCommitting(false);
+      rotateModeRef.current = 'orbit';
+      setRotateMode('orbit');
     }
   }, [status]);
 
@@ -288,14 +310,19 @@ export const CanvasSplatOverlay = memo(() => {
             ))}
         </Box>
       </Box>
-      {/* Screen-space toolbar: always visible regardless of pan/zoom. */}
+      {/* Screen-space toolbar: always visible regardless of pan/zoom. Wraps on narrow panels — the hint
+          breaks between segments and the button pair drops to its own row rather than clipping. */}
       <Flex
         position="absolute"
         top={2}
         insetInlineStart="50%"
         transform="translateX(-50%)"
-        gap={2}
+        columnGap={2}
+        rowGap={1}
         alignItems="center"
+        justifyContent="center"
+        flexWrap="wrap"
+        maxW="calc(100% - 16px)"
         pointerEvents="auto"
         bg="base.800"
         borderRadius="base"
@@ -306,25 +333,44 @@ export const CanvasSplatOverlay = memo(() => {
         {state.status === 'loading' ? (
           <Flex gap={2} alignItems="center" px={1}>
             <Spinner size="sm" />
-            <Text fontSize="sm">Generating 3D…</Text>
+            <Text fontSize="sm" whiteSpace="nowrap">
+              Generating 3D…
+            </Text>
           </Flex>
         ) : (
-          <Text fontSize="xs" color="base.300" px={1}>
-            Drag to orbit · Alt+drag to rotate object · scroll to zoom · edges to move · corners to resize
-          </Text>
+          <>
+            <ButtonGroup isAttached size="sm" flexShrink={0}>
+              <Button colorScheme={rotateMode === 'orbit' ? 'invokeBlue' : 'base'} onClick={onOrbitMode}>
+                Orbit view
+              </Button>
+              <Button colorScheme={rotateMode === 'object' ? 'invokeBlue' : 'base'} onClick={onObjectMode}>
+                Rotate object
+              </Button>
+            </ButtonGroup>
+            <Flex px={1} columnGap={1.5} flexWrap="wrap" justifyContent="center">
+              {CONTROL_HINTS[rotateMode].map((hint, i) => (
+                <Text key={hint} fontSize="xs" color="base.300" whiteSpace="nowrap">
+                  {hint}
+                  {i < CONTROL_HINTS[rotateMode].length - 1 ? ' ·' : ''}
+                </Text>
+              ))}
+            </Flex>
+          </>
         )}
-        <Button size="sm" onClick={clearSplatOverlay} isDisabled={isCommitting}>
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          colorScheme="invokeYellow"
-          onClick={handleCommit}
-          isLoading={isCommitting}
-          isDisabled={state.status !== 'ready'}
-        >
-          Commit to layer
-        </Button>
+        <Flex gap={2} flexShrink={0}>
+          <Button size="sm" onClick={clearSplatOverlay} isDisabled={isCommitting}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            colorScheme="invokeYellow"
+            onClick={handleCommit}
+            isLoading={isCommitting}
+            isDisabled={state.status !== 'ready'}
+          >
+            Commit to layer
+          </Button>
+        </Flex>
       </Flex>
     </Flex>
   );
