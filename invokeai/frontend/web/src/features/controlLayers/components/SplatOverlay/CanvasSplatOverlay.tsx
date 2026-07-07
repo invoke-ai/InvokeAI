@@ -47,9 +47,10 @@ type DragState = {
 /**
  * The in-canvas 3D (Gaussian-splat) overlay: a transparent three.js viewport pinned to a world-space
  * footprint rect, so the splat composites live over the actual canvas content. Drag inside the frame to
- * orbit/angle the object; drag the frame edges to move it; drag the corners to resize (shift = keep
- * aspect). The stage stays interactive outside the frame, so you can pan/zoom the canvas for precise
- * placement. Commit bakes the current framing to a new raster layer at the current rect.
+ * orbit the view; Alt+drag to rotate the object itself (any axis, including roll); drag the frame edges to
+ * move it; drag the corners to resize (shift = keep aspect). The stage stays interactive outside the
+ * frame, so you can pan/zoom the canvas for precise placement. Commit bakes the current framing to a new
+ * raster layer at the current rect.
  */
 export const CanvasSplatOverlay = memo(() => {
   const canvasManager = useCanvasManager();
@@ -309,7 +310,7 @@ export const CanvasSplatOverlay = memo(() => {
           </Flex>
         ) : (
           <Text fontSize="xs" color="base.300" px={1}>
-            Drag to rotate · edges to move · corners to resize
+            Drag to orbit · Alt+drag to rotate object · scroll to zoom · edges to move · corners to resize
           </Text>
         )}
         <Button size="sm" onClick={clearSplatOverlay} isDisabled={isCommitting}>

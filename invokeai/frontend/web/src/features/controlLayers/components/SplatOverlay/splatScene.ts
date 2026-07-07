@@ -8,11 +8,16 @@ import { remapPointerForViewHelper } from './viewHelperPointer';
 // Cap the drawing buffer's largest dimension so deep stage zooms don't allocate absurd buffers.
 const MAX_DRAWING_BUFFER_DIM = 4096;
 
+// Object-rotation speed for Alt+drag, radians per screen px (~0.46°/px: a 200px drag is ~a quarter turn).
+const OBJECT_ROTATE_SPEED = 0.008;
+
 /**
  * A transparent three.js + Spark viewport for a single 3D Gaussian splat, designed to sit directly on the
  * canvas: orbit/zoom/pan camera and a clickable corner navigation gizmo (ViewHelper, shown only while the
- * pointer is over the viewport). The background is always transparent so the canvas shows through — the
- * live view is the compositing preview. Capture renders the object alone at a given pixel size.
+ * pointer is over the viewport). Alt+drag rotates the object itself (all three axes) — OrbitControls keeps
+ * the horizon level, so poses like a diagonal lean are unreachable by camera orbit alone. The background is
+ * always transparent so the canvas shows through — the live view is the compositing preview. Capture
+ * renders the object alone at a given pixel size.
  *
  * The element hosting this scene is CSS-scaled by the canvas stage transform, so the drawing buffer is
  * sized at (layout px × devicePixelRatio × stage scale) to stay crisp at any zoom — see setStageScale.
@@ -36,7 +41,11 @@ export class SplatScene {
   private readonly resizeObserver: ResizeObserver;
   private readonly onPointerDown: (e: PointerEvent) => void;
   private readonly onPointerUp: (e: PointerEvent) => void;
+  private readonly onObjectRotateStart: (e: PointerEvent) => void;
+  private readonly onObjectRotateMove: (e: PointerEvent) => void;
+  private readonly onObjectRotateEnd: (e: PointerEvent) => void;
   private pointerDownPos: { x: number; y: number } | null = null;
+  private objectRotate: { pointerId: number; lastX: number; lastY: number } | null = null;
   private mesh: SplatMesh | null = null;
   private stageScale = 1;
   private gizmoVisible = false;
@@ -86,6 +95,7 @@ export class SplatScene {
     };
     this.onPointerUp = (e) => {
       const down = this.pointerDownPos;
+      this.pointerDownPos = null;
       if (down && this.gizmoVisible && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5) {
         // ViewHelper's own hit test breaks while the stage transform CSS-scales this viewport (it mixes
         // visual and layout coordinates) — remap so axis clicks land at any stage zoom.
@@ -100,6 +110,47 @@ export class SplatScene {
     };
     this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
     this.renderer.domElement.addEventListener('pointerup', this.onPointerUp);
+
+    // Alt+drag rotates the object itself about its center, on the camera's screen axes. Registered on the
+    // container in the capture phase so it claims the gesture before OrbitControls' own pointerdown runs.
+    this.onObjectRotateStart = (e) => {
+      if (!e.altKey || e.button !== 0 || this.disposed || this.objectRotate) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      this.objectRotate = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY };
+      window.addEventListener('pointermove', this.onObjectRotateMove);
+      window.addEventListener('pointerup', this.onObjectRotateEnd);
+      window.addEventListener('pointercancel', this.onObjectRotateEnd);
+    };
+    this.onObjectRotateMove = (e) => {
+      const rot = this.objectRotate;
+      if (!rot || e.pointerId !== rot.pointerId) {
+        return;
+      }
+      const dx = e.clientX - rot.lastX;
+      const dy = e.clientY - rot.lastY;
+      rot.lastX = e.clientX;
+      rot.lastY = e.clientY;
+      // Rotate about the camera's current screen axes so the object follows the pointer from any view
+      // angle; successive two-axis increments compose to reach any orientation, including roll.
+      const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+      const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+      const q = new THREE.Quaternion();
+      this.splatRoot.quaternion.premultiply(q.setFromAxisAngle(up, dx * OBJECT_ROTATE_SPEED));
+      this.splatRoot.quaternion.premultiply(q.setFromAxisAngle(right, dy * OBJECT_ROTATE_SPEED));
+    };
+    this.onObjectRotateEnd = (e) => {
+      if (!this.objectRotate || e.pointerId !== this.objectRotate.pointerId) {
+        return;
+      }
+      this.objectRotate = null;
+      window.removeEventListener('pointermove', this.onObjectRotateMove);
+      window.removeEventListener('pointerup', this.onObjectRotateEnd);
+      window.removeEventListener('pointercancel', this.onObjectRotateEnd);
+    };
+    container.addEventListener('pointerdown', this.onObjectRotateStart, true);
 
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(container);
@@ -234,6 +285,10 @@ export class SplatScene {
     this.resizeObserver.disconnect();
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
+    this.container.removeEventListener('pointerdown', this.onObjectRotateStart, true);
+    window.removeEventListener('pointermove', this.onObjectRotateMove);
+    window.removeEventListener('pointerup', this.onObjectRotateEnd);
+    window.removeEventListener('pointercancel', this.onObjectRotateEnd);
     this.controls.dispose();
     this.viewHelper.dispose();
     if (this.mesh) {
