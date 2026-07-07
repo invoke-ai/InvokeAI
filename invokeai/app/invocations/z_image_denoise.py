@@ -571,6 +571,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     transformer=transformer,
                     regional_attn_mask=regional_extension.regional_attn_mask,
                     img_seq_len=img_seq_len,
+                    positive_cap_feats=pos_prompt_embeds,
                 )
             )
 
