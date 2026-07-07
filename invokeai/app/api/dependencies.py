@@ -6,6 +6,7 @@ from logging import Logger
 import torch
 
 from invokeai.app.services.app_settings import AppSettingsService
+from invokeai.app.services.asset_files.asset_files_disk import DiskAssetFileStorage
 from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
@@ -53,7 +54,6 @@ from invokeai.app.services.style_preset_records.style_preset_records_sqlite impo
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
-from invokeai.app.services.asset_files.asset_files_disk import DiskAssetFileStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     AnimaConditioningInfo,

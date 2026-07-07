@@ -5510,6 +5510,50 @@
         ]
       }
     },
+    "/api/v1/assets/i/{asset_name}": {
+      "get": {
+        "tags": ["assets"],
+        "summary": "Get Asset",
+        "description": "Gets a 3D asset file (e.g. a Gaussian-splat .ply).",
+        "operationId": "get_asset",
+        "parameters": [
+          {
+            "name": "asset_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The name of the 3D asset file to get",
+              "title": "Asset Name"
+            },
+            "description": "The name of the 3D asset file to get"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The 3D asset was fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "The 3D asset could not be found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/boards/": {
       "post": {
         "tags": ["boards"],
@@ -11972,6 +12016,41 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "Asset3DField": {
+        "description": "A 3D asset primitive field",
+        "properties": {
+          "asset_name": {
+            "description": "The name of the 3D asset file",
+            "title": "Asset Name",
+            "type": "string"
+          }
+        },
+        "required": ["asset_name"],
+        "title": "Asset3DField",
+        "type": "object"
+      },
+      "Asset3DOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output a single 3D asset",
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/Asset3DField",
+            "description": "The output 3D asset",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "asset_3d_output",
+            "default": "asset_3d_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "asset", "type", "type"],
+        "title": "Asset3DOutput",
+        "type": "object"
       },
       "BaseMetadata": {
         "properties": {
@@ -29140,6 +29219,9 @@
                   "$ref": "#/components/schemas/ImageScaleInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/ImageTo3DInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ImageToLatentsInvocation"
                 },
                 {
@@ -29621,6 +29703,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/AnimaModelLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Asset3DOutput"
                 },
                 {
                   "$ref": "#/components/schemas/BooleanCollectionOutput"
@@ -34937,6 +35022,157 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "ImageTo3DInvocation": {
+        "category": "3d",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Generates a 3D Gaussian splat (.ply) from a single image using TripoSplat.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to convert to a 3D Gaussian splat.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "remove_background": {
+            "default": true,
+            "description": "Isolate the subject by removing the background (BiRefNet). Disable to feed the full image as-is.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Remove Background",
+            "type": "boolean"
+          },
+          "num_gaussians": {
+            "default": 262144,
+            "description": "Number of 3D Gaussians to generate. Higher is more detailed but larger and slower to render.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 262144,
+            "minimum": 32768,
+            "orig_default": 262144,
+            "orig_required": false,
+            "title": "Num Gaussians",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 20,
+            "description": "Number of flow-matching sampler steps.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 100,
+            "minimum": 1,
+            "orig_default": 20,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "guidance_scale": {
+            "default": 3.0,
+            "description": "Classifier-free guidance scale. Values <= 1.0 disable guidance.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0.0,
+            "orig_default": 3.0,
+            "orig_required": false,
+            "title": "Guidance Scale",
+            "type": "number"
+          },
+          "seed": {
+            "default": 42,
+            "description": "Seed for reproducible generation.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "orig_default": 42,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "image_to_3d",
+            "default": "image_to_3d",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["3d", "image", "gaussian", "splat"],
+        "title": "Image to 3D (TripoSplat)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Asset3DOutput"
+        }
+      },
       "ImageToLatentsInvocation": {
         "category": "latents",
         "class": "invocation",
@@ -36836,6 +37072,9 @@
                 "$ref": "#/components/schemas/ImageScaleInvocation"
               },
               {
+                "$ref": "#/components/schemas/ImageTo3DInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ImageToLatentsInvocation"
               },
               {
@@ -37274,6 +37513,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaModelLoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Asset3DOutput"
               },
               {
                 "$ref": "#/components/schemas/BooleanCollectionOutput"
@@ -37984,6 +38226,9 @@
               },
               {
                 "$ref": "#/components/schemas/ImageScaleInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ImageTo3DInvocation"
               },
               {
                 "$ref": "#/components/schemas/ImageToLatentsInvocation"
@@ -38753,6 +38998,9 @@
           "image_panel_layout": {
             "$ref": "#/components/schemas/ImagePanelCoordinateOutput"
           },
+          "image_to_3d": {
+            "$ref": "#/components/schemas/Asset3DOutput"
+          },
           "img_blur": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -39330,6 +39578,7 @@
           "image_generator",
           "image_mask_to_tensor",
           "image_panel_layout",
+          "image_to_3d",
           "img_blur",
           "img_chan",
           "img_channel_multiply",
@@ -39909,6 +40158,9 @@
               },
               {
                 "$ref": "#/components/schemas/ImageScaleInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ImageTo3DInvocation"
               },
               {
                 "$ref": "#/components/schemas/ImageToLatentsInvocation"
@@ -40808,6 +41060,9 @@
               },
               {
                 "$ref": "#/components/schemas/ImageScaleInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ImageTo3DInvocation"
               },
               {
                 "$ref": "#/components/schemas/ImageToLatentsInvocation"
