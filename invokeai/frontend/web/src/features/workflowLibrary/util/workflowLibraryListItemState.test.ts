@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getWorkflowLibraryListItemState } from './workflowLibraryListItemState';
 
 describe('workflowLibraryListItemState', () => {
-  it('marks unsupported workflows with their localized reason key', () => {
+  it('does not mark ordinary workflows unsupported when they are not callable as sub-workflows', () => {
     expect(
       getWorkflowLibraryListItemState({
         category: 'user',
@@ -15,8 +15,8 @@ describe('workflowLibraryListItemState', () => {
         },
       })
     ).toEqual({
-      showUnsupportedBadge: true,
-      unsupportedMessageKey: 'workflows.savedWorkflowCompatibility.missingWorkflowReturn',
+      showUnsupportedBadge: false,
+      unsupportedMessageKey: null,
       showSharedBadge: false,
       showDefaultIcon: false,
     });
