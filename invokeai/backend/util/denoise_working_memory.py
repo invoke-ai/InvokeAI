@@ -39,9 +39,11 @@ Usage (every denoise invocation follows this shape)::
         mem_probe.end()
 
 Calibration convention: estimates and DENOISE_MEM records use PRE-PACKING latent spatial dims
-(``pixel // vae_scale_factor``); any token-packing factor is folded into the family multiplier. The
-cleanest calibration data comes from fully-resident runs — under partial loading, streamed-weight
-buffers count toward the measured peak.
+(``pixel // vae_scale_factor``); any token-packing factor is folded into the family multiplier.
+Reference/conditioning latents that join the token sequence (FLUX Kontext, FLUX.2 reference images)
+are passed separately as ``extra_latent_area`` — the multipliers are fitted on reference-free runs
+(qwen excepted; see ``ACTIVATION_MULTIPLIER``). The cleanest calibration data comes from
+fully-resident runs — under partial loading, streamed-weight buffers count toward the measured peak.
 
 Safety properties
 -----------------
@@ -91,8 +93,11 @@ DenoiseFamily = Literal["unet", "dit", "flux2", "z_image", "anima", "sd3", "qwen
 #     transformers we have NOT measured yet (cogview4, future archs), so an unmeasured arch never
 #     under-reserves.
 #   - sd3's value folds in its always-on CFG (a doubled-batch single forward). qwen is the Edit variant
-#     (its reference image lengthens the sequence ~2x) from a single 1024 point. Both are floor-covered
-#     at the resolutions they were run, so their exact value is not yet load-bearing.
+#     (its reference image lengthens the sequence ~2x) from a single 1024 point; unlike flux/flux2, the
+#     qwen call site deliberately does NOT pass extra_latent_area — its denoise node clamps the
+#     reference to ~1024^2 and this multiplier already folds that bounded worst case in (passing it too
+#     would double-count). Both are floor-covered at the resolutions they were run, so their exact
+#     value is not yet load-bearing.
 ACTIVATION_MULTIPLIER: dict[str, float] = {
     "unet": 32,  # SD1.5 / SDXL conv UNet
     "dit": 6,  # FLUX.1 anchor + DEFAULT for unmeasured transformers (cogview4, future archs)
@@ -164,6 +169,7 @@ def estimate_denoise_working_memory(
     element_size: int,
     multiplier: float,
     base_bytes: int = BASE_WORKING_MEMORY_BYTES,
+    extra_latent_area: int = 0,
 ) -> int:
     """Estimate denoise working memory (bytes) from the architecture-scaled activation size.
 
@@ -173,8 +179,13 @@ def estimate_denoise_working_memory(
         per-family multiplier, so do NOT double for classifier-free guidance.
     :param element_size: bytes per element of the inference dtype (e.g. 2 for fp16/bf16).
     :param multiplier: the per-family activation multiplier (see ``ACTIVATION_MULTIPLIER``).
+    :param extra_latent_area: pre-packing latent area of conditioning latents that join the denoise
+        token sequence (e.g. FLUX Kontext / FLUX.2 reference images). Activation memory scales with
+        TOTAL sequence length, so these tokens cost the same as output tokens — a single max-size
+        FLUX.2 reference image adds ~4x a 1024x1024 output's area and would otherwise be invisible
+        to the estimate.
     """
-    area = max(0, int(latent_area))
+    area = max(0, int(latent_area)) + max(0, int(extra_latent_area))
     width = max(1, int(activation_width))
     batch = max(1, int(batch_size))
     return int(base_bytes + multiplier * area * width * batch * int(element_size))
@@ -250,6 +261,7 @@ class DenoiseMemProbe:
                         "batch": int(self._estimate.batch_size),
                         "elt": int(self._estimate.element_size),
                         "mult": self._estimate.multiplier,
+                        "extra_area": int(self._estimate.extra_latent_area),
                         "estimate_mb": round(estimate_bytes / MB, 1),
                         "measured_peak_mb": round(measured / MB, 1),
                         "resident_before_mb": round(self._alloc_before / MB, 1),
@@ -277,6 +289,9 @@ class DenoiseWorkingMemory:
     multiplier: float
     element_size: int
     batch_size: int
+    # Pre-packing latent area of reference/conditioning tokens included in the estimate (0 = none).
+    # Logged in DENOISE_MEM so calibration runs with reference images are distinguishable.
+    extra_latent_area: int = 0
 
     def measure(
         self,
@@ -308,6 +323,7 @@ def estimate_denoise_working_memory_for_model(
     batch_size: int,
     inference_dtype: torch.dtype,
     family: DenoiseFamily,
+    extra_latent_area: int = 0,
 ) -> DenoiseWorkingMemory:
     """Estimate denoise working memory for a loaded model, scaling by its activation width.
 
@@ -316,6 +332,9 @@ def estimate_denoise_working_memory_for_model(
     :param latent_width: latent-space width (pre-packing).
     :param family: the architecture/family key; selects the calibrated multiplier, with unmeasured
         transformers passing ``"dit"`` (the conservative default).
+    :param extra_latent_area: pre-packing latent area of reference/conditioning latents concatenated
+        into the denoise sequence (see ``estimate_denoise_working_memory``). Pass
+        ``packed_seq_len * 4`` for FLUX-style 2x2-packed reference latents.
     """
     multiplier = family_multiplier(family)
     element_size = dtype_element_size(inference_dtype)
@@ -325,6 +344,7 @@ def estimate_denoise_working_memory_for_model(
         batch_size=batch_size,
         element_size=element_size,
         multiplier=multiplier,
+        extra_latent_area=extra_latent_area,
     )
     return DenoiseWorkingMemory(
         bytes=working_mem_bytes,
@@ -332,4 +352,5 @@ def estimate_denoise_working_memory_for_model(
         multiplier=multiplier,
         element_size=element_size,
         batch_size=max(1, int(batch_size)),
+        extra_latent_area=max(0, int(extra_latent_area)),
     )

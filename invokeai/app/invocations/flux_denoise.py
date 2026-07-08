@@ -425,6 +425,13 @@ class FluxDenoiseInvocation(BaseInvocation):
             )
 
             # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+            # Kontext reference latents are concatenated into the token sequence, so they enlarge the
+            # activation working set exactly like output latents (Kontext images are encoded at native
+            # resolution — a large reference can dwarf the output tokens). shape[1] is the packed
+            # sequence length; x4 converts it back to the pre-packing latent area of the estimate.
+            extra_latent_area = 0
+            if kontext_extension is not None:
+                extra_latent_area = int(kontext_extension.kontext_latents.shape[1]) * 4
             transformer_info = context.models.load(self.transformer.transformer)
             working_memory = estimate_denoise_working_memory_for_model(
                 model=transformer_info.model,
@@ -433,6 +440,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                 batch_size=b,
                 inference_dtype=inference_dtype,
                 family="dit",
+                extra_latent_area=extra_latent_area,
             )
 
             # Load the transformer model.

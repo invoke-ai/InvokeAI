@@ -451,6 +451,13 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         with ExitStack() as exit_stack:
             # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+            # Reference-image latents are concatenated into the transformer's token sequence, so they
+            # enlarge the activation working set exactly like output latents (a single max-size
+            # reference adds ~4x a 1024x1024 output's tokens). shape[1] is the packed sequence
+            # length; x4 converts it back to the pre-packing latent area the estimate is fitted in.
+            extra_latent_area = 0
+            if ref_image_extension is not None:
+                extra_latent_area = int(ref_image_extension.ref_image_latents.shape[1]) * 4
             transformer_info = context.models.load(self.transformer.transformer)
             working_memory = estimate_denoise_working_memory_for_model(
                 model=transformer_info.model,
@@ -459,6 +466,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 batch_size=b,
                 inference_dtype=inference_dtype,
                 family="flux2",
+                extra_latent_area=extra_latent_area,
             )
 
             # Load the transformer model

@@ -57,6 +57,67 @@ def test_core_scales_with_area_width_batch_and_element_size():
     assert estimate_denoise_working_memory(16384, 320, 1, 4, 32) - BASE_WORKING_MEMORY_BYTES == 2 * base
 
 
+# --- reference-image / kontext sequence inflation ---
+
+
+def test_extra_latent_area_counts_like_output_area():
+    """Reference latents join the token sequence, so their (pre-packing) area must cost exactly the
+    same as output latent area — the two are interchangeable in the formula."""
+    inflated = estimate_denoise_working_memory(16384, 320, 1, 2, 32, extra_latent_area=4096)
+    merged = estimate_denoise_working_memory(16384 + 4096, 320, 1, 2, 32)
+    assert inflated == merged
+    # Absent/zero/negative extra area leaves the estimate unchanged.
+    base = estimate_denoise_working_memory(16384, 320, 1, 2, 32)
+    assert estimate_denoise_working_memory(16384, 320, 1, 2, 32, extra_latent_area=0) == base
+    assert estimate_denoise_working_memory(16384, 320, 1, 2, 32, extra_latent_area=-1) == base
+
+
+def test_for_model_threads_extra_latent_area_and_carries_it():
+    """The model-level helper must add the extra area to the reserve AND record it on the estimate
+    object, so DENOISE_MEM calibration records with reference images are distinguishable."""
+    m = _model(hidden_size=3072)
+    without = estimate_denoise_working_memory_for_model(
+        model=m, latent_height=128, latent_width=128, batch_size=1, inference_dtype=torch.float16, family="flux2"
+    )
+    with_ref = estimate_denoise_working_memory_for_model(
+        model=m,
+        latent_height=128,
+        latent_width=128,
+        batch_size=1,
+        inference_dtype=torch.float16,
+        family="flux2",
+        extra_latent_area=64516,
+    )
+    assert without.extra_latent_area == 0
+    assert with_ref.extra_latent_area == 64516
+    expected_delta = ACTIVATION_MULTIPLIER["flux2"] * 64516 * 3072 * 1 * 2
+    assert with_ref.bytes - without.bytes == pytest.approx(expected_delta, abs=1)  # int() truncation slack
+
+
+def test_max_size_flux2_reference_dominates_the_estimate():
+    """The scenario from PR review: FLUX.2 Klein, 1024x1024 output, one reference image at the
+    single-ref cap (2024^2 ~ 4.1MP). The ref contributes ~4x the output's tokens, so an estimate
+    that ignores it misses most of the real activation working set. Guard that the ref-aware
+    estimate reflects that (>3x the activation term of the ref-free one)."""
+    m = _model(joint_attention_dim=15360)  # Klein 9B width
+    # 2024^2 px -> latent 253x253, padded even -> 254x254 pre-packing area.
+    ref_area = 254 * 254
+    without = _estimate(m, 128, "flux2").bytes - BASE_WORKING_MEMORY_BYTES
+    with_ref = (
+        estimate_denoise_working_memory_for_model(
+            model=m,
+            latent_height=128,
+            latent_width=128,
+            batch_size=1,
+            inference_dtype=torch.float16,
+            family="flux2",
+            extra_latent_area=ref_area,
+        ).bytes
+        - BASE_WORKING_MEMORY_BYTES
+    )
+    assert with_ref > 3 * without
+
+
 # --- width extraction from the model config ---
 
 
@@ -232,6 +293,7 @@ def test_probe_emits_or_noops_without_raising():
         assert payload["mult"] == ACTIVATION_MULTIPLIER["flux2"]
         assert payload["label"] == "flux2" and "measured_peak_mb" in payload
         assert "elapsed_ms" in payload  # denoise-loop wall time, for the on/off timing A/B
+        assert payload["extra_area"] == 0  # no reference latents in this estimate
     else:
         assert probe.active is False
         assert log.records == []
