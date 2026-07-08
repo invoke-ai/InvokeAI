@@ -776,6 +776,37 @@ def test_graph_collector_reuses_outer_collection_input_for_each_nested_iterator_
     assert collect_results == [[100, 0, 1], [100, 10, 11]]
 
 
+def test_graph_collector_nested_under_three_iterators_preserves_outer_iteration_paths():
+    graph = Graph()
+
+    graph.add_node(RangeInvocation(id="outer_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    graph.add_node(IntegerCollectionFromItemTestInvocation(id="middle_collection"))
+    graph.add_node(IterateInvocation(id="middle_iter"))
+    graph.add_node(IntegerCollectionFromItemTestInvocation(id="inner_collection"))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+    graph.add_node(AddInvocation(id="inner_item", b=0))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(IntegerCollectionPassthroughTestInvocation(id="per_middle_consumer"))
+
+    graph.add_edge(create_edge("outer_range", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "middle_collection", "value"))
+    graph.add_edge(create_edge("middle_collection", "collection", "middle_iter", "collection"))
+    graph.add_edge(create_edge("middle_iter", "item", "inner_collection", "value"))
+    graph.add_edge(create_edge("inner_collection", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "inner_item", "a"))
+    graph.add_edge(create_edge("inner_item", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "per_middle_consumer", "collection"))
+
+    g = GraphExecutionState(graph=graph)
+    execute_all_nodes(g)
+
+    prepared_consumer_ids = g.source_prepared_mapping["per_middle_consumer"]
+    consumer_collections = sorted(g.results[node_id].collection for node_id in prepared_consumer_ids)
+
+    assert consumer_collections == [[0, 1], [10, 11], [100, 101], [110, 111]]
+
+
 def test_graph_validate_self_iterator_without_collection_input_raises_invalid_edge_error():
     """Iterator nodes with no collection input should fail validation cleanly.
 
