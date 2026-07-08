@@ -46,7 +46,7 @@ AnimaVAE = Union[AutoencoderKLWan, FluxAutoEncoder]
     title="Image to Latents - Anima",
     tags=["image", "latents", "vae", "i2l", "anima"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):

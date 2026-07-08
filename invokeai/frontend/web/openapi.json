@@ -10852,7 +10852,7 @@
         "tags": ["image", "latents", "vae", "i2l", "anima"],
         "title": "Image to Latents - Anima",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -10962,7 +10962,7 @@
         "tags": ["latents", "image", "vae", "l2i", "anima"],
         "title": "Latents to Image - Anima",
         "type": "object",
-        "version": "1.0.2",
+        "version": "1.0.3",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }

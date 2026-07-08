@@ -59,7 +59,7 @@ def _is_oom_error(e: RuntimeError) -> bool:
     title="Latents to Image - Anima",
     tags=["latents", "image", "vae", "l2i", "anima"],
     category="latents",
-    version="1.0.2",
+    version="1.0.3",
     classification=Classification.Prototype,
 )
 class AnimaLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
