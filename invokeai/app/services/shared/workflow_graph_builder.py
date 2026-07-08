@@ -301,7 +301,10 @@ def build_graph_from_workflow(workflow: Mapping[str, Any]) -> Graph:
             for field_name, field_value in inputs.items():
                 if not isinstance(field_name, str) or not _is_mapping(field_value):
                     continue
-                graph_node[field_name] = field_value.get("value")
+                # Saved workflows may include input metadata for unfilled optional fields without a "value".
+                # Omit those fields so invocation defaults are applied instead of forcing None.
+                if "value" in field_value:
+                    graph_node[field_name] = field_value["value"]
 
         parsed_nodes[node_id] = graph_node
 
