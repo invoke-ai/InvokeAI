@@ -5,7 +5,11 @@ from pathlib import Path
 import pytest
 import torch
 
-from invokeai.backend.quantization.sdnq.loaders import has_sdnq_keys, sdnq_sd_loader
+from invokeai.backend.quantization.sdnq.loaders import (
+    has_sdnq_keys,
+    raise_on_incomplete_sdnq_load,
+    sdnq_sd_loader,
+)
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
@@ -205,3 +209,46 @@ class TestSDNQLoader:
         # Dequantization must succeed and produce the original (unpacked) shape.
         dequantized = layer_weight.get_dequantized_tensor()
         assert dequantized.shape == torch.Size([out_features, in_features])
+
+
+class TestRaiseOnIncompleteSdnqLoad:
+    """The SDNQ folder loaders build an empty model then load_state_dict(strict=False); this guard
+    must turn a silently-incomplete load (a required parameter left on the meta device) into an
+    explicit error naming the offending key."""
+
+    def test_missing_required_transformer_weight_raises(self):
+        """Removing a required weight from a folder load must raise, naming the missing key.
+
+        Reproduces the loader pattern: build an empty (meta) model, load a state dict with one
+        required key removed, then run the guard. Without the guard the model would be returned with
+        that parameter still on the meta device and fail cryptically later.
+        """
+        import accelerate
+
+        with accelerate.init_empty_weights():
+            model = torch.nn.Linear(8, 8)
+
+        full_sd = {"weight": torch.zeros(8, 8), "bias": torch.zeros(8)}
+        partial_sd = {"weight": full_sd["weight"]}  # drop the required "bias"
+
+        missing, unexpected = model.load_state_dict(partial_sd, strict=False, assign=True)
+        assert "bias" in missing
+
+        with pytest.raises(ValueError, match="bias"):
+            raise_on_incomplete_sdnq_load("SDNQ test transformer", missing, unexpected)
+
+    def test_unexpected_key_raises(self):
+        with pytest.raises(ValueError, match="not_a_real_param"):
+            raise_on_incomplete_sdnq_load("SDNQ test", missing_keys=[], unexpected_keys=["not_a_real_param"])
+
+    def test_allowed_missing_is_tolerated(self):
+        # Tied/re-shared weights (e.g. T5 encoder.embed_tokens, Qwen3 lm_head) must not raise.
+        raise_on_incomplete_sdnq_load(
+            "SDNQ test",
+            missing_keys=["encoder.embed_tokens.weight"],
+            unexpected_keys=[],
+            allowed_missing={"encoder.embed_tokens.weight"},
+        )
+
+    def test_complete_load_does_not_raise(self):
+        raise_on_incomplete_sdnq_load("SDNQ test", missing_keys=[], unexpected_keys=[])

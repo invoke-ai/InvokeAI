@@ -23,7 +23,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
+from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 
 
 def _is_sdnq_vae_folder(path: Path) -> bool:
@@ -124,6 +124,8 @@ class VAELoader(GenericDiffusersLoader):
         with accelerate.init_empty_weights():
             model = AutoencoderKL.from_config(AutoencoderKL.load_config(model_path, local_files_only=True))
 
-        # Load state dict with SDNQTensor objects
-        model.load_state_dict(sd, strict=False, assign=True)
+        # Load state dict with SDNQTensor objects. AutoencoderKL has no tied weights, so a complete
+        # state dict is expected — a missing key would leave a required parameter on the meta device.
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        raise_on_incomplete_sdnq_load("SDNQ VAE", missing, unexpected)
         return model

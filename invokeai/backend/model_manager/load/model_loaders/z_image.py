@@ -35,7 +35,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
-from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
+from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -275,7 +275,11 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
         with accelerate.init_empty_weights():
             model = Qwen3ForCausalLM(qwen_config)
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        # lm_head is tied to embed_tokens (re-shared below), so it is expected to be missing.
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        raise_on_incomplete_sdnq_load(
+            "SDNQ Z-Image Qwen3 text encoder", missing, unexpected, allowed_missing={"lm_head.weight"}
+        )
 
         # Dequantize embed_tokens weight for embedding lookups
         embed_tokens_weight = model.model.embed_tokens.weight
@@ -306,6 +310,12 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
                     base = qwen_config.rope_theta
                     inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
                     parent.register_buffer(buffer_name, inv_freq.to(dtype=compute_dtype), persistent=False)
+
+        # Fail fast if any required parameter is still on the meta device (e.g. a partial export).
+        # This mirrors the standalone SDNQ Qwen3 encoder loader's final guard.
+        meta_params = [name for name, p in model.named_parameters() if p.is_meta]
+        if meta_params:
+            raise RuntimeError(f"SDNQ Z-Image Qwen3 text encoder has parameters left on meta: {meta_params}")
 
         return model
 
@@ -724,13 +734,9 @@ class ZImageSDNQCheckpointModel(ModelLoader):
         # Diffusers-format Z-Image keys already match ZImageTransformer2DModel.state_dict(),
         # so no BFL→diffusers conversion is needed here. The transformer has no tied/shared weights,
         # so we expect a complete state dict — any missing key would leave a required parameter on a
-        # meta tensor and fail later during device movement or inference. Fail fast here with the
-        # offending key list instead (mirrors the SDNQ text-encoder path).
+        # meta tensor and fail later during device movement or inference. Fail fast here instead.
         missing, unexpected = model.load_state_dict(sd, assign=True, strict=False)
-        if unexpected:
-            raise ValueError(f"Unexpected keys loading SDNQ Z-Image transformer: {unexpected}")
-        if missing:
-            raise ValueError(f"Missing keys loading SDNQ Z-Image transformer: {missing}")
+        raise_on_incomplete_sdnq_load("SDNQ Z-Image transformer", missing, unexpected)
         return model
 
 

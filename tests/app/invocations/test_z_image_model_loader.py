@@ -73,3 +73,45 @@ class TestZImageSelfContainedSDNQ:
 
         with pytest.raises(ValueError, match="No VAE source"):
             invocation.invoke(context)
+
+
+class TestQwen3SourceFieldTemplate:
+    """The generic node/workflow model pickers filter candidates by the field template's
+    ui_model_base / ui_model_type / ui_model_format hints. Since _validate_diffusers_format now
+    accepts SDNQ pipeline configs (with submodels) as a Qwen3 source, the qwen3_source_model field
+    must NOT pin ui_model_format=diffusers — otherwise SDNQ Z-Image pipelines are filtered out of
+    the picker even though the backend supports them.
+    """
+
+    def test_qwen3_source_field_has_no_format_filter(self):
+        schema = ZImageModelLoaderInvocation.model_json_schema()
+        field = schema["properties"]["qwen3_source_model"]
+
+        # No format constraint: an SDNQ z-image main model (format=sdnq_quantized) is not filtered.
+        assert "ui_model_format" not in field
+        # Still scoped to Z-Image main models so unrelated models don't show up.
+        assert field["ui_model_base"] == [BaseModelType.ZImage.value]
+        assert field["ui_model_type"] == [ModelType.Main.value]
+
+    def test_sdnq_pipeline_passes_field_template_filter(self):
+        """Reproduce the picker's filter predicate and confirm an SDNQ pipeline is kept."""
+        schema = ZImageModelLoaderInvocation.model_json_schema()
+        field = schema["properties"]["qwen3_source_model"]
+
+        sdnq_pipeline_config = {
+            "base": BaseModelType.ZImage.value,
+            "type": ModelType.Main.value,
+            "format": ModelFormat.SDNQQuantized.value,
+        }
+
+        # Mirror the filter in ModelIdentifierFieldInputComponent / WorkflowFieldRenderer.
+        def is_filtered_out(config: dict) -> bool:
+            if "ui_model_base" in field and config["base"] not in field["ui_model_base"]:
+                return True
+            if "ui_model_type" in field and config["type"] not in field["ui_model_type"]:
+                return True
+            if "ui_model_format" in field and config["format"] not in field["ui_model_format"]:
+                return True
+            return False
+
+        assert not is_filtered_out(sdnq_pipeline_config)

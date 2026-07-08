@@ -77,7 +77,7 @@ from invokeai.backend.model_manager.util.model_util import (
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
-from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
+from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
@@ -1232,7 +1232,10 @@ class Flux2SDNQCheckpointModel(ModelLoader):
             )
 
         sd = sdnq_sd_loader(transformer_path, compute_dtype=torch.bfloat16)
-        model.load_state_dict(sd, assign=True, strict=False)
+        # The FLUX.2 transformer has no tied weights, so we expect a complete state dict — a missing
+        # key means a required parameter is left on the meta device and would fail later.
+        missing, unexpected = model.load_state_dict(sd, assign=True, strict=False)
+        raise_on_incomplete_sdnq_load("SDNQ FLUX.2 transformer", missing, unexpected)
         return model
 
     def _load_text_encoder(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
@@ -2019,7 +2022,11 @@ class FluxSDNQDiffusersModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = CLIPTextModel(model_config)
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        # position_ids is a non-persistent buffer that may be absent from the checkpoint.
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        raise_on_incomplete_sdnq_load(
+            "SDNQ CLIP text encoder", missing, unexpected, allowed_missing={"text_model.embeddings.position_ids"}
+        )
 
         # Dequantize embedding layer
         if hasattr(model, "text_model") and hasattr(model.text_model, "embeddings"):
@@ -2044,7 +2051,12 @@ class FluxSDNQDiffusersModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = AutoModelForTextEncoding.from_config(model_config)
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        # T5 ties encoder.embed_tokens to shared; the checkpoint only ships `shared.weight` and the
+        # tie is re-established below, so encoder.embed_tokens.weight is expected to be missing.
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        raise_on_incomplete_sdnq_load(
+            "SDNQ T5 text encoder", missing, unexpected, allowed_missing={"encoder.embed_tokens.weight"}
+        )
 
         # Dequantize shared embedding
         if hasattr(model, "shared") and isinstance(model.shared.weight, SDNQTensor):
@@ -2074,5 +2086,7 @@ class FluxSDNQDiffusersModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = AutoencoderKL.from_config(AutoencoderKL.load_config(vae_path, local_files_only=True))
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        # AutoencoderKL has no tied weights, so a complete state dict is expected.
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        raise_on_incomplete_sdnq_load("SDNQ VAE", missing, unexpected)
         return model

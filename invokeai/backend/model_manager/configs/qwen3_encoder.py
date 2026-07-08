@@ -249,10 +249,37 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
             },
         )
 
+        # Reject SDNQ-quantized encoders so Qwen3Encoder_SDNQ_Folder_Config matches them instead.
+        # A real SDNQ Qwen3 encoder has the same Qwen3 config class name as an unquantized one, so
+        # without this guard both configs accept the folder — and since they share the Qwen3Encoder
+        # type, the factory tiebreak is non-deterministic. If it picked this (unquantized) config,
+        # the non-SDNQ loader would then mis-read the packed uint8 weights.
+        cls._reject_if_sdnq_quantized(mod)
+
         # Determine variant from config.json hidden_size
         variant = cls._get_variant_from_config(expected_config_path)
 
         return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _reject_if_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        # Primary signal: quantization_config.json with quant_method="sdnq" (at root or in
+        # text_encoder/). Fallback: SDNQ-style weight+scale key pairs in the state dict. This mirrors
+        # the detection in Qwen3Encoder_SDNQ_Folder_Config so the two stay mutually exclusive.
+        for folder in (mod.path, mod.path / "text_encoder"):
+            quant_config_path = folder / "quantization_config.json"
+            if not quant_config_path.exists():
+                continue
+            try:
+                with open(quant_config_path, "r", encoding="utf-8") as f:
+                    quant_config = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            if quant_config.get("quant_method") == "sdnq":
+                raise NotAMatchError("folder is SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
+
+        if _has_sdnq_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
 
     @classmethod
     def _get_variant_from_config(cls, config_path) -> Qwen3VariantType:
@@ -411,8 +438,41 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
         if not matched:
             raise NotAMatchError("directory does not look like an SDNQ-quantized Qwen3 encoder")
 
+        # Being SDNQ-quantized is not enough: an SDNQ transformer, VAE or other component folder
+        # also has a quantization_config.json with quant_method="sdnq". Without verifying the folder
+        # is actually a Qwen3 encoder, such a folder would be stored as type=qwen3_encoder and only
+        # blow up later in the loader when Qwen-specific weights are missing. Require either a Qwen3
+        # architecture in the (text_encoder/)config.json or Qwen3-specific state-dict keys.
+        cls._validate_is_qwen3_encoder(mod)
+
         variant = cls._get_variant_from_dir(mod)
         return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _validate_is_qwen3_encoder(cls, mod: ModelOnDisk) -> None:
+        # Strongest signal: a transformers-style config.json naming a Qwen3 architecture.
+        for cfg_path in (mod.path / "config.json", mod.path / "text_encoder" / "config.json"):
+            if not cfg_path.exists():
+                continue
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            names: set[str] = set(cfg.get("architectures") or [])
+            class_name = cfg.get("_class_name")
+            if isinstance(class_name, str):
+                names.add(class_name)
+            if any("Qwen3" in n for n in names):
+                return
+
+        # Fallback for folders without a usable config.json: check for Qwen3-specific state-dict
+        # keys (model.layers. / model.embed_tokens.weight). An SDNQ transformer/VAE folder has
+        # transformer_blocks. / decoder. keys instead and is correctly rejected here.
+        if _has_qwen3_keys(mod.load_state_dict()):
+            return
+
+        raise NotAMatchError("directory does not look like a Qwen3 encoder (no Qwen3 config class or keys)")
 
     @classmethod
     def _get_variant_from_dir(cls, mod: ModelOnDisk) -> Qwen3VariantType:

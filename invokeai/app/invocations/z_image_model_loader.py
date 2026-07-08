@@ -73,14 +73,17 @@ class ZImageModelLoaderInvocation(BaseInvocation):
 
     qwen3_source_model: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="Diffusers Z-Image model to extract VAE and/or Qwen3 encoder from. "
+        description="Z-Image pipeline model to extract VAE and/or Qwen3 encoder from. "
         "Use this if you don't have separate VAE/Qwen3 models. "
         "Ignored if both VAE and Qwen3 Encoder are provided separately.",
         input=Input.Direct,
         ui_model_base=BaseModelType.ZImage,
         ui_model_type=ModelType.Main,
-        ui_model_format=ModelFormat.Diffusers,
-        title="Qwen3 Source (Diffusers)",
+        # No ui_model_format hint: both plain Diffusers pipelines and SDNQ-quantized ZImagePipeline
+        # folders (which ship VAE/Qwen3 submodels) are valid sources. _validate_diffusers_format
+        # accepts both, so pinning the format here would wrongly filter SDNQ pipelines out of the
+        # generic node/workflow model pickers.
+        title="Qwen3 Source",
     )
 
     def invoke(self, context: InvocationContext) -> ZImageModelLoaderOutput:
