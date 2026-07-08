@@ -203,8 +203,18 @@ class Flux2RefImageExtension:
             image_tensor = image_tensor * 2.0 - 1.0
             image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
 
+            # Estimate the encode's working memory so the model cache reserves it (mirrors
+            # KontextExtension). A single reference can be up to ~4.1MP, whose encode needs far more
+            # than the default reserve — without an estimate it overflows VRAM (on Windows, silently
+            # spilling to shared memory). Encoding uses ~50% of the decode scaling constant (see #8414).
+            img_h = image_tensor.shape[-2]
+            img_w = image_tensor.shape[-1]
+            element_size = next(vae_info.model.parameters()).element_size()
+            scaling_constant = 1100  # 50% of decode scaling constant (2200)
+            estimated_working_memory = int(img_h * img_w * element_size * scaling_constant)
+
             # Encode using FLUX.2 VAE
-            with vae_info.model_on_device() as (_, vae):
+            with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
                 vae_dtype = next(iter(vae.parameters())).dtype
                 image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
 

@@ -426,6 +426,17 @@
     },
     {
       "category": "CACHE",
+      "default": false,
+      "description": "EXPERIMENTAL (off by default, pending validation across hardware). Estimate each denoise operation's working-memory need (scaled by the model and output resolution) and reserve only that much VRAM, instead of always holding back the flat device_working_mem_gb. This keeps more of the model resident in VRAM on memory-constrained cards (faster). Operations that do not provide an estimate keep the full flat reserve. Enable to opt in.",
+      "env_var": "INVOKEAI_SMART_PARTIAL_LOADING",
+      "literal_values": [],
+      "name": "smart_partial_loading",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
       "default": true,
       "description": "Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.",
       "env_var": "INVOKEAI_KEEP_RAM_COPY_OF_WEIGHTS",

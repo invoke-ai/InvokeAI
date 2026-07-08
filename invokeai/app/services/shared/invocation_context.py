@@ -163,6 +163,17 @@ class LoggerInterface(InvocationContextInterface):
         """
         self._services.logger.error(message)
 
+    def isEnabledFor(self, level: int) -> bool:
+        """Whether the underlying logger is enabled for the given level.
+
+        Mirrors ``logging.Logger.isEnabledFor`` so callers can cheaply gate expensive diagnostics
+        (e.g. CUDA-sync-based memory measurement) on the active log level.
+
+        Args:
+            level: A standard ``logging`` level (e.g. ``logging.DEBUG``).
+        """
+        return self._services.logger.isEnabledFor(level)
+
 
 class ImagesInterface(InvocationContextInterface):
     def __init__(self, services: InvocationServices, data: InvocationContextData, util: "UtilInterface") -> None:

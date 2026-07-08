@@ -64,6 +64,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -423,9 +424,28 @@ class FluxDenoiseInvocation(BaseInvocation):
                 device=x.device,
             )
 
+            # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+            # Kontext reference latents are concatenated into the token sequence, so they enlarge the
+            # activation working set exactly like output latents (Kontext images are encoded at native
+            # resolution — a large reference can dwarf the output tokens). shape[1] is the packed
+            # sequence length; x4 converts it back to the pre-packing latent area of the estimate.
+            extra_latent_area = 0
+            if kontext_extension is not None:
+                extra_latent_area = int(kontext_extension.kontext_latents.shape[1]) * 4
+            transformer_info = context.models.load(self.transformer.transformer)
+            working_memory = estimate_denoise_working_memory_for_model(
+                model=transformer_info.model,
+                latent_height=latent_h,
+                latent_width=latent_w,
+                batch_size=b,
+                inference_dtype=inference_dtype,
+                family="dit",
+                extra_latent_area=extra_latent_area,
+            )
+
             # Load the transformer model.
             (cached_weights, transformer) = exit_stack.enter_context(
-                context.models.load(self.transformer.transformer).model_on_device()
+                transformer_info.model_on_device(working_mem_bytes=working_memory.bytes)
             )
             assert isinstance(transformer, Flux)
             config = transformer_config
@@ -500,6 +520,9 @@ class FluxDenoiseInvocation(BaseInvocation):
             else:
                 context.logger.debug(f"DyPE disabled: resolution={self.width}x{self.height}, preset={self.dype_preset}")
 
+            mem_probe = working_memory.measure(
+                context.logger, pixel_height=self.height, pixel_width=self.width, label="flux"
+            )
             x = denoise(
                 model=transformer,
                 img=x,
@@ -520,6 +543,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                 dype_extension=dype_extension,
                 scheduler=scheduler,
             )
+            mem_probe.end()
 
         x = unpack(x.float(), self.height, self.width)
         return x

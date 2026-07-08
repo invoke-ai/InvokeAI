@@ -443,6 +443,21 @@
           "signature": "(message: str) -> None"
         },
         {
+          "description": "Whether the underlying logger is enabled for the given level.\nMirrors ``logging.Logger.isEnabledFor`` so callers can cheaply gate expensive diagnostics\n(e.g. CUDA-sync-based memory measurement) on the active log level.",
+          "name": "isEnabledFor",
+          "parameters": [
+            {
+              "default": "",
+              "description": "A standard ``logging`` level (e.g. ``logging.DEBUG``).",
+              "name": "level",
+              "type": "int"
+            }
+          ],
+          "return_type": "bool",
+          "returns": "",
+          "signature": "(level: int) -> bool"
+        },
+        {
           "description": "Logs a warning message.",
           "name": "warning",
           "parameters": [

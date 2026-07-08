@@ -47,6 +47,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -449,9 +450,28 @@ class Flux2DenoiseInvocation(BaseInvocation):
             )
 
         with ExitStack() as exit_stack:
+            # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+            # Reference-image latents are concatenated into the transformer's token sequence, so they
+            # enlarge the activation working set exactly like output latents (a single max-size
+            # reference adds ~4x a 1024x1024 output's tokens). shape[1] is the packed sequence
+            # length; x4 converts it back to the pre-packing latent area the estimate is fitted in.
+            extra_latent_area = 0
+            if ref_image_extension is not None:
+                extra_latent_area = int(ref_image_extension.ref_image_latents.shape[1]) * 4
+            transformer_info = context.models.load(self.transformer.transformer)
+            working_memory = estimate_denoise_working_memory_for_model(
+                model=transformer_info.model,
+                latent_height=latent_h,
+                latent_width=latent_w,
+                batch_size=b,
+                inference_dtype=inference_dtype,
+                family="flux2",
+                extra_latent_area=extra_latent_area,
+            )
+
             # Load the transformer model
             (cached_weights, transformer) = exit_stack.enter_context(
-                context.models.load(self.transformer.transformer).model_on_device()
+                transformer_info.model_on_device(working_mem_bytes=working_memory.bytes)
             )
             config = transformer_config
 
@@ -490,6 +510,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     ref_image_extension.ref_image_ids,
                 )
 
+            mem_probe = working_memory.measure(context.logger, pixel_height=self.height, pixel_width=self.width)
             x = denoise(
                 model=transformer,
                 img=x,
@@ -508,6 +529,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 img_cond_seq=img_cond_seq,
                 img_cond_seq_ids=img_cond_seq_ids,
             )
+            mem_probe.end()
 
         # Apply BN denormalization if BN stats are available
         # The diffusers Flux2KleinPipeline applies: latents = latents * bn_std + bn_mean

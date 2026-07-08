@@ -32,6 +32,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageConditioningInfo
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -461,7 +462,20 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         model_is_quantized = transformer_config.format in (ModelFormat.GGUFQuantized,)
 
         with ExitStack() as exit_stack:
-            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+            # Use PRE-PACKING latent spatial dims (latent_height/latent_width) and the latent batch.
+            working_memory = estimate_denoise_working_memory_for_model(
+                model=transformer_info.model,
+                latent_height=latent_height,
+                latent_width=latent_width,
+                batch_size=latents.shape[0],
+                inference_dtype=inference_dtype,
+                family="qwen",
+            )
+
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=working_memory.bytes)
+            )
             assert isinstance(transformer, QwenImageTransformer2DModel)
 
             # Apply LoRA patches to the transformer
@@ -476,6 +490,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
             )
 
+            mem_probe = working_memory.measure(context.logger, pixel_height=self.height, pixel_width=self.width)
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / 1000 to the transformer
                 timestep = t.expand(latents.shape[0]).to(inference_dtype)
@@ -535,6 +550,8 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         latents=self._unpack_latents(latents, latent_height, latent_width),
                     ),
                 )
+
+            mem_probe.end()
 
         # Unpack back to 4D then add frame dim for the video-style VAE: (B, C, 1, H, W)
         latents = self._unpack_latents(latents, latent_height, latent_width)
