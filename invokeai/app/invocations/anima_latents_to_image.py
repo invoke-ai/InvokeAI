@@ -41,6 +41,19 @@ ANIMA_VAE_TILE_SIZE = 512
 ANIMA_VAE_TILE_STRIDE = 384
 
 
+def _is_oom_error(e: RuntimeError) -> bool:
+    """Return True if the error indicates a CUDA out-of-memory condition.
+
+    The caching allocator raises torch.cuda.OutOfMemoryError, but an OOM surfaced from inside a
+    cuDNN/cuBLAS kernel (e.g. workspace allocation in the Wan VAE's convolutions) arrives as a
+    plain RuntimeError, which must be matched by message.
+    """
+    if isinstance(e, torch.cuda.OutOfMemoryError):
+        return True
+    msg = str(e)
+    return "out of memory" in msg.lower() or "CUDNN_STATUS_ALLOC_FAILED" in msg or "CUBLAS_STATUS_ALLOC_FAILED" in msg
+
+
 @invocation(
     "anima_l2i",
     title="Latents to Image - Anima",
@@ -146,8 +159,8 @@ class AnimaLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
                     try:
                         decoded = vae.decode(latents, return_dict=False)[0]
-                    except torch.cuda.OutOfMemoryError:
-                        if use_tiling:
+                    except RuntimeError as e:
+                        if use_tiling or not _is_oom_error(e):
                             raise
                         # The working-memory estimate was insufficient on this system;
                         # retry once with tiling, which caps the peak allocation.
