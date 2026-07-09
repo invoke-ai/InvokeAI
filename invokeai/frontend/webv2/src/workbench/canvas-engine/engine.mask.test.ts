@@ -349,4 +349,46 @@ describe('mask invert', () => {
 
     engine.dispose();
   });
+
+  it('extracts through a live unflushed mask whose contract bitmap is still null', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const doc = maskDoc();
+    doc.layers.push({
+      blendMode: 'normal',
+      id: 'raster1',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Raster 1',
+      opacity: 1,
+      source: { image: { height: 100, imageName: 'raster-image', width: 100 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    const reactive = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const overlay = createInputCanvas();
+    const screen = createInputCanvas();
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    raf.flush();
+
+    engine.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(50, 50));
+    overlay.fire('pointerup', pointerAt(50, 50, 0));
+
+    expect(await engine.extractMaskedArea('mask1')).toMatchObject({ status: 'extracted' });
+    engine.dispose();
+  });
 });

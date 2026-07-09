@@ -52,7 +52,7 @@ const useSelectedModelBase = (): string | null => {
 
 interface ControlLayerSettingsProps {
   engine: CanvasEngine | null;
-  focusFilter?: boolean;
+  filterRequestToken?: number | null;
   layer: CanvasControlLayerContract;
 }
 
@@ -64,7 +64,7 @@ interface ControlLayerSettingsProps {
  * undo stack (`updateCanvasLayerConfig`); the filter preview runs on the utility
  * queue and never mutates the document until "Apply".
  */
-export const ControlLayerSettings = ({ engine, focusFilter = false, layer }: ControlLayerSettingsProps) => {
+export const ControlLayerSettings = ({ engine, filterRequestToken = null, layer }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
@@ -339,10 +339,10 @@ export const ControlLayerSettings = ({ engine, focusFilter = false, layer }: Con
        * unmount cleanup (see its ref-callback below).
        */}
       <ControlFilterSection
-        key={layer.id}
+        key={`${layer.id}-${filterRequestToken ?? 'default'}`}
         dispatch={dispatch}
         engine={engine}
-        focusFilter={focusFilter}
+        focusFilter={filterRequestToken !== null}
         layer={layer}
       />
     </Stack>

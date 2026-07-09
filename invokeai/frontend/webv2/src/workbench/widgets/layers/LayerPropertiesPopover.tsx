@@ -92,7 +92,7 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
                 <LayerTypeSettings
                   dispatch={dispatch}
                   engine={engine}
-                  focusFilter={request?.section === 'filter'}
+                  filterRequestToken={request?.section === 'filter' ? request.token : null}
                   layer={layer}
                 />
               </Stack>
@@ -161,12 +161,12 @@ const LayerBlendModeControl = ({
 const LayerTypeSettings = ({
   dispatch,
   engine,
-  focusFilter,
+  filterRequestToken,
   layer,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
   engine: CanvasEngine | null;
-  focusFilter: boolean;
+  filterRequestToken: number | null;
   layer: CanvasLayerContract;
 }) => {
   switch (layer.type) {
@@ -175,7 +175,9 @@ const LayerTypeSettings = ({
     case 'regional_guidance':
       return <RegionalGuidanceSettings key={layer.id} engine={engine} layer={layer} />;
     case 'control':
-      return <ControlLayerSettings key={layer.id} engine={engine} focusFilter={focusFilter} layer={layer} />;
+      return (
+        <ControlLayerSettings key={layer.id} engine={engine} filterRequestToken={filterRequestToken} layer={layer} />
+      );
     case 'raster':
       return <RasterLayerSettings key={layer.id} dispatch={dispatch} engine={engine} layer={layer} />;
   }

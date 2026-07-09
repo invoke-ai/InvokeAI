@@ -1,3 +1,5 @@
+import type { CanvasLayerContract } from '@workbench/types';
+
 import { createExternalStore } from '@workbench/externalStore';
 
 export type LayerPropertiesSection = 'filter';
@@ -34,3 +36,11 @@ export const useLayerPropertiesRequest = (layerId: string): LayerPropertiesReque
     (snapshot) => (snapshot.request?.layerId === layerId ? snapshot.request : null),
     Object.is
   );
+
+export const useCurrentLayerPropertiesRequest = (): LayerPropertiesRequest | null =>
+  layerPropertiesRequestStore.useSelector((snapshot) => snapshot.request, Object.is);
+
+export const isLayerPropertiesGroupRequested = (
+  request: LayerPropertiesRequest | null,
+  layers: readonly CanvasLayerContract[]
+): boolean => !!request && layers.some((layer) => layer.id === request.layerId);

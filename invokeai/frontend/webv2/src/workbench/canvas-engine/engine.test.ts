@@ -532,6 +532,32 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('copyLayerToRaster records mask copies in engine history', async () => {
+    const mask: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('mask'),
+      mask: {
+        bitmap: { height: 10, imageName: 'mask-image', width: 10 },
+        fill: { color: '#e07575', style: 'diagonal' },
+      },
+    };
+    const { projectId, store } = createReducerBackedStore({ ...makeDoc(), layers: [mask] });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+
+    const newId = await engine.copyLayerToRaster('mask');
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === newId)).toBe(true);
+
+    engine.undo();
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === newId)).toBe(false);
+    engine.redo();
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === newId)).toBe(true);
+    engine.dispose();
+  });
+
   it('setTool switches the active tool and updates the store', () => {
     const { engine } = createEngine();
     const listener = vi.fn();
@@ -1956,6 +1982,53 @@ describe('boolean raster operations', () => {
     expect(await engine.booleanMergeRasterLayers('upper', 'exclude')).toBe('unsupported');
     expect(await engine.booleanMergeRasterLayers('missing', 'exclude')).toBe('missing');
     expect(engine.getDocument()!.layers).toEqual(doc.layers);
+    engine.dispose();
+  });
+
+  it('merges two live unflushed paint caches whose contract bitmaps are still null', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const emptyPaint = (id: string): CanvasRasterLayerContractV2 => ({
+      blendMode: 'normal',
+      id,
+      isEnabled: true,
+      isLocked: false,
+      name: id,
+      opacity: 1,
+      source: { bitmap: null, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    const upper = emptyPaint('upper');
+    const below = emptyPaint('below');
+    const doc = { ...makeDoc(), layers: [upper, below], selectedLayerId: 'upper' };
+    const { projectId, store } = createReducerBackedStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const overlay = createInputCanvas();
+    const screen = createInputCanvas();
+    engine.attach(screen.element, overlay.element);
+    engine.setTool('brush');
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    overlay.fire('pointerdown', pointerAt(10, 10));
+    overlay.fire('pointermove', pointerAt(30, 30));
+    overlay.fire('pointerup', pointerAt(30, 30, { buttons: 0 }));
+    store.dispatch({ id: 'below', type: 'setCanvasSelectedLayer' });
+    overlay.fire('pointerdown', pointerAt(15, 15));
+    overlay.fire('pointermove', pointerAt(35, 35));
+    overlay.fire('pointerup', pointerAt(35, 35, { buttons: 0 }));
+
+    expect(await engine.booleanMergeRasterLayers('upper', 'intersect')).toBe('merged');
     engine.dispose();
   });
 });
@@ -3390,6 +3463,32 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     return { bitmapStore, engine, paintCache: paintCache!, raf, resolver, setDocument };
   };
 
+  const paintOneStrokeWithReducer = async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const { projectId, store } = createReducerBackedStore(paintDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const overlay = createInputCanvas();
+    const screen = createInputCanvas();
+    engine.attach(screen.element, overlay.element);
+    engine.setTool('brush');
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+    return engine;
+  };
+
   it('keeps an unflushed paint layer’s pixels on a transform/opacity-only change (no re-rasterize)', async () => {
     const { engine, paintCache, raf, resolver, setDocument } = await paintOneStroke();
 
@@ -3417,6 +3516,56 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     expect(resolver).not.toHaveBeenCalled();
     expect(engine.getDocument()!.layers[0]!.opacity).toBe(0.5);
 
+    engine.dispose();
+  });
+
+  it('exports an unflushed paint layer from its ready live cache when the contract bitmap is still null', async () => {
+    const { engine, paintCache } = await paintOneStroke();
+
+    const result = await engine.exportLayerPixels('paint1');
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.surface).toBe(paintCache);
+      expect(result.rect.width).toBeGreaterThan(0);
+      expect(result.rect.height).toBeGreaterThan(0);
+    }
+    engine.dispose();
+  });
+
+  it('preserves live pixels through contract copy and conversion history', async () => {
+    const engine = await paintOneStrokeWithReducer();
+    const raster = engine.getDocument()!.layers[0]!;
+    if (raster.type !== 'raster') {
+      throw new Error('expected raster source');
+    }
+    const control: CanvasLayerContract = {
+      ...raster,
+      adapter: {
+        beginEndStepPct: [0, 0.75],
+        controlMode: 'balanced',
+        kind: 'controlnet',
+        model: null,
+        weight: 1,
+      },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const copy = { ...control, id: 'control-copy', name: 'Control copy' };
+
+    expect(engine.commitLayerCopy('Copy layer', raster.id, copy, 0)).toBe(true);
+    expect((await engine.exportLayerPixels(copy.id)).status).toBe('ok');
+    engine.undo();
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === copy.id)).toBe(false);
+    engine.redo();
+    expect((await engine.exportLayerPixels(copy.id)).status).toBe('ok');
+
+    expect(engine.commitLayerConversion('Convert layer', raster, control)).toBe(true);
+    expect(engine.getDocument()!.layers.find((layer) => layer.id === raster.id)?.type).toBe('control');
+    expect((await engine.exportLayerPixels(raster.id)).status).toBe('ok');
+    engine.undo();
+    expect(engine.getDocument()!.layers.find((layer) => layer.id === raster.id)?.type).toBe('raster');
+    expect((await engine.exportLayerPixels(raster.id)).status).toBe('ok');
     engine.dispose();
   });
 

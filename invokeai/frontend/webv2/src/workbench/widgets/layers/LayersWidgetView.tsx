@@ -9,6 +9,7 @@ import type { LayerGroupKey } from './layerGroups';
 
 import { groupLayers } from './layerGroups';
 import { LayerGroupSection } from './LayerGroupSection';
+import { isLayerPropertiesGroupRequested, useCurrentLayerPropertiesRequest } from './layerPropertiesRequestStore';
 import { LayersPanelHeader } from './LayersPanelHeader';
 
 /**
@@ -22,6 +23,7 @@ export const LayersWidgetView = () => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
   const dispatch = useWorkbenchDispatch();
+  const propertiesRequest = useCurrentLayerPropertiesRequest();
   const { layers, selectedLayerId } = useActiveProjectSelector(
     (project) => ({
       layers: project.canvas.document.layers,
@@ -70,7 +72,9 @@ export const LayersWidgetView = () => {
               engine={engine}
               groupKey={group.key}
               groupLayers={group.layers}
-              isCollapsed={collapsedGroups[group.key] === true}
+              isCollapsed={
+                collapsedGroups[group.key] === true && !isLayerPropertiesGroupRequested(propertiesRequest, group.layers)
+              }
               layers={layers}
               onToggleCollapse={handleToggleCollapse}
               selectedLayerId={selectedLayerId}

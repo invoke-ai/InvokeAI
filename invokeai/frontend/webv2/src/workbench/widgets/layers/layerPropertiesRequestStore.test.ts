@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createControlLayer, createEmptyPaintLayer } from './layerOps';
 import {
   clearLayerPropertiesRequest,
   getLayerPropertiesRequest,
+  isLayerPropertiesGroupRequested,
   layerPropertiesRequestStore,
   requestLayerProperties,
 } from './layerPropertiesRequestStore';
@@ -42,5 +44,14 @@ describe('layerPropertiesRequestStore', () => {
     expect(getLayerPropertiesRequest()).toEqual(second);
     clearLayerPropertiesRequest(second?.token);
     expect(getLayerPropertiesRequest()).toBeNull();
+  });
+
+  it('identifies the collapsed layer group that must mount to consume the request', () => {
+    const control = createControlLayer('Control', 'control-1');
+    requestLayerProperties(control.id, 'filter');
+    const request = getLayerPropertiesRequest();
+
+    expect(isLayerPropertiesGroupRequested(request, [control])).toBe(true);
+    expect(isLayerPropertiesGroupRequested(request, [createEmptyPaintLayer('Raster', 'raster-1')])).toBe(false);
   });
 });

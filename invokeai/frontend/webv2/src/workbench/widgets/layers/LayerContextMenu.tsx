@@ -248,6 +248,10 @@ const LayerMenu = ({
       if (!copied) {
         return;
       }
+      if (engine) {
+        engine.commitLayerCopy(label, layer.id, copied, index);
+        return;
+      }
       applyStructural(
         engine,
         dispatch,
@@ -256,7 +260,7 @@ const LayerMenu = ({
         { ids: [copied.id], type: 'removeCanvasLayers' }
       );
     },
-    [dispatch, engine, index]
+    [dispatch, engine, index, layer.id]
   );
 
   const convert = useCallback(
@@ -276,13 +280,18 @@ const LayerMenu = ({
       }
       // Convert in place, preserving the pixel source + id. The inverse restores
       // the layer verbatim (adapter/filter config and all).
-      applyStructural(
-        engine,
-        dispatch,
-        label,
-        { id: layer.id, layer: converted, targetType, type: 'convertCanvasLayer' },
-        { id: layer.id, layer: structuredClone(layer), targetType: layer.type, type: 'convertCanvasLayer' }
-      );
+      const original = structuredClone(layer);
+      if (engine) {
+        engine.commitLayerConversion(label, original, converted);
+      } else {
+        applyStructural(
+          engine,
+          dispatch,
+          label,
+          { id: layer.id, layer: converted, targetType, type: 'convertCanvasLayer' },
+          { id: layer.id, layer: original, targetType: layer.type, type: 'convertCanvasLayer' }
+        );
+      }
     },
     [dispatch, engine, layer]
   );
@@ -386,8 +395,9 @@ const LayerMenu = ({
   }, [engine, layer.id]);
 
   const handleFilter = useCallback(() => {
+    dispatch({ region: 'right', type: 'openRegionWidget', widgetId: 'layers' });
     requestLayerProperties(layer.id, 'filter');
-  }, [layer.id]);
+  }, [dispatch, layer.id]);
 
   const handleBooleanRaster = useCallback(
     (operation: 'intersect' | 'cutout' | 'cutaway' | 'exclude') => {

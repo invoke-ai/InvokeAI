@@ -354,6 +354,10 @@ export interface CanvasEngine {
    * so they share the canvas undo stack with paint edits.
    */
   commitStructural(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): void;
+  /** Adds a contract-built layer while preserving the source layer's live cache pixels. */
+  commitLayerCopy(label: string, sourceLayerId: string, layer: CanvasLayerContract, index: number): boolean;
+  /** Converts a layer contract in place while preserving its live cache pixels through undo/redo. */
+  commitLayerConversion(label: string, before: CanvasLayerContract, after: CanvasLayerContract): boolean;
   /**
    * Updates the active transform session's live transform (a numeric options-bar
    * edit). Refreshes the preview; no dispatch until Apply. A no-op with no session.
@@ -1105,6 +1109,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!isSupportedExportSource(source)) {
       return { status: 'unsupported' };
     }
+    const liveEntry = layerCache.get(layerId);
+    if (liveEntry && !liveEntry.stale && !inFlight.has(layer.id) && !isEmpty(liveEntry.rect)) {
+      return { rect: liveEntry.rect, status: 'ok', surface: liveEntry.surface };
+    }
     const contentRect = getSourceContentRect(layer, doc);
     if (isEmpty(contentRect)) {
       return { status: 'empty' };
@@ -1269,13 +1277,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
       type: 'raster',
     };
-    store.dispatch({ index: sourceIndex, layer, type: 'addCanvasLayer' });
-
-    const target = layerCache.getOrCreateRect(newId, baked.rect);
-    target.surface.ctx.drawImage(baked.surface.canvas, 0, 0);
-    target.stale = false;
-    notifyLayerPainted(newId);
-    bitmapStore.markLayerDirty(newId);
+    const apply = (): void => {
+      store.dispatch({ index: sourceIndex, layer, type: 'addCanvasLayer' });
+      seedGeneratedPaintCache(newId, baked.rect, baked.surface);
+    };
+    apply();
+    history.push({
+      bytes: baked.rect.width * baked.rect.height * 4 + 256,
+      label: 'Copy layer to raster',
+      redo: apply,
+      undo: () => store.dispatch({ ids: [newId], type: 'removeCanvasLayers' }),
+    });
     return newId;
   };
 
@@ -2047,14 +2059,100 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     intersect: 'source-in',
   };
 
-  const seedGeneratedPaintCache = (layerId: string, rect: Rect, pixels: RasterSurface): void => {
+  const seedGeneratedPaintCache = (layerId: string, rect: Rect, pixels: RasterSurface, persist = true): void => {
     layerCache.delete(layerId);
     adjustedSurfaceCache.delete(layerId);
     const target = layerCache.getOrCreateRect(layerId, rect);
     target.surface.ctx.drawImage(pixels.canvas, 0, 0);
     target.stale = false;
     notifyLayerPainted(layerId);
-    bitmapStore.markLayerDirty(layerId);
+    if (persist) {
+      bitmapStore.markLayerDirty(layerId);
+    }
+  };
+
+  const captureLayerCache = (
+    layer: CanvasLayerContract,
+    doc: CanvasDocumentContractV2
+  ): { pixels: RasterSurface; rect: Rect } | null | 'not-ready' => {
+    const entry = layerCache.get(layer.id);
+    if (!entry || isEmpty(entry.rect)) {
+      return null;
+    }
+    if (inFlight.has(layer.id) || (entry.stale && !isEmpty(getSourceContentRect(layer, doc)))) {
+      return 'not-ready';
+    }
+    const pixels = backend.createSurface(entry.rect.width, entry.rect.height);
+    pixels.ctx.drawImage(entry.surface.canvas, 0, 0);
+    return { pixels, rect: { ...entry.rect } };
+  };
+
+  const layerNeedsPixelPersistence = (layer: CanvasLayerContract): boolean =>
+    renderableSourceOf(layer)?.type === 'paint';
+
+  const commitLayerCopy = (
+    label: string,
+    sourceLayerId: string,
+    layer: CanvasLayerContract,
+    index: number
+  ): boolean => {
+    if (pipeline.isGestureActive()) {
+      return false;
+    }
+    endNudgeBurst();
+    const doc = mirror.getDocument();
+    const source = doc?.layers.find((candidate) => candidate.id === sourceLayerId);
+    if (!doc || !source || doc.layers.some((candidate) => candidate.id === layer.id)) {
+      return false;
+    }
+    const captured = captureLayerCache(source, doc);
+    if (captured === 'not-ready') {
+      return false;
+    }
+    const apply = (): void => {
+      store.dispatch({ index, layer, type: 'addCanvasLayer' });
+      if (captured) {
+        seedGeneratedPaintCache(layer.id, captured.rect, captured.pixels, layerNeedsPixelPersistence(layer));
+      }
+    };
+    apply();
+    history.push({
+      bytes: captured ? captured.rect.width * captured.rect.height * 4 + 256 : 256,
+      label,
+      redo: apply,
+      undo: () => store.dispatch({ ids: [layer.id], type: 'removeCanvasLayers' }),
+    });
+    return true;
+  };
+
+  const commitLayerConversion = (label: string, before: CanvasLayerContract, after: CanvasLayerContract): boolean => {
+    if (pipeline.isGestureActive() || before.id !== after.id || before.type === after.type) {
+      return false;
+    }
+    endNudgeBurst();
+    const doc = mirror.getDocument();
+    const current = doc?.layers.find((candidate) => candidate.id === before.id);
+    if (!doc || !current || current.type !== before.type) {
+      return false;
+    }
+    const captured = captureLayerCache(current, doc);
+    if (captured === 'not-ready') {
+      return false;
+    }
+    const apply = (layer: CanvasLayerContract): void => {
+      store.dispatch({ id: layer.id, layer, targetType: layer.type, type: 'convertCanvasLayer' });
+      if (captured) {
+        seedGeneratedPaintCache(layer.id, captured.rect, captured.pixels, layerNeedsPixelPersistence(layer));
+      }
+    };
+    apply(after);
+    history.push({
+      bytes: captured ? captured.rect.width * captured.rect.height * 4 + 256 : 256,
+      label,
+      redo: () => apply(after),
+      undo: () => apply(before),
+    });
+    return true;
   };
 
   const booleanMergeRasterLayers = async (
@@ -2164,7 +2262,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!maskLayer || maskLayer.type !== 'inpaint_mask') {
       return { status: 'unsupported' };
     }
-    if (isEmpty(getSourceContentRect(maskLayer, doc))) {
+    const liveMask = layerCache.get(maskLayerId);
+    if (isEmpty(getSourceContentRect(maskLayer, doc)) && (!liveMask || isEmpty(liveMask.rect))) {
       return { status: 'empty' };
     }
     const contributors = doc.layers.filter(
@@ -3505,6 +3604,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     cancelTextEdit,
     cancelTransform,
     commitOpenTextSession,
+    commitLayerConversion,
+    commitLayerCopy,
     commitStructural,
     commitTextEdit,
     cropLayerToBbox,
