@@ -28,5 +28,7 @@ describe('getDenoisingStrengthWavePath', () => {
     expect(markup.match(/<path/g)).toHaveLength(1);
     expect(markup).not.toContain('stroke-dasharray');
     expect(markup.match(/ Q/g)).toHaveLength(5);
+    expect(markup).toContain('width="56"');
+    expect(markup).not.toContain('position:absolute');
   });
 });

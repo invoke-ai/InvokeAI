@@ -37,9 +37,9 @@ export const DenoisingStrengthWave = ({ value }: { value: number }) => {
       aria-hidden
       height={WAVE_HEIGHT}
       preserveAspectRatio="none"
-      style={{ left: 0, pointerEvents: 'none', position: 'absolute', top: '50%', transform: 'translateY(-50%)' }}
+      style={{ display: 'block', flexShrink: 0, marginLeft: 8, pointerEvents: 'none' }}
       viewBox={`0 0 ${WAVE_WIDTH} ${WAVE_HEIGHT}`}
-      width="100%"
+      width={56}
     >
       <path
         d={path}

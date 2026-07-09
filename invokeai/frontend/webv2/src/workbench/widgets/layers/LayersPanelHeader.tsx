@@ -25,9 +25,6 @@ import { DenoisingStrengthWave } from './DenoisingStrengthWave';
 import { applyStructural } from './layerOps';
 
 const STRENGTH_DEBOUNCE_MS = 250;
-const DENOISING_STRENGTH_SLIDER_CSS = {
-  '& [data-part="range"], & [data-part="track"]': { background: 'transparent' },
-} as const;
 
 const formatStrengthPercent = (value: number): string => `${Math.round(value * 100)}%`;
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
@@ -290,7 +287,7 @@ const DenoisingStrengthControl = () => {
   const strengthAriaLabel = useMemo(() => [t('widgets.layers.denoisingStrength')], [t]);
   const strengthSliderValue = useMemo(() => [draftStrength], [draftStrength]);
   const strengthNumberValue = useMemo(() => draftStrength.toFixed(2), [draftStrength]);
-  const strengthTrackDecoration = useMemo(() => <DenoisingStrengthWave value={draftStrength} />, [draftStrength]);
+  const strengthWave = useMemo(() => <DenoisingStrengthWave value={draftStrength} />, [draftStrength]);
 
   const onSliderChange = useCallback(
     ({ value }: SliderValueChangeDetails) => {
@@ -312,11 +309,10 @@ const DenoisingStrengthControl = () => {
   );
 
   return (
-    <Field label={t('widgets.layers.denoisingStrength')} helpText={t('widgets.layers.denoisingStrengthHelp')}>
+    <Field label={t('widgets.layers.denoisingStrength')} labelEnd={strengthWave} orientation="horizontal">
       <Stack direction="row" gap="2">
         <Slider
           aria-label={strengthAriaLabel}
-          css={DENOISING_STRENGTH_SLIDER_CSS}
           flex="1"
           formatValue={formatStrengthPercent}
           max={MAX_CANVAS_DENOISING_STRENGTH}
@@ -324,7 +320,6 @@ const DenoisingStrengthControl = () => {
           minW="0"
           size="sm"
           step={0.01}
-          trackDecoration={strengthTrackDecoration}
           value={strengthSliderValue}
           withThumbTooltip
           onValueChange={onSliderChange}
