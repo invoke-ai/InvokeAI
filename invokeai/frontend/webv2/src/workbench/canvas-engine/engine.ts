@@ -131,6 +131,9 @@ export type StagedPreviewInput = { imageName: string } | { dataUrl: string; widt
  */
 export type MergeVisibleResult = 'merged' | 'not-ready' | 'nothing';
 
+export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclude';
+export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty';
+
 /**
  * Result of {@link CanvasEngine.exportRasterLayersToPsd}: `'exported'` on
  * success, `'nothing'` when there are no raster layers with content, `'too-large'`
@@ -268,6 +271,12 @@ export interface CanvasEngine {
    * engine's undo history (the inverse would need the discarded pixels).
    */
   mergeLayerDown(upperLayerId: string): boolean;
+  /**
+   * Applies a Canvas2D boolean operation to an adjacent raster pair, inserts the
+   * paint-backed result above them, and disables (but preserves) both sources.
+   * The complete change is one engine-history entry.
+   */
+  booleanMergeRasterLayers(upperLayerId: string, operation: BooleanRasterOperation): Promise<BooleanRasterResult>;
   /**
    * Folds ALL visible mergeable raster layers together (the raster group-header
    * "merge visible" action; legacy `mergeVisibleOfType`). Plans runs via the pure
@@ -2025,6 +2034,113 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return !!entry && !entry.stale && !inFlight.has(layer.id);
   };
 
+  const booleanCompositeModes: Record<BooleanRasterOperation, GlobalCompositeOperation> = {
+    cutaway: 'source-out',
+    cutout: 'destination-in',
+    exclude: 'xor',
+    intersect: 'source-in',
+  };
+
+  const seedGeneratedPaintCache = (layerId: string, rect: Rect, pixels: RasterSurface): void => {
+    layerCache.delete(layerId);
+    adjustedSurfaceCache.delete(layerId);
+    const target = layerCache.getOrCreateRect(layerId, rect);
+    target.surface.ctx.drawImage(pixels.canvas, 0, 0);
+    target.stale = false;
+    notifyLayerPainted(layerId);
+    bitmapStore.markLayerDirty(layerId);
+  };
+
+  const booleanMergeRasterLayers = async (
+    upperLayerId: string,
+    operation: BooleanRasterOperation
+  ): Promise<BooleanRasterResult> => {
+    if (pipeline.isGestureActive()) {
+      return 'busy';
+    }
+    endNudgeBurst();
+    const doc = mirror.getDocument();
+    if (!doc) {
+      return 'missing';
+    }
+    const upperIndex = doc.layers.findIndex((layer) => layer.id === upperLayerId);
+    if (upperIndex < 0) {
+      return 'missing';
+    }
+    const upper = doc.layers[upperIndex];
+    const below = doc.layers[upperIndex + 1];
+    if (!upper || !below) {
+      return 'missing';
+    }
+    if (!isMergeableRasterLayer(upper) || !isMergeableRasterLayer(below)) {
+      return 'unsupported';
+    }
+    if (!isLayerCacheReadyForOp(upper, doc) || !isLayerCacheReadyForOp(below, doc)) {
+      return 'not-ready';
+    }
+
+    const [upperPixels, belowPixels] = await Promise.all([
+      exportBakedLayerPixels(upper.id),
+      exportBakedLayerPixels(below.id),
+    ]);
+    if (upperPixels.status !== 'ok' || belowPixels.status !== 'ok') {
+      if (upperPixels.status === 'not-ready' || belowPixels.status === 'not-ready') {
+        return 'not-ready';
+      }
+      return 'empty';
+    }
+
+    const resultRect = roundOut(union(upperPixels.rect, belowPixels.rect));
+    if (isEmpty(resultRect)) {
+      return 'empty';
+    }
+    const resultPixels = backend.createSurface(resultRect.width, resultRect.height);
+    const ctx = resultPixels.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, resultRect.width, resultRect.height);
+    ctx.globalAlpha = below.opacity;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(belowPixels.surface.canvas, belowPixels.rect.x - resultRect.x, belowPixels.rect.y - resultRect.y);
+    ctx.globalAlpha = upper.opacity;
+    ctx.globalCompositeOperation = booleanCompositeModes[operation];
+    ctx.drawImage(upperPixels.surface.canvas, upperPixels.rect.x - resultRect.x, upperPixels.rect.y - resultRect.y);
+
+    const resultId = createLayerId();
+    const resultLayer: CanvasLayerContract = {
+      blendMode: 'normal',
+      id: resultId,
+      isEnabled: true,
+      isLocked: false,
+      name: `${upper.name} ${operation}`,
+      opacity: 1,
+      source: { bitmap: null, offset: { x: resultRect.x, y: resultRect.y }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    };
+    const originalEnabled = [
+      { id: upper.id, isEnabled: upper.isEnabled },
+      { id: below.id, isEnabled: below.isEnabled },
+    ];
+    const disabled = originalEnabled.map(({ id }) => ({ id, isEnabled: false }));
+    const apply = (): void => {
+      store.dispatch({ index: upperIndex, layer: resultLayer, type: 'addCanvasLayer' });
+      seedGeneratedPaintCache(resultId, resultRect, resultPixels);
+      store.dispatch({ type: 'setCanvasLayersEnabled', updates: disabled });
+    };
+
+    apply();
+    history.push({
+      bytes: resultRect.width * resultRect.height * 4 + 256,
+      label: `Boolean ${operation}`,
+      redo: apply,
+      undo: () => {
+        store.dispatch({ ids: [resultId], type: 'removeCanvasLayers' });
+        store.dispatch({ type: 'setCanvasLayersEnabled', updates: originalEnabled });
+      },
+    });
+    return 'merged';
+  };
+
   const mergeLayerDown = (upperLayerId: string): boolean => {
     // No-op mid-gesture (a mod+e mashed during a paint drag): merging writes
     // pixels and dispatches a structural collapse under the open stroke session.
@@ -3289,6 +3405,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   return {
     applyTransform,
+    booleanMergeRasterLayers,
     clearCaches,
     clearHistory,
     contextMenuLayerIdAt,

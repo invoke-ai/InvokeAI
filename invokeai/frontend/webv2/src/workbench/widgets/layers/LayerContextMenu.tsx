@@ -380,6 +380,13 @@ const LayerMenu = ({
     void engine?.cropLayerToBbox(layer.id);
   }, [engine, layer.id]);
 
+  const handleBooleanRaster = useCallback(
+    (operation: 'intersect' | 'cutout' | 'cutaway' | 'exclude') => {
+      void engine?.booleanMergeRasterLayers(layer.id, operation);
+    },
+    [engine, layer.id]
+  );
+
   const handleCopyToRaster = useCallback(() => {
     if (layer.type === 'control') {
       addCopy(copyControlToRaster(layer, createLayerId()), getActionLabel('copy-to-raster'));
@@ -484,6 +491,12 @@ const LayerMenu = ({
         case 'crop-to-bbox':
           handleCropToBbox();
           break;
+        case 'intersect':
+        case 'cutout':
+        case 'cutaway':
+        case 'exclude':
+          handleBooleanRaster(id);
+          break;
         case 'copy-to-raster':
           handleCopyToRaster();
           break;
@@ -533,6 +546,7 @@ const LayerMenu = ({
       handleConvertToInpaintMask,
       handleConvertToRegionalGuidance,
       handleConvertToRaster,
+      handleBooleanRaster,
       handleCopyToControl,
       handleCopyToClipboard,
       handleCopyToInpaintMask,
@@ -733,11 +747,15 @@ const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
   'convert-to-inpaint-mask': ImageIcon,
   'convert-to-raster': ImageIcon,
   'convert-to-regional-guidance': ImageIcon,
+  cutaway: MergeIcon,
+  cutout: MergeIcon,
   delete: Trash2Icon,
   duplicate: CopyIcon,
+  exclude: MergeIcon,
   'fit-to-bbox': ImageIcon,
   'inpaint-denoise-limit': SlidersHorizontalIcon,
   'inpaint-noise': SlidersHorizontalIcon,
+  intersect: MergeIcon,
   'merge-down': MergeIcon,
   'move-backward': ArrowDownIcon,
   'move-forward': ArrowUpIcon,

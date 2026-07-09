@@ -1858,6 +1858,108 @@ describe('mergeLayerDown', () => {
   });
 });
 
+describe('boolean raster operations', () => {
+  const setup = () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const { projectId, store } = createReducerBackedStore(twoPaintDoc());
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const backend = {
+      ...base,
+      createSurface: (width: number, height: number): StubRasterSurface => {
+        const surface = base.createSurface(width, height);
+        surfaces.push(surface);
+        return surface;
+      },
+    };
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+    engine.attach(screen.element, overlay.element);
+    return { engine, raf, surfaces };
+  };
+
+  it.each([
+    ['intersect', 'source-in'],
+    ['cutout', 'destination-in'],
+    ['cutaway', 'source-out'],
+    ['exclude', 'xor'],
+  ] as const)('applies %s with %s, preserves its sources, and supports undo/redo', async (operation, composite) => {
+    const { engine, raf, surfaces } = setup();
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    expect(await engine.booleanMergeRasterLayers('upper', operation)).toBe('merged');
+
+    const resultSurface = surfaces.find((surface) =>
+      surface.callLog.some(
+        (entry) => entry.op === 'set' && entry.args[0] === 'globalCompositeOperation' && entry.args[1] === composite
+      )
+    );
+    expect(resultSurface).toBeDefined();
+    expect(resultSurface!.callLog.filter((entry) => entry.op === 'drawImage')).toHaveLength(2);
+
+    const merged = engine.getDocument()!;
+    const result = merged.layers.find((layer) => layer.id !== 'upper' && layer.id !== 'below');
+    expect(result).toMatchObject({
+      isEnabled: true,
+      source: { bitmap: null, offset: { x: 10, y: 20 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    expect(merged.layers.find((layer) => layer.id === 'upper')?.isEnabled).toBe(false);
+    expect(merged.layers.find((layer) => layer.id === 'below')?.isEnabled).toBe(false);
+
+    engine.undo();
+    expect(engine.getDocument()!.layers.map((layer) => [layer.id, layer.isEnabled])).toEqual([
+      ['upper', true],
+      ['below', true],
+    ]);
+
+    engine.redo();
+    expect(engine.getDocument()!.layers.map((layer) => [layer.id, layer.isEnabled])).toEqual([
+      [result!.id, true],
+      ['upper', false],
+      ['below', false],
+    ]);
+    engine.dispose();
+  });
+
+  it('refuses the operation until both raster caches are ready', async () => {
+    const { engine, raf } = setup();
+    raf.flush();
+
+    expect(await engine.booleanMergeRasterLayers('upper', 'intersect')).toBe('not-ready');
+    expect(engine.getDocument()!.layers.map((layer) => layer.id)).toEqual(['upper', 'below']);
+    engine.dispose();
+  });
+
+  it('rejects unsupported and missing layer pairs without modifying the document', async () => {
+    const doc = twoPaintDoc();
+    doc.layers[1] = maskLayer('below');
+    const { projectId, store } = createReducerBackedStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+
+    expect(await engine.booleanMergeRasterLayers('upper', 'exclude')).toBe('unsupported');
+    expect(await engine.booleanMergeRasterLayers('missing', 'exclude')).toBe('missing');
+    expect(engine.getDocument()!.layers).toEqual(doc.layers);
+    engine.dispose();
+  });
+});
+
 // ---- mergeVisibleRasterLayers: whole-fold pre-flight + interleave-safe fold ----
 
 /**

@@ -129,4 +129,16 @@ describe('getLayerContextActions', () => {
 
     expect(actions.find((action) => action.id === 'crop-to-bbox')?.isDisabled).toBe(true);
   });
+
+  it('exposes boolean raster actions only for an adjacent mergeable raster pair', () => {
+    const upper = paintLayer('upper');
+    const below = paintLayer('below');
+    const operations = ['intersect', 'cutout', 'cutaway', 'exclude'];
+
+    expect(idsFor(upper, [upper, below])).toEqual(expect.arrayContaining(operations));
+    expect(idsFor(below, [upper, below])).toEqual(expect.not.arrayContaining(operations));
+    expect(idsFor(upper, [upper, createInpaintMaskLayer('Mask', 'mask')])).toEqual(
+      expect.not.arrayContaining(operations)
+    );
+  });
 });

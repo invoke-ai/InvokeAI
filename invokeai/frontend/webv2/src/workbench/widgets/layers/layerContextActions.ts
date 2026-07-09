@@ -15,6 +15,10 @@ export type LayerContextActionId =
   | 'save-to-assets'
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
+  | 'intersect'
+  | 'cutout'
+  | 'cutaway'
+  | 'exclude'
   | 'copy-to-raster'
   | 'copy-to-control'
   | 'copy-to-inpaint-mask'
@@ -142,6 +146,34 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     id: 'crop-to-bbox',
     isDisabled: (ctx) => !ctx.hasEngine || ctx.layer.isLocked,
     labelKey: 'widgets.layers.actions.cropLayerToBbox',
+  },
+  {
+    defaultLabel: 'Intersect with layer below',
+    group: 'edit',
+    id: 'intersect',
+    isVisible: (ctx) => canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
+    labelKey: 'widgets.layers.actions.intersect',
+  },
+  {
+    defaultLabel: 'Cutout with layer below',
+    group: 'edit',
+    id: 'cutout',
+    isVisible: (ctx) => canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
+    labelKey: 'widgets.layers.actions.cutout',
+  },
+  {
+    defaultLabel: 'Cutaway with layer below',
+    group: 'edit',
+    id: 'cutaway',
+    isVisible: (ctx) => canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
+    labelKey: 'widgets.layers.actions.cutaway',
+  },
+  {
+    defaultLabel: 'Exclude layer below',
+    group: 'edit',
+    id: 'exclude',
+    isVisible: (ctx) => canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
+    labelKey: 'widgets.layers.actions.exclude',
   },
   {
     defaultLabel: 'Copy to raster layer',
