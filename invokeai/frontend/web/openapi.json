@@ -11019,7 +11019,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["anima"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -11067,7 +11069,7 @@
         "tags": ["lora", "model", "anima"],
         "title": "Apply LoRA Collection - Anima",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
         }
@@ -12113,6 +12115,25 @@
                 },
                 {
                   "$ref": "#/components/schemas/ImageField"
+                },
+                {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ImageField"
+                      }
+                    ]
+                  },
+                  "type": "array"
                 }
               ]
             },
@@ -12228,6 +12249,11 @@
             "title": "In Progress",
             "description": "Number of queue items with status 'in_progress'"
           },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting",
+            "description": "Number of queue items with status 'waiting'"
+          },
           "completed": {
             "type": "integer",
             "title": "Completed",
@@ -12257,6 +12283,7 @@
           "destination",
           "pending",
           "in_progress",
+          "waiting",
           "completed",
           "failed",
           "canceled",
@@ -14785,6 +14812,77 @@
         "required": ["output_meta", "tiles", "type", "type"],
         "title": "CalculateImageTilesOutput",
         "type": "object"
+      },
+      "CallSavedWorkflowInvocation": {
+        "category": "workflow",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Displays and later executes against a selected saved workflow.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "workflow_id": {
+            "default": "",
+            "description": "The selected saved workflow ID, managed by the workflow editor UI.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Workflow Id",
+            "type": "string",
+            "ui_type": "SavedWorkflowField"
+          },
+          "workflow_inputs": {
+            "additionalProperties": true,
+            "default": {},
+            "description": "Literal values for the selected workflow's exposed inputs, managed by the workflow editor UI.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": {},
+            "orig_required": false,
+            "title": "Workflow Inputs",
+            "type": "object",
+            "ui_hidden": true
+          },
+          "type": {
+            "const": "call_saved_workflow",
+            "default": "call_saved_workflow",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["workflow", "saved", "library"],
+        "title": "Call Saved Workflow",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WorkflowReturnOutput"
+        }
       },
       "CancelAllExceptCurrentResult": {
         "properties": {
@@ -22998,7 +23096,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["flux"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -23063,7 +23163,7 @@
         "tags": ["lora", "model", "flux"],
         "title": "Apply LoRA Collection - FLUX",
         "type": "object",
-        "version": "1.3.1",
+        "version": "1.3.2",
         "output": {
           "$ref": "#/components/schemas/FluxLoRALoaderOutput"
         }
@@ -24630,7 +24730,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -24678,7 +24780,7 @@
         "tags": ["lora", "model", "flux", "klein", "flux2"],
         "title": "Apply LoRA Collection - Flux2 Klein",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/Flux2KleinLoRALoaderOutput"
         }
@@ -28747,6 +28849,9 @@
                   "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
                 },
                 {
@@ -29416,6 +29521,15 @@
                   "$ref": "#/components/schemas/VAELoaderInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkflowReturnInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ZImageControlInvocation"
                 },
                 {
@@ -29758,6 +29872,15 @@
                   "$ref": "#/components/schemas/VAEOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/WorkflowReturnGetOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkflowReturnOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkflowReturnValueOutput"
+                },
+                {
                   "$ref": "#/components/schemas/ZImageConditioningOutput"
                 },
                 {
@@ -29782,6 +29905,73 @@
             "type": "object",
             "title": "Errors",
             "description": "Errors raised when executing nodes"
+          },
+          "workflow_call_stack": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowCallFrame"
+            },
+            "type": "array",
+            "title": "Workflow Call Stack",
+            "description": "The nested workflow call stack inherited by this execution state."
+          },
+          "workflow_call_history": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowCallExecution"
+            },
+            "type": "array",
+            "title": "Workflow Call History",
+            "description": "Completed or failed workflow-call relationships observed by this execution state."
+          },
+          "workflow_call_parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallParentRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent workflow-call relationship metadata when this execution state is a child workflow session."
+          },
+          "waiting_workflow_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallFrame"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The child workflow call this execution state is currently waiting on, if any."
+          },
+          "waiting_workflow_call_execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallExecution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The active workflow-call relationship metadata for the current waiting child workflow, if any."
+          },
+          "waiting_workflow_call_child_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphExecutionState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The child workflow execution state spawned by the current waiting workflow call, if any."
+          },
+          "max_workflow_call_depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Workflow Call Depth",
+            "description": "The maximum permitted workflow call depth for nested workflow execution.",
+            "default": 4
           },
           "prepared_source_mapping": {
             "additionalProperties": {
@@ -29828,6 +30018,8 @@
           "executed_history",
           "results",
           "errors",
+          "workflow_call_stack",
+          "workflow_call_history",
           "prepared_source_mapping",
           "source_prepared_mapping"
         ],
@@ -36353,6 +36545,9 @@
                 "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
               },
               {
+                "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
               },
               {
@@ -37020,6 +37215,15 @@
               },
               {
                 "$ref": "#/components/schemas/VAELoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageControlInvocation"
@@ -37321,6 +37525,15 @@
                 "$ref": "#/components/schemas/VAEOutput"
               },
               {
+                "$ref": "#/components/schemas/WorkflowReturnGetOutput"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnOutput"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueOutput"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageConditioningOutput"
               },
               {
@@ -37480,6 +37693,9 @@
               },
               {
                 "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
               },
               {
                 "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
@@ -38151,6 +38367,15 @@
                 "$ref": "#/components/schemas/VAELoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageControlInvocation"
               },
               {
@@ -38281,6 +38506,9 @@
           },
           "calculate_image_tiles_min_overlap": {
             "$ref": "#/components/schemas/CalculateImageTilesOutput"
+          },
+          "call_saved_workflow": {
+            "$ref": "#/components/schemas/WorkflowReturnOutput"
           },
           "canny_edge_detection": {
             "$ref": "#/components/schemas/ImageOutput"
@@ -38960,6 +39188,15 @@
           "vae_loader": {
             "$ref": "#/components/schemas/VAEOutput"
           },
+          "workflow_return": {
+            "$ref": "#/components/schemas/WorkflowReturnOutput"
+          },
+          "workflow_return_get": {
+            "$ref": "#/components/schemas/WorkflowReturnGetOutput"
+          },
+          "workflow_return_value": {
+            "$ref": "#/components/schemas/WorkflowReturnValueOutput"
+          },
           "z_image_control": {
             "$ref": "#/components/schemas/ZImageControlOutput"
           },
@@ -39011,6 +39248,7 @@
           "calculate_image_tiles",
           "calculate_image_tiles_even_split",
           "calculate_image_tiles_min_overlap",
+          "call_saved_workflow",
           "canny_edge_detection",
           "canvas_output",
           "canvas_paste_back",
@@ -39237,6 +39475,9 @@
           "unsharp_mask",
           "unsharp_mask_oklab",
           "vae_loader",
+          "workflow_return",
+          "workflow_return_get",
+          "workflow_return_value",
           "z_image_control",
           "z_image_denoise",
           "z_image_denoise_meta",
@@ -39377,6 +39618,9 @@
               },
               {
                 "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
               },
               {
                 "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
@@ -40046,6 +40290,15 @@
               },
               {
                 "$ref": "#/components/schemas/VAELoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageControlInvocation"
@@ -40266,6 +40519,9 @@
                 "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
               },
               {
+                "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
               },
               {
@@ -40933,6 +41189,15 @@
               },
               {
                 "$ref": "#/components/schemas/VAELoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageControlInvocation"
@@ -43834,7 +44099,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["sd-1", "sd-2"],
+            "ui_model_type": ["lora"]
           },
           "unet": {
             "anyOf": [
@@ -43882,7 +44149,7 @@
         "tags": ["model"],
         "title": "Apply LoRA Collection - SD1.5",
         "type": "object",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "output": {
           "$ref": "#/components/schemas/LoRALoaderOutput"
         }
@@ -57533,6 +57800,25 @@
               },
               {
                 "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImageField"
+                    }
+                  ]
+                },
+                "type": "array"
               }
             ],
             "title": "Value",
@@ -59363,7 +59649,7 @@
           },
           "status": {
             "description": "The new status of the queue item",
-            "enum": ["pending", "in_progress", "completed", "failed", "canceled"],
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
             "title": "Status",
             "type": "string"
           },
@@ -59513,9 +59799,28 @@
             },
             "title": "Retried Item Ids",
             "type": "array"
+          },
+          "user_ids": {
+            "description": "The IDs of the users who own the retried root queue items",
+            "items": {
+              "type": "string"
+            },
+            "title": "User Ids",
+            "type": "array"
+          },
+          "retried_item_ids_by_user": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "description": "The retried root queue item IDs keyed by owner user ID.",
+            "title": "Retried Item Ids By User",
+            "type": "object"
           }
         },
-        "required": ["timestamp", "queue_id", "retried_item_ids"],
+        "required": ["timestamp", "queue_id", "retried_item_ids", "user_ids", "retried_item_ids_by_user"],
         "title": "QueueItemsRetriedEvent",
         "type": "object"
       },
@@ -60618,7 +60923,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -60649,7 +60956,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA Collection - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -63324,7 +63631,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["sdxl"],
+            "ui_model_type": ["lora"]
           },
           "unet": {
             "anyOf": [
@@ -63389,7 +63698,7 @@
         "tags": ["model"],
         "title": "Apply LoRA Collection - SDXL",
         "type": "object",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "output": {
           "$ref": "#/components/schemas/SDXLLoRALoaderOutput"
         }
@@ -65326,6 +65635,11 @@
             "title": "In Progress",
             "description": "Number of queue items with status 'in_progress' for the destination"
           },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting",
+            "description": "Number of queue items with status 'waiting' for the destination"
+          },
           "completed": {
             "type": "integer",
             "title": "Completed",
@@ -65348,7 +65662,17 @@
           }
         },
         "type": "object",
-        "required": ["queue_id", "destination", "pending", "in_progress", "completed", "failed", "canceled", "total"],
+        "required": [
+          "queue_id",
+          "destination",
+          "pending",
+          "in_progress",
+          "waiting",
+          "completed",
+          "failed",
+          "canceled",
+          "total"
+        ],
         "title": "SessionQueueCountsByDestination"
       },
       "SessionQueueItem": {
@@ -65360,7 +65684,7 @@
           },
           "status": {
             "type": "string",
-            "enum": ["pending", "in_progress", "completed", "failed", "canceled"],
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
             "title": "Status",
             "description": "The status of this queue item",
             "default": "pending"
@@ -65573,6 +65897,66 @@
             "title": "Retried From Item Id",
             "description": "The item_id of the queue item that this item was retried from"
           },
+          "workflow_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Call Id",
+            "description": "The active workflow-call relationship id when this queue item is a child execution."
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id",
+            "description": "The parent queue item id when this queue item is a child workflow execution."
+          },
+          "parent_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Session Id",
+            "description": "The parent session id when this queue item is a child workflow execution."
+          },
+          "root_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Item Id",
+            "description": "The root queue item id for this workflow call chain, if any."
+          },
+          "workflow_call_depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Call Depth",
+            "description": "The 1-based workflow-call depth for this queue item when it is a child execution."
+          },
           "session": {
             "$ref": "#/components/schemas/GraphExecutionState",
             "description": "The fully-populated session to be executed"
@@ -65658,6 +66042,11 @@
             "title": "In Progress",
             "description": "Number of queue items with status 'in_progress'"
           },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting",
+            "description": "Number of queue items with status 'waiting'"
+          },
           "completed": {
             "type": "integer",
             "title": "Completed",
@@ -65711,6 +66100,7 @@
           "session_id",
           "pending",
           "in_progress",
+          "waiting",
           "completed",
           "failed",
           "canceled",
@@ -70079,6 +70469,7 @@
         "enum": [
           "SchedulerField",
           "AnyField",
+          "SavedWorkflowField",
           "CollectionField",
           "CollectionItemField",
           "IsIntermediate",
@@ -72311,6 +72702,29 @@
         ],
         "title": "Workflow"
       },
+      "WorkflowAccessRevokedEvent": {
+        "description": "Event model for workflow_access_revoked.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id"],
+        "title": "WorkflowAccessRevokedEvent",
+        "type": "object"
+      },
       "WorkflowAndGraphResponse": {
         "properties": {
           "workflow": {
@@ -72342,10 +72756,309 @@
         "required": ["workflow", "graph"],
         "title": "WorkflowAndGraphResponse"
       },
+      "WorkflowCallCompatibility": {
+        "properties": {
+          "is_callable": {
+            "type": "boolean",
+            "title": "Is Callable",
+            "description": "Whether the workflow can currently be executed by call_saved_workflow."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/WorkflowCallCompatibilityReason",
+            "description": "Structured compatibility result."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Human-readable compatibility detail when unavailable."
+          }
+        },
+        "type": "object",
+        "required": ["is_callable", "reason"],
+        "title": "WorkflowCallCompatibility"
+      },
+      "WorkflowCallCompatibilityReason": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "missing_workflow_return",
+          "multiple_workflow_return",
+          "unsupported_node",
+          "unsupported_batch_input",
+          "invalid_graph",
+          "invalid_inputs",
+          "exceeds_capacity",
+          "unknown"
+        ],
+        "title": "WorkflowCallCompatibilityReason"
+      },
+      "WorkflowCallExecution": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The workflow-call execution id."
+          },
+          "parent_session_id": {
+            "type": "string",
+            "title": "Parent Session Id",
+            "description": "The parent graph execution state id."
+          },
+          "child_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Session Id",
+            "description": "The child graph execution state id, if any."
+          },
+          "prepared_call_node_id": {
+            "type": "string",
+            "title": "Prepared Call Node Id",
+            "description": "The prepared exec node id for the parent call site."
+          },
+          "source_call_node_id": {
+            "type": "string",
+            "title": "Source Call Node Id",
+            "description": "The source graph node id for the parent call site."
+          },
+          "workflow_id": {
+            "type": "string",
+            "title": "Workflow Id",
+            "description": "The saved workflow being called."
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Depth",
+            "description": "The 1-based depth of this call frame."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["waiting_for_child", "running_child", "completed", "failed"],
+            "title": "Status",
+            "description": "The current workflow-call lifecycle state."
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "Failure reason, if the call failed."
+          },
+          "child_session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Child Session Ids",
+            "description": "All child graph execution state ids."
+          },
+          "child_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Child Item Ids",
+            "description": "Child queue item ids in enqueue order."
+          },
+          "expected_child_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Child Count",
+            "description": "The number of child executions for this call.",
+            "default": 1
+          },
+          "completed_child_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Completed Child Item Ids",
+            "description": "The child queue item ids whose workflow_return outputs have been aggregated."
+          },
+          "aggregated_values": {
+            "additionalProperties": {
+              "items": {},
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Aggregated Values",
+            "description": "The aggregated workflow_return values accumulated from child executions."
+          },
+          "child_outputs": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Child Outputs",
+            "description": "Workflow return values keyed by child queue item id."
+          }
+        },
+        "type": "object",
+        "required": [
+          "parent_session_id",
+          "prepared_call_node_id",
+          "source_call_node_id",
+          "workflow_id",
+          "depth",
+          "status"
+        ],
+        "title": "WorkflowCallExecution",
+        "description": "Tracks one parent/child workflow-call relationship and its lifecycle."
+      },
+      "WorkflowCallFrame": {
+        "properties": {
+          "prepared_call_node_id": {
+            "type": "string",
+            "title": "Prepared Call Node Id",
+            "description": "The prepared exec node id for the call site."
+          },
+          "source_call_node_id": {
+            "type": "string",
+            "title": "Source Call Node Id",
+            "description": "The source graph node id for the call site."
+          },
+          "workflow_id": {
+            "type": "string",
+            "title": "Workflow Id",
+            "description": "The saved workflow being called."
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Depth",
+            "description": "The 1-based depth of this call frame."
+          }
+        },
+        "type": "object",
+        "required": ["prepared_call_node_id", "source_call_node_id", "workflow_id", "depth"],
+        "title": "WorkflowCallFrame",
+        "description": "Represents one workflow-call frame in a nested call chain."
+      },
+      "WorkflowCallParentRef": {
+        "properties": {
+          "workflow_call_id": {
+            "type": "string",
+            "title": "Workflow Call Id",
+            "description": "The workflow-call execution id."
+          },
+          "parent_session_id": {
+            "type": "string",
+            "title": "Parent Session Id",
+            "description": "The parent graph execution state id."
+          },
+          "prepared_call_node_id": {
+            "type": "string",
+            "title": "Prepared Call Node Id",
+            "description": "The prepared exec node id for the parent call site."
+          },
+          "source_call_node_id": {
+            "type": "string",
+            "title": "Source Call Node Id",
+            "description": "The source graph node id for the parent call site."
+          },
+          "workflow_id": {
+            "type": "string",
+            "title": "Workflow Id",
+            "description": "The saved workflow being called."
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Depth",
+            "description": "The 1-based depth of this call frame."
+          }
+        },
+        "type": "object",
+        "required": [
+          "workflow_call_id",
+          "parent_session_id",
+          "prepared_call_node_id",
+          "source_call_node_id",
+          "workflow_id",
+          "depth"
+        ],
+        "title": "WorkflowCallParentRef",
+        "description": "Reference from a child execution state back to its parent workflow-call relationship."
+      },
       "WorkflowCategory": {
         "type": "string",
         "enum": ["user", "default"],
         "title": "WorkflowCategory"
+      },
+      "WorkflowCreatedEvent": {
+        "description": "Event model for workflow_created",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          },
+          "is_public": {
+            "description": "Whether the workflow is shared with all users",
+            "title": "Is Public",
+            "type": "boolean"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id", "is_public"],
+        "title": "WorkflowCreatedEvent",
+        "type": "object"
+      },
+      "WorkflowDeletedEvent": {
+        "description": "Event model for workflow_deleted",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          },
+          "is_public": {
+            "description": "Whether the workflow was shared when it was deleted",
+            "title": "Is Public",
+            "type": "boolean"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id", "is_public"],
+        "title": "WorkflowDeletedEvent",
+        "type": "object"
       },
       "WorkflowMeta": {
         "properties": {
@@ -72525,6 +73238,17 @@
             ],
             "title": "Thumbnail Url",
             "description": "The URL of the workflow thumbnail."
+          },
+          "call_saved_workflow_compatibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallCompatibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether this workflow is currently callable by call_saved_workflow."
           }
         },
         "type": "object",
@@ -72626,11 +73350,358 @@
             ],
             "title": "Thumbnail Url",
             "description": "The URL of the workflow thumbnail."
+          },
+          "call_saved_workflow_compatibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallCompatibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether this workflow is currently callable by call_saved_workflow."
           }
         },
         "type": "object",
         "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
         "title": "WorkflowRecordWithThumbnailDTO"
+      },
+      "WorkflowReturnGetInvocation": {
+        "category": "workflow",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Extracts one named value from a callable workflow return.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "values": {
+            "additionalProperties": true,
+            "default": {},
+            "description": "The named workflow return values.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": {},
+            "orig_required": false,
+            "title": "Values",
+            "type": "object",
+            "ui_type": "AnyField"
+          },
+          "key": {
+            "default": "",
+            "description": "The return key to extract.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Key",
+            "type": "string"
+          },
+          "type": {
+            "const": "workflow_return_get",
+            "default": "workflow_return_get",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["workflow", "return", "input"],
+        "title": "Get Workflow Return Value",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WorkflowReturnGetOutput"
+        }
+      },
+      "WorkflowReturnGetOutput": {
+        "class": "output",
+        "description": "A value extracted from named workflow return values.",
+        "properties": {
+          "value": {
+            "description": "The extracted workflow return value.",
+            "field_kind": "output",
+            "title": "Value",
+            "ui_hidden": false,
+            "ui_type": "AnyField"
+          },
+          "type": {
+            "const": "workflow_return_get_output",
+            "default": "workflow_return_get_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "value", "type", "type"],
+        "title": "WorkflowReturnGetOutput",
+        "type": "object"
+      },
+      "WorkflowReturnInvocation": {
+        "category": "workflow",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Defines the explicit named result returned by a callable workflow.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WorkflowReturnValueField"
+                },
+                "type": "array"
+              }
+            ],
+            "default": [],
+            "description": "The named values returned to a calling workflow.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Values"
+          },
+          "type": {
+            "const": "workflow_return",
+            "default": "workflow_return",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["workflow", "return", "output"],
+        "title": "Workflow Return",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WorkflowReturnOutput"
+        }
+      },
+      "WorkflowReturnOutput": {
+        "class": "output",
+        "description": "The explicit named values returned from a callable workflow.",
+        "properties": {
+          "values": {
+            "additionalProperties": true,
+            "default": {},
+            "description": "The workflow return values, keyed by return name.",
+            "field_kind": "output",
+            "title": "Values",
+            "type": "object",
+            "ui_hidden": false,
+            "ui_type": "AnyField"
+          },
+          "type": {
+            "const": "workflow_return_output",
+            "default": "workflow_return_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "values", "type", "type"],
+        "title": "WorkflowReturnOutput",
+        "type": "object"
+      },
+      "WorkflowReturnValueField": {
+        "description": "One named workflow return value.",
+        "properties": {
+          "key": {
+            "description": "The workflow return key.",
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "default": null,
+            "description": "The workflow return value.",
+            "title": "Value"
+          }
+        },
+        "required": ["key"],
+        "title": "WorkflowReturnValueField",
+        "type": "object"
+      },
+      "WorkflowReturnValueInvocation": {
+        "category": "workflow",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Creates one named value for a callable workflow return.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "key": {
+            "default": "",
+            "description": "The return key.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The value returned under this key.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Value",
+            "ui_type": "AnyField"
+          },
+          "type": {
+            "const": "workflow_return_value",
+            "default": "workflow_return_value",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["workflow", "return", "output"],
+        "title": "Workflow Return Value",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WorkflowReturnValueOutput"
+        }
+      },
+      "WorkflowReturnValueOutput": {
+        "class": "output",
+        "description": "A named workflow return value.",
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/WorkflowReturnValueField",
+            "description": "The named workflow return value.",
+            "field_kind": "output",
+            "title": "Return Value",
+            "ui_hidden": false,
+            "ui_type": "CollectionItemField"
+          },
+          "type": {
+            "const": "workflow_return_value_output",
+            "default": "workflow_return_value_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "value", "type", "type"],
+        "title": "WorkflowReturnValueOutput",
+        "type": "object"
+      },
+      "WorkflowUpdatedEvent": {
+        "description": "Event model for workflow_updated",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          },
+          "old_is_public": {
+            "description": "Whether the workflow was shared before the update",
+            "title": "Old Is Public",
+            "type": "boolean"
+          },
+          "new_is_public": {
+            "description": "Whether the workflow is shared after the update",
+            "title": "New Is Public",
+            "type": "boolean"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id", "old_is_public", "new_is_public"],
+        "title": "WorkflowUpdatedEvent",
+        "type": "object"
       },
       "WorkflowWithoutID": {
         "properties": {
@@ -73872,7 +74943,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["z-image"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -73920,7 +74993,7 @@
         "tags": ["lora", "model", "z-image"],
         "title": "Apply LoRA Collection - Z-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ZImageLoRALoaderOutput"
         }
