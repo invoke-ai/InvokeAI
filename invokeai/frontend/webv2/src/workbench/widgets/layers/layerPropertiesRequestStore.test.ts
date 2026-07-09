@@ -14,10 +14,18 @@ describe('layerPropertiesRequestStore', () => {
     clearLayerPropertiesRequest();
   });
 
-  it('publishes the requested layer and section', () => {
-    requestLayerProperties('control-1', 'filter');
+  it.each(['filter', 'adjustments'] as const)('publishes and token-safely clears a %s request', (section) => {
+    requestLayerProperties('layer-1', section);
+    const first = getLayerPropertiesRequest();
+    requestLayerProperties('layer-2', section);
+    const second = getLayerPropertiesRequest();
 
-    expect(getLayerPropertiesRequest()).toMatchObject({ layerId: 'control-1', section: 'filter' });
+    expect(first).toMatchObject({ layerId: 'layer-1', section });
+    expect(second).toMatchObject({ layerId: 'layer-2', section });
+    clearLayerPropertiesRequest(first?.token);
+    expect(getLayerPropertiesRequest()).toEqual(second);
+    clearLayerPropertiesRequest(second?.token);
+    expect(getLayerPropertiesRequest()).toBeNull();
   });
 
   it('publishes a fresh token for repeated requests and notifies subscribers', () => {

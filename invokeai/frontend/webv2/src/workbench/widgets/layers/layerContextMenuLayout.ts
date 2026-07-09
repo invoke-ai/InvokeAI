@@ -1,111 +1,70 @@
-import type { LayerContextAction, LayerContextActionId } from './layerContextActions';
+import type { LayerContextAction, LayerContextMenuSectionId, LayerContextSubmenuId } from './layerContextActions';
 
-export type LayerContextSubmenuId = 'arrange' | 'add-modifiers' | 'add-regional' | 'boolean' | 'copy-to' | 'convert-to';
+export type { LayerContextSubmenuId } from './layerContextActions';
 
 export type LayerContextMenuItem =
   | { action: LayerContextAction; kind: 'action' }
   | { actions: readonly LayerContextAction[]; id: LayerContextSubmenuId; kind: 'submenu' };
 
 export interface LayerContextMenuSection {
-  id: 'quick' | 'primary' | 'operations' | 'output' | 'state' | 'danger';
+  id: LayerContextMenuSectionId;
   items: readonly LayerContextMenuItem[];
   presentation: 'row' | 'list';
 }
 
-const ARRANGE_IDS: readonly LayerContextActionId[] = ['move-to-front', 'move-forward', 'move-backward', 'move-to-back'];
-const MODIFIER_IDS: readonly LayerContextActionId[] = ['inpaint-noise', 'inpaint-denoise-limit'];
-const REGIONAL_ADD_IDS: readonly LayerContextActionId[] = [
-  'regional-positive-prompt',
-  'regional-negative-prompt',
-  'regional-reference-image',
-];
-const PRIMARY_IDS: readonly LayerContextActionId[] = [
-  'transform',
-  'rename',
-  'fit-to-bbox',
-  'filter',
-  'control-transparency-effect',
-  'regional-auto-negative',
-  'extract-masked-area',
-];
-const BOOLEAN_IDS: readonly LayerContextActionId[] = ['intersect', 'cutout', 'cutaway', 'exclude'];
-const COPY_IDS: readonly LayerContextActionId[] = [
-  'copy-to-clipboard',
-  'copy-to-raster',
-  'copy-to-control',
-  'copy-to-inpaint-mask',
-  'copy-to-regional-guidance',
-];
-const CONVERT_IDS: readonly LayerContextActionId[] = [
-  'rasterize',
-  'convert-to-control',
-  'convert-to-raster',
-  'convert-to-inpaint-mask',
-  'convert-to-regional-guidance',
+const SECTION_LAYOUT: readonly {
+  id: LayerContextMenuSectionId;
+  order: number;
+  presentation: 'row' | 'list';
+}[] = [
+  { id: 'quick', order: 0, presentation: 'row' },
+  { id: 'primary', order: 1, presentation: 'list' },
+  { id: 'operations', order: 2, presentation: 'list' },
+  { id: 'output', order: 3, presentation: 'list' },
+  { id: 'state', order: 4, presentation: 'list' },
+  { id: 'danger', order: 5, presentation: 'list' },
 ];
 
-const orderedActions = (
-  byId: ReadonlyMap<LayerContextActionId, LayerContextAction>,
-  ids: readonly LayerContextActionId[]
-): LayerContextAction[] => ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+const sortActions = (actions: readonly LayerContextAction[]): LayerContextAction[] =>
+  [...actions].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 
-const actionItem = (
-  byId: ReadonlyMap<LayerContextActionId, LayerContextAction>,
-  id: LayerContextActionId
-): LayerContextMenuItem[] => {
-  const action = byId.get(id);
-  return action ? [{ action, kind: 'action' }] : [];
+interface OrderedMenuItem {
+  id: string;
+  item: LayerContextMenuItem;
+  order: number;
+}
+
+const buildSectionItems = (actions: readonly LayerContextAction[]): LayerContextMenuItem[] => {
+  const ordered: OrderedMenuItem[] = [];
+  const submenus = new Map<LayerContextSubmenuId, LayerContextAction[]>();
+
+  for (const action of actions) {
+    if (!action.submenu) {
+      ordered.push({ id: action.id, item: { action, kind: 'action' }, order: action.order });
+      continue;
+    }
+    const submenuActions = submenus.get(action.submenu) ?? [];
+    submenuActions.push(action);
+    submenus.set(action.submenu, submenuActions);
+  }
+
+  for (const [id, submenuActions] of submenus) {
+    const sorted = sortActions(submenuActions);
+    ordered.push({
+      id,
+      item: { actions: sorted, id, kind: 'submenu' },
+      order: sorted[0]?.order ?? Number.POSITIVE_INFINITY,
+    });
+  }
+
+  return ordered.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).map(({ item }) => item);
 };
 
-const submenuItem = (
-  byId: ReadonlyMap<LayerContextActionId, LayerContextAction>,
-  id: LayerContextSubmenuId,
-  actionIds: readonly LayerContextActionId[]
-): LayerContextMenuItem[] => {
-  const actions = orderedActions(byId, actionIds);
-  return actions.length > 0 ? [{ actions, id, kind: 'submenu' }] : [];
-};
-
-/** Builds the legacy-style layer-menu hierarchy without coupling it to Chakra rendering. */
-export const getLayerContextMenuLayout = (actions: readonly LayerContextAction[]): LayerContextMenuSection[] => {
-  const byId = new Map(actions.map((action) => [action.id, action]));
-  const sections: LayerContextMenuSection[] = [
-    {
-      id: 'quick',
-      items: [...submenuItem(byId, 'arrange', ARRANGE_IDS), ...actionItem(byId, 'duplicate')],
-      presentation: 'row',
-    },
-    {
-      id: 'primary',
-      items: [
-        ...submenuItem(byId, 'add-modifiers', MODIFIER_IDS),
-        ...submenuItem(byId, 'add-regional', REGIONAL_ADD_IDS),
-        ...orderedActions(byId, PRIMARY_IDS).map((action) => ({ action, kind: 'action' }) as const),
-      ],
-      presentation: 'list',
-    },
-    {
-      id: 'operations',
-      items: [
-        ...actionItem(byId, 'merge-down'),
-        ...submenuItem(byId, 'boolean', BOOLEAN_IDS),
-        ...submenuItem(byId, 'copy-to', COPY_IDS),
-        ...submenuItem(byId, 'convert-to', CONVERT_IDS),
-      ],
-      presentation: 'list',
-    },
-    {
-      id: 'output',
-      items: [...actionItem(byId, 'crop-to-bbox'), ...actionItem(byId, 'save-to-assets')],
-      presentation: 'list',
-    },
-    {
-      id: 'state',
-      items: [...actionItem(byId, 'toggle-visibility'), ...actionItem(byId, 'toggle-lock')],
-      presentation: 'list',
-    },
-    { id: 'danger', items: actionItem(byId, 'delete'), presentation: 'list' },
-  ];
-
-  return sections.filter((section) => section.items.length > 0);
-};
+/** Builds the layer-menu hierarchy exclusively from executable registry metadata. */
+export const getLayerContextMenuLayout = (actions: readonly LayerContextAction[]): LayerContextMenuSection[] =>
+  [...SECTION_LAYOUT]
+    .sort((a, b) => a.order - b.order)
+    .flatMap((section): LayerContextMenuSection[] => {
+      const items = buildSectionItems(actions.filter((action) => action.section === section.id));
+      return items.length > 0 ? [{ id: section.id, items, presentation: section.presentation }] : [];
+    });

@@ -1,8 +1,17 @@
-import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { getLayerContextActions } from './layerContextActions';
+import {
+  getLayerContextActionDefinition,
+  getLayerContextActions,
+  LAYER_CONTEXT_ACTION_DEFINITIONS,
+  type LayerContextAction,
+  type LayerContextActionEffects,
+  type LayerContextActionId,
+  type LayerContextActionRuntimeContext,
+  type LayerContextActionState,
+} from './layerContextActions';
 import {
   createControlLayer,
   createEmptyPaintLayer,
@@ -10,23 +19,386 @@ import {
   createRegionalGuidanceLayer,
 } from './layerOps';
 
-const paintLayer = (id: string, patch: Partial<CanvasRasterLayerContractV2> = {}): CanvasLayerContract => ({
+const englishCatalogModules = import.meta.glob('../../../../public/locales/en.json', {
+  eager: true,
+  import: 'default',
+});
+const en = Object.values(englishCatalogModules)[0] as unknown;
+
+const paintLayer = (id: string, patch: Partial<CanvasRasterLayerContractV2> = {}): CanvasRasterLayerContractV2 => ({
   ...createEmptyPaintLayer(id, id),
+  source: { bitmap: { height: 10, imageName: `${id}.png`, width: 10 }, type: 'paint' },
   ...patch,
 });
 
-const idsFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerContract[] = [layer], hasEngine = true) =>
-  getLayerContextActions({ hasEngine, index: layers.indexOf(layer), layer, layers }).map((action) => action.id);
+const rasterLayer = paintLayer('raster');
+const nonEmptyControlLayer = {
+  ...createControlLayer('Control', 'control'),
+  source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
+};
+
+const makeLayer = (type: CanvasLayerContract['type']): CanvasLayerContract => {
+  switch (type) {
+    case 'raster':
+      return paintLayer('raster');
+    case 'control':
+      return nonEmptyControlLayer;
+    case 'inpaint_mask':
+      return createInpaintMaskLayer('Mask', 'mask');
+    case 'regional_guidance':
+      return createRegionalGuidanceLayer('Region', 0, 'region');
+  }
+};
+
+const makeDocument = (layers: CanvasLayerContract[]): CanvasDocumentContractV2 => ({
+  background: 'transparent',
+  bbox: { height: 512, width: 512, x: 0, y: 0 },
+  height: 512,
+  layers,
+  selectedLayerId: layers[0]?.id ?? null,
+  version: 2,
+  width: 512,
+});
+
+const makeState = (
+  layer: CanvasLayerContract,
+  overrides: Partial<LayerContextActionState> = {}
+): LayerContextActionState => {
+  const document = overrides.document ?? makeDocument([layer]);
+  return {
+    document,
+    hasEngine: true,
+    hasSupportedContent: true,
+    index: document.layers.findIndex((entry) => entry.id === layer.id),
+    interactionLocked: false,
+    layer,
+    ...overrides,
+  };
+};
+
+const makeEffects = (): LayerContextActionEffects => ({
+  booleanMerge: vi.fn(() => Promise.resolve()),
+  copyTo: vi.fn(),
+  copyToClipboard: vi.fn(() => Promise.resolve()),
+  cropToBbox: vi.fn(() => Promise.resolve()),
+  delete: vi.fn(),
+  duplicate: vi.fn(),
+  extractMaskedArea: vi.fn(() => Promise.resolve()),
+  fitToBbox: vi.fn(),
+  mergeDown: vi.fn(),
+  openProperties: vi.fn(),
+  openRename: vi.fn(),
+  patchConfig: vi.fn(),
+  rasterize: vi.fn(),
+  reorder: vi.fn(),
+  saveToAssets: vi.fn(() => Promise.resolve()),
+  toggleLock: vi.fn(),
+  toggleVisibility: vi.fn(),
+  transform: vi.fn(),
+  convertTo: vi.fn(),
+});
+
+const makeRuntimeContext = (
+  layer: CanvasLayerContract,
+  overrides: Partial<LayerContextActionRuntimeContext> = {}
+): LayerContextActionRuntimeContext => ({
+  ...makeState(layer, overrides),
+  effects: makeEffects(),
+  ...overrides,
+});
+
+const byId = (actions: readonly LayerContextAction[], id: LayerContextActionId): LayerContextAction => {
+  const action = actions.find((entry) => entry.id === id);
+  expect(action, `Expected action ${id}`).toBeDefined();
+  return action!;
+};
+
+const idsFor = (
+  layer: CanvasLayerContract,
+  layers: readonly CanvasLayerContract[] = [layer],
+  overrides: Partial<LayerContextActionState> = {}
+): LayerContextActionId[] =>
+  getLayerContextActions(makeState(layer, { document: makeDocument([...layers]), ...overrides })).map(
+    (action) => action.id
+  );
+
+const getEnglishTranslation = (key: string): unknown =>
+  key.split('.').reduce<unknown>((value, segment) => {
+    if (!value || typeof value !== 'object') {
+      return undefined;
+    }
+    return (value as Record<string, unknown>)[segment];
+  }, en);
+
+describe('layer context action registry', () => {
+  it('defines every action as complete executable data', () => {
+    for (const definition of LAYER_CONTEXT_ACTION_DEFINITIONS) {
+      expect(definition.icon).toBeDefined();
+      expect(definition.section).toMatch(/^(quick|primary|operations|output|state|danger)$/);
+      expect(definition.order).toEqual(expect.any(Number));
+      expect(definition.supportedLayerTypes.length).toBeGreaterThan(0);
+      expect(definition.isVisible).toEqual(expect.any(Function));
+      expect(definition.isEnabled).toEqual(expect.any(Function));
+      expect(definition.handler).toEqual(expect.any(Function));
+    }
+  });
+
+  it('has one definition per action id', () => {
+    const ids = LAYER_CONTEXT_ACTION_DEFINITIONS.map((definition) => definition.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('has English translations for registry labels and action errors', () => {
+    const keys = [
+      ...LAYER_CONTEXT_ACTION_DEFINITIONS.map((definition) => definition.labelKey),
+      'widgets.layers.actions.enableTransparencyEffect',
+      'widgets.layers.actions.disableTransparencyEffect',
+      'widgets.layers.actions.enableAutoNegative',
+      'widgets.layers.actions.disableAutoNegative',
+      'widgets.layers.actions.actionFailed',
+      'widgets.layers.actions.missing',
+      'widgets.layers.actions.unsupported',
+      'widgets.layers.actions.busy',
+      'widgets.layers.actions.locked',
+      'widgets.layers.actions.notReady',
+      'widgets.layers.actions.empty',
+      'widgets.layers.actions.disabled',
+      'widgets.layers.actions.copyFailed',
+      'widgets.layers.actions.cropFailed',
+    ];
+
+    for (const key of keys) {
+      expect(getEnglishTranslation(key), key).toEqual(expect.any(String));
+    }
+  });
+
+  it('throws for an unknown action definition', () => {
+    expect(() => getLayerContextActionDefinition('unknown' as LayerContextActionId)).toThrow(
+      'Unknown layer context action: unknown'
+    );
+  });
+
+  it('dispatches a registry handler through injected effects', () => {
+    const transform = vi.fn();
+    const context = makeRuntimeContext(rasterLayer, { effects: { ...makeEffects(), transform } });
+    getLayerContextActionDefinition('transform').handler(context);
+    expect(transform).toHaveBeenCalledOnce();
+  });
+
+  it('dispatches parameterized registry handlers through injected effects', () => {
+    const effects = makeEffects();
+    const context = makeRuntimeContext(rasterLayer, { effects });
+
+    getLayerContextActionDefinition('move-to-front').handler(context);
+    getLayerContextActionDefinition('adjustments').handler(context);
+    getLayerContextActionDefinition('intersect').handler(context);
+    getLayerContextActionDefinition('copy-to-control').handler(context);
+    getLayerContextActionDefinition('convert-to-control').handler(context);
+    getLayerContextActionDefinition('regional-auto-negative').handler(context);
+
+    expect(effects.reorder).toHaveBeenCalledWith('front', 'move-to-front');
+    expect(effects.openProperties).toHaveBeenCalledWith('adjustments');
+    expect(effects.booleanMerge).toHaveBeenCalledWith('intersect');
+    expect(effects.copyTo).toHaveBeenCalledWith('control');
+    expect(effects.convertTo).toHaveBeenCalledWith('control');
+    expect(effects.patchConfig).toHaveBeenCalledWith('regional-auto-negative');
+  });
+});
 
 describe('getLayerContextActions', () => {
+  it.each([
+    ['raster', 'adjustments', true],
+    ['control', 'adjustments', false],
+    ['inpaint_mask', 'extract-masked-area', true],
+    ['control', 'extract-masked-area', false],
+  ] as const)('resolves %s visibility for %s', (type, actionId, expected) => {
+    const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === actionId);
+    expect(Boolean(action)).toBe(expected);
+  });
+
+  it.each([
+    ['raster', true],
+    ['control', true],
+    ['inpaint_mask', false],
+    ['regional_guidance', false],
+  ] as const)('exposes transform only for engine-supported %s layers', (type, expected) => {
+    const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'transform');
+    expect(Boolean(action)).toBe(expected);
+  });
+
+  it('disables transform for a hidden layer', () => {
+    const hidden = { ...rasterLayer, isEnabled: false };
+    expect(byId(getLayerContextActions(makeState(hidden)), 'transform').isDisabled).toBe(true);
+  });
+
+  it('disables mutating pixel actions while interaction is locked', () => {
+    const rasterActions = getLayerContextActions(makeState(rasterLayer, { interactionLocked: true }));
+    const controlActions = getLayerContextActions(makeState(nonEmptyControlLayer, { interactionLocked: true }));
+    expect(byId(rasterActions, 'crop-to-bbox').isDisabled).toBe(true);
+    expect(byId(rasterActions, 'transform').isDisabled).toBe(true);
+    expect(byId(controlActions, 'filter').isDisabled).toBe(true);
+    expect(byId(rasterActions, 'copy-to-clipboard').isDisabled).toBe(true);
+  });
+
+  it('disables every layer action while canvas interaction is locked', () => {
+    const above = paintLayer('interaction-above');
+    const raster = paintLayer('interaction-raster');
+    const below = paintLayer('interaction-below');
+    const rasterDocument = makeDocument([above, raster, below]);
+    const text = paintLayer('interaction-text', {
+      source: {
+        align: 'left',
+        color: '#fff',
+        content: 'locked',
+        fontFamily: 'Inter',
+        fontSize: 32,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        type: 'text',
+      },
+    });
+    const inpaint = createInpaintMaskLayer('Interaction mask', 'interaction-mask');
+    const regional = createRegionalGuidanceLayer('Interaction region', 0, 'interaction-region');
+    const contexts = [
+      makeState(raster, { document: rasterDocument, interactionLocked: true }),
+      makeState(nonEmptyControlLayer, { interactionLocked: true }),
+      makeState(inpaint, { interactionLocked: true }),
+      makeState(regional, { interactionLocked: true }),
+      makeState(text, { interactionLocked: true }),
+    ];
+    const actions = contexts.flatMap((context) => getLayerContextActions(context));
+    const actionsById = new Map(actions.map((action) => [action.id, action]));
+    const actionIds: readonly LayerContextActionId[] = [
+      'move-to-front',
+      'move-forward',
+      'move-backward',
+      'move-to-back',
+      'duplicate',
+      'rename',
+      'transform',
+      'fit-to-bbox',
+      'adjustments',
+      'save-to-assets',
+      'copy-to-clipboard',
+      'crop-to-bbox',
+      'extract-masked-area',
+      'filter',
+      'intersect',
+      'cutout',
+      'cutaway',
+      'exclude',
+      'copy-to-raster',
+      'copy-to-control',
+      'copy-to-inpaint-mask',
+      'copy-to-regional-guidance',
+      'rasterize',
+      'convert-to-control',
+      'convert-to-raster',
+      'convert-to-inpaint-mask',
+      'convert-to-regional-guidance',
+      'control-transparency-effect',
+      'regional-positive-prompt',
+      'regional-negative-prompt',
+      'regional-reference-image',
+      'regional-auto-negative',
+      'inpaint-noise',
+      'inpaint-denoise-limit',
+      'merge-down',
+      'toggle-visibility',
+      'toggle-lock',
+      'delete',
+    ];
+
+    expect(actionIds).toHaveLength(LAYER_CONTEXT_ACTION_DEFINITIONS.length);
+    expect(actionIds.filter((id) => !actionsById.has(id))).toEqual([]);
+    expect([...new Set(actions.filter((action) => !action.isDisabled).map((action) => action.id))]).toEqual([]);
+  });
+
+  it('still allows non-destructive copy and export from a locked layer when interaction is free', () => {
+    const actions = getLayerContextActions(makeState({ ...rasterLayer, isLocked: true }));
+    expect(byId(actions, 'copy-to-clipboard').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+  });
+
+  it('disables locked-layer mutations but keeps toggle lock enabled', () => {
+    const lockedRaster = { ...rasterLayer, isLocked: true };
+    const below = paintLayer('below-locked-raster');
+    const actions = getLayerContextActions(makeState(lockedRaster, { document: makeDocument([lockedRaster, below]) }));
+
+    for (const id of [
+      'fit-to-bbox',
+      'adjustments',
+      'crop-to-bbox',
+      'convert-to-control',
+      'intersect',
+      'merge-down',
+      'delete',
+    ] as const) {
+      expect(byId(actions, id).isDisabled, id).toBe(true);
+    }
+    expect(byId(actions, 'toggle-lock').isDisabled).toBe(false);
+
+    const lockedControl = { ...nonEmptyControlLayer, isLocked: true };
+    const controlActions = getLayerContextActions(makeState(lockedControl));
+    expect(byId(controlActions, 'filter').isDisabled).toBe(true);
+    expect(byId(controlActions, 'control-transparency-effect').isDisabled).toBe(true);
+    expect(byId(controlActions, 'convert-to-raster').isDisabled).toBe(true);
+
+    const lockedText = paintLayer('locked-text', {
+      isLocked: true,
+      source: {
+        align: 'left',
+        color: '#fff',
+        content: 'locked',
+        fontFamily: 'Inter',
+        fontSize: 32,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        type: 'text',
+      },
+    });
+    expect(byId(getLayerContextActions(makeState(lockedText)), 'rasterize').isDisabled).toBe(true);
+  });
+
+  it('keeps boolean operations visible but disabled when an adjacent raster is locked', () => {
+    const upper = { ...paintLayer('locked-upper'), isLocked: true };
+    const below = paintLayer('below-locked-upper');
+    const actions = getLayerContextActions(makeState(upper, { document: makeDocument([upper, below]) }));
+
+    for (const id of ['intersect', 'cutout', 'cutaway', 'exclude'] as const) {
+      expect(byId(actions, id).isDisabled, id).toBe(true);
+    }
+  });
+
+  it('requires an engine and supported content for pixel actions', () => {
+    const noEngine = getLayerContextActions(makeState(rasterLayer, { hasEngine: false }));
+    const empty = getLayerContextActions(makeState(rasterLayer, { hasSupportedContent: false }));
+
+    for (const id of ['transform', 'save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+      expect(byId(noEngine, id).isDisabled, id).toBe(true);
+    }
+    for (const id of ['save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+      expect(byId(empty, id).isDisabled, id).toBe(true);
+    }
+  });
+
+  it('does not offer fit for cache-only content whose bounds are not yet persisted', () => {
+    const cacheOnly = createEmptyPaintLayer('Cache only', 'cache-only');
+    const actions = getLayerContextActions(makeState(cacheOnly, { hasSupportedContent: true }));
+
+    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'fit-to-bbox').isDisabled).toBe(true);
+  });
+
   it('keeps common actions available for a raster layer', () => {
-    expect(idsFor(paintLayer('raster'))).toEqual(
+    expect(idsFor(rasterLayer)).toEqual(
       expect.arrayContaining([
         'move-to-front',
         'duplicate',
         'rename',
         'transform',
         'fit-to-bbox',
+        'adjustments',
         'save-to-assets',
         'copy-to-clipboard',
         'crop-to-bbox',
@@ -34,6 +406,27 @@ describe('getLayerContextActions', () => {
         'delete',
       ])
     );
+  });
+
+  it('resolves movement boundaries within the layer type group', () => {
+    const first = paintLayer('first');
+    const middle = paintLayer('middle');
+    const last = paintLayer('last');
+    const document = makeDocument([first, middle, last]);
+
+    const firstActions = getLayerContextActions(makeState(first, { document }));
+    expect(byId(firstActions, 'move-to-front').isDisabled).toBe(true);
+    expect(byId(firstActions, 'move-forward').isDisabled).toBe(true);
+    expect(byId(firstActions, 'move-backward').isDisabled).toBe(false);
+    expect(byId(firstActions, 'move-to-back').isDisabled).toBe(false);
+
+    const middleActions = getLayerContextActions(makeState(middle, { document }));
+    expect(byId(middleActions, 'move-forward').isDisabled).toBe(false);
+    expect(byId(middleActions, 'move-backward').isDisabled).toBe(false);
+
+    const lastActions = getLayerContextActions(makeState(last, { document }));
+    expect(byId(lastActions, 'move-forward').isDisabled).toBe(false);
+    expect(byId(lastActions, 'move-backward').isDisabled).toBe(true);
   });
 
   it('exposes only pixel-backed raster to control conversion', () => {
@@ -65,10 +458,10 @@ describe('getLayerContextActions', () => {
     expect(idsFor(text)).not.toContain('copy-to-inpaint-mask');
   });
 
-  it('exposes control-only transparency and raster conversion actions', () => {
-    const layer = createControlLayer('Control', 'control');
+  it('exposes control-only transparency, filter, and raster conversion actions', () => {
+    const empty = createControlLayer('Control', 'control-empty');
 
-    expect(idsFor(layer)).toEqual(
+    expect(idsFor(empty, [empty], { hasSupportedContent: false })).toEqual(
       expect.arrayContaining([
         'control-transparency-effect',
         'convert-to-raster',
@@ -77,21 +470,17 @@ describe('getLayerContextActions', () => {
         'copy-to-regional-guidance',
       ])
     );
-    expect(idsFor(layer)).not.toContain('filter');
-
-    const withContent = {
-      ...layer,
-      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
-    };
-    expect(idsFor(withContent)).toContain('filter');
+    expect(idsFor(empty, [empty], { hasSupportedContent: false })).not.toContain('filter');
+    expect(idsFor(empty, [empty], { hasSupportedContent: true })).toContain('filter');
+    expect(idsFor(nonEmptyControlLayer)).toContain('filter');
   });
 
   it('does not expose copy-to-raster for raster layers', () => {
-    expect(idsFor(paintLayer('raster'))).not.toContain('copy-to-raster');
+    expect(idsFor(rasterLayer)).not.toContain('copy-to-raster');
   });
 
   it('exposes regional guidance add actions only for missing prompts', () => {
-    const layer = { ...createRegionalGuidanceLayer('Region', 0, 'region'), positivePrompt: 'already' };
+    const layer = { ...createRegionalGuidanceLayer('Region', 0, 'region-prompts'), positivePrompt: 'already' };
 
     expect(idsFor(layer)).toContain('regional-negative-prompt');
     expect(idsFor(layer)).toContain('regional-reference-image');
@@ -100,7 +489,7 @@ describe('getLayerContextActions', () => {
   });
 
   it('exposes inpaint modifier add actions only for missing modifiers', () => {
-    const layer = { ...createInpaintMaskLayer('Mask', 'mask'), noiseLevel: 0.25 };
+    const layer = { ...createInpaintMaskLayer('Mask', 'mask-modifiers'), noiseLevel: 0.25 };
 
     expect(idsFor(layer)).toContain('inpaint-denoise-limit');
     expect(idsFor(layer)).toContain('copy-to-regional-guidance');
@@ -108,42 +497,12 @@ describe('getLayerContextActions', () => {
     expect(idsFor(layer)).not.toContain('inpaint-noise');
   });
 
-  it('exposes masked extraction only for inpaint masks and disables it without an engine', () => {
-    const mask = createInpaintMaskLayer('Mask', 'mask');
-    const withoutEngine = getLayerContextActions({ hasEngine: false, index: 0, layer: mask, layers: [mask] });
-
-    expect(withoutEngine.find((action) => action.id === 'extract-masked-area')?.isDisabled).toBe(true);
-    expect(idsFor(paintLayer('raster'))).not.toContain('extract-masked-area');
-  });
-
-  it('copies regional guidance to an inpaint mask without offering unsupported conversions', () => {
-    const layer = createRegionalGuidanceLayer('Region', 0, 'region');
+  it('copies regional guidance to an inpaint mask without unsupported conversions', () => {
+    const layer = createRegionalGuidanceLayer('Region', 0, 'region-copy');
 
     expect(idsFor(layer)).toContain('copy-to-inpaint-mask');
     expect(idsFor(layer)).not.toContain('convert-to-inpaint-mask');
     expect(idsFor(layer)).not.toContain('copy-to-control');
-  });
-
-  it('disables transform and merge-down without an engine', () => {
-    const layer = paintLayer('raster');
-    const actions = getLayerContextActions({ hasEngine: false, index: 0, layer, layers: [layer] });
-
-    expect(actions.find((action) => action.id === 'transform')?.isDisabled).toBe(true);
-    expect(actions.find((action) => action.id === 'save-to-assets')?.isDisabled).toBe(true);
-    expect(actions.find((action) => action.id === 'copy-to-clipboard')?.isDisabled).toBe(true);
-    expect(actions.find((action) => action.id === 'crop-to-bbox')?.isDisabled).toBe(true);
-    expect(actions.find((action) => action.id === 'merge-down')?.isDisabled).toBe(true);
-
-    const control = createControlLayer('Control', 'control');
-    const controlActions = getLayerContextActions({ hasEngine: false, index: 0, layer: control, layers: [control] });
-    expect(controlActions.find((action) => action.id === 'copy-to-raster')?.isDisabled).toBe(true);
-  });
-
-  it('disables crop-to-bbox for locked layers', () => {
-    const layer = paintLayer('raster', { isLocked: true });
-    const actions = getLayerContextActions({ hasEngine: true, index: 0, layer, layers: [layer] });
-
-    expect(actions.find((action) => action.id === 'crop-to-bbox')?.isDisabled).toBe(true);
   });
 
   it('exposes boolean raster actions only for an adjacent mergeable raster pair', () => {
@@ -153,7 +512,7 @@ describe('getLayerContextActions', () => {
 
     expect(idsFor(upper, [upper, below])).toEqual(expect.arrayContaining(operations));
     expect(idsFor(below, [upper, below])).toEqual(expect.not.arrayContaining(operations));
-    expect(idsFor(upper, [upper, createInpaintMaskLayer('Mask', 'mask')])).toEqual(
+    expect(idsFor(upper, [upper, createInpaintMaskLayer('Mask', 'mask-below')])).toEqual(
       expect.not.arrayContaining(operations)
     );
   });

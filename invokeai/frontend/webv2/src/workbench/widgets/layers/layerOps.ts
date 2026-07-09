@@ -318,14 +318,13 @@ export const fitLayerTransformToBbox = (
   if (contentRect.width <= 0 || contentRect.height <= 0) {
     return null;
   }
-  const scaleX = bbox.width / contentRect.width;
-  const scaleY = bbox.height / contentRect.height;
+  const scale = Math.min(bbox.width / contentRect.width, bbox.height / contentRect.height);
   return {
     rotation: 0,
-    scaleX,
-    scaleY,
-    x: bbox.x - contentRect.x * scaleX,
-    y: bbox.y - contentRect.y * scaleY,
+    scaleX: scale,
+    scaleY: scale,
+    x: bbox.x + (bbox.width - contentRect.width * scale) / 2 - contentRect.x * scale,
+    y: bbox.y + (bbox.height - contentRect.height * scale) / 2 - contentRect.y * scale,
   };
 };
 

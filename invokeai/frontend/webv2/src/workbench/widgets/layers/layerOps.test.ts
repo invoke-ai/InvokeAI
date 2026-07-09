@@ -289,6 +289,60 @@ describe('fitLayerTransformToBbox', () => {
   it('returns null for empty content', () => {
     expect(fitLayerTransformToBbox(createEmptyPaintLayer('empty'), { height: 512, width: 512, x: 0, y: 0 })).toBeNull();
   });
+
+  it('contains and centers landscape content without stretching', () => {
+    const layer = paintLayer('landscape', {
+      source: {
+        bitmap: { height: 100, imageName: 'landscape', width: 200 },
+        offset: { x: 10, y: 20 },
+        type: 'paint',
+      },
+    });
+
+    expect(fitLayerTransformToBbox(layer, { height: 100, width: 100, x: 0, y: 0 })).toEqual({
+      rotation: 0,
+      scaleX: 0.5,
+      scaleY: 0.5,
+      x: -5,
+      y: 15,
+    });
+  });
+
+  it('contains and centers portrait content without stretching', () => {
+    const layer = paintLayer('portrait', {
+      source: {
+        bitmap: { height: 200, imageName: 'portrait', width: 100 },
+        offset: { x: 10, y: 20 },
+        type: 'paint',
+      },
+    });
+
+    expect(fitLayerTransformToBbox(layer, { height: 100, width: 100, x: 0, y: 0 })).toEqual({
+      rotation: 0,
+      scaleX: 0.5,
+      scaleY: 0.5,
+      x: 20,
+      y: -10,
+    });
+  });
+
+  it('accounts for non-zero local content origins and bbox placement', () => {
+    const layer = paintLayer('offset', {
+      source: {
+        bitmap: { height: 50, imageName: 'offset', width: 50 },
+        offset: { x: -20, y: 30 },
+        type: 'paint',
+      },
+    });
+
+    expect(fitLayerTransformToBbox(layer, { height: 100, width: 200, x: 50, y: 100 })).toEqual({
+      rotation: 0,
+      scaleX: 2,
+      scaleY: 2,
+      x: 140,
+      y: 40,
+    });
+  });
 });
 
 describe('menu patch helpers', () => {

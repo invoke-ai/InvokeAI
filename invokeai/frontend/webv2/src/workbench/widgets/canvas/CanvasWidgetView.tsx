@@ -22,7 +22,7 @@ import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { gridSizeForModelBase } from './bboxGrid';
-import { isCanvasStagingActive } from './canvasInteractionLock';
+import { isCanvasInteractionLocked } from './canvasInteractionLock';
 import {
   CANVAS_SETTINGS,
   CANVAS_SHOW_PROGRESS_KEY,
@@ -157,7 +157,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const selectedPlaceholder = selectedSlot?.kind === 'placeholder' ? selectedSlot : null;
   const hasStagingSlots = stagingSlots.length > 0;
   const hasMultipleStagingSlots = stagingSlots.length > 1;
-
   const isCanvasGenerationInFlight = queueItems.some(
     (item) =>
       item.snapshot.destination === 'canvas' &&
@@ -168,10 +167,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       // fresh canvas (F2). `documentRevision` bumps only on those swaps.
       item.snapshot.canvas.documentRevision === canvas.documentRevision
   );
-  const isInteractionLocked = isCanvasStagingActive({
-    hasStagedCandidates: hasStagingSlots,
-    isCanvasGenerationInFlight,
-  });
+  const isInteractionLocked = isCanvasInteractionLocked(canvas, queueItems);
 
   useEffect(() => {
     engine?.setInteractionLocked(isInteractionLocked);

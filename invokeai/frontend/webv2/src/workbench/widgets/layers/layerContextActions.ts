@@ -1,4 +1,29 @@
-import type { CanvasLayerContract } from '@workbench/types';
+import type { BooleanRasterOperation } from '@workbench/canvas-engine/engine';
+import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
+import type { LucideIcon } from 'lucide-react';
+
+import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
+import {
+  ArrowDownIcon,
+  ArrowDownToLineIcon,
+  ArrowUpIcon,
+  ArrowUpToLineIcon,
+  CopyIcon,
+  CropIcon,
+  EyeIcon,
+  EyeOffIcon,
+  ImageIcon,
+  LockIcon,
+  LockOpenIcon,
+  MergeIcon,
+  PencilIcon,
+  SaveIcon,
+  SlidersHorizontalIcon,
+  Trash2Icon,
+} from 'lucide-react';
+
+import type { LayerMoveKind } from './layerGroups';
+import type { LayerPropertiesSection } from './layerPropertiesRequestStore';
 
 import { getGroupPosition } from './layerGroups';
 import { canConvertRasterControl, canMergeLayerDown } from './layerOps';
@@ -12,6 +37,7 @@ export type LayerContextActionId =
   | 'rename'
   | 'transform'
   | 'fit-to-bbox'
+  | 'adjustments'
   | 'save-to-assets'
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
@@ -42,29 +68,104 @@ export type LayerContextActionId =
   | 'toggle-lock'
   | 'delete';
 
-export type LayerContextActionGroup = 'icons' | 'edit' | 'convert' | 'layerConfig' | 'state' | 'danger';
+export type LayerType = CanvasLayerContract['type'];
+export type LayerContextMenuSectionId = 'quick' | 'primary' | 'operations' | 'output' | 'state' | 'danger';
+export type LayerContextSubmenuId = 'arrange' | 'add-modifiers' | 'add-regional' | 'boolean' | 'copy-to' | 'convert-to';
 
-export interface LayerContextActionContext {
+export interface LayerContextActionState {
+  document: CanvasDocumentContractV2;
   hasEngine: boolean;
+  hasSupportedContent: boolean;
   index: number;
+  interactionLocked: boolean;
   layer: CanvasLayerContract;
-  layers: readonly CanvasLayerContract[];
+}
+
+export interface LayerContextActionEffects {
+  reorder(kind: LayerMoveKind, actionId: LayerContextActionId): void;
+  duplicate(): void;
+  openRename(): void;
+  transform(): void;
+  fitToBbox(): void;
+  openProperties(section: LayerPropertiesSection): void;
+  saveToAssets(): Promise<void>;
+  copyToClipboard(): Promise<void>;
+  cropToBbox(): Promise<void>;
+  extractMaskedArea(): Promise<void>;
+  booleanMerge(operation: BooleanRasterOperation): Promise<void>;
+  copyTo(target: LayerType): void | Promise<void>;
+  rasterize(): void;
+  convertTo(target: LayerType): void;
+  patchConfig(kind: LayerConfigPatchKind): void;
+  mergeDown(): void;
+  toggleVisibility(): void;
+  toggleLock(): void;
+  delete(): void;
+}
+
+export interface LayerContextActionRuntimeContext extends LayerContextActionState {
+  effects: LayerContextActionEffects;
+}
+
+export interface LayerContextActionDefinition {
+  id: LayerContextActionId;
+  labelKey: string;
+  defaultLabel: string;
+  icon: LucideIcon;
+  getIcon?(context: LayerContextActionState): LucideIcon;
+  section: LayerContextMenuSectionId;
+  submenu?: LayerContextSubmenuId;
+  order: number;
+  supportedLayerTypes: readonly LayerType[];
+  tone?: 'danger';
+  isVisible(context: LayerContextActionState): boolean;
+  isEnabled(context: LayerContextActionState): boolean;
+  handler(context: LayerContextActionRuntimeContext): void | Promise<void>;
+  getDefaultLabel?(context: LayerContextActionState): string;
+  getLabelKey?(context: LayerContextActionState): string;
 }
 
 export interface LayerContextAction {
-  defaultLabel: string;
-  group: LayerContextActionGroup;
   id: LayerContextActionId;
-  isDisabled: boolean;
   labelKey: string;
+  defaultLabel: string;
+  icon: LucideIcon;
+  section: LayerContextMenuSectionId;
+  submenu?: LayerContextSubmenuId;
+  order: number;
   tone?: 'danger';
+  isDisabled: boolean;
+  handler(context: LayerContextActionRuntimeContext): void | Promise<void>;
 }
 
-type LayerContextActionDefinition = Omit<LayerContextAction, 'isDisabled'> & {
-  getDefaultLabel?: (ctx: LayerContextActionContext) => string;
-  getLabelKey?: (ctx: LayerContextActionContext) => string;
-  isDisabled?: (ctx: LayerContextActionContext) => boolean;
-  isVisible?: (ctx: LayerContextActionContext) => boolean;
+export type LayerConfigPatchKind =
+  | 'control-transparency-effect'
+  | 'regional-positive-prompt'
+  | 'regional-negative-prompt'
+  | 'regional-reference-image'
+  | 'regional-auto-negative'
+  | 'inpaint-noise'
+  | 'inpaint-denoise-limit';
+
+const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const;
+const RASTER_ONLY = ['raster'] as const;
+const CONTROL_ONLY = ['control'] as const;
+const INPAINT_ONLY = ['inpaint_mask'] as const;
+const REGIONAL_ONLY = ['regional_guidance'] as const;
+
+const alwaysVisible = (): boolean => true;
+const isInteractionFree = (context: LayerContextActionState): boolean => !context.interactionLocked;
+const isLayerMutable = (context: LayerContextActionState): boolean =>
+  isInteractionFree(context) && !context.layer.isLocked;
+const hasReadablePixels = (context: LayerContextActionState): boolean =>
+  context.hasEngine && context.hasSupportedContent && !context.interactionLocked;
+const hasMutablePixels = (context: LayerContextActionState): boolean =>
+  isLayerMutable(context) && hasReadablePixels(context);
+const hasTransformablePixels = (context: LayerContextActionState): boolean =>
+  context.layer.isEnabled && hasMutablePixels(context);
+const hasDocumentContent = (context: LayerContextActionState): boolean => {
+  const contentRect = getSourceContentRect(context.layer, context.document);
+  return contentRect.width > 0 && contentRect.height > 0;
 };
 
 const isParametricRasterizable = (layer: CanvasLayerContract): boolean =>
@@ -77,289 +178,562 @@ const isPixelBacked = (layer: CanvasLayerContract): boolean =>
   (layer.type === 'raster' || layer.type === 'control') &&
   (layer.source.type === 'image' || layer.source.type === 'paint');
 
-const hasFilterableControlContent = (layer: CanvasLayerContract): boolean =>
-  layer.type === 'control' &&
-  (layer.source.type === 'image' || (layer.source.type === 'paint' && layer.source.bitmap !== null));
+const hasFilterableControlContent = (context: LayerContextActionState): boolean =>
+  context.hasSupportedContent &&
+  context.layer.type === 'control' &&
+  (context.layer.source.type === 'image' || context.layer.source.type === 'paint');
 
-const groupPosition = (ctx: LayerContextActionContext) => getGroupPosition(ctx.layers, ctx.layer.id);
+const groupPosition = (context: LayerContextActionState) => getGroupPosition(context.document.layers, context.layer.id);
 
-const canMoveForward = (ctx: LayerContextActionContext): boolean => {
-  const position = groupPosition(ctx);
-  return !!position && position.index > 0;
+const canMoveForward = (context: LayerContextActionState): boolean => {
+  const position = groupPosition(context);
+  return isInteractionFree(context) && !!position && position.index > 0;
 };
 
-const canMoveBackward = (ctx: LayerContextActionContext): boolean => {
-  const position = groupPosition(ctx);
-  return !!position && position.index < position.count - 1;
+const canMoveBackward = (context: LayerContextActionState): boolean => {
+  const position = groupPosition(context);
+  return isInteractionFree(context) && !!position && position.index < position.count - 1;
 };
+
+const hasMergeableLayerBelow = (context: LayerContextActionState): boolean =>
+  canMergeLayerDown(context.document.layers, context.index, true);
+
+const isBooleanRasterLayer = (layer: CanvasLayerContract | undefined): boolean =>
+  !!layer &&
+  layer.isEnabled &&
+  layer.type === 'raster' &&
+  (layer.source.type === 'paint' || layer.source.type === 'image');
+
+const hasBooleanRasterPair = (context: LayerContextActionState): boolean =>
+  isBooleanRasterLayer(context.document.layers[context.index]) &&
+  isBooleanRasterLayer(context.document.layers[context.index + 1]);
 
 export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefinition[] = [
   {
     defaultLabel: 'Move to front',
-    group: 'icons',
+    handler: ({ effects }) => effects.reorder('front', 'move-to-front'),
+    icon: ArrowUpToLineIcon,
     id: 'move-to-front',
-    isDisabled: (ctx) => !canMoveForward(ctx),
+    isEnabled: canMoveForward,
+    isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.moveToFront',
+    order: 0,
+    section: 'quick',
+    submenu: 'arrange',
+    supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
     defaultLabel: 'Move forward',
-    group: 'icons',
+    handler: ({ effects }) => effects.reorder('forward', 'move-forward'),
+    icon: ArrowUpIcon,
     id: 'move-forward',
-    isDisabled: (ctx) => !canMoveForward(ctx),
+    isEnabled: canMoveForward,
+    isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.moveForward',
+    order: 1,
+    section: 'quick',
+    submenu: 'arrange',
+    supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
     defaultLabel: 'Move backward',
-    group: 'icons',
+    handler: ({ effects }) => effects.reorder('backward', 'move-backward'),
+    icon: ArrowDownIcon,
     id: 'move-backward',
-    isDisabled: (ctx) => !canMoveBackward(ctx),
+    isEnabled: canMoveBackward,
+    isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.moveBackward',
+    order: 2,
+    section: 'quick',
+    submenu: 'arrange',
+    supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
     defaultLabel: 'Move to back',
-    group: 'icons',
+    handler: ({ effects }) => effects.reorder('back', 'move-to-back'),
+    icon: ArrowDownToLineIcon,
     id: 'move-to-back',
-    isDisabled: (ctx) => !canMoveBackward(ctx),
+    isEnabled: canMoveBackward,
+    isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.moveToBack',
-  },
-  { defaultLabel: 'Duplicate', group: 'icons', id: 'duplicate', labelKey: 'widgets.layers.actions.duplicate' },
-  { defaultLabel: 'Rename', group: 'edit', id: 'rename', labelKey: 'widgets.layers.actions.rename' },
-  {
-    defaultLabel: 'Transform',
-    group: 'edit',
-    id: 'transform',
-    isDisabled: (ctx) => !ctx.hasEngine,
-    labelKey: 'widgets.layers.actions.transform',
-  },
-  { defaultLabel: 'Fit to bbox', group: 'edit', id: 'fit-to-bbox', labelKey: 'widgets.layers.actions.fitToBbox' },
-  {
-    defaultLabel: 'Save layer to assets',
-    group: 'edit',
-    id: 'save-to-assets',
-    isDisabled: (ctx) => !ctx.hasEngine,
-    labelKey: 'widgets.layers.actions.saveLayerToAssets',
+    order: 3,
+    section: 'quick',
+    submenu: 'arrange',
+    supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
-    defaultLabel: 'Copy layer to clipboard',
-    group: 'edit',
-    id: 'copy-to-clipboard',
-    isDisabled: (ctx) => !ctx.hasEngine,
-    labelKey: 'widgets.layers.actions.copyLayerToClipboard',
-  },
-  {
-    defaultLabel: 'Crop layer to bbox',
-    group: 'edit',
-    id: 'crop-to-bbox',
-    isDisabled: (ctx) => !ctx.hasEngine || ctx.layer.isLocked,
-    labelKey: 'widgets.layers.actions.cropLayerToBbox',
-  },
-  {
-    defaultLabel: 'Extract masked area',
-    group: 'edit',
-    id: 'extract-masked-area',
-    isDisabled: (ctx) => !ctx.hasEngine,
-    isVisible: (ctx) => ctx.layer.type === 'inpaint_mask',
-    labelKey: 'widgets.layers.actions.extractMaskedArea',
-  },
-  {
-    defaultLabel: 'Filter',
-    group: 'edit',
-    id: 'filter',
-    isVisible: (ctx) => hasFilterableControlContent(ctx.layer),
-    labelKey: 'widgets.layers.control.filter',
-  },
-  {
-    defaultLabel: 'Intersect with layer below',
-    group: 'edit',
-    id: 'intersect',
-    isVisible: (ctx) => canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
-    labelKey: 'widgets.layers.actions.intersect',
-  },
-  {
-    defaultLabel: 'Cutout with layer below',
-    group: 'edit',
-    id: 'cutout',
-    isVisible: (ctx) => canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
-    labelKey: 'widgets.layers.actions.cutout',
-  },
-  {
-    defaultLabel: 'Cutaway with layer below',
-    group: 'edit',
-    id: 'cutaway',
-    isVisible: (ctx) => canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
-    labelKey: 'widgets.layers.actions.cutaway',
-  },
-  {
-    defaultLabel: 'Exclude layer below',
-    group: 'edit',
-    id: 'exclude',
-    isVisible: (ctx) => canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
-    labelKey: 'widgets.layers.actions.exclude',
-  },
-  {
-    defaultLabel: 'Copy to raster layer',
-    group: 'convert',
-    id: 'copy-to-raster',
-    isDisabled: (ctx) => !ctx.hasEngine,
-    isVisible: (ctx) => ctx.layer.type !== 'raster',
-    labelKey: 'widgets.layers.actions.copyToRasterLayer',
-  },
-  {
-    defaultLabel: 'Copy to control layer',
-    group: 'convert',
-    id: 'copy-to-control',
-    isDisabled: (ctx) => !ctx.hasEngine,
-    isVisible: (ctx) => ctx.layer.type === 'raster' && isPixelBacked(ctx.layer),
-    labelKey: 'widgets.layers.actions.copyToControl',
-  },
-  {
-    defaultLabel: 'Copy to inpaint mask',
-    group: 'convert',
-    id: 'copy-to-inpaint-mask',
-    isDisabled: (ctx) => !ctx.hasEngine,
-    isVisible: (ctx) => isPixelBacked(ctx.layer) || ctx.layer.type === 'regional_guidance',
-    labelKey: 'widgets.layers.actions.copyToInpaintMask',
-  },
-  {
-    defaultLabel: 'Copy to regional guidance',
-    group: 'convert',
-    id: 'copy-to-regional-guidance',
-    isDisabled: (ctx) => !ctx.hasEngine,
-    isVisible: (ctx) => isPixelBacked(ctx.layer) || ctx.layer.type === 'inpaint_mask',
-    labelKey: 'widgets.layers.actions.copyToRegionalGuidance',
-  },
-  {
-    defaultLabel: 'Rasterize',
-    group: 'convert',
-    id: 'rasterize',
-    isVisible: (ctx) => ctx.hasEngine && isParametricRasterizable(ctx.layer),
-    labelKey: 'widgets.layers.actions.rasterize',
-  },
-  {
-    defaultLabel: 'Convert to Control Layer',
-    group: 'convert',
-    id: 'convert-to-control',
-    isVisible: (ctx) => ctx.layer.type === 'raster' && canConvertRasterControl(ctx.layer),
-    labelKey: 'widgets.layers.actions.convertToControl',
-  },
-  {
-    defaultLabel: 'Convert to Raster Layer',
-    group: 'convert',
-    id: 'convert-to-raster',
-    isVisible: (ctx) => ctx.layer.type === 'control',
-    labelKey: 'widgets.layers.actions.convertToRaster',
-  },
-  {
-    defaultLabel: 'Convert to inpaint mask',
-    group: 'convert',
-    id: 'convert-to-inpaint-mask',
-    isVisible: (ctx) => ctx.layer.type === 'raster' && isPixelBacked(ctx.layer),
-    labelKey: 'widgets.layers.actions.convertToInpaintMask',
-  },
-  {
-    defaultLabel: 'Convert to regional guidance',
-    group: 'convert',
-    id: 'convert-to-regional-guidance',
-    isVisible: (ctx) => ctx.layer.type === 'raster' && isPixelBacked(ctx.layer),
-    labelKey: 'widgets.layers.actions.convertToRegionalGuidance',
-  },
-  {
-    getDefaultLabel: (ctx) =>
-      ctx.layer.type === 'control' && ctx.layer.withTransparencyEffect
-        ? 'Disable transparency effect'
-        : 'Enable transparency effect',
-    getLabelKey: (ctx) =>
-      ctx.layer.type === 'control' && ctx.layer.withTransparencyEffect
-        ? 'widgets.layers.actions.disableTransparencyEffect'
-        : 'widgets.layers.actions.enableTransparencyEffect',
-    defaultLabel: 'Toggle transparency effect',
-    group: 'layerConfig',
-    id: 'control-transparency-effect',
-    isVisible: (ctx) => ctx.layer.type === 'control',
-    labelKey: 'widgets.layers.actions.toggleTransparencyEffect',
-  },
-  {
-    defaultLabel: 'Add positive prompt',
-    group: 'layerConfig',
-    id: 'regional-positive-prompt',
-    isVisible: (ctx) => ctx.layer.type === 'regional_guidance' && ctx.layer.positivePrompt === null,
-    labelKey: 'widgets.layers.actions.addPositivePrompt',
-  },
-  {
-    defaultLabel: 'Add negative prompt',
-    group: 'layerConfig',
-    id: 'regional-negative-prompt',
-    isVisible: (ctx) => ctx.layer.type === 'regional_guidance' && ctx.layer.negativePrompt === null,
-    labelKey: 'widgets.layers.actions.addNegativePrompt',
-  },
-  {
-    defaultLabel: 'Add reference image',
-    group: 'layerConfig',
-    id: 'regional-reference-image',
-    isVisible: (ctx) => ctx.layer.type === 'regional_guidance',
-    labelKey: 'widgets.layers.actions.addReferenceImage',
-  },
-  {
-    getDefaultLabel: (ctx) =>
-      ctx.layer.type === 'regional_guidance' && ctx.layer.autoNegative
-        ? 'Disable auto-negative'
-        : 'Enable auto-negative',
-    getLabelKey: (ctx) =>
-      ctx.layer.type === 'regional_guidance' && ctx.layer.autoNegative
-        ? 'widgets.layers.actions.disableAutoNegative'
-        : 'widgets.layers.actions.enableAutoNegative',
-    defaultLabel: 'Toggle auto-negative',
-    group: 'layerConfig',
-    id: 'regional-auto-negative',
-    isVisible: (ctx) => ctx.layer.type === 'regional_guidance',
-    labelKey: 'widgets.layers.actions.toggleAutoNegative',
+    defaultLabel: 'Duplicate',
+    handler: ({ effects }) => effects.duplicate(),
+    icon: CopyIcon,
+    id: 'duplicate',
+    isEnabled: isInteractionFree,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.duplicate',
+    order: 10,
+    section: 'quick',
+    supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
     defaultLabel: 'Add image noise',
-    group: 'layerConfig',
+    handler: ({ effects }) => effects.patchConfig('inpaint-noise'),
+    icon: SlidersHorizontalIcon,
     id: 'inpaint-noise',
-    isVisible: (ctx) => ctx.layer.type === 'inpaint_mask' && ctx.layer.noiseLevel === undefined,
+    isEnabled: isLayerMutable,
+    isVisible: (context) => context.layer.type === 'inpaint_mask' && context.layer.noiseLevel === undefined,
     labelKey: 'widgets.layers.actions.addImageNoise',
+    order: 0,
+    section: 'primary',
+    submenu: 'add-modifiers',
+    supportedLayerTypes: INPAINT_ONLY,
   },
   {
     defaultLabel: 'Add denoise limit',
-    group: 'layerConfig',
+    handler: ({ effects }) => effects.patchConfig('inpaint-denoise-limit'),
+    icon: SlidersHorizontalIcon,
     id: 'inpaint-denoise-limit',
-    isVisible: (ctx) => ctx.layer.type === 'inpaint_mask' && ctx.layer.denoiseLimit === undefined,
+    isEnabled: isLayerMutable,
+    isVisible: (context) => context.layer.type === 'inpaint_mask' && context.layer.denoiseLimit === undefined,
     labelKey: 'widgets.layers.actions.addDenoiseLimit',
+    order: 1,
+    section: 'primary',
+    submenu: 'add-modifiers',
+    supportedLayerTypes: INPAINT_ONLY,
+  },
+  {
+    defaultLabel: 'Add positive prompt',
+    handler: ({ effects }) => effects.patchConfig('regional-positive-prompt'),
+    icon: PencilIcon,
+    id: 'regional-positive-prompt',
+    isEnabled: isLayerMutable,
+    isVisible: (context) => context.layer.type === 'regional_guidance' && context.layer.positivePrompt === null,
+    labelKey: 'widgets.layers.actions.addPositivePrompt',
+    order: 0,
+    section: 'primary',
+    submenu: 'add-regional',
+    supportedLayerTypes: REGIONAL_ONLY,
+  },
+  {
+    defaultLabel: 'Add negative prompt',
+    handler: ({ effects }) => effects.patchConfig('regional-negative-prompt'),
+    icon: PencilIcon,
+    id: 'regional-negative-prompt',
+    isEnabled: isLayerMutable,
+    isVisible: (context) => context.layer.type === 'regional_guidance' && context.layer.negativePrompt === null,
+    labelKey: 'widgets.layers.actions.addNegativePrompt',
+    order: 1,
+    section: 'primary',
+    submenu: 'add-regional',
+    supportedLayerTypes: REGIONAL_ONLY,
+  },
+  {
+    defaultLabel: 'Add reference image',
+    handler: ({ effects }) => effects.patchConfig('regional-reference-image'),
+    icon: ImageIcon,
+    id: 'regional-reference-image',
+    isEnabled: isLayerMutable,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.addReferenceImage',
+    order: 2,
+    section: 'primary',
+    submenu: 'add-regional',
+    supportedLayerTypes: REGIONAL_ONLY,
+  },
+  {
+    defaultLabel: 'Transform',
+    handler: ({ effects }) => effects.transform(),
+    icon: SlidersHorizontalIcon,
+    id: 'transform',
+    isEnabled: hasTransformablePixels,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.transform',
+    order: 10,
+    section: 'primary',
+    supportedLayerTypes: ['raster', 'control'],
+  },
+  {
+    defaultLabel: 'Rename',
+    handler: ({ effects }) => effects.openRename(),
+    icon: PencilIcon,
+    id: 'rename',
+    isEnabled: isInteractionFree,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.rename',
+    order: 20,
+    section: 'primary',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
+    defaultLabel: 'Fit to bbox',
+    handler: ({ effects }) => effects.fitToBbox(),
+    icon: ImageIcon,
+    id: 'fit-to-bbox',
+    isEnabled: (context) => hasDocumentContent(context) && isLayerMutable(context),
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.fitToBbox',
+    order: 30,
+    section: 'primary',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
+    defaultLabel: 'Adjustments',
+    handler: ({ effects }) => effects.openProperties('adjustments'),
+    icon: SlidersHorizontalIcon,
+    id: 'adjustments',
+    isEnabled: hasMutablePixels,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.adjustments',
+    order: 31,
+    section: 'primary',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Filter',
+    handler: ({ effects }) => effects.openProperties('filter'),
+    icon: SlidersHorizontalIcon,
+    id: 'filter',
+    isEnabled: hasMutablePixels,
+    isVisible: hasFilterableControlContent,
+    labelKey: 'widgets.layers.control.filter',
+    order: 40,
+    section: 'primary',
+    supportedLayerTypes: CONTROL_ONLY,
+  },
+  {
+    defaultLabel: 'Toggle transparency effect',
+    getDefaultLabel: (context) =>
+      context.layer.type === 'control' && context.layer.withTransparencyEffect
+        ? 'Disable transparency effect'
+        : 'Enable transparency effect',
+    getLabelKey: (context) =>
+      context.layer.type === 'control' && context.layer.withTransparencyEffect
+        ? 'widgets.layers.actions.disableTransparencyEffect'
+        : 'widgets.layers.actions.enableTransparencyEffect',
+    handler: ({ effects }) => effects.patchConfig('control-transparency-effect'),
+    icon: SlidersHorizontalIcon,
+    id: 'control-transparency-effect',
+    isEnabled: isLayerMutable,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.toggleTransparencyEffect',
+    order: 50,
+    section: 'primary',
+    supportedLayerTypes: CONTROL_ONLY,
+  },
+  {
+    defaultLabel: 'Toggle auto-negative',
+    getDefaultLabel: (context) =>
+      context.layer.type === 'regional_guidance' && context.layer.autoNegative
+        ? 'Disable auto-negative'
+        : 'Enable auto-negative',
+    getLabelKey: (context) =>
+      context.layer.type === 'regional_guidance' && context.layer.autoNegative
+        ? 'widgets.layers.actions.disableAutoNegative'
+        : 'widgets.layers.actions.enableAutoNegative',
+    handler: ({ effects }) => effects.patchConfig('regional-auto-negative'),
+    icon: SlidersHorizontalIcon,
+    id: 'regional-auto-negative',
+    isEnabled: isLayerMutable,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.toggleAutoNegative',
+    order: 50,
+    section: 'primary',
+    supportedLayerTypes: REGIONAL_ONLY,
+  },
+  {
+    defaultLabel: 'Extract masked area',
+    handler: ({ effects }) => effects.extractMaskedArea(),
+    icon: CropIcon,
+    id: 'extract-masked-area',
+    isEnabled: hasMutablePixels,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.extractMaskedArea',
+    order: 60,
+    section: 'primary',
+    supportedLayerTypes: INPAINT_ONLY,
   },
   {
     defaultLabel: 'Merge down',
-    group: 'state',
+    handler: ({ effects }) => effects.mergeDown(),
+    icon: MergeIcon,
     id: 'merge-down',
-    isDisabled: (ctx) => !canMergeLayerDown(ctx.layers, ctx.index, ctx.hasEngine),
+    isEnabled: (context) => hasMutablePixels(context) && hasMergeableLayerBelow(context),
+    isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.mergeDown',
+    order: 0,
+    section: 'operations',
+    supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
-    getDefaultLabel: (ctx) => (ctx.layer.isEnabled ? 'Hide' : 'Show'),
-    getLabelKey: (ctx) => (ctx.layer.isEnabled ? 'widgets.layers.actions.hide' : 'widgets.layers.actions.show'),
+    defaultLabel: 'Intersect with layer below',
+    handler: ({ effects }) => effects.booleanMerge('intersect'),
+    icon: MergeIcon,
+    id: 'intersect',
+    isEnabled: (context) => hasMutablePixels(context) && hasMergeableLayerBelow(context),
+    isVisible: hasBooleanRasterPair,
+    labelKey: 'widgets.layers.actions.intersect',
+    order: 10,
+    section: 'operations',
+    submenu: 'boolean',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Cutout with layer below',
+    handler: ({ effects }) => effects.booleanMerge('cutout'),
+    icon: MergeIcon,
+    id: 'cutout',
+    isEnabled: (context) => hasMutablePixels(context) && hasMergeableLayerBelow(context),
+    isVisible: hasBooleanRasterPair,
+    labelKey: 'widgets.layers.actions.cutout',
+    order: 11,
+    section: 'operations',
+    submenu: 'boolean',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Cutaway with layer below',
+    handler: ({ effects }) => effects.booleanMerge('cutaway'),
+    icon: MergeIcon,
+    id: 'cutaway',
+    isEnabled: (context) => hasMutablePixels(context) && hasMergeableLayerBelow(context),
+    isVisible: hasBooleanRasterPair,
+    labelKey: 'widgets.layers.actions.cutaway',
+    order: 12,
+    section: 'operations',
+    submenu: 'boolean',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Exclude layer below',
+    handler: ({ effects }) => effects.booleanMerge('exclude'),
+    icon: MergeIcon,
+    id: 'exclude',
+    isEnabled: (context) => hasMutablePixels(context) && hasMergeableLayerBelow(context),
+    isVisible: hasBooleanRasterPair,
+    labelKey: 'widgets.layers.actions.exclude',
+    order: 13,
+    section: 'operations',
+    submenu: 'boolean',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Copy layer to clipboard',
+    handler: ({ effects }) => effects.copyToClipboard(),
+    icon: CopyIcon,
+    id: 'copy-to-clipboard',
+    isEnabled: hasReadablePixels,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.copyLayerToClipboard',
+    order: 20,
+    section: 'operations',
+    submenu: 'copy-to',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
+    defaultLabel: 'Copy to raster layer',
+    handler: ({ effects }) => effects.copyTo('raster'),
+    icon: CopyIcon,
+    id: 'copy-to-raster',
+    isEnabled: hasReadablePixels,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.copyToRasterLayer',
+    order: 21,
+    section: 'operations',
+    submenu: 'copy-to',
+    supportedLayerTypes: ['control', 'inpaint_mask', 'regional_guidance'],
+  },
+  {
+    defaultLabel: 'Copy to control layer',
+    handler: ({ effects }) => effects.copyTo('control'),
+    icon: CopyIcon,
+    id: 'copy-to-control',
+    isEnabled: hasReadablePixels,
+    isVisible: (context) => isPixelBacked(context.layer),
+    labelKey: 'widgets.layers.actions.copyToControl',
+    order: 22,
+    section: 'operations',
+    submenu: 'copy-to',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Copy to inpaint mask',
+    handler: ({ effects }) => effects.copyTo('inpaint_mask'),
+    icon: CopyIcon,
+    id: 'copy-to-inpaint-mask',
+    isEnabled: hasReadablePixels,
+    isVisible: (context) => isPixelBacked(context.layer) || context.layer.type === 'regional_guidance',
+    labelKey: 'widgets.layers.actions.copyToInpaintMask',
+    order: 23,
+    section: 'operations',
+    submenu: 'copy-to',
+    supportedLayerTypes: ['raster', 'control', 'regional_guidance'],
+  },
+  {
+    defaultLabel: 'Copy to regional guidance',
+    handler: ({ effects }) => effects.copyTo('regional_guidance'),
+    icon: CopyIcon,
+    id: 'copy-to-regional-guidance',
+    isEnabled: hasReadablePixels,
+    isVisible: (context) => isPixelBacked(context.layer) || context.layer.type === 'inpaint_mask',
+    labelKey: 'widgets.layers.actions.copyToRegionalGuidance',
+    order: 24,
+    section: 'operations',
+    submenu: 'copy-to',
+    supportedLayerTypes: ['raster', 'control', 'inpaint_mask'],
+  },
+  {
+    defaultLabel: 'Rasterize',
+    handler: ({ effects }) => effects.rasterize(),
+    icon: ImageIcon,
+    id: 'rasterize',
+    isEnabled: hasMutablePixels,
+    isVisible: (context) => isParametricRasterizable(context.layer),
+    labelKey: 'widgets.layers.actions.rasterize',
+    order: 30,
+    section: 'operations',
+    submenu: 'convert-to',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Convert to Control Layer',
+    handler: ({ effects }) => effects.convertTo('control'),
+    icon: SlidersHorizontalIcon,
+    id: 'convert-to-control',
+    isEnabled: isLayerMutable,
+    isVisible: (context) => canConvertRasterControl(context.layer),
+    labelKey: 'widgets.layers.actions.convertToControl',
+    order: 31,
+    section: 'operations',
+    submenu: 'convert-to',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Convert to Raster Layer',
+    handler: ({ effects }) => effects.convertTo('raster'),
+    icon: ImageIcon,
+    id: 'convert-to-raster',
+    isEnabled: isLayerMutable,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.convertToRaster',
+    order: 32,
+    section: 'operations',
+    submenu: 'convert-to',
+    supportedLayerTypes: CONTROL_ONLY,
+  },
+  {
+    defaultLabel: 'Convert to inpaint mask',
+    handler: ({ effects }) => effects.convertTo('inpaint_mask'),
+    icon: ImageIcon,
+    id: 'convert-to-inpaint-mask',
+    isEnabled: isLayerMutable,
+    isVisible: (context) => isPixelBacked(context.layer),
+    labelKey: 'widgets.layers.actions.convertToInpaintMask',
+    order: 33,
+    section: 'operations',
+    submenu: 'convert-to',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Convert to regional guidance',
+    handler: ({ effects }) => effects.convertTo('regional_guidance'),
+    icon: ImageIcon,
+    id: 'convert-to-regional-guidance',
+    isEnabled: isLayerMutable,
+    isVisible: (context) => isPixelBacked(context.layer),
+    labelKey: 'widgets.layers.actions.convertToRegionalGuidance',
+    order: 34,
+    section: 'operations',
+    submenu: 'convert-to',
+    supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Crop layer to bbox',
+    handler: ({ effects }) => effects.cropToBbox(),
+    icon: CropIcon,
+    id: 'crop-to-bbox',
+    isEnabled: hasMutablePixels,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.cropLayerToBbox',
+    order: 0,
+    section: 'output',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
+    defaultLabel: 'Save layer to assets',
+    handler: ({ effects }) => effects.saveToAssets(),
+    icon: SaveIcon,
+    id: 'save-to-assets',
+    isEnabled: hasReadablePixels,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.saveLayerToAssets',
+    order: 10,
+    section: 'output',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
     defaultLabel: 'Toggle visibility',
-    group: 'state',
+    getDefaultLabel: (context) => (context.layer.isEnabled ? 'Hide' : 'Show'),
+    getIcon: (context) => (context.layer.isEnabled ? EyeOffIcon : EyeIcon),
+    getLabelKey: (context) => (context.layer.isEnabled ? 'widgets.layers.actions.hide' : 'widgets.layers.actions.show'),
+    handler: ({ effects }) => effects.toggleVisibility(),
+    icon: EyeIcon,
     id: 'toggle-visibility',
+    isEnabled: isInteractionFree,
+    isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.toggleVisibility',
+    order: 0,
+    section: 'state',
+    supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
-    getDefaultLabel: (ctx) => (ctx.layer.isLocked ? 'Unlock' : 'Lock'),
-    getLabelKey: (ctx) => (ctx.layer.isLocked ? 'widgets.layers.actions.unlock' : 'widgets.layers.actions.lock'),
     defaultLabel: 'Toggle lock',
-    group: 'state',
+    getDefaultLabel: (context) => (context.layer.isLocked ? 'Unlock' : 'Lock'),
+    getIcon: (context) => (context.layer.isLocked ? LockOpenIcon : LockIcon),
+    getLabelKey: (context) =>
+      context.layer.isLocked ? 'widgets.layers.actions.unlock' : 'widgets.layers.actions.lock',
+    handler: ({ effects }) => effects.toggleLock(),
+    icon: LockIcon,
     id: 'toggle-lock',
+    isEnabled: isInteractionFree,
+    isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.toggleLock',
+    order: 10,
+    section: 'state',
+    supportedLayerTypes: ALL_LAYER_TYPES,
   },
-  { defaultLabel: 'Delete', group: 'danger', id: 'delete', labelKey: 'widgets.layers.actions.delete', tone: 'danger' },
+  {
+    defaultLabel: 'Delete',
+    handler: ({ effects }) => effects.delete(),
+    icon: Trash2Icon,
+    id: 'delete',
+    isEnabled: isLayerMutable,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.delete',
+    order: 0,
+    section: 'danger',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+    tone: 'danger',
+  },
 ];
 
-export const getLayerContextActions = (ctx: LayerContextActionContext): LayerContextAction[] =>
-  LAYER_CONTEXT_ACTION_DEFINITIONS.filter((definition) => definition.isVisible?.(ctx) ?? true).map((definition) => ({
-    defaultLabel: definition.getDefaultLabel?.(ctx) ?? definition.defaultLabel,
-    group: definition.group,
+export const getLayerContextActionDefinition = (id: LayerContextActionId): LayerContextActionDefinition => {
+  const definition = LAYER_CONTEXT_ACTION_DEFINITIONS.find((candidate) => candidate.id === id);
+  if (!definition) {
+    throw new Error(`Unknown layer context action: ${id}`);
+  }
+  return definition;
+};
+
+export const getLayerContextActions = (context: LayerContextActionState): LayerContextAction[] =>
+  LAYER_CONTEXT_ACTION_DEFINITIONS.filter(
+    (definition) => definition.supportedLayerTypes.includes(context.layer.type) && definition.isVisible(context)
+  ).map((definition) => ({
+    defaultLabel: definition.getDefaultLabel?.(context) ?? definition.defaultLabel,
+    handler: definition.handler,
+    icon: definition.getIcon?.(context) ?? definition.icon,
     id: definition.id,
-    isDisabled: definition.isDisabled?.(ctx) ?? false,
-    labelKey: definition.getLabelKey?.(ctx) ?? definition.labelKey,
+    isDisabled: !definition.isEnabled(context),
+    labelKey: definition.getLabelKey?.(context) ?? definition.labelKey,
+    order: definition.order,
+    section: definition.section,
+    submenu: definition.submenu,
     tone: definition.tone,
   }));

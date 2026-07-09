@@ -3668,6 +3668,209 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
   });
 });
 
+describe('hasExportableLayerContent', () => {
+  const sourceLayer = (id: string, source: CanvasLayerSourceContract, isEnabled = true): CanvasLayerContract => ({
+    blendMode: 'normal',
+    id,
+    isEnabled,
+    isLocked: false,
+    name: id,
+    opacity: 1,
+    source,
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'raster',
+  });
+
+  const createContentEngine = (layers: CanvasLayerContract[]) => {
+    const { store } = createFakeStore({ ...makeDoc(), layers });
+    return createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+  };
+
+  const createLiveUnpersistedLayer = async (layer: CanvasLayerContract) => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal('Path2D', class FakePath2D {});
+
+    const { setDocument, store } = createReactiveStore({
+      ...makeDoc(),
+      layers: [layer],
+      selectedLayerId: layer.id,
+    });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const overlay = createInputCanvas();
+    engine.attach(createInputCanvas().element, overlay.element);
+
+    // Settle the initial empty paint/mask rasterization before drawing. A stroke
+    // then grows that current cache without updating the persisted contract.
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    engine.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+
+    return { engine, setDocument };
+  };
+
+  it('returns true for image, persisted paint, and every supported parametric source', () => {
+    const sources: { id: string; source: CanvasLayerSourceContract }[] = [
+      {
+        id: 'image',
+        source: { image: { height: 12, imageName: 'image', width: 14 }, type: 'image' },
+      },
+      {
+        id: 'persisted-paint',
+        source: {
+          bitmap: { height: 15, imageName: 'paint', width: 16 },
+          offset: { x: -3, y: 4 },
+          type: 'paint',
+        },
+      },
+      {
+        id: 'rect',
+        source: { fill: '#000', height: 18, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 20 },
+      },
+      {
+        id: 'ellipse',
+        source: {
+          fill: '#000',
+          height: 18,
+          kind: 'ellipse',
+          stroke: null,
+          strokeWidth: 0,
+          type: 'shape',
+          width: 20,
+        },
+      },
+      {
+        id: 'gradient',
+        source: {
+          angle: 45,
+          height: 22,
+          kind: 'linear',
+          stops: [{ color: '#000', offset: 0 }],
+          type: 'gradient',
+          width: 24,
+        },
+      },
+      {
+        id: 'text',
+        source: {
+          align: 'left',
+          color: '#000',
+          content: 'Export me',
+          fontFamily: 'Inter',
+          fontSize: 20,
+          fontWeight: 400,
+          lineHeight: 1.2,
+          type: 'text',
+        },
+      },
+    ];
+    // Disabled layers remain exportable because Save/Clipboard may explicitly
+    // export hidden content.
+    const engine = createContentEngine(sources.map(({ id, source }) => sourceLayer(id, source, false)));
+
+    for (const { id } of sources) {
+      expect(engine.hasExportableLayerContent(id), id).toBe(true);
+    }
+    engine.dispose();
+  });
+
+  it('returns false for empty paint, unsupported polygon, and missing ids', () => {
+    const polygon: CanvasLayerSourceContract = {
+      fill: '#000',
+      height: 20,
+      kind: 'polygon',
+      points: [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 10, y: 20 },
+      ],
+      stroke: null,
+      strokeWidth: 0,
+      type: 'shape',
+      width: 20,
+    };
+    const engine = createContentEngine([
+      sourceLayer('empty-paint', { bitmap: null, type: 'paint' }),
+      sourceLayer('polygon', polygon),
+    ]);
+
+    expect(engine.hasExportableLayerContent('empty-paint')).toBe(false);
+    expect(engine.hasExportableLayerContent('polygon')).toBe(false);
+    expect(engine.hasExportableLayerContent('missing')).toBe(false);
+    engine.dispose();
+  });
+
+  it('returns true for a persisted disabled mask and false for an empty mask', () => {
+    const persistedMask: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('persisted-mask'),
+      isEnabled: false,
+      mask: {
+        ...maskLayer('persisted-mask').mask,
+        bitmap: { height: 17, imageName: 'persisted-mask', width: 19 },
+        offset: { x: 2, y: 3 },
+      },
+    };
+    const engine = createContentEngine([persistedMask, maskLayer('empty-mask')]);
+
+    expect(engine.hasExportableLayerContent('persisted-mask')).toBe(true);
+    expect(engine.hasExportableLayerContent('empty-mask')).toBe(false);
+    engine.dispose();
+  });
+
+  it('returns true for current live unpersisted paint pixels', async () => {
+    const { engine } = await createLiveUnpersistedLayer(sourceLayer('live-paint', { bitmap: null, type: 'paint' }));
+
+    expect(engine.hasExportableLayerContent('live-paint')).toBe(true);
+    engine.dispose();
+  });
+
+  it('returns false for a stale non-empty live cache with no persisted pixels', async () => {
+    const { engine, setDocument } = await createLiveUnpersistedLayer(
+      sourceLayer('stale-paint', { bitmap: null, type: 'paint' })
+    );
+    expect(engine.hasExportableLayerContent('stale-paint')).toBe(true);
+
+    const doc = engine.getDocument()!;
+    const layer = doc.layers[0];
+    if (!layer || layer.type !== 'raster') {
+      throw new Error('expected raster paint layer');
+    }
+    // A genuine source-reference change invalidates the still-non-empty live
+    // cache synchronously. Do not run the scheduled frame that would rebuild it.
+    setDocument({
+      ...doc,
+      layers: [{ ...layer, source: { bitmap: null, type: 'paint' } }],
+    });
+    const { target } = createThumbnailTarget();
+    expect(engine.drawLayerThumbnail('stale-paint', target, 96)).toBe(true);
+    expect(engine.hasExportableLayerContent('stale-paint')).toBe(false);
+    engine.dispose();
+  });
+
+  it('returns true for current live unpersisted mask pixels', async () => {
+    const { engine } = await createLiveUnpersistedLayer(maskLayer('live-mask'));
+
+    expect(engine.hasExportableLayerContent('live-mask')).toBe(true);
+    engine.dispose();
+  });
+});
+
 // ---- I4: structural edits are no-ops during an active pointer gesture -----
 
 describe('gesture guard: nudge / commitStructural mid-stroke', () => {

@@ -311,6 +311,12 @@ export interface CanvasEngine {
    */
   exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
   /**
+   * True when a layer has pixels that Save/Clipboard can export. Hidden layers
+   * are eligible; unsupported polygon sources, missing layers, and empty or
+   * stale unpersisted paint/mask caches are not.
+   */
+  hasExportableLayerContent(layerId: string): boolean;
+  /**
    * Ensures one layer's pixels are rasterized in the shared layer cache and returns
    * the cache surface plus its layer-local content rect. Read-only: no dispatches,
    * no history entry, no document mutation. Returns `not-ready` rather than racing
@@ -1090,6 +1096,29 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return source.kind !== 'polygon';
     }
     return true;
+  };
+
+  const hasExportableLayerContent = (layerId: string): boolean => {
+    const doc = mirror.getDocument();
+    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
+    if (!doc || !layer) {
+      return false;
+    }
+    const source = renderableSourceOf(layer);
+    if (!source || !isSupportedExportSource(source)) {
+      return false;
+    }
+    if (!isEmpty(getSourceContentRect(layer, doc))) {
+      return true;
+    }
+    // Only paint-backed layers (including masks through renderableSourceOf) can
+    // have real pixels beyond their persisted source rect. The live cache must
+    // describe the current source revision and must not be mid-rasterization.
+    if (source.type !== 'paint') {
+      return false;
+    }
+    const entry = layerCache.get(layerId);
+    return !!entry && !entry.stale && !inFlight.has(layerId) && !isEmpty(entry.rect);
   };
 
   const rasterizeLayerPixels = async (
@@ -3690,6 +3719,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }),
     getDocument: () => mirror.getDocument(),
     handleEscapePriority,
+    hasExportableLayerContent,
     invertMask,
     invertSelection,
     mergeLayerDown,

@@ -1,9 +1,9 @@
-import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { describe, expect, it } from 'vitest';
 
 import { getLayerContextActions } from './layerContextActions';
-import { getLayerContextMenuLayout } from './layerContextMenuLayout';
+import { getLayerContextMenuLayout, type LayerContextMenuSection } from './layerContextMenuLayout';
 import {
   createControlLayer,
   createEmptyPaintLayer,
@@ -13,22 +13,44 @@ import {
 
 const paintLayer = (id: string, patch: Partial<CanvasRasterLayerContractV2> = {}): CanvasLayerContract => ({
   ...createEmptyPaintLayer(id, id),
+  source: { bitmap: { height: 10, imageName: `${id}.png`, width: 10 }, type: 'paint' },
   ...patch,
 });
 
-const layoutFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerContract[] = [layer]) => {
-  const actions = getLayerContextActions({ hasEngine: true, index: layers.indexOf(layer), layer, layers });
-  return getLayerContextMenuLayout(actions);
-};
+const makeDocument = (layers: CanvasLayerContract[]): CanvasDocumentContractV2 => ({
+  background: 'transparent',
+  bbox: { height: 512, width: 512, x: 0, y: 0 },
+  height: 512,
+  layers,
+  selectedLayerId: layers[0]?.id ?? null,
+  version: 2,
+  width: 512,
+});
 
-const summarize = (layer: CanvasLayerContract, layers: readonly CanvasLayerContract[] = [layer]) =>
-  layoutFor(layer, layers).map((section) => ({
+const actionsFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerContract[] = [layer]) =>
+  getLayerContextActions({
+    document: makeDocument([...layers]),
+    hasEngine: true,
+    hasSupportedContent: true,
+    index: layers.indexOf(layer),
+    interactionLocked: false,
+    layer,
+  });
+
+const layoutFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerContract[] = [layer]) =>
+  getLayerContextMenuLayout(actionsFor(layer, layers));
+
+const summarizeLayout = (layout: readonly LayerContextMenuSection[]) =>
+  layout.map((section) => ({
     id: section.id,
     items: section.items.map((item) =>
       item.kind === 'action' ? item.action.id : `${item.id}(${item.actions.map((action) => action.id).join(',')})`
     ),
     presentation: section.presentation,
   }));
+
+const summarize = (layer: CanvasLayerContract, layers: readonly CanvasLayerContract[] = [layer]) =>
+  summarizeLayout(layoutFor(layer, layers));
 
 describe('getLayerContextMenuLayout', () => {
   it('organizes raster actions like the legacy menu and keeps delete last', () => {
@@ -41,7 +63,7 @@ describe('getLayerContextMenuLayout', () => {
         items: ['arrange(move-to-front,move-forward,move-backward,move-to-back)', 'duplicate'],
         presentation: 'row',
       },
-      { id: 'primary', items: ['transform', 'rename', 'fit-to-bbox'], presentation: 'list' },
+      { id: 'primary', items: ['transform', 'rename', 'fit-to-bbox', 'adjustments'], presentation: 'list' },
       {
         id: 'operations',
         items: [
@@ -64,20 +86,13 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(inpaint)[1]).toEqual({
       id: 'primary',
-      items: [
-        'add-modifiers(inpaint-noise,inpaint-denoise-limit)',
-        'transform',
-        'rename',
-        'fit-to-bbox',
-        'extract-masked-area',
-      ],
+      items: ['add-modifiers(inpaint-noise,inpaint-denoise-limit)', 'rename', 'fit-to-bbox', 'extract-masked-area'],
       presentation: 'list',
     });
     expect(summarize(regional)[1]).toEqual({
       id: 'primary',
       items: [
         'add-regional(regional-positive-prompt,regional-negative-prompt,regional-reference-image)',
-        'transform',
         'rename',
         'fit-to-bbox',
         'regional-auto-negative',
@@ -106,5 +121,16 @@ describe('getLayerContextMenuLayout', () => {
       ],
       presentation: 'list',
     });
+  });
+
+  it('derives the same hierarchy when the input registry order is shuffled', () => {
+    const upper = paintLayer('upper-shuffled');
+    const below = paintLayer('below-shuffled');
+    const actions = actionsFor(upper, [upper, below]);
+    const reversed = [...actions].reverse();
+
+    expect(summarizeLayout(getLayerContextMenuLayout(reversed))).toEqual(
+      summarizeLayout(getLayerContextMenuLayout(actions))
+    );
   });
 });

@@ -2,7 +2,7 @@ import type { CanvasLayerContract } from '@workbench/types';
 
 import { createExternalStore } from '@workbench/externalStore';
 
-export type LayerPropertiesSection = 'filter';
+export type LayerPropertiesSection = 'filter' | 'adjustments';
 
 export interface LayerPropertiesRequest {
   layerId: string;
