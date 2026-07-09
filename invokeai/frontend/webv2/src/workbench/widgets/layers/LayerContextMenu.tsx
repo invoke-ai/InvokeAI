@@ -90,6 +90,10 @@ const PANEL_POSITIONING: MenuPositioning = { placement: 'bottom-end' };
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
+const assertNever = (value: never): never => {
+  throw new Error(`Unhandled layer action result: ${String(value)}`);
+};
+
 type LayerActionErrorStatus = 'busy' | 'disabled' | 'empty' | 'locked' | 'missing' | 'not-ready' | 'unsupported';
 
 const LAYER_ACTION_ERROR_KEYS: Record<LayerActionErrorStatus, string> = {
@@ -334,12 +338,16 @@ const LayerMenu = ({
       if (!converted) {
         throw makeStatusError('unsupported');
       }
-      // Convert in place, preserving the pixel source + id. The inverse restores
-      // the layer verbatim (adapter/filter config and all).
-      const original = structuredClone(layer);
       if (engine) {
-        engine.commitLayerConversion(label, original, converted);
+        // Pass the immutable live object: the engine rejects stale menu actions
+        // by identity and clones the inverse contract internally.
+        if (!engine.commitLayerConversion(label, layer, converted)) {
+          throw makeStatusError('not-ready');
+        }
       } else {
+        // Convert in place, preserving the pixel source + id. The inverse restores
+        // the layer verbatim (adapter/filter config and all).
+        const original = structuredClone(layer);
         applyStructural(
           engine,
           dispatch,
@@ -413,10 +421,26 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    if (!(await engine.cropLayerToBbox(layer.id))) {
-      throw new Error(t('widgets.layers.actions.cropFailed'));
+    const result = await engine.cropLayerToBbox(layer.id);
+    switch (result.status) {
+      case 'cropped':
+        notify.success(t('widgets.layers.actions.cropped'));
+        return;
+      case 'missing':
+      case 'locked':
+      case 'empty':
+      case 'not-ready':
+        throw makeStatusError(result.status);
+      case 'busy':
+        throw new Error(t('widgets.layers.actions.cropBusy'));
+      case 'unsupported':
+        throw new Error(t('widgets.layers.actions.cropUnsupported'));
+      case 'failed':
+        throw new Error(`${t('widgets.layers.actions.cropFailed')} ${result.message}`);
+      default:
+        return assertNever(result);
     }
-  }, [engine, layer.id, makeStatusError, t]);
+  }, [engine, layer.id, makeStatusError, notify, t]);
 
   const handleExtractMaskedArea = useCallback(async () => {
     if (!engine) {

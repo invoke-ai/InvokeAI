@@ -1829,6 +1829,60 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getCanvas(updated).document.layers.find((layer) => layer.id === 'b')).toBe(originalLayerB);
   });
 
+  it('replaces one complete layer contract in place and no-ops when the id is missing', () => {
+    const state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createRasterLayer('c'),
+    ]);
+    const beforeDocument = getCanvas(state).document;
+    const replacement: CanvasControlLayerContract = {
+      adapter: {
+        beginEndStepPct: [0.2, 0.8],
+        controlMode: 'more_control',
+        kind: 'control_lora',
+        model: 'control-model',
+        weight: 0.65,
+      },
+      blendMode: 'multiply',
+      filter: { settings: { radius: 3 }, type: 'canny' },
+      id: 'b',
+      isEnabled: false,
+      isLocked: true,
+      name: 'Complete replacement',
+      opacity: 0.4,
+      source: {
+        bitmap: { contentHash: 'hash', height: 23, imageName: 'replacement.png', width: 17 },
+        offset: { x: -4, y: 9 },
+        type: 'paint',
+      },
+      transform: { rotation: 0.75, scaleX: -2, scaleY: 3, x: 12, y: -8 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+
+    const replaced = workbenchReducer(state, {
+      layer: replacement,
+      layerId: 'b',
+      type: 'replaceCanvasLayer',
+    });
+    const afterLayers = getCanvas(replaced).document.layers;
+
+    expect(afterLayers.map((layer) => layer.id)).toEqual(['a', 'b', 'c']);
+    expect(afterLayers[1]).toBe(replacement);
+    expect(afterLayers[1]).toEqual(replacement);
+    expect(afterLayers[0]).toBe(beforeDocument.layers[0]);
+    expect(afterLayers[2]).toBe(beforeDocument.layers[2]);
+
+    const missing = workbenchReducer(replaced, {
+      layer: replacement,
+      layerId: 'missing',
+      type: 'replaceCanvasLayer',
+    });
+    expect(missing).toBe(replaced);
+    expect(getCanvas(missing).document).toBe(getCanvas(replaced).document);
+  });
+
   it('swaps a raster/control layer source but ignores mask-only layer types', () => {
     let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
     const newSource = { image: { height: 10, imageName: 'swapped.png', width: 10 }, type: 'image' } as const;

@@ -63,13 +63,19 @@ const maskDoc = (): CanvasDocumentContractV2 => ({
 });
 
 const createReactiveStore = (document: CanvasDocumentContractV2) => {
-  let state = { projects: [{ canvas: makeCanvas(document), id: 'p1' }] } as unknown as WorkbenchState;
+  let state = {
+    activeProjectId: 'p1',
+    projects: [{ canvas: makeCanvas(document), id: 'p1' }],
+  } as unknown as WorkbenchState;
   const listeners = new Set<() => void>();
   const dispatch = vi.fn<(action: WorkbenchAction) => void>();
   return {
     dispatch,
     setDocument: (next: CanvasDocumentContractV2, revision = 0) => {
-      state = { projects: [{ canvas: makeCanvas(next, revision), id: 'p1' }] } as unknown as WorkbenchState;
+      state = {
+        activeProjectId: 'p1',
+        projects: [{ canvas: makeCanvas(next, revision), id: 'p1' }],
+      } as unknown as WorkbenchState;
       for (const listener of listeners) {
         listener();
       }

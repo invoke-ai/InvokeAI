@@ -92,7 +92,10 @@ const makeCanvas = (document: CanvasDocumentContractV2, documentRevision = 0): C
 const createFakeStore = (
   document: CanvasDocumentContractV2
 ): { store: EngineStore; unsubscribe: ReturnType<typeof vi.fn> } => {
-  const state = { projects: [{ canvas: makeCanvas(document), id: 'p1' }] } as unknown as WorkbenchState;
+  const state = {
+    activeProjectId: 'p1',
+    projects: [{ canvas: makeCanvas(document), id: 'p1' }],
+  } as unknown as WorkbenchState;
   const unsubscribe = vi.fn();
   return {
     store: {
@@ -129,21 +132,35 @@ const createEngine = () => {
 const createReactiveStore = (
   document: CanvasDocumentContractV2
 ): {
+  setActiveProjectId: (projectId: string) => void;
   setDocument: (next: CanvasDocumentContractV2, documentRevision?: number) => void;
   store: EngineStore;
 } => {
   let revision = 0;
-  let state = { projects: [{ canvas: makeCanvas(document), id: 'p1' }] } as unknown as WorkbenchState;
+  let activeProjectId = 'p1';
+  let state = {
+    activeProjectId,
+    projects: [{ canvas: makeCanvas(document), id: 'p1' }],
+  } as unknown as WorkbenchState;
   const listeners = new Set<() => void>();
+  const notify = (): void => {
+    for (const listener of listeners) {
+      listener();
+    }
+  };
   return {
+    setActiveProjectId: (projectId) => {
+      activeProjectId = projectId;
+      state = { ...state, activeProjectId };
+      notify();
+    },
     setDocument: (next, documentRevision = revision) => {
       revision = documentRevision;
       state = {
+        activeProjectId,
         projects: [{ canvas: makeCanvas(next, documentRevision), id: 'p1' }],
       } as unknown as WorkbenchState;
-      for (const listener of listeners) {
-        listener();
-      }
+      notify();
     },
     store: {
       dispatch: vi.fn(),
@@ -228,6 +245,44 @@ const createDeferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void
   return { promise, resolve };
 };
 
+type RecordingRasterBackend = StubRasterBackend & {
+  drawSourcesFor(surface: StubRasterSurface): string[];
+  surfaceById(id: string): StubRasterSurface | undefined;
+  surfaceId(surface: StubRasterSurface): string;
+};
+
+/**
+ * Stateful raster backend for publication-race tests. Every scratch/cache
+ * surface gets a stable id, as do the fake bitmaps supplied by each test. This
+ * lets a test distinguish a decode drawn into an isolated scratch surface from
+ * a scratch surface published into the live cache without exposing cache
+ * internals from the production engine.
+ */
+const createRecordingRasterBackend = (): RecordingRasterBackend => {
+  const base = createTestStubRasterBackend();
+  let nextSurfaceId = 1;
+  const surfaces = new Map<string, StubRasterSurface>();
+  return {
+    ...base,
+    createSurface: (width, height) => {
+      const surface = base.createSurface(width, height);
+      const id = `surface-${nextSurfaceId++}`;
+      Object.assign(surface.canvas, { __recordingId: id });
+      surfaces.set(id, surface);
+      return surface;
+    },
+    drawSourcesFor: (surface) =>
+      surface.callLog
+        .filter((entry) => entry.op === 'drawImage')
+        .map((entry) => (entry.args[0] as { __recordingId?: string }).__recordingId ?? 'unknown'),
+    surfaceById: (id) => surfaces.get(id),
+    surfaceId: (surface) => (surface.canvas as unknown as { __recordingId: string }).__recordingId,
+  };
+};
+
+const recordingBitmap = (id: string): ImageBitmap =>
+  ({ __recordingId: `bitmap-${id}`, close: vi.fn(), height: 10, width: 10 }) as unknown as ImageBitmap;
+
 /** Flushes pending microtasks (promise chains) without depending on fake timers. */
 const flushMicrotasks = (): Promise<void> =>
   new Promise((resolve) => {
@@ -283,15 +338,16 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
-  it('exportLayerPixels refuses a layer while its cache is already rasterizing', async () => {
+  it('exportLayerPixels shares the scheduled rasterization already running for the same source', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
     const pendingResolve = createDeferred<Blob>();
+    const imageResolver = vi.fn(() => pendingResolve.promise);
     const { store } = createReactiveStore(makeDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
-      imageResolver: () => pendingResolve.promise,
+      imageResolver,
       projectId: 'p1',
       store,
     });
@@ -301,10 +357,203 @@ describe('createCanvasEngine', () => {
     engine.attach(screen.element, overlay.element);
     raf.flush();
 
-    expect(await engine.exportLayerPixels('a')).toEqual({ status: 'not-ready' });
+    const exported = engine.exportLayerPixels('a');
+    expect(imageResolver).toHaveBeenCalledTimes(1);
 
     pendingResolve.resolve(new Blob());
+    expect((await exported).status).toBe('ok');
+    engine.dispose();
+  });
+
+  it('does not publish an older rasterization after a newer source wins', async () => {
+    const first = createDeferred<Blob>();
+    const second = createDeferred<Blob>();
+    const blobA = new Blob(['A']);
+    const blobB = new Blob(['B']);
+    const bitmapA = recordingBitmap('A');
+    const bitmapB = recordingBitmap('B');
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn((blob) => Promise.resolve(blob === blobA ? bitmapA : bitmapB));
+    const imageResolver = vi.fn((imageName: string) => (imageName === 'A' ? first.promise : second.promise));
+    const document = { ...makeDoc(), layers: [rasterLayer('L', { imageName: 'A' })] };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({ backend, imageResolver, projectId: 'p1', store });
+
+    const exportA = engine.exportLayerPixels('L');
+    setDocument({ ...document, layers: [rasterLayer('L', { imageName: 'B' })] });
+    const exportB = engine.exportLayerPixels('L');
+
+    second.resolve(blobB);
+    const resultB = await exportB;
+    expect(resultB.status).toBe('ok');
+    if (resultB.status !== 'ok') {
+      throw new Error('newer rasterization did not publish');
+    }
+    const publicationAfterB = backend.drawSourcesFor(resultB.surface as StubRasterSurface);
+
+    first.resolve(blobA);
+    expect(await exportA).toEqual({ status: 'not-ready' });
+    expect(backend.drawSourcesFor(resultB.surface as StubRasterSurface)).toEqual(publicationAfterB);
+    engine.dispose();
+  });
+
+  it('does not publish a rasterization from a replaced document that reuses the layer id', async () => {
+    const first = createDeferred<Blob>();
+    const second = createDeferred<Blob>();
+    const blobA = new Blob(['document-A']);
+    const blobB = new Blob(['document-B']);
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn((blob) =>
+      Promise.resolve(blob === blobA ? recordingBitmap('document-A') : recordingBitmap('document-B'))
+    );
+    const imageResolver = vi.fn((imageName: string) => (imageName === 'A' ? first.promise : second.promise));
+    const document = { ...makeDoc(), layers: [rasterLayer('L', { imageName: 'A' })] };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({ backend, imageResolver, projectId: 'p1', store });
+
+    const oldExport = engine.exportLayerPixels('L');
+    setDocument({ ...document, layers: [rasterLayer('L', { imageName: 'B' })] }, 1);
+    const newExport = engine.exportLayerPixels('L');
+
+    second.resolve(blobB);
+    const newResult = await newExport;
+    expect(newResult.status).toBe('ok');
+    if (newResult.status !== 'ok') {
+      throw new Error('replacement rasterization did not publish');
+    }
+    const publicationAfterReplacement = backend.drawSourcesFor(newResult.surface as StubRasterSurface);
+
+    first.resolve(blobA);
+    expect(await oldExport).toEqual({ status: 'not-ready' });
+    expect(backend.drawSourcesFor(newResult.surface as StubRasterSurface)).toEqual(publicationAfterReplacement);
+    engine.dispose();
+  });
+
+  it('shares one rasterization between concurrent exports of the same version', async () => {
+    const blob = new Blob(['shared']);
+    const imageResolver = vi.fn(() => Promise.resolve(blob));
+    const { store } = createFakeStore({ ...makeDoc(), layers: [rasterLayer('L')] });
+    const engine = createCanvasEngine({
+      backend: createRecordingRasterBackend(),
+      imageResolver,
+      projectId: 'p1',
+      store,
+    });
+
+    const [a, b] = await Promise.all([engine.exportLayerPixels('L'), engine.exportLayerPixels('L')]);
+
+    expect(imageResolver).toHaveBeenCalledTimes(1);
+    expect(a.status).toBe('ok');
+    expect(b.status).toBe('ok');
+    engine.dispose();
+  });
+
+  it('does not return a default export when the layer becomes disabled during rasterization', async () => {
+    const pending = createDeferred<Blob>();
+    const layer = rasterLayer('L');
+    const document = { ...makeDoc(), layers: [layer] };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => pending.promise,
+      projectId: 'p1',
+      store,
+    });
+
+    const exported = engine.exportLayerPixels('L');
+    setDocument({ ...document, layers: [{ ...layer, isEnabled: false }] });
+    pending.resolve(new Blob());
+
+    expect(await exported).toEqual({ status: 'disabled' });
+    engine.dispose();
+  });
+
+  it('publishes an empty paint cache without drawing a zero-sized scratch canvas', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const empty = { ...rasterLayer('empty'), source: { bitmap: null, type: 'paint' } as const };
+    const { store } = createReactiveStore({ ...makeDoc(), layers: [empty] });
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const engine = createCanvasEngine({
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
     await flushMicrotasks();
+
+    const zeroSizedDraws = surfaces.flatMap((surface) =>
+      surface.callLog.filter((entry) => {
+        if (entry.op !== 'drawImage') {
+          return false;
+        }
+        const source = entry.args[0] as { height?: number; width?: number };
+        return source.width === 0 || source.height === 0;
+      })
+    );
+    expect(zeroSizedDraws).toEqual([]);
+    expect(await engine.exportLayerPixels('empty')).toEqual({ status: 'empty' });
+    engine.dispose();
+  });
+
+  it('retries a same-version rasterization after a one-time synchronous rasterizer failure', async () => {
+    const shape: CanvasLayerSourceContract = {
+      fill: '#fff',
+      height: 10,
+      kind: 'rect',
+      stroke: null,
+      strokeWidth: 0,
+      type: 'shape',
+      width: 10,
+    };
+    const layer = { ...rasterLayer('shape'), source: shape };
+    const { store } = createFakeStore({ ...makeDoc(), layers: [layer] });
+    const base = createTestStubRasterBackend();
+    let shouldThrow = true;
+    const engine = createCanvasEngine({
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          const ctx = new Proxy(surface.ctx, {
+            get(target, property, receiver) {
+              if (property === 'fill') {
+                return (...args: unknown[]) => {
+                  if (shouldThrow) {
+                    shouldThrow = false;
+                    throw new Error('one-time fill failure');
+                  }
+                  return Reflect.apply(target.fill, target, args);
+                };
+              }
+              return Reflect.get(target, property, receiver);
+            },
+          });
+          Object.defineProperty(surface, 'ctx', { value: ctx });
+          return surface;
+        },
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.exportLayerPixels('shape')).toEqual({ status: 'not-ready' });
+    expect((await engine.exportLayerPixels('shape')).status).toBe('ok');
     engine.dispose();
   });
 
@@ -384,90 +633,509 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
-  it('cropLayerToBbox replaces a raster/control source with bbox-sized paint pixels at identity', async () => {
-    const doc = { ...makeDoc(), bbox: { height: 7, width: 6, x: 2, y: 3 } };
-    const { store } = createFakeStore(doc);
-    const dispatch = store.dispatch as Mock;
-    const base = createTestStubRasterBackend();
-    const surfaces: StubRasterSurface[] = [];
+  it('returns a current LayerExportGuard from local, baked-pixel, and baked-blob exports', async () => {
+    const { doc, engine } = createEngine();
+
+    const local = await engine.exportLayerPixels('a');
+    const baked = await engine.exportBakedLayerPixels('a');
+    const blob = await engine.exportBakedLayerBlob('a');
+
+    expect(local.status).toBe('ok');
+    expect(baked.status).toBe('ok');
+    expect(blob.status).toBe('ok');
+    if (local.status !== 'ok' || baked.status !== 'ok' || blob.status !== 'ok') {
+      throw new Error('expected successful exports');
+    }
+    for (const result of [local, baked, blob]) {
+      expect(result.guard).toMatchObject({ layer: doc.layers[0], layerId: 'a', projectId: 'p1' });
+      expect(engine.isLayerExportGuardCurrent(result.guard)).toBe(true);
+    }
+    engine.dispose();
+  });
+
+  it('invalidates a LayerExportGuard when the immutable layer contract changes', async () => {
+    const document = makeDoc();
+    const { setDocument, store } = createReactiveStore(document);
     const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('a');
+    expect(exported.status).toBe('ok');
+    if (exported.status !== 'ok') {
+      throw new Error('expected successful export');
+    }
+
+    setDocument({ ...document, layers: [{ ...document.layers[0]!, opacity: 0.5 }] });
+
+    expect(engine.isLayerExportGuardCurrent(exported.guard)).toBe(false);
+    engine.dispose();
+  });
+
+  it('invalidates a LayerExportGuard when the document is replaced with the same layer object', async () => {
+    const document = makeDoc();
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('a');
+    expect(exported.status).toBe('ok');
+    if (exported.status !== 'ok') {
+      throw new Error('expected successful export');
+    }
+
+    setDocument({ ...document, layers: document.layers }, 1);
+
+    expect(engine.isLayerExportGuardCurrent(exported.guard)).toBe(false);
+    engine.dispose();
+  });
+
+  it('invalidates a LayerExportGuard when another project becomes active', async () => {
+    const document = makeDoc();
+    const { setActiveProjectId, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('a');
+    expect(exported.status).toBe('ok');
+    if (exported.status !== 'ok') {
+      throw new Error('expected successful export');
+    }
+
+    setActiveProjectId('p2');
+
+    expect(engine.isLayerExportGuardCurrent(exported.guard)).toBe(false);
+    engine.dispose();
+  });
+
+  it('does not return an encoded layer blob after its export guard becomes stale', async () => {
+    const encoded = createDeferred<Blob>();
+    const base = createTestStubRasterBackend();
+    const encodeSurface = vi.fn(() => encoded.promise);
+    const document = makeDoc();
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: { ...base, encodeSurface },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    const pending = engine.exportBakedLayerBlob('a');
+    await vi.waitFor(() => expect(encodeSurface).toHaveBeenCalledOnce());
+    setDocument({ ...document, layers: [{ ...document.layers[0]!, opacity: 0.5 }] });
+    encoded.resolve(new Blob(['stale'], { type: 'image/png' }));
+
+    expect(await pending).toEqual({ status: 'not-ready' });
+    engine.dispose();
+  });
+
+  it('invalidates a LayerExportGuard when live cache pixels are edited', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const document = paintDoc();
+    const layer = document.layers[0];
+    if (!layer || layer.type !== 'raster') {
+      throw new Error('expected paint layer');
+    }
+    const persisted: CanvasDocumentContractV2 = {
+      ...document,
+      layers: [
+        {
+          ...layer,
+          source: { bitmap: { height: 20, imageName: 'paint-pixels', width: 20 }, type: 'paint' },
+        },
+      ],
+    };
+    const { projectId, store } = createReducerBackedStore(persisted);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const overlay = createInputCanvas();
+    const screen = createInputCanvas();
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const exported = await engine.exportLayerPixels(layer.id);
+    expect(exported.status).toBe('ok');
+    if (exported.status !== 'ok') {
+      throw new Error('expected successful export');
+    }
+
+    engine.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    overlay.fire('pointermove', pointerAt(10, 10));
+    overlay.fire('pointerup', pointerAt(10, 10, { buttons: 0 }));
+
+    expect(engine.isLayerExportGuardCurrent(exported.guard)).toBe(false);
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox crops only the bbox overlap and restores exact contracts/cache snapshots on undo/redo', async () => {
+    const layer = {
+      ...rasterLayer('a'),
+      adjustments: { brightness: 0.2, contrast: -0.1, saturation: 0.3 },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 5, y: 5 },
+    };
+    const document = { ...makeDoc(), bbox: { height: 8, width: 10, x: 8, y: 2 }, layers: [layer] };
+    const { projectId, store } = createReducerBackedStore(document);
+    const backend = createRecordingRasterBackend();
+    const bitmapStore = createSpyBitmapStore();
+    const engine = createCanvasEngine({
+      backend,
+      bitmapStore,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const beforeContract = structuredClone(engine.getDocument()!.layers[0]!);
+    const beforeExport = await engine.exportLayerPixels('a');
+    expect(beforeExport.status).toBe('ok');
+    if (beforeExport.status !== 'ok') {
+      throw new Error('expected original cache pixels');
+    }
+    const thumbnailListener = vi.fn();
+    engine.stores.thumbnailVersion.subscribeKey('a', thumbnailListener);
+    bitmapStore.markLayerDirty.mockClear();
+
+    expect(await engine.cropLayerToBbox('a')).toEqual({ status: 'cropped' });
+
+    const afterContract = engine.getDocument()!.layers[0]!;
+    expect(afterContract).toEqual({
+      blendMode: 'normal',
+      id: 'a',
+      isEnabled: true,
+      isLocked: false,
+      name: 'a',
+      opacity: 1,
+      source: { bitmap: null, offset: { x: 8, y: 5 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    expect('adjustments' in afterContract).toBe(false);
+    expect(bitmapStore.markLayerDirty).toHaveBeenCalledTimes(1);
+    expect(thumbnailListener).toHaveBeenCalledTimes(1);
+    const forwardExport = await engine.exportLayerPixels('a');
+    expect(forwardExport.status).toBe('ok');
+    if (forwardExport.status !== 'ok') {
+      throw new Error('expected cropped cache pixels');
+    }
+    expect(forwardExport.rect).toEqual({ height: 5, width: 7, x: 8, y: 5 });
+    const forwardSources = backend.drawSourcesFor(forwardExport.surface as StubRasterSurface);
+
+    engine.undo();
+    expect(engine.getDocument()!.layers[0]).toEqual(beforeContract);
+    expect(bitmapStore.markLayerDirty).toHaveBeenCalledTimes(2);
+    expect(thumbnailListener).toHaveBeenCalledTimes(2);
+    const undoExport = await engine.exportLayerPixels('a');
+    expect(undoExport.status).toBe('ok');
+    if (undoExport.status !== 'ok') {
+      throw new Error('expected restored cache pixels');
+    }
+    const undoSources = backend.drawSourcesFor(undoExport.surface as StubRasterSurface);
+    const beforeSnapshot = backend.surfaceById(undoSources.at(-1)!);
+    expect(beforeSnapshot).toBeDefined();
+    expect(backend.drawSourcesFor(beforeSnapshot!)).toContain(
+      backend.surfaceId(beforeExport.surface as StubRasterSurface)
+    );
+
+    engine.redo();
+    expect(engine.getDocument()!.layers[0]).toEqual(afterContract);
+    expect(bitmapStore.markLayerDirty).toHaveBeenCalledTimes(3);
+    expect(thumbnailListener).toHaveBeenCalledTimes(3);
+    const redoExport = await engine.exportLayerPixels('a');
+    expect(redoExport.status).toBe('ok');
+    if (redoExport.status !== 'ok') {
+      throw new Error('expected redone cache pixels');
+    }
+    expect(backend.drawSourcesFor(redoExport.surface as StubRasterSurface)).toEqual(forwardSources);
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox preserves control adapter settings while removing the baked filter', async () => {
+    const control: CanvasLayerContract = {
+      adapter: {
+        beginEndStepPct: [0.1, 0.9],
+        controlMode: 'more_control',
+        kind: 'controlnet',
+        model: 'm',
+        weight: 0.7,
+      },
+      blendMode: 'screen',
+      filter: { settings: { low: 10 }, type: 'canny' },
+      id: 'control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Control',
+      opacity: 0.6,
+      source: { image: { height: 10, imageName: 'control', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const document = { ...makeDoc(), bbox: { height: 7, width: 6, x: 2, y: 3 }, layers: [control] };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+
+    expect(await engine.cropLayerToBbox('control')).toEqual({ status: 'cropped' });
+    const cropped = engine.getDocument()!.layers[0];
+    expect(cropped).toMatchObject({
+      adapter: control.adapter,
+      source: { bitmap: null, offset: { x: 2, y: 3 }, type: 'paint' },
+      type: 'control',
+      withTransparencyEffect: true,
+    });
+    expect(cropped && 'filter' in cropped).toBe(false);
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox preserves mask fill/noise/denoise configuration while replacing pixels and offset', async () => {
+    const layer: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('mask'),
+      denoiseLimit: 0.45,
+      mask: {
+        bitmap: { height: 10, imageName: 'mask-img', width: 10 },
+        fill: { color: '#123456', style: 'crosshatch' },
+        offset: { x: 0, y: 0 },
+      },
+      noiseLevel: 0.25,
+    };
+    const document = { ...makeDoc(), bbox: { height: 7, width: 6, x: 2, y: 3 }, layers: [layer] };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+
+    expect(await engine.cropLayerToBbox('mask')).toEqual({ status: 'cropped' });
+    expect(engine.getDocument()!.layers[0]).toMatchObject({
+      denoiseLimit: 0.45,
+      mask: { bitmap: null, fill: layer.mask.fill, offset: { x: 2, y: 3 } },
+      noiseLevel: 0.25,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'inpaint_mask',
+    });
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox preserves regional prompts and reference images while replacing mask pixels', async () => {
+    const layer: CanvasLayerContract = {
+      autoNegative: false,
+      blendMode: 'normal',
+      id: 'region',
+      isEnabled: true,
+      isLocked: false,
+      mask: {
+        bitmap: { height: 10, imageName: 'region-mask', width: 10 },
+        fill: { color: '#abcdef', style: 'vertical' },
+      },
+      name: 'Region',
+      negativePrompt: 'negative',
+      opacity: 0.8,
+      positivePrompt: 'positive',
+      referenceImages: [{ config: { image: null, type: 'flux2_reference_image' }, id: 'reference', isEnabled: true }],
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'regional_guidance',
+    };
+    const document = { ...makeDoc(), bbox: { height: 7, width: 6, x: 2, y: 3 }, layers: [layer] };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+
+    expect(await engine.cropLayerToBbox('region')).toEqual({ status: 'cropped' });
+    expect(engine.getDocument()!.layers[0]).toMatchObject({
+      autoNegative: false,
+      mask: { bitmap: null, fill: layer.mask.fill, offset: { x: 2, y: 3 } },
+      negativePrompt: 'negative',
+      positivePrompt: 'positive',
+      referenceImages: layer.referenceImages,
+      type: 'regional_guidance',
+    });
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox returns empty without mutation when the layer and bbox do not overlap', async () => {
+    const document = { ...makeDoc(), bbox: { height: 5, width: 5, x: 50, y: 50 } };
+    const { projectId, store } = createReducerBackedStore(document);
+    const bitmapStore = createSpyBitmapStore();
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const before = engine.getDocument();
+
+    expect(await engine.cropLayerToBbox('a')).toEqual({ status: 'empty' });
+    expect(engine.getDocument()).toBe(before);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox reports missing, locked, unsupported, and not-ready layers explicitly', async () => {
+    const polygon: CanvasLayerSourceContract = {
+      fill: '#000',
+      height: 10,
+      kind: 'polygon',
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 5, y: 10 },
+      ],
+      stroke: null,
+      strokeWidth: 0,
+      type: 'shape',
+      width: 10,
+    };
+    const layers = [
+      { ...rasterLayer('locked'), isLocked: true },
+      { ...rasterLayer('polygon'), source: polygon },
+      rasterLayer('pending'),
+    ];
+    const document = { ...makeDoc(), layers };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.reject(new Error('decode failed')),
+      projectId,
+      store,
+    });
+
+    expect(await engine.cropLayerToBbox('missing')).toEqual({ status: 'missing' });
+    expect(await engine.cropLayerToBbox('locked')).toEqual({ status: 'locked' });
+    expect(await engine.cropLayerToBbox('polygon')).toEqual({ status: 'unsupported' });
+    expect(await engine.cropLayerToBbox('pending')).toEqual({ status: 'not-ready' });
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox returns not-ready without mutation when the source changes during rasterization', async () => {
+    const pending = createDeferred<Blob>();
+    const document = { ...makeDoc(), layers: [rasterLayer('a', { imageName: 'A' })] };
+    const { setDocument, store } = createReactiveStore(document);
+    const bitmapStore = createSpyBitmapStore();
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore,
+      imageResolver: () => pending.promise,
+      projectId: 'p1',
+      store,
+    });
+
+    const crop = engine.cropLayerToBbox('a');
+    setDocument({ ...document, layers: [rasterLayer('a', { imageName: 'B' })] });
+    pending.resolve(new Blob());
+
+    expect(await crop).toEqual({ status: 'not-ready' });
+    expect(store.dispatch).not.toHaveBeenCalled();
+    expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox reports busy during an open gesture', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const paint = {
+      ...rasterLayer('paint'),
+      source: { bitmap: { height: 10, imageName: 'paint', width: 10 }, type: 'paint' as const },
+    };
+    const busyHarness = createReducerBackedStore({ ...makeDoc(), layers: [paint], selectedLayerId: 'paint' });
+    const busyEngine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: busyHarness.projectId,
+      store: busyHarness.store,
+    });
+    const overlay = createInputCanvas();
+    const screen = createInputCanvas();
+    busyEngine.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    busyEngine.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(2, 2));
+    expect(await busyEngine.cropLayerToBbox('paint')).toEqual({ status: 'busy' });
+    overlay.fire('pointerup', pointerAt(2, 2, { buttons: 0 }));
+    busyEngine.dispose();
+  });
+
+  it('cropLayerToBbox reports failed for unexpected raster errors', async () => {
+    const base = createTestStubRasterBackend();
+    const failedHarness = createReducerBackedStore({
+      ...makeDoc(),
+      bbox: { height: 7, width: 6, x: 2, y: 3 },
+    });
+    const failedEngine = createCanvasEngine({
       backend: {
         ...base,
         createSurface: (width, height) => {
-          const surface = base.createSurface(width, height);
-          surfaces.push(surface);
-          return surface;
+          if (width === 6 && height === 7) {
+            throw new Error('crop allocation failed');
+          }
+          return base.createSurface(width, height);
         },
       },
       imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store,
+      projectId: failedHarness.projectId,
+      store: failedHarness.store,
     });
-
-    expect(await engine.cropLayerToBbox('a')).toBe(true);
-
-    expect(dispatch.mock.calls.map((call) => call[0])).toEqual(
-      expect.arrayContaining([
-        { id: 'a', source: { bitmap: null, offset: { x: 2, y: 3 }, type: 'paint' }, type: 'updateCanvasLayerSource' },
-        {
-          id: 'a',
-          patch: { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 } },
-          type: 'updateCanvasLayer',
-        },
-      ])
-    );
-    const cropped = surfaces.find((surface) => surface.width === 6 && surface.height === 7);
-    expect(cropped?.callLog.some((entry) => entry.op === 'drawImage')).toBe(true);
-    engine.dispose();
+    expect(await failedEngine.cropLayerToBbox('a')).toEqual({
+      message: 'crop allocation failed',
+      status: 'failed',
+    });
+    failedEngine.dispose();
   });
 
-  it('cropLayerToBbox replaces a mask bitmap while preserving mask fill', async () => {
-    const layer: CanvasInpaintMaskLayerContract = {
-      ...maskLayer('mask'),
-      mask: { bitmap: { height: 10, imageName: 'mask-img', width: 10 }, fill: { color: '#e07575', style: 'diagonal' } },
-    };
-    const doc = { ...makeDoc(), bbox: { height: 7, width: 6, x: 2, y: 3 }, layers: [layer] };
-    const { store } = createFakeStore(doc);
-    const dispatch = store.dispatch as Mock;
+  it('copyLayerToRaster does not mutate another project after its export resolves', async () => {
+    const pending = createDeferred<Blob>();
+    const document = makeDoc();
+    const { setActiveProjectId, store } = createReactiveStore(document);
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
-      imageResolver: () => Promise.resolve(new Blob()),
+      imageResolver: () => pending.promise,
       projectId: 'p1',
       store,
     });
 
-    expect(await engine.cropLayerToBbox('mask')).toBe(true);
+    const copy = engine.copyLayerToRaster('a');
+    setActiveProjectId('p2');
+    pending.resolve(new Blob());
 
-    expect(dispatch.mock.calls.map((call) => call[0])).toEqual(
-      expect.arrayContaining([
-        {
-          config: { layerType: 'inpaint_mask', mask: { bitmap: null, offset: { x: 2, y: 3 } } },
-          id: 'mask',
-          type: 'updateCanvasLayerConfig',
-        },
-        {
-          id: 'mask',
-          patch: { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 } },
-          type: 'updateCanvasLayer',
-        },
-      ])
-    );
-    engine.dispose();
-  });
-
-  it('cropLayerToBbox refuses locked layers', async () => {
-    const doc = { ...makeDoc(), layers: [{ ...rasterLayer('a'), isLocked: true }] };
-    const { store } = createFakeStore(doc);
-    const dispatch = store.dispatch as Mock;
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store,
-    });
-
-    expect(await engine.cropLayerToBbox('a')).toBe(false);
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(await copy).toBeNull();
+    expect(store.dispatch).not.toHaveBeenCalled();
     engine.dispose();
   });
 
@@ -887,39 +1555,26 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     // An edit lands mid-flight: same layer id, new object reference, new source.
     setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'a-v2' })] });
 
-    // A frame runs while the first rasterize is still in flight: the in-flight
-    // guard must prevent a second dispatch here.
-    raf.flush();
-    expect(resolver).toHaveBeenCalledTimes(1);
-
-    // The first (now-stale) rasterize resolves with the OLD pixels.
-    deferreds.get('a')!.resolve(new Blob());
-    await flushMicrotasks();
-
-    // Its resolution scheduled a follow-up frame; running it must re-dispatch a
-    // rasterize for the layer, this time picking up the newest source.
+    // A frame runs while the first rasterize is still in flight. The source no
+    // longer matches that job, so a fresh isolated job starts immediately.
     raf.flush();
     expect(resolver).toHaveBeenCalledTimes(2);
     expect(resolver).toHaveBeenNthCalledWith(2, 'a-v2');
 
-    // Critical assertion: the stale completion must NOT have notified thumbnail
-    // subscribers. If it did, subscribers would have redrawn from the surface
-    // while it still held the OLD pixels (the fresh rasterize hasn't finished
-    // yet), and -- because the store's `set` is equality-guarded -- the later,
-    // real notification for the fresh pixels would be silently swallowed since
-    // it lands on the same version number the stale completion already wrote.
-    expect(thumbnailListener).not.toHaveBeenCalled();
-
-    // Resolve the second (fresh) rasterize so nothing is left in flight.
+    // The newer rasterize wins and publishes while the old decode is pending.
     deferreds.get('a-v2')!.resolve(new Blob());
     await flushMicrotasks();
     raf.flush();
-
-    // Now that fresh pixels have actually landed, subscribers must be notified
-    // exactly once -- not zero times (swallowed by the equality guard) and not
-    // twice (which would imply the stale completion also fired).
     expect(thumbnailListener).toHaveBeenCalledTimes(1);
     expect(engine.stores.thumbnailVersion.get('a')).toBe(1);
+
+    // The older decode resolves afterwards. It may finish its isolated scratch
+    // draw, but it must neither publish nor notify subscribers.
+    deferreds.get('a')!.resolve(new Blob());
+    await flushMicrotasks();
+    raf.flush();
+    expect(thumbnailListener).toHaveBeenCalledTimes(1);
+    expect(resolver).toHaveBeenCalledTimes(2);
 
     unsubscribe();
     engine.dispose();
@@ -1960,6 +2615,33 @@ describe('boolean raster operations', () => {
     engine.dispose();
   });
 
+  it('does not publish a boolean merge into another active project after awaiting exports', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const { setActiveProjectId, store } = createReactiveStore(twoPaintDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    (store.dispatch as Mock).mockClear();
+
+    const merge = engine.booleanMergeRasterLayers('upper', 'intersect');
+    setActiveProjectId('p2');
+
+    expect(await merge).toBe('not-ready');
+    expect(store.dispatch).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
   it('refuses the operation until both raster caches are ready', async () => {
     const { engine, raf } = setup();
     raf.flush();
@@ -2120,6 +2802,170 @@ describe('extract masked canvas area', () => {
     engine.dispose();
   });
 
+  it('extracts enabled raster layers but never control layers', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const raster = rasterLayer('raster');
+    const control: CanvasLayerContract = {
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'normal',
+      id: 'control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Control',
+      opacity: 1,
+      source: { image: { height: 10, imageName: 'control', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: false,
+    };
+    const mask: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('mask'),
+      mask: {
+        ...maskLayer('mask').mask,
+        bitmap: { height: 10, imageName: 'mask', width: 10 },
+      },
+    };
+    const document = { ...makeDoc(), layers: [mask, raster, control], selectedLayerId: 'mask' };
+    const { projectId, store } = createReducerBackedStore(document);
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const engine = createCanvasEngine({
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const rasterExport = await engine.exportLayerPixels(raster.id);
+    const controlExport = await engine.exportLayerPixels(control.id);
+    expect(rasterExport.status).toBe('ok');
+    expect(controlExport.status).toBe('ok');
+    if (rasterExport.status !== 'ok' || controlExport.status !== 'ok') {
+      throw new Error('fixture layers did not rasterize');
+    }
+
+    expect((await engine.extractMaskedArea(mask.id)).status).toBe('extracted');
+
+    const extractedPixels = surfaces.find((surface) =>
+      surface.callLog.some(
+        (entry) =>
+          entry.op === 'set' && entry.args[0] === 'globalCompositeOperation' && entry.args[1] === 'destination-in'
+      )
+    );
+    const compositeSources = extractedPixels?.callLog
+      .filter((entry) => entry.op === 'drawImage')
+      .map((entry) => entry.args[0]);
+    expect(compositeSources).toContain(rasterExport.surface.canvas);
+    expect(compositeSources).not.toContain(controlExport.surface.canvas);
+    engine.dispose();
+  });
+
+  it('skips enabled raster layers that have no persisted or live pixels', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const document = maskedDoc();
+    const blank: CanvasRasterLayerContractV2 = {
+      blendMode: 'normal',
+      id: 'blank',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Blank',
+      opacity: 1,
+      source: { bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    };
+    document.layers.splice(2, 0, blank);
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    expect((await engine.extractMaskedArea('mask')).status).toBe('extracted');
+    engine.dispose();
+  });
+
+  it('does not extract stale contributor pixels after a source change during await', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const document = maskedDoc();
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    (store.dispatch as Mock).mockClear();
+
+    const extraction = engine.extractMaskedArea('mask');
+    setDocument({
+      ...document,
+      layers: document.layers.map((layer) =>
+        layer.id === 'upper' && layer.type === 'raster'
+          ? {
+              ...layer,
+              source: {
+                bitmap: { height: 40, imageName: 'upper-v2', width: 40 },
+                offset: { x: 0, y: 0 },
+                type: 'paint',
+              },
+            }
+          : layer
+      ),
+    });
+
+    expect(await extraction).toEqual({ status: 'not-ready' });
+    expect(store.dispatch).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
+  it('refuses extraction from a locked mask', async () => {
+    const document = maskedDoc();
+    document.layers[0] = { ...document.layers[0]!, isLocked: true };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+
+    expect(await engine.extractMaskedArea('mask')).toEqual({ status: 'unsupported' });
+    engine.dispose();
+  });
+
   it('refuses extraction until the mask and contributor caches are ready', async () => {
     const { engine, raf } = setup();
     raf.flush();
@@ -2167,20 +3013,24 @@ describe('extract masked canvas area', () => {
  * mirror re-reads between steps — the no-op mock store cannot exercise a
  * multi-step fold.
  */
-const createReducerBackedStore = (document: CanvasDocumentContractV2): { projectId: string; store: EngineStore } => {
+const createReducerBackedStore = (
+  document: CanvasDocumentContractV2
+): { dispatch: Mock<(action: WorkbenchAction) => void>; projectId: string; store: EngineStore } => {
   let state = createInitialWorkbenchState();
   const projectId = state.projects[0]!.id;
   state = workbenchReducer(state, { document, type: 'replaceCanvasDocument' });
   const listeners = new Set<() => void>();
+  const dispatch = vi.fn((action: WorkbenchAction) => {
+    state = workbenchReducer(state, action);
+    for (const listener of listeners) {
+      listener();
+    }
+  });
   return {
+    dispatch,
     projectId,
     store: {
-      dispatch: (action) => {
-        state = workbenchReducer(state, action);
-        for (const listener of listeners) {
-          listener();
-        }
-      },
+      dispatch,
       getState: () => state,
       subscribe: (listener) => {
         listeners.add(listener);
@@ -3567,6 +4417,61 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     engine.undo();
     expect(engine.getDocument()!.layers.find((layer) => layer.id === raster.id)?.type).toBe('raster');
     expect((await engine.exportLayerPixels(raster.id)).status).toBe('ok');
+    engine.dispose();
+  });
+
+  it('commitLayerConversion requires the caller to hold the immutable live layer object', async () => {
+    const { dispatch, projectId, store } = createReducerBackedStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    expect((await engine.exportLayerPixels('a')).status).toBe('ok');
+    const live = engine.getDocument()!.layers[0]!;
+    if (live.type !== 'raster') {
+      throw new Error('expected raster layer');
+    }
+    const converted: CanvasLayerContract = {
+      ...live,
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      type: 'control',
+      withTransparencyEffect: false,
+    };
+    dispatch.mockClear();
+
+    expect(engine.commitLayerConversion('Convert', structuredClone(live), converted)).toBe(false);
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'convertCanvasLayer' }));
+    expect(engine.getDocument()!.layers[0]!.type).toBe('raster');
+    engine.dispose();
+  });
+
+  it('commitLayerConversion refuses conversion when the live layer is locked', async () => {
+    const { dispatch, projectId, store } = createReducerBackedStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    expect((await engine.exportLayerPixels('a')).status).toBe('ok');
+    const expectedUnlocked = engine.getDocument()!.layers[0]!;
+    if (expectedUnlocked.type !== 'raster') {
+      throw new Error('expected raster layer');
+    }
+    const converted: CanvasLayerContract = {
+      ...expectedUnlocked,
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      type: 'control',
+      withTransparencyEffect: false,
+    };
+    dispatch({ id: expectedUnlocked.id, patch: { isLocked: true }, type: 'updateCanvasLayer' });
+    dispatch.mockClear();
+
+    expect(engine.commitLayerConversion('Convert', expectedUnlocked, converted)).toBe(false);
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'convertCanvasLayer' }));
+    expect(engine.getDocument()!.layers[0]).toMatchObject({ isLocked: true, type: 'raster' });
     engine.dispose();
   });
 

@@ -164,7 +164,10 @@ describe('layer context action registry', () => {
       'widgets.layers.actions.empty',
       'widgets.layers.actions.disabled',
       'widgets.layers.actions.copyFailed',
+      'widgets.layers.actions.cropBusy',
       'widgets.layers.actions.cropFailed',
+      'widgets.layers.actions.cropUnsupported',
+      'widgets.layers.actions.cropped',
     ];
 
     for (const key of keys) {

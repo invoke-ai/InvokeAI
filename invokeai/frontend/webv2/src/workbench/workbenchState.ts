@@ -240,6 +240,7 @@ type WorkbenchAction =
   | { type: 'duplicateCanvasLayer'; sourceId: string; newId: string }
   | { type: 'reorderCanvasLayers'; orderedIds: string[] }
   | { type: 'updateCanvasLayer'; id: string; patch: CanvasLayerBasePatch }
+  | { type: 'replaceCanvasLayer'; layerId: string; layer: CanvasLayerContract }
   | { type: 'setCanvasLayersEnabled'; updates: readonly { id: string; isEnabled: boolean }[] }
   | { type: 'updateCanvasLayerSource'; id: string; source: CanvasLayerSourceContract }
   | { type: 'updateCanvasLayerConfig'; id: string; config: CanvasLayerConfigPatch }
@@ -3136,6 +3137,11 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         updateCanvasDocument(project, (document) =>
           mapCanvasLayer(document, action.id, (layer) => applyCanvasLayerBasePatch(layer, action.patch))
         )
+      );
+    }
+    case 'replaceCanvasLayer': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) => mapCanvasLayer(document, action.layerId, () => action.layer))
       );
     }
     case 'setCanvasLayersEnabled': {

@@ -138,6 +138,11 @@ export type ExtractMaskedAreaResult =
   | { status: 'extracted'; layerId: string }
   | { status: 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty' };
 
+export type CropLayerResult =
+  | { status: 'cropped' }
+  | { status: 'missing' | 'locked' | 'unsupported' | 'empty' | 'not-ready' | 'busy' }
+  | { status: 'failed'; message: string };
+
 /**
  * Result of {@link CanvasEngine.exportRasterLayersToPsd}: `'exported'` on
  * success, `'nothing'` when there are no raster layers with content, `'too-large'`
@@ -151,8 +156,17 @@ export interface ExportLayerPixelsOptions {
   includeDisabled?: boolean;
 }
 
+/** Opaque snapshot identity carried through async layer operations. */
+export interface LayerExportGuard {
+  readonly projectId: string;
+  readonly layerId: string;
+  readonly layer: CanvasLayerContract;
+  readonly cacheVersion: number;
+  readonly documentGeneration: number;
+}
+
 export type ExportLayerPixelsResult =
-  | { status: 'ok'; surface: RasterSurface; rect: Rect }
+  | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' };
 
 export interface ExportBakedLayerPixelsOptions extends ExportLayerPixelsOptions {
@@ -163,8 +177,44 @@ export interface ExportBakedLayerPixelsOptions extends ExportLayerPixelsOptions 
 export type ExportBakedLayerPixelsResult = ExportLayerPixelsResult;
 
 export type ExportBakedLayerBlobResult =
-  | { status: 'ok'; blob: Blob; rect: Rect }
+  | { status: 'ok'; blob: Blob; rect: Rect; guard: LayerExportGuard }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' };
+
+interface RasterizationJob {
+  version: number;
+  documentGeneration: number;
+  source: CanvasLayerSourceContract;
+  promise: Promise<'published' | 'stale'>;
+}
+
+/** Structural equality for JSON-safe canvas contracts (including synthetic mask paint sources). */
+const isDeeplyEqual = (left: unknown, right: unknown): boolean => {
+  if (Object.is(left, right)) {
+    return true;
+  }
+  if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => isDeeplyEqual(value, right[index]))
+    );
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key) =>
+        Object.prototype.hasOwnProperty.call(rightRecord, key) && isDeeplyEqual(leftRecord[key], rightRecord[key])
+    )
+  );
+};
 
 /** The minimal workbench store the engine depends on. */
 export interface EngineStore {
@@ -281,7 +331,7 @@ export interface CanvasEngine {
    * The complete change is one engine-history entry.
    */
   booleanMergeRasterLayers(upperLayerId: string, operation: BooleanRasterOperation): Promise<BooleanRasterResult>;
-  /** Extracts the enabled raster/control composite through one inpaint mask. */
+  /** Extracts the enabled raster-layer composite through one inpaint mask. */
   extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
   /**
    * Folds ALL visible mergeable raster layers together (the raster group-header
@@ -319,8 +369,8 @@ export interface CanvasEngine {
   /**
    * Ensures one layer's pixels are rasterized in the shared layer cache and returns
    * the cache surface plus its layer-local content rect. Read-only: no dispatches,
-   * no history entry, no document mutation. Returns `not-ready` rather than racing
-   * an already in-flight rasterize, so callers never export stale/blank pixels.
+   * no history entry, no document mutation. Joins an equivalent in-flight
+   * rasterization and returns `not-ready` only when that work becomes stale or fails.
    */
   exportLayerPixels(layerId: string, options?: ExportLayerPixelsOptions): Promise<ExportLayerPixelsResult>;
   /**
@@ -334,12 +384,14 @@ export interface CanvasEngine {
   ): Promise<ExportBakedLayerPixelsResult>;
   /** Encodes {@link exportBakedLayerPixels} as a PNG blob for save/copy/upload actions. */
   exportBakedLayerBlob(layerId: string, options?: ExportBakedLayerPixelsOptions): Promise<ExportBakedLayerBlobResult>;
+  /** True only while the exact exported layer/cache/document/project snapshot remains live. */
+  isLayerExportGuardCurrent(guard: LayerExportGuard): boolean;
   /**
-   * Destructively crops a layer to the current bbox: bakes transform/adjustments
-   * into bbox-sized paint/mask pixels, resets transform to identity, and persists
-   * through the normal bitmap-store path. A no-op for locked/missing/unsupported layers.
+   * Destructively crops a layer to its overlap with the current bbox, baking its
+   * transform/adjustments into content-sized paint/mask pixels. The full layer
+   * contract and cache snapshot are restored by one undoable history entry.
    */
-  cropLayerToBbox(layerId: string): Promise<boolean>;
+  cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
   /** Creates a new raster paint layer above `layerId` from that layer's baked pixels. */
   copyLayerToRaster(layerId: string): Promise<string | null>;
   /**
@@ -362,8 +414,8 @@ export interface CanvasEngine {
   commitStructural(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): void;
   /** Adds a contract-built layer while preserving the source layer's live cache pixels. */
   commitLayerCopy(label: string, sourceLayerId: string, layer: CanvasLayerContract, index: number): boolean;
-  /** Converts a layer contract in place while preserving its live cache pixels through undo/redo. */
-  commitLayerConversion(label: string, before: CanvasLayerContract, after: CanvasLayerContract): boolean;
+  /** Converts the expected immutable live layer while preserving its cache pixels through undo/redo. */
+  commitLayerConversion(label: string, expectedLiveLayer: CanvasLayerContract, after: CanvasLayerContract): boolean;
   /**
    * Updates the active transform session's live transform (a numeric options-bar
    * edit). Refreshes the preview; no dispatch until Apply. A no-op with no session.
@@ -616,8 +668,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   /** Layer id → decoded image name, so removed layers can release their bitmaps. */
   const trackedImageNames = new Map<string, string>();
-  /** Layer ids with an in-flight rasterization, to avoid re-triggering each frame. */
-  const inFlight = new Set<string>();
+  /** The newest isolated rasterization job for each layer id. */
+  const layerRasterizationJobs = new Map<string, RasterizationJob>();
+  /** Invalidates jobs and export guards across wholesale document replacement. */
+  let rasterDocumentGeneration = 0;
 
   let screenSurface: RasterSurface | null = null;
   let overlaySurface: RasterSurface | null = null;
@@ -1015,6 +1069,150 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     store: layerCache,
   });
 
+  const isSupportedExportSource = (source: CanvasLayerSourceContract): boolean => {
+    if (source.type === 'shape') {
+      return source.kind !== 'polygon';
+    }
+    return true;
+  };
+
+  const isCurrentRasterizationJob = (layer: CanvasLayerContract): boolean => {
+    const job = layerRasterizationJobs.get(layer.id);
+    const source = renderableSourceOf(layer);
+    return (
+      !!job &&
+      !!source &&
+      job.version === layerCache.version(layer.id) &&
+      job.documentGeneration === rasterDocumentGeneration &&
+      isDeeplyEqual(job.source, source)
+    );
+  };
+
+  /**
+   * Starts (or joins) an isolated rasterization. Pixels land in a scratch
+   * surface and are copied into the live cache only while this exact job still
+   * describes the current layer source, cache version, and document.
+   */
+  const getOrStartLayerRasterization = (
+    layer: CanvasLayerContract,
+    document: CanvasDocumentContractV2
+  ): Promise<'published' | 'stale'> => {
+    const liveSource = renderableSourceOf(layer);
+    if (!liveSource || !isSupportedExportSource(liveSource)) {
+      return Promise.resolve('stale');
+    }
+
+    const contentRect = getSourceContentRect(layer, document);
+    const entry = layerCache.getOrCreateRect(layer.id, contentRect);
+    const version = entry.version;
+    const documentGeneration = rasterDocumentGeneration;
+    const source = structuredClone(liveSource);
+    const existing = layerRasterizationJobs.get(layer.id);
+    if (
+      existing &&
+      existing.version === version &&
+      existing.documentGeneration === documentGeneration &&
+      isDeeplyEqual(existing.source, source)
+    ) {
+      return existing.promise;
+    }
+
+    if (source.type === 'text') {
+      fontLoader.ensure(textFontString(source), () => {
+        const currentDocument = mirror.getDocument();
+        const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
+        if (
+          disposed ||
+          !currentLayer ||
+          rasterDocumentGeneration !== documentGeneration ||
+          layerCache.version(layer.id) !== version ||
+          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
+        ) {
+          return;
+        }
+        layerCache.invalidate(layer.id);
+        scheduler.invalidate({ layers: [layer.id] });
+      });
+    }
+
+    const scratch = backend.createSurface(contentRect.width, contentRect.height);
+    let settleJob!: (result: 'published' | 'stale') => void;
+    const promise = new Promise<'published' | 'stale'>((resolve) => {
+      settleJob = resolve;
+    });
+    const job: RasterizationJob = {
+      documentGeneration,
+      promise,
+      source,
+      version,
+    };
+    layerRasterizationJobs.set(layer.id, job);
+    void (async () => {
+      try {
+        const result = await rasterizeSource(source, rasterizeDeps(document), scratch);
+        const currentDocument = mirror.getDocument();
+        const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
+        const currentEntry = layerCache.get(layer.id);
+        if (
+          disposed ||
+          layerRasterizationJobs.get(layer.id) !== job ||
+          rasterDocumentGeneration !== documentGeneration ||
+          !currentLayer ||
+          !currentEntry ||
+          currentEntry.version !== version ||
+          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
+        ) {
+          return 'stale';
+        }
+
+        if (currentEntry.surface.width !== result.rect.width || currentEntry.surface.height !== result.rect.height) {
+          currentEntry.surface.resize(result.rect.width, result.rect.height);
+        }
+        const ctx = currentEntry.surface.ctx;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, result.rect.width, result.rect.height);
+        if (!isEmpty(result.rect)) {
+          ctx.drawImage(result.surface.canvas, 0, 0);
+        }
+        currentEntry.rect = { ...result.rect };
+        currentEntry.stale = false;
+        stores.thumbnailVersion.set(layer.id, currentEntry.version);
+        scheduler.invalidate({ layers: [layer.id] });
+        return 'published';
+      } catch {
+        return 'stale';
+      } finally {
+        if (layerRasterizationJobs.get(layer.id) === job) {
+          layerRasterizationJobs.delete(layer.id);
+        }
+      }
+    })().then(settleJob, () => settleJob('stale'));
+    return promise;
+  };
+
+  const captureLayerExportGuard = (layer: CanvasLayerContract, entry: LayerCacheEntry): LayerExportGuard => ({
+    cacheVersion: entry.version,
+    documentGeneration: rasterDocumentGeneration,
+    layer,
+    layerId: layer.id,
+    projectId,
+  });
+
+  const isLayerExportGuardCurrent = (guard: LayerExportGuard): boolean => {
+    if (
+      disposed ||
+      guard.projectId !== projectId ||
+      store.getState().activeProjectId !== projectId ||
+      guard.documentGeneration !== rasterDocumentGeneration
+    ) {
+      return false;
+    }
+    const document = mirror.getDocument();
+    const liveLayer = document?.layers.find((candidate) => candidate.id === guard.layerId);
+    const entry = layerCache.get(guard.layerId);
+    return !!entry && liveLayer === guard.layer && entry.version === guard.cacheVersion;
+  };
+
   const ensureLayerCaches = (doc: CanvasDocumentContractV2): void => {
     for (const layer of doc.layers) {
       // The layer's rasterizable source: a raster/control `source`, or a mask
@@ -1038,64 +1236,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       // here — that would destroy those pixels. The rasterizer (below, guarded by
       // `stale`) owns sizing the surface + placing its content rect.
       const entry = layerCache.getOrCreateRect(layer.id, getSourceContentRect(layer, doc));
-      if (!entry.stale || inFlight.has(layer.id)) {
+      if (!entry.stale) {
         continue;
       }
 
-      inFlight.add(layer.id);
-      // Capture the cache's version before dispatching: if another
-      // invalidation bumps it while this rasterize is in flight, the pixels
-      // we're about to produce are already stale by the time they land, and
-      // must not clear `stale` — otherwise the newest edit would be dropped
-      // until some unrelated invalidation happens to re-trigger a rasterize.
-      const dispatchedVersion = layerCache.version(layer.id);
-      // Text metrics depend on the font actually being available. This rasterize
-      // draws with whatever `measureText` reports now (a fallback if a web font
-      // is still loading); when the font resolves, re-rasterize — unless a newer
-      // edit already bumped the version (a stale resolve must not clobber it).
-      if (source.type === 'text') {
-        fontLoader.ensure(textFontString(source), () => {
-          if (disposed || layerCache.version(layer.id) !== dispatchedVersion) {
-            return;
-          }
-          layerCache.invalidate(layer.id);
-          scheduler.invalidate({ layers: [layer.id] });
-        });
-      }
-      rasterizeSource(source, rasterizeDeps(doc), entry.surface)
-        .then((result) => {
-          inFlight.delete(layer.id);
-          const current = layerCache.get(layer.id);
-          if (current && layerCache.version(layer.id) === dispatchedVersion) {
-            current.stale = false;
-            // Adopt the placed content rect the rasterizer produced (the surface
-            // was resized in place, so its identity is unchanged).
-            current.rect = result.rect;
-            // Only bump the thumbnail version when the pixels that just
-            // landed are actually the current ones. A stale (superseded)
-            // completion must not touch `thumbnailVersion`: since the
-            // equality-guarded store only notifies on change, a stale
-            // completion setting the same version the fresh completion will
-            // later compute would suppress that later notification, leaving
-            // thumbnail subscribers stuck on pre-edit pixels indefinitely.
-            stores.thumbnailVersion.set(layer.id, layerCache.version(layer.id));
-          }
-          // If the version moved on, `current.stale` is left `true` (set by
-          // the intervening `invalidate`), so the next scheduled frame's
-          // `ensureLayerCaches` pass re-dispatches a fresh rasterize.
-          scheduler.invalidate({ layers: [layer.id] });
-        })
-        .catch(() => {
-          inFlight.delete(layer.id);
-        });
+      void getOrStartLayerRasterization(layer, doc);
     }
-  };
-
-  const isSupportedExportSource = (source: CanvasLayerSourceContract): boolean => {
-    if (source.type === 'shape') {
-      return source.kind !== 'polygon';
-    }
-    return true;
   };
 
   const hasExportableLayerContent = (layerId: string): boolean => {
@@ -1118,7 +1264,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return false;
     }
     const entry = layerCache.get(layerId);
-    return !!entry && !entry.stale && !inFlight.has(layerId) && !isEmpty(entry.rect);
+    return !!entry && !entry.stale && !isCurrentRasterizationJob(layer) && !isEmpty(entry.rect);
   };
 
   const rasterizeLayerPixels = async (
@@ -1141,24 +1287,47 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return { status: 'unsupported' };
     }
     const liveEntry = layerCache.get(layerId);
-    if (liveEntry && !liveEntry.stale && !inFlight.has(layer.id) && !isEmpty(liveEntry.rect)) {
-      return { rect: liveEntry.rect, status: 'ok', surface: liveEntry.surface };
+    if (liveEntry && !liveEntry.stale && !isCurrentRasterizationJob(layer) && !isEmpty(liveEntry.rect)) {
+      return {
+        guard: captureLayerExportGuard(layer, liveEntry),
+        rect: liveEntry.rect,
+        status: 'ok',
+        surface: liveEntry.surface,
+      };
     }
     const contentRect = getSourceContentRect(layer, doc);
     if (isEmpty(contentRect)) {
       return { status: 'empty' };
     }
-    if (inFlight.has(layer.id)) {
+    const rasterized = await getOrStartLayerRasterization(layer, doc);
+    if (rasterized !== 'published') {
       return { status: 'not-ready' };
     }
-    const entry = layerCache.getOrCreateRect(layerId, contentRect);
-    if (entry.stale) {
-      const result = await rasterizeSource(source, rasterizeDeps(doc), entry.surface);
-      entry.rect = result.rect;
-      entry.stale = false;
-      stores.thumbnailVersion.set(layer.id, layerCache.version(layer.id));
+    const currentDocument = mirror.getDocument();
+    const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layerId);
+    const entry = layerCache.get(layerId);
+    if (!currentLayer || !entry || entry.stale) {
+      return { status: 'not-ready' };
     }
-    return { rect: entry.rect, status: 'ok', surface: entry.surface };
+    const currentSource = renderableSourceOf(currentLayer);
+    if (!currentSource) {
+      return { status: 'missing' };
+    }
+    if (!options.includeDisabled && !currentLayer.isEnabled) {
+      return { status: 'disabled' };
+    }
+    if (!isSupportedExportSource(currentSource)) {
+      return { status: 'unsupported' };
+    }
+    if (isEmpty(entry.rect)) {
+      return { status: 'empty' };
+    }
+    return {
+      guard: captureLayerExportGuard(currentLayer, entry),
+      rect: entry.rect,
+      status: 'ok',
+      surface: entry.surface,
+    };
   };
 
   const exportBakedLayerPixels = async (
@@ -1169,11 +1338,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (raw.status !== 'ok') {
       return raw;
     }
-    const doc = mirror.getDocument();
-    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
-    if (!doc || !layer) {
-      return { status: 'missing' };
-    }
+    const layer = raw.guard.layer;
 
     const matrix = fromTRS(
       { x: layer.transform.x, y: layer.transform.y },
@@ -1199,7 +1364,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       ctx.putImageData(imageData, 0, 0);
     }
 
-    return { rect: worldRect, status: 'ok', surface };
+    return { guard: raw.guard, rect: worldRect, status: 'ok', surface };
   };
 
   const exportBakedLayerBlob = async (
@@ -1210,71 +1375,120 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (result.status !== 'ok') {
       return result;
     }
-    return { blob: await backend.encodeSurface(result.surface, 'image/png'), rect: result.rect, status: 'ok' };
+    const blob = await backend.encodeSurface(result.surface, 'image/png');
+    if (!isLayerExportGuardCurrent(result.guard)) {
+      return { status: 'not-ready' };
+    }
+    return { blob, guard: result.guard, rect: result.rect, status: 'ok' };
   };
 
-  const cropLayerToBbox = async (layerId: string): Promise<boolean> => {
+  const cropLayerToBbox = async (layerId: string): Promise<CropLayerResult> => {
     if (pipeline.isGestureActive()) {
-      return false;
+      return { status: 'busy' };
     }
     endNudgeBurst();
-    const doc = mirror.getDocument();
-    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
-    if (!doc || !layer || layer.isLocked) {
-      return false;
+    const document = mirror.getDocument();
+    const layer = document?.layers.find((candidate) => candidate.id === layerId);
+    if (!document || !layer) {
+      return { status: 'missing' };
     }
-    const cropRect = roundOut(doc.bbox);
-    if (isEmpty(cropRect)) {
-      return false;
+    if (layer.isLocked) {
+      return { status: 'locked' };
     }
-
-    const baked = await exportBakedLayerPixels(layerId, { includeDisabled: true });
-    if (baked.status !== 'ok') {
-      return false;
+    const source = renderableSourceOf(layer);
+    if (!source || !isSupportedExportSource(source)) {
+      return { status: 'unsupported' };
     }
 
-    const cropped = backend.createSurface(cropRect.width, cropRect.height);
-    const cctx = cropped.ctx;
-    cctx.setTransform(1, 0, 0, 1, 0, 0);
-    cctx.clearRect(0, 0, cropRect.width, cropRect.height);
-    cctx.drawImage(baked.surface.canvas, baked.rect.x - cropRect.x, baked.rect.y - cropRect.y);
-
-    const identity = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
-    if (layer.type === 'raster' || layer.type === 'control') {
-      store.dispatch({
-        id: layerId,
-        source: { bitmap: null, offset: { x: cropRect.x, y: cropRect.y }, type: 'paint' },
-        type: 'updateCanvasLayerSource',
-      });
-      if (layer.type === 'raster' && layer.adjustments) {
-        store.dispatch({
-          config: { adjustments: undefined, layerType: 'raster' },
-          id: layerId,
-          type: 'updateCanvasLayerConfig',
-        });
-      } else if (layer.type === 'control' && layer.filter) {
-        store.dispatch({
-          config: { filter: undefined, layerType: 'control' },
-          id: layerId,
-          type: 'updateCanvasLayerConfig',
-        });
+    try {
+      const exported = await exportBakedLayerPixels(layerId, { includeDisabled: true });
+      if (exported.status !== 'ok') {
+        switch (exported.status) {
+          case 'missing':
+          case 'unsupported':
+          case 'empty':
+          case 'not-ready':
+            return { status: exported.status };
+          case 'disabled':
+            return { status: 'not-ready' };
+        }
       }
-    } else {
-      store.dispatch({
-        config: { layerType: layer.type, mask: { bitmap: null, offset: { x: cropRect.x, y: cropRect.y } } },
-        id: layerId,
-        type: 'updateCanvasLayerConfig',
-      });
-    }
-    store.dispatch({ id: layerId, patch: { transform: identity }, type: 'updateCanvasLayer' });
 
-    layerCache.delete(layerId);
-    const target = layerCache.getOrCreateRect(layerId, cropRect);
-    target.surface.ctx.drawImage(cropped.canvas, 0, 0);
-    target.stale = false;
-    notifyLayerPainted(layerId);
-    bitmapStore.markLayerDirty(layerId);
-    return true;
+      const liveDocument = mirror.getDocument();
+      const liveLayer = liveDocument?.layers.find((candidate) => candidate.id === layerId);
+      if (!liveDocument || !liveLayer) {
+        return { status: 'missing' };
+      }
+      if (pipeline.isGestureActive()) {
+        return { status: 'busy' };
+      }
+      if (liveLayer.isLocked) {
+        return { status: 'locked' };
+      }
+      if (!isLayerExportGuardCurrent(exported.guard)) {
+        return { status: 'not-ready' };
+      }
+      const liveSource = renderableSourceOf(liveLayer);
+      if (!liveSource || !isSupportedExportSource(liveSource)) {
+        return { status: 'unsupported' };
+      }
+
+      const overlap = intersect(exported.rect, roundOut(liveDocument.bbox));
+      if (!overlap) {
+        return { status: 'empty' };
+      }
+      const cropRect = roundOut(overlap);
+      if (isEmpty(cropRect)) {
+        return { status: 'empty' };
+      }
+
+      const beforePixels = captureLayerCache(liveLayer, liveDocument);
+      if (!beforePixels || beforePixels === 'not-ready') {
+        return { status: 'not-ready' };
+      }
+      const before = structuredClone(liveLayer);
+      const cropped = backend.createSurface(cropRect.width, cropRect.height);
+      const cctx = cropped.ctx;
+      cctx.setTransform(1, 0, 0, 1, 0, 0);
+      cctx.clearRect(0, 0, cropRect.width, cropRect.height);
+      cctx.drawImage(exported.surface.canvas, exported.rect.x - cropRect.x, exported.rect.y - cropRect.y);
+
+      const identity = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
+      const paintSource = { bitmap: null, offset: { x: cropRect.x, y: cropRect.y }, type: 'paint' } as const;
+      let after: CanvasLayerContract;
+      if (before.type === 'raster') {
+        const { adjustments: _adjustments, ...rest } = before;
+        after = { ...rest, source: paintSource, transform: identity };
+      } else if (before.type === 'control') {
+        const { filter: _filter, ...rest } = before;
+        after = { ...rest, source: paintSource, transform: identity };
+      } else {
+        after = {
+          ...before,
+          mask: { ...before.mask, bitmap: null, offset: { x: cropRect.x, y: cropRect.y } },
+          transform: identity,
+        };
+      }
+
+      const applySnapshot = (contract: CanvasLayerContract, snapshot: { pixels: RasterSurface; rect: Rect }): void => {
+        store.dispatch({ layer: contract, layerId, type: 'replaceCanvasLayer' });
+        seedGeneratedPaintCache(layerId, snapshot.rect, snapshot.pixels);
+      };
+      const afterPixels = { pixels: cropped, rect: cropRect };
+      applySnapshot(after, afterPixels);
+      history.push({
+        bytes:
+          beforePixels.rect.width * beforePixels.rect.height * 4 +
+          afterPixels.rect.width * afterPixels.rect.height * 4 +
+          256,
+        label: 'Crop layer to bbox',
+        redo: () => applySnapshot(after, afterPixels),
+        undo: () => applySnapshot(before, beforePixels),
+      });
+      return { status: 'cropped' };
+    } catch (error) {
+      return { message: error instanceof Error ? error.message : String(error), status: 'failed' };
+    }
   };
 
   const copyLayerToRaster = async (layerId: string): Promise<string | null> => {
@@ -1287,12 +1501,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!doc || !sourceLayer) {
       return null;
     }
-    const sourceIndex = doc.layers.findIndex((layer) => layer.id === layerId);
-    if (sourceIndex < 0) {
-      return null;
-    }
     const baked = await exportBakedLayerPixels(layerId, { includeDisabled: true });
     if (baked.status !== 'ok') {
+      return null;
+    }
+    if (pipeline.isGestureActive() || !isLayerExportGuardCurrent(baked.guard) || baked.guard.layer !== sourceLayer) {
+      return null;
+    }
+    const liveDocument = mirror.getDocument();
+    const liveSourceLayer = liveDocument?.layers.find((layer) => layer.id === layerId);
+    const sourceIndex = liveDocument?.layers.findIndex((layer) => layer.id === layerId) ?? -1;
+    if (!liveDocument || liveSourceLayer !== sourceLayer || sourceIndex < 0) {
       return null;
     }
 
@@ -1354,9 +1573,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const dropLayer = (layerId: string): void => {
+    layerRasterizationJobs.delete(layerId);
     layerCache.delete(layerId);
     adjustedSurfaceCache.delete(layerId);
-    inFlight.delete(layerId);
     stores.thumbnailVersion.delete(layerId);
     const imageName = trackedImageNames.get(layerId);
     trackedImageNames.delete(layerId);
@@ -1640,6 +1859,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // is active the document must recomposite to reposition it with the bbox.
     onBboxChanged: () => scheduler.invalidate(stagedPreview ? { all: true } : { overlay: true }),
     onDocumentReplaced: () => {
+      rasterDocumentGeneration += 1;
+      layerRasterizationJobs.clear();
       // A wholesale document swap — project switch, dims/background change, or a
       // snapshot restore that changes dims — invalidates the pixel history: its
       // entries reference layers/pixels that no longer describe the live document.
@@ -2069,7 +2290,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
    * cache: the surface then holds blank/old pixels, so the op would bake garbage
    * AND the in-flight `rasterizeSource` completion would later redraw over the
    * op's result. Such a layer is safe only once its cache exists and is neither
-   * stale (re-rasterize pending) nor mid-decode (`inFlight`).
+   * stale (re-rasterize pending) nor in its current decode job.
    *
    * A layer with NO persisted content is always safe: its cache — whether a fresh
    * live paint (unflushed stroke) or a genuinely empty 0×0 stale entry — already
@@ -2080,7 +2301,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return true;
     }
     const entry = layerCache.get(layer.id);
-    return !!entry && !entry.stale && !inFlight.has(layer.id);
+    return !!entry && !entry.stale && !isCurrentRasterizationJob(layer);
   };
 
   const booleanCompositeModes: Record<BooleanRasterOperation, GlobalCompositeOperation> = {
@@ -2110,7 +2331,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!entry || isEmpty(entry.rect)) {
       return null;
     }
-    if (inFlight.has(layer.id) || (entry.stale && !isEmpty(getSourceContentRect(layer, doc)))) {
+    if (isCurrentRasterizationJob(layer) || (entry.stale && !isEmpty(getSourceContentRect(layer, doc)))) {
       return 'not-ready';
     }
     const pixels = backend.createSurface(entry.rect.width, entry.rect.height);
@@ -2156,14 +2377,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return true;
   };
 
-  const commitLayerConversion = (label: string, before: CanvasLayerContract, after: CanvasLayerContract): boolean => {
-    if (pipeline.isGestureActive() || before.id !== after.id || before.type === after.type) {
+  const commitLayerConversion = (
+    label: string,
+    expectedLiveLayer: CanvasLayerContract,
+    after: CanvasLayerContract
+  ): boolean => {
+    if (pipeline.isGestureActive() || expectedLiveLayer.id !== after.id || expectedLiveLayer.type === after.type) {
       return false;
     }
     endNudgeBurst();
     const doc = mirror.getDocument();
-    const current = doc?.layers.find((candidate) => candidate.id === before.id);
-    if (!doc || !current || current.type !== before.type) {
+    const current = doc?.layers.find((candidate) => candidate.id === expectedLiveLayer.id);
+    if (
+      !doc ||
+      !current ||
+      current !== expectedLiveLayer ||
+      current.isLocked ||
+      current.type !== expectedLiveLayer.type
+    ) {
       return false;
     }
     const captured = captureLayerCache(current, doc);
@@ -2176,6 +2407,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         seedGeneratedPaintCache(layer.id, captured.rect, captured.pixels, layerNeedsPixelPersistence(layer));
       }
     };
+    const before = structuredClone(current);
     apply(after);
     history.push({
       bytes: captured ? captured.rect.width * captured.rect.height * 4 + 256 : 256,
@@ -2222,7 +2454,36 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (upperPixels.status === 'not-ready' || belowPixels.status === 'not-ready') {
         return 'not-ready';
       }
+      if (
+        upperPixels.status === 'disabled' ||
+        upperPixels.status === 'unsupported' ||
+        belowPixels.status === 'disabled' ||
+        belowPixels.status === 'unsupported'
+      ) {
+        return 'unsupported';
+      }
       return 'empty';
+    }
+    if (pipeline.isGestureActive()) {
+      return 'busy';
+    }
+    if (
+      upperPixels.guard.layer !== upper ||
+      belowPixels.guard.layer !== below ||
+      !isLayerExportGuardCurrent(upperPixels.guard) ||
+      !isLayerExportGuardCurrent(belowPixels.guard)
+    ) {
+      return 'not-ready';
+    }
+    const liveDocument = mirror.getDocument();
+    const liveUpperIndex = liveDocument?.layers.findIndex((layer) => layer.id === upperLayerId) ?? -1;
+    const liveUpper = liveDocument?.layers[liveUpperIndex];
+    const liveBelow = liveDocument?.layers[liveUpperIndex + 1];
+    if (!liveDocument || liveUpper !== upper || liveBelow !== below) {
+      return 'not-ready';
+    }
+    if (!isMergeableRasterLayer(liveUpper) || !isMergeableRasterLayer(liveBelow)) {
+      return 'unsupported';
     }
 
     const resultRect = roundOut(union(upperPixels.rect, belowPixels.rect));
@@ -2258,7 +2519,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     ];
     const disabled = originalEnabled.map(({ id }) => ({ id, isEnabled: false }));
     const apply = (): void => {
-      store.dispatch({ index: upperIndex, layer: resultLayer, type: 'addCanvasLayer' });
+      store.dispatch({ index: liveUpperIndex, layer: resultLayer, type: 'addCanvasLayer' });
       seedGeneratedPaintCache(resultId, resultRect, resultPixels);
       store.dispatch({ type: 'setCanvasLayersEnabled', updates: disabled });
     };
@@ -2293,12 +2554,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!maskLayer || maskLayer.type !== 'inpaint_mask') {
       return { status: 'unsupported' };
     }
-    const liveMask = layerCache.get(maskLayerId);
-    if (isEmpty(getSourceContentRect(maskLayer, doc)) && (!liveMask || isEmpty(liveMask.rect))) {
+    if (maskLayer.isLocked) {
+      return { status: 'unsupported' };
+    }
+    const liveMaskCache = layerCache.get(maskLayerId);
+    if (isEmpty(getSourceContentRect(maskLayer, doc)) && (!liveMaskCache || isEmpty(liveMaskCache.rect))) {
       return { status: 'empty' };
     }
     const contributors = doc.layers.filter(
-      (layer) => layer.isEnabled && (layer.type === 'raster' || layer.type === 'control')
+      (layer) => layer.isEnabled && layer.type === 'raster' && hasExportableLayerContent(layer.id)
     );
     if (contributors.length === 0) {
       return { status: 'empty' };
@@ -2307,9 +2571,55 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return { status: 'not-ready' };
     }
 
-    const maskPixels = await exportBakedLayerPixels(maskLayerId, { includeDisabled: true });
+    const [maskPixels, contributorPixels] = await Promise.all([
+      exportBakedLayerPixels(maskLayerId, { includeDisabled: true }),
+      Promise.all(contributors.map((layer) => rasterizeLayerPixels(layer.id))),
+    ]);
     if (maskPixels.status !== 'ok') {
       return { status: maskPixels.status === 'not-ready' ? 'not-ready' : 'empty' };
+    }
+    if (contributorPixels.some((pixels) => pixels.status !== 'ok')) {
+      return {
+        status: contributorPixels.some((pixels) => pixels.status === 'not-ready') ? 'not-ready' : 'empty',
+      };
+    }
+    if (pipeline.isGestureActive()) {
+      return { status: 'busy' };
+    }
+    if (maskPixels.guard.layer !== maskLayer || !isLayerExportGuardCurrent(maskPixels.guard)) {
+      return { status: 'not-ready' };
+    }
+    const liveDocument = mirror.getDocument();
+    const liveMaskIndex = liveDocument?.layers.findIndex((layer) => layer.id === maskLayerId) ?? -1;
+    const currentMask = liveDocument?.layers[liveMaskIndex];
+    if (!liveDocument || !currentMask) {
+      return { status: 'missing' };
+    }
+    if (currentMask !== maskLayer) {
+      return { status: currentMask.type === 'inpaint_mask' && currentMask.isLocked ? 'unsupported' : 'not-ready' };
+    }
+    const liveContributors = liveDocument.layers.filter(
+      (layer) => layer.isEnabled && layer.type === 'raster' && hasExportableLayerContent(layer.id)
+    );
+    if (
+      liveMaskIndex !== maskIndex ||
+      liveContributors.length !== contributors.length ||
+      liveContributors.some((layer, index) => layer !== contributors[index])
+    ) {
+      return { status: 'not-ready' };
+    }
+    for (let index = 0; index < contributorPixels.length; index += 1) {
+      const pixels = contributorPixels[index];
+      const contributor = contributors[index];
+      if (
+        !pixels ||
+        pixels.status !== 'ok' ||
+        !contributor ||
+        pixels.guard.layer !== contributor ||
+        !isLayerExportGuardCurrent(pixels.guard)
+      ) {
+        return { status: 'not-ready' };
+      }
     }
     const resultRect = maskPixels.rect;
     if (isEmpty(resultRect)) {
@@ -2602,7 +2912,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (rasterLayers.length === 0) {
       return 'nothing';
     }
-    // Readiness pre-flight: a layer whose cache is MID-DECODE (`inFlight`) would
+    // Readiness pre-flight: a layer whose cache is in its current decode job would
     // bake blank/old pixels, so refuse the whole export (nothing partial). A
     // layer with no live cache entry is safe — the executor rasterizes it fresh
     // and synchronously. Transform/stroke sessions in progress export the current
@@ -2611,7 +2921,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (isEmpty(getSourceContentRect(layer, doc))) {
         continue;
       }
-      if (inFlight.has(layer.id)) {
+      if (isCurrentRasterizationJob(layer)) {
         return 'not-ready';
       }
     }
@@ -3603,7 +3913,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     layerCache.dispose();
     adjustedSurfaceCache.dispose();
     trackedImageNames.clear();
-    inFlight.clear();
+    layerRasterizationJobs.clear();
     strokeListeners.clear();
   };
 
@@ -3722,6 +4032,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     hasExportableLayerContent,
     invertMask,
     invertSelection,
+    isLayerExportGuardCurrent,
     mergeLayerDown,
     mergeVisibleRasterLayers,
     openTextCreate,
