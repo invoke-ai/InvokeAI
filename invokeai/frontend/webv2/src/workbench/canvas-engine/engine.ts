@@ -138,6 +138,15 @@ export type MergeVisibleResult = 'merged' | 'not-ready' | 'nothing';
  */
 export type PsdExportResult = 'exported' | 'nothing' | 'too-large' | 'not-ready';
 
+export interface ExportLayerPixelsOptions {
+  /** Export disabled/hidden layers too. Used by PSD/save-layer actions. */
+  includeDisabled?: boolean;
+}
+
+export type ExportLayerPixelsResult =
+  | { status: 'ok'; surface: RasterSurface; rect: Rect }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' };
+
 /** The minimal workbench store the engine depends on. */
 export interface EngineStore {
   getState(): WorkbenchState;
@@ -274,6 +283,13 @@ export interface CanvasEngine {
    * the download name (extension appended if absent).
    */
   exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
+  /**
+   * Ensures one layer's pixels are rasterized in the shared layer cache and returns
+   * the cache surface plus its layer-local content rect. Read-only: no dispatches,
+   * no history entry, no document mutation. Returns `not-ready` rather than racing
+   * an already in-flight rasterize, so callers never export stale/blank pixels.
+   */
+  exportLayerPixels(layerId: string, options?: ExportLayerPixelsOptions): Promise<ExportLayerPixelsResult>;
   /**
    * Rasterizes a parametric (shape/gradient/text) layer to a paint layer: bakes its
    * current appearance into a content-sized paint bitmap (persisted through the
@@ -1017,6 +1033,49 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
   };
 
+  const isSupportedExportSource = (source: CanvasLayerSourceContract): boolean => {
+    if (source.type === 'shape') {
+      return source.kind !== 'polygon';
+    }
+    return true;
+  };
+
+  const rasterizeLayerPixels = async (
+    layerId: string,
+    options: ExportLayerPixelsOptions = {}
+  ): Promise<ExportLayerPixelsResult> => {
+    const doc = mirror.getDocument();
+    if (!doc) {
+      return { status: 'missing' };
+    }
+    const layer = doc.layers.find((candidate) => candidate.id === layerId);
+    const source = layer ? renderableSourceOf(layer) : null;
+    if (!layer || !source) {
+      return { status: 'missing' };
+    }
+    if (!options.includeDisabled && !layer.isEnabled) {
+      return { status: 'disabled' };
+    }
+    if (!isSupportedExportSource(source)) {
+      return { status: 'unsupported' };
+    }
+    const contentRect = getSourceContentRect(layer, doc);
+    if (isEmpty(contentRect)) {
+      return { status: 'empty' };
+    }
+    if (inFlight.has(layer.id)) {
+      return { status: 'not-ready' };
+    }
+    const entry = layerCache.getOrCreateRect(layerId, contentRect);
+    if (entry.stale) {
+      const result = await rasterizeSource(source, rasterizeDeps(doc), entry.surface);
+      entry.rect = result.rect;
+      entry.stale = false;
+      stores.thumbnailVersion.set(layer.id, layerCache.version(layer.id));
+    }
+    return { rect: entry.rect, status: 'ok', surface: entry.surface };
+  };
+
   /**
    * Rasterizes a single layer on demand and returns its cache surface plus the
    * content rect (layer-local origin/size) those pixels occupy, for the
@@ -1027,32 +1086,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
    * (enabled image/paint rasters).
    */
   const getLayerSurfaceForExport = async (layerId: string): Promise<{ surface: RasterSurface; rect: Rect }> => {
-    const doc = mirror.getDocument();
-    if (!doc) {
-      throw new Error(`Cannot rasterize layer ${layerId} for generation: no active canvas document.`);
+    const result = await rasterizeLayerPixels(layerId);
+    if (result.status === 'ok') {
+      return { rect: result.rect, surface: result.surface };
     }
-    const layer = doc.layers.find((candidate) => candidate.id === layerId);
-    // Raster/control layers rasterize their own source; inpaint-mask layers
-    // rasterize their alpha bitmap through the shared paint view (`renderableSourceOf`),
-    // so the grayscale mask composite can read a mask's alpha exactly like a paint layer.
-    const source = layer ? renderableSourceOf(layer) : null;
-    if (!layer || !source) {
-      throw new Error(
-        `Cannot rasterize layer ${layerId} for generation: layer is missing or has no rasterizable source.`
-      );
-    }
-    if (!isRenderableLayer(layer)) {
-      throw new Error(`Cannot rasterize layer ${layerId} for generation: unsupported source type "${source.type}".`);
-    }
-    const entry = layerCache.getOrCreateRect(layerId, getSourceContentRect(layer, doc));
-    if (entry.stale) {
-      // Rasterize synchronously into the cache; a failure (e.g. asset resolve)
-      // propagates so the executor aborts with a meaningful message.
-      const result = await rasterizeSource(source, rasterizeDeps(doc), entry.surface);
-      entry.rect = result.rect;
-      entry.stale = false;
-    }
-    return { rect: entry.rect, surface: entry.surface };
+    throw new Error(`Cannot rasterize layer ${layerId} for generation: ${result.status}.`);
   };
 
   const releaseBitmapIfUnreferenced = (imageName: string): void => {
@@ -2023,22 +2061,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
    * from the source.
    */
   const getLayerSurfaceForPsd = async (layerId: string): Promise<{ surface: RasterSurface; rect: Rect }> => {
-    const doc = mirror.getDocument();
-    if (!doc) {
-      throw new Error(`Cannot rasterize layer ${layerId} for PSD export: no active canvas document.`);
+    const result = await rasterizeLayerPixels(layerId, { includeDisabled: true });
+    if (result.status === 'ok') {
+      return { rect: result.rect, surface: result.surface };
     }
-    const layer = doc.layers.find((candidate) => candidate.id === layerId);
-    const source = layer ? renderableSourceOf(layer) : null;
-    if (!layer || !source) {
-      throw new Error(`Cannot rasterize layer ${layerId} for PSD export: layer is missing or has no source.`);
-    }
-    const entry = layerCache.getOrCreateRect(layerId, getSourceContentRect(layer, doc));
-    if (entry.stale) {
-      const result = await rasterizeSource(source, rasterizeDeps(doc), entry.surface);
-      entry.rect = result.rect;
-      entry.stale = false;
-    }
-    return { rect: entry.rect, surface: entry.surface };
+    throw new Error(`Cannot rasterize layer ${layerId} for PSD export: ${result.status}.`);
   };
 
   const exportRasterLayersToPsd = async (fileName: string): Promise<PsdExportResult> => {
@@ -3090,6 +3117,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     drawLayerThumbnail,
     eraseSelection,
     exportRasterLayersToPsd,
+    exportLayerPixels: rasterizeLayerPixels,
     fillSelection,
     fitToView,
     flushPendingUploads: () => bitmapStore.flushPendingUploads(),

@@ -253,6 +253,61 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('exportLayerPixels rasterizes a visible layer and returns its cache surface plus content rect', async () => {
+    const { engine } = createEngine();
+
+    const result = await engine.exportLayerPixels('a');
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.rect).toEqual({ height: 10, width: 10, x: 0, y: 0 });
+      expect(result.surface.width).toBe(10);
+      expect(result.surface.height).toBe(10);
+      expect((result.surface as StubRasterSurface).callLog.some((entry) => entry.op === 'drawImage')).toBe(true);
+    }
+    engine.dispose();
+  });
+
+  it('exportLayerPixels refuses hidden layers unless includeDisabled is set', async () => {
+    const hidden = { ...rasterLayer('hidden'), isEnabled: false };
+    const { store } = createFakeStore({ ...makeDoc(), layers: [hidden] });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.exportLayerPixels('hidden')).toEqual({ status: 'disabled' });
+    expect((await engine.exportLayerPixels('hidden', { includeDisabled: true })).status).toBe('ok');
+    engine.dispose();
+  });
+
+  it('exportLayerPixels refuses a layer while its cache is already rasterizing', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const pendingResolve = createDeferred<Blob>();
+    const { store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => pendingResolve.promise,
+      projectId: 'p1',
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+
+    expect(await engine.exportLayerPixels('a')).toEqual({ status: 'not-ready' });
+
+    pendingResolve.resolve(new Blob());
+    await flushMicrotasks();
+    engine.dispose();
+  });
+
   it('setTool switches the active tool and updates the store', () => {
     const { engine } = createEngine();
     const listener = vi.fn();
