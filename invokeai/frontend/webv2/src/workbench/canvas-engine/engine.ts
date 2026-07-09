@@ -155,6 +155,10 @@ export interface ExportBakedLayerPixelsOptions extends ExportLayerPixelsOptions 
 
 export type ExportBakedLayerPixelsResult = ExportLayerPixelsResult;
 
+export type ExportBakedLayerBlobResult =
+  | { status: 'ok'; blob: Blob; rect: Rect }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' };
+
 /** The minimal workbench store the engine depends on. */
 export interface EngineStore {
   getState(): WorkbenchState;
@@ -307,6 +311,8 @@ export interface CanvasEngine {
     layerId: string,
     options?: ExportBakedLayerPixelsOptions
   ): Promise<ExportBakedLayerPixelsResult>;
+  /** Encodes {@link exportBakedLayerPixels} as a PNG blob for save/copy/upload actions. */
+  exportBakedLayerBlob(layerId: string, options?: ExportBakedLayerPixelsOptions): Promise<ExportBakedLayerBlobResult>;
   /**
    * Rasterizes a parametric (shape/gradient/text) layer to a paint layer: bakes its
    * current appearance into a content-sized paint bitmap (persisted through the
@@ -1132,6 +1138,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
 
     return { rect: worldRect, status: 'ok', surface };
+  };
+
+  const exportBakedLayerBlob = async (
+    layerId: string,
+    options: ExportBakedLayerPixelsOptions = {}
+  ): Promise<ExportBakedLayerBlobResult> => {
+    const result = await exportBakedLayerPixels(layerId, options);
+    if (result.status !== 'ok') {
+      return result;
+    }
+    return { blob: await backend.encodeSurface(result.surface, 'image/png'), rect: result.rect, status: 'ok' };
   };
 
   /**
@@ -3175,6 +3192,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     drawLayerThumbnail,
     eraseSelection,
     exportRasterLayersToPsd,
+    exportBakedLayerBlob,
     exportBakedLayerPixels,
     exportLayerPixels: rasterizeLayerPixels,
     fillSelection,

@@ -12,6 +12,7 @@ export type LayerContextActionId =
   | 'rename'
   | 'transform'
   | 'fit-to-bbox'
+  | 'save-to-assets'
   | 'rasterize'
   | 'convert-to-control'
   | 'convert-to-raster'
@@ -109,6 +110,13 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.actions.transform',
   },
   { defaultLabel: 'Fit to bbox', group: 'edit', id: 'fit-to-bbox', labelKey: 'widgets.layers.actions.fitToBbox' },
+  {
+    defaultLabel: 'Save layer to assets',
+    group: 'edit',
+    id: 'save-to-assets',
+    isDisabled: (ctx) => !ctx.hasEngine,
+    labelKey: 'widgets.layers.actions.saveLayerToAssets',
+  },
   {
     defaultLabel: 'Rasterize',
     group: 'convert',

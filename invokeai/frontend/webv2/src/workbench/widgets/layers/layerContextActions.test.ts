@@ -27,6 +27,7 @@ describe('getLayerContextActions', () => {
         'rename',
         'transform',
         'fit-to-bbox',
+        'save-to-assets',
         'merge-down',
         'delete',
       ])
@@ -79,6 +80,7 @@ describe('getLayerContextActions', () => {
     const actions = getLayerContextActions({ hasEngine: false, index: 0, layer, layers: [layer] });
 
     expect(actions.find((action) => action.id === 'transform')?.isDisabled).toBe(true);
+    expect(actions.find((action) => action.id === 'save-to-assets')?.isDisabled).toBe(true);
     expect(actions.find((action) => action.id === 'merge-down')?.isDisabled).toBe(true);
   });
 });

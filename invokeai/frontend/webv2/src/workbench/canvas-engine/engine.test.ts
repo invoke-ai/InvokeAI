@@ -370,6 +370,20 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('exportBakedLayerBlob encodes the baked layer surface as PNG', async () => {
+    const { engine } = createEngine();
+
+    const result = await engine.exportBakedLayerBlob('a');
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.rect).toEqual({ height: 10, width: 10, x: 0, y: 0 });
+      expect(result.blob.type).toBe('image/png');
+      expect(await result.blob.text()).toBe('stub-surface-10x10');
+    }
+    engine.dispose();
+  });
+
   it('setTool switches the active tool and updates the store', () => {
     const { engine } = createEngine();
     const listener = vi.fn();

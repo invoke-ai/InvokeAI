@@ -8,6 +8,7 @@ import type { ComponentProps, Dispatch } from 'react';
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { deleteLayerActions, duplicateLayerActions } from '@workbench/canvasLayerOps';
 import { IconButton, MenuContent, RenameDialog } from '@workbench/components/ui';
+import { uploadGalleryImage } from '@workbench/gallery/api';
 import { useModelsSelector } from '@workbench/models/modelsStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -25,6 +26,7 @@ import {
   MergeIcon,
   MoreVerticalIcon,
   PencilIcon,
+  SaveIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
 } from 'lucide-react';
@@ -311,6 +313,15 @@ const LayerMenu = ({
     patchBase(getActionLabel('fit-to-bbox'), { transform }, { transform: layer.transform });
   }, [bbox, documentRect, getActionLabel, layer, patchBase]);
 
+  const handleSaveToAssets = useCallback(async () => {
+    const result = await engine?.exportBakedLayerBlob(layer.id, { includeDisabled: true });
+    if (!result || result.status !== 'ok') {
+      return;
+    }
+    const file = new File([result.blob], `layer-${layer.id}.png`, { type: result.blob.type || 'image/png' });
+    await uploadGalleryImage(file, 'none');
+  }, [engine, layer.id]);
+
   const handleLayerConfigAction = useCallback(
     (id: LayerContextActionId) => {
       if (id === 'control-transparency-effect' && layer.type === 'control') {
@@ -366,6 +377,9 @@ const LayerMenu = ({
         case 'fit-to-bbox':
           handleFitToBbox();
           break;
+        case 'save-to-assets':
+          void handleSaveToAssets();
+          break;
         case 'rasterize':
           handleRasterize();
           break;
@@ -408,6 +422,7 @@ const LayerMenu = ({
       handleToggleLock,
       handleToggleVisibility,
       handleTransform,
+      handleSaveToAssets,
       openRename,
     ]
   );
@@ -596,6 +611,7 @@ const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
   'regional-positive-prompt': PencilIcon,
   'regional-reference-image': ImageIcon,
   rename: PencilIcon,
+  'save-to-assets': SaveIcon,
   'toggle-lock': LockIcon,
   'toggle-visibility': EyeIcon,
   transform: SlidersHorizontalIcon,
