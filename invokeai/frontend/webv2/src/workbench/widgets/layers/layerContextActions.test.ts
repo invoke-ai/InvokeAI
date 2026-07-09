@@ -51,15 +51,31 @@ describe('getLayerContextActions', () => {
       },
     });
 
-    expect(idsFor(paint)).toContain('convert-to-control');
+    expect(idsFor(paint)).toEqual(
+      expect.arrayContaining([
+        'copy-to-control',
+        'copy-to-inpaint-mask',
+        'copy-to-regional-guidance',
+        'convert-to-control',
+        'convert-to-inpaint-mask',
+        'convert-to-regional-guidance',
+      ])
+    );
     expect(idsFor(text)).not.toContain('convert-to-control');
+    expect(idsFor(text)).not.toContain('copy-to-inpaint-mask');
   });
 
   it('exposes control-only transparency and raster conversion actions', () => {
     const layer = createControlLayer('Control', 'control');
 
     expect(idsFor(layer)).toEqual(
-      expect.arrayContaining(['control-transparency-effect', 'convert-to-raster', 'copy-to-raster'])
+      expect.arrayContaining([
+        'control-transparency-effect',
+        'convert-to-raster',
+        'copy-to-raster',
+        'copy-to-inpaint-mask',
+        'copy-to-regional-guidance',
+      ])
     );
   });
 
@@ -80,7 +96,16 @@ describe('getLayerContextActions', () => {
     const layer = { ...createInpaintMaskLayer('Mask', 'mask'), noiseLevel: 0.25 };
 
     expect(idsFor(layer)).toContain('inpaint-denoise-limit');
+    expect(idsFor(layer)).toContain('copy-to-regional-guidance');
     expect(idsFor(layer)).not.toContain('inpaint-noise');
+  });
+
+  it('copies regional guidance to an inpaint mask without offering unsupported conversions', () => {
+    const layer = createRegionalGuidanceLayer('Region', 0, 'region');
+
+    expect(idsFor(layer)).toContain('copy-to-inpaint-mask');
+    expect(idsFor(layer)).not.toContain('convert-to-inpaint-mask');
+    expect(idsFor(layer)).not.toContain('copy-to-control');
   });
 
   it('disables transform and merge-down without an engine', () => {

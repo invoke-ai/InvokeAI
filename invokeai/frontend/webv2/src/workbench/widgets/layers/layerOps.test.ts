@@ -8,7 +8,18 @@ import {
   applyStructural,
   canConvertRasterControl,
   canMergeLayerDown,
+  convertRasterToControl,
+  convertRasterToInpaintMask,
+  convertRasterToRegionalGuidance,
   convertRasterControlLayer,
+  copyControlToInpaintMask,
+  copyControlToRaster,
+  copyControlToRegionalGuidance,
+  copyMaskToRegionalGuidance,
+  copyRasterToControl,
+  copyRasterToInpaintMask,
+  copyRasterToRegionalGuidance,
+  copyRegionalGuidanceToInpaintMask,
   createControlLayer,
   createEmptyPaintLayer,
   createInpaintMaskLayer,
@@ -366,6 +377,133 @@ describe('convertRasterControlLayer', () => {
     expect(convertRasterControlLayer(createControlLayer('c', 'c'), 'control')).toBeNull();
     expect(convertRasterControlLayer(createEmptyPaintLayer('p', 'p'), 'raster')).toBeNull();
     expect(convertRasterControlLayer(createInpaintMaskLayer('m', 'm'), 'control')).toBeNull();
+  });
+});
+
+describe('layer copy and conversion parity', () => {
+  const transform = { rotation: 10, scaleX: 2, scaleY: 3, x: 4, y: 5 };
+  const raster = {
+    ...createEmptyPaintLayer('Raster', 'r1'),
+    blendMode: 'multiply' as const,
+    isEnabled: false,
+    isLocked: true,
+    opacity: 0.4,
+    source: {
+      bitmap: { height: 20, imageName: 'paint-bitmap', width: 30 },
+      offset: { x: -3, y: 7 },
+      type: 'paint' as const,
+    },
+    transform,
+  };
+
+  it('copies and converts pixel-backed raster layers without baking their source', () => {
+    const controlCopy = copyRasterToControl(raster, 'c-copy');
+    expect(controlCopy).toMatchObject({
+      id: 'c-copy',
+      isEnabled: false,
+      isLocked: true,
+      name: 'Raster copy',
+      opacity: 0.4,
+      source: raster.source,
+      transform,
+      type: 'control',
+      withTransparencyEffect: true,
+    });
+    expect(copyRasterToInpaintMask(raster, 'm-copy')).toMatchObject({
+      id: 'm-copy',
+      mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
+      name: 'Raster copy',
+      type: 'inpaint_mask',
+    });
+    expect(copyRasterToRegionalGuidance(raster, 'rg-copy')).toMatchObject({
+      autoNegative: false,
+      id: 'rg-copy',
+      mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
+      name: 'Raster copy',
+      negativePrompt: null,
+      positivePrompt: null,
+      referenceImages: [],
+      type: 'regional_guidance',
+    });
+
+    expect(convertRasterToControl(raster)).toMatchObject({ id: 'r1', source: raster.source, type: 'control' });
+    expect(convertRasterToInpaintMask(raster)).toMatchObject({
+      id: 'r1',
+      mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
+      type: 'inpaint_mask',
+    });
+    expect(convertRasterToRegionalGuidance(raster)).toMatchObject({
+      id: 'r1',
+      mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
+      type: 'regional_guidance',
+    });
+  });
+
+  it('copies control layers to pixel and mask-backed destinations', () => {
+    const control = { ...createControlLayer('Control', 'c1'), source: raster.source, transform };
+
+    expect(copyControlToRaster(control, 'r-copy')).toMatchObject({
+      id: 'r-copy',
+      name: 'Control copy',
+      source: raster.source,
+      transform,
+      type: 'raster',
+    });
+    expect(copyControlToInpaintMask(control, 'm-copy')).toMatchObject({
+      id: 'm-copy',
+      mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
+      type: 'inpaint_mask',
+    });
+    expect(copyControlToRegionalGuidance(control, 'rg-copy')).toMatchObject({
+      id: 'rg-copy',
+      mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
+      type: 'regional_guidance',
+    });
+  });
+
+  it('copies between mask layer types while preserving bitmap, offset, and fill', () => {
+    const mask = {
+      ...createInpaintMaskLayer('Mask', 'm1'),
+      mask: {
+        bitmap: { height: 12, imageName: 'mask-bitmap', width: 13 },
+        fill: { color: '#123456', style: 'crosshatch' as const },
+        offset: { x: 8, y: -2 },
+      },
+      transform,
+    };
+    const regional = copyMaskToRegionalGuidance(mask, 'rg-copy');
+
+    expect(regional).toMatchObject({ id: 'rg-copy', mask: mask.mask, name: 'Mask copy', type: 'regional_guidance' });
+    expect(regional?.mask).not.toBe(mask.mask);
+    expect(copyRegionalGuidanceToInpaintMask(regional!, 'm-copy')).toMatchObject({
+      id: 'm-copy',
+      mask: mask.mask,
+      name: 'Mask copy copy',
+      type: 'inpaint_mask',
+    });
+  });
+
+  it('rejects parametric raster sources that cannot be represented as masks or controls', () => {
+    const text = {
+      ...raster,
+      source: {
+        align: 'left' as const,
+        color: '#fff',
+        content: 'hello',
+        fontFamily: 'Inter',
+        fontSize: 32,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        type: 'text' as const,
+      },
+    };
+
+    expect(copyRasterToControl(text, 'copy')).toBeNull();
+    expect(copyRasterToInpaintMask(text, 'copy')).toBeNull();
+    expect(copyRasterToRegionalGuidance(text, 'copy')).toBeNull();
+    expect(convertRasterToControl(text)).toBeNull();
+    expect(convertRasterToInpaintMask(text)).toBeNull();
+    expect(convertRasterToRegionalGuidance(text)).toBeNull();
   });
 });
 

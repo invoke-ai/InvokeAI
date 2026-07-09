@@ -42,7 +42,18 @@ import { reorderWithinGroupByKind } from './layerGroups';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
   applyStructural,
+  convertRasterToControl,
+  convertRasterToInpaintMask,
+  convertRasterToRegionalGuidance,
   convertRasterControlLayer,
+  copyControlToInpaintMask,
+  copyControlToRaster,
+  copyControlToRegionalGuidance,
+  copyMaskToRegionalGuidance,
+  copyRasterToControl,
+  copyRasterToInpaintMask,
+  copyRasterToRegionalGuidance,
+  copyRegionalGuidanceToInpaintMask,
   createLayerId,
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
@@ -231,9 +242,34 @@ const LayerMenu = ({
     engine?.rasterizeLayer(layer.id);
   }, [engine, layer.id]);
 
+  const addCopy = useCallback(
+    (copied: CanvasLayerContract | null, label: string) => {
+      if (!copied) {
+        return;
+      }
+      applyStructural(
+        engine,
+        dispatch,
+        label,
+        { index, layer: copied, type: 'addCanvasLayer' },
+        { ids: [copied.id], type: 'removeCanvasLayers' }
+      );
+    },
+    [dispatch, engine, index]
+  );
+
   const convert = useCallback(
-    (targetType: 'raster' | 'control', label: string) => {
-      const converted = convertRasterControlLayer(layer, targetType);
+    (targetType: CanvasLayerContract['type'], label: string) => {
+      const converted =
+        layer.type === 'raster' && targetType === 'control'
+          ? convertRasterToControl(layer)
+          : layer.type === 'raster' && targetType === 'inpaint_mask'
+            ? convertRasterToInpaintMask(layer)
+            : layer.type === 'raster' && targetType === 'regional_guidance'
+              ? convertRasterToRegionalGuidance(layer)
+              : targetType === 'raster'
+                ? convertRasterControlLayer(layer, 'raster')
+                : null;
       if (!converted) {
         return;
       }
@@ -256,6 +292,14 @@ const LayerMenu = ({
   );
   const handleConvertToRaster = useCallback(
     () => convert('raster', t('widgets.layers.actions.convertToRaster')),
+    [convert, t]
+  );
+  const handleConvertToInpaintMask = useCallback(
+    () => convert('inpaint_mask', t('widgets.layers.actions.convertToInpaintMask')),
+    [convert, t]
+  );
+  const handleConvertToRegionalGuidance = useCallback(
+    () => convert('regional_guidance', t('widgets.layers.actions.convertToRegionalGuidance')),
     [convert, t]
   );
 
@@ -337,8 +381,44 @@ const LayerMenu = ({
   }, [engine, layer.id]);
 
   const handleCopyToRaster = useCallback(() => {
+    if (layer.type === 'control') {
+      addCopy(copyControlToRaster(layer, createLayerId()), getActionLabel('copy-to-raster'));
+      return;
+    }
     void engine?.copyLayerToRaster(layer.id);
-  }, [engine, layer.id]);
+  }, [addCopy, engine, getActionLabel, layer]);
+
+  const handleCopyToControl = useCallback(() => {
+    if (layer.type === 'raster') {
+      addCopy(copyRasterToControl(layer, createLayerId()), getActionLabel('copy-to-control'));
+    }
+  }, [addCopy, getActionLabel, layer]);
+
+  const handleCopyToInpaintMask = useCallback(() => {
+    const id = createLayerId();
+    const copied =
+      layer.type === 'raster'
+        ? copyRasterToInpaintMask(layer, id)
+        : layer.type === 'control'
+          ? copyControlToInpaintMask(layer, id)
+          : layer.type === 'regional_guidance'
+            ? copyRegionalGuidanceToInpaintMask(layer, id)
+            : null;
+    addCopy(copied, getActionLabel('copy-to-inpaint-mask'));
+  }, [addCopy, getActionLabel, layer]);
+
+  const handleCopyToRegionalGuidance = useCallback(() => {
+    const id = createLayerId();
+    const copied =
+      layer.type === 'raster'
+        ? copyRasterToRegionalGuidance(layer, id)
+        : layer.type === 'control'
+          ? copyControlToRegionalGuidance(layer, id)
+          : layer.type === 'inpaint_mask'
+            ? copyMaskToRegionalGuidance(layer, id)
+            : null;
+    addCopy(copied, getActionLabel('copy-to-regional-guidance'));
+  }, [addCopy, getActionLabel, layer]);
 
   const handleLayerConfigAction = useCallback(
     (id: LayerContextActionId) => {
@@ -407,6 +487,15 @@ const LayerMenu = ({
         case 'copy-to-raster':
           handleCopyToRaster();
           break;
+        case 'copy-to-control':
+          handleCopyToControl();
+          break;
+        case 'copy-to-inpaint-mask':
+          handleCopyToInpaintMask();
+          break;
+        case 'copy-to-regional-guidance':
+          handleCopyToRegionalGuidance();
+          break;
         case 'rasterize':
           handleRasterize();
           break;
@@ -415,6 +504,12 @@ const LayerMenu = ({
           break;
         case 'convert-to-raster':
           handleConvertToRaster();
+          break;
+        case 'convert-to-inpaint-mask':
+          handleConvertToInpaintMask();
+          break;
+        case 'convert-to-regional-guidance':
+          handleConvertToRegionalGuidance();
           break;
         case 'merge-down':
           handleMerge();
@@ -435,9 +530,14 @@ const LayerMenu = ({
     },
     [
       handleConvertToControl,
+      handleConvertToInpaintMask,
+      handleConvertToRegionalGuidance,
       handleConvertToRaster,
+      handleCopyToControl,
       handleCopyToClipboard,
+      handleCopyToInpaintMask,
       handleCopyToRaster,
+      handleCopyToRegionalGuidance,
       handleCropToBbox,
       handleDelete,
       handleDuplicate,
@@ -624,10 +724,15 @@ const LAYER_ACTION_GROUPS: readonly LayerContextAction['group'][] = [
 const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
   'control-transparency-effect': SlidersHorizontalIcon,
   'copy-to-clipboard': CopyIcon,
+  'copy-to-control': CopyIcon,
+  'copy-to-inpaint-mask': CopyIcon,
   'copy-to-raster': CopyIcon,
+  'copy-to-regional-guidance': CopyIcon,
   'crop-to-bbox': CropIcon,
   'convert-to-control': SlidersHorizontalIcon,
+  'convert-to-inpaint-mask': ImageIcon,
   'convert-to-raster': ImageIcon,
+  'convert-to-regional-guidance': ImageIcon,
   delete: Trash2Icon,
   duplicate: CopyIcon,
   'fit-to-bbox': ImageIcon,

@@ -16,6 +16,8 @@ import type {
   CanvasInpaintMaskLayerContract,
   CanvasLayerBaseContract,
   CanvasLayerContract,
+  CanvasLayerSourceContract,
+  CanvasMaskContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/types';
@@ -391,6 +393,163 @@ export const canConvertRasterControl = (layer: CanvasLayerContract): boolean => 
   return layer.type === 'raster' && (layer.source.type === 'image' || layer.source.type === 'paint');
 };
 
+type PixelLayer = CanvasRasterLayerContractV2 | CanvasControlLayerContract;
+type PixelSource = Extract<CanvasLayerSourceContract, { type: 'image' | 'paint' }>;
+
+const cloneTransform = (layer: CanvasLayerContract): LayerTransform => ({ ...layer.transform });
+
+const clonePixelSource = (layer: PixelLayer): PixelSource | null => {
+  if (layer.source.type === 'image') {
+    return { image: { ...layer.source.image }, type: 'image' };
+  }
+  if (layer.source.type === 'paint') {
+    return {
+      bitmap: layer.source.bitmap ? { ...layer.source.bitmap } : null,
+      offset: layer.source.offset ? { ...layer.source.offset } : undefined,
+      type: 'paint',
+    };
+  }
+  return null;
+};
+
+const pixelLayerToMask = (layer: PixelLayer): CanvasMaskContract | null => {
+  const source = clonePixelSource(layer);
+  if (!source) {
+    return null;
+  }
+  if (source.type === 'image') {
+    return { bitmap: source.image, fill: { ...DEFAULT_INPAINT_MASK_FILL } };
+  }
+  return {
+    bitmap: source.bitmap,
+    fill: { ...DEFAULT_INPAINT_MASK_FILL },
+    offset: source.offset,
+  };
+};
+
+const cloneMask = (mask: CanvasMaskContract): CanvasMaskContract => ({
+  bitmap: mask.bitmap ? { ...mask.bitmap } : null,
+  fill: { ...mask.fill },
+  offset: mask.offset ? { ...mask.offset } : undefined,
+});
+
+const destinationBase = (layer: CanvasLayerContract, id: string, isCopy: boolean): CanvasLayerBaseContract => ({
+  blendMode: layer.blendMode,
+  id,
+  isEnabled: layer.isEnabled,
+  isLocked: layer.isLocked,
+  name: isCopy ? `${layer.name} copy` : layer.name,
+  opacity: layer.opacity,
+  transform: cloneTransform(layer),
+});
+
+const pixelLayerToControl = (layer: PixelLayer, id: string, isCopy: boolean): CanvasControlLayerContract | null => {
+  const source = clonePixelSource(layer);
+  if (!source) {
+    return null;
+  }
+  return {
+    ...destinationBase(layer, id, isCopy),
+    adapter: { ...DEFAULT_CONTROL_ADAPTER, beginEndStepPct: [...DEFAULT_CONTROL_ADAPTER.beginEndStepPct] },
+    source,
+    type: 'control',
+    withTransparencyEffect: true,
+  };
+};
+
+const pixelLayerToInpaintMask = (
+  layer: PixelLayer,
+  id: string,
+  isCopy: boolean
+): CanvasInpaintMaskLayerContract | null => {
+  const mask = pixelLayerToMask(layer);
+  return mask ? { ...destinationBase(layer, id, isCopy), mask, type: 'inpaint_mask' } : null;
+};
+
+const pixelLayerToRegionalGuidance = (
+  layer: PixelLayer,
+  id: string,
+  isCopy: boolean
+): CanvasRegionalGuidanceLayerContract | null => {
+  const mask = pixelLayerToMask(layer);
+  return mask
+    ? {
+        ...destinationBase(layer, id, isCopy),
+        autoNegative: false,
+        mask,
+        negativePrompt: null,
+        positivePrompt: null,
+        referenceImages: [],
+        type: 'regional_guidance',
+      }
+    : null;
+};
+
+export const copyRasterToControl = (
+  layer: CanvasRasterLayerContractV2,
+  id: string
+): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true);
+
+export const copyRasterToInpaintMask = (
+  layer: CanvasRasterLayerContractV2,
+  id: string
+): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true);
+
+export const copyRasterToRegionalGuidance = (
+  layer: CanvasRasterLayerContractV2,
+  id: string
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true);
+
+export const convertRasterToControl = (layer: CanvasRasterLayerContractV2): CanvasControlLayerContract | null =>
+  pixelLayerToControl(layer, layer.id, false);
+
+export const convertRasterToInpaintMask = (layer: CanvasRasterLayerContractV2): CanvasInpaintMaskLayerContract | null =>
+  pixelLayerToInpaintMask(layer, layer.id, false);
+
+export const convertRasterToRegionalGuidance = (
+  layer: CanvasRasterLayerContractV2
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, layer.id, false);
+
+export const copyControlToRaster = (
+  layer: CanvasControlLayerContract,
+  id: string
+): CanvasRasterLayerContractV2 | null => {
+  const source = clonePixelSource(layer);
+  return source ? { ...destinationBase(layer, id, true), source, type: 'raster' } : null;
+};
+
+export const copyControlToInpaintMask = (
+  layer: CanvasControlLayerContract,
+  id: string
+): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true);
+
+export const copyControlToRegionalGuidance = (
+  layer: CanvasControlLayerContract,
+  id: string
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true);
+
+export const copyMaskToRegionalGuidance = (
+  layer: CanvasInpaintMaskLayerContract,
+  id: string
+): CanvasRegionalGuidanceLayerContract => ({
+  ...destinationBase(layer, id, true),
+  autoNegative: false,
+  mask: cloneMask(layer.mask),
+  negativePrompt: null,
+  positivePrompt: null,
+  referenceImages: [],
+  type: 'regional_guidance',
+});
+
+export const copyRegionalGuidanceToInpaintMask = (
+  layer: CanvasRegionalGuidanceLayerContract,
+  id: string
+): CanvasInpaintMaskLayerContract => ({
+  ...destinationBase(layer, id, true),
+  mask: cloneMask(layer.mask),
+  type: 'inpaint_mask',
+});
+
 /**
  * Converts a raster layer to a control layer (default adapter, transparency on)
  * or a control layer back to a raster layer, preserving the pixel source, id,
@@ -404,26 +563,12 @@ export const convertRasterControlLayer = (
   if (layer.type === targetType || !canConvertRasterControl(layer)) {
     return null;
   }
-  const base = {
-    blendMode: layer.blendMode,
-    id: layer.id,
-    isEnabled: layer.isEnabled,
-    isLocked: layer.isLocked,
-    name: layer.name,
-    opacity: layer.opacity,
-    transform: layer.transform,
-  };
   if (layer.type === 'raster' && targetType === 'control') {
-    return {
-      ...base,
-      adapter: { ...DEFAULT_CONTROL_ADAPTER, beginEndStepPct: [...DEFAULT_CONTROL_ADAPTER.beginEndStepPct] },
-      source: layer.source,
-      type: 'control',
-      withTransparencyEffect: true,
-    };
+    return convertRasterToControl(layer);
   }
   if (layer.type === 'control' && targetType === 'raster') {
-    return { ...base, source: layer.source, type: 'raster' };
+    const source = clonePixelSource(layer);
+    return source ? { ...destinationBase(layer, layer.id, false), source, type: 'raster' } : null;
   }
   return null;
 };

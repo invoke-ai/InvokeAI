@@ -16,9 +16,14 @@ export type LayerContextActionId =
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
   | 'copy-to-raster'
+  | 'copy-to-control'
+  | 'copy-to-inpaint-mask'
+  | 'copy-to-regional-guidance'
   | 'rasterize'
   | 'convert-to-control'
   | 'convert-to-raster'
+  | 'convert-to-inpaint-mask'
+  | 'convert-to-regional-guidance'
   | 'control-transparency-effect'
   | 'regional-positive-prompt'
   | 'regional-negative-prompt'
@@ -61,6 +66,10 @@ const isParametricRasterizable = (layer: CanvasLayerContract): boolean =>
   (layer.source.type === 'gradient' ||
     layer.source.type === 'text' ||
     (layer.source.type === 'shape' && layer.source.kind !== 'polygon'));
+
+const isPixelBacked = (layer: CanvasLayerContract): boolean =>
+  (layer.type === 'raster' || layer.type === 'control') &&
+  (layer.source.type === 'image' || layer.source.type === 'paint');
 
 const groupPosition = (ctx: LayerContextActionContext) => getGroupPosition(ctx.layers, ctx.layer.id);
 
@@ -143,6 +152,30 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.actions.copyToRasterLayer',
   },
   {
+    defaultLabel: 'Copy to control layer',
+    group: 'convert',
+    id: 'copy-to-control',
+    isDisabled: (ctx) => !ctx.hasEngine,
+    isVisible: (ctx) => ctx.layer.type === 'raster' && isPixelBacked(ctx.layer),
+    labelKey: 'widgets.layers.actions.copyToControl',
+  },
+  {
+    defaultLabel: 'Copy to inpaint mask',
+    group: 'convert',
+    id: 'copy-to-inpaint-mask',
+    isDisabled: (ctx) => !ctx.hasEngine,
+    isVisible: (ctx) => isPixelBacked(ctx.layer) || ctx.layer.type === 'regional_guidance',
+    labelKey: 'widgets.layers.actions.copyToInpaintMask',
+  },
+  {
+    defaultLabel: 'Copy to regional guidance',
+    group: 'convert',
+    id: 'copy-to-regional-guidance',
+    isDisabled: (ctx) => !ctx.hasEngine,
+    isVisible: (ctx) => isPixelBacked(ctx.layer) || ctx.layer.type === 'inpaint_mask',
+    labelKey: 'widgets.layers.actions.copyToRegionalGuidance',
+  },
+  {
     defaultLabel: 'Rasterize',
     group: 'convert',
     id: 'rasterize',
@@ -162,6 +195,20 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     id: 'convert-to-raster',
     isVisible: (ctx) => ctx.layer.type === 'control',
     labelKey: 'widgets.layers.actions.convertToRaster',
+  },
+  {
+    defaultLabel: 'Convert to inpaint mask',
+    group: 'convert',
+    id: 'convert-to-inpaint-mask',
+    isVisible: (ctx) => ctx.layer.type === 'raster' && isPixelBacked(ctx.layer),
+    labelKey: 'widgets.layers.actions.convertToInpaintMask',
+  },
+  {
+    defaultLabel: 'Convert to regional guidance',
+    group: 'convert',
+    id: 'convert-to-regional-guidance',
+    isVisible: (ctx) => ctx.layer.type === 'raster' && isPixelBacked(ctx.layer),
+    labelKey: 'widgets.layers.actions.convertToRegionalGuidance',
   },
   {
     getDefaultLabel: (ctx) =>
