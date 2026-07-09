@@ -1289,6 +1289,14 @@
         "layers": "Layers",
         "regional": "Regional"
       },
+      "menu": {
+        "add": "Add",
+        "addModifiers": "Add modifiers",
+        "arrange": "Arrange",
+        "booleanOperations": "Boolean operations",
+        "convertTo": "Convert to",
+        "copyTo": "Copy to"
+      },
       "options": "Layer options",
       "properties": "Layer properties",
       "regionalGuidance": {

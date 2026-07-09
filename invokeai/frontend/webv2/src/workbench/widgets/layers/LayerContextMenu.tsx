@@ -15,8 +15,11 @@ import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowDownIcon,
   ArrowDownToLineIcon,
+  ArrowRightLeftIcon,
   ArrowUpIcon,
   ArrowUpToLineIcon,
+  ArrowUpDownIcon,
+  ChevronRightIcon,
   CopyIcon,
   CropIcon,
   EyeIcon,
@@ -27,6 +30,7 @@ import {
   MergeIcon,
   MoreVerticalIcon,
   PencilIcon,
+  PlusIcon,
   SaveIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
@@ -34,9 +38,11 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { LayerContextMenuItem, LayerContextMenuSection, LayerContextSubmenuId } from './layerContextMenuLayout';
 import type { LayerMoveKind } from './layerGroups';
 
 import { getLayerContextActions, type LayerContextAction, type LayerContextActionId } from './layerContextActions';
+import { getLayerContextMenuLayout } from './layerContextMenuLayout';
 import { copyBlobToClipboard } from './layerExportActions';
 import { reorderWithinGroupByKind } from './layerGroups';
 import { resolveMenuTargetForRender } from './layerMenuState';
@@ -338,15 +344,7 @@ const LayerMenu = ({
     () => getLayerContextActions({ hasEngine: !!engine, index, layer, layers }),
     [engine, index, layer, layers]
   );
-  const iconActions = useMemo(() => actions.filter((action) => action.group === 'icons'), [actions]);
-  const actionGroups = useMemo(
-    () =>
-      LAYER_ACTION_GROUPS.map((group) => ({
-        actions: actions.filter((action) => action.group === group),
-        group,
-      })).filter((entry) => entry.actions.length > 0),
-    [actions]
-  );
+  const menuLayout = useMemo(() => getLayerContextMenuLayout(actions), [actions]);
 
   const getActionLabel = useCallback(
     (id: LayerContextActionId) => {
@@ -623,13 +621,8 @@ const LayerMenu = ({
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="14rem" py="1">
-              <HStack gap="1">
-                {iconActions.map((action) => (
-                  <LayerMenuIconActionItem key={action.id} action={action} handleAction={handleAction} t={t} />
-                ))}
-              </HStack>
-              {actionGroups.map(({ actions, group }) => (
-                <LayerMenuGroup key={group} actions={actions} handleAction={handleAction} t={t} />
+              {menuLayout.map((section) => (
+                <LayerMenuSection key={section.id} handleAction={handleAction} section={section} t={t} />
               ))}
             </MenuContent>
           </Menu.Positioner>
@@ -754,14 +747,6 @@ export const CanvasLayerContextMenu = ({
   );
 };
 
-const LAYER_ACTION_GROUPS: readonly LayerContextAction['group'][] = [
-  'edit',
-  'convert',
-  'layerConfig',
-  'state',
-  'danger',
-];
-
 const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
   'control-transparency-effect': SlidersHorizontalIcon,
   'copy-to-clipboard': CopyIcon,
@@ -804,22 +789,119 @@ const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
 
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
-const LayerMenuGroup = ({
-  actions,
+const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: LucideIcon; labelKey: string }> = {
+  'add-modifiers': {
+    defaultLabel: 'Add modifiers',
+    icon: PlusIcon,
+    labelKey: 'widgets.layers.menu.addModifiers',
+  },
+  'add-regional': { defaultLabel: 'Add', icon: PlusIcon, labelKey: 'widgets.layers.menu.add' },
+  arrange: { defaultLabel: 'Arrange', icon: ArrowUpDownIcon, labelKey: 'widgets.layers.menu.arrange' },
+  boolean: { defaultLabel: 'Boolean operations', icon: MergeIcon, labelKey: 'widgets.layers.menu.booleanOperations' },
+  'convert-to': { defaultLabel: 'Convert to', icon: ArrowRightLeftIcon, labelKey: 'widgets.layers.menu.convertTo' },
+  'copy-to': { defaultLabel: 'Copy to', icon: CopyIcon, labelKey: 'widgets.layers.menu.copyTo' },
+};
+
+const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
+
+const LayerMenuSection = ({
   handleAction,
+  section,
   t,
 }: {
-  actions: readonly LayerContextAction[];
   handleAction: (id: LayerContextActionId) => void;
+  section: LayerContextMenuSection;
   t: (key: string, options: { defaultValue: string }) => string;
-}) => (
-  <>
-    <Menu.Separator borderColor="border.subtle" />
-    {actions.map((action) => (
-      <LayerMenuActionItem key={action.id} action={action} handleAction={handleAction} t={t} />
-    ))}
-  </>
-);
+}) => {
+  const content = section.items.map((item) => (
+    <LayerMenuLayoutItem
+      key={item.kind === 'action' ? item.action.id : item.id}
+      compact={section.presentation === 'row'}
+      handleAction={handleAction}
+      item={item}
+      t={t}
+    />
+  ));
+
+  if (section.presentation === 'row') {
+    return <HStack gap="1">{content}</HStack>;
+  }
+
+  return (
+    <>
+      <Menu.Separator borderColor="border.subtle" />
+      {content}
+    </>
+  );
+};
+
+const LayerMenuLayoutItem = ({
+  compact,
+  handleAction,
+  item,
+  t,
+}: {
+  compact: boolean;
+  handleAction: (id: LayerContextActionId) => void;
+  item: LayerContextMenuItem;
+  t: (key: string, options: { defaultValue: string }) => string;
+}) => {
+  if (item.kind === 'action') {
+    return compact ? (
+      <LayerMenuIconActionItem action={item.action} handleAction={handleAction} t={t} />
+    ) : (
+      <LayerMenuActionItem action={item.action} handleAction={handleAction} t={t} />
+    );
+  }
+
+  return <LayerMenuSubmenu compact={compact} handleAction={handleAction} item={item} t={t} />;
+};
+
+const LayerMenuSubmenu = ({
+  compact,
+  handleAction,
+  item,
+  t,
+}: {
+  compact: boolean;
+  handleAction: (id: LayerContextActionId) => void;
+  item: Extract<LayerContextMenuItem, { kind: 'submenu' }>;
+  t: (key: string, options: { defaultValue: string }) => string;
+}) => {
+  const meta = SUBMENU_META[item.id];
+  const label = t(meta.labelKey, { defaultValue: meta.defaultLabel });
+
+  return (
+    <Menu.Root positioning={SUBMENU_POSITIONING}>
+      <Menu.TriggerItem
+        aria-label={label}
+        flex={compact ? '1' : undefined}
+        justifyContent={compact ? 'center' : undefined}
+      >
+        {compact ? (
+          <Icon as={meta.icon} boxSize="4" color="fg.subtle" />
+        ) : (
+          <HStack gap="2" minW="0" w="full">
+            <Icon as={meta.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+            <Text flex="1" fontSize="xs">
+              {label}
+            </Text>
+            <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+          </HStack>
+        )}
+      </Menu.TriggerItem>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent minW="13rem" py="1">
+            {item.actions.map((action) => (
+              <LayerMenuActionItem key={action.id} action={action} handleAction={handleAction} t={t} />
+            ))}
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
 
 const LayerMenuIconActionItem = ({
   action,
