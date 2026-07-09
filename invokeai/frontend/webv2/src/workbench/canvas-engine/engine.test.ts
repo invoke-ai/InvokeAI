@@ -1960,6 +1960,131 @@ describe('boolean raster operations', () => {
   });
 });
 
+describe('extract masked canvas area', () => {
+  const maskedDoc = (): CanvasDocumentContractV2 => {
+    const doc = twoPaintDoc();
+    return {
+      ...doc,
+      layers: [
+        {
+          ...maskLayer('mask'),
+          mask: {
+            bitmap: { height: 20, imageName: 'mask-bitmap', width: 20 },
+            fill: { color: '#e07575', style: 'diagonal' },
+            offset: { x: 15, y: 25 },
+          },
+        },
+        ...doc.layers,
+      ],
+      selectedLayerId: 'mask',
+    };
+  };
+
+  const setup = () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const { projectId, store } = createReducerBackedStore(maskedDoc());
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const backend = {
+      ...base,
+      createSurface: (width: number, height: number): StubRasterSurface => {
+        const surface = base.createSurface(width, height);
+        surfaces.push(surface);
+        return surface;
+      },
+    };
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+    engine.attach(screen.element, overlay.element);
+    return { engine, raf, surfaces };
+  };
+
+  it('composites visible raster content through mask alpha and inserts one undoable raster layer', async () => {
+    const { engine, raf, surfaces } = setup();
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    const result = await engine.extractMaskedArea('mask');
+    expect(result.status).toBe('extracted');
+    if (result.status !== 'extracted') {
+      throw new Error('expected an extracted layer');
+    }
+
+    const extractedPixels = surfaces.find((surface) =>
+      surface.callLog.some(
+        (entry) =>
+          entry.op === 'set' && entry.args[0] === 'globalCompositeOperation' && entry.args[1] === 'destination-in'
+      )
+    );
+    expect(extractedPixels).toMatchObject({ height: 20, width: 20 });
+    expect(extractedPixels!.callLog.filter((entry) => entry.op === 'drawImage').length).toBeGreaterThanOrEqual(3);
+
+    const extracted = engine.getDocument()!.layers.find((layer) => layer.id === result.layerId);
+    expect(extracted).toMatchObject({
+      isEnabled: true,
+      source: { bitmap: null, offset: { x: 15, y: 25 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    expect(engine.getDocument()!.layers.find((layer) => layer.id === 'mask')).toEqual(maskedDoc().layers[0]);
+    expect(engine.getDocument()!.layers.find((layer) => layer.id === 'upper')?.isEnabled).toBe(true);
+    expect(engine.getDocument()!.layers.find((layer) => layer.id === 'below')?.isEnabled).toBe(true);
+
+    engine.undo();
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === result.layerId)).toBe(false);
+    engine.redo();
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === result.layerId)).toBe(true);
+    engine.dispose();
+  });
+
+  it('refuses extraction until the mask and contributor caches are ready', async () => {
+    const { engine, raf } = setup();
+    raf.flush();
+
+    expect(await engine.extractMaskedArea('mask')).toEqual({ status: 'not-ready' });
+    expect(engine.getDocument()!.layers.map((layer) => layer.id)).toEqual(['mask', 'upper', 'below']);
+    engine.dispose();
+  });
+
+  it('rejects missing, unsupported, and empty masks without changing the document', async () => {
+    const doc = maskedDoc();
+    const { projectId, store } = createReducerBackedStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+
+    expect(await engine.extractMaskedArea('missing')).toEqual({ status: 'missing' });
+    expect(await engine.extractMaskedArea('upper')).toEqual({ status: 'unsupported' });
+    expect(await engine.extractMaskedArea('mask')).toEqual({ status: 'not-ready' });
+    expect(engine.getDocument()!.layers).toEqual(doc.layers);
+    engine.dispose();
+
+    const emptyDoc = maskedDoc();
+    emptyDoc.layers[0] = maskLayer('mask');
+    const emptyHarness = createReducerBackedStore(emptyDoc);
+    const emptyEngine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: emptyHarness.projectId,
+      store: emptyHarness.store,
+    });
+    expect(await emptyEngine.extractMaskedArea('mask')).toEqual({ status: 'empty' });
+    emptyEngine.dispose();
+  });
+});
+
 // ---- mergeVisibleRasterLayers: whole-fold pre-flight + interleave-safe fold ----
 
 /**

@@ -134,6 +134,10 @@ export type MergeVisibleResult = 'merged' | 'not-ready' | 'nothing';
 export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclude';
 export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty';
 
+export type ExtractMaskedAreaResult =
+  | { status: 'extracted'; layerId: string }
+  | { status: 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty' };
+
 /**
  * Result of {@link CanvasEngine.exportRasterLayersToPsd}: `'exported'` on
  * success, `'nothing'` when there are no raster layers with content, `'too-large'`
@@ -277,6 +281,8 @@ export interface CanvasEngine {
    * The complete change is one engine-history entry.
    */
   booleanMergeRasterLayers(upperLayerId: string, operation: BooleanRasterOperation): Promise<BooleanRasterResult>;
+  /** Extracts the enabled raster/control composite through one inpaint mask. */
+  extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
   /**
    * Folds ALL visible mergeable raster layers together (the raster group-header
    * "merge visible" action; legacy `mergeVisibleOfType`). Plans runs via the pure
@@ -2141,6 +2147,91 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return 'merged';
   };
 
+  const extractMaskedArea = async (maskLayerId: string): Promise<ExtractMaskedAreaResult> => {
+    if (pipeline.isGestureActive()) {
+      return { status: 'busy' };
+    }
+    endNudgeBurst();
+    const doc = mirror.getDocument();
+    if (!doc) {
+      return { status: 'missing' };
+    }
+    const maskIndex = doc.layers.findIndex((layer) => layer.id === maskLayerId);
+    if (maskIndex < 0) {
+      return { status: 'missing' };
+    }
+    const maskLayer = doc.layers[maskIndex];
+    if (!maskLayer || maskLayer.type !== 'inpaint_mask') {
+      return { status: 'unsupported' };
+    }
+    if (isEmpty(getSourceContentRect(maskLayer, doc))) {
+      return { status: 'empty' };
+    }
+    const contributors = doc.layers.filter(
+      (layer) => layer.isEnabled && (layer.type === 'raster' || layer.type === 'control')
+    );
+    if (contributors.length === 0) {
+      return { status: 'empty' };
+    }
+    if (!isLayerCacheReadyForOp(maskLayer, doc) || contributors.some((layer) => !isLayerCacheReadyForOp(layer, doc))) {
+      return { status: 'not-ready' };
+    }
+
+    const maskPixels = await exportBakedLayerPixels(maskLayerId, { includeDisabled: true });
+    if (maskPixels.status !== 'ok') {
+      return { status: maskPixels.status === 'not-ready' ? 'not-ready' : 'empty' };
+    }
+    const resultRect = maskPixels.rect;
+    if (isEmpty(resultRect)) {
+      return { status: 'empty' };
+    }
+
+    const resultPixels = backend.createSurface(resultRect.width, resultRect.height);
+    const compositeDoc: CanvasDocumentContractV2 = { ...doc, layers: contributors };
+    compositeDocument(
+      resultPixels,
+      compositeDoc,
+      layerCache,
+      { a: 1, b: 0, c: 0, d: 1, e: -resultRect.x, f: -resultRect.y },
+      {
+        adjustedSurface: getAdjustedSurface,
+        backend,
+        maskPatternTile: getMaskPatternTile,
+      }
+    );
+    const ctx = resultPixels.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(maskPixels.surface.canvas, 0, 0);
+
+    const resultId = createLayerId();
+    const resultLayer: CanvasLayerContract = {
+      blendMode: 'normal',
+      id: resultId,
+      isEnabled: true,
+      isLocked: false,
+      name: `${maskLayer.name} extraction`,
+      opacity: 1,
+      source: { bitmap: null, offset: { x: resultRect.x, y: resultRect.y }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    };
+    const apply = (): void => {
+      store.dispatch({ index: maskIndex, layer: resultLayer, type: 'addCanvasLayer' });
+      seedGeneratedPaintCache(resultId, resultRect, resultPixels);
+    };
+
+    apply();
+    history.push({
+      bytes: resultRect.width * resultRect.height * 4 + 256,
+      label: 'Extract masked area',
+      redo: apply,
+      undo: () => store.dispatch({ ids: [resultId], type: 'removeCanvasLayers' }),
+    });
+    return { layerId: resultId, status: 'extracted' };
+  };
+
   const mergeLayerDown = (upperLayerId: string): boolean => {
     // No-op mid-gesture (a mod+e mashed during a paint drag): merging writes
     // pixels and dispatches a structural collapse under the open stroke session.
@@ -3423,6 +3514,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     dispose,
     drawLayerThumbnail,
     eraseSelection,
+    extractMaskedArea,
     exportRasterLayersToPsd,
     exportBakedLayerBlob,
     exportBakedLayerPixels,

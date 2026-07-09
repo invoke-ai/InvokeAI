@@ -15,6 +15,7 @@ export type LayerContextActionId =
   | 'save-to-assets'
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
+  | 'extract-masked-area'
   | 'intersect'
   | 'cutout'
   | 'cutaway'
@@ -146,6 +147,14 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     id: 'crop-to-bbox',
     isDisabled: (ctx) => !ctx.hasEngine || ctx.layer.isLocked,
     labelKey: 'widgets.layers.actions.cropLayerToBbox',
+  },
+  {
+    defaultLabel: 'Extract masked area',
+    group: 'edit',
+    id: 'extract-masked-area',
+    isDisabled: (ctx) => !ctx.hasEngine,
+    isVisible: (ctx) => ctx.layer.type === 'inpaint_mask',
+    labelKey: 'widgets.layers.actions.extractMaskedArea',
   },
   {
     defaultLabel: 'Intersect with layer below',

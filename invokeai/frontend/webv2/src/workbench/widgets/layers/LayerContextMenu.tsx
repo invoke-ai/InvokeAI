@@ -380,6 +380,10 @@ const LayerMenu = ({
     void engine?.cropLayerToBbox(layer.id);
   }, [engine, layer.id]);
 
+  const handleExtractMaskedArea = useCallback(() => {
+    void engine?.extractMaskedArea(layer.id);
+  }, [engine, layer.id]);
+
   const handleBooleanRaster = useCallback(
     (operation: 'intersect' | 'cutout' | 'cutaway' | 'exclude') => {
       void engine?.booleanMergeRasterLayers(layer.id, operation);
@@ -491,6 +495,9 @@ const LayerMenu = ({
         case 'crop-to-bbox':
           handleCropToBbox();
           break;
+        case 'extract-masked-area':
+          handleExtractMaskedArea();
+          break;
         case 'intersect':
         case 'cutout':
         case 'cutaway':
@@ -555,6 +562,7 @@ const LayerMenu = ({
       handleCropToBbox,
       handleDelete,
       handleDuplicate,
+      handleExtractMaskedArea,
       handleFitToBbox,
       handleLayerConfigAction,
       handleMerge,
@@ -752,6 +760,7 @@ const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
   delete: Trash2Icon,
   duplicate: CopyIcon,
   exclude: MergeIcon,
+  'extract-masked-area': CropIcon,
   'fit-to-bbox': ImageIcon,
   'inpaint-denoise-limit': SlidersHorizontalIcon,
   'inpaint-noise': SlidersHorizontalIcon,

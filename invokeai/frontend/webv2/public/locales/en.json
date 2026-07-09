@@ -1137,6 +1137,7 @@
         "delete": "Delete layer",
         "duplicate": "Duplicate layer",
         "exclude": "Exclude layer below",
+        "extractMaskedArea": "Extract masked area",
         "hide": "Hide layer",
         "intersect": "Intersect with layer below",
         "lock": "Lock layer",

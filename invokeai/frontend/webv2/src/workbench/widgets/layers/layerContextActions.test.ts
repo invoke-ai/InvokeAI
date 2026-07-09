@@ -97,7 +97,16 @@ describe('getLayerContextActions', () => {
 
     expect(idsFor(layer)).toContain('inpaint-denoise-limit');
     expect(idsFor(layer)).toContain('copy-to-regional-guidance');
+    expect(idsFor(layer)).toContain('extract-masked-area');
     expect(idsFor(layer)).not.toContain('inpaint-noise');
+  });
+
+  it('exposes masked extraction only for inpaint masks and disables it without an engine', () => {
+    const mask = createInpaintMaskLayer('Mask', 'mask');
+    const withoutEngine = getLayerContextActions({ hasEngine: false, index: 0, layer: mask, layers: [mask] });
+
+    expect(withoutEngine.find((action) => action.id === 'extract-masked-area')?.isDisabled).toBe(true);
+    expect(idsFor(paintLayer('raster'))).not.toContain('extract-masked-area');
   });
 
   it('copies regional guidance to an inpaint mask without offering unsupported conversions', () => {
