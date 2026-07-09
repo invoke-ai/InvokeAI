@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
-import type { GeneratedImageContract, Project, WorkbenchState } from './types';
+import type {
+  CanvasControlLayerContract,
+  CanvasLayerContract,
+  CanvasRasterLayerContractV2,
+  GeneratedImageContract,
+  GraphContract,
+  Project,
+  WorkbenchState,
+} from './types';
 
+import { createEmptyCanvasDocumentV2 } from './canvasMigration';
 import { MAX_PROMPT_HISTORY } from './generation/promptHistory';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
+import { createInitialWorkbenchState, nextLayerName, workbenchReducer } from './workbenchState';
 
 const model: MainModelConfig = {
   base: 'sdxl',
@@ -72,6 +81,84 @@ const getProject = (state: WorkbenchState, projectId: string): Project => {
 };
 
 const getActiveProject = (state: WorkbenchState): Project => getProject(state, state.activeProjectId);
+
+type CanvasLayer = Project['canvas']['document']['layers'][number];
+
+const getRasterLayerImageName = (layer: CanvasLayer | undefined): string | undefined =>
+  layer?.type === 'raster' && layer.source.type === 'image' ? layer.source.image.imageName : undefined;
+
+/** Reconstructs a v1-style `{x,y,width,height,opacity}` placement from a v2 raster layer's transform, mirroring `CanvasWidgetView`'s rendering math. */
+const getRasterLayerPlacement = (layer: CanvasLayer | undefined) => {
+  if (!layer || layer.type !== 'raster' || layer.source.type !== 'image') {
+    return undefined;
+  }
+
+  const { image } = layer.source;
+
+  return {
+    height: image.height * layer.transform.scaleY,
+    opacity: layer.opacity,
+    width: image.width * layer.transform.scaleX,
+    x: layer.transform.x,
+    y: layer.transform.y,
+  };
+};
+
+const createRasterLayer = (id: string, imageName = `${id}.png`): CanvasRasterLayerContractV2 => ({
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: { image: { height: 64, imageName, width: 64 }, type: 'image' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'raster',
+});
+
+const createControlLayer = (id: string): CanvasControlLayerContract => ({
+  adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: { bitmap: null, type: 'paint' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'control',
+  withTransparencyEffect: false,
+});
+
+const createInpaintMaskLayer = (id: string): CanvasLayerContract =>
+  ({
+    blendMode: 'normal',
+    id,
+    isEnabled: true,
+    isLocked: false,
+    mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
+    name: id,
+    opacity: 1,
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'inpaint_mask',
+  }) as CanvasLayerContract;
+
+/** Adds layers top-to-bottom in array order (each `addCanvasLayer` inserts at index 0). */
+// A new project's canvas now seeds one empty inpaint mask (see
+// `createNewCanvasStateV2`). These layer-reducer/staging tests exercise layer
+// mechanics where that default mask is incidental, so they start from an empty
+// canvas document to keep their expectations focused on the layers under test.
+const withEmptyCanvas = (state: WorkbenchState): WorkbenchState =>
+  workbenchReducer(state, { document: createEmptyCanvasDocumentV2(), type: 'replaceCanvasDocument' });
+
+const withCanvasLayers = (state: WorkbenchState, layers: Project['canvas']['document']['layers']): WorkbenchState =>
+  [...layers]
+    .reverse()
+    .reduce((next, layer) => workbenchReducer(next, { layer, type: 'addCanvasLayer' }), withEmptyCanvas(state));
+
+const getCanvas = (state: WorkbenchState) => getActiveProject(state).canvas;
+
+const getLayerIds = (state: WorkbenchState): string[] => getCanvas(state).document.layers.map((layer) => layer.id);
 
 const primeGenerate = (state = createInitialWorkbenchState(), overrides: Partial<GenerateWidgetValues> = {}) =>
   workbenchReducer(state, { type: 'setGenerateSettings', values: createGenerateValues(overrides) });
@@ -413,8 +500,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(secondValues.seed).toBe(999);
   });
 
-  it('accepts a staged candidate into an undoable raster layer and prevents duplicate accepts', () => {
-    let state = submitGenerate(primeGenerate());
+  it('accepts a staged candidate into a selected raster layer that project undo no longer touches', () => {
+    let state = submitGenerate(primeGenerate(withEmptyCanvas(createInitialWorkbenchState())));
     const queueItem = getActiveProject(state).queue.items[0];
 
     state = workbenchReducer(state, {
@@ -426,26 +513,31 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, { type: 'acceptStagedImage' });
 
     let project = getActiveProject(state);
+    const acceptedLayerId = project.canvas.document.layers[0]?.id;
 
     expect(project.canvas.document.layers).toHaveLength(1);
-    expect(project.canvas.document.layers[0]?.imageName).toBe('candidate.png');
+    expect(getRasterLayerImageName(project.canvas.document.layers[0])).toBe('candidate.png');
+    expect(project.canvas.document.selectedLayerId).toBe(acceptedLayerId);
     expect(project.canvas.stagingArea.pendingImages).toEqual([]);
-    expect(project.undoRedo.past).toHaveLength(1);
+    // Deliberate semantic change (P0.2): canvas is engine-owned, so accepting a
+    // staged image does not create a project-level undo entry.
+    expect(project.undoRedo.past).toHaveLength(0);
 
     state = workbenchReducer(state, { type: 'acceptStagedImage' });
     project = getActiveProject(state);
 
     expect(project.canvas.document.layers).toHaveLength(1);
 
+    // Project undo neither snapshots nor restores canvas: the accepted layer survives.
     state = workbenchReducer(state, { type: 'undoProjectChange' });
     project = getActiveProject(state);
 
-    expect(project.canvas.document.layers).toEqual([]);
-    expect(project.canvas.stagingArea.pendingImages).toEqual([]);
+    expect(project.canvas.document.layers).toHaveLength(1);
+    expect(getRasterLayerImageName(project.canvas.document.layers[0])).toBe('candidate.png');
   });
 
   it('discards selected and all staged canvas candidates without touching accepted document layers', () => {
-    let state = submitGenerate(primeGenerate());
+    let state = submitGenerate(primeGenerate(withEmptyCanvas(createInitialWorkbenchState())));
     const queueItem = getActiveProject(state).queue.items[0];
 
     state = workbenchReducer(state, {
@@ -472,7 +564,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(project.canvas.stagingArea.isVisible).toBe(false);
   });
 
-  it('cycles staged canvas candidates and accepts the selected candidate placement into a raster layer', () => {
+  it('cycles staged canvas candidates and accepts the selected one at the bbox origin', () => {
     let state = submitGenerate(primeGenerate());
     const queueItem = getActiveProject(state).queue.items[0];
 
@@ -486,24 +578,22 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(getActiveProject(state).canvas.stagingArea.selectedImageIndex).toBe(1);
 
-    const selectedPlacement = getActiveProject(state).canvas.stagingArea.pendingImages[1]?.placement;
-
+    // Move the bbox first so we can prove the accepted layer lands at its origin.
+    state = workbenchReducer(state, { bbox: { height: 256, width: 256, x: 40, y: 24 }, type: 'setCanvasBbox' });
     state = workbenchReducer(state, { type: 'acceptStagedImage' });
 
     let project = getActiveProject(state);
+    const acceptedLayer = project.canvas.document.layers[0];
 
-    expect(project.canvas.document.layers[0]?.imageName).toBe('candidate-2.png');
-    expect(project.canvas.document.layers[0]?.placement).toEqual(selectedPlacement);
+    expect(getRasterLayerImageName(acceptedLayer)).toBe('candidate-2.png');
+    // The v2 accept places the raster at the bbox origin, unscaled (P0.2 Deliverable 3).
+    expect(getRasterLayerPlacement(acceptedLayer)).toEqual({ height: 768, opacity: 1, width: 512, x: 40, y: 24 });
 
+    // Project undo/redo leaves the engine-owned canvas alone.
     state = workbenchReducer(state, { type: 'undoProjectChange' });
     project = getActiveProject(state);
 
-    expect(project.canvas.document.layers).toEqual([]);
-
-    state = workbenchReducer(state, { type: 'redoProjectChange' });
-    project = getActiveProject(state);
-
-    expect(project.canvas.document.layers[0]?.imageName).toBe('candidate-2.png');
+    expect(getRasterLayerImageName(project.canvas.document.layers[0])).toBe('candidate-2.png');
   });
 
   it('keeps thumbnail strip visibility separate from staged result preview visibility', () => {
@@ -1383,5 +1473,686 @@ describe('workbench backend connection recovery', () => {
 
     expect(persisted.notifications).toHaveLength(1);
     expect(state.notifications).toEqual([]);
+  });
+});
+
+describe('nextLayerName', () => {
+  it('starts at Layer 1 with no existing layers', () => {
+    expect(nextLayerName([])).toBe('Layer 1');
+  });
+
+  it('picks the next free number above a contiguous run', () => {
+    expect(nextLayerName(['Layer 1', 'Layer 2'])).toBe('Layer 3');
+  });
+
+  it('fills the lowest gap so names do not collide after a deletion', () => {
+    // Deleting "Layer 2" from [Layer 1, Layer 2, Layer 3] must not re-mint the
+    // count-derived "Layer 3" (which would collide); the lowest free slot is 2.
+    expect(nextLayerName(['Layer 1', 'Layer 3'])).toBe('Layer 2');
+  });
+
+  it('ignores custom names and non-matching patterns', () => {
+    expect(nextLayerName(['Backdrop', 'Layer 10 copy', 'Layer 1'])).toBe('Layer 2');
+    expect(nextLayerName(['Sketch'])).toBe('Layer 1');
+  });
+});
+
+describe('workbenchReducer canvas v2 layer reducers', () => {
+  it('seeds a new project canvas with a single empty inpaint mask, selected', () => {
+    const state = createInitialWorkbenchState();
+    const { document } = getActiveProject(state).canvas;
+
+    expect(document.layers).toHaveLength(1);
+    const mask = document.layers[0];
+    expect(mask?.type).toBe('inpaint_mask');
+    // Empty: no bitmap (no strokes) — so it never flips generation-mode detection.
+    expect(mask && 'mask' in mask ? mask.mask.bitmap : 'missing').toBeNull();
+    expect(document.selectedLayerId).toBe(mask?.id);
+  });
+
+  it('adds a layer at the top and selects it, honoring an explicit insert index', () => {
+    let state = withEmptyCanvas(createInitialWorkbenchState());
+
+    state = workbenchReducer(state, { layer: createRasterLayer('a'), type: 'addCanvasLayer' });
+    state = workbenchReducer(state, { layer: createRasterLayer('b'), type: 'addCanvasLayer' });
+
+    expect(getLayerIds(state)).toEqual(['b', 'a']);
+    expect(getCanvas(state).document.selectedLayerId).toBe('b');
+
+    state = workbenchReducer(state, { index: 1, layer: createRasterLayer('c'), type: 'addCanvasLayer' });
+
+    expect(getLayerIds(state)).toEqual(['b', 'c', 'a']);
+    expect(getCanvas(state).document.selectedLayerId).toBe('c');
+  });
+
+  it('removes layers and repairs selection to the nearest remaining layer (below, then above)', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createRasterLayer('c'),
+    ]);
+
+    state = workbenchReducer(state, { id: 'b', type: 'setCanvasSelectedLayer' });
+    state = workbenchReducer(state, { ids: ['b'], type: 'removeCanvasLayers' });
+
+    // 'b' sat between 'a' and 'c'; the nearest survivor below it is 'c'.
+    expect(getLayerIds(state)).toEqual(['a', 'c']);
+    expect(getCanvas(state).document.selectedLayerId).toBe('c');
+
+    state = workbenchReducer(state, { id: 'c', type: 'setCanvasSelectedLayer' });
+    state = workbenchReducer(state, { ids: ['c'], type: 'removeCanvasLayers' });
+
+    // Nothing remains below 'c', so selection falls back to 'a' above it.
+    expect(getCanvas(state).document.selectedLayerId).toBe('a');
+
+    state = workbenchReducer(state, { ids: ['a'], type: 'removeCanvasLayers' });
+
+    expect(getLayerIds(state)).toEqual([]);
+    expect(getCanvas(state).document.selectedLayerId).toBeNull();
+  });
+
+  it('sets many layers visibility in one bulk action, preserving unlisted layers by identity', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createRasterLayer('c'),
+    ]);
+    const before = getCanvas(state).document.layers;
+
+    // Hide 'a' and 'c' in one dispatch; 'b' is unlisted and must keep its object identity.
+    state = workbenchReducer(state, {
+      type: 'setCanvasLayersEnabled',
+      updates: [
+        { id: 'a', isEnabled: false },
+        { id: 'c', isEnabled: false },
+      ],
+    });
+    const after = getCanvas(state).document.layers;
+
+    expect(after.map((layer) => [layer.id, layer.isEnabled])).toEqual([
+      ['a', false],
+      ['b', true],
+      ['c', false],
+    ]);
+    // 'b' unchanged ⇒ same reference; 'a'/'c' replaced.
+    expect(after[1]).toBe(before[1]);
+    expect(after[0]).not.toBe(before[0]);
+  });
+
+  it('returns the same document when a bulk visibility action changes nothing', () => {
+    const state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
+    const before = getCanvas(state).document;
+
+    const next = workbenchReducer(state, {
+      type: 'setCanvasLayersEnabled',
+      updates: [{ id: 'a', isEnabled: true }],
+    });
+
+    // 'a' is already enabled ⇒ no change ⇒ document identity preserved (no selector churn).
+    expect(getCanvas(next).document).toBe(before);
+  });
+
+  it('duplicates a layer above its source with a copy name and selects the duplicate', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
+
+    state = workbenchReducer(state, { newId: 'b-copy', sourceId: 'b', type: 'duplicateCanvasLayer' });
+
+    expect(getLayerIds(state)).toEqual(['a', 'b-copy', 'b']);
+    expect(getCanvas(state).document.selectedLayerId).toBe('b-copy');
+
+    const [, duplicate, source] = getCanvas(state).document.layers;
+
+    expect(duplicate?.name).toBe('b copy');
+    expect(duplicate).not.toBe(source);
+    expect(getRasterLayerImageName(duplicate)).toBe(getRasterLayerImageName(source));
+  });
+
+  it('reorders layers only when the id set matches, and preserves layer identity', () => {
+    const state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createRasterLayer('c'),
+    ]);
+    const originalLayerA = getCanvas(state).document.layers.find((layer) => layer.id === 'a');
+
+    const reordered = workbenchReducer(state, { orderedIds: ['c', 'a', 'b'], type: 'reorderCanvasLayers' });
+
+    expect(getLayerIds(reordered)).toEqual(['c', 'a', 'b']);
+    // Untouched layer objects are reused, not cloned.
+    expect(getCanvas(reordered).document.layers.find((layer) => layer.id === 'a')).toBe(originalLayerA);
+
+    const ignoredMissing = workbenchReducer(state, { orderedIds: ['c', 'a'], type: 'reorderCanvasLayers' });
+    const ignoredUnknown = workbenchReducer(state, { orderedIds: ['c', 'a', 'z'], type: 'reorderCanvasLayers' });
+
+    expect(getLayerIds(ignoredMissing)).toEqual(['a', 'b', 'c']);
+    expect(getLayerIds(ignoredUnknown)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('updates base props with a field-wise transform merge and leaves other layers untouched', () => {
+    const state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
+    const originalLayerB = getCanvas(state).document.layers.find((layer) => layer.id === 'b');
+
+    const updated = workbenchReducer(state, {
+      id: 'a',
+      patch: { name: 'Renamed', opacity: 0.5, transform: { x: 12 } },
+      type: 'updateCanvasLayer',
+    });
+
+    const layerA = getCanvas(updated).document.layers.find((layer) => layer.id === 'a');
+
+    expect(layerA?.name).toBe('Renamed');
+    expect(layerA?.opacity).toBe(0.5);
+    expect(layerA?.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 12, y: 0 });
+    expect(getCanvas(updated).document.layers.find((layer) => layer.id === 'b')).toBe(originalLayerB);
+  });
+
+  it('swaps a raster/control layer source but ignores mask-only layer types', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+    const newSource = { image: { height: 10, imageName: 'swapped.png', width: 10 }, type: 'image' } as const;
+
+    state = workbenchReducer(state, { id: 'a', source: newSource, type: 'updateCanvasLayerSource' });
+
+    expect(getRasterLayerImageName(getCanvas(state).document.layers[0])).toBe('swapped.png');
+  });
+
+  it('applies per-type config patches and ignores mismatched layer types', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createControlLayer('ctrl')]);
+
+    state = workbenchReducer(state, {
+      config: { adapter: { weight: 0.25 }, layerType: 'control', withTransparencyEffect: true },
+      id: 'ctrl',
+      type: 'updateCanvasLayerConfig',
+    });
+
+    const controlLayer = getCanvas(state).document.layers[0];
+
+    expect(controlLayer?.type).toBe('control');
+
+    if (controlLayer?.type === 'control') {
+      expect(controlLayer.adapter.weight).toBe(0.25);
+      expect(controlLayer.adapter.kind).toBe('controlnet');
+      expect(controlLayer.withTransparencyEffect).toBe(true);
+    }
+
+    // A raster-shaped config against a control layer is a no-op.
+    const unchanged = workbenchReducer(state, {
+      config: { isTransparencyLocked: true, layerType: 'raster' },
+      id: 'ctrl',
+      type: 'updateCanvasLayerConfig',
+    });
+
+    expect(getCanvas(unchanged).document.layers[0]).toBe(controlLayer);
+  });
+
+  it('applies an inpaint-mask config patch: mask bitmap + offset, fill, noise, denoise-limit', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createInpaintMaskLayer('m')]);
+
+    state = workbenchReducer(state, {
+      config: {
+        denoiseLimit: 0.8,
+        layerType: 'inpaint_mask',
+        mask: { bitmap: { contentHash: 'h', height: 20, imageName: 'mask.png', width: 30 }, offset: { x: 4, y: 5 } },
+        noiseLevel: 0.25,
+      },
+      id: 'm',
+      type: 'updateCanvasLayerConfig',
+    });
+
+    const layer = getCanvas(state).document.layers[0];
+    expect(layer?.type).toBe('inpaint_mask');
+    if (layer?.type === 'inpaint_mask') {
+      // Bitmap + content offset persisted; the fill is preserved (merged, not replaced).
+      expect(layer.mask.bitmap).toMatchObject({ imageName: 'mask.png', width: 30, height: 20 });
+      expect(layer.mask.offset).toEqual({ x: 4, y: 5 });
+      expect(layer.mask.fill).toEqual({ color: '#e07575', style: 'diagonal' });
+      expect(layer.noiseLevel).toBe(0.25);
+      expect(layer.denoiseLimit).toBe(0.8);
+    }
+
+    // A fill-only patch replaces the fill while keeping the bitmap.
+    const recolored = workbenchReducer(state, {
+      config: { layerType: 'inpaint_mask', mask: { fill: { color: '#00ff00', style: 'grid' } } },
+      id: 'm',
+      type: 'updateCanvasLayerConfig',
+    });
+    const after = getCanvas(recolored).document.layers[0];
+    if (after?.type === 'inpaint_mask') {
+      expect(after.mask.fill).toEqual({ color: '#00ff00', style: 'grid' });
+      expect(after.mask.bitmap).toMatchObject({ imageName: 'mask.png' });
+    }
+  });
+
+  it('converts a layer in place, preserving its id and z-order', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
+    const converted = createControlLayer('ignored-id');
+
+    state = workbenchReducer(state, { id: 'b', layer: converted, targetType: 'control', type: 'convertCanvasLayer' });
+
+    expect(getLayerIds(state)).toEqual(['a', 'b']);
+    expect(getCanvas(state).document.layers[1]?.type).toBe('control');
+    expect(getCanvas(state).document.layers[1]?.id).toBe('b');
+  });
+
+  it('merges a layer down: the layer below becomes a raster with the merged paint source', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('top'),
+      createControlLayer('bottom'),
+    ]);
+
+    state = workbenchReducer(state, { id: 'bottom', type: 'setCanvasSelectedLayer' });
+    const mergedSource = { bitmap: { height: 8, imageName: 'merged.png', width: 8 }, type: 'paint' } as const;
+
+    state = workbenchReducer(state, { source: mergedSource, type: 'mergeCanvasLayersDown', upperLayerId: 'top' });
+
+    const layers = getCanvas(state).document.layers;
+
+    expect(getLayerIds(state)).toEqual(['bottom']);
+    expect(layers[0]?.type).toBe('raster');
+    expect(layers[0]?.id).toBe('bottom');
+    expect(layers[0]?.type === 'raster' && layers[0].source).toEqual(mergedSource);
+    expect(getCanvas(state).document.selectedLayerId).toBe('bottom');
+  });
+
+  it('clamps and rounds the bbox, and validates the selected layer id', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+
+    state = workbenchReducer(state, { bbox: { height: -4, width: 12.6, x: 3.2, y: 9.8 }, type: 'setCanvasBbox' });
+
+    expect(getCanvas(state).document.bbox).toEqual({ height: 1, width: 13, x: 3, y: 10 });
+
+    // 'a' was selected on insert; selecting a non-existent id is ignored, not applied.
+    expect(getCanvas(state).document.selectedLayerId).toBe('a');
+    state = workbenchReducer(state, { id: 'missing', type: 'setCanvasSelectedLayer' });
+    expect(getCanvas(state).document.selectedLayerId).toBe('a');
+
+    state = workbenchReducer(state, { id: null, type: 'setCanvasSelectedLayer' });
+    expect(getCanvas(state).document.selectedLayerId).toBeNull();
+  });
+
+  it('resizes the document, translating layer transforms and clamping the bbox in-bounds', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+
+    state = workbenchReducer(state, {
+      height: 256,
+      offsetX: 20,
+      offsetY: 10,
+      type: 'resizeCanvasDocument',
+      width: 300,
+    });
+
+    const document = getCanvas(state).document;
+
+    expect(document.width).toBe(300);
+    expect(document.height).toBe(256);
+    expect(document.layers[0]?.transform.x).toBe(20);
+    expect(document.layers[0]?.transform.y).toBe(10);
+    expect(document.bbox.x + document.bbox.width).toBeLessThanOrEqual(300);
+    expect(document.bbox.y + document.bbox.height).toBeLessThanOrEqual(256);
+  });
+
+  it('replaces the whole document with a deep copy', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+    const replacement = {
+      ...createEmptyCanvasDocumentV2(),
+      layers: [createRasterLayer('fresh')],
+      selectedLayerId: 'fresh',
+    };
+
+    state = workbenchReducer(state, { document: replacement, type: 'replaceCanvasDocument' });
+
+    expect(getLayerIds(state)).toEqual(['fresh']);
+    expect(getCanvas(state).document).not.toBe(replacement);
+    expect(getCanvas(state).document.layers[0]).not.toBe(replacement.layers[0]);
+  });
+
+  it('clears the staging area on replaceCanvasDocument (staged candidates belong to the outgoing document)', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+    const staged: Project['canvas']['stagingArea']['pendingImages'][number] = {
+      height: 64,
+      imageName: 'staged-1',
+      imageUrl: 'url',
+      placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 },
+      queuedAt: 'now',
+      sourceQueueItemId: 'queue-1',
+      thumbnailUrl: 'thumb',
+      width: 64,
+    };
+    state = {
+      ...state,
+      projects: state.projects.map((project) =>
+        project.id === state.activeProjectId
+          ? {
+              ...project,
+              canvas: {
+                ...project.canvas,
+                stagingArea: {
+                  ...project.canvas.stagingArea,
+                  isVisible: true,
+                  pendingImageIds: ['queue-1'],
+                  pendingImages: [staged],
+                  selectedImageIndex: 0,
+                  sourceQueueItemId: 'queue-1',
+                },
+              },
+            }
+          : project
+      ),
+    };
+
+    state = workbenchReducer(state, { document: createEmptyCanvasDocumentV2(), type: 'replaceCanvasDocument' });
+
+    const { stagingArea } = getCanvas(state);
+    expect(stagingArea.pendingImages).toEqual([]);
+    expect(stagingArea.pendingImageIds).toEqual([]);
+    expect(stagingArea.isVisible).toBe(false);
+    expect(stagingArea.sourceQueueItemId).toBeUndefined();
+  });
+
+  it('repairs a dangling selectedLayerId on replaceCanvasDocument (falls back to the top layer)', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+    const replacement = {
+      ...createEmptyCanvasDocumentV2(),
+      layers: [createRasterLayer('top'), createRasterLayer('bottom')],
+      selectedLayerId: 'ghost', // names no layer in the incoming document
+    };
+
+    state = workbenchReducer(state, { document: replacement, type: 'replaceCanvasDocument' });
+
+    expect(getCanvas(state).document.selectedLayerId).toBe('top');
+  });
+
+  it('nulls a dangling selectedLayerId when the replacement document has no layers', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+    const replacement = { ...createEmptyCanvasDocumentV2(), layers: [], selectedLayerId: 'ghost' };
+
+    state = workbenchReducer(state, { document: replacement, type: 'replaceCanvasDocument' });
+
+    expect(getCanvas(state).document.selectedLayerId).toBeNull();
+  });
+
+  it('preserves a valid selectedLayerId on replaceCanvasDocument', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+    const replacement = {
+      ...createEmptyCanvasDocumentV2(),
+      layers: [createRasterLayer('top'), createRasterLayer('bottom')],
+      selectedLayerId: 'bottom',
+    };
+
+    state = workbenchReducer(state, { document: replacement, type: 'replaceCanvasDocument' });
+
+    expect(getCanvas(state).document.selectedLayerId).toBe('bottom');
+  });
+
+  it('repairs a dangling selectedLayerId on restoreCanvasSnapshot (defensive against a corrupt snapshot)', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
+    state = workbenchReducer(state, { createdAt: 'now', id: 'snap-1', name: 'First', type: 'saveCanvasSnapshot' });
+
+    // Corrupt the stored snapshot so its selectedLayerId names no present layer.
+    const snapshot = getCanvas(state).snapshots.find((entry) => entry.id === 'snap-1');
+    expect(snapshot).toBeDefined();
+    snapshot!.document.selectedLayerId = 'ghost';
+
+    state = workbenchReducer(state, { snapshotId: 'snap-1', type: 'restoreCanvasSnapshot' });
+
+    const restored = getCanvas(state).document;
+    expect(restored.selectedLayerId).not.toBe('ghost');
+    expect(restored.selectedLayerId).toBe(restored.layers[0]?.id);
+  });
+
+  it('saves, restores, and deletes canvas snapshots', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+
+    state = workbenchReducer(state, { createdAt: 'now', id: 'snap-1', name: 'First', type: 'saveCanvasSnapshot' });
+
+    expect(getCanvas(state).snapshots).toHaveLength(1);
+    expect(getCanvas(state).snapshots[0]?.document.layers.map((layer) => layer.id)).toEqual(['a']);
+
+    // Mutate the live document, then restore the snapshot back over it.
+    state = workbenchReducer(state, { layer: createRasterLayer('b'), type: 'addCanvasLayer' });
+    expect(getLayerIds(state)).toEqual(['b', 'a']);
+
+    state = workbenchReducer(state, { snapshotId: 'snap-1', type: 'restoreCanvasSnapshot' });
+    expect(getLayerIds(state)).toEqual(['a']);
+
+    state = workbenchReducer(state, { snapshotId: 'snap-1', type: 'deleteCanvasSnapshot' });
+    expect(getCanvas(state).snapshots).toEqual([]);
+  });
+
+  it('bumps documentRevision on wholesale swaps (restore/replace) but not on ordinary edits', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+    const initialRevision = getCanvas(state).documentRevision;
+
+    // Ordinary incremental edits never bump the revision.
+    state = workbenchReducer(state, { id: 'a', patch: { opacity: 0.3 }, type: 'updateCanvasLayer' });
+    state = workbenchReducer(state, { layer: createRasterLayer('b'), type: 'addCanvasLayer' });
+    state = workbenchReducer(state, { bbox: { height: 32, width: 32, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    state = workbenchReducer(state, { height: 256, type: 'resizeCanvasDocument', width: 256 });
+    expect(getCanvas(state).documentRevision).toBe(initialRevision);
+
+    // replaceCanvasDocument is a wholesale swap: bump.
+    state = workbenchReducer(state, { document: createEmptyCanvasDocumentV2(), type: 'replaceCanvasDocument' });
+    expect(getCanvas(state).documentRevision).toBe(initialRevision + 1);
+
+    // restoreCanvasSnapshot is a wholesale swap: bump — even though the restored
+    // document reuses the saved layer ids at the same dimensions.
+    state = workbenchReducer(state, { createdAt: 'now', id: 'snap-1', name: 'First', type: 'saveCanvasSnapshot' });
+    expect(getCanvas(state).documentRevision).toBe(initialRevision + 1);
+    state = workbenchReducer(state, { snapshotId: 'snap-1', type: 'restoreCanvasSnapshot' });
+    expect(getCanvas(state).documentRevision).toBe(initialRevision + 2);
+
+    // Restoring a nonexistent snapshot is a no-op: no bump.
+    state = workbenchReducer(state, { snapshotId: 'missing', type: 'restoreCanvasSnapshot' });
+    expect(getCanvas(state).documentRevision).toBe(initialRevision + 2);
+  });
+
+  it('never records project undo entries for canvas layer edits', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+
+    state = workbenchReducer(state, { id: 'a', patch: { opacity: 0.3 }, type: 'updateCanvasLayer' });
+    state = workbenchReducer(state, { layer: createRasterLayer('b'), type: 'addCanvasLayer' });
+    state = workbenchReducer(state, { ids: ['a'], type: 'removeCanvasLayers' });
+
+    expect(getActiveProject(state).undoRedo.past).toEqual([]);
+  });
+});
+
+describe('workbenchReducer canvas staging auto-switch + canvas submission', () => {
+  const stageResults = (state: WorkbenchState, imageNames: string[]): WorkbenchState => {
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    return workbenchReducer(state, {
+      images: imageNames.map((name) => createImage(name, queueItem.id)),
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+  };
+
+  it("'latest' selects the newest pending candidate as results arrive", () => {
+    let state = submitGenerate(primeGenerate());
+
+    state = workbenchReducer(state, { mode: 'latest', type: 'setCanvasStagingAutoSwitch' });
+    state = stageResults(state, ['first.png', 'second.png']);
+
+    expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('latest');
+    expect(getCanvas(state).stagingArea.selectedImageIndex).toBe(1);
+  });
+
+  it("'oldest' keeps the first pending candidate selected", () => {
+    let state = submitGenerate(primeGenerate());
+
+    state = workbenchReducer(state, { mode: 'oldest', type: 'setCanvasStagingAutoSwitch' });
+    state = stageResults(state, ['first.png', 'second.png']);
+
+    expect(getCanvas(state).stagingArea.selectedImageIndex).toBe(0);
+  });
+
+  const submitCanvasGeneration = (state: WorkbenchState): { queueItemId: string; state: WorkbenchState } => {
+    const graph: GraphContract = {
+      edges: [],
+      id: 'canvas-graph',
+      label: 'Canvas',
+      nodes: [],
+      updatedAt: '2026-06-09T00:00:00.000Z',
+      version: 1,
+    };
+    const next = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      destination: 'canvas',
+      graph,
+      projectId: state.activeProjectId,
+      type: 'submitCanvasInvocationSnapshot',
+    });
+
+    return { queueItemId: getActiveProject(next).queue.items[0]!.id, state: next };
+  };
+
+  it('routes canvas results into staging when the session (documentRevision) still matches', () => {
+    const { queueItemId, state: submitted } = submitCanvasGeneration(createInitialWorkbenchState());
+
+    const state = workbenchReducer(submitted, {
+      images: [createImage('fresh.png', queueItemId)],
+      projectId: getActiveProject(submitted).id,
+      queueItemId,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getCanvas(state).stagingArea.pendingImageIds).toEqual(['fresh.png']);
+    expect(getCanvas(state).stagingArea.isVisible).toBe(true);
+  });
+
+  it('drops mid-flight canvas results after a new-canvas swap so cleared staging is not resurrected (F2)', () => {
+    const { queueItemId, state: submitted } = submitCanvasGeneration(createInitialWorkbenchState());
+
+    // The user confirms a new canvas while the generation is still in flight: a
+    // wholesale swap that clears staging and bumps documentRevision (new session).
+    const swapped = workbenchReducer(submitted, {
+      document: createEmptyCanvasDocumentV2(),
+      type: 'replaceCanvasDocument',
+    });
+
+    // The stale generation's results arrive against the brand-new empty canvas.
+    const state = workbenchReducer(swapped, {
+      images: [createImage('stale.png', queueItemId)],
+      projectId: getActiveProject(swapped).id,
+      queueItemId,
+      type: 'routeQueueItemResults',
+    });
+
+    const { stagingArea } = getCanvas(state);
+    expect(stagingArea.pendingImages).toEqual([]);
+    expect(stagingArea.pendingImageIds).toEqual([]);
+    expect(stagingArea.isVisible).toBe(false);
+    // The item still completes — only its staged candidates are dropped.
+    expect(getActiveProject(state).queue.items[0]?.status).toBe('completed');
+  });
+
+  it('submitCanvasInvocationSnapshot enqueues a pre-compiled graph bound for the canvas', () => {
+    const graph: GraphContract = {
+      edges: [],
+      id: 'canvas-graph',
+      label: 'Canvas',
+      nodes: [],
+      updatedAt: '2026-06-09T00:00:00.000Z',
+      version: 1,
+    };
+
+    const initial = createInitialWorkbenchState();
+    const state = workbenchReducer(initial, {
+      backendSupportsCancellation: true,
+      destination: 'canvas',
+      graph,
+      projectId: initial.activeProjectId,
+      type: 'submitCanvasInvocationSnapshot',
+    });
+
+    const queueItem = getActiveProject(state).queue.items[0];
+
+    expect(queueItem?.snapshot.sourceId).toBe('canvas');
+    expect(queueItem?.snapshot.destination).toBe('canvas');
+    expect(queueItem?.snapshot.graph.id).toBe('canvas-graph');
+    expect(getActiveProject(state).invocation.sourceId).toBe('canvas');
+  });
+
+  it('submitCanvasInvocationSnapshot honors a Gallery destination instead of hardcoding canvas', () => {
+    const graph: GraphContract = {
+      edges: [],
+      id: 'canvas-graph',
+      label: 'Canvas',
+      nodes: [],
+      updatedAt: '2026-06-09T00:00:00.000Z',
+      version: 1,
+    };
+
+    const initial = createInitialWorkbenchState();
+    const state = workbenchReducer(initial, {
+      backendSupportsCancellation: true,
+      destination: 'gallery',
+      graph,
+      projectId: initial.activeProjectId,
+      type: 'submitCanvasInvocationSnapshot',
+    });
+
+    const queueItem = getActiveProject(state).queue.items[0];
+
+    // A Canvas source still runs, but the resolved Gallery destination rides
+    // through so `routeQueueItemResults` keeps it out of canvas staging.
+    expect(queueItem?.snapshot.sourceId).toBe('canvas');
+    expect(queueItem?.snapshot.destination).toBe('gallery');
+    expect(getActiveProject(state).invocation.destination).toBe('gallery');
+    expect(getActiveProject(state).canvas.stagingArea.pendingImageIds).toHaveLength(0);
+  });
+
+  it('submitCanvasInvocationSnapshot targets the project it names, not the active one', () => {
+    const graph: GraphContract = {
+      edges: [],
+      id: 'canvas-graph',
+      label: 'Canvas',
+      nodes: [],
+      updatedAt: '2026-06-09T00:00:00.000Z',
+      version: 1,
+    };
+
+    let state = createInitialWorkbenchState();
+    const originatingProjectId = state.activeProjectId;
+    state = workbenchReducer(state, { type: 'createProject' });
+    const otherProjectId = state.activeProjectId;
+
+    expect(otherProjectId).not.toBe(originatingProjectId);
+
+    state = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      destination: 'canvas',
+      graph,
+      projectId: originatingProjectId,
+      type: 'submitCanvasInvocationSnapshot',
+    });
+
+    expect(getProject(state, originatingProjectId).queue.items).toHaveLength(1);
+    expect(getProject(state, originatingProjectId).queue.items[0]?.snapshot.graph.id).toBe('canvas-graph');
+    expect(getProject(state, otherProjectId).queue.items).toHaveLength(0);
+  });
+
+  it('submitCanvasInvocationSnapshot with a stale/unknown projectId is a no-op', () => {
+    const graph: GraphContract = {
+      edges: [],
+      id: 'canvas-graph',
+      label: 'Canvas',
+      nodes: [],
+      updatedAt: '2026-06-09T00:00:00.000Z',
+      version: 1,
+    };
+
+    const initial = createInitialWorkbenchState();
+    const state = workbenchReducer(initial, {
+      backendSupportsCancellation: true,
+      destination: 'canvas',
+      graph,
+      projectId: 'not-a-real-project',
+      type: 'submitCanvasInvocationSnapshot',
+    });
+
+    expect(state).toBe(initial);
   });
 });

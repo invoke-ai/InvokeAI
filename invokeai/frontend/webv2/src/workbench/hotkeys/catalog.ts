@@ -28,6 +28,9 @@ const implemented = new Set([
   'app.togglePanels',
   'app.toggleRightPanel',
   'canvas.deleteSelected',
+  'canvas.fitBboxToLayers',
+  'canvas.fitBboxToMasks',
+  'canvas.newSession',
   'canvas.nextEntity',
   'canvas.prevEntity',
   'canvas.redo',
@@ -159,6 +162,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'toggleNonRasterLayers', ['shift+h']),
   hotkey('canvas', 'fitBboxToMasks', ['shift+b']),
   hotkey('canvas', 'toggleBbox', ['shift+o']),
+  // New canvas session: no default keys — assignable via the hotkeys settings.
+  hotkey('canvas', 'newSession', []),
   hotkey('workflows', 'addNode', ['shift+a', 'space']),
   hotkey('workflows', 'copySelection', ['mod+c']),
   hotkey('workflows', 'pasteSelection', ['mod+v']),

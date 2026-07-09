@@ -76,8 +76,12 @@ interface ListImagesResponse {
 const imageCategories = ['general'];
 const assetCategories = ['control', 'mask', 'user', 'other'];
 
-const getImageThumbnailUrl = (imageName: string): string =>
+export const getImageThumbnailUrl = (imageName: string): string =>
   absolutizeApiUrl(`/api/v1/images/i/${encodeURIComponent(imageName)}/thumbnail`);
+
+/** The full-resolution image URL for an image referenced only by name (e.g. a v2 canvas layer's `CanvasImageRef`). */
+export const getImageFullUrl = (imageName: string): string =>
+  absolutizeApiUrl(`/api/v1/images/i/${encodeURIComponent(imageName)}/full`);
 
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
@@ -298,6 +302,56 @@ export const listGalleryImages = async ({
       offset + items.length + (Array.isArray(body) && items.length >= limit ? 1 : 0)
     ),
   };
+};
+
+/**
+ * The `ImageRecordChanges` body that promotes a staged canvas candidate (an
+ * intermediate image) into a durable, gallery-visible image: clearing
+ * `is_intermediate` stops it being garbage-collected, and `image_category:
+ * 'general'` surfaces it in the gallery's images view. Pure so the request
+ * shape can be unit-tested without a fetch.
+ */
+export const imageSaveToGalleryChanges = (): { is_intermediate: false; image_category: 'general' } => ({
+  image_category: 'general',
+  is_intermediate: false,
+});
+
+/**
+ * The `ImageRecordChanges` body that makes an intermediate image durable WITHOUT
+ * surfacing it in the gallery: clearing `is_intermediate` stops it being
+ * garbage-collected, but (unlike {@link imageSaveToGalleryChanges}) it leaves
+ * `image_category` untouched so it stays out of the gallery's images view. Used
+ * when applying a control-filter preview: the chosen image becomes the layer's
+ * new source (durable), while the discarded previews GC away as intermediates.
+ */
+export const imageMakeDurableChanges = (): { is_intermediate: false } => ({
+  is_intermediate: false,
+});
+
+/**
+ * Makes a single intermediate image durable (survives GC) without adding it to
+ * the gallery, via `PATCH /api/v1/images/i/{image_name}`. Resolves once the PATCH
+ * succeeds; the caller commits the layer-source swap only after this settles so a
+ * failed PATCH never strands the layer pointing at a soon-to-be-collected image.
+ */
+export const makeImageDurable = async (imageName: string): Promise<void> => {
+  await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
+    body: JSON.stringify(imageMakeDurableChanges()),
+    method: 'PATCH',
+  });
+};
+
+/**
+ * Promotes a single image (e.g. a staged canvas candidate) into the gallery via
+ * `PATCH /api/v1/images/i/{image_name}` and returns the updated {@link GalleryImage}.
+ */
+export const saveImageToGallery = async (imageName: string): Promise<GalleryImage> => {
+  const body = await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
+    body: JSON.stringify(imageSaveToGalleryChanges()),
+    method: 'PATCH',
+  });
+
+  return mapImage(body);
 };
 
 export const getGalleryImageMetadata = async (imageName: string): Promise<GalleryImageMetadata | null> => {

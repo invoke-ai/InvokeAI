@@ -15,7 +15,7 @@ export interface ProgressImageTarget {
   itemIndex: number;
 }
 
-type LatestProgressImageSnapshot = ProgressImageSnapshot & { target?: ProgressImageTarget };
+export type LatestProgressImageSnapshot = ProgressImageSnapshot & { target?: ProgressImageTarget };
 
 const latestSnapshotStore = createExternalStore<{ latestSnapshot: LatestProgressImageSnapshot | null }>({
   latestSnapshot: null,
@@ -57,7 +57,7 @@ export const progressImageStore = {
 
 export type ProgressImageSink = typeof progressImageStore;
 
-export const useProgressImage = (): ProgressImageSnapshot | null =>
+export const useProgressImage = (): LatestProgressImageSnapshot | null =>
   latestSnapshotStore.useSelector((snapshot) => snapshot.latestSnapshot);
 
 export const useQueueItemProgressImage = (queueItemId: string, itemIndex: number): ProgressImageSnapshot | null =>

@@ -18,6 +18,18 @@ export default defineConfig({
             return undefined;
           }
 
+          // ag-psd (+ its only dependents pako/base64-js) is loaded LAZILY via a
+          // dynamic `import('ag-psd')` at PSD-export time. Keep it in its own chunk
+          // so it never lands in the eagerly-preloaded `vendor` bundle — otherwise
+          // the manualChunks catch-all below would pull it into the initial load.
+          if (
+            id.includes('/node_modules/ag-psd/') ||
+            id.includes('/node_modules/pako/') ||
+            id.includes('/node_modules/base64-js/')
+          ) {
+            return 'ag-psd';
+          }
+
           if (id.includes('/node_modules/react-icons/')) {
             return 'react-icons';
           }

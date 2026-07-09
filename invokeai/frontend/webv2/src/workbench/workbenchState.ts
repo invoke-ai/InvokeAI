@@ -2,11 +2,20 @@ import type { GallerySettings } from './gallery/settings';
 import type { GenerateWidgetValues } from './generation/types';
 import type { ModelConfig } from './models/types';
 import type {
-  CanvasDocumentContract,
+  CanvasAdjustmentsContract,
+  CanvasControlAdapterContract,
+  CanvasControlLayerContract,
+  CanvasDocumentContractV2,
+  CanvasLayerBaseContract,
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+  CanvasMaskContract,
   CanvasPlacementContract,
-  CanvasStateContract,
+  CanvasRegionalGuidanceLayerContract,
+  CanvasStagingAreaContractV2,
+  CanvasStateContractV2,
   CenterViewId,
-  CanvasRasterLayerContract,
+  CanvasRasterLayerContractV2,
   CanvasStagingCandidateContract,
   DeveloperLogNamespace,
   GeneratedImageContract,
@@ -40,6 +49,7 @@ import type {
 } from './types';
 import type { ProjectGraphState } from './workflows/types';
 
+import { createNewCanvasStateV2, migrateCanvasStateToV2 } from './canvasMigration';
 import { getGenerationModelAvailabilityReasons } from './generation/baseGenerationPolicies';
 import { sanitizeBatchCount } from './generation/batch';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
@@ -74,6 +84,30 @@ import {
   type ProjectGraphAction,
 } from './workflows/document';
 import { getInvocationTemplatesSnapshot } from './workflows/templates';
+
+/** Partial of the base props shared by every canvas layer. `transform` merges field-wise. */
+type CanvasLayerBasePatch = Partial<
+  Pick<CanvasLayerBaseContract, 'name' | 'isEnabled' | 'isLocked' | 'opacity' | 'blendMode'>
+> & { transform?: Partial<CanvasLayerBaseContract['transform']> };
+
+/** Per-layer-type config patch for `updateCanvasLayerConfig`; a mismatched `layerType` is ignored. */
+type CanvasLayerConfigPatch =
+  | { layerType: 'raster'; adjustments?: CanvasAdjustmentsContract; isTransparencyLocked?: boolean }
+  | {
+      layerType: 'control';
+      adapter?: Partial<CanvasControlAdapterContract>;
+      withTransparencyEffect?: boolean;
+      filter?: CanvasControlLayerContract['filter'];
+    }
+  | {
+      layerType: 'regional_guidance';
+      mask?: Partial<CanvasMaskContract>;
+      positivePrompt?: string | null;
+      negativePrompt?: string | null;
+      autoNegative?: boolean;
+      referenceImages?: CanvasRegionalGuidanceLayerContract['referenceImages'];
+    }
+  | { layerType: 'inpaint_mask'; mask?: Partial<CanvasMaskContract>; noiseLevel?: number; denoiseLimit?: number };
 
 type WorkbenchAction =
   | { type: 'createProject' }
@@ -194,6 +228,35 @@ type WorkbenchAction =
   | { type: 'setGalleryProjectBoardId'; boardId: string; projectId?: string }
   | { type: 'acceptStagedImage' }
   | { type: 'clearCanvasStaging' }
+  | { type: 'addCanvasLayer'; layer: CanvasLayerContract; index?: number }
+  | { type: 'removeCanvasLayers'; ids: string[] }
+  | { type: 'duplicateCanvasLayer'; sourceId: string; newId: string }
+  | { type: 'reorderCanvasLayers'; orderedIds: string[] }
+  | { type: 'updateCanvasLayer'; id: string; patch: CanvasLayerBasePatch }
+  | { type: 'setCanvasLayersEnabled'; updates: readonly { id: string; isEnabled: boolean }[] }
+  | { type: 'updateCanvasLayerSource'; id: string; source: CanvasLayerSourceContract }
+  | { type: 'updateCanvasLayerConfig'; id: string; config: CanvasLayerConfigPatch }
+  | { type: 'convertCanvasLayer'; id: string; targetType: CanvasLayerContract['type']; layer: CanvasLayerContract }
+  | {
+      type: 'mergeCanvasLayersDown';
+      upperLayerId: string;
+      source: Extract<CanvasLayerSourceContract, { type: 'paint' }>;
+    }
+  | { type: 'setCanvasBbox'; bbox: CanvasDocumentContractV2['bbox'] }
+  | { type: 'setCanvasSelectedLayer'; id: string | null }
+  | { type: 'resizeCanvasDocument'; width: number; height: number; offsetX?: number; offsetY?: number }
+  | { type: 'replaceCanvasDocument'; document: CanvasDocumentContractV2 }
+  | { type: 'saveCanvasSnapshot'; id: string; name: string; createdAt: string }
+  | { type: 'restoreCanvasSnapshot'; snapshotId: string }
+  | { type: 'deleteCanvasSnapshot'; snapshotId: string }
+  | { type: 'setCanvasStagingAutoSwitch'; mode: CanvasStagingAreaContractV2['autoSwitchMode'] }
+  | {
+      type: 'submitCanvasInvocationSnapshot';
+      backendSupportsCancellation: boolean;
+      destination: ResultDestination;
+      graph: GraphContract;
+      projectId: string;
+    }
   | { type: 'cancelQueueItem'; queueItemId: string; projectId?: string }
   | { type: 'cancelAllQueueItems'; projectId?: string }
   | { type: 'cancelAllQueueItemsExceptCurrent'; projectId?: string; currentQueueItemId?: string | null }
@@ -227,8 +290,6 @@ const MIN_PANEL_SIZE_PX = 180;
 const MAX_PANEL_SIZE_PX = 520;
 const MIN_STATUS_PANEL_SIZE_PX = 96;
 const MAX_STATUS_PANEL_SIZE_PX = 420;
-const DEFAULT_CANVAS_DOCUMENT_WIDTH = 1024;
-const DEFAULT_CANVAS_DOCUMENT_HEIGHT = 1024;
 
 const now = (): string => new Date().toISOString();
 
@@ -324,7 +385,7 @@ const clonePlacement = (placement: CanvasPlacementContract): CanvasPlacementCont
 
 const createCenteredPlacement = (
   image: Pick<GeneratedImageContract, 'height' | 'width'>,
-  document: Pick<CanvasDocumentContract, 'height' | 'width'>
+  document: Pick<CanvasDocumentContractV2, 'height' | 'width'>
 ): CanvasPlacementContract => {
   const imageWidth = image.width > 0 ? image.width : document.width;
   const imageHeight = image.height > 0 ? image.height : document.height;
@@ -341,54 +402,9 @@ const createCenteredPlacement = (
   };
 };
 
-const createCanvasDocument = (layers: CanvasRasterLayerContract[] = []): CanvasDocumentContract => ({
-  height: DEFAULT_CANVAS_DOCUMENT_HEIGHT,
-  layers,
-  version: 1,
-  width: DEFAULT_CANVAS_DOCUMENT_WIDTH,
-});
-
-const normalizeLayer = (layer: CanvasRasterLayerContract | string): CanvasRasterLayerContract => {
-  if (typeof layer !== 'string') {
-    return {
-      ...layer,
-      placement: layer.placement
-        ? clonePlacement(layer.placement)
-        : createCenteredPlacement(layer, createCanvasDocument()),
-    };
-  }
-
-  return {
-    acceptedAt: now(),
-    height: 0,
-    id: layer,
-    imageName: layer,
-    imageUrl: '',
-    label: layer,
-    placement: createCenteredPlacement({ height: 0, width: 0 }, createCanvasDocument()),
-    queuedAt: now(),
-    sourceQueueItemId: 'legacy',
-    thumbnailUrl: '',
-    width: 0,
-  };
-};
-
-const normalizeCanvasDocument = (canvas: CanvasStateContract): CanvasDocumentContract => {
-  const legacyCanvas = canvas as CanvasStateContract & { layers?: CanvasRasterLayerContract[] };
-  const rawDocument = legacyCanvas.document;
-  const document = rawDocument ?? createCanvasDocument(legacyCanvas.layers ?? []);
-
-  return {
-    height: document.height || DEFAULT_CANVAS_DOCUMENT_HEIGHT,
-    layers: (document.layers ?? []).map(normalizeLayer),
-    version: 1,
-    width: document.width || DEFAULT_CANVAS_DOCUMENT_WIDTH,
-  };
-};
-
 const normalizeStagingCandidate = (
   image: CanvasStagingCandidateContract | GeneratedImageContract,
-  document: CanvasDocumentContract
+  document: Pick<CanvasDocumentContractV2, 'height' | 'width'>
 ): CanvasStagingCandidateContract => ({
   ...image,
   placement:
@@ -397,7 +413,7 @@ const normalizeStagingCandidate = (
       : createCenteredPlacement(image, document),
 });
 
-const clearStagingArea = (stagingArea: CanvasStateContract['stagingArea']): CanvasStateContract['stagingArea'] => ({
+const clearStagingArea = (stagingArea: CanvasStateContractV2['stagingArea']): CanvasStateContractV2['stagingArea'] => ({
   ...stagingArea,
   isVisible: false,
   pendingImageIds: [],
@@ -420,6 +436,466 @@ const cycleStagedImageIndex = (imageIndex: number, pendingImageCount: number, di
   return (imageIndex + direction + pendingImageCount) % pendingImageCount;
 };
 
+/**
+ * Picks the staging selection after a batch of results arrives, honoring
+ * `stagingArea.autoSwitchMode`. With nothing new, the current index is kept
+ * (clamped). `off` preserves the prior behavior of focusing the first freshly
+ * arrived candidate; `latest`/`oldest` jump to the newest/oldest pending image.
+ */
+const resolveStagingSelectionIndex = (
+  mode: CanvasStagingAreaContractV2['autoSwitchMode'],
+  currentIndex: number,
+  existingCount: number,
+  incomingCount: number,
+  totalCount: number
+): number => {
+  if (incomingCount === 0) {
+    return clampStagedImageIndex(currentIndex, totalCount);
+  }
+
+  switch (mode) {
+    case 'latest':
+      return Math.max(0, totalCount - 1);
+    case 'oldest':
+      return 0;
+    default:
+      return existingCount;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Canvas v2 layer reducers
+//
+// Dispatched one-per-gesture by the canvas engine and layers panel. Each mutates
+// only `project.canvas` with a small serializable payload and never touches
+// pixels or calls `pushUndo` — canvas history is owned by the rendering engine,
+// not the project undo stack. Invariants upheld everywhere: layer index 0 is the
+// top-most layer, `document.selectedLayerId` is always null or a present layer id,
+// and untouched layers keep their object identity (reference-preserving updates).
+// ---------------------------------------------------------------------------
+
+type CanvasLayers = CanvasDocumentContractV2['layers'];
+
+const layerExists = (layers: CanvasLayers, id: string): boolean => layers.some((layer) => layer.id === id);
+
+/** Matches the auto-generated `Layer N` default name (N a positive integer). */
+const AUTO_LAYER_NAME_PATTERN = /^Layer (\d+)$/;
+
+/**
+ * Picks the next auto-generated `Layer N` name that does not collide with any
+ * existing name. Deriving `N` from the layer *count* (the previous approach)
+ * collides after deletions — e.g. deleting `Layer 1` from `[Layer 1, Layer 2]`
+ * leaves one layer, so the next add would re-mint `Layer 2`. This instead scans
+ * the existing `Layer N` names and returns the lowest unused positive `N`, so
+ * names stay unique regardless of add/delete history.
+ */
+export const nextLayerName = (existingNames: readonly string[]): string => {
+  const used = new Set<number>();
+  for (const name of existingNames) {
+    const match = AUTO_LAYER_NAME_PATTERN.exec(name.trim());
+    if (match) {
+      const n = Number(match[1]);
+      if (Number.isInteger(n) && n > 0) {
+        used.add(n);
+      }
+    }
+  }
+  let n = 1;
+  while (used.has(n)) {
+    n += 1;
+  }
+  return `Layer ${n}`;
+};
+
+/**
+ * Repairs a dangling `selectedLayerId` after a wholesale document swap
+ * (`replaceCanvasDocument` / snapshot restore): if it names no layer present in
+ * the incoming document, fall back to the top-most layer id (or null when the
+ * document has no layers). Upholds the invariant that `selectedLayerId` is
+ * always null or a present layer id.
+ */
+const repairSelectedLayerId = (document: CanvasDocumentContractV2): CanvasDocumentContractV2 =>
+  document.selectedLayerId === null || layerExists(document.layers, document.selectedLayerId)
+    ? document
+    : { ...document, selectedLayerId: document.layers[0]?.id ?? null };
+
+/** Returns a project whose canvas document is replaced, preserving identity when unchanged. */
+const setCanvasDocument = (project: Project, document: CanvasDocumentContractV2): Project =>
+  document === project.canvas.document ? project : { ...project, canvas: { ...project.canvas, document } };
+
+const updateCanvasDocument = (
+  project: Project,
+  update: (document: CanvasDocumentContractV2) => CanvasDocumentContractV2
+): Project => setCanvasDocument(project, update(project.canvas.document));
+
+/** Returns a project whose canvas state is replaced, preserving identity when unchanged. */
+const setCanvasState = (project: Project, canvas: CanvasStateContractV2): Project =>
+  canvas === project.canvas ? project : { ...project, canvas };
+
+/** Replaces exactly the layer with `id`, keeping every other layer's object identity. */
+const mapCanvasLayer = (
+  document: CanvasDocumentContractV2,
+  id: string,
+  update: (layer: CanvasLayerContract) => CanvasLayerContract
+): CanvasDocumentContractV2 => {
+  let changed = false;
+  const layers = document.layers.map((layer) => {
+    if (layer.id !== id) {
+      return layer;
+    }
+
+    const next = update(layer);
+
+    if (next !== layer) {
+      changed = true;
+    }
+
+    return next;
+  });
+
+  return changed ? { ...document, layers } : document;
+};
+
+/**
+ * Sets the `isEnabled` flag of many layers in one pass (the layers panel's
+ * "hide/show all in group" action). Every listed layer is set to its target;
+ * unlisted layers keep object identity. Returns the same document when nothing
+ * actually changes so selectors don't churn.
+ */
+const setCanvasLayersEnabledInDocument = (
+  document: CanvasDocumentContractV2,
+  updates: readonly { id: string; isEnabled: boolean }[]
+): CanvasDocumentContractV2 => {
+  if (updates.length === 0) {
+    return document;
+  }
+  const targets = new Map(updates.map((update) => [update.id, update.isEnabled]));
+  let changed = false;
+  const layers = document.layers.map((layer) => {
+    const next = targets.get(layer.id);
+    if (next === undefined || layer.isEnabled === next) {
+      return layer;
+    }
+    changed = true;
+    return { ...layer, isEnabled: next };
+  });
+  return changed ? { ...document, layers } : document;
+};
+
+/** After removing the selected layer, selects the nearest surviving layer below it, else above it, else null. */
+const selectNearestRemainingLayerId = (
+  previousLayers: CanvasLayers,
+  remainingIds: Set<string>,
+  removedSelectedId: string
+): string | null => {
+  const removedIndex = previousLayers.findIndex((layer) => layer.id === removedSelectedId);
+
+  for (let index = removedIndex + 1; index < previousLayers.length; index += 1) {
+    const id = previousLayers[index]?.id;
+
+    if (id !== undefined && remainingIds.has(id)) {
+      return id;
+    }
+  }
+
+  for (let index = removedIndex - 1; index >= 0; index -= 1) {
+    const id = previousLayers[index]?.id;
+
+    if (id !== undefined && remainingIds.has(id)) {
+      return id;
+    }
+  }
+
+  return null;
+};
+
+const addCanvasLayerToDocument = (
+  document: CanvasDocumentContractV2,
+  layer: CanvasLayerContract,
+  index = 0
+): CanvasDocumentContractV2 => {
+  const insertIndex = Math.min(Math.max(0, Math.round(index)), document.layers.length);
+
+  return {
+    ...document,
+    layers: [...document.layers.slice(0, insertIndex), layer, ...document.layers.slice(insertIndex)],
+    selectedLayerId: layer.id,
+  };
+};
+
+const removeCanvasLayersFromDocument = (
+  document: CanvasDocumentContractV2,
+  ids: readonly string[]
+): CanvasDocumentContractV2 => {
+  const removed = new Set(ids);
+  const layers = document.layers.filter((layer) => !removed.has(layer.id));
+
+  if (layers.length === document.layers.length) {
+    return document;
+  }
+
+  const remainingIds = new Set(layers.map((layer) => layer.id));
+  const selectedLayerId =
+    document.selectedLayerId !== null && removed.has(document.selectedLayerId)
+      ? selectNearestRemainingLayerId(document.layers, remainingIds, document.selectedLayerId)
+      : document.selectedLayerId;
+
+  return { ...document, layers, selectedLayerId };
+};
+
+const duplicateCanvasLayerInDocument = (
+  document: CanvasDocumentContractV2,
+  sourceId: string,
+  newId: string
+): CanvasDocumentContractV2 => {
+  const sourceIndex = document.layers.findIndex((layer) => layer.id === sourceId);
+
+  if (sourceIndex === -1) {
+    return document;
+  }
+
+  const source = document.layers[sourceIndex] as CanvasLayerContract;
+  const duplicate = structuredClone(source);
+
+  duplicate.id = newId;
+  duplicate.name = `${source.name} copy`;
+
+  return {
+    ...document,
+    layers: [...document.layers.slice(0, sourceIndex), duplicate, ...document.layers.slice(sourceIndex)],
+    selectedLayerId: newId,
+  };
+};
+
+const reorderCanvasLayersInDocument = (
+  document: CanvasDocumentContractV2,
+  orderedIds: readonly string[]
+): CanvasDocumentContractV2 => {
+  if (orderedIds.length !== document.layers.length || new Set(orderedIds).size !== orderedIds.length) {
+    return document;
+  }
+
+  const byId = new Map(document.layers.map((layer) => [layer.id, layer]));
+  const layers: CanvasLayers = [];
+
+  for (const id of orderedIds) {
+    const layer = byId.get(id);
+
+    if (!layer) {
+      return document;
+    }
+
+    layers.push(layer);
+  }
+
+  return { ...document, layers };
+};
+
+const applyCanvasLayerBasePatch = (layer: CanvasLayerContract, patch: CanvasLayerBasePatch): CanvasLayerContract => {
+  const { transform, ...rest } = patch;
+
+  return {
+    ...layer,
+    ...rest,
+    transform: transform ? { ...layer.transform, ...transform } : layer.transform,
+  };
+};
+
+const applyCanvasLayerConfigPatch = (
+  layer: CanvasLayerContract,
+  config: CanvasLayerConfigPatch
+): CanvasLayerContract => {
+  if (layer.type !== config.layerType) {
+    return layer;
+  }
+
+  if (layer.type === 'raster' && config.layerType === 'raster') {
+    return {
+      ...layer,
+      ...(config.adjustments !== undefined ? { adjustments: config.adjustments } : {}),
+      ...(config.isTransparencyLocked !== undefined ? { isTransparencyLocked: config.isTransparencyLocked } : {}),
+    };
+  }
+
+  if (layer.type === 'control' && config.layerType === 'control') {
+    return {
+      ...layer,
+      ...(config.adapter ? { adapter: { ...layer.adapter, ...config.adapter } } : {}),
+      ...(config.withTransparencyEffect !== undefined ? { withTransparencyEffect: config.withTransparencyEffect } : {}),
+      ...(config.filter !== undefined ? { filter: config.filter } : {}),
+    };
+  }
+
+  if (layer.type === 'regional_guidance' && config.layerType === 'regional_guidance') {
+    return {
+      ...layer,
+      ...(config.mask ? { mask: { ...layer.mask, ...config.mask } } : {}),
+      ...(config.positivePrompt !== undefined ? { positivePrompt: config.positivePrompt } : {}),
+      ...(config.negativePrompt !== undefined ? { negativePrompt: config.negativePrompt } : {}),
+      ...(config.autoNegative !== undefined ? { autoNegative: config.autoNegative } : {}),
+      ...(config.referenceImages !== undefined ? { referenceImages: config.referenceImages } : {}),
+    };
+  }
+
+  if (layer.type === 'inpaint_mask' && config.layerType === 'inpaint_mask') {
+    return {
+      ...layer,
+      ...(config.mask ? { mask: { ...layer.mask, ...config.mask } } : {}),
+      ...(config.noiseLevel !== undefined ? { noiseLevel: config.noiseLevel } : {}),
+      ...(config.denoiseLimit !== undefined ? { denoiseLimit: config.denoiseLimit } : {}),
+    };
+  }
+
+  return layer;
+};
+
+const updateCanvasLayerSourceInDocument = (
+  document: CanvasDocumentContractV2,
+  id: string,
+  source: CanvasLayerSourceContract
+): CanvasDocumentContractV2 =>
+  mapCanvasLayer(document, id, (layer) =>
+    layer.type === 'raster' || layer.type === 'control' ? { ...layer, source } : layer
+  );
+
+const convertCanvasLayerInDocument = (
+  document: CanvasDocumentContractV2,
+  id: string,
+  targetType: CanvasLayerContract['type'],
+  layer: CanvasLayerContract
+): CanvasDocumentContractV2 => {
+  if (layer.type !== targetType || !layerExists(document.layers, id)) {
+    return document;
+  }
+
+  const converted = structuredClone(layer);
+
+  converted.id = id;
+
+  return { ...document, layers: document.layers.map((existing) => (existing.id === id ? converted : existing)) };
+};
+
+const mergeCanvasLayersDownInDocument = (
+  document: CanvasDocumentContractV2,
+  upperLayerId: string,
+  source: Extract<CanvasLayerSourceContract, { type: 'paint' }>
+): CanvasDocumentContractV2 => {
+  const upperIndex = document.layers.findIndex((layer) => layer.id === upperLayerId);
+  const below = upperIndex === -1 ? undefined : document.layers[upperIndex + 1];
+
+  if (!below) {
+    return document;
+  }
+
+  const mergedBelow: CanvasRasterLayerContractV2 = {
+    blendMode: below.blendMode,
+    id: below.id,
+    isEnabled: below.isEnabled,
+    isLocked: below.isLocked,
+    name: below.name,
+    opacity: below.opacity,
+    source,
+    transform: below.transform,
+    type: 'raster',
+  };
+  const layers = document.layers
+    .filter((_, index) => index !== upperIndex)
+    .map((layer) => (layer.id === below.id ? mergedBelow : layer));
+  const selectedLayerId = document.selectedLayerId === upperLayerId ? below.id : document.selectedLayerId;
+
+  return { ...document, layers, selectedLayerId };
+};
+
+const clampCanvasBbox = (
+  bbox: CanvasDocumentContractV2['bbox'],
+  width: number,
+  height: number
+): CanvasDocumentContractV2['bbox'] => {
+  const clampedWidth = Math.min(Math.max(1, Math.round(bbox.width)), width);
+  const clampedHeight = Math.min(Math.max(1, Math.round(bbox.height)), height);
+
+  return {
+    height: clampedHeight,
+    width: clampedWidth,
+    x: Math.min(Math.max(0, Math.round(bbox.x)), width - clampedWidth),
+    y: Math.min(Math.max(0, Math.round(bbox.y)), height - clampedHeight),
+  };
+};
+
+const setCanvasBboxInDocument = (
+  document: CanvasDocumentContractV2,
+  bbox: CanvasDocumentContractV2['bbox']
+): CanvasDocumentContractV2 => ({
+  ...document,
+  bbox: {
+    height: Math.max(1, Math.round(bbox.height)),
+    width: Math.max(1, Math.round(bbox.width)),
+    x: Math.round(bbox.x),
+    y: Math.round(bbox.y),
+  },
+});
+
+const resizeCanvasDocumentInDocument = (
+  document: CanvasDocumentContractV2,
+  width: number,
+  height: number,
+  offsetX: number,
+  offsetY: number
+): CanvasDocumentContractV2 => {
+  const nextWidth = Math.max(1, Math.round(width));
+  const nextHeight = Math.max(1, Math.round(height));
+  const layers =
+    offsetX === 0 && offsetY === 0
+      ? document.layers
+      : document.layers.map((layer) => ({
+          ...layer,
+          transform: { ...layer.transform, x: layer.transform.x + offsetX, y: layer.transform.y + offsetY },
+        }));
+
+  return {
+    ...document,
+    bbox: clampCanvasBbox(
+      { ...document.bbox, x: document.bbox.x + offsetX, y: document.bbox.y + offsetY },
+      nextWidth,
+      nextHeight
+    ),
+    height: nextHeight,
+    layers,
+    width: nextWidth,
+  };
+};
+
+const saveCanvasSnapshotToState = (
+  canvas: CanvasStateContractV2,
+  snapshot: { id: string; name: string; createdAt: string }
+): CanvasStateContractV2 => ({
+  ...canvas,
+  snapshots: [
+    ...canvas.snapshots,
+    { createdAt: snapshot.createdAt, document: structuredClone(canvas.document), id: snapshot.id, name: snapshot.name },
+  ],
+});
+
+const restoreCanvasSnapshotInState = (canvas: CanvasStateContractV2, snapshotId: string): CanvasStateContractV2 => {
+  const snapshot = canvas.snapshots.find((entry) => entry.id === snapshotId);
+
+  // Wholesale swap: bump the revision so the document mirror clears engine pixel
+  // history even when the restored document keeps the same dims/layer ids.
+  return snapshot
+    ? {
+        ...canvas,
+        document: repairSelectedLayerId(structuredClone(snapshot.document)),
+        documentRevision: canvas.documentRevision + 1,
+      }
+    : canvas;
+};
+
+const deleteCanvasSnapshotInState = (canvas: CanvasStateContractV2, snapshotId: string): CanvasStateContractV2 => {
+  const snapshots = canvas.snapshots.filter((entry) => entry.id !== snapshotId);
+
+  return snapshots.length === canvas.snapshots.length ? canvas : { ...canvas, snapshots };
+};
+
 const getGalleryImages = (values: Record<string, unknown>): GeneratedImageContract[] =>
   Array.isArray(values.recentImages) ? (values.recentImages as GeneratedImageContract[]) : [];
 
@@ -431,20 +907,32 @@ const getGallerySelectedImageNames = (values: Record<string, unknown>): string[]
   return typeof values.selectedImageName === 'string' ? [values.selectedImageName] : [];
 };
 
-const cloneCanvas = (canvas: CanvasStateContract): CanvasStateContract => ({
-  version: 1,
-  document: normalizeCanvasDocument(canvas),
-  stagingArea: {
-    ...canvas.stagingArea,
-    pendingImageIds: [...(canvas.stagingArea?.pendingImageIds ?? [])],
-    pendingImages: (canvas.stagingArea?.pendingImages ?? []).map((image) =>
-      normalizeStagingCandidate(image, normalizeCanvasDocument(canvas))
-    ),
-    areThumbnailsVisible: canvas.stagingArea?.areThumbnailsVisible ?? true,
-    isVisible: canvas.stagingArea?.isVisible ?? (canvas.stagingArea?.pendingImages?.length ?? 0) > 0,
-    selectedImageIndex: canvas.stagingArea?.selectedImageIndex ?? 0,
-  },
-});
+/**
+ * Deep-clones an already-v2 canvas state and normalizes staging candidate placements. Not a
+ * migration boundary: callers with genuinely unknown/legacy input must run
+ * `migrateCanvasStateToV2` first (see `ensureProjectWidgetContracts`).
+ */
+const cloneCanvas = (canvas: CanvasStateContractV2): CanvasStateContractV2 => {
+  const document = structuredClone(canvas.document);
+
+  return {
+    version: 2,
+    document,
+    documentRevision: canvas.documentRevision,
+    snapshots: canvas.snapshots.map((snapshot) => ({ ...snapshot, document: structuredClone(snapshot.document) })),
+    stagingArea: {
+      ...canvas.stagingArea,
+      pendingImageIds: [...(canvas.stagingArea?.pendingImageIds ?? [])],
+      pendingImages: (canvas.stagingArea?.pendingImages ?? []).map((image) =>
+        normalizeStagingCandidate(image, document)
+      ),
+      areThumbnailsVisible: canvas.stagingArea?.areThumbnailsVisible ?? true,
+      autoSwitchMode: canvas.stagingArea?.autoSwitchMode ?? 'off',
+      isVisible: canvas.stagingArea?.isVisible ?? (canvas.stagingArea?.pendingImages?.length ?? 0) > 0,
+      selectedImageIndex: canvas.stagingArea?.selectedImageIndex ?? 0,
+    },
+  };
+};
 
 const cloneWidgetState = (widgetState: WidgetStateContract): WidgetStateContract => ({
   ...widgetState,
@@ -579,8 +1067,11 @@ const cloneWidgetRegions = (
 const cloneWidgetGraphs = (widgetGraphs: Project['widgetGraphs']): Project['widgetGraphs'] =>
   Object.fromEntries(Object.entries(widgetGraphs).map(([key, graph]) => [key, graph ? cloneGraph(graph) : graph]));
 
+// Canvas is intentionally absent from undo snapshots: the canvas rendering
+// engine owns its own pixel-patch history, so project-level undo/redo neither
+// snapshots nor restores canvas — `restoreUndoSnapshot` passes the live
+// `project.canvas` straight through via the `...project` spread.
 const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
-  canvas: cloneCanvas(project.canvas),
   invocation: { ...project.invocation },
   layout: { ...project.layout, panels: { ...project.layout.panels } },
   projectGraph: cloneProjectGraph(project.projectGraph),
@@ -591,7 +1082,6 @@ const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
 
 const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): Project => ({
   ...project,
-  canvas: { ...cloneCanvas(snapshot.canvas), stagingArea: cloneCanvas(project.canvas).stagingArea },
   invocation: { ...snapshot.invocation },
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
   projectGraph: cloneProjectGraph(normalizeProjectGraph(snapshot.projectGraph)),
@@ -784,7 +1274,9 @@ const ensureProjectWidgetContracts = (project: Project): Project => {
 
   return {
     ...project,
-    canvas: cloneCanvas(project.canvas ?? createCanvasState()),
+    // `project` may come straight from persisted storage (an unsafe cast boundary), so its
+    // canvas can still be v1-shaped, malformed, or missing — migrate before cloning.
+    canvas: cloneCanvas(migrateCanvasStateToV2(project.canvas)),
     projectGraph: normalizeProjectGraph(project.projectGraph),
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
     settings: normalizeProjectSettings(project.settings),
@@ -806,17 +1298,7 @@ const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
   return Math.min(MAX_PANEL_SIZE_PX, Math.max(MIN_PANEL_SIZE_PX, sizePx));
 };
 
-const createCanvasState = (): CanvasStateContract => ({
-  document: createCanvasDocument(),
-  stagingArea: {
-    areThumbnailsVisible: true,
-    isVisible: false,
-    pendingImageIds: [],
-    pendingImages: [],
-    selectedImageIndex: 0,
-  },
-  version: 1,
-});
+const createCanvasState = (): CanvasStateContractV2 => createNewCanvasStateV2();
 
 const createProject = (index: number, id = `project-${index}`): Project => ({
   canvas: createCanvasState(),
@@ -1335,6 +1817,17 @@ const routeQueueItemResults = (project: Project, queueItemId: string, images: Ge
     return updateGalleryWithResultImages(nextProject, images);
   }
 
+  // A canvas generation belongs to the canvas SESSION it was submitted against,
+  // identified by `documentRevision` (bumped only on wholesale swaps — new canvas,
+  // snapshot restore, project sync — never on ordinary edits, and captured in the
+  // queue item's canvas snapshot at submit time). If a fresh session started while
+  // this generation was in flight, its results belong to a document that no longer
+  // exists; routing them would resurrect staging on the brand-new canvas (F2). Keep
+  // the completed status, but drop the staged candidates.
+  if (queueItem && queueItem.snapshot.canvas.documentRevision !== nextProject.canvas.documentRevision) {
+    return nextProject;
+  }
+
   const incomingImages = images.map((image) => normalizeStagingCandidate(image, nextProject.canvas.document));
   const incomingImageKeys = new Set(incomingImages.map((image) => `${image.sourceQueueItemId}:${image.imageName}`));
   const existingImages = nextProject.canvas.stagingArea.pendingImages.filter(
@@ -1352,33 +1845,33 @@ const routeQueueItemResults = (project: Project, queueItemId: string, images: Ge
         isVisible: pendingImages.length > 0,
         pendingImageIds: pendingImages.map((image) => image.imageName),
         pendingImages,
-        selectedImageIndex:
-          incomingImages.length > 0 ? existingImages.length : nextProject.canvas.stagingArea.selectedImageIndex,
+        selectedImageIndex: resolveStagingSelectionIndex(
+          nextProject.canvas.stagingArea.autoSwitchMode,
+          nextProject.canvas.stagingArea.selectedImageIndex,
+          existingImages.length,
+          incomingImages.length,
+          pendingImages.length
+        ),
         sourceQueueItemId: queueItemId,
       },
     },
   };
 };
 
-const submitInvocationSnapshot = (
+/**
+ * Enqueues an already-compiled graph snapshot. Shared by the route-validated
+ * `submitInvocationSnapshot` and the canvas engine's `submitCanvasInvocationSnapshot`,
+ * whose graph is compiled asynchronously outside the reducer.
+ */
+const enqueueCompiledSnapshot = (
   project: Project,
-  backendSupportsCancellation: boolean,
-  route = resolveInvocationRoute(project),
-  models?: readonly ModelConfig[]
+  route: InvocationRoute,
+  compiled: { graph: GraphContract; widgetStates: WidgetStateMap },
+  backendSupportsCancellation: boolean
 ): Project => {
-  if (!isInvocationRouteValid(route)) {
-    return project;
-  }
-
   const submittedAt = now();
   const queueItemId = createId('queue-item');
-  const compiledSnapshot = compileInvocationSnapshot(project, route, models);
-
-  if (!compiledSnapshot) {
-    return project;
-  }
-
-  const { graph, widgetStates } = compiledSnapshot;
+  const { graph, widgetStates } = compiled;
   const graphHistorySnapshot = createGraphHistorySnapshot(`Queue snapshot ${queueItemId}`, graph);
   const generateSettings =
     route.sourceId === 'generate' ? normalizeGenerateSettings(widgetStates.generate.values) : null;
@@ -1423,6 +1916,25 @@ const submitInvocationSnapshot = (
     widgetGraphs:
       route.sourceId === 'generate' ? { ...project.widgetGraphs, generate: cloneGraph(graph) } : project.widgetGraphs,
   };
+};
+
+const submitInvocationSnapshot = (
+  project: Project,
+  backendSupportsCancellation: boolean,
+  route = resolveInvocationRoute(project),
+  models?: readonly ModelConfig[]
+): Project => {
+  if (!isInvocationRouteValid(route)) {
+    return project;
+  }
+
+  const compiledSnapshot = compileInvocationSnapshot(project, route, models);
+
+  if (!compiledSnapshot) {
+    return project;
+  }
+
+  return enqueueCompiledSnapshot(project, route, compiledSnapshot, backendSupportsCancellation);
 };
 
 export const createInitialWorkbenchState = (): WorkbenchState => {
@@ -2332,24 +2844,35 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         }
 
         const acceptedAt = now();
-        const nextProject = pushUndo(project, 'Accept staged canvas candidate');
-        const layer: CanvasRasterLayerContract = {
-          ...stagedImage,
-          acceptedAt,
+        // Canvas mutations are engine-owned and no longer participate in project
+        // undo, so accept does not `pushUndo`. The layer lands at the bbox origin
+        // (transform x/y = bbox x/y, unscaled), on top, and becomes selected.
+        const { bbox } = project.canvas.document;
+        const layer: CanvasRasterLayerContractV2 = {
+          blendMode: 'normal',
           id: createId('layer'),
-          label: `Layer ${project.canvas.document.layers.length + 1}`,
-          placement: clonePlacement(stagedImage.placement),
+          isEnabled: true,
+          isLocked: false,
+          name: `Layer ${project.canvas.document.layers.length + 1}`,
+          opacity: 1,
+          source: {
+            image: { height: stagedImage.height, imageName: stagedImage.imageName, width: stagedImage.width },
+            type: 'image',
+          },
+          transform: { rotation: 0, scaleX: 1, scaleY: 1, x: bbox.x, y: bbox.y },
+          type: 'raster',
         };
 
         return {
-          ...nextProject,
+          ...project,
           canvas: {
-            ...nextProject.canvas,
+            ...project.canvas,
             document: {
-              ...nextProject.canvas.document,
-              layers: [layer, ...nextProject.canvas.document.layers],
+              ...project.canvas.document,
+              layers: [layer, ...project.canvas.document.layers],
+              selectedLayerId: layer.id,
             },
-            stagingArea: clearStagingArea(nextProject.canvas.stagingArea),
+            stagingArea: clearStagingArea(project.canvas.stagingArea),
           },
           events: [
             {
@@ -2358,7 +2881,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
               summary: `Accepted ${stagedImage.imageName} into a new raster layer`,
               type: 'canvas-layer-accepted',
             },
-            ...nextProject.events,
+            ...project.events,
           ],
         };
       });
@@ -2382,6 +2905,158 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         ...project,
         canvas: { ...project.canvas, stagingArea: clearStagingArea(project.canvas.stagingArea) },
       }));
+    }
+    case 'addCanvasLayer': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) => addCanvasLayerToDocument(document, action.layer, action.index))
+      );
+    }
+    case 'removeCanvasLayers': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) => removeCanvasLayersFromDocument(document, action.ids))
+      );
+    }
+    case 'duplicateCanvasLayer': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) =>
+          duplicateCanvasLayerInDocument(document, action.sourceId, action.newId)
+        )
+      );
+    }
+    case 'reorderCanvasLayers': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) => reorderCanvasLayersInDocument(document, action.orderedIds))
+      );
+    }
+    case 'updateCanvasLayer': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) =>
+          mapCanvasLayer(document, action.id, (layer) => applyCanvasLayerBasePatch(layer, action.patch))
+        )
+      );
+    }
+    case 'setCanvasLayersEnabled': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) => setCanvasLayersEnabledInDocument(document, action.updates))
+      );
+    }
+    case 'updateCanvasLayerSource': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) =>
+          updateCanvasLayerSourceInDocument(document, action.id, action.source)
+        )
+      );
+    }
+    case 'updateCanvasLayerConfig': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) =>
+          mapCanvasLayer(document, action.id, (layer) => applyCanvasLayerConfigPatch(layer, action.config))
+        )
+      );
+    }
+    case 'convertCanvasLayer': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) =>
+          convertCanvasLayerInDocument(document, action.id, action.targetType, action.layer)
+        )
+      );
+    }
+    case 'mergeCanvasLayersDown': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) =>
+          mergeCanvasLayersDownInDocument(document, action.upperLayerId, action.source)
+        )
+      );
+    }
+    case 'setCanvasBbox': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) => setCanvasBboxInDocument(document, action.bbox))
+      );
+    }
+    case 'setCanvasSelectedLayer': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) => {
+          if (action.id !== null && !layerExists(document.layers, action.id)) {
+            return document;
+          }
+
+          return document.selectedLayerId === action.id ? document : { ...document, selectedLayerId: action.id };
+        })
+      );
+    }
+    case 'resizeCanvasDocument': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) =>
+          resizeCanvasDocumentInDocument(
+            document,
+            action.width,
+            action.height,
+            action.offsetX ?? 0,
+            action.offsetY ?? 0
+          )
+        )
+      );
+    }
+    case 'replaceCanvasDocument': {
+      return updateActiveProject(state, (project) =>
+        setCanvasState(project, {
+          ...project.canvas,
+          document: repairSelectedLayerId(structuredClone(action.document)),
+          // Wholesale swap: bump the revision so the document mirror clears engine
+          // pixel history even when the new document keeps the same dims/layer ids.
+          documentRevision: project.canvas.documentRevision + 1,
+          // Staged candidates (and their pending ids) belong to the outgoing
+          // document — a swap (new canvas session) must not leave them hovering
+          // over the fresh document, nor let a late-completing generation append
+          // stale candidates. Same rule as snapshot restore above.
+          stagingArea: clearStagingArea(project.canvas.stagingArea),
+        })
+      );
+    }
+    case 'saveCanvasSnapshot': {
+      return updateActiveProject(state, (project) =>
+        setCanvasState(
+          project,
+          saveCanvasSnapshotToState(project.canvas, {
+            createdAt: action.createdAt,
+            id: action.id,
+            name: action.name,
+          })
+        )
+      );
+    }
+    case 'restoreCanvasSnapshot': {
+      return updateActiveProject(state, (project) =>
+        setCanvasState(project, restoreCanvasSnapshotInState(project.canvas, action.snapshotId))
+      );
+    }
+    case 'deleteCanvasSnapshot': {
+      return updateActiveProject(state, (project) =>
+        setCanvasState(project, deleteCanvasSnapshotInState(project.canvas, action.snapshotId))
+      );
+    }
+    case 'setCanvasStagingAutoSwitch': {
+      return updateActiveProject(state, (project) =>
+        project.canvas.stagingArea.autoSwitchMode === action.mode
+          ? project
+          : {
+              ...project,
+              canvas: {
+                ...project.canvas,
+                stagingArea: { ...project.canvas.stagingArea, autoSwitchMode: action.mode },
+              },
+            }
+      );
+    }
+    case 'submitCanvasInvocationSnapshot': {
+      return updateProjectById(state, action.projectId, (project) =>
+        enqueueCompiledSnapshot(
+          project,
+          { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
+          { graph: action.graph, widgetStates: getWidgetStatesSnapshot(project.widgetInstances) },
+          action.backendSupportsCancellation
+        )
+      );
     }
     case 'cancelQueueItem': {
       const targetProjectId = action.projectId ?? state.activeProjectId;
@@ -2571,9 +3246,25 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       // version takes over the original project id, and the local edits
       // continue in the recovered fork — which stays the active project when
       // the user was looking at it.
-      const serverProject = ensureProjectWidgetContracts(action.serverProject);
+      const normalizedServerProject = ensureProjectWidgetContracts(action.serverProject);
       const recoveredProject = ensureProjectWidgetContracts(action.recoveredProject);
-      const hasOriginal = state.projects.some((project) => project.id === action.projectId);
+      const localProject = state.projects.find((project) => project.id === action.projectId);
+      const hasOriginal = localProject !== undefined;
+      // The server document replaces the local one under the SAME project id, so a
+      // live engine mirroring that id may hold pixel history for the outgoing
+      // document. Bump the revision past both sides so the mirror treats the swap
+      // as a document replacement (clearing that history) even when dims/layer ids
+      // coincide. (The recovered fork gets a fresh project id → a fresh engine.)
+      const serverProject: Project = hasOriginal
+        ? {
+            ...normalizedServerProject,
+            canvas: {
+              ...normalizedServerProject.canvas,
+              documentRevision:
+                Math.max(normalizedServerProject.canvas.documentRevision, localProject.canvas.documentRevision) + 1,
+            },
+          }
+        : normalizedServerProject;
       const projects = hasOriginal
         ? state.projects.flatMap((project) =>
             project.id === action.projectId ? [serverProject, recoveredProject] : [project]

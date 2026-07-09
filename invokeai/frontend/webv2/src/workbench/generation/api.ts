@@ -86,6 +86,33 @@ export const enqueueWorkflowGraph = async (request: EnqueueWorkflowRequest): Pro
   };
 };
 
+/**
+ * Enqueues a small graph OUTSIDE any project's queue, tagged with a caller-built
+ * utility origin (`webv2:util:<id>`). Used by {@link import('@workbench/canvas-engine/backend/utilityQueue').runUtilityGraph}
+ * for filter previews / SAM: the origin is intentionally opaque to project
+ * routing (see `events.ts`), so results are never staged or added to the gallery.
+ * A single deterministic run (no seed/prompt batch data).
+ */
+export const enqueueUtilityGraph = async (request: {
+  graph: BackendGraphContract;
+  origin: string;
+}): Promise<{ itemIds: number[]; enqueued: number }> => {
+  const body = {
+    batch: {
+      graph: request.graph satisfies BackendGraphContract,
+      origin: request.origin,
+      runs: 1,
+    },
+    prepend: false,
+  };
+  const result = await apiFetchJson<{ enqueued?: number; item_ids?: number[] }>('/api/v1/queue/default/enqueue_batch', {
+    body: JSON.stringify(body),
+    method: 'POST',
+  });
+
+  return { enqueued: result.enqueued ?? 0, itemIds: result.item_ids ?? [] };
+};
+
 export const getQueueItem = (itemId: number): Promise<QueueItemDTO> =>
   apiFetchJson<QueueItemDTO>(`/api/v1/queue/default/i/${itemId}`);
 

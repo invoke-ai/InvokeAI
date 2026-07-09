@@ -12,11 +12,13 @@ import {
   type ReconcileInput,
 } from './backend/queueCoordinator';
 import { socketHub } from './backend/socketHub';
+import { createCanvasDimsSync } from './canvasDimsSync';
 import { configureDiagnostics } from './diagnostics/logger';
 import { addImagesToGalleryBoard } from './gallery/api';
 import { getQueueItemResultImages, resumeQueueProcessor } from './generation/api';
 import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
+import { shouldSubmitPendingQueueItem } from './queueSubmission';
 import { useWorkbenchPreferenceSelector } from './settings/store';
 import {
   useWorkbenchDispatch,
@@ -256,6 +258,15 @@ export const WorkbenchRuntime = () => {
     [store]
   );
 
+  // Keep the canvas generation frame and the generate-widget dimensions in sync
+  // while a project invokes into the canvas (the frame is the generation size).
+  // Lives beside the other store subscriptions; renders nothing.
+  useEffect(() => {
+    const sync = createCanvasDimsSync(store);
+
+    return () => sync.dispose();
+  }, [store]);
+
   useEffect(() => {
     configureDiagnostics(diagnosticsPreferences);
   }, [diagnosticsPreferences]);
@@ -446,11 +457,7 @@ export const WorkbenchRuntime = () => {
 
     for (const project of stateRef.current.projects) {
       for (const queueItem of project.queue.items) {
-        if (
-          queueItem.status === 'pending' &&
-          (queueItem.snapshot.sourceId === 'generate' || queueItem.snapshot.sourceId === 'workflow') &&
-          !startedQueueItemIdsRef.current.has(queueItem.id)
-        ) {
+        if (shouldSubmitPendingQueueItem(queueItem) && !startedQueueItemIdsRef.current.has(queueItem.id)) {
           startedQueueItemIdsRef.current.add(queueItem.id);
           submitQueueItem(coordinator, project, queueItem, dispatch);
         }

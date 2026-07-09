@@ -24,6 +24,19 @@ export const getHotkeyExecutionSource = (
   activeSource: WidgetContributionSource | null
 ): WidgetContributionSource | null => (hotkey.scope.kind === 'global' ? (hotkey.source ?? null) : activeSource);
 
+/**
+ * Whether the browser default should be suppressed for a resolved hotkey.
+ *
+ * `resolveHotkey` only returns a hotkey once it has *claimed* the event — the
+ * scope is active and it is not skipped by the editable-target/modal-layer
+ * rules — so a matched-and-run binding must swallow the browser default (e.g.
+ * `mod+d` opening the bookmark dialog). Prevention is therefore on by default;
+ * a binding opts out only by explicitly setting `preventDefault: false`. A
+ * `null` hotkey (no binding claimed the event) never prevents the default.
+ */
+export const shouldPreventHotkeyDefault = (hotkey: RegisteredHotkey | null): boolean =>
+  hotkey !== null && hotkey.preventDefault !== false;
+
 export const WorkbenchHotkeyRuntime = () => {
   useRegisterFirstPartyCommands();
 
@@ -81,7 +94,7 @@ export const WorkbenchHotkeyRuntime = () => {
       return;
     }
 
-    if (hotkey.preventDefault) {
+    if (shouldPreventHotkeyDefault(hotkey)) {
       event.preventDefault();
     }
 

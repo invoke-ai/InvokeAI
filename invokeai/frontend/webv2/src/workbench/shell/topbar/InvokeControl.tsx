@@ -14,7 +14,9 @@ import {
   resolveInvocationRouteInput,
   resultDestinations,
 } from '@workbench/invocation';
+import { submitResolvedInvocation } from '@workbench/invocationSubmit';
 import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
+import { prepareCanvasInvocation } from '@workbench/widgets/canvas/invoke/prepareCanvasInvocation';
 import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import {
   useActiveProjectSelector,
@@ -146,11 +148,12 @@ export const InvokeControl = () => {
       return;
     }
 
-    dispatch({
-      backendSupportsCancellation: true,
+    submitResolvedInvocation({
+      dispatch,
       models: modelsRef.current,
+      prepareCanvasInvocation,
+      project: snapshot.activeProject,
       route: postFlushRoute,
-      type: 'submitResolvedInvocationSnapshot',
     });
   }, [dispatch, store]);
   const tooltipContent = useMemo(

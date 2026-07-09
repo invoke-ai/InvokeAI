@@ -20,7 +20,6 @@ describe('project document serialization', () => {
       id: 'undo-1',
       label: 'test',
       project: {
-        canvas: project.canvas,
         invocation: project.invocation,
         layout: project.layout,
         projectGraph: project.projectGraph,

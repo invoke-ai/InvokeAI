@@ -96,6 +96,23 @@ export const isTerminalBackendStatus = (status: BackendQueueItemStatus): status 
 const QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:';
 const PROJECT_QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:p:';
 
+/**
+ * The origin prefix for utility-queue items — small graphs (filter previews,
+ * SAM, …) enqueued OUTSIDE any project's queue and awaited directly via
+ * `socketHub.on` (see `canvas-engine/backend/utilityQueue.ts`).
+ *
+ * The whole point of a distinct prefix is result isolation (plan Risk 4): a
+ * utility item must never be mistaken for a project queue item and routed into
+ * staging or the gallery. `parseQueueItemOrigin` therefore returns `null` for it
+ * — so `queueCoordinator.reconcile` and `isQueueServerItemInProject` never map a
+ * utility backend item to a local project item, and `routeQueueItemResults`
+ * (only ever invoked for coordinator-tracked project runs, which utility items
+ * are never registered as) never sees it. The `util:` segment sits under the
+ * shared `webv2:` namespace but is checked BEFORE the generic branch below, so
+ * it is not misparsed as a bare (non-project) local queue item id.
+ */
+const UTILITY_QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:util:';
+
 export const buildProjectQueueItemOriginPrefix = (projectId: string): string =>
   `${PROJECT_QUEUE_ITEM_ORIGIN_PREFIX}${projectId}:q:`;
 
@@ -104,12 +121,29 @@ export const buildQueueItemOrigin = (localQueueItemId: string, projectId?: strin
     ? `${buildProjectQueueItemOriginPrefix(projectId)}${localQueueItemId}`
     : `${QUEUE_ITEM_ORIGIN_PREFIX}${localQueueItemId}`;
 
-export const parseQueueItemOrigin = (origin: string | null | undefined): string | null =>
-  origin?.startsWith(PROJECT_QUEUE_ITEM_ORIGIN_PREFIX)
+/** Builds the isolated origin for a utility-queue item (`webv2:util:<id>`). */
+export const buildUtilityQueueItemOrigin = (utilityId: string): string =>
+  `${UTILITY_QUEUE_ITEM_ORIGIN_PREFIX}${utilityId}`;
+
+/** True when `origin` belongs to the utility queue (never a project/local queue item). */
+export const isUtilityQueueItemOrigin = (origin: string | null | undefined): boolean =>
+  origin?.startsWith(UTILITY_QUEUE_ITEM_ORIGIN_PREFIX) ?? false;
+
+export const parseQueueItemOrigin = (origin: string | null | undefined): string | null => {
+  // Utility items are intentionally invisible to project routing (Risk 4): they
+  // resolve to no local queue item, so nothing adopts them or routes their
+  // results. Checked first because `webv2:util:` also matches the generic
+  // `webv2:` branch below.
+  if (isUtilityQueueItemOrigin(origin)) {
+    return null;
+  }
+
+  return origin?.startsWith(PROJECT_QUEUE_ITEM_ORIGIN_PREFIX)
     ? origin.slice(origin.lastIndexOf(':q:') + 3)
     : origin?.startsWith(QUEUE_ITEM_ORIGIN_PREFIX)
       ? origin.slice(QUEUE_ITEM_ORIGIN_PREFIX.length)
       : null;
+};
 
 export const parseQueueItemOriginProjectId = (origin: string | null | undefined): string | null => {
   if (!origin?.startsWith(PROJECT_QUEUE_ITEM_ORIGIN_PREFIX)) {
