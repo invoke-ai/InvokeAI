@@ -50,6 +50,11 @@ import type {
 import type { ProjectGraphState } from './workflows/types';
 
 import { createNewCanvasStateV2, migrateCanvasStateToV2 } from './canvasMigration';
+import {
+  getCanvasStagingSlotCount,
+  getCanvasStagingSlots,
+  getFirstCanvasPlaceholderSlotIndex,
+} from './canvasStagingView';
 import { getGenerationModelAvailabilityReasons } from './generation/baseGenerationPolicies';
 import { sanitizeBatchCount } from './generation/batch';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
@@ -433,9 +438,15 @@ const createCenteredPlacement = (
 
 const normalizeStagingCandidate = (
   image: CanvasStagingCandidateContract | GeneratedImageContract,
-  document: Pick<CanvasDocumentContractV2, 'height' | 'width'>
+  document: Pick<CanvasDocumentContractV2, 'height' | 'width'>,
+  sourceBackendItemId?: number
 ): CanvasStagingCandidateContract => ({
   ...image,
+  ...('sourceBackendItemId' in image && image.sourceBackendItemId !== undefined
+    ? { sourceBackendItemId: image.sourceBackendItemId }
+    : sourceBackendItemId === undefined
+      ? {}
+      : { sourceBackendItemId }),
   placement:
     'placement' in image && image.placement
       ? clonePlacement(image.placement)
@@ -465,31 +476,182 @@ const cycleStagedImageIndex = (imageIndex: number, pendingImageCount: number, di
   return (imageIndex + direction + pendingImageCount) % pendingImageCount;
 };
 
-/**
- * Picks the staging selection after a batch of results arrives, honoring
- * `stagingArea.autoSwitchMode`. With nothing new, the current index is kept
- * (clamped). `off` preserves the prior behavior of focusing the first freshly
- * arrived candidate; `latest`/`oldest` jump to the newest/oldest pending image.
- */
-const resolveStagingSelectionIndex = (
-  mode: CanvasStagingAreaContractV2['autoSwitchMode'],
-  currentIndex: number,
-  existingCount: number,
-  incomingCount: number,
-  totalCount: number
+const getCanvasStagingSlotCountWithPendingImages = (
+  project: Project,
+  pendingImages: CanvasStagingCandidateContract[]
+): number =>
+  getCanvasStagingSlotCount(
+    {
+      ...project.canvas,
+      stagingArea: {
+        ...project.canvas.stagingArea,
+        pendingImages,
+      },
+    },
+    project.queue.items
+  );
+
+const getCanvasWithPendingImages = (
+  canvas: CanvasStateContractV2,
+  pendingImages: CanvasStagingCandidateContract[]
+): CanvasStateContractV2 => ({
+  ...canvas,
+  stagingArea: {
+    ...canvas.stagingArea,
+    pendingImages,
+  },
+});
+
+const getCanvasStagingCandidateSlotIndex = (
+  project: Project,
+  pendingImages: CanvasStagingCandidateContract[],
+  target: CanvasStagingCandidateContract | undefined
 ): number => {
-  if (incomingCount === 0) {
-    return clampStagedImageIndex(currentIndex, totalCount);
+  if (!target) {
+    return -1;
   }
 
-  switch (mode) {
-    case 'latest':
-      return Math.max(0, totalCount - 1);
-    case 'oldest':
-      return 0;
-    default:
-      return existingCount;
+  return getCanvasStagingSlots(
+    getCanvasWithPendingImages(project.canvas, pendingImages),
+    project.queue.items
+  ).findIndex(
+    (slot) =>
+      slot.kind === 'candidate' &&
+      slot.candidate.sourceQueueItemId === target.sourceQueueItemId &&
+      slot.candidate.imageName === target.imageName
+  );
+};
+
+const getSelectedCanvasStagingCandidate = (project: Project): CanvasStagingCandidateContract | undefined => {
+  const selectedSlot = getCanvasStagingSlots(project.canvas, project.queue.items)[
+    project.canvas.stagingArea.selectedImageIndex
+  ];
+
+  return selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined;
+};
+
+const resolveStagingSelectionIndexForSlots = ({
+  incomingImages,
+  pendingImages,
+  project,
+  slotCount,
+}: {
+  incomingImages: CanvasStagingCandidateContract[];
+  pendingImages: CanvasStagingCandidateContract[];
+  project: Project;
+  slotCount: number;
+}): number => {
+  if (project.canvas.stagingArea.autoSwitchMode === 'progress') {
+    const placeholderIndex = getFirstCanvasPlaceholderSlotIndex(
+      getCanvasWithPendingImages(project.canvas, pendingImages),
+      project.queue.items
+    );
+
+    if (placeholderIndex !== -1) {
+      return placeholderIndex;
+    }
+
+    const firstIncomingSlotIndex = getCanvasStagingCandidateSlotIndex(project, pendingImages, incomingImages[0]);
+
+    return firstIncomingSlotIndex !== -1
+      ? firstIncomingSlotIndex
+      : clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
   }
+
+  if (incomingImages.length === 0) {
+    return clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
+  }
+
+  const selectedImage =
+    project.canvas.stagingArea.autoSwitchMode === 'latest'
+      ? (pendingImages[pendingImages.length - 1] ?? incomingImages[incomingImages.length - 1])
+      : incomingImages[0];
+  const selectedSlotIndex = getCanvasStagingCandidateSlotIndex(project, pendingImages, selectedImage);
+
+  return selectedSlotIndex === -1
+    ? clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount)
+    : selectedSlotIndex;
+};
+
+const stageCanvasResultImages = (
+  project: Project,
+  queueItemId: string,
+  images: GeneratedImageContract[],
+  sourceBackendItemIds?: readonly (number | undefined)[]
+): Project => {
+  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+
+  if (
+    images.length === 0 ||
+    !queueItem ||
+    queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision
+  ) {
+    return project;
+  }
+
+  const incomingImages = images.map((image, index) =>
+    normalizeStagingCandidate(image, project.canvas.document, sourceBackendItemIds?.[index])
+  );
+  const existingImages = project.canvas.stagingArea.pendingImages;
+  const existingImageKeys = new Set(existingImages.map((image) => `${image.sourceQueueItemId}:${image.imageName}`));
+  const newImages = incomingImages.filter(
+    (image) => !existingImageKeys.has(`${image.sourceQueueItemId}:${image.imageName}`)
+  );
+  const pendingImages = [...existingImages, ...newImages];
+  const slotCount = getCanvasStagingSlotCountWithPendingImages(project, pendingImages);
+
+  return {
+    ...project,
+    canvas: {
+      ...project.canvas,
+      stagingArea: {
+        ...project.canvas.stagingArea,
+        areThumbnailsVisible: true,
+        isVisible: slotCount > 0,
+        pendingImageIds: pendingImages.map((image) => image.imageName),
+        pendingImages,
+        selectedImageIndex: resolveStagingSelectionIndexForSlots({
+          incomingImages: newImages,
+          pendingImages,
+          project,
+          slotCount,
+        }),
+        sourceQueueItemId: queueItemId,
+      },
+    },
+  };
+};
+
+const clampCanvasStagingSelection = (project: Project): Project => {
+  const slotCount = getCanvasStagingSlotCount(project.canvas, project.queue.items);
+  const placeholderIndex =
+    project.canvas.stagingArea.autoSwitchMode === 'progress'
+      ? getFirstCanvasPlaceholderSlotIndex(project.canvas, project.queue.items)
+      : -1;
+  const selectedImageIndex =
+    placeholderIndex === -1
+      ? clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount)
+      : placeholderIndex;
+  const isVisible = slotCount > 0 ? project.canvas.stagingArea.isVisible : false;
+
+  if (
+    selectedImageIndex === project.canvas.stagingArea.selectedImageIndex &&
+    isVisible === project.canvas.stagingArea.isVisible
+  ) {
+    return project;
+  }
+
+  return {
+    ...project,
+    canvas: {
+      ...project.canvas,
+      stagingArea: {
+        ...project.canvas.stagingArea,
+        isVisible,
+        selectedImageIndex,
+      },
+    },
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -1827,7 +1989,18 @@ const routeQueueItemPartialResults = (
     resultImages: mergeImageResults(item.resultImages, images),
   }));
 
-  return destination === 'gallery' ? updateGalleryWithResultImages(nextProject, images) : nextProject;
+  if (destination === 'gallery') {
+    return updateGalleryWithResultImages(nextProject, images);
+  }
+
+  return clampCanvasStagingSelection(
+    stageCanvasResultImages(
+      nextProject,
+      queueItemId,
+      images,
+      images.map(() => backendItemId)
+    )
+  );
 };
 
 const routeQueueItemResults = (project: Project, queueItemId: string, images: GeneratedImageContract[]): Project => {
@@ -1857,34 +2030,11 @@ const routeQueueItemResults = (project: Project, queueItemId: string, images: Ge
     return nextProject;
   }
 
-  const incomingImages = images.map((image) => normalizeStagingCandidate(image, nextProject.canvas.document));
-  const incomingImageKeys = new Set(incomingImages.map((image) => `${image.sourceQueueItemId}:${image.imageName}`));
-  const existingImages = nextProject.canvas.stagingArea.pendingImages.filter(
-    (image) => !incomingImageKeys.has(`${image.sourceQueueItemId}:${image.imageName}`)
+  const sourceBackendItemIds = queueItem?.backendItemIds?.filter(
+    (backendItemId) => !queueItem.cancelledBackendItemIds?.includes(backendItemId)
   );
-  const pendingImages = [...existingImages, ...incomingImages];
 
-  return {
-    ...nextProject,
-    canvas: {
-      ...nextProject.canvas,
-      stagingArea: {
-        ...nextProject.canvas.stagingArea,
-        areThumbnailsVisible: true,
-        isVisible: pendingImages.length > 0,
-        pendingImageIds: pendingImages.map((image) => image.imageName),
-        pendingImages,
-        selectedImageIndex: resolveStagingSelectionIndex(
-          nextProject.canvas.stagingArea.autoSwitchMode,
-          nextProject.canvas.stagingArea.selectedImageIndex,
-          existingImages.length,
-          incomingImages.length,
-          pendingImages.length
-        ),
-        sourceQueueItemId: queueItemId,
-      },
-    },
-  };
+  return stageCanvasResultImages(nextProject, queueItemId, images, sourceBackendItemIds);
 };
 
 /**
@@ -2484,16 +2634,18 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'markQueueItemBackendSubmitted': {
       return updateProjectById(state, action.projectId, (project) =>
-        updateQueueItem(project, action.queueItemId, (item) => {
-          const status = item.status === 'cancelled' ? 'cancelled' : 'running';
-          const hasSameBackendItemIds =
-            item.backendItemIds?.length === action.backendItemIds.length &&
-            item.backendItemIds.every((id, index) => id === action.backendItemIds[index]);
+        clampCanvasStagingSelection(
+          updateQueueItem(project, action.queueItemId, (item) => {
+            const status = item.status === 'cancelled' ? 'cancelled' : 'running';
+            const hasSameBackendItemIds =
+              item.backendItemIds?.length === action.backendItemIds.length &&
+              item.backendItemIds.every((id, index) => id === action.backendItemIds[index]);
 
-          return item.backendBatchId === action.backendBatchId && hasSameBackendItemIds && item.status === status
-            ? item
-            : { ...item, backendBatchId: action.backendBatchId, backendItemIds: action.backendItemIds, status };
-        })
+            return item.backendBatchId === action.backendBatchId && hasSameBackendItemIds && item.status === status
+              ? item
+              : { ...item, backendBatchId: action.backendBatchId, backendItemIds: action.backendItemIds, status };
+          })
+        )
       );
     }
     case 'setQueueItemStatus': {
@@ -2509,11 +2661,13 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       }
 
       const nextState = updateProjectById(state, action.projectId, (project) =>
-        updateQueueItem(project, action.queueItemId, (item) => ({
-          ...item,
-          error: action.error,
-          status: action.status,
-        }))
+        clampCanvasStagingSelection(
+          updateQueueItem(project, action.queueItemId, (item) => ({
+            ...item,
+            error: action.error,
+            status: action.status,
+          }))
+        )
       );
 
       if (action.notify === false || (action.status !== 'failed' && action.status !== 'cancelled')) {
@@ -2550,8 +2704,8 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         return state;
       }
 
-      return updateProjectById(state, action.projectId, (project) =>
-        updateQueueItem(project, action.queueItemId, (item) => {
+      return updateProjectById(state, action.projectId, (project) => {
+        const nextProject = updateQueueItem(project, action.queueItemId, (item) => {
           const cancelledBackendItemIds = mergeBackendItemId(item.cancelledBackendItemIds, action.backendItemId);
 
           return {
@@ -2559,8 +2713,10 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
             cancelledBackendItemIds,
             status: getQueueItemStatusAfterBackendCancellation(item, cancelledBackendItemIds),
           };
-        })
-      );
+        });
+
+        return clampCanvasStagingSelection(nextProject);
+      });
     }
     case 'routeQueueItemResults': {
       const project = state.projects.find((project) => project.id === action.projectId);
@@ -2592,7 +2748,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       return updateActiveProject(state, (project) => {
         const selectedImageIndex = clampStagedImageIndex(
           action.imageIndex,
-          project.canvas.stagingArea.pendingImages.length
+          getCanvasStagingSlotCount(project.canvas, project.queue.items)
         );
 
         return {
@@ -2606,7 +2762,8 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'cycleStagedImage': {
       return updateActiveProject(state, (project) => {
-        const { pendingImages, selectedImageIndex } = project.canvas.stagingArea;
+        const { selectedImageIndex } = project.canvas.stagingArea;
+        const slotCount = getCanvasStagingSlotCount(project.canvas, project.queue.items);
 
         return {
           ...project,
@@ -2614,7 +2771,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
             ...project.canvas,
             stagingArea: {
               ...project.canvas.stagingArea,
-              selectedImageIndex: cycleStagedImageIndex(selectedImageIndex, pendingImages.length, action.direction),
+              selectedImageIndex: cycleStagedImageIndex(selectedImageIndex, slotCount, action.direction),
             },
           },
         };
@@ -2623,12 +2780,17 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     case 'discardSelectedStagedImage': {
       return updateActiveProject(state, (project) => {
         const { pendingImages, selectedImageIndex } = project.canvas.stagingArea;
+        const selectedImage = getSelectedCanvasStagingCandidate(project);
 
-        if (pendingImages.length === 0) {
+        if (!selectedImage) {
           return project;
         }
 
-        const nextPendingImages = pendingImages.filter((_image, index) => index !== selectedImageIndex);
+        const nextPendingImages = pendingImages.filter(
+          (image) =>
+            image.sourceQueueItemId !== selectedImage.sourceQueueItemId || image.imageName !== selectedImage.imageName
+        );
+        const nextSlotCount = getCanvasStagingSlotCountWithPendingImages(project, nextPendingImages);
 
         return {
           ...project,
@@ -2636,10 +2798,10 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
             ...project.canvas,
             stagingArea: {
               ...project.canvas.stagingArea,
-              isVisible: nextPendingImages.length > 0 ? project.canvas.stagingArea.isVisible : false,
+              isVisible: nextSlotCount > 0 ? project.canvas.stagingArea.isVisible : false,
               pendingImageIds: nextPendingImages.map((image) => image.imageName),
               pendingImages: nextPendingImages,
-              selectedImageIndex: clampStagedImageIndex(selectedImageIndex, nextPendingImages.length),
+              selectedImageIndex: clampStagedImageIndex(selectedImageIndex, nextSlotCount),
               sourceQueueItemId:
                 nextPendingImages.length > 0 ? project.canvas.stagingArea.sourceQueueItemId : undefined,
             },
@@ -2648,10 +2810,19 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       });
     }
     case 'discardAllStagedImages': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        canvas: { ...project.canvas, stagingArea: clearStagingArea(project.canvas.stagingArea) },
-      }));
+      return updateActiveProject(state, (project) => {
+        const nextStagingArea = clearStagingArea(project.canvas.stagingArea);
+        const nextCanvas = { ...project.canvas, stagingArea: nextStagingArea };
+        const nextSlotCount = getCanvasStagingSlotCount(nextCanvas, project.queue.items);
+
+        return {
+          ...project,
+          canvas: {
+            ...nextCanvas,
+            stagingArea: { ...nextStagingArea, isVisible: nextSlotCount > 0 },
+          },
+        };
+      });
     }
     case 'selectGalleryImage': {
       return updateGalleryValues(
@@ -2832,7 +3003,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'toggleCanvasStagingVisibility': {
       return updateActiveProject(state, (project) => {
-        if (project.canvas.stagingArea.pendingImages.length === 0) {
+        if (getCanvasStagingSlotCount(project.canvas, project.queue.items) === 0) {
           return project;
         }
 
@@ -2847,7 +3018,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'toggleCanvasStagingThumbnailsVisibility': {
       return updateActiveProject(state, (project) => {
-        if (project.canvas.stagingArea.pendingImages.length === 0) {
+        if (getCanvasStagingSlotCount(project.canvas, project.queue.items) === 0) {
           return project;
         }
 
@@ -2865,10 +3036,9 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'acceptStagedImage': {
       const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
-      const stagedImage =
-        activeProject?.canvas.stagingArea.pendingImages[activeProject.canvas.stagingArea.selectedImageIndex];
+      const stagedImage = activeProject ? getSelectedCanvasStagingCandidate(activeProject) : undefined;
       const nextState = updateActiveProject(state, (project) => {
-        const stagedImage = project.canvas.stagingArea.pendingImages[project.canvas.stagingArea.selectedImageIndex];
+        const stagedImage = getSelectedCanvasStagingCandidate(project);
 
         if (!stagedImage) {
           return project;
@@ -3067,17 +3237,19 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       );
     }
     case 'setCanvasStagingAutoSwitch': {
-      return updateActiveProject(state, (project) =>
-        project.canvas.stagingArea.autoSwitchMode === action.mode
-          ? project
-          : {
-              ...project,
-              canvas: {
-                ...project.canvas,
-                stagingArea: { ...project.canvas.stagingArea, autoSwitchMode: action.mode },
-              },
-            }
-      );
+      return updateActiveProject(state, (project) => {
+        if (project.canvas.stagingArea.autoSwitchMode === action.mode) {
+          return project;
+        }
+
+        return clampCanvasStagingSelection({
+          ...project,
+          canvas: {
+            ...project.canvas,
+            stagingArea: { ...project.canvas.stagingArea, autoSwitchMode: action.mode },
+          },
+        });
+      });
     }
     case 'submitCanvasInvocationSnapshot': {
       return updateProjectById(state, action.projectId, (project) =>
@@ -3098,18 +3270,20 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       const targetProject = state.projects.find((project) => project.id === targetProjectId);
       const queueItem = targetProject?.queue.items.find((item) => item.id === action.queueItemId);
       const canCancelQueueItem = queueItem ? isCancellableQueueItem(queueItem) : false;
-      const nextState = updateProjectById(state, targetProjectId, (project) => ({
-        ...project,
-        queue: {
-          items: project.queue.items.map((item) => {
-            if (item.id !== action.queueItemId || !isCancellableQueueItem(item)) {
-              return item;
-            }
+      const nextState = updateProjectById(state, targetProjectId, (project) =>
+        clampCanvasStagingSelection({
+          ...project,
+          queue: {
+            items: project.queue.items.map((item) => {
+              if (item.id !== action.queueItemId || !isCancellableQueueItem(item)) {
+                return item;
+              }
 
-            return { ...item, status: 'cancelled' };
-          }),
-        },
-      }));
+              return { ...item, status: 'cancelled' };
+            }),
+          },
+        })
+      );
 
       if (!targetProject || !queueItem || !canCancelQueueItem) {
         return nextState;
@@ -3140,16 +3314,18 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
 
       const nextState: WorkbenchState = {
         ...state,
-        projects: state.projects.map((project) => ({
-          ...project,
-          queue: {
-            items: shouldApplyQueueBulkActionToProject(project, action.projectId)
-              ? project.queue.items.map((item) =>
-                  isCancellableQueueItem(item) ? { ...item, status: 'cancelled' } : item
-                )
-              : project.queue.items,
-          },
-        })),
+        projects: state.projects.map((project) =>
+          clampCanvasStagingSelection({
+            ...project,
+            queue: {
+              items: shouldApplyQueueBulkActionToProject(project, action.projectId)
+                ? project.queue.items.map((item) =>
+                    isCancellableQueueItem(item) ? { ...item, status: 'cancelled' } : item
+                  )
+                : project.queue.items,
+            },
+          })
+        ),
       };
 
       return addNotification(
@@ -3179,18 +3355,20 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
 
       const nextState: WorkbenchState = {
         ...state,
-        projects: state.projects.map((project) => ({
-          ...project,
-          queue: {
-            items: shouldApplyQueueBulkActionToProject(project, action.projectId)
-              ? project.queue.items.map((item) =>
-                  isCancellableQueueItem(item) && item.id !== action.currentQueueItemId
-                    ? { ...item, status: 'cancelled' }
-                    : item
-                )
-              : project.queue.items,
-          },
-        })),
+        projects: state.projects.map((project) =>
+          clampCanvasStagingSelection({
+            ...project,
+            queue: {
+              items: shouldApplyQueueBulkActionToProject(project, action.projectId)
+                ? project.queue.items.map((item) =>
+                    isCancellableQueueItem(item) && item.id !== action.currentQueueItemId
+                      ? { ...item, status: 'cancelled' }
+                      : item
+                  )
+                : project.queue.items,
+            },
+          })
+        ),
       };
 
       return addNotification(

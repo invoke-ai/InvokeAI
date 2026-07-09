@@ -407,6 +407,7 @@ export interface CanvasPlacementContract {
 
 export interface CanvasStagingCandidateContract extends GeneratedImageContract {
   placement: CanvasPlacementContract;
+  sourceBackendItemId?: number;
 }
 
 export interface CanvasRasterLayerContract extends GeneratedImageContract {
@@ -632,7 +633,7 @@ export interface CanvasSnapshotContract {
 }
 
 export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
-  autoSwitchMode: 'off' | 'latest' | 'oldest';
+  autoSwitchMode: 'off' | 'latest' | 'progress';
 }
 
 export interface CanvasStateContractV2 {
