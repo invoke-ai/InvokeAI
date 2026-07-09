@@ -27,6 +27,7 @@ from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite im
     SqliteSystemPromptRecordsStorage,
 )
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
@@ -62,7 +63,7 @@ def mock_services() -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=None,  # type: ignore
+        workflow_records=SqliteWorkflowRecordsStorage(db=db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore

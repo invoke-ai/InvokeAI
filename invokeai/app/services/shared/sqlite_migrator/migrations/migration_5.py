@@ -26,6 +26,8 @@ def build_migration_5() -> Migration:
       to be purely in-memory.
     """
     migration_5 = Migration(
+        id="migration_5",
+        depends_on="migration_4",
         from_version=4,
         to_version=5,
         callback=Migration5Callback(),
