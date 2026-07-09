@@ -144,3 +144,7 @@ Original portions of the software are Copyright © 2024 by respective contributo
 [translation status link]: https://hosted.weblate.org/engage/invokeai/
 [nvidia docker docs]: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 [amd docker docs]: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html
+
+---
+
+*[Mukller](https://github.com/Mukller)*
