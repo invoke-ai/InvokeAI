@@ -1,4 +1,5 @@
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+const LEGACY_WAVE_AMPLITUDE_SCALE = 10;
 
 export const getDenoisingStrengthWavePath = (
   strength: number,
@@ -7,7 +8,7 @@ export const getDenoisingStrengthWavePath = (
   segments: number
 ): string => {
   const centerY = height / 2;
-  const amplitude = clamp01(strength) * Math.max(0, centerY - 1);
+  const amplitude = Math.min(centerY, clamp01(strength) * LEGACY_WAVE_AMPLITUDE_SCALE);
   if (amplitude === 0) {
     return `M0,${centerY} L${width},${centerY}`;
   }
@@ -24,13 +25,12 @@ export const getDenoisingStrengthWavePath = (
 };
 
 const WAVE_WIDTH = 100;
-const WAVE_HEIGHT = 12;
-const WAVE_SEGMENTS = 10;
+const WAVE_HEIGHT = 14;
+const WAVE_SEGMENTS = 5;
 
 /** A value-reactive replacement for the denoising slider's straight track. */
 export const DenoisingStrengthWave = ({ value }: { value: number }) => {
-  const clampedValue = clamp01(value);
-  const path = getDenoisingStrengthWavePath(clampedValue, WAVE_WIDTH, WAVE_HEIGHT, WAVE_SEGMENTS);
+  const path = getDenoisingStrengthWavePath(value, WAVE_WIDTH, WAVE_HEIGHT, WAVE_SEGMENTS);
 
   return (
     <svg
@@ -44,18 +44,8 @@ export const DenoisingStrengthWave = ({ value }: { value: number }) => {
       <path
         d={path}
         fill="none"
-        opacity="0.55"
-        stroke="var(--chakra-colors-fg-muted)"
-        strokeWidth="1.25"
-        vectorEffect="non-scaling-stroke"
-      />
-      <path
-        d={path}
-        fill="none"
-        pathLength={100}
         stroke="var(--chakra-colors-accent-solid)"
-        strokeDasharray={`${clampedValue * 100} 100`}
-        strokeWidth="1.75"
+        strokeWidth="1.5"
         vectorEffect="non-scaling-stroke"
       />
     </svg>
