@@ -3402,27 +3402,29 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return false;
     }
     const layer = doc.layers.find((candidate) => candidate.id === layerId);
-    if (!layer || !isMaskLayer(layer) || layer.isLocked || !isLayerCacheReadyForOp(layer, doc)) {
+    if (!layer || !isMaskLayer(layer) || layer.isLocked) {
       return false;
     }
-    const entry = layerCache.get(layerId);
-    if (!entry || isEmpty(entry.rect)) {
+    const originalBitmap = layer.mask.bitmap;
+    const originalOffset = layer.mask.offset ?? { x: 0, y: 0 };
+    const entry = isLayerCacheReadyForOp(layer, doc) ? layerCache.get(layerId) : undefined;
+    const rect = entry && !isEmpty(entry.rect) ? { ...entry.rect } : null;
+    const before = rect ? entry?.surface.ctx.getImageData(0, 0, rect.width, rect.height) : null;
+    if (!originalBitmap && (!before || !rect)) {
       return false;
     }
-    const before = entry.surface.ctx.getImageData(0, 0, entry.rect.width, entry.rect.height);
     endNudgeBurst();
-    const rect = { ...entry.rect };
     const emptyRect = { height: 0, width: 0, x: 0, y: 0 };
-    const dispatchEmptyMask = (offset: { x: number; y: number }): void => {
+    const dispatchMask = (bitmap: CanvasImageRef | null, offset: { x: number; y: number }): void => {
       store.dispatch({
-        config: { layerType: layer.type, mask: { bitmap: null, offset } },
+        config: { layerType: layer.type, mask: { bitmap, offset } },
         id: layerId,
         type: 'updateCanvasLayerConfig',
       });
     };
     const applyClear = (): void => {
       bitmapStore.discardLayer(layerId);
-      dispatchEmptyMask({ x: 0, y: 0 });
+      dispatchMask(null, { x: 0, y: 0 });
       layerCache.delete(layerId);
       adjustedSurfaceCache.delete(layerId);
       const empty = layerCache.getOrCreateRect(layerId, emptyRect);
@@ -3431,13 +3433,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     };
     const applyRestore = (): void => {
       bitmapStore.discardLayer(layerId);
-      dispatchEmptyMask({ x: rect.x, y: rect.y });
-      restoreLayerCache(layerId, rect, before);
+      dispatchMask(originalBitmap, originalOffset);
+      if (before && rect) {
+        restoreLayerCache(layerId, rect, before);
+      }
     };
 
     applyClear();
     history.push({
-      bytes: before.data.byteLength + 256,
+      bytes: (before?.data.byteLength ?? 0) + 256,
       label: 'Clear mask',
       redo: applyClear,
       undo: applyRestore,

@@ -441,6 +441,38 @@ describe('mask clear', () => {
     engine.dispose();
   });
 
+  it('clears a cold hidden persisted mask and restores its bitmap reference on undo', () => {
+    const doc = maskDoc();
+    const mask = doc.layers[0]!;
+    if (mask.type !== 'inpaint_mask') {
+      throw new Error('Expected inpaint mask fixture');
+    }
+    mask.isEnabled = false;
+    mask.mask = {
+      ...mask.mask,
+      bitmap: { height: 40, imageName: 'persisted-mask', width: 50 },
+      offset: { x: 7, y: 9 },
+    };
+    const { dispatch, engine } = setupEngine(doc);
+
+    expect(engine.clearMask('mask1')).toBe(true);
+    expect(dispatch.mock.calls.at(-1)?.[0]).toMatchObject({
+      config: { mask: { bitmap: null } },
+      id: 'mask1',
+      type: 'updateCanvasLayerConfig',
+    });
+
+    engine.undo();
+    expect(dispatch.mock.calls.at(-1)?.[0]).toMatchObject({
+      config: {
+        mask: { bitmap: { imageName: 'persisted-mask' }, offset: { x: 7, y: 9 } },
+      },
+      id: 'mask1',
+      type: 'updateCanvasLayerConfig',
+    });
+    engine.dispose();
+  });
+
   it('refuses missing, non-mask, locked, and empty layers', () => {
     const locked = maskDoc();
     locked.layers[0]!.isLocked = true;
