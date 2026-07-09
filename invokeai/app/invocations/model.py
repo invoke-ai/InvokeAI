@@ -296,13 +296,17 @@ class LoRASelectorInvocation(BaseInvocation):
 
 
 @invocation(
-    "lora_collection_loader", title="Apply LoRA Collection - SD1.5", tags=["model"], category="model", version="1.1.2"
+    "lora_collection_loader", title="Apply LoRA Collection - SD1.5", tags=["model"], category="model", version="1.1.3"
 )
 class LoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to the provided UNet and CLIP models."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None,
+        description="LoRA models and weights. May be a single LoRA or collection.",
+        title="LoRAs",
+        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2],
+        ui_model_type=ModelType.LoRA,
     )
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -446,13 +450,17 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - SDXL",
     tags=["model"],
     category="model",
-    version="1.1.2",
+    version="1.1.3",
 )
 class SDXLLoRACollectionLoader(BaseInvocation):
     """Applies a collection of SDXL LoRAs to the provided UNet and CLIP models."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None,
+        description="LoRA models and weights. May be a single LoRA or collection.",
+        title="LoRAs",
+        ui_model_base=[BaseModelType.StableDiffusionXL],
+        ui_model_type=ModelType.LoRA,
     )
     unet: Optional[UNetField] = InputField(
         default=None,

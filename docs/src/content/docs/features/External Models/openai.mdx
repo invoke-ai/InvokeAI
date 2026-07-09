@@ -4,7 +4,11 @@ title: OpenAI
 
 import { Steps } from '@astrojs/starlight/components'
 
-Invoke supports OpenAI's image generation models — both the GPT Image family and the older DALL·E models — through the OpenAI API.
+Invoke supports OpenAI's image generation models — the GPT Image family and DALL·E 3 — through the OpenAI API.
+
+:::note[DALL·E 2 removed]
+DALL·E 2 was deprecated by OpenAI and is scheduled for shutdown on 2026-05-12. It is no longer offered as a starter model in Invoke.
+:::
 
 ## Getting an API Key
 
@@ -31,11 +35,12 @@ Restart Invoke for the change to take effect.
 
 | Model | Modes | Aspect Ratios | Batch | Notes |
 | --- | --- | --- | --- | --- |
-| **GPT Image 1.5** | txt2img, img2img, inpaint | 1:1, 3:2, 2:3 | up to 10 | Fastest and cheapest GPT Image model. |
-| **GPT Image 1** | txt2img, img2img, inpaint | 1:1, 3:2, 2:3 | up to 10 | Highest quality of the GPT Image family. |
-| **GPT Image 1 Mini** | txt2img, img2img, inpaint | 1:1, 3:2, 2:3 | up to 10 | ~80% cheaper than GPT Image 1. |
+| **GPT Image 1.5** | txt2img, img2img | 1:1, 3:2, 2:3 | up to 10 | Fastest and cheapest GPT Image model. |
+| **GPT Image 1** | txt2img, img2img | 1:1, 3:2, 2:3 | up to 10 | Highest quality of the GPT Image family. |
+| **GPT Image 1 Mini** | txt2img, img2img | 1:1, 3:2, 2:3 | up to 10 | ~80% cheaper than GPT Image 1. |
 | **DALL·E 3** | txt2img only | 1:1, 7:4, 4:7 | 1 | No reference-image / edit support. |
-| **DALL·E 2** | txt2img, img2img, inpaint | 1:1 | up to 10 | Square only. |
+
+Inpainting (mask-based editing) is not currently supported for any OpenAI model in Invoke. img2img on the GPT Image family routes through the `/v1/images/edits` endpoint without a mask.
 
 ## Provider-Specific Options
 
@@ -54,7 +59,7 @@ DALL·E 2 and DALL·E 3 do not expose these options.
 ## Tips
 
 <Steps>
-1. Batching on GPT Image and DALL·E 2 tops out at 10 per request. Larger batches are split into multiple API calls.
+1. Batching on GPT Image tops out at 10 per request. Larger batches are split into multiple API calls.
 2. Costs can climb quickly with high-quality GPT Image generations. Start with GPT Image 1 Mini when iterating on prompts.
 3. Rate limits from OpenAI surface as failed invocations — retry after a short wait.
 </Steps>

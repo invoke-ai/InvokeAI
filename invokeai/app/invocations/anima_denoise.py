@@ -622,6 +622,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     else:
                         noise_pred = noise_pred_cond
 
+                    latents_preview = self._estimate_preview_latents(
+                        latents=latents,
+                        sigma=it.sigma_curr,
+                        noise_pred=noise_pred,
+                    )
+
                     latents = driver.step(model_output=noise_pred, timestep=it.sched_timestep, sample=latents)
 
                     if it.completes_user_step:
@@ -643,7 +649,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                                 order=it.order,
                                 total_steps=total_steps,
                                 timestep=int(it.sigma_curr * 1000),
-                                latents=latents.squeeze(2),
+                                latents=latents_preview.squeeze(2),
                             )
                         )
                 pbar.close()
@@ -669,6 +675,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     latents = latents.to(dtype=torch.float32)
                     latents = latents + (sigma_prev - sigma_curr) * noise_pred
                     latents = latents.to(dtype=latents_dtype)
+                    latents_preview = self._estimate_preview_latents(
+                        latents=latents, sigma=sigma_prev, noise_pred=noise_pred
+                    )
 
                     if inpaint_extension is not None:
                         latents_4d = latents.squeeze(2)
@@ -683,7 +692,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                             order=1,
                             total_steps=total_steps,
                             timestep=int(sigma_curr * 1000),
-                            latents=latents.squeeze(2),
+                            latents=latents_preview.squeeze(2),
                         ),
                     )
 
@@ -699,6 +708,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
             return noise
 
         return self._get_noise(self.height, self.width, inference_dtype, device, self.seed)
+
+    def _estimate_preview_latents(self, latents: torch.Tensor, sigma: float, noise_pred: torch.Tensor) -> torch.Tensor:
+        latents_dtype = latents.dtype
+        latents_fp32 = latents.to(dtype=torch.float32)
+        preview = latents_fp32 - sigma * noise_pred.to(dtype=torch.float32)
+        return preview.to(dtype=latents_dtype)
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
