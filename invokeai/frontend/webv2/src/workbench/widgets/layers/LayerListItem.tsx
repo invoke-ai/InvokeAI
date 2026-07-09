@@ -130,7 +130,7 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
         {...attributes}
         {...listeners}
         active={isSelected ? 'muted' : undefined}
-        cursor="grab"
+        cursor={isDragging ? 'grabbing' : 'default'}
         display="flex"
         gap="1.5"
         p="1.5"

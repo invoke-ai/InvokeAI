@@ -147,7 +147,7 @@ export const LayerGroupSection = ({
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={groupIds} strategy={verticalListSortingStrategy}>
-              <Stack gap="1">
+              <Stack gap="0.5">
                 {groupLayers.map((layer) => (
                   <LayerListItem
                     key={layer.id}
