@@ -11,9 +11,9 @@ import {
   isMainModelWithoutUnet,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
-  DenoiseLatentsNodes,
   LatentToImageNodes,
   MainModelLoaderNodes,
+  MaskableDenoiseNodes,
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
 import type { ImageDTO, Invocation } from 'services/api/types';
@@ -35,7 +35,7 @@ type AddInpaintArg = {
     | 'anima_i2l'
   >;
   noise?: Invocation<'noise'>;
-  denoise: Invocation<DenoiseLatentsNodes>;
+  denoise: Invocation<MaskableDenoiseNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   modelLoader: Invocation<MainModelLoaderNodes>;
   seed: Invocation<'integer'>;
@@ -69,7 +69,6 @@ export const addInpaint = async ({
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
     denoise.type === 'z_image_denoise' ||
-    denoise.type === 'ernie_image_denoise' ||
     denoise.type === 'anima_denoise'
   ) {
     denoise.width = scaledSize.width;

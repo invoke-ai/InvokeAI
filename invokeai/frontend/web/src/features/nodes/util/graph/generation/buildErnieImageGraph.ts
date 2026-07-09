@@ -8,10 +8,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
-import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
-import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -20,7 +17,6 @@ import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'feat
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
-import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
@@ -125,66 +121,15 @@ export const buildErnieImageGraph = async (arg: GraphBuilderArg): Promise<GraphB
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
-  let canvasOutput: Invocation<ImageOutputNodes> = l2i;
+  // ERNIE-Image is text-to-image only. Its denoise node has no `denoise_mask` input, so
+  // masked modes (inpaint/outpaint) are unsupported, and we do not offer image-to-image.
+  assert(
+    generationMode === 'txt2img',
+    `ERNIE-Image only supports text-to-image generation, but got generation mode: ${generationMode}`
+  );
 
-  if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, state, denoise, l2i });
-    g.upsertMetadata({ generation_mode: 'ernie_image_txt2img' });
-  } else if (generationMode === 'img2img') {
-    assert(manager !== null);
-    const i2l = g.addNode({
-      type: 'ernie_image_vae_encode',
-      id: getPrefixedId('ernie_image_i2l'),
-    });
-    canvasOutput = await addImageToImage({
-      g,
-      state,
-      manager,
-      denoise,
-      l2i,
-      i2l,
-      vaeSource: modelLoader,
-    });
-    g.upsertMetadata({ generation_mode: 'ernie_image_img2img' });
-  } else if (generationMode === 'inpaint') {
-    assert(manager !== null);
-    const i2l = g.addNode({
-      type: 'ernie_image_vae_encode',
-      id: getPrefixedId('ernie_image_i2l'),
-    });
-    canvasOutput = await addInpaint({
-      g,
-      state,
-      manager,
-      l2i,
-      i2l,
-      denoise,
-      vaeSource: modelLoader,
-      modelLoader,
-      seed,
-    });
-    g.upsertMetadata({ generation_mode: 'ernie_image_inpaint' });
-  } else if (generationMode === 'outpaint') {
-    assert(manager !== null);
-    const i2l = g.addNode({
-      type: 'ernie_image_vae_encode',
-      id: getPrefixedId('ernie_image_i2l'),
-    });
-    canvasOutput = await addOutpaint({
-      g,
-      state,
-      manager,
-      l2i,
-      i2l,
-      denoise,
-      vaeSource: modelLoader,
-      modelLoader,
-      seed,
-    });
-    g.upsertMetadata({ generation_mode: 'ernie_image_outpaint' });
-  } else {
-    assert<Equals<typeof generationMode, never>>(false);
-  }
+  let canvasOutput: Invocation<ImageOutputNodes> = addTextToImage({ g, state, denoise, l2i });
+  g.upsertMetadata({ generation_mode: 'ernie_image_txt2img' });
 
   if (state.system.shouldUseNSFWChecker) {
     canvasOutput = addNSFWChecker(g, canvasOutput);
