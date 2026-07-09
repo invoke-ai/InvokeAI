@@ -903,8 +903,8 @@ const applyCanvasLayerConfigPatch = (
   if (layer.type === 'raster' && config.layerType === 'raster') {
     return {
       ...layer,
-      ...(config.adjustments !== undefined ? { adjustments: config.adjustments } : {}),
-      ...(config.isTransparencyLocked !== undefined ? { isTransparencyLocked: config.isTransparencyLocked } : {}),
+      ...(Object.hasOwn(config, 'adjustments') ? { adjustments: config.adjustments } : {}),
+      ...(Object.hasOwn(config, 'isTransparencyLocked') ? { isTransparencyLocked: config.isTransparencyLocked } : {}),
     };
   }
 
@@ -912,8 +912,10 @@ const applyCanvasLayerConfigPatch = (
     return {
       ...layer,
       ...(config.adapter ? { adapter: { ...layer.adapter, ...config.adapter } } : {}),
-      ...(config.withTransparencyEffect !== undefined ? { withTransparencyEffect: config.withTransparencyEffect } : {}),
-      ...(config.filter !== undefined ? { filter: config.filter } : {}),
+      ...(Object.hasOwn(config, 'withTransparencyEffect')
+        ? { withTransparencyEffect: config.withTransparencyEffect }
+        : {}),
+      ...(Object.hasOwn(config, 'filter') ? { filter: config.filter } : {}),
     };
   }
 
@@ -921,10 +923,10 @@ const applyCanvasLayerConfigPatch = (
     return {
       ...layer,
       ...(config.mask ? { mask: { ...layer.mask, ...config.mask } } : {}),
-      ...(config.positivePrompt !== undefined ? { positivePrompt: config.positivePrompt } : {}),
-      ...(config.negativePrompt !== undefined ? { negativePrompt: config.negativePrompt } : {}),
-      ...(config.autoNegative !== undefined ? { autoNegative: config.autoNegative } : {}),
-      ...(config.referenceImages !== undefined ? { referenceImages: config.referenceImages } : {}),
+      ...(Object.hasOwn(config, 'positivePrompt') ? { positivePrompt: config.positivePrompt } : {}),
+      ...(Object.hasOwn(config, 'negativePrompt') ? { negativePrompt: config.negativePrompt } : {}),
+      ...(Object.hasOwn(config, 'autoNegative') ? { autoNegative: config.autoNegative } : {}),
+      ...(Object.hasOwn(config, 'referenceImages') ? { referenceImages: config.referenceImages } : {}),
     };
   }
 
@@ -932,8 +934,8 @@ const applyCanvasLayerConfigPatch = (
     return {
       ...layer,
       ...(config.mask ? { mask: { ...layer.mask, ...config.mask } } : {}),
-      ...(config.noiseLevel !== undefined ? { noiseLevel: config.noiseLevel } : {}),
-      ...(config.denoiseLimit !== undefined ? { denoiseLimit: config.denoiseLimit } : {}),
+      ...(Object.hasOwn(config, 'noiseLevel') ? { noiseLevel: config.noiseLevel } : {}),
+      ...(Object.hasOwn(config, 'denoiseLimit') ? { denoiseLimit: config.denoiseLimit } : {}),
     };
   }
 

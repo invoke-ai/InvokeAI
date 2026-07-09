@@ -6,12 +6,15 @@
  */
 
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { Rect } from '@workbench/canvas-engine/types';
 import type { GenerateReferenceImage } from '@workbench/generation/types';
 import type {
   CanvasBlendMode,
   CanvasControlAdapterContract,
   CanvasControlLayerContract,
+  CanvasDocumentContractV2,
   CanvasInpaintMaskLayerContract,
+  CanvasLayerBaseContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
@@ -19,7 +22,20 @@ import type {
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
 
-import { isMergeableRasterLayer } from '@workbench/canvas-engine/document/sources';
+import { getSourceContentRect, isMergeableRasterLayer } from '@workbench/canvas-engine/document/sources';
+
+type LayerTransform = CanvasLayerBaseContract['transform'];
+
+type ControlConfigPatch = { layerType: 'control'; withTransparencyEffect?: boolean };
+type RegionalGuidanceConfigPatch = {
+  layerType: 'regional_guidance';
+  positivePrompt?: string | null;
+  negativePrompt?: string | null;
+  autoNegative?: boolean;
+  referenceImages?: CanvasRegionalGuidanceLayerContract['referenceImages'];
+};
+type InpaintMaskConfigPatch = { layerType: 'inpaint_mask'; noiseLevel?: number; denoiseLimit?: number };
+type PatchPair<T> = { forward: T; inverse: T };
 
 /**
  * Re-exported so existing imports of `isMergeableRasterLayer` from this module
@@ -287,6 +303,79 @@ export const createControlLayer = (name: string, id: string = createLayerId()): 
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'control',
   withTransparencyEffect: true,
+});
+
+/** Returns the transform that fits the layer's unrotated local content into the bbox. */
+export const fitLayerTransformToBbox = (
+  layer: CanvasLayerContract,
+  bbox: Rect,
+  documentRect: Rect = bbox
+): LayerTransform | null => {
+  const doc = { height: documentRect.height, width: documentRect.width } as CanvasDocumentContractV2;
+  const contentRect = getSourceContentRect(layer, doc);
+  if (contentRect.width <= 0 || contentRect.height <= 0) {
+    return null;
+  }
+  const scaleX = bbox.width / contentRect.width;
+  const scaleY = bbox.height / contentRect.height;
+  return {
+    rotation: 0,
+    scaleX,
+    scaleY,
+    x: bbox.x - contentRect.x * scaleX,
+    y: bbox.y - contentRect.y * scaleY,
+  };
+};
+
+export const getControlTransparencyEffectPatch = (
+  layer: CanvasControlLayerContract
+): PatchPair<ControlConfigPatch> => ({
+  forward: { layerType: 'control', withTransparencyEffect: !layer.withTransparencyEffect },
+  inverse: { layerType: 'control', withTransparencyEffect: layer.withTransparencyEffect },
+});
+
+export const getRegionalGuidancePositivePromptPatch = (
+  layer: CanvasRegionalGuidanceLayerContract
+): PatchPair<RegionalGuidanceConfigPatch> => ({
+  forward: { layerType: 'regional_guidance', positivePrompt: layer.positivePrompt ?? '' },
+  inverse: { layerType: 'regional_guidance', positivePrompt: layer.positivePrompt },
+});
+
+export const getRegionalGuidanceNegativePromptPatch = (
+  layer: CanvasRegionalGuidanceLayerContract
+): PatchPair<RegionalGuidanceConfigPatch> => ({
+  forward: { layerType: 'regional_guidance', negativePrompt: layer.negativePrompt ?? '' },
+  inverse: { layerType: 'regional_guidance', negativePrompt: layer.negativePrompt },
+});
+
+export const getRegionalGuidanceAutoNegativePatch = (
+  layer: CanvasRegionalGuidanceLayerContract
+): PatchPair<RegionalGuidanceConfigPatch> => ({
+  forward: { autoNegative: !layer.autoNegative, layerType: 'regional_guidance' },
+  inverse: { autoNegative: layer.autoNegative, layerType: 'regional_guidance' },
+});
+
+export const getRegionalGuidanceReferenceImagePatch = (
+  layer: CanvasRegionalGuidanceLayerContract,
+  base: string | null
+): PatchPair<RegionalGuidanceConfigPatch> => ({
+  forward: {
+    layerType: 'regional_guidance',
+    referenceImages: [...layer.referenceImages, createRegionalReferenceImage(base)],
+  },
+  inverse: { layerType: 'regional_guidance', referenceImages: layer.referenceImages },
+});
+
+export const getInpaintNoisePatch = (layer: CanvasInpaintMaskLayerContract): PatchPair<InpaintMaskConfigPatch> => ({
+  forward: { layerType: 'inpaint_mask', noiseLevel: layer.noiseLevel === undefined ? 0.25 : undefined },
+  inverse: { layerType: 'inpaint_mask', noiseLevel: layer.noiseLevel },
+});
+
+export const getInpaintDenoiseLimitPatch = (
+  layer: CanvasInpaintMaskLayerContract
+): PatchPair<InpaintMaskConfigPatch> => ({
+  forward: { denoiseLimit: layer.denoiseLimit === undefined ? 0.8 : undefined, layerType: 'inpaint_mask' },
+  inverse: { denoiseLimit: layer.denoiseLimit, layerType: 'inpaint_mask' },
 });
 
 /**

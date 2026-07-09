@@ -1,5 +1,6 @@
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
-import type { CanvasLayerContract } from '@workbench/types';
+import type { GenerateReferenceImage } from '@workbench/generation/types';
+import type { CanvasLayerContract, CanvasMaskContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, Dispatch } from 'react';
@@ -7,6 +8,9 @@ import type { ComponentProps, Dispatch } from 'react';
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { deleteLayerActions, duplicateLayerActions } from '@workbench/canvasLayerOps';
 import { IconButton, MenuContent, RenameDialog } from '@workbench/components/ui';
+import { useModelsSelector } from '@workbench/models/modelsStore';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowDownIcon,
   ArrowDownToLineIcon,
@@ -29,27 +33,50 @@ import { useTranslation } from 'react-i18next';
 
 import type { LayerMoveKind } from './layerGroups';
 
-import { getGroupPosition, reorderWithinGroupByKind } from './layerGroups';
+import { getLayerContextActions, type LayerContextAction, type LayerContextActionId } from './layerContextActions';
+import { reorderWithinGroupByKind } from './layerGroups';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
   applyStructural,
-  canConvertRasterControl,
-  canMergeLayerDown,
   convertRasterControlLayer,
   createLayerId,
+  fitLayerTransformToBbox,
+  getControlTransparencyEffectPatch,
+  getInpaintDenoiseLimitPatch,
+  getInpaintNoisePatch,
+  getRegionalGuidanceAutoNegativePatch,
+  getRegionalGuidanceNegativePromptPatch,
+  getRegionalGuidancePositivePromptPatch,
+  getRegionalGuidanceReferenceImagePatch,
 } from './layerOps';
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 type MenuOpenChange = ComponentProps<typeof Menu.Root>['onOpenChange'];
 
+type LayerConfigPatch =
+  | { layerType: 'control'; withTransparencyEffect?: boolean }
+  | {
+      layerType: 'regional_guidance';
+      mask?: Partial<CanvasMaskContract>;
+      positivePrompt?: string | null;
+      negativePrompt?: string | null;
+      autoNegative?: boolean;
+      referenceImages?: GenerateReferenceImage[];
+    }
+  | { layerType: 'inpaint_mask'; noiseLevel?: number; denoiseLimit?: number };
+
 const PANEL_POSITIONING: MenuPositioning = { placement: 'bottom-end' };
 
-// const layerBadgeKey = (layer: CanvasLayerContract): string => {
-//   if (layer.type === 'raster') {
-//     return layer.source.type === 'image' ? 'widgets.layers.types.image' : 'widgets.layers.types.paint';
-//   }
-//   return `widgets.layers.types.${layer.type}`;
-// };
+/** The main model's base, read from the generate widget values (drives regional ref-image support). */
+const useSelectedModelBase = (): string | null => {
+  const modelKey = useActiveProjectSelector((project) => {
+    const values = getProjectWidgetValues(project, 'generate');
+    const model = values?.model;
+    return model && typeof model === 'object' && 'key' in model ? String((model as { key: unknown }).key) : null;
+  });
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  return useMemo(() => models.find((model) => model.key === modelKey)?.base ?? null, [models, modelKey]);
+};
 
 interface LayerMenuProps {
   dispatch: Dispatch<WorkbenchAction>;
@@ -108,6 +135,11 @@ const LayerMenu = ({
   onRenamingChange,
 }: LayerMenuProps) => {
   const { t } = useTranslation();
+  const base = useSelectedModelBase();
+  const { bbox, documentRect } = useActiveProjectSelector((project) => ({
+    bbox: project.canvas.document.bbox,
+    documentRect: { height: project.canvas.document.height, width: project.canvas.document.width, x: 0, y: 0 },
+  }));
   const [internalRenaming, setInternalRenaming] = useState(false);
   // Controlled (canvas) vs. uncontrolled (panel): the canvas parent owns the flag
   // so the rename dialog outlives the menu closing. The panel keeps it internally.
@@ -120,20 +152,6 @@ const LayerMenu = ({
     [onRenamingChange]
   );
 
-  const groupPosition = getGroupPosition(layers, layer.id);
-  const canMoveForward = !!groupPosition && groupPosition.index > 0;
-  const canMoveBackward = !!groupPosition && groupPosition.index < groupPosition.count - 1;
-  const canMerge = canMergeLayerDown(layers, index, !!engine);
-  // "Rasterize layer" is offered only for parametric sources (shape/gradient/
-  // text), where the engine can bake the params to pixels. A polygon shape has
-  // no rasterizer yet, so it stays disabled.
-  const canRasterize =
-    !!engine &&
-    layer.type === 'raster' &&
-    (layer.source.type === 'gradient' ||
-      layer.source.type === 'text' ||
-      (layer.source.type === 'shape' && layer.source.kind !== 'polygon'));
-
   const patchBase = useCallback(
     (label: string, forward: Partial<CanvasLayerContract>, inverse: Partial<CanvasLayerContract>) => {
       applyStructural(
@@ -142,6 +160,19 @@ const LayerMenu = ({
         label,
         { id: layer.id, patch: forward, type: 'updateCanvasLayer' },
         { id: layer.id, patch: inverse, type: 'updateCanvasLayer' }
+      );
+    },
+    [dispatch, engine, layer.id]
+  );
+
+  const patchConfig = useCallback(
+    (label: string, forward: LayerConfigPatch, inverse: LayerConfigPatch) => {
+      applyStructural(
+        engine,
+        dispatch,
+        label,
+        { config: forward, id: layer.id, type: 'updateCanvasLayerConfig' },
+        { config: inverse, id: layer.id, type: 'updateCanvasLayerConfig' }
       );
     },
     [dispatch, engine, layer.id]
@@ -223,10 +254,6 @@ const LayerMenu = ({
     () => convert('raster', t('widgets.layers.actions.convertToRaster')),
     [convert, t]
   );
-  // raster↔control conversion is offered only for pixel-backed layers (image/paint
-  // raster sources, or a control layer). Parametric raster + mask layers cannot.
-  const canConvertToControl = layer.type === 'raster' && canConvertRasterControl(layer);
-  const canConvertToRaster = layer.type === 'control';
 
   const handleToggleVisibility = useCallback(() => {
     patchBase(
@@ -247,6 +274,142 @@ const LayerMenu = ({
       patchBase(t('widgets.layers.actions.rename'), { name }, { name: layer.name });
     },
     [layer.name, patchBase, t]
+  );
+
+  const actions = useMemo(
+    () => getLayerContextActions({ hasEngine: !!engine, index, layer, layers }),
+    [engine, index, layer, layers]
+  );
+  const iconActions = useMemo(() => actions.filter((action) => action.group === 'icons'), [actions]);
+  const actionGroups = useMemo(
+    () =>
+      LAYER_ACTION_GROUPS.map((group) => ({
+        actions: actions.filter((action) => action.group === group),
+        group,
+      })).filter((entry) => entry.actions.length > 0),
+    [actions]
+  );
+
+  const getActionLabel = useCallback(
+    (id: LayerContextActionId) => {
+      const action = actions.find((entry) => entry.id === id);
+      return action ? t(action.labelKey, { defaultValue: action.defaultLabel }) : id;
+    },
+    [actions, t]
+  );
+
+  const handleTransform = useCallback(() => {
+    dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+    engine?.setTool('transform');
+  }, [dispatch, engine, layer.id]);
+
+  const handleFitToBbox = useCallback(() => {
+    const transform = fitLayerTransformToBbox(layer, bbox, documentRect);
+    if (!transform) {
+      return;
+    }
+    patchBase(getActionLabel('fit-to-bbox'), { transform }, { transform: layer.transform });
+  }, [bbox, documentRect, getActionLabel, layer, patchBase]);
+
+  const handleLayerConfigAction = useCallback(
+    (id: LayerContextActionId) => {
+      if (id === 'control-transparency-effect' && layer.type === 'control') {
+        const { forward, inverse } = getControlTransparencyEffectPatch(layer);
+        patchConfig(getActionLabel(id), forward, inverse);
+      } else if (id === 'regional-positive-prompt' && layer.type === 'regional_guidance') {
+        const { forward, inverse } = getRegionalGuidancePositivePromptPatch(layer);
+        patchConfig(getActionLabel(id), forward, inverse);
+      } else if (id === 'regional-negative-prompt' && layer.type === 'regional_guidance') {
+        const { forward, inverse } = getRegionalGuidanceNegativePromptPatch(layer);
+        patchConfig(getActionLabel(id), forward, inverse);
+      } else if (id === 'regional-reference-image' && layer.type === 'regional_guidance') {
+        const { forward, inverse } = getRegionalGuidanceReferenceImagePatch(layer, base);
+        patchConfig(getActionLabel(id), forward, inverse);
+      } else if (id === 'regional-auto-negative' && layer.type === 'regional_guidance') {
+        const { forward, inverse } = getRegionalGuidanceAutoNegativePatch(layer);
+        patchConfig(getActionLabel(id), forward, inverse);
+      } else if (id === 'inpaint-noise' && layer.type === 'inpaint_mask') {
+        const { forward, inverse } = getInpaintNoisePatch(layer);
+        patchConfig(getActionLabel(id), forward, inverse);
+      } else if (id === 'inpaint-denoise-limit' && layer.type === 'inpaint_mask') {
+        const { forward, inverse } = getInpaintDenoiseLimitPatch(layer);
+        patchConfig(getActionLabel(id), forward, inverse);
+      }
+    },
+    [base, getActionLabel, layer, patchConfig]
+  );
+
+  const handleAction = useCallback(
+    (id: LayerContextActionId) => {
+      switch (id) {
+        case 'move-to-front':
+          handleMoveToFront();
+          break;
+        case 'move-forward':
+          handleMoveForward();
+          break;
+        case 'move-backward':
+          handleMoveBackward();
+          break;
+        case 'move-to-back':
+          handleMoveToBack();
+          break;
+        case 'duplicate':
+          handleDuplicate();
+          break;
+        case 'rename':
+          openRename();
+          break;
+        case 'transform':
+          handleTransform();
+          break;
+        case 'fit-to-bbox':
+          handleFitToBbox();
+          break;
+        case 'rasterize':
+          handleRasterize();
+          break;
+        case 'convert-to-control':
+          handleConvertToControl();
+          break;
+        case 'convert-to-raster':
+          handleConvertToRaster();
+          break;
+        case 'merge-down':
+          handleMerge();
+          break;
+        case 'toggle-visibility':
+          handleToggleVisibility();
+          break;
+        case 'toggle-lock':
+          handleToggleLock();
+          break;
+        case 'delete':
+          handleDelete();
+          break;
+        default:
+          handleLayerConfigAction(id);
+          break;
+      }
+    },
+    [
+      handleConvertToControl,
+      handleConvertToRaster,
+      handleDelete,
+      handleDuplicate,
+      handleFitToBbox,
+      handleLayerConfigAction,
+      handleMerge,
+      handleMoveBackward,
+      handleMoveForward,
+      handleMoveToBack,
+      handleMoveToFront,
+      handleRasterize,
+      handleToggleLock,
+      handleToggleVisibility,
+      handleTransform,
+      openRename,
+    ]
   );
 
   return (
@@ -275,106 +438,13 @@ const LayerMenu = ({
           <Menu.Positioner>
             <MenuContent minW="14rem" py="1">
               <HStack gap="1">
-                <LayerMenuIconItem
-                  disabled={!canMoveForward}
-                  icon={ArrowUpToLineIcon}
-                  label={t('widgets.layers.actions.moveToFront')}
-                  value="move-to-front"
-                  onSelect={handleMoveToFront}
-                />
-                <LayerMenuIconItem
-                  disabled={!canMoveForward}
-                  icon={ArrowUpIcon}
-                  label={t('widgets.layers.actions.moveForward')}
-                  value="move-forward"
-                  onSelect={handleMoveForward}
-                />
-                <LayerMenuIconItem
-                  disabled={!canMoveBackward}
-                  icon={ArrowDownIcon}
-                  label={t('widgets.layers.actions.moveBackward')}
-                  value="move-backward"
-                  onSelect={handleMoveBackward}
-                />
-                <LayerMenuIconItem
-                  disabled={!canMoveBackward}
-                  icon={ArrowDownToLineIcon}
-                  label={t('widgets.layers.actions.moveToBack')}
-                  value="move-to-back"
-                  onSelect={handleMoveToBack}
-                />
-                <LayerMenuIconItem
-                  icon={CopyIcon}
-                  label={t('widgets.layers.actions.duplicate')}
-                  value="duplicate"
-                  onSelect={handleDuplicate}
-                />
-                {/*<LayerMenuIconItem
-                  color="fg.error"
-                  icon={Trash2Icon}
-                  label={t('widgets.layers.actions.delete')}
-                  value="delete"
-                  onSelect={handleDelete}
-                />*/}
+                {iconActions.map((action) => (
+                  <LayerMenuIconActionItem key={action.id} action={action} handleAction={handleAction} t={t} />
+                ))}
               </HStack>
-              <Menu.Separator borderColor="border.subtle" />
-              <LayerMenuItem
-                icon={PencilIcon}
-                label={t('widgets.layers.actions.rename')}
-                value="rename"
-                onSelect={openRename}
-              />
-              {canRasterize ? (
-                <LayerMenuItem
-                  icon={ImageIcon}
-                  label={t('widgets.layers.actions.rasterize')}
-                  value="rasterize"
-                  onSelect={handleRasterize}
-                />
-              ) : null}
-              {canConvertToControl ? (
-                <LayerMenuItem
-                  icon={SlidersHorizontalIcon}
-                  label={t('widgets.layers.actions.convertToControl')}
-                  value="convert-to-control"
-                  onSelect={handleConvertToControl}
-                />
-              ) : null}
-              {canConvertToRaster ? (
-                <LayerMenuItem
-                  icon={ImageIcon}
-                  label={t('widgets.layers.actions.convertToRaster')}
-                  value="convert-to-raster"
-                  onSelect={handleConvertToRaster}
-                />
-              ) : null}
-              <Menu.Separator borderColor="border.subtle" />
-              <LayerMenuItem
-                disabled={!canMerge}
-                icon={MergeIcon}
-                label={t('widgets.layers.actions.mergeDown')}
-                value="merge-down"
-                onSelect={handleMerge}
-              />
-              <LayerMenuItem
-                icon={layer.isEnabled ? EyeOffIcon : EyeIcon}
-                label={layer.isEnabled ? t('widgets.layers.actions.hide') : t('widgets.layers.actions.show')}
-                value="toggle-visibility"
-                onSelect={handleToggleVisibility}
-              />
-              <LayerMenuItem
-                icon={layer.isLocked ? LockOpenIcon : LockIcon}
-                label={layer.isLocked ? t('widgets.layers.actions.unlock') : t('widgets.layers.actions.lock')}
-                value="toggle-lock"
-                onSelect={handleToggleLock}
-              />
-              <LayerMenuItem
-                icon={Trash2Icon}
-                label={t('widgets.layers.actions.delete')}
-                value="delete"
-                onSelect={handleDelete}
-                color="fg.error"
-              />
+              {actionGroups.map(({ actions, group }) => (
+                <LayerMenuGroup key={group} actions={actions} handleAction={handleAction} t={t} />
+              ))}
             </MenuContent>
           </Menu.Positioner>
         </Portal>
@@ -498,7 +568,112 @@ export const CanvasLayerContextMenu = ({
   );
 };
 
+const LAYER_ACTION_GROUPS: readonly LayerContextAction['group'][] = [
+  'edit',
+  'convert',
+  'layerConfig',
+  'state',
+  'danger',
+];
+
+const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
+  'control-transparency-effect': SlidersHorizontalIcon,
+  'convert-to-control': SlidersHorizontalIcon,
+  'convert-to-raster': ImageIcon,
+  delete: Trash2Icon,
+  duplicate: CopyIcon,
+  'fit-to-bbox': ImageIcon,
+  'inpaint-denoise-limit': SlidersHorizontalIcon,
+  'inpaint-noise': SlidersHorizontalIcon,
+  'merge-down': MergeIcon,
+  'move-backward': ArrowDownIcon,
+  'move-forward': ArrowUpIcon,
+  'move-to-back': ArrowDownToLineIcon,
+  'move-to-front': ArrowUpToLineIcon,
+  rasterize: ImageIcon,
+  'regional-auto-negative': SlidersHorizontalIcon,
+  'regional-negative-prompt': PencilIcon,
+  'regional-positive-prompt': PencilIcon,
+  'regional-reference-image': ImageIcon,
+  rename: PencilIcon,
+  'toggle-lock': LockIcon,
+  'toggle-visibility': EyeIcon,
+  transform: SlidersHorizontalIcon,
+};
+
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
+
+const LayerMenuGroup = ({
+  actions,
+  handleAction,
+  t,
+}: {
+  actions: readonly LayerContextAction[];
+  handleAction: (id: LayerContextActionId) => void;
+  t: (key: string, options: { defaultValue: string }) => string;
+}) => (
+  <>
+    <Menu.Separator borderColor="border.subtle" />
+    {actions.map((action) => (
+      <LayerMenuActionItem key={action.id} action={action} handleAction={handleAction} t={t} />
+    ))}
+  </>
+);
+
+const LayerMenuIconActionItem = ({
+  action,
+  handleAction,
+  t,
+}: {
+  action: LayerContextAction;
+  handleAction: (id: LayerContextActionId) => void;
+  t: (key: string, options: { defaultValue: string }) => string;
+}) => {
+  const onSelect = useCallback(() => handleAction(action.id), [action.id, handleAction]);
+
+  return (
+    <LayerMenuIconItem
+      disabled={action.isDisabled}
+      icon={LAYER_ACTION_ICONS[action.id]}
+      label={t(action.labelKey, { defaultValue: action.defaultLabel })}
+      value={action.id}
+      onSelect={onSelect}
+    />
+  );
+};
+
+const LayerMenuActionItem = ({
+  action,
+  handleAction,
+  t,
+}: {
+  action: LayerContextAction;
+  handleAction: (id: LayerContextActionId) => void;
+  t: (key: string, options: { defaultValue: string }) => string;
+}) => {
+  const onSelect = useCallback(() => handleAction(action.id), [action.id, handleAction]);
+
+  return (
+    <LayerMenuItem
+      color={action.tone === 'danger' ? 'fg.error' : undefined}
+      disabled={action.isDisabled}
+      icon={getLayerActionIcon(action)}
+      label={t(action.labelKey, { defaultValue: action.defaultLabel })}
+      value={action.id}
+      onSelect={onSelect}
+    />
+  );
+};
+
+const getLayerActionIcon = (action: LayerContextAction): LucideIcon => {
+  if (action.id === 'toggle-visibility') {
+    return action.defaultLabel === 'Hide' ? EyeOffIcon : EyeIcon;
+  }
+  if (action.id === 'toggle-lock') {
+    return action.defaultLabel === 'Unlock' ? LockOpenIcon : LockIcon;
+  }
+  return LAYER_ACTION_ICONS[action.id];
+};
 
 const LayerMenuItem = ({
   color,

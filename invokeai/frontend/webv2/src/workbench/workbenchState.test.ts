@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
 import type {
   CanvasControlLayerContract,
+  CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
   GeneratedImageContract,
@@ -1901,6 +1902,50 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     if (after?.type === 'inpaint_mask') {
       expect(after.mask.fill).toEqual({ color: '#00ff00', style: 'grid' });
       expect(after.mask.bitmap).toMatchObject({ imageName: 'mask.png' });
+    }
+  });
+
+  it('removes optional config fields when a patch explicitly sets them to undefined', () => {
+    const configuredMask: CanvasInpaintMaskLayerContract = {
+      blendMode: 'normal',
+      denoiseLimit: 0.8,
+      id: 'm',
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
+      name: 'm',
+      noiseLevel: 0.25,
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'inpaint_mask',
+    };
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      configuredMask,
+      { ...createControlLayer('ctrl'), filter: { settings: {}, type: 'canny' } },
+    ]);
+
+    state = workbenchReducer(state, {
+      config: { denoiseLimit: undefined, layerType: 'inpaint_mask', noiseLevel: undefined },
+      id: 'm',
+      type: 'updateCanvasLayerConfig',
+    });
+    state = workbenchReducer(state, {
+      config: { filter: undefined, layerType: 'control' },
+      id: 'ctrl',
+      type: 'updateCanvasLayerConfig',
+    });
+
+    const mask = getCanvas(state).document.layers[0];
+    const control = getCanvas(state).document.layers[1];
+
+    expect(mask?.type).toBe('inpaint_mask');
+    if (mask?.type === 'inpaint_mask') {
+      expect(mask.noiseLevel).toBeUndefined();
+      expect(mask.denoiseLimit).toBeUndefined();
+    }
+    expect(control?.type).toBe('control');
+    if (control?.type === 'control') {
+      expect(control.filter).toBeUndefined();
     }
   });
 

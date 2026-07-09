@@ -17,6 +17,14 @@ import {
   createRegionalReferenceImage,
   DEFAULT_CONTROL_ADAPTER,
   DEFAULT_INPAINT_MASK_FILL,
+  fitLayerTransformToBbox,
+  getControlTransparencyEffectPatch,
+  getInpaintDenoiseLimitPatch,
+  getInpaintNoisePatch,
+  getRegionalGuidanceAutoNegativePatch,
+  getRegionalGuidanceNegativePromptPatch,
+  getRegionalGuidancePositivePromptPatch,
+  getRegionalGuidanceReferenceImagePatch,
   isMergeableRasterLayer,
   nextControlLayerName,
   nextInpaintMaskName,
@@ -253,6 +261,64 @@ describe('canConvertRasterControl', () => {
       )
     ).toBe(false);
     expect(canConvertRasterControl(createInpaintMaskLayer('m', 'm'))).toBe(false);
+  });
+});
+
+describe('fitLayerTransformToBbox', () => {
+  it('scales and positions a layer content rect into the bbox', () => {
+    const layer = paintLayer('paint', {
+      source: { bitmap: { height: 50, imageName: 'paint', width: 100 }, offset: { x: 20, y: 10 }, type: 'paint' },
+    });
+
+    expect(
+      fitLayerTransformToBbox(layer, { height: 100, width: 200, x: 0, y: 0 }, { height: 512, width: 512, x: 0, y: 0 })
+    ).toEqual({ rotation: 0, scaleX: 2, scaleY: 2, x: -40, y: -20 });
+  });
+
+  it('returns null for empty content', () => {
+    expect(fitLayerTransformToBbox(createEmptyPaintLayer('empty'), { height: 512, width: 512, x: 0, y: 0 })).toBeNull();
+  });
+});
+
+describe('menu patch helpers', () => {
+  it('builds control transparency effect patches', () => {
+    const layer = createControlLayer('control', 'c1');
+
+    expect(getControlTransparencyEffectPatch(layer)).toEqual({
+      forward: { layerType: 'control', withTransparencyEffect: false },
+      inverse: { layerType: 'control', withTransparencyEffect: true },
+    });
+  });
+
+  it('builds regional prompt and reference image patches', () => {
+    const layer = createRegionalGuidanceLayer('region', 0, 'r1');
+
+    expect(getRegionalGuidancePositivePromptPatch(layer)).toEqual({
+      forward: { layerType: 'regional_guidance', positivePrompt: '' },
+      inverse: { layerType: 'regional_guidance', positivePrompt: null },
+    });
+    expect(getRegionalGuidanceNegativePromptPatch(layer)).toEqual({
+      forward: { layerType: 'regional_guidance', negativePrompt: '' },
+      inverse: { layerType: 'regional_guidance', negativePrompt: null },
+    });
+    expect(getRegionalGuidanceAutoNegativePatch(layer)).toEqual({
+      forward: { autoNegative: true, layerType: 'regional_guidance' },
+      inverse: { autoNegative: false, layerType: 'regional_guidance' },
+    });
+    expect(getRegionalGuidanceReferenceImagePatch(layer, 'sdxl').forward.referenceImages).toHaveLength(1);
+  });
+
+  it('builds inpaint modifier patches', () => {
+    const layer = createInpaintMaskLayer('mask', 'm1');
+
+    expect(getInpaintNoisePatch(layer)).toEqual({
+      forward: { layerType: 'inpaint_mask', noiseLevel: 0.25 },
+      inverse: { layerType: 'inpaint_mask', noiseLevel: undefined },
+    });
+    expect(getInpaintDenoiseLimitPatch(layer)).toEqual({
+      forward: { denoiseLimit: 0.8, layerType: 'inpaint_mask' },
+      inverse: { denoiseLimit: undefined, layerType: 'inpaint_mask' },
+    });
   });
 });
 
