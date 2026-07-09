@@ -76239,14 +76239,13 @@
               }
             ],
             "default": null,
-            "description": "Diffusers Z-Image model to extract VAE and/or Qwen3 encoder from. Use this if you don't have separate VAE/Qwen3 models. Ignored if both VAE and Qwen3 Encoder are provided separately.",
+            "description": "Z-Image pipeline model to extract VAE and/or Qwen3 encoder from. Use this if you don't have separate VAE/Qwen3 models. Ignored if both VAE and Qwen3 Encoder are provided separately.",
             "field_kind": "input",
             "input": "direct",
             "orig_default": null,
             "orig_required": false,
-            "title": "Qwen3 Source (Diffusers)",
+            "title": "Qwen3 Source",
             "ui_model_base": ["z-image"],
-            "ui_model_format": ["diffusers"],
             "ui_model_type": ["main"]
           },
           "type": {

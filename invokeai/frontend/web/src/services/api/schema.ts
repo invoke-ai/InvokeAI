@@ -34127,8 +34127,8 @@ export type components = {
              */
             qwen3_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
-             * Qwen3 Source (Diffusers)
-             * @description Diffusers Z-Image model to extract VAE and/or Qwen3 encoder from. Use this if you don't have separate VAE/Qwen3 models. Ignored if both VAE and Qwen3 Encoder are provided separately.
+             * Qwen3 Source
+             * @description Z-Image pipeline model to extract VAE and/or Qwen3 encoder from. Use this if you don't have separate VAE/Qwen3 models. Ignored if both VAE and Qwen3 Encoder are provided separately.
              * @default null
              */
             qwen3_source_model?: components["schemas"]["ModelIdentifierField"] | null;
