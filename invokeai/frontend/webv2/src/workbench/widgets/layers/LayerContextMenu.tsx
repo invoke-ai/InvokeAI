@@ -44,6 +44,13 @@ type MenuOpenChange = ComponentProps<typeof Menu.Root>['onOpenChange'];
 
 const PANEL_POSITIONING: MenuPositioning = { placement: 'bottom-end' };
 
+// const layerBadgeKey = (layer: CanvasLayerContract): string => {
+//   if (layer.type === 'raster') {
+//     return layer.source.type === 'image' ? 'widgets.layers.types.image' : 'widgets.layers.types.paint';
+//   }
+//   return `widgets.layers.types.${layer.type}`;
+// };
+
 interface LayerMenuProps {
   dispatch: Dispatch<WorkbenchAction>;
   engine: CanvasEngine | null;
@@ -266,18 +273,56 @@ const LayerMenu = ({
         ) : null}
         <Portal>
           <Menu.Positioner>
-            <MenuContent minW="12rem">
+            <MenuContent minW="14rem" py="1">
+              <HStack gap="1">
+                <LayerMenuIconItem
+                  disabled={!canMoveForward}
+                  icon={ArrowUpToLineIcon}
+                  label={t('widgets.layers.actions.moveToFront')}
+                  value="move-to-front"
+                  onSelect={handleMoveToFront}
+                />
+                <LayerMenuIconItem
+                  disabled={!canMoveForward}
+                  icon={ArrowUpIcon}
+                  label={t('widgets.layers.actions.moveForward')}
+                  value="move-forward"
+                  onSelect={handleMoveForward}
+                />
+                <LayerMenuIconItem
+                  disabled={!canMoveBackward}
+                  icon={ArrowDownIcon}
+                  label={t('widgets.layers.actions.moveBackward')}
+                  value="move-backward"
+                  onSelect={handleMoveBackward}
+                />
+                <LayerMenuIconItem
+                  disabled={!canMoveBackward}
+                  icon={ArrowDownToLineIcon}
+                  label={t('widgets.layers.actions.moveToBack')}
+                  value="move-to-back"
+                  onSelect={handleMoveToBack}
+                />
+                <LayerMenuIconItem
+                  icon={CopyIcon}
+                  label={t('widgets.layers.actions.duplicate')}
+                  value="duplicate"
+                  onSelect={handleDuplicate}
+                />
+                {/*<LayerMenuIconItem
+                  color="fg.error"
+                  icon={Trash2Icon}
+                  label={t('widgets.layers.actions.delete')}
+                  value="delete"
+                  onSelect={handleDelete}
+                />*/}
+              </HStack>
+              <Menu.Separator borderColor="border.subtle" />
               <LayerMenuItem
                 icon={PencilIcon}
                 label={t('widgets.layers.actions.rename')}
                 value="rename"
                 onSelect={openRename}
-              />
-              <LayerMenuItem
-                icon={CopyIcon}
-                label={t('widgets.layers.actions.duplicate')}
-                value="duplicate"
-                onSelect={handleDuplicate}
               />
               {canRasterize ? (
                 <LayerMenuItem
@@ -305,35 +350,6 @@ const LayerMenu = ({
               ) : null}
               <Menu.Separator borderColor="border.subtle" />
               <LayerMenuItem
-                disabled={!canMoveForward}
-                icon={ArrowUpToLineIcon}
-                label={t('widgets.layers.actions.moveToFront')}
-                value="move-to-front"
-                onSelect={handleMoveToFront}
-              />
-              <LayerMenuItem
-                disabled={!canMoveForward}
-                icon={ArrowUpIcon}
-                label={t('widgets.layers.actions.moveForward')}
-                value="move-forward"
-                onSelect={handleMoveForward}
-              />
-              <LayerMenuItem
-                disabled={!canMoveBackward}
-                icon={ArrowDownIcon}
-                label={t('widgets.layers.actions.moveBackward')}
-                value="move-backward"
-                onSelect={handleMoveBackward}
-              />
-              <LayerMenuItem
-                disabled={!canMoveBackward}
-                icon={ArrowDownToLineIcon}
-                label={t('widgets.layers.actions.moveToBack')}
-                value="move-to-back"
-                onSelect={handleMoveToBack}
-              />
-              <Menu.Separator borderColor="border.subtle" />
-              <LayerMenuItem
                 disabled={!canMerge}
                 icon={MergeIcon}
                 label={t('widgets.layers.actions.mergeDown')}
@@ -352,13 +368,12 @@ const LayerMenu = ({
                 value="toggle-lock"
                 onSelect={handleToggleLock}
               />
-              <Menu.Separator borderColor="border.subtle" />
               <LayerMenuItem
-                color="fg.error"
                 icon={Trash2Icon}
                 label={t('widgets.layers.actions.delete')}
                 value="delete"
                 onSelect={handleDelete}
+                color="fg.error"
               />
             </MenuContent>
           </Menu.Positioner>
@@ -507,5 +522,33 @@ const LayerMenuItem = ({
         {label}
       </Text>
     </HStack>
+  </Menu.Item>
+);
+
+const LayerMenuIconItem = ({
+  color,
+  disabled,
+  icon,
+  label,
+  onSelect,
+  value,
+}: {
+  color?: string;
+  disabled?: boolean;
+  icon: LucideIcon;
+  label: string;
+  onSelect: () => void;
+  value: string;
+}) => (
+  <Menu.Item
+    aria-label={label}
+    color={color}
+    disabled={disabled}
+    flex="1"
+    justifyContent="center"
+    value={value}
+    onSelect={onSelect}
+  >
+    <Icon as={icon} boxSize="4" color={color ?? 'fg.subtle'} />
   </Menu.Item>
 );

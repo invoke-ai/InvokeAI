@@ -16,6 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
 import { useQueueItemProgress } from '@workbench/backend/progressStore';
+import { getCancelableCanvasStagingQueueItemId } from '@workbench/canvasStagingView';
 import { Button, IconButton, MenuContent, toaster, Tooltip } from '@workbench/components/ui';
 import { getImageThumbnailUrl, saveImageToGallery } from '@workbench/gallery/api';
 import { StreamingImageFrame } from '@workbench/images/StreamingImageFrame';
@@ -57,6 +58,7 @@ interface StagingBarProps {
   selectedSlot: CanvasStagingSlot | undefined;
   slots: CanvasStagingSlot[];
   onAccept: () => void;
+  onCancelQueueItem: (queueItemId: string) => void;
   onCycle: (direction: -1 | 1) => void;
   onDiscardAll: () => void;
   onDiscardSelected: () => void;
@@ -87,6 +89,7 @@ export const StagingBar = ({
   selectedSlot,
   slots,
   onAccept,
+  onCancelQueueItem,
   onCycle,
   onDiscardAll,
   onDiscardSelected,
@@ -98,6 +101,7 @@ export const StagingBar = ({
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
   const hasSlots = slots.length > 0;
+  const cancelableQueueItemId = getCancelableCanvasStagingQueueItemId(selectedSlot);
 
   const handleSaveToGallery = async () => {
     if (!selectedCandidate || isSaving) {
@@ -207,6 +211,13 @@ export const StagingBar = ({
             <CanvasFloatingBarDivider />
 
             <AutoSwitchMenu mode={autoSwitchMode} onSelect={onSetAutoSwitch} />
+
+            {cancelableQueueItemId ? (
+              <Button size="xs" variant="ghost" onClick={() => onCancelQueueItem(cancelableQueueItemId)}>
+                <XIcon />
+                {t('common.cancel')}
+              </Button>
+            ) : null}
 
             {selectedCandidate ? (
               <>

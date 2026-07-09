@@ -3,14 +3,16 @@ import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { GenerateReferenceImage, GenerateReferenceImageAsset, IPAdapterMethod } from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
 import type { CanvasMaskContract, CanvasMaskFillContract, CanvasRegionalGuidanceLayerContract } from '@workbench/types';
-import type { ChangeEvent, CSSProperties, FocusEvent } from 'react';
+import type { ChangeEvent, CSSProperties, FocusEvent, KeyboardEvent } from 'react';
 
-import { Box, createListCollection, HStack, IconButton, Input, Stack, Switch, Text, Textarea } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, IconButton, Input, Stack, Switch, Text } from '@chakra-ui/react';
 import { useDndMonitor, useDroppable } from '@dnd-kit/core';
 import { Button, ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
 import { getGalleryImagesByNames, uploadGalleryImage } from '@workbench/gallery/api';
 import { useModelsSelector } from '@workbench/models/modelsStore';
 import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { PROMPT_ATTENTION_TARGET_PROPS } from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
+import { PromptTextarea } from '@workbench/widgets/generate/promptFields/PromptTextarea';
 import { FluxReduxControls } from '@workbench/widgets/generate/reference-images/ReferenceImageControls';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
@@ -53,6 +55,8 @@ const COVER_IMG_STYLE: CSSProperties = { height: '100%', objectFit: 'cover', wid
 
 const formatWeight = (value: number): string => value.toFixed(2);
 
+const REGIONAL_PROMPT_HEIGHT_PX = 72;
+
 /** DnD droppable id for a specific region's reference-image slot (gallery-image drop target). */
 const referenceImageDropId = (layerId: string, refId: string): string => `regional-ref-image:${layerId}:${refId}`;
 
@@ -91,7 +95,10 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const dispatch = useWorkbenchDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const base = useSelectedModelBase();
+  const showSyntaxHighlighting = useActiveProjectSelector((project) => project.settings.showPromptSyntaxHighlighting);
   const fillBeforeRef = useRef<CanvasMaskFillContract | null>(null);
+  const [positivePrompt, setPositivePrompt] = useState(layer.positivePrompt ?? '');
+  const [negativePrompt, setNegativePrompt] = useState(layer.negativePrompt ?? '');
 
   const fill = layer.mask.fill;
   const isFlux = base === 'flux';
@@ -126,6 +133,11 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     [commitConfig, layer.positivePrompt, t]
   );
 
+  const handlePositiveChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => setPositivePrompt(event.currentTarget.value),
+    []
+  );
+
   const handleNegativeBlur = useCallback(
     (event: FocusEvent<HTMLTextAreaElement>) => {
       const value = event.target.value;
@@ -142,6 +154,13 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     },
     [commitConfig, layer.negativePrompt, t]
   );
+
+  const handleNegativeChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => setNegativePrompt(event.currentTarget.value),
+    []
+  );
+
+  const stopKeyboardPropagation = useCallback((event: KeyboardEvent) => event.stopPropagation(), []);
 
   const handleAutoNegative = useCallback(
     (details: { checked: boolean }) => {
@@ -316,26 +335,38 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const styleValue = useMemo(() => [fill.style], [fill.style]);
 
   return (
-    <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md">
+    <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md" onKeyDown={stopKeyboardPropagation}>
       <Field label={t('widgets.layers.regionalGuidance.positivePrompt')}>
-        <Textarea
-          defaultValue={layer.positivePrompt ?? ''}
-          key={`pos-${layer.id}`}
+        <PromptTextarea
+          {...PROMPT_ATTENTION_TARGET_PROPS}
+          aria-label={t('widgets.layers.regionalGuidance.positivePrompt')}
+          defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
+          maxHeightPx={180}
+          minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
           placeholder={t('widgets.layers.regionalGuidance.positivePromptPlaceholder')}
-          rows={2}
+          resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.positivePrompt')}
+          showSyntaxHighlighting={showSyntaxHighlighting}
           size="sm"
+          value={positivePrompt}
           onBlur={handlePositiveBlur}
+          onChange={handlePositiveChange}
         />
       </Field>
       {!isFlux && (
         <Field label={t('widgets.layers.regionalGuidance.negativePrompt')}>
-          <Textarea
-            defaultValue={layer.negativePrompt ?? ''}
-            key={`neg-${layer.id}`}
+          <PromptTextarea
+            {...PROMPT_ATTENTION_TARGET_PROPS}
+            aria-label={t('widgets.layers.regionalGuidance.negativePrompt')}
+            defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
+            maxHeightPx={180}
+            minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
             placeholder={t('widgets.layers.regionalGuidance.negativePromptPlaceholder')}
-            rows={2}
+            resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.negativePrompt')}
+            showSyntaxHighlighting={showSyntaxHighlighting}
             size="sm"
+            value={negativePrompt}
             onBlur={handleNegativeBlur}
+            onChange={handleNegativeChange}
           />
         </Field>
       )}

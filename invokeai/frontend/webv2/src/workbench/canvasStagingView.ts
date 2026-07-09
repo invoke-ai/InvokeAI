@@ -241,3 +241,6 @@ export const getFirstCanvasPlaceholderSlotIndex = (
   canvas: CanvasStateContractV2,
   queueItems: readonly QueueItem[]
 ): number => getCanvasStagingSlots(canvas, queueItems).findIndex((slot) => slot.kind === 'placeholder');
+
+export const getCancelableCanvasStagingQueueItemId = (slot: CanvasStagingSlot | undefined): string | null =>
+  slot?.kind === 'placeholder' ? slot.queueItemId : null;

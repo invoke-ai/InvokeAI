@@ -422,6 +422,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
             selectedSlot={selectedSlot}
             slots={stagingSlots}
             onAccept={() => dispatch({ type: 'acceptStagedImage' })}
+            onCancelQueueItem={(queueItemId) => dispatch({ queueItemId, type: 'cancelQueueItem' })}
             onCycle={(direction) => dispatch({ direction, type: 'cycleStagedImage' })}
             onDiscardAll={() => dispatch({ type: 'discardAllStagedImages' })}
             onDiscardSelected={() => dispatch({ type: 'discardSelectedStagedImage' })}
