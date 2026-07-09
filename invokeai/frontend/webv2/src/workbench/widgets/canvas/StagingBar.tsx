@@ -1,9 +1,25 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
+import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 import type { CanvasStagingAreaContractV2, CanvasStagingCandidateContract } from '@workbench/types';
 
-import { HStack, Menu, Portal, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
-import { Button, IconButton, MenuContent, toaster } from '@workbench/components/ui';
+import {
+  Flex,
+  HStack,
+  Menu,
+  Portal,
+  ProgressCircle,
+  ScrollArea,
+  Skeleton,
+  Spinner,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
+import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
+import { useQueueItemProgress } from '@workbench/backend/progressStore';
+import { Button, IconButton, MenuContent, toaster, Tooltip } from '@workbench/components/ui';
 import { getImageThumbnailUrl, saveImageToGallery } from '@workbench/gallery/api';
+import { StreamingImageFrame } from '@workbench/images/StreamingImageFrame';
+import { progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
 import { CanvasOptionsBar } from '@workbench/widgets/canvas/tool-options/CanvasOptionsBar';
 import {
   CheckIcon,
@@ -13,28 +29,33 @@ import {
   ChevronUpIcon,
   EyeIcon,
   EyeOffIcon,
-  ImagePlusIcon,
+  SaveIcon,
   SparklesIcon,
   Trash2Icon,
+  XIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
+
 type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
-const AUTO_SWITCH_MODES: AutoSwitchMode[] = ['off', 'latest', 'oldest'];
+const AUTO_SWITCH_MODES: AutoSwitchMode[] = ['off', 'progress', 'latest'];
 const MENU_POSITIONING = { placement: 'top-end' } as const;
 
 interface StagingBarProps {
+  antialiasProgressImages: boolean;
   areThumbnailsVisible: boolean;
   autoSwitchMode: AutoSwitchMode;
-  hasMultipleCandidates: boolean;
+  hasMultipleSlots: boolean;
   isGenerating: boolean;
   isVisible: boolean;
-  pendingImages: CanvasStagingCandidateContract[];
   selectedCandidate: CanvasStagingCandidateContract | undefined;
   selectedImageIndex: number;
+  selectedSlot: CanvasStagingSlot | undefined;
+  slots: CanvasStagingSlot[];
   onAccept: () => void;
   onCycle: (direction: -1 | 1) => void;
   onDiscardAll: () => void;
@@ -55,14 +76,16 @@ interface StagingBarProps {
  * options bar; positioning is the parent's job.
  */
 export const StagingBar = ({
+  antialiasProgressImages,
   areThumbnailsVisible,
   autoSwitchMode,
-  hasMultipleCandidates,
+  hasMultipleSlots,
   isGenerating,
   isVisible,
-  pendingImages,
   selectedCandidate,
   selectedImageIndex,
+  selectedSlot,
+  slots,
   onAccept,
   onCycle,
   onDiscardAll,
@@ -74,7 +97,7 @@ export const StagingBar = ({
 }: StagingBarProps) => {
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
-  const hasCandidates = pendingImages.length > 0;
+  const hasSlots = slots.length > 0;
 
   const handleSaveToGallery = async () => {
     if (!selectedCandidate || isSaving) {
@@ -97,7 +120,7 @@ export const StagingBar = ({
 
   return (
     <Stack align="center" gap="2" w="full">
-      {hasCandidates ? (
+      {hasSlots ? (
         <ScrollArea.Root
           h={areThumbnailsVisible ? THUMBNAIL_STRIP_HEIGHT : '0'}
           opacity={areThumbnailsVisible ? 1 : 0}
@@ -110,12 +133,13 @@ export const StagingBar = ({
           <ScrollArea.Viewport h="full" w="full">
             <ScrollArea.Content asChild>
               <HStack h="full" justify="center">
-                {pendingImages.map((candidate, index) => (
+                {slots.map((slot, index) => (
                   <StagingThumbnail
-                    key={`${candidate.sourceQueueItemId}-${candidate.imageName}`}
-                    candidate={candidate}
+                    key={slot.id}
+                    antialiasProgressImages={antialiasProgressImages}
                     index={index}
                     isSelected={index === selectedImageIndex}
+                    slot={slot}
                     onSelect={() => onSelectImage(index)}
                   />
                 ))}
@@ -129,95 +153,117 @@ export const StagingBar = ({
       ) : null}
 
       <CanvasOptionsBar>
-        <HStack gap="2">
-          {isGenerating ? (
-            <HStack color="fg.muted" gap="1.5" px="1">
-              <Spinner size="xs" />
-              <Text fontSize="xs" fontWeight="600">
-                {t('widgets.canvas.staging.generating')}
+        {isGenerating ? (
+          <HStack color="fg.muted" gap="1.5" px="1">
+            <Spinner size="xs" />
+            <Text fontSize="xs" fontWeight="600">
+              {t('widgets.canvas.staging.generating')}
+            </Text>
+          </HStack>
+        ) : null}
+
+        {hasSlots && selectedSlot ? (
+          <>
+            <IconButton
+              aria-label={
+                areThumbnailsVisible
+                  ? t('widgets.canvas.hideStagingThumbnails')
+                  : t('widgets.canvas.showStagingThumbnails')
+              }
+              size="xs"
+              variant="ghost"
+              onClick={onToggleThumbnails}
+            >
+              {areThumbnailsVisible ? <ChevronDownIcon /> : <ChevronUpIcon />}
+            </IconButton>
+
+            <HStack gap="0.5">
+              <IconButton
+                aria-label={t('widgets.canvas.previousStagedCandidate')}
+                disabled={!hasMultipleSlots}
+                size="xs"
+                variant="ghost"
+                onClick={() => onCycle(-1)}
+              >
+                <ChevronLeftIcon />
+              </IconButton>
+              <Text fontSize="xs" fontVariantNumeric="tabular-nums" minW="3.5rem" px="1" textAlign="center">
+                {t('widgets.canvas.candidateCount', {
+                  current: selectedImageIndex + 1,
+                  total: slots.length,
+                })}
               </Text>
+              <IconButton
+                aria-label={t('widgets.canvas.nextStagedCandidate')}
+                disabled={!hasMultipleSlots}
+                size="xs"
+                variant="ghost"
+                onClick={() => onCycle(1)}
+              >
+                <ChevronRightIcon />
+              </IconButton>
             </HStack>
-          ) : null}
 
-          {hasCandidates && selectedCandidate ? (
-            <>
-              <IconButton
-                aria-label={
-                  areThumbnailsVisible
-                    ? t('widgets.canvas.hideStagingThumbnails')
-                    : t('widgets.canvas.showStagingThumbnails')
-                }
-                size="xs"
-                variant="ghost"
-                onClick={onToggleThumbnails}
-              >
-                {areThumbnailsVisible ? <ChevronDownIcon /> : <ChevronUpIcon />}
-              </IconButton>
+            <CanvasFloatingBarDivider />
 
-              <HStack gap="0.5">
-                <IconButton
-                  aria-label={t('widgets.canvas.previousStagedCandidate')}
-                  disabled={!hasMultipleCandidates}
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => onCycle(-1)}
+            <AutoSwitchMenu mode={autoSwitchMode} onSelect={onSetAutoSwitch} />
+
+            {selectedCandidate ? (
+              <>
+                <Tooltip
+                  content={
+                    isVisible
+                      ? t('widgets.canvas.hideStagedResultPreview')
+                      : t('widgets.canvas.showStagedResultPreview')
+                  }
                 >
-                  <ChevronLeftIcon />
-                </IconButton>
-                <Text fontSize="xs" fontVariantNumeric="tabular-nums" minW="3.5rem" px="1" textAlign="center">
-                  {t('widgets.canvas.candidateCount', {
-                    current: selectedImageIndex + 1,
-                    total: pendingImages.length,
-                  })}
-                </Text>
-                <IconButton
-                  aria-label={t('widgets.canvas.nextStagedCandidate')}
-                  disabled={!hasMultipleCandidates}
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => onCycle(1)}
-                >
-                  <ChevronRightIcon />
-                </IconButton>
-              </HStack>
+                  <IconButton
+                    aria-label={
+                      isVisible
+                        ? t('widgets.canvas.hideStagedResultPreview')
+                        : t('widgets.canvas.showStagedResultPreview')
+                    }
+                    size="xs"
+                    variant="ghost"
+                    onClick={onToggleVisibility}
+                  >
+                    {isVisible ? <EyeIcon /> : <EyeOffIcon />}
+                  </IconButton>
+                </Tooltip>
 
-              <IconButton
-                aria-label={
-                  isVisible ? t('widgets.canvas.hideStagedResultPreview') : t('widgets.canvas.showStagedResultPreview')
-                }
-                size="xs"
-                variant="ghost"
-                onClick={onToggleVisibility}
-              >
-                {isVisible ? <EyeIcon /> : <EyeOffIcon />}
-              </IconButton>
+                <Tooltip content={t('widgets.canvas.staging.saveToGallery')}>
+                  <IconButton
+                    aria-label={t('widgets.canvas.staging.saveToGallery')}
+                    disabled={isSaving}
+                    size="xs"
+                    variant="ghost"
+                    onClick={handleSaveToGallery}
+                  >
+                    {isSaving ? <Spinner size="xs" /> : <SaveIcon />}
+                  </IconButton>
+                </Tooltip>
 
-              <IconButton
-                aria-label={t('widgets.canvas.staging.saveToGallery')}
-                disabled={isSaving}
-                size="xs"
-                variant="ghost"
-                onClick={handleSaveToGallery}
-              >
-                {isSaving ? <Spinner size="xs" /> : <ImagePlusIcon />}
-              </IconButton>
+                <Tooltip content={t('common.discard')}>
+                  <IconButton aria-label={t('common.discard')} size="xs" variant="ghost" onClick={onDiscardSelected}>
+                    <XIcon />
+                  </IconButton>
+                </Tooltip>
 
-              <IconButton aria-label={t('common.discard')} size="xs" variant="ghost" onClick={onDiscardSelected}>
-                <Trash2Icon />
-              </IconButton>
+                <CanvasFloatingBarDivider />
 
-              <Button size="xs" variant="ghost" onClick={onDiscardAll}>
-                {t('common.discardAll')}
-              </Button>
+                <Button size="xs" variant="ghost" onClick={onDiscardAll}>
+                  <Trash2Icon />
+                  {t('common.discardAll')}
+                </Button>
 
-              <AutoSwitchMenu mode={autoSwitchMode} onSelect={onSetAutoSwitch} />
-
-              <Button size="xs" onClick={onAccept}>
-                {t('widgets.canvas.acceptToLayer')}
-              </Button>
-            </>
-          ) : null}
-        </HStack>
+                <Button size="xs" onClick={onAccept}>
+                  <CheckIcon />
+                  {t('widgets.canvas.acceptToLayer')}
+                </Button>
+              </>
+            ) : null}
+          </>
+        ) : null}
       </CanvasOptionsBar>
     </Stack>
   );
@@ -229,30 +275,35 @@ const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (m
     t(
       value === 'off'
         ? 'widgets.canvas.staging.autoSwitchOff'
-        : value === 'latest'
-          ? 'widgets.canvas.staging.autoSwitchLatest'
-          : 'widgets.canvas.staging.autoSwitchOldest'
+        : value === 'progress'
+          ? 'widgets.canvas.staging.autoSwitchProgress'
+          : 'widgets.canvas.staging.autoSwitchLatest'
     );
 
   return (
     <Menu.Root positioning={MENU_POSITIONING}>
-      <Menu.Trigger asChild>
-        <IconButton aria-label={t('widgets.canvas.staging.autoSwitch')} minW="unset" px="2" size="xs" variant="ghost">
-          <HStack gap="1">
-            <SparklesIcon size={13} />
-            <Text fontSize="xs">{label(mode)}</Text>
-          </HStack>
-        </IconButton>
-      </Menu.Trigger>
+      <Tooltip content={t('widgets.canvas.staging.autoSwitch')}>
+        <span style={{ display: 'inline-flex' }}>
+          <Menu.Trigger asChild>
+            <Button minW="unset" px="2" size="xs" variant="ghost">
+              <SparklesIcon size={13} />
+              <Text fontSize="xs">{label(mode)}</Text>
+            </Button>
+          </Menu.Trigger>
+        </span>
+      </Tooltip>
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="8rem" py="1">
-            {AUTO_SWITCH_MODES.map((value) => (
-              <Menu.Item key={value} value={value} onClick={() => onSelect(value)}>
-                <CheckIcon size={12} opacity={mode === value ? 1 : 0} />
-                <Menu.ItemText fontSize="xs">{label(value)}</Menu.ItemText>
-              </Menu.Item>
-            ))}
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel>{t('widgets.canvas.staging.autoSwitch')}</Menu.ItemGroupLabel>
+              {AUTO_SWITCH_MODES.map((value) => (
+                <Menu.Item key={value} value={value} onClick={() => onSelect(value)}>
+                  <CheckIcon size={12} opacity={mode === value ? 1 : 0} />
+                  <Menu.ItemText fontSize="xs">{label(value)}</Menu.ItemText>
+                </Menu.Item>
+              ))}
+            </Menu.ItemGroup>
           </MenuContent>
         </Menu.Positioner>
       </Portal>
@@ -261,14 +312,16 @@ const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (m
 };
 
 const StagingThumbnail = ({
-  candidate,
+  antialiasProgressImages,
   index,
   isSelected,
+  slot,
   onSelect,
 }: {
-  candidate: CanvasStagingCandidateContract;
+  antialiasProgressImages: boolean;
   index: number;
   isSelected: boolean;
+  slot: CanvasStagingSlot;
   onSelect: () => void;
 }) => {
   const { t } = useTranslation();
@@ -289,11 +342,15 @@ const StagingThumbnail = ({
       style={{ aspectRatio: '1 / 1' }}
       onClick={onSelect}
     >
-      <img
-        alt={candidate.imageName}
-        src={candidate.thumbnailUrl || getImageThumbnailUrl(candidate.imageName)}
-        style={{ display: 'block', height: '100%', objectFit: 'cover', width: '100%' }}
-      />
+      {slot.kind === 'candidate' ? (
+        <img
+          alt={slot.candidate.imageName}
+          src={slot.candidate.thumbnailUrl || getImageThumbnailUrl(slot.candidate.imageName)}
+          style={{ display: 'block', height: '100%', objectFit: 'cover', width: '100%' }}
+        />
+      ) : (
+        <StagingPlaceholderThumbnail antialiasProgressImages={antialiasProgressImages} slot={slot} />
+      )}
       <Text
         bg="blackAlpha.700"
         bottom="1"
@@ -308,5 +365,60 @@ const StagingThumbnail = ({
         {index + 1}
       </Text>
     </Stack>
+  );
+};
+
+const StagingPlaceholderThumbnail = ({
+  antialiasProgressImages,
+  slot,
+}: {
+  antialiasProgressImages: boolean;
+  slot: Extract<CanvasStagingSlot, { kind: 'placeholder' }>;
+}) => {
+  const progressImage = useQueueItemProgressImage(slot.queueItemId, slot.itemIndex);
+  const progress = useQueueItemProgress(slot.queueItemId);
+  const isActive = progress?.activeItemIndex === slot.itemIndex;
+  const percentage = typeof progress?.percentage === 'number' ? Math.round(progress.percentage * 100) : null;
+
+  return (
+    <>
+      <StreamingImageFrame
+        fit="cover"
+        h="full"
+        liveImage={progressImageToStreamingSource(progressImage)}
+        shouldAntialiasLiveImage={antialiasProgressImages}
+        w="full"
+      >
+        <Skeleton h="full" w="full" />
+      </StreamingImageFrame>
+      {isActive ? <StagingPlaceholderProgress percentage={percentage} /> : null}
+    </>
+  );
+};
+
+const StagingPlaceholderProgress = ({ percentage }: { percentage: number | null }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex
+      align="center"
+      aria-label={
+        percentage === null
+          ? t('widgets.gallery.generationProgress')
+          : t('widgets.gallery.generationProgressPercent', { percentage })
+      }
+      inset="0"
+      justify="center"
+      pointerEvents="none"
+      position="absolute"
+      zIndex="1"
+    >
+      <ProgressCircle.Root bg="bg/85" borderWidth={1} p={0.5} rounded="full" size="xs" value={percentage}>
+        <ProgressCircle.Circle>
+          <ProgressCircle.Track />
+          <ProgressCircle.Range />
+        </ProgressCircle.Circle>
+      </ProgressCircle.Root>
+    </Flex>
   );
 };

@@ -214,17 +214,13 @@ const routeRunResults = async (
   }
 };
 
-/** Route one completed backend item from a still-running local batch into Gallery. */
+/** Route one completed backend item from a still-running local batch into its destination. */
 const routeBackendItemResults = async (
   projectId: string,
   queueItem: QueueItem,
   backendItemId: number,
   dispatch: Dispatch<WorkbenchAction>
 ): Promise<void> => {
-  if (queueItem.snapshot.destination !== 'gallery') {
-    return;
-  }
-
   try {
     const resultImageOptions = getQueueItemResultImageOptions(queueItem);
     const allImages = resultImageOptions
@@ -232,17 +228,21 @@ const routeBackendItemResults = async (
       : await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt);
     const images =
       queueItem.snapshot.sourceId === 'workflow' ? allImages.filter((image) => !image.isIntermediate) : allImages;
-    const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
+    if (queueItem.snapshot.destination === 'gallery') {
+      const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
 
-    if (selectedBoardId && selectedBoardId !== 'none') {
-      await addImagesToGalleryBoard(
-        selectedBoardId,
-        images.map((image) => image.imageName)
-      );
+      if (selectedBoardId && selectedBoardId !== 'none') {
+        await addImagesToGalleryBoard(
+          selectedBoardId,
+          images.map((image) => image.imageName)
+        );
+      }
     }
 
     dispatch({ backendItemId, images, projectId, queueItemId: queueItem.id, type: 'routeQueueItemPartialResults' });
-    dispatch({ type: 'refreshBackendData' });
+    if (queueItem.snapshot.destination === 'gallery') {
+      dispatch({ type: 'refreshBackendData' });
+    }
   } catch (error) {
     dispatch({
       area: 'queue-results',

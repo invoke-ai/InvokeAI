@@ -3,7 +3,7 @@ import type { WidgetViewProps } from '@workbench/types';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box, Stack } from '@chakra-ui/react';
-import { useProgressImage } from '@workbench/backend/progressImageStore';
+import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
 import {
   createLayerId,
   deleteLayerActions,
@@ -12,15 +12,15 @@ import {
   reorderIdsForHotkey,
   reorderLayerActions,
 } from '@workbench/canvasLayerOps';
+import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { CanvasLayerContextMenu, type CanvasLayerContextMenuTarget } from '@workbench/widgets/layers/LayerContextMenu';
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { BboxDetailsBar } from './BboxDetailsBar';
 import { gridSizeForModelBase } from './bboxGrid';
 import { isCanvasStagingActive } from './canvasInteractionLock';
 import {
@@ -32,7 +32,7 @@ import {
 import { CanvasSurface } from './CanvasSurface';
 import { resolveCheckerColors } from './checkerColors';
 import { StagingBar } from './StagingBar';
-import { selectCanvasProgressImage, selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
+import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolOptionsBar } from './tool-options/ToolOptionsBar';
 import { ToolStrip } from './ToolStrip';
@@ -70,6 +70,8 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const dispatch = useWorkbenchDispatch();
   const engine = useCanvasEngine();
   const canvas = useActiveProjectSelector((project) => project.canvas);
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
   const { document, stagingArea } = canvas;
 
   // Right-click on the canvas surface: hit-test the layer under the cursor, select
@@ -149,46 +151,40 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     engine?.stores.checkerColors.set(resolveCheckerColors());
   }, [engine, themeId]);
 
-  const selectedCandidate = stagingArea.pendingImages[stagingArea.selectedImageIndex];
-  const hasStagedCandidates = stagingArea.pendingImages.length > 0;
-  const hasMultipleCandidates = stagingArea.pendingImages.length > 1;
+  const stagingSlots = getCanvasStagingSlots(canvas, queueItems);
+  const selectedSlot = stagingSlots[stagingArea.selectedImageIndex];
+  const selectedCandidate = selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined;
+  const selectedPlaceholder = selectedSlot?.kind === 'placeholder' ? selectedSlot : null;
+  const hasStagingSlots = stagingSlots.length > 0;
+  const hasMultipleStagingSlots = stagingSlots.length > 1;
 
-  // The pending/running canvas-destination queue items for THIS project, as a
-  // stable comma-joined key (so the selector's identity check stays cheap). The
-  // staging bar keys off whether any exist; the live progress preview is gated
-  // to only these items so a generate-widget run (same project) or another
-  // project's run can't draw its denoise frames over this canvas's bbox.
-  const canvasQueueItemIdsKey = useActiveProjectSelector((project) =>
-    project.queue.items
-      .filter(
-        (item) =>
-          item.snapshot.destination === 'canvas' &&
-          (item.status === 'pending' || item.status === 'running') &&
-          // Only this canvas SESSION's in-flight items: an item submitted before a
-          // wholesale swap (new canvas / snapshot restore) belongs to a document
-          // that no longer exists, so its denoise frames must not leak onto the
-          // fresh canvas (F2). `documentRevision` bumps only on those swaps.
-          item.snapshot.canvas.documentRevision === project.canvas.documentRevision
-      )
-      .map((item) => item.id)
-      .join(',')
+  const isCanvasGenerationInFlight = queueItems.some(
+    (item) =>
+      item.snapshot.destination === 'canvas' &&
+      (item.status === 'pending' || item.status === 'running') &&
+      // Only this canvas SESSION's in-flight items: an item submitted before a
+      // wholesale swap (new canvas / snapshot restore) belongs to a document
+      // that no longer exists, so its denoise frames must not leak onto the
+      // fresh canvas (F2). `documentRevision` bumps only on those swaps.
+      item.snapshot.canvas.documentRevision === canvas.documentRevision
   );
-  const canvasQueueItemIds = useMemo(
-    () => new Set(canvasQueueItemIdsKey ? canvasQueueItemIdsKey.split(',') : []),
-    [canvasQueueItemIdsKey]
-  );
-  const isCanvasGenerationInFlight = canvasQueueItemIds.size > 0;
-  const isInteractionLocked = isCanvasStagingActive({ hasStagedCandidates, isCanvasGenerationInFlight });
+  const isInteractionLocked = isCanvasStagingActive({
+    hasStagedCandidates: hasStagingSlots,
+    isCanvasGenerationInFlight,
+  });
 
   useEffect(() => {
     engine?.setInteractionLocked(isInteractionLocked);
     return () => engine?.setInteractionLocked(false);
   }, [engine, isInteractionLocked]);
 
-  // "Show progress on canvas" gates ONLY the live denoise-frame preview; when off,
-  // the accepted staged candidate still previews (that's staging, not progress).
-  const liveProgressImage = selectCanvasProgressImage(useProgressImage(), canvasQueueItemIds);
-  const progressImage = settings[CANVAS_SHOW_PROGRESS_KEY] ? liveProgressImage : null;
+  // "Show progress on canvas" gates ONLY the selected placeholder's live denoise
+  // frame; a selected finished candidate still previews (that's staging, not progress).
+  const selectedPlaceholderProgressImage = useQueueItemProgressImage(
+    selectedPlaceholder?.queueItemId ?? '',
+    selectedPlaceholder?.itemIndex ?? 0
+  );
+  const progressImage = settings[CANVAS_SHOW_PROGRESS_KEY] ? selectedPlaceholderProgressImage : null;
 
   // What the engine should draw as the staged preview: the live denoise-progress
   // frame while generating, else the selected candidate, else nothing. The pure
@@ -196,7 +192,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const previewSource = selectStagedPreviewSource({
     bboxHeight: document.bbox.height,
     bboxWidth: document.bbox.width,
-    isGenerationInFlight: isCanvasGenerationInFlight,
+    isGenerationInFlight: selectedPlaceholder !== null,
     isVisible: stagingArea.isVisible,
     progressImage,
     selectedImageName: selectedCandidate?.imageName ?? null,
@@ -225,17 +221,17 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     const selectedIndex = selectedLayerId ? layers.findIndex((layer) => layer.id === selectedLayerId) : -1;
     const selectedLayer = selectedIndex >= 0 ? layers[selectedIndex] : undefined;
 
-    if (commandId === 'canvas.prevEntity' && hasStagedCandidates) {
+    if ((commandId === 'canvas.prevEntity' || commandId === 'canvas.nudgeLeft') && hasStagingSlots) {
       dispatch({ direction: -1, type: 'cycleStagedImage' });
       return;
     }
 
-    if (commandId === 'canvas.nextEntity' && hasStagedCandidates) {
+    if ((commandId === 'canvas.nextEntity' || commandId === 'canvas.nudgeRight') && hasStagingSlots) {
       dispatch({ direction: 1, type: 'cycleStagedImage' });
       return;
     }
 
-    if (commandId === 'canvas.deleteSelected' && hasStagedCandidates) {
+    if (commandId === 'canvas.deleteSelected' && selectedCandidate) {
       dispatch({ type: 'discardSelectedStagedImage' });
       return;
     }
@@ -337,8 +333,8 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
 
   useEffect(() => {
     const hotkeys = [
-      // Staged-candidate cycling keeps `alt+[` / `alt+]`; the bare arrows now nudge
-      // the selected layer (see below), so they are no longer bound here.
+      // Staging keeps `alt+[` / `alt+]`; bare left/right are registered as layer nudges,
+      // then intercepted above to cycle staging slots while any slot exists.
       ['canvas.prevEntity', t('widgets.canvas.commands.previousEntity'), ['alt+[']],
       ['canvas.nextEntity', t('widgets.canvas.commands.nextEntity'), ['alt+]']],
       ['canvas.deleteSelected', t('widgets.canvas.commands.deleteSelected'), ['delete', 'backspace']],
@@ -413,16 +409,18 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
        * interactive around the bars; each bar re-enables pointer events.
        */}
       <Stack align="center" bottom="2" gap="2" left="2" pointerEvents="none" position="absolute" right="2" zIndex="3">
-        {hasStagedCandidates || isCanvasGenerationInFlight ? (
+        {hasStagingSlots || isCanvasGenerationInFlight ? (
           <StagingBar
+            antialiasProgressImages={antialiasProgressImages}
             areThumbnailsVisible={stagingArea.areThumbnailsVisible}
             autoSwitchMode={stagingArea.autoSwitchMode}
-            hasMultipleCandidates={hasMultipleCandidates}
+            hasMultipleSlots={hasMultipleStagingSlots}
             isGenerating={isCanvasGenerationInFlight}
             isVisible={stagingArea.isVisible}
-            pendingImages={stagingArea.pendingImages}
             selectedCandidate={selectedCandidate}
             selectedImageIndex={stagingArea.selectedImageIndex}
+            selectedSlot={selectedSlot}
+            slots={stagingSlots}
             onAccept={() => dispatch({ type: 'acceptStagedImage' })}
             onCycle={(direction) => dispatch({ direction, type: 'cycleStagedImage' })}
             onDiscardAll={() => dispatch({ type: 'discardAllStagedImages' })}
@@ -433,7 +431,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
             onToggleVisibility={() => dispatch({ type: 'toggleCanvasStagingVisibility' })}
           />
         ) : null}
-        {engine && !isInteractionLocked ? <BboxDetailsBar engine={engine} /> : null}
         {engine && !isInteractionLocked ? (
           <ToolOptionsBar documentHeight={document.height} documentWidth={document.width} engine={engine} />
         ) : null}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { selectCanvasProgressImage, selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
+import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 
 const base = {
   bboxHeight: 512,
@@ -24,13 +24,24 @@ describe('selectStagedPreviewSource', () => {
     expect(selectStagedPreviewSource({ ...base, isVisible: false, selectedImageName: 'img-1' })).toBeNull();
   });
 
-  it('prefers the live progress frame while generating, scaled to fill the bbox', () => {
+  it('returns the selected candidate even while another canvas slot is generating', () => {
+    expect(
+      selectStagedPreviewSource({
+        ...base,
+        isGenerationInFlight: true,
+        progressImage: { dataUrl: 'data:image/png;base64,AAAA', height: 64, width: 64 },
+        selectedImageName: 'img-1',
+      })
+    ).toEqual({ imageName: 'img-1' });
+  });
+
+  it('returns the selected placeholder progress frame while generating, scaled to fill the bbox', () => {
     const source = selectStagedPreviewSource({
       ...base,
       isGenerationInFlight: true,
       progressImage: { dataUrl: 'data:image/png;base64,AAAA', height: 64, width: 64 },
-      selectedImageName: 'img-1',
     });
+
     // Fills the bbox dims (512x512), not the progress frame's native 64x64.
     expect(source).toEqual({ dataUrl: 'data:image/png;base64,AAAA', height: 512, width: 512 });
   });
@@ -56,35 +67,6 @@ describe('selectStagedPreviewSource', () => {
         progressImage: { dataUrl: 'data:image/png;base64,AAAA', height: 64, width: 64 },
       })
     ).toBeNull();
-  });
-});
-
-describe('selectCanvasProgressImage', () => {
-  const frame = (queueItemId: string) => ({
-    dataUrl: 'data:image/png;base64,AAAA',
-    height: 64,
-    target: { itemIndex: 1, queueItemId },
-    width: 64,
-  });
-
-  it('returns the frame when its queue item belongs to this canvas', () => {
-    const result = selectCanvasProgressImage(frame('q-canvas'), new Set(['q-canvas']));
-    expect(result).toEqual({ dataUrl: 'data:image/png;base64,AAAA', height: 64, width: 64 });
-  });
-
-  it('ignores a frame from a foreign (non-canvas / other-project) queue item', () => {
-    // A generate-widget run in the same project, or another project's run, shares
-    // the app-global latest-progress store — its frames must not leak onto the canvas.
-    expect(selectCanvasProgressImage(frame('q-generate'), new Set(['q-canvas']))).toBeNull();
-  });
-
-  it('returns null when there is no latest frame or the frame has no target', () => {
-    expect(selectCanvasProgressImage(null, new Set(['q-canvas']))).toBeNull();
-    expect(selectCanvasProgressImage({ dataUrl: 'x', height: 8, width: 8 }, new Set(['q-canvas']))).toBeNull();
-  });
-
-  it('returns null when no canvas queue items are in flight', () => {
-    expect(selectCanvasProgressImage(frame('q-canvas'), new Set())).toBeNull();
   });
 });
 
