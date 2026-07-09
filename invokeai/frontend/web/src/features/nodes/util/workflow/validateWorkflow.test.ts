@@ -1,12 +1,23 @@
 import { get } from 'es-toolkit/compat';
 import { addElement } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
-import { img_resize, main_model_loader } from 'features/nodes/store/util/testUtils';
+import { img_resize, main_model_loader, workflow_return } from 'features/nodes/store/util/testUtils';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { buildNodeFieldElement, getDefaultForm, isNodeFieldElement } from 'features/nodes/types/workflow';
+import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('app/logging/logger', () => ({
+  logger: () => ({
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
 
 const imageCollectionTemplate = {
   title: 'Image Collection Primitive',
@@ -89,6 +100,7 @@ describe('validateWorkflow', () => {
           version: '1.0.2',
           label: '',
           notes: '',
+          dynamicInputTemplates: {},
           isOpen: true,
           isIntermediate: true,
           useCache: true,
@@ -119,6 +131,7 @@ describe('validateWorkflow', () => {
           version: '1.2.2',
           label: '',
           notes: '',
+          dynamicInputTemplates: {},
           isOpen: true,
           isIntermediate: true,
           useCache: true,
@@ -169,6 +182,7 @@ describe('validateWorkflow', () => {
         isIntermediate: true,
         useCache: true,
         nodePack: 'invokeai',
+        dynamicInputTemplates: {},
         inputs: {
           collection: {
             name: 'collection',
@@ -214,6 +228,46 @@ describe('validateWorkflow', () => {
     });
     expect(validationResult.warnings.length).toBe(1);
     expect(get(validationResult, 'workflow.nodes[0].data.inputs.model.value')).toBeUndefined();
+  });
+  it('should reject workflows with duplicate workflow_return nodes at build time', async () => {
+    Object.assign(globalThis, {
+      window: {
+        location: {
+          origin: 'http://localhost',
+        },
+      },
+    });
+
+    const { buildWorkflowWithValidation } = await import('features/nodes/util/workflow/buildWorkflow');
+    const returnNode1 = buildInvocationNode({ x: 0, y: 0 }, workflow_return);
+    const returnNode2 = buildInvocationNode({ x: 100, y: 0 }, workflow_return);
+
+    const built = buildWorkflowWithValidation({
+      _version: 1,
+      formFieldInitialValues: {},
+      ...getWorkflow(),
+      nodes: [returnNode1, returnNode2],
+      edges: [],
+    });
+
+    expect(built).toBeNull();
+  });
+  it('should warn when loading a workflow with duplicate workflow_return nodes', async () => {
+    const returnNode1 = buildInvocationNode({ x: 0, y: 0 }, workflow_return);
+    const returnNode2 = buildInvocationNode({ x: 100, y: 0 }, workflow_return);
+
+    await expect(
+      validateWorkflow({
+        workflow: {
+          ...getWorkflow(),
+          nodes: [returnNode1, returnNode2],
+        },
+        templates: { img_resize, main_model_loader, workflow_return },
+        checkImageAccess: resolveTrue,
+        checkBoardAccess: resolveTrue,
+        checkModelAccess: resolveTrue,
+      })
+    ).rejects.toThrow(/workflow_return/i);
   });
 
   it('should delete malformed connector edges with invalid handles', async () => {
