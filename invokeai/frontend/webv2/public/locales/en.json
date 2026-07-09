@@ -907,7 +907,7 @@
     },
     "canvas": {
       "acceptToLayer": "Accept to Layer",
-      "candidateCount": "Candidate {{current}} of {{total}}",
+      "candidateCount": "{{current}} of {{total}}",
       "commands": {
         "decreaseBrushSize": "Decrease brush/eraser size",
         "deleteLayer": "Delete layer",
@@ -988,7 +988,7 @@
         "autoSwitch": "Auto-switch",
         "autoSwitchLatest": "Newest",
         "autoSwitchOff": "Off",
-        "autoSwitchOldest": "Oldest",
+        "autoSwitchProgress": "In progress",
         "generating": "Generating…",
         "saveError": "Couldn't save to gallery",
         "saveToGallery": "Save to gallery",

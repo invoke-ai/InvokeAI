@@ -239,6 +239,26 @@ describe('migrateCanvasStateToV2', () => {
     expect(migrated.stagingArea.autoSwitchMode).toBe('latest');
   });
 
+  it('preserves the progress canvas staging auto-switch mode', () => {
+    const migrated = migrateCanvasStateToV2({
+      document: { height: 512, layers: [], width: 512 },
+      stagingArea: { autoSwitchMode: 'progress' },
+      version: 2,
+    });
+
+    expect(migrated.stagingArea.autoSwitchMode).toBe('progress');
+  });
+
+  it('normalizes the removed oldest canvas staging auto-switch mode to off', () => {
+    const migrated = migrateCanvasStateToV2({
+      document: { height: 512, layers: [], width: 512 },
+      stagingArea: { autoSwitchMode: 'oldest' },
+      version: 2,
+    });
+
+    expect(migrated.stagingArea.autoSwitchMode).toBe('off');
+  });
+
   it('round-trips content-sized fields (paint offset, gradient width/height) on an already-v2 doc unchanged', () => {
     const paintOffset = { x: -30, y: 45 };
     const gradientExtent = { height: 220, width: 180 };
