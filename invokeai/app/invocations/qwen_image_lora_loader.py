@@ -75,14 +75,18 @@ class QwenImageLoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - Qwen Image",
     tags=["lora", "model", "qwen_image"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class QwenImageLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to a Qwen Image transformer."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None,
+        description="LoRA models and weights. May be a single LoRA or collection.",
+        title="LoRAs",
+        ui_model_base=[BaseModelType.QwenImage],
+        ui_model_type=ModelType.LoRA,
     )
     transformer: Optional[TransformerField] = InputField(
         default=None,
