@@ -13,6 +13,7 @@ export type LayerContextActionId =
   | 'transform'
   | 'fit-to-bbox'
   | 'save-to-assets'
+  | 'copy-to-clipboard'
   | 'rasterize'
   | 'convert-to-control'
   | 'convert-to-raster'
@@ -116,6 +117,13 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     id: 'save-to-assets',
     isDisabled: (ctx) => !ctx.hasEngine,
     labelKey: 'widgets.layers.actions.saveLayerToAssets',
+  },
+  {
+    defaultLabel: 'Copy layer to clipboard',
+    group: 'edit',
+    id: 'copy-to-clipboard',
+    isDisabled: (ctx) => !ctx.hasEngine,
+    labelKey: 'widgets.layers.actions.copyLayerToClipboard',
   },
   {
     defaultLabel: 'Rasterize',

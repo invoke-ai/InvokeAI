@@ -36,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 import type { LayerMoveKind } from './layerGroups';
 
 import { getLayerContextActions, type LayerContextAction, type LayerContextActionId } from './layerContextActions';
+import { copyBlobToClipboard } from './layerExportActions';
 import { reorderWithinGroupByKind } from './layerGroups';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
@@ -322,6 +323,14 @@ const LayerMenu = ({
     await uploadGalleryImage(file, 'none');
   }, [engine, layer.id]);
 
+  const handleCopyToClipboard = useCallback(async () => {
+    const result = await engine?.exportBakedLayerBlob(layer.id, { includeDisabled: true });
+    if (!result || result.status !== 'ok') {
+      return;
+    }
+    await copyBlobToClipboard(result.blob);
+  }, [engine, layer.id]);
+
   const handleLayerConfigAction = useCallback(
     (id: LayerContextActionId) => {
       if (id === 'control-transparency-effect' && layer.type === 'control') {
@@ -380,6 +389,9 @@ const LayerMenu = ({
         case 'save-to-assets':
           void handleSaveToAssets();
           break;
+        case 'copy-to-clipboard':
+          void handleCopyToClipboard();
+          break;
         case 'rasterize':
           handleRasterize();
           break;
@@ -409,6 +421,7 @@ const LayerMenu = ({
     [
       handleConvertToControl,
       handleConvertToRaster,
+      handleCopyToClipboard,
       handleDelete,
       handleDuplicate,
       handleFitToBbox,
@@ -593,6 +606,7 @@ const LAYER_ACTION_GROUPS: readonly LayerContextAction['group'][] = [
 
 const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
   'control-transparency-effect': SlidersHorizontalIcon,
+  'copy-to-clipboard': CopyIcon,
   'convert-to-control': SlidersHorizontalIcon,
   'convert-to-raster': ImageIcon,
   delete: Trash2Icon,

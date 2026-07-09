@@ -28,6 +28,7 @@ describe('getLayerContextActions', () => {
         'transform',
         'fit-to-bbox',
         'save-to-assets',
+        'copy-to-clipboard',
         'merge-down',
         'delete',
       ])
@@ -81,6 +82,7 @@ describe('getLayerContextActions', () => {
 
     expect(actions.find((action) => action.id === 'transform')?.isDisabled).toBe(true);
     expect(actions.find((action) => action.id === 'save-to-assets')?.isDisabled).toBe(true);
+    expect(actions.find((action) => action.id === 'copy-to-clipboard')?.isDisabled).toBe(true);
     expect(actions.find((action) => action.id === 'merge-down')?.isDisabled).toBe(true);
   });
 });
