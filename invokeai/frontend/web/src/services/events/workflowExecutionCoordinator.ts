@@ -1,6 +1,4 @@
-import { deepClone } from 'common/util/deepClone';
 import type { NodeExecutionState } from 'features/nodes/types/invocation';
-import { zNodeStatus } from 'features/nodes/types/invocation';
 import { LRUCache } from 'lru-cache';
 import type { S } from 'services/api/types';
 import {
@@ -10,6 +8,7 @@ import {
 import {
   getCompletedInvocationIdsFromCompletedSession,
   getNodeExecutionStatesFromCompletedSession,
+  getResetNodeExecutionStatesOnQueueItemStarted,
   getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
   getUpdatedNodeExecutionStateOnInvocationStarted,
@@ -215,17 +214,19 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
     }
 
     if (data.status === 'in_progress') {
-      for (const nes of Object.values(deps.getAllNodeExecutionStates())) {
+      const nextNodeExecutionStates = getResetNodeExecutionStatesOnQueueItemStarted(
+        deps.getAllNodeExecutionStates(),
+        data.item_id,
+        deps.completedInvocationKeysByItemId
+      );
+      if (!nextNodeExecutionStates) {
+        return true;
+      }
+      for (const nes of Object.values(nextNodeExecutionStates)) {
         if (!nes) {
           continue;
         }
-        const clone = deepClone(nes);
-        clone.status = zNodeStatus.enum.PENDING;
-        clone.error = null;
-        clone.progress = null;
-        clone.progressImage = null;
-        clone.outputs = [];
-        deps.setNodeExecutionState(clone.nodeId, clone);
+        deps.setNodeExecutionState(nes.nodeId, nes);
       }
     } else if (data.status === 'completed' || data.status === 'failed' || data.status === 'canceled') {
       if (data.origin === 'workflows') {
