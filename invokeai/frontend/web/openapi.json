@@ -19053,9 +19053,6 @@
                   "z_image_inpaint",
                   "z_image_outpaint",
                   "ernie_image_txt2img",
-                  "ernie_image_img2img",
-                  "ernie_image_inpaint",
-                  "ernie_image_outpaint",
                   "qwen_image_txt2img",
                   "qwen_image_img2img",
                   "qwen_image_inpaint",
@@ -22870,100 +22867,6 @@
         "version": "1.0.0",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
-        }
-      },
-      "ErnieImageVaeEncodeInvocation": {
-        "category": "latents",
-        "class": "invocation",
-        "classification": "prototype",
-        "description": "Encode an image into ERNIE-Image-ready packed latents.",
-        "node_pack": "invokeai",
-        "properties": {
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MetadataField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Optional metadata to be saved with the image",
-            "field_kind": "internal",
-            "input": "connection",
-            "orig_required": false,
-            "ui_hidden": false
-          },
-          "id": {
-            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
-            "field_kind": "node_attribute",
-            "title": "Id",
-            "type": "string"
-          },
-          "is_intermediate": {
-            "default": false,
-            "description": "Whether or not this is an intermediate invocation.",
-            "field_kind": "node_attribute",
-            "input": "direct",
-            "orig_required": true,
-            "title": "Is Intermediate",
-            "type": "boolean",
-            "ui_hidden": false,
-            "ui_type": "IsIntermediate"
-          },
-          "use_cache": {
-            "default": true,
-            "description": "Whether or not to use the cache",
-            "field_kind": "node_attribute",
-            "title": "Use Cache",
-            "type": "boolean"
-          },
-          "image": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ImageField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Input image to encode.",
-            "field_kind": "input",
-            "input": "any",
-            "orig_required": true
-          },
-          "vae": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VAEField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "VAE",
-            "field_kind": "input",
-            "input": "connection",
-            "orig_required": true
-          },
-          "type": {
-            "const": "ernie_image_vae_encode",
-            "default": "ernie_image_vae_encode",
-            "field_kind": "node_attribute",
-            "title": "type",
-            "type": "string"
-          }
-        },
-        "required": ["type", "id"],
-        "tags": ["latents", "image", "vae", "i2l", "ernie-image"],
-        "title": "Image to Latents - ERNIE-Image",
-        "type": "object",
-        "version": "1.0.0",
-        "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
         }
       },
       "ExpandMaskWithFadeInvocation": {
@@ -29722,9 +29625,6 @@
                 },
                 {
                   "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
-                },
-                {
-                  "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
@@ -37441,9 +37341,6 @@
                 "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
               },
               {
-                "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
-              },
-              {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
               },
               {
@@ -38612,9 +38509,6 @@
                 "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
               },
               {
-                "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
-              },
-              {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
               },
               {
@@ -39436,9 +39330,6 @@
           "ernie_image_vae_decode": {
             "$ref": "#/components/schemas/ImageOutput"
           },
-          "ernie_image_vae_encode": {
-            "$ref": "#/components/schemas/LatentsOutput"
-          },
           "esrgan": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -40118,7 +40009,6 @@
           "ernie_image_model_loader",
           "ernie_image_text_encoder",
           "ernie_image_vae_decode",
-          "ernie_image_vae_encode",
           "esrgan",
           "expand_mask_with_fade",
           "face_identifier",
@@ -40570,9 +40460,6 @@
               },
               {
                 "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
-              },
-              {
-                "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
@@ -41484,9 +41371,6 @@
               },
               {
                 "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
-              },
-              {
-                "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
