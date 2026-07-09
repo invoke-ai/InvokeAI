@@ -272,6 +272,10 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
         const { forward, inverse } = deleteLayerActions(selectedLayer, selectedIndex);
         engine.commitStructural(t('widgets.canvas.commands.deleteLayer'), forward, inverse);
       }
+    } else if (commandId === 'canvas.resetSelected') {
+      if (engine && selectedLayer) {
+        engine.clearMask(selectedLayer.id);
+      }
     } else if (commandId === 'canvas.undo') {
       // Canvas undo/redo is engine-scoped: it drives the engine-owned pixel/
       // structural history, NOT project-level (reducer) undo. When the canvas
@@ -338,6 +342,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       ['canvas.prevEntity', t('widgets.canvas.commands.previousEntity'), ['alt+[']],
       ['canvas.nextEntity', t('widgets.canvas.commands.nextEntity'), ['alt+]']],
       ['canvas.deleteSelected', t('widgets.canvas.commands.deleteSelected'), ['delete', 'backspace']],
+      ['canvas.resetSelected', t('widgets.canvas.commands.resetSelected'), ['shift+c']],
       ['canvas.undo', t('widgets.canvas.commands.undo'), ['mod+z']],
       ['canvas.redo', t('widgets.canvas.commands.redo'), ['mod+shift+z', 'mod+y']],
       // Tool selection and brush/eraser size step. `allowInEditable: false` below

@@ -392,3 +392,82 @@ describe('mask invert', () => {
     engine.dispose();
   });
 });
+
+describe('mask clear', () => {
+  it('clears a live unflushed inpaint mask and restores it through undo', () => {
+    const { engine, overlay } = setupEngine(maskDoc());
+    engine.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(50, 50));
+    overlay.fire('pointerup', pointerAt(50, 50, 0));
+
+    expect(engine.clearMask('mask1')).toBe(true);
+    expect(engine.clearMask('mask1')).toBe(false);
+    expect(engine.stores.canUndo.get()).toBe(true);
+
+    engine.undo();
+    expect(engine.stores.canRedo.get()).toBe(true);
+    engine.redo();
+    expect(engine.clearMask('mask1')).toBe(false);
+    engine.undo();
+    expect(engine.clearMask('mask1')).toBe(true);
+    engine.dispose();
+  });
+
+  it('clears a regional-guidance mask', () => {
+    const doc = maskDoc();
+    doc.layers[0] = {
+      autoNegative: false,
+      blendMode: 'normal',
+      id: 'mask1',
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
+      name: 'Region 1',
+      negativePrompt: null,
+      opacity: 1,
+      positivePrompt: null,
+      referenceImages: [],
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'regional_guidance',
+    };
+    const { engine, overlay } = setupEngine(doc);
+    engine.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(50, 50));
+    overlay.fire('pointerup', pointerAt(50, 50, 0));
+
+    expect(engine.clearMask('mask1')).toBe(true);
+    engine.dispose();
+  });
+
+  it('refuses missing, non-mask, locked, and empty layers', () => {
+    const locked = maskDoc();
+    locked.layers[0]!.isLocked = true;
+    const { engine } = setupEngine(locked);
+
+    expect(engine.clearMask('missing')).toBe(false);
+    expect(engine.clearMask('mask1')).toBe(false);
+    engine.dispose();
+
+    const raster = maskDoc();
+    raster.layers[0] = {
+      blendMode: 'normal',
+      id: 'mask1',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Raster 1',
+      opacity: 1,
+      source: { bitmap: null, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    };
+    const { engine: rasterEngine } = setupEngine(raster);
+    expect(rasterEngine.clearMask('mask1')).toBe(false);
+    rasterEngine.dispose();
+
+    const { engine: emptyEngine } = setupEngine(maskDoc());
+    expect(emptyEngine.clearMask('mask1')).toBe(false);
+    emptyEngine.dispose();
+  });
+});

@@ -934,6 +934,7 @@
         "previousEntity": "Previous canvas entity",
         "redo": "Redo canvas edit",
         "reorderLayer": "Reorder layer",
+        "resetSelected": "Clear selected mask",
         "selectAll": "Select all",
         "selectBboxTool": "Select generation frame tool",
         "selectBrushTool": "Select brush tool",

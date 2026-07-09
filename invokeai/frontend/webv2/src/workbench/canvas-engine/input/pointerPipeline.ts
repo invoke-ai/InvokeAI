@@ -104,7 +104,8 @@ const toPointerType = (type: string): PointerInput['pointerType'] =>
   type === 'pen' ? 'pen' : type === 'touch' ? 'touch' : 'mouse';
 
 const isAltKey = (event: KeyboardEvent): boolean => event.code === 'AltLeft' || event.code === 'AltRight';
-const isBboxKey = (event: KeyboardEvent): boolean => event.code === 'KeyC';
+const isBboxKey = (event: KeyboardEvent): boolean =>
+  event.code === 'KeyC' && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
 
 /**
  * True when the key event targets an editable element (text input, textarea, or

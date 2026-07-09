@@ -123,6 +123,8 @@ export interface BitmapStoreDeps {
 export interface BitmapStore {
   /** Marks a layer dirty and (re)arms its debounce timer. Called on each committed stroke. */
   markLayerDirty(layerId: string): void;
+  /** Cancels pending persistence and invalidates an in-flight result for one layer. */
+  discardLayer(layerId: string): void;
   /** Flushes every dirty layer immediately and resolves once all in-flight uploads settle. */
   flushPendingUploads(): Promise<void>;
   /**
@@ -204,6 +206,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   const hashToImage = new Map<string, CanvasImageUploadResult>();
   /** Layer id → the image name most recently dispatched by this store (self-echo guard). */
   const lastApplied = new Map<string, string>();
+  /** Per-layer generation used to invalidate an upload already in flight when its pixels are discarded. */
+  const layerGenerations = new Map<string, number>();
   let disposed = false;
 
   const clearTimer = (layerId: string): void => {
@@ -261,6 +265,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
 
   /** Encodes → hashes → dedupes/uploads → swaps the layer's ref, once. */
   const flushLayer = async (layerId: string): Promise<void> => {
+    const generationAtEntry = layerGenerations.get(layerId) ?? 0;
     const placed = deps.getLayerSurface(layerId);
     if (!placed) {
       // Layer or its cache is gone (or empty); nothing to persist.
@@ -323,6 +328,9 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     }
 
     if (disposed) {
+      return;
+    }
+    if ((layerGenerations.get(layerId) ?? 0) !== generationAtEntry) {
       return;
     }
     // Re-check the source right before dispatching: `encodeSurface`/`hashBlob`/
@@ -416,6 +424,14 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     scheduleFlush(layerId);
   };
 
+  const discardLayer = (layerId: string): void => {
+    layerGenerations.set(layerId, (layerGenerations.get(layerId) ?? 0) + 1);
+    dirty.delete(layerId);
+    dirtyReason.delete(layerId);
+    lastApplied.delete(layerId);
+    clearTimer(layerId);
+  };
+
   /** Safety net against a genuine infinite loop; real barrier calls settle in a handful of rounds. */
   const MAX_BARRIER_ITERATIONS = 10_000;
 
@@ -457,6 +473,9 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   };
 
   const reset = (): void => {
+    for (const layerId of inFlight.keys()) {
+      layerGenerations.set(layerId, (layerGenerations.get(layerId) ?? 0) + 1);
+    }
     // Cancel pending debounced flushes and drop dirty state for the OLD document.
     for (const handle of debounceTimers.values()) {
       timers.clearTimeout(handle);
@@ -480,7 +499,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     inFlight.clear();
     hashToImage.clear();
     lastApplied.clear();
+    layerGenerations.clear();
   };
 
-  return { dispose, flushPendingUploads, isSelfEcho, markLayerDirty, reset };
+  return { discardLayer, dispose, flushPendingUploads, isSelfEcho, markLayerDirty, reset };
 };

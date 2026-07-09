@@ -429,6 +429,8 @@ export interface CanvasEngine {
   deselect(): void;
   /** Inverts the selection within the document (`mod+shift+i`). */
   invertSelection(): void;
+  /** Clears an inpaint/regional mask as one undoable edit, preserving its non-pixel settings. */
+  clearMask(layerId: string): boolean;
   /**
    * Inverts a mask layer's alpha in place over `content ∪ bbox`, as one undoable
    * edit persisted through the normal dirty path. A no-op (returns `false`)
@@ -3390,6 +3392,59 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const fillSelection = (): void => runMaskedSelectionEdit('fill');
   const eraseSelection = (): void => runMaskedSelectionEdit('erase');
 
+  /** Clears a mask's live pixels and persisted bitmap while retaining prompts, fill, and modifiers. */
+  const clearMask = (layerId: string): boolean => {
+    if (pipeline.isGestureActive()) {
+      return false;
+    }
+    const doc = mirror.getDocument();
+    if (!doc) {
+      return false;
+    }
+    const layer = doc.layers.find((candidate) => candidate.id === layerId);
+    if (!layer || !isMaskLayer(layer) || layer.isLocked || !isLayerCacheReadyForOp(layer, doc)) {
+      return false;
+    }
+    const entry = layerCache.get(layerId);
+    if (!entry || isEmpty(entry.rect)) {
+      return false;
+    }
+    const before = entry.surface.ctx.getImageData(0, 0, entry.rect.width, entry.rect.height);
+    endNudgeBurst();
+    const rect = { ...entry.rect };
+    const emptyRect = { height: 0, width: 0, x: 0, y: 0 };
+    const dispatchEmptyMask = (offset: { x: number; y: number }): void => {
+      store.dispatch({
+        config: { layerType: layer.type, mask: { bitmap: null, offset } },
+        id: layerId,
+        type: 'updateCanvasLayerConfig',
+      });
+    };
+    const applyClear = (): void => {
+      bitmapStore.discardLayer(layerId);
+      dispatchEmptyMask({ x: 0, y: 0 });
+      layerCache.delete(layerId);
+      adjustedSurfaceCache.delete(layerId);
+      const empty = layerCache.getOrCreateRect(layerId, emptyRect);
+      empty.stale = false;
+      notifyLayerPainted(layerId);
+    };
+    const applyRestore = (): void => {
+      bitmapStore.discardLayer(layerId);
+      dispatchEmptyMask({ x: rect.x, y: rect.y });
+      restoreLayerCache(layerId, rect, before);
+    };
+
+    applyClear();
+    history.push({
+      bytes: before.data.byteLength + 256,
+      label: 'Clear mask',
+      redo: applyClear,
+      undo: applyRestore,
+    });
+    return true;
+  };
+
   /**
    * Inverts a mask layer's alpha in place, over the domain
    * `content ∪ liveCacheRect ∪ bbox` (the same bounded-domain decision the
@@ -3598,6 +3653,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     booleanMergeRasterLayers,
     clearCaches,
     clearHistory,
+    clearMask,
     contextMenuLayerIdAt,
     logDebugInfo,
     attach,

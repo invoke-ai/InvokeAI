@@ -41,12 +41,19 @@ const makePointerEvent = (init: FakePointerInit = {}): PointerEvent => {
   return self as unknown as PointerEvent;
 };
 
-const makeKeyEvent = (init: { code?: string; key?: string; repeat?: boolean; target?: unknown }): KeyboardEvent =>
+const makeKeyEvent = (init: {
+  code?: string;
+  key?: string;
+  repeat?: boolean;
+  shiftKey?: boolean;
+  target?: unknown;
+}): KeyboardEvent =>
   ({
     code: init.code ?? '',
     key: init.key ?? '',
     preventDefault: vi.fn(),
     repeat: init.repeat ?? false,
+    shiftKey: init.shiftKey ?? false,
     target: init.target ?? null,
   }) as unknown as KeyboardEvent;
 
@@ -423,6 +430,16 @@ describe('pointer pipeline: temporary modifier tools', () => {
     h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'c' }));
     expect(h.setTool).toHaveBeenLastCalledWith('bbox');
     expect(h.setTool.mock.calls.slice(-2)).toEqual([['brush', { temporary: true }], ['bbox']]);
+  });
+
+  it('leaves Shift+C to the registered clear-mask hotkey', () => {
+    const h = createHarness({ tools: ['view', 'brush', 'bbox'] });
+    h.pipeline.onPointerEnter();
+
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'C', shiftKey: true }));
+    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'C', shiftKey: true }));
+
+    expect(h.setTool).not.toHaveBeenCalled();
   });
 
   it('holding C restores the prior tool on release without sticky-selecting bbox', () => {

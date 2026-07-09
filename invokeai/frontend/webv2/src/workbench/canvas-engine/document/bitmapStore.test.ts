@@ -513,6 +513,24 @@ describe('createBitmapStore', () => {
     h.store.dispose();
   });
 
+  it('discardLayer cancels pending and in-flight persistence for one cleared layer', async () => {
+    const deferred = createDeferred<CanvasImageUploadResult>();
+    const uploadImage = vi.fn(() => deferred.promise);
+    const h = createHarness({ uploadImage });
+
+    h.store.markLayerDirty(LAYER);
+    const barrier = h.store.flushPendingUploads();
+    await drainUntil(() => uploadImage.mock.calls.length >= 1);
+
+    h.store.discardLayer(LAYER);
+    deferred.resolve({ height: 10, imageName: 'stale-mask', width: 10 });
+    await barrier;
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(h.dispatch).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+
   it('does not flush after dispose', async () => {
     const h = createHarness();
     h.store.markLayerDirty(LAYER);

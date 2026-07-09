@@ -961,6 +961,7 @@ const createSpyBitmapStore = (): BitmapStore & {
   markLayerDirty: Mock<(layerId: string) => void>;
   reset: Mock<() => void>;
 } => ({
+  discardLayer: vi.fn(),
   dispose: vi.fn(),
   flushPendingUploads: vi.fn(() => Promise.resolve()),
   isSelfEcho: () => false,
