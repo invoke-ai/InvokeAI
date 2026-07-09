@@ -268,6 +268,28 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('interaction lock forces view and refuses non-view tools until unlocked', () => {
+    const { engine } = createEngine();
+
+    engine.setTool('brush');
+    expect(engine.stores.activeTool.get()).toBe('brush');
+
+    engine.setInteractionLocked(true);
+    expect(engine.stores.activeTool.get()).toBe('view');
+
+    engine.setTool('bbox');
+    expect(engine.stores.activeTool.get()).toBe('view');
+
+    engine.setTool('colorPicker');
+    expect(engine.stores.activeTool.get()).toBe('view');
+
+    engine.setInteractionLocked(false);
+    engine.setTool('bbox');
+    expect(engine.stores.activeTool.get()).toBe('bbox');
+
+    engine.dispose();
+  });
+
   it('registers the brush and eraser tools', () => {
     const { engine } = createEngine();
     engine.setTool('brush');

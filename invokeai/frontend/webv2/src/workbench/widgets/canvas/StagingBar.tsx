@@ -4,7 +4,7 @@ import type { CanvasStagingAreaContractV2, CanvasStagingCandidateContract } from
 import { HStack, Menu, Portal, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton, MenuContent, toaster } from '@workbench/components/ui';
 import { getImageThumbnailUrl, saveImageToGallery } from '@workbench/gallery/api';
-import { CanvasFloatingBar } from '@workbench/widgets/canvas/CanvasFloatingBar';
+import { CanvasOptionsBar } from '@workbench/widgets/canvas/tool-options/CanvasOptionsBar';
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -128,7 +128,7 @@ export const StagingBar = ({
         </ScrollArea.Root>
       ) : null}
 
-      <CanvasFloatingBar>
+      <CanvasOptionsBar>
         <HStack gap="2">
           {isGenerating ? (
             <HStack color="fg.muted" gap="1.5" px="1">
@@ -218,7 +218,7 @@ export const StagingBar = ({
             </>
           ) : null}
         </HStack>
-      </CanvasFloatingBar>
+      </CanvasOptionsBar>
     </Stack>
   );
 };

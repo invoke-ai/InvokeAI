@@ -6,9 +6,9 @@
  * - Pointer capture on down; `getCoalescedEvents()` batching on move (so fast
  *   strokes keep every intermediate sample); mouse pressure defaulted to 0.5.
  * - Middle-mouse pan (engine-level, tool-independent).
- * - Modifier-hold temporary tools: space → view; alt → colorPicker (a no-op if
- *   that tool isn't registered yet — the registry decides). The prior tool is
- *   restored on release. Temp switches are suppressed mid-gesture, and are
+ * - Modifier/key-hold temporary tools: space → view, alt → colorPicker, hold C
+ *   → bbox (quick-tap C still sticky-selects bbox). The prior tool is restored
+ *   on release. Temp switches are suppressed mid-gesture, and are
  *   flagged `{ temporary: true }` on `setTool` so a session-bearing tool
  *   (transform) can tell them apart from a real switch and keep its session
  *   alive across the hold.
@@ -29,6 +29,10 @@ import type { Viewport } from '@workbench/canvas-engine/viewport';
 const ALT_TEMP_TOOL: ToolId = 'colorPicker';
 /** The tool id temporarily activated while space is held. */
 const SPACE_TEMP_TOOL: ToolId = 'view';
+/** The tool id temporarily activated while the bbox key is held. */
+const BBOX_TEMP_TOOL: ToolId = 'bbox';
+/** Key-up before this threshold keeps the bbox tool selected, preserving the old tap behavior. */
+const BBOX_QUICK_TAP_MS = 180;
 
 /** Dependencies injected by the engine. */
 export interface PointerPipelineDeps {
@@ -100,6 +104,7 @@ const toPointerType = (type: string): PointerInput['pointerType'] =>
   type === 'pen' ? 'pen' : type === 'touch' ? 'touch' : 'mouse';
 
 const isAltKey = (event: KeyboardEvent): boolean => event.code === 'AltLeft' || event.code === 'AltRight';
+const isBboxKey = (event: KeyboardEvent): boolean => event.code === 'KeyC';
 
 /**
  * True when the key event targets an editable element (text input, textarea, or
@@ -127,9 +132,12 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   let middlePanning = false;
   let middleLast: Vec2 | null = null;
   // Temporary modifier-hold tool.
-  let tempHold: 'space' | 'alt' | null = null;
+  let tempHold: 'space' | 'alt' | 'bbox' | null = null;
   let priorToolId: ToolId = deps.getActiveToolId();
   let tempSwitched = false;
+  let restoreTempAfterGesture = false;
+  let bboxQuickTap = false;
+  let bboxTapTimer: ReturnType<typeof setTimeout> | null = null;
 
   const buildPointerInput = (event: PointerEvent): PointerInput => {
     const el = deps.getInputElement();
@@ -169,6 +177,24 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     }
     deps.getActiveTool()?.onPointerCancel?.(deps.getToolContext());
     deps.updateCursor();
+    if (restoreTempAfterGesture && tempHold) {
+      endTempTool();
+    }
+  };
+
+  const clearBboxTapTimer = (): void => {
+    if (bboxTapTimer !== null) {
+      clearTimeout(bboxTapTimer);
+      bboxTapTimer = null;
+    }
+  };
+
+  const markBboxHold = (): void => {
+    if (tempHold !== 'bbox') {
+      return;
+    }
+    bboxQuickTap = false;
+    clearBboxTapTimer();
   };
 
   const beginTempTool = (hold: 'space' | 'alt', toolId: ToolId): void => {
@@ -185,12 +211,72 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     }
   };
 
-  const endTempTool = (): void => {
+  const beginBboxTempTool = (): void => {
+    if (tempHold || gestureActive) {
+      return;
+    }
+    tempHold = 'bbox';
+    priorToolId = deps.getActiveToolId();
+    restoreTempAfterGesture = false;
+    bboxQuickTap = true;
+    clearBboxTapTimer();
+    bboxTapTimer = setTimeout(() => {
+      bboxQuickTap = false;
+      bboxTapTimer = null;
+    }, BBOX_QUICK_TAP_MS);
+
+    if (hovered && deps.hasTool(BBOX_TEMP_TOOL)) {
+      deps.setTool(BBOX_TEMP_TOOL, { temporary: true });
+      tempSwitched = true;
+    } else {
+      tempSwitched = false;
+    }
+  };
+
+  function endTempTool(): void {
+    clearBboxTapTimer();
     if (tempSwitched) {
       deps.setTool(priorToolId, { temporary: true });
     }
     tempHold = null;
     tempSwitched = false;
+    restoreTempAfterGesture = false;
+    bboxQuickTap = false;
+  }
+
+  const releaseTempTool = (): void => {
+    if (!tempHold) {
+      return;
+    }
+    if (gestureActive) {
+      restoreTempAfterGesture = true;
+      return;
+    }
+    endTempTool();
+  };
+
+  const releaseBboxTempTool = (): void => {
+    if (tempHold !== 'bbox') {
+      return;
+    }
+    clearBboxTapTimer();
+    if (gestureActive) {
+      bboxQuickTap = false;
+      restoreTempAfterGesture = true;
+      return;
+    }
+    if (bboxQuickTap) {
+      if (tempSwitched) {
+        deps.setTool(priorToolId, { temporary: true });
+      }
+      deps.setTool(BBOX_TEMP_TOOL);
+      tempHold = null;
+      tempSwitched = false;
+      restoreTempAfterGesture = false;
+      bboxQuickTap = false;
+      return;
+    }
+    endTempTool();
   };
 
   return {
@@ -233,14 +319,20 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       }
       if (isAltKey(event) && !event.repeat) {
         beginTempTool('alt', ALT_TEMP_TOOL);
+        return;
+      }
+      if (isBboxKey(event) && !event.repeat) {
+        beginBboxTempTool();
       }
     },
     isGestureActive: () => gestureActive,
     onKeyUp: (event) => {
       if (event.code === 'Space' && tempHold === 'space') {
-        endTempTool();
+        releaseTempTool();
       } else if (isAltKey(event) && tempHold === 'alt') {
-        endTempTool();
+        releaseTempTool();
+      } else if (isBboxKey(event) && tempHold === 'bbox') {
+        releaseBboxTempTool();
       }
     },
     onPointerCancel: (event) => {
@@ -284,6 +376,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         event.preventDefault();
         return;
       }
+      markBboxHold();
       el?.setPointerCapture?.(event.pointerId);
       activePointerId = event.pointerId;
       gestureActive = true;
@@ -334,8 +427,12 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       activePointerId = null;
       deps.getActiveTool()?.onPointerUp?.(deps.getToolContext(), buildPointerInput(event));
       deps.updateCursor();
+      if (restoreTempAfterGesture && tempHold) {
+        endTempTool();
+      }
     },
     reset: () => {
+      clearBboxTapTimer();
       if (tempHold) {
         endTempTool();
       }

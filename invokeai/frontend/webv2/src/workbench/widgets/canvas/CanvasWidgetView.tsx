@@ -20,7 +20,9 @@ import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/Workb
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { BboxDetailsBar } from './BboxDetailsBar';
 import { gridSizeForModelBase } from './bboxGrid';
+import { isCanvasStagingActive } from './canvasInteractionLock';
 import {
   CANVAS_SETTINGS,
   CANVAS_SHOW_PROGRESS_KEY,
@@ -84,6 +86,10 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     }
     // Suppress the browser context menu everywhere else on the surface.
     event.preventDefault();
+    if (isInteractionLocked) {
+      setLayerMenuTarget(null);
+      return;
+    }
     if (!engine) {
       setLayerMenuTarget(null);
       return;
@@ -172,6 +178,13 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     [canvasQueueItemIdsKey]
   );
   const isCanvasGenerationInFlight = canvasQueueItemIds.size > 0;
+  const isInteractionLocked = isCanvasStagingActive({ hasStagedCandidates, isCanvasGenerationInFlight });
+
+  useEffect(() => {
+    engine?.setInteractionLocked(isInteractionLocked);
+    return () => engine?.setInteractionLocked(false);
+  }, [engine, isInteractionLocked]);
+
   // "Show progress on canvas" gates ONLY the live denoise-frame preview; when off,
   // the accepted staged candidate still previews (that's staging, not progress).
   const liveProgressImage = selectCanvasProgressImage(useProgressImage(), canvasQueueItemIds);
@@ -212,6 +225,28 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     const selectedIndex = selectedLayerId ? layers.findIndex((layer) => layer.id === selectedLayerId) : -1;
     const selectedLayer = selectedIndex >= 0 ? layers[selectedIndex] : undefined;
 
+    if (commandId === 'canvas.prevEntity' && hasStagedCandidates) {
+      dispatch({ direction: -1, type: 'cycleStagedImage' });
+      return;
+    }
+
+    if (commandId === 'canvas.nextEntity' && hasStagedCandidates) {
+      dispatch({ direction: 1, type: 'cycleStagedImage' });
+      return;
+    }
+
+    if (commandId === 'canvas.deleteSelected' && hasStagedCandidates) {
+      dispatch({ type: 'discardSelectedStagedImage' });
+      return;
+    }
+
+    if (isInteractionLocked) {
+      if (commandId === 'canvas.tool.view') {
+        engine?.setTool('view');
+      }
+      return;
+    }
+
     // Arrow-key nudge: engine owns the bounds/lock logic (no-op with no/locked selection).
     const nudge = NUDGE_DELTAS[commandId];
     if (nudge) {
@@ -235,15 +270,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       return;
     }
 
-    if (commandId === 'canvas.prevEntity' && hasStagedCandidates) {
-      dispatch({ direction: -1, type: 'cycleStagedImage' });
-    } else if (commandId === 'canvas.nextEntity' && hasStagedCandidates) {
-      dispatch({ direction: 1, type: 'cycleStagedImage' });
-    } else if (commandId === 'canvas.deleteSelected') {
+    if (commandId === 'canvas.deleteSelected') {
       // Staged images take priority; otherwise delete the selected layer (undoable).
-      if (hasStagedCandidates) {
-        dispatch({ type: 'discardSelectedStagedImage' });
-      } else if (engine && selectedLayer && selectedIndex >= 0) {
+      if (engine && selectedLayer && selectedIndex >= 0) {
         const { forward, inverse } = deleteLayerActions(selectedLayer, selectedIndex);
         engine.commitStructural(t('widgets.canvas.commands.deleteLayer'), forward, inverse);
       }
@@ -321,7 +350,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       ['canvas.tool.view', t('widgets.canvas.commands.selectViewTool'), ['h']],
       ['canvas.tool.move', t('widgets.canvas.commands.selectMoveTool'), ['v']],
       ['canvas.transformSelected', t('widgets.canvas.commands.selectTransformTool'), ['mod+t']],
-      ['canvas.tool.bbox', t('widgets.canvas.commands.selectBboxTool'), ['c']],
+      ['canvas.tool.bbox', t('widgets.canvas.commands.selectBboxTool'), []],
       ['canvas.tool.brush', t('widgets.canvas.commands.selectBrushTool'), ['b']],
       ['canvas.tool.eraser', t('widgets.canvas.commands.selectEraserTool'), ['e']],
       ['canvas.tool.lasso', t('widgets.canvas.commands.selectLassoTool'), ['l']],
@@ -366,7 +395,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       {engine ? (
         <>
           <CanvasSurface engine={engine} onContextMenu={handleSurfaceContextMenu} />
-          <ToolStrip engine={engine} />
+          <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
           <CanvasLayerContextMenu
             dispatch={dispatch}
             engine={engine}
@@ -404,14 +433,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
             onToggleVisibility={() => dispatch({ type: 'toggleCanvasStagingVisibility' })}
           />
         ) : null}
-        {engine ? (
-          <ToolOptionsBar
-            bboxHeight={document.bbox.height}
-            bboxWidth={document.bbox.width}
-            documentHeight={document.height}
-            documentWidth={document.width}
-            engine={engine}
-          />
+        {engine && !isInteractionLocked ? <BboxDetailsBar engine={engine} /> : null}
+        {engine && !isInteractionLocked ? (
+          <ToolOptionsBar documentHeight={document.height} documentWidth={document.width} engine={engine} />
         ) : null}
       </Stack>
     </Box>

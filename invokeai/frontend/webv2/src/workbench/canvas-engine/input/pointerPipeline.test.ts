@@ -4,7 +4,7 @@ import type { PointerInput, ToolId } from '@workbench/canvas-engine/types';
 
 import { createPointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createViewport } from '@workbench/canvas-engine/viewport';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // ---- Fakes -----------------------------------------------------------------
 
@@ -114,6 +114,10 @@ const createHarness = (
 };
 
 // ---- Tests -----------------------------------------------------------------
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('pointer pipeline: pressure + capture', () => {
   it('captures the pointer on primary down and defaults mouse pressure to 0.5', () => {
@@ -406,6 +410,43 @@ describe('pointer pipeline: temporary modifier tools', () => {
     h.pipeline.onKeyDown(makeKeyEvent({ code: 'AltLeft' }));
     expect(h.setTool).toHaveBeenLastCalledWith('colorPicker', { temporary: true });
     h.pipeline.onKeyUp(makeKeyEvent({ code: 'AltLeft' }));
+    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
+  });
+
+  it('quick-tapping C sticky-selects the bbox tool after the temporary preview switch', () => {
+    const h = createHarness({ tools: ['view', 'brush', 'bbox'] });
+    h.pipeline.onPointerEnter();
+
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'c' }));
+    expect(h.setTool).toHaveBeenLastCalledWith('bbox', { temporary: true });
+
+    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'c' }));
+    expect(h.setTool).toHaveBeenLastCalledWith('bbox');
+    expect(h.setTool.mock.calls.slice(-2)).toEqual([['brush', { temporary: true }], ['bbox']]);
+  });
+
+  it('holding C restores the prior tool on release without sticky-selecting bbox', () => {
+    vi.useFakeTimers();
+    const h = createHarness({ tools: ['view', 'brush', 'bbox'] });
+    h.pipeline.onPointerEnter();
+
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'c' }));
+    vi.runAllTimers();
+    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'c' }));
+
+    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
+  });
+
+  it('keeps temporary bbox active until pointerup when C is released mid-gesture', () => {
+    const h = createHarness({ tools: ['view', 'brush', 'bbox'] });
+    h.pipeline.onPointerEnter();
+
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'c' }));
+    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 11 }));
+    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'c' }));
+    expect(h.setTool).toHaveBeenLastCalledWith('bbox', { temporary: true });
+
+    h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 11 }));
     expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
   });
 

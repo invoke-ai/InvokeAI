@@ -1,15 +1,14 @@
-import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
-import type { Rect } from '@workbench/canvas-engine/types';
+import type { SelectValueChangeDetails } from '@chakra-ui/react';
 
-import { createListCollection, HStack, NumberInput, Text } from '@chakra-ui/react';
-import { bboxEquals, constrainBboxToRatio, roundBbox } from '@workbench/canvas-engine/tools/bboxHitTest';
+import { createListCollection, HStack } from '@chakra-ui/react';
+import { constrainBboxToRatio } from '@workbench/canvas-engine/tools/bboxHitTest';
 import { Select, ToggleDot } from '@workbench/components/ui';
-import { useBboxGrid, useBboxOptions } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ToolOptionsComponentProps } from './ToolOptionsBar';
+
+import { useBboxEditor } from './useBboxEditor';
 
 /** Aspect-ratio presets offered in the options bar. `null` ratio = Free (unlocked). */
 interface AspectPreset {
@@ -28,24 +27,17 @@ const ASPECT_PRESETS: readonly AspectPreset[] = [
 
 const ASPECT_TRIGGER_PROPS = { minW: '5.5rem' } as const;
 
-const bboxEqualsSelected = (a: Rect | null, b: Rect | null): boolean =>
-  a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height);
-
 /** The preset id whose ratio matches `aspectRatio` (within tolerance), or `null`. */
 const matchingPresetId = (aspectRatio: number): string | null =>
   ASPECT_PRESETS.find((preset) => preset.ratio !== null && Math.abs(preset.ratio - aspectRatio) < 1e-3)?.id ?? null;
 
 /**
- * Bbox tool options: numeric W/H and X/Y of the generation frame (document px,
- * snap-rounded), an aspect-ratio preset select, and an aspect lock toggle. Frame
- * edits commit through the engine's structural history (shared canvas undo stack
- * with drags); the aspect lock/ratio lives in the engine's transient store.
+ * Bbox tool options: aspect-ratio preset select and aspect lock toggle. Numeric
+ * frame details live in the separate bbox details bar.
  */
 export const BboxOptions = ({ engine }: ToolOptionsComponentProps) => {
   const { t } = useTranslation();
-  const bbox = useActiveProjectSelector((project) => project.canvas.document.bbox, bboxEqualsSelected);
-  const options = useBboxOptions(engine);
-  const grid = useBboxGrid(engine);
+  const { bbox, commitBbox, grid, options } = useBboxEditor(engine);
 
   const collection = useMemo(
     () =>
@@ -60,55 +52,6 @@ export const BboxOptions = ({ engine }: ToolOptionsComponentProps) => {
   const selectValue = useMemo(
     () => [options.aspectLocked ? (matchingPresetId(options.aspectRatio) ?? 'Free') : 'Free'],
     [options.aspectLocked, options.aspectRatio]
-  );
-
-  const commitBbox = useCallback(
-    (next: Rect) => {
-      const rounded = roundBbox(next);
-      if (bboxEquals(rounded, bbox)) {
-        return;
-      }
-      engine.commitStructural(
-        t('widgets.canvas.toolOptions.setFrame'),
-        { bbox: rounded, type: 'setCanvasBbox' },
-        { bbox: roundBbox(bbox), type: 'setCanvasBbox' }
-      );
-    },
-    [bbox, engine, t]
-  );
-
-  const setWidth = useCallback(
-    (value: number) => {
-      const width = Math.max(1, Math.round(value / grid) * grid);
-      const height =
-        options.aspectLocked && options.aspectRatio > 0
-          ? Math.max(1, Math.round(width / options.aspectRatio))
-          : bbox.height;
-      commitBbox({ height, width, x: bbox.x, y: bbox.y });
-    },
-    [bbox, commitBbox, grid, options.aspectLocked, options.aspectRatio]
-  );
-
-  const setHeight = useCallback(
-    (value: number) => {
-      const height = Math.max(1, Math.round(value / grid) * grid);
-      const width =
-        options.aspectLocked && options.aspectRatio > 0
-          ? Math.max(1, Math.round(height * options.aspectRatio))
-          : bbox.width;
-      commitBbox({ height, width, x: bbox.x, y: bbox.y });
-    },
-    [bbox, commitBbox, grid, options.aspectLocked, options.aspectRatio]
-  );
-
-  const setX = useCallback(
-    (value: number) => commitBbox({ ...bbox, x: Math.round(value / grid) * grid }),
-    [bbox, commitBbox, grid]
-  );
-
-  const setY = useCallback(
-    (value: number) => commitBbox({ ...bbox, y: Math.round(value / grid) * grid }),
-    [bbox, commitBbox, grid]
   );
 
   const onAspectPresetChange = useCallback(
@@ -141,77 +84,8 @@ export const BboxOptions = ({ engine }: ToolOptionsComponentProps) => {
     [bbox, engine, options.aspectRatio]
   );
 
-  const onWidthChange = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        setWidth(valueAsNumber);
-      }
-    },
-    [setWidth]
-  );
-  const onHeightChange = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        setHeight(valueAsNumber);
-      }
-    },
-    [setHeight]
-  );
-  const onXChange = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        setX(valueAsNumber);
-      }
-    },
-    [setX]
-  );
-  const onYChange = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        setY(valueAsNumber);
-      }
-    },
-    [setY]
-  );
-
   return (
     <HStack align="center" gap="3">
-      <HStack align="center" gap="1.5">
-        <Text color="fg.muted" fontSize="2xs">
-          {t('widgets.canvas.toolOptions.frameWidth')}
-        </Text>
-        <NumberInput.Root min={1} size="xs" value={String(bbox.width)} w="5rem" onValueChange={onWidthChange}>
-          <NumberInput.Control />
-          <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.frameWidth')} fontSize="xs" />
-        </NumberInput.Root>
-      </HStack>
-      <HStack align="center" gap="1.5">
-        <Text color="fg.muted" fontSize="2xs">
-          {t('widgets.canvas.toolOptions.frameHeight')}
-        </Text>
-        <NumberInput.Root min={1} size="xs" value={String(bbox.height)} w="5rem" onValueChange={onHeightChange}>
-          <NumberInput.Control />
-          <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.frameHeight')} fontSize="xs" />
-        </NumberInput.Root>
-      </HStack>
-      <HStack align="center" gap="1.5">
-        <Text color="fg.muted" fontSize="2xs">
-          {t('widgets.canvas.toolOptions.positionX')}
-        </Text>
-        <NumberInput.Root size="xs" value={String(bbox.x)} w="5rem" onValueChange={onXChange}>
-          <NumberInput.Control />
-          <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.positionX')} fontSize="xs" />
-        </NumberInput.Root>
-      </HStack>
-      <HStack align="center" gap="1.5">
-        <Text color="fg.muted" fontSize="2xs">
-          {t('widgets.canvas.toolOptions.positionY')}
-        </Text>
-        <NumberInput.Root size="xs" value={String(bbox.y)} w="5rem" onValueChange={onYChange}>
-          <NumberInput.Control />
-          <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.positionY')} fontSize="xs" />
-        </NumberInput.Root>
-      </HStack>
       <Select
         aria-label={t('widgets.canvas.toolOptions.aspectRatio')}
         collection={collection}

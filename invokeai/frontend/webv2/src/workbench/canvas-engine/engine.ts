@@ -181,7 +181,9 @@ export interface CanvasEngine {
   /** Sizes the backing stores to `css × min(dpr, 2)` and updates the viewport. */
   resize(cssWidth: number, cssHeight: number, dpr: number): void;
   /** Activates a tool (deactivating the previous one). */
-  setTool(toolId: ToolId): void;
+  setTool(toolId: ToolId, opts?: { temporary?: boolean }): void;
+  /** Locks interaction to the view tool; used while staged canvas results await a decision. */
+  setInteractionLocked(locked: boolean): void;
   /**
    * Steps the active brush/eraser diameter by one notch (`+1` grows, `-1`
    * shrinks) — the same helper the ctrl+wheel path drives, so the `[`/`]`
@@ -528,6 +530,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     ['text', createTextTool()],
   ]);
   let activeToolId: ToolId = 'view';
+  let interactionLocked = false;
 
   // Transient per-layer transform overrides driving the move/transform drag
   // preview (compositor + overlay read at render time; the mirror stays untouched).
@@ -1615,6 +1618,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   // ---- Public API ---------------------------------------------------------
 
   function setTool(toolId: ToolId, opts?: { temporary?: boolean }): void {
+    if (interactionLocked && toolId !== 'view') {
+      return;
+    }
     if (toolId === activeToolId) {
       return;
     }
@@ -1627,6 +1633,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // on the active tool, so a switch must repaint it even without a doc change.
     scheduler.invalidate({ overlay: true });
   }
+
+  const setInteractionLocked = (locked: boolean): void => {
+    if (interactionLocked === locked) {
+      return;
+    }
+    interactionLocked = locked;
+    if (locked) {
+      pipeline.cancelActiveGesture();
+      setTool('view');
+    }
+  };
 
   const attach = (screenCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement): void => {
     if (disposed) {
@@ -3111,6 +3128,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     resize,
     setBboxGrid: (size) => stores.bboxGrid.set(size > 0 ? size : 1),
     setFilterPreview,
+    setInteractionLocked,
     setStagedPreview,
     setTool,
     stepBrushSize: stepActiveBrushSize,
