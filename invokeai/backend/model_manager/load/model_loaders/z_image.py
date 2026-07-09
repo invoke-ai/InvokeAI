@@ -1590,9 +1590,7 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
         # incompatible or contaminated export) must fail here. The later meta-parameter guard only
         # catches missing required params, not unexpected ones.
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
-        raise_on_incomplete_sdnq_load(
-            "SDNQ Qwen3 encoder", missing, unexpected, allowed_missing={"lm_head.weight"}
-        )
+        raise_on_incomplete_sdnq_load("SDNQ Qwen3 encoder", missing, unexpected, allowed_missing={"lm_head.weight"})
 
         # Dequantize embed_tokens weight - embedding lookups require indexed access
         embed_tokens_weight = model.model.embed_tokens.weight
