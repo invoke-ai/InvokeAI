@@ -12,6 +12,8 @@ export interface SliderProps extends Omit<ChakraSlider.RootProps, 'children'> {
   marks?: SliderMark[];
   /** Show the formatted value above each thumb while the slider is hovered or a thumb is dragged. */
   withThumbTooltip?: boolean;
+  /** Optional visual rendered behind the track and thumbs. */
+  trackDecoration?: ReactNode;
 }
 
 // Marks stay mounted so the slider keeps a stable height, but only fade in
@@ -70,6 +72,7 @@ const SliderThumb = ({ index, isTooltipOpen, label }: { index: number; isTooltip
 export const Slider = ({
   formatValue = formatValueDefault,
   marks,
+  trackDecoration,
   withThumbTooltip = true,
   ...rootProps
 }: SliderProps) => {
@@ -159,6 +162,7 @@ export const Slider = ({
       thumbCollisionBehavior="push"
     >
       <ChakraSlider.Control>
+        {trackDecoration}
         <ChakraSlider.Track>
           <ChakraSlider.Range />
         </ChakraSlider.Track>
