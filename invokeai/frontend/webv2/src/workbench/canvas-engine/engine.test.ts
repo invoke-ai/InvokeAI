@@ -384,6 +384,93 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('cropLayerToBbox replaces a raster/control source with bbox-sized paint pixels at identity', async () => {
+    const doc = { ...makeDoc(), bbox: { height: 7, width: 6, x: 2, y: 3 } };
+    const { store } = createFakeStore(doc);
+    const dispatch = store.dispatch as Mock;
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const engine = createCanvasEngine({
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.cropLayerToBbox('a')).toBe(true);
+
+    expect(dispatch.mock.calls.map((call) => call[0])).toEqual(
+      expect.arrayContaining([
+        { id: 'a', source: { bitmap: null, offset: { x: 2, y: 3 }, type: 'paint' }, type: 'updateCanvasLayerSource' },
+        {
+          id: 'a',
+          patch: { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 } },
+          type: 'updateCanvasLayer',
+        },
+      ])
+    );
+    const cropped = surfaces.find((surface) => surface.width === 6 && surface.height === 7);
+    expect(cropped?.callLog.some((entry) => entry.op === 'drawImage')).toBe(true);
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox replaces a mask bitmap while preserving mask fill', async () => {
+    const layer: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('mask'),
+      mask: { bitmap: { height: 10, imageName: 'mask-img', width: 10 }, fill: { color: '#e07575', style: 'diagonal' } },
+    };
+    const doc = { ...makeDoc(), bbox: { height: 7, width: 6, x: 2, y: 3 }, layers: [layer] };
+    const { store } = createFakeStore(doc);
+    const dispatch = store.dispatch as Mock;
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.cropLayerToBbox('mask')).toBe(true);
+
+    expect(dispatch.mock.calls.map((call) => call[0])).toEqual(
+      expect.arrayContaining([
+        {
+          config: { layerType: 'inpaint_mask', mask: { bitmap: null, offset: { x: 2, y: 3 } } },
+          id: 'mask',
+          type: 'updateCanvasLayerConfig',
+        },
+        {
+          id: 'mask',
+          patch: { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 } },
+          type: 'updateCanvasLayer',
+        },
+      ])
+    );
+    engine.dispose();
+  });
+
+  it('cropLayerToBbox refuses locked layers', async () => {
+    const doc = { ...makeDoc(), layers: [{ ...rasterLayer('a'), isLocked: true }] };
+    const { store } = createFakeStore(doc);
+    const dispatch = store.dispatch as Mock;
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.cropLayerToBbox('a')).toBe(false);
+    expect(dispatch).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
   it('setTool switches the active tool and updates the store', () => {
     const { engine } = createEngine();
     const listener = vi.fn();

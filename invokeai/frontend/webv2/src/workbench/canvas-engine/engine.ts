@@ -314,6 +314,12 @@ export interface CanvasEngine {
   /** Encodes {@link exportBakedLayerPixels} as a PNG blob for save/copy/upload actions. */
   exportBakedLayerBlob(layerId: string, options?: ExportBakedLayerPixelsOptions): Promise<ExportBakedLayerBlobResult>;
   /**
+   * Destructively crops a layer to the current bbox: bakes transform/adjustments
+   * into bbox-sized paint/mask pixels, resets transform to identity, and persists
+   * through the normal bitmap-store path. A no-op for locked/missing/unsupported layers.
+   */
+  cropLayerToBbox(layerId: string): Promise<boolean>;
+  /**
    * Rasterizes a parametric (shape/gradient/text) layer to a paint layer: bakes its
    * current appearance into a content-sized paint bitmap (persisted through the
    * normal dirty path) and converts the source via `convertCanvasLayer`. UNDOABLE
@@ -1149,6 +1155,70 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return result;
     }
     return { blob: await backend.encodeSurface(result.surface, 'image/png'), rect: result.rect, status: 'ok' };
+  };
+
+  const cropLayerToBbox = async (layerId: string): Promise<boolean> => {
+    if (pipeline.isGestureActive()) {
+      return false;
+    }
+    endNudgeBurst();
+    const doc = mirror.getDocument();
+    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
+    if (!doc || !layer || layer.isLocked) {
+      return false;
+    }
+    const cropRect = roundOut(doc.bbox);
+    if (isEmpty(cropRect)) {
+      return false;
+    }
+
+    const baked = await exportBakedLayerPixels(layerId, { includeDisabled: true });
+    if (baked.status !== 'ok') {
+      return false;
+    }
+
+    const cropped = backend.createSurface(cropRect.width, cropRect.height);
+    const cctx = cropped.ctx;
+    cctx.setTransform(1, 0, 0, 1, 0, 0);
+    cctx.clearRect(0, 0, cropRect.width, cropRect.height);
+    cctx.drawImage(baked.surface.canvas, baked.rect.x - cropRect.x, baked.rect.y - cropRect.y);
+
+    const identity = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
+    if (layer.type === 'raster' || layer.type === 'control') {
+      store.dispatch({
+        id: layerId,
+        source: { bitmap: null, offset: { x: cropRect.x, y: cropRect.y }, type: 'paint' },
+        type: 'updateCanvasLayerSource',
+      });
+      if (layer.type === 'raster' && layer.adjustments) {
+        store.dispatch({
+          config: { adjustments: undefined, layerType: 'raster' },
+          id: layerId,
+          type: 'updateCanvasLayerConfig',
+        });
+      } else if (layer.type === 'control' && layer.filter) {
+        store.dispatch({
+          config: { filter: undefined, layerType: 'control' },
+          id: layerId,
+          type: 'updateCanvasLayerConfig',
+        });
+      }
+    } else {
+      store.dispatch({
+        config: { layerType: layer.type, mask: { bitmap: null, offset: { x: cropRect.x, y: cropRect.y } } },
+        id: layerId,
+        type: 'updateCanvasLayerConfig',
+      });
+    }
+    store.dispatch({ id: layerId, patch: { transform: identity }, type: 'updateCanvasLayer' });
+
+    layerCache.delete(layerId);
+    const target = layerCache.getOrCreateRect(layerId, cropRect);
+    target.surface.ctx.drawImage(cropped.canvas, 0, 0);
+    target.stale = false;
+    notifyLayerPainted(layerId);
+    bitmapStore.markLayerDirty(layerId);
+    return true;
   };
 
   /**
@@ -3186,6 +3256,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     commitOpenTextSession,
     commitStructural,
     commitTextEdit,
+    cropLayerToBbox,
     deselect,
     detach,
     dispose,

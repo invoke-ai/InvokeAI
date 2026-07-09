@@ -18,6 +18,7 @@ import {
   ArrowUpIcon,
   ArrowUpToLineIcon,
   CopyIcon,
+  CropIcon,
   EyeIcon,
   EyeOffIcon,
   ImageIcon,
@@ -331,6 +332,10 @@ const LayerMenu = ({
     await copyBlobToClipboard(result.blob);
   }, [engine, layer.id]);
 
+  const handleCropToBbox = useCallback(() => {
+    void engine?.cropLayerToBbox(layer.id);
+  }, [engine, layer.id]);
+
   const handleLayerConfigAction = useCallback(
     (id: LayerContextActionId) => {
       if (id === 'control-transparency-effect' && layer.type === 'control') {
@@ -392,6 +397,9 @@ const LayerMenu = ({
         case 'copy-to-clipboard':
           void handleCopyToClipboard();
           break;
+        case 'crop-to-bbox':
+          handleCropToBbox();
+          break;
         case 'rasterize':
           handleRasterize();
           break;
@@ -422,6 +430,7 @@ const LayerMenu = ({
       handleConvertToControl,
       handleConvertToRaster,
       handleCopyToClipboard,
+      handleCropToBbox,
       handleDelete,
       handleDuplicate,
       handleFitToBbox,
@@ -607,6 +616,7 @@ const LAYER_ACTION_GROUPS: readonly LayerContextAction['group'][] = [
 const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
   'control-transparency-effect': SlidersHorizontalIcon,
   'copy-to-clipboard': CopyIcon,
+  'crop-to-bbox': CropIcon,
   'convert-to-control': SlidersHorizontalIcon,
   'convert-to-raster': ImageIcon,
   delete: Trash2Icon,

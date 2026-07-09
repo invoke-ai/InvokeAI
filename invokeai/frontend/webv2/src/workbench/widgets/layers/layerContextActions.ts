@@ -14,6 +14,7 @@ export type LayerContextActionId =
   | 'fit-to-bbox'
   | 'save-to-assets'
   | 'copy-to-clipboard'
+  | 'crop-to-bbox'
   | 'rasterize'
   | 'convert-to-control'
   | 'convert-to-raster'
@@ -124,6 +125,13 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     id: 'copy-to-clipboard',
     isDisabled: (ctx) => !ctx.hasEngine,
     labelKey: 'widgets.layers.actions.copyLayerToClipboard',
+  },
+  {
+    defaultLabel: 'Crop layer to bbox',
+    group: 'edit',
+    id: 'crop-to-bbox',
+    isDisabled: (ctx) => !ctx.hasEngine || ctx.layer.isLocked,
+    labelKey: 'widgets.layers.actions.cropLayerToBbox',
   },
   {
     defaultLabel: 'Rasterize',

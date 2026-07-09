@@ -29,6 +29,7 @@ describe('getLayerContextActions', () => {
         'fit-to-bbox',
         'save-to-assets',
         'copy-to-clipboard',
+        'crop-to-bbox',
         'merge-down',
         'delete',
       ])
@@ -83,6 +84,14 @@ describe('getLayerContextActions', () => {
     expect(actions.find((action) => action.id === 'transform')?.isDisabled).toBe(true);
     expect(actions.find((action) => action.id === 'save-to-assets')?.isDisabled).toBe(true);
     expect(actions.find((action) => action.id === 'copy-to-clipboard')?.isDisabled).toBe(true);
+    expect(actions.find((action) => action.id === 'crop-to-bbox')?.isDisabled).toBe(true);
     expect(actions.find((action) => action.id === 'merge-down')?.isDisabled).toBe(true);
+  });
+
+  it('disables crop-to-bbox for locked layers', () => {
+    const layer = paintLayer('raster', { isLocked: true });
+    const actions = getLayerContextActions({ hasEngine: true, index: 0, layer, layers: [layer] });
+
+    expect(actions.find((action) => action.id === 'crop-to-bbox')?.isDisabled).toBe(true);
   });
 });
