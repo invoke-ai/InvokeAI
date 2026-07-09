@@ -304,6 +304,10 @@ def build_graph_from_workflow(workflow: Mapping[str, Any]) -> Graph:
                 # Saved workflows may include input metadata for unfilled optional fields without a "value".
                 # Omit those fields so invocation defaults are applied instead of forcing None.
                 if "value" in field_value:
+                    # The frontend board picker may persist the "auto" sentinel; graph nodes model automatic
+                    # board selection as the board field default, None.
+                    if field_name == "board" and field_value["value"] == "auto":
+                        continue
                     graph_node[field_name] = field_value["value"]
 
         parsed_nodes[node_id] = graph_node
