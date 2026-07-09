@@ -124,6 +124,27 @@ describe('callSavedWorkflowFormUtils', () => {
     expect(getRenderableWorkflowForm(workflow, templates)).toBe(form);
   });
 
+  it('adds exposed fields missing from a non-empty stored form', () => {
+    const form = getDefaultForm();
+    const element = buildNodeFieldElement('node-1', 'a', addInputA.type);
+    form.elements[element.id] = { ...element, parentId: form.rootElementId };
+    getRootChildren(form).push(element.id);
+    const workflow = buildWorkflowResponse({
+      exposedFields: [
+        { nodeId: 'node-1', fieldName: 'a' },
+        { nodeId: 'node-1', fieldName: 'b' },
+      ],
+      form,
+    });
+
+    const dynamicFields = getSavedWorkflowDynamicFields(workflow, templates);
+
+    expect(dynamicFields.map((field) => field.fieldName)).toEqual([
+      'saved_workflow_input::node-1::a',
+      'saved_workflow_input::node-1::b',
+    ]);
+  });
+
   it('builds a fallback form from exposed fields when the stored form is empty', () => {
     const workflow = buildWorkflowResponse({
       exposedFields: [{ nodeId: 'node-1', fieldName: 'a' }],

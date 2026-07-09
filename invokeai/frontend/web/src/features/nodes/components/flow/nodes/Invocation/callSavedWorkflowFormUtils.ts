@@ -105,6 +105,74 @@ const buildFormFromExposedFields = (
   return form;
 };
 
+const getFormFieldKey = (nodeId: string, fieldName: string) => `${nodeId}.${fieldName}`;
+
+const getFormFieldKeys = (form: BuilderForm): Set<string> => {
+  const fieldKeys = new Set<string>();
+
+  for (const element of Object.values(form.elements)) {
+    if (!element || element.type !== 'node-field') {
+      continue;
+    }
+    const { nodeId, fieldName } = element.data.fieldIdentifier;
+    fieldKeys.add(getFormFieldKey(nodeId, fieldName));
+  }
+
+  return fieldKeys;
+};
+
+const addMissingExposedFieldsToForm = (
+  form: BuilderForm,
+  workflow: WorkflowResponse | undefined,
+  templates: Templates
+): BuilderForm => {
+  const exposedFields = (workflow?.workflow.exposedFields ?? []) as ExposedFieldLike[];
+  if (exposedFields.length === 0) {
+    return form;
+  }
+
+  const nodes = getWorkflowNodes(workflow);
+  const fieldKeys = getFormFieldKeys(form);
+  const nextForm = structuredClone(form);
+
+  for (const { nodeId, fieldName } of exposedFields) {
+    if (!nodeId || !fieldName || fieldKeys.has(getFormFieldKey(nodeId, fieldName))) {
+      continue;
+    }
+
+    const node = nodes.find((candidate) => candidate.data?.id === nodeId);
+    const nodeType = node?.data?.type;
+    if (!nodeType) {
+      continue;
+    }
+
+    const fieldTemplate = templates[nodeType]?.inputs[fieldName];
+    if (!fieldTemplate) {
+      continue;
+    }
+
+    const element = buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
+    element.data.showDescription = false;
+    addElement({
+      form: nextForm,
+      element,
+      parentId: nextForm.rootElementId,
+      index: getRootChildCount(nextForm),
+    });
+    fieldKeys.add(getFormFieldKey(nodeId, fieldName));
+  }
+
+  return nextForm;
+};
+
+const getRootChildCount = (form: BuilderForm): number => {
+  const rootElement = form.elements[form.rootElementId];
+  if (!rootElement || !isContainerElement(rootElement)) {
+    return 0;
+  }
+  return rootElement.data.children.length;
+};
+
 export const getRenderableWorkflowForm = (
   workflow: WorkflowResponse | undefined,
   templates: Templates
@@ -112,7 +180,7 @@ export const getRenderableWorkflowForm = (
   const storedForm = getStoredForm(workflow);
 
   if (storedForm && validateFormStructure(storedForm) && !getIsFormEmpty(storedForm)) {
-    return storedForm;
+    return addMissingExposedFieldsToForm(storedForm, workflow, templates);
   }
 
   const fallbackForm = buildFormFromExposedFields(workflow, templates);
