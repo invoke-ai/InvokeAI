@@ -308,6 +308,68 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('exportBakedLayerPixels draws the cache through the layer transform into a document-space surface', async () => {
+    const layer = {
+      ...rasterLayer('a'),
+      transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 5, y: 6 },
+    };
+    const { store } = createFakeStore({ ...makeDoc(), layers: [layer] });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    const result = await engine.exportBakedLayerPixels('a');
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.rect).toEqual({ height: 30, width: 20, x: 5, y: 6 });
+      expect(result.surface.width).toBe(20);
+      expect(result.surface.height).toBe(30);
+      expect((result.surface as StubRasterSurface).callLog).toEqual(
+        expect.arrayContaining([
+          { args: [1, 0, 0, 1, 0, 0], op: 'setTransform' },
+          { args: [2, 0, 0, 3, 0, 0], op: 'setTransform' },
+          expect.objectContaining({ op: 'drawImage' }),
+        ])
+      );
+    }
+    engine.dispose();
+  });
+
+  it('exportBakedLayerPixels bakes raster adjustments into the exported surface only', async () => {
+    const layer = {
+      ...rasterLayer('a'),
+      adjustments: { brightness: 0.25, contrast: 0, saturation: 0 },
+    };
+    const { store } = createFakeStore({ ...makeDoc(), layers: [layer] });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    const raw = await engine.exportLayerPixels('a');
+    const baked = await engine.exportBakedLayerPixels('a');
+
+    expect(raw.status).toBe('ok');
+    expect(baked.status).toBe('ok');
+    if (raw.status === 'ok' && baked.status === 'ok') {
+      expect(baked.surface).not.toBe(raw.surface);
+      expect((raw.surface as StubRasterSurface).callLog.some((entry) => entry.op === 'putImageData')).toBe(false);
+      expect((baked.surface as StubRasterSurface).callLog).toEqual(
+        expect.arrayContaining([
+          { args: [0, 0, 10, 10], op: 'getImageData' },
+          expect.objectContaining({ op: 'putImageData' }),
+        ])
+      );
+    }
+    engine.dispose();
+  });
+
   it('setTool switches the active tool and updates the store', () => {
     const { engine } = createEngine();
     const listener = vi.fn();

@@ -45,9 +45,10 @@ import { createEngineStores, type EngineStores, type TextToolOptions } from '@wo
 import { executePsdExport, planPsdExport } from '@workbench/canvas-engine/export/psdExport';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
-import { invert as invertMatrix } from '@workbench/canvas-engine/math/mat2d';
+import { fromTRS, invert as invertMatrix } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { createAdjustedSurfaceCache } from '@workbench/canvas-engine/render/adjustedSurfaceCache';
+import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import {
   blendToComposite,
   compositeDocument,
@@ -146,6 +147,13 @@ export interface ExportLayerPixelsOptions {
 export type ExportLayerPixelsResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' };
+
+export interface ExportBakedLayerPixelsOptions extends ExportLayerPixelsOptions {
+  /** Defaults true. When false, leaves raster adjustments non-destructive. */
+  applyAdjustments?: boolean;
+}
+
+export type ExportBakedLayerPixelsResult = ExportLayerPixelsResult;
 
 /** The minimal workbench store the engine depends on. */
 export interface EngineStore {
@@ -290,6 +298,15 @@ export interface CanvasEngine {
    * an already in-flight rasterize, so callers never export stale/blank pixels.
    */
   exportLayerPixels(layerId: string, options?: ExportLayerPixelsOptions): Promise<ExportLayerPixelsResult>;
+  /**
+   * Exports a layer as a new world-space surface: its cache is drawn through the
+   * layer transform into the returned document-space rect, and raster adjustments
+   * are baked by default. Opacity/blend are intentionally not baked.
+   */
+  exportBakedLayerPixels(
+    layerId: string,
+    options?: ExportBakedLayerPixelsOptions
+  ): Promise<ExportBakedLayerPixelsResult>;
   /**
    * Rasterizes a parametric (shape/gradient/text) layer to a paint layer: bakes its
    * current appearance into a content-sized paint bitmap (persisted through the
@@ -1074,6 +1091,47 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       stores.thumbnailVersion.set(layer.id, layerCache.version(layer.id));
     }
     return { rect: entry.rect, status: 'ok', surface: entry.surface };
+  };
+
+  const exportBakedLayerPixels = async (
+    layerId: string,
+    options: ExportBakedLayerPixelsOptions = {}
+  ): Promise<ExportBakedLayerPixelsResult> => {
+    const raw = await rasterizeLayerPixels(layerId, options);
+    if (raw.status !== 'ok') {
+      return raw;
+    }
+    const doc = mirror.getDocument();
+    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
+    if (!doc || !layer) {
+      return { status: 'missing' };
+    }
+
+    const matrix = fromTRS(
+      { x: layer.transform.x, y: layer.transform.y },
+      layer.transform.rotation,
+      layer.transform.scaleX,
+      layer.transform.scaleY
+    );
+    const worldRect = roundOut(transformBounds(matrix, raw.rect));
+    if (isEmpty(worldRect)) {
+      return { status: 'empty' };
+    }
+
+    const surface = backend.createSurface(worldRect.width, worldRect.height);
+    const ctx = surface.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, worldRect.width, worldRect.height);
+    ctx.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e - worldRect.x, matrix.f - worldRect.y);
+    ctx.drawImage(raw.surface.canvas, raw.rect.x, raw.rect.y);
+
+    if (options.applyAdjustments !== false && layer.type === 'raster' && layer.adjustments) {
+      const imageData = ctx.getImageData(0, 0, worldRect.width, worldRect.height);
+      applyAdjustments(imageData, layer.adjustments);
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    return { rect: worldRect, status: 'ok', surface };
   };
 
   /**
@@ -3117,6 +3175,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     drawLayerThumbnail,
     eraseSelection,
     exportRasterLayersToPsd,
+    exportBakedLayerPixels,
     exportLayerPixels: rasterizeLayerPixels,
     fillSelection,
     fitToView,
