@@ -46,6 +46,22 @@ def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(v, GGMLTensor) for v in state_dict.values())
 
 
+def _has_qwen_vl_visual_tower(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict bundles a Qwen2.5-VL / Qwen2-VL vision tower.
+
+    Qwen-VL encoders ship the visual tower (`visual.blocks.*`, `visual.patch_embed.*`)
+    alongside the language model, whereas a text-only Qwen3 encoder never does. A Qwen-VL
+    file otherwise satisfies the Qwen3 key heuristic (it has `model.layers.*` /
+    `model.embed_tokens.weight` too), so without this check it matches *both* the Qwen3 and
+    the QwenVLEncoder configs and the tiebreak can misroute it to Qwen3. We use it to keep
+    the two mutually exclusive.
+    """
+    for key in state_dict.keys():
+        if isinstance(key, str) and (key.startswith("visual.blocks.") or key.startswith("visual.patch_embed.")):
+            return True
+    return False
+
+
 def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Optional[Qwen3VariantType]:
     """Determine Qwen3 variant (0.6B, 4B, or 8B) from state dict based on hidden_size.
 
@@ -143,9 +159,15 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
     @classmethod
     def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:
-        has_qwen3_keys = _has_qwen3_keys(mod.load_state_dict())
-        if not has_qwen3_keys:
+        state_dict = mod.load_state_dict()
+        if not _has_qwen3_keys(state_dict):
             raise NotAMatchError("state dict does not look like a Qwen3 model")
+        # Reject Qwen2.5-VL / Qwen2-VL encoders: they carry a visual tower and must be
+        # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
+        if _has_qwen_vl_visual_tower(state_dict):
+            raise NotAMatchError(
+                "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
+            )
 
     @classmethod
     def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
@@ -283,9 +305,15 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
 
     @classmethod
     def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:
-        has_qwen3_keys = _has_qwen3_keys(mod.load_state_dict())
-        if not has_qwen3_keys:
+        state_dict = mod.load_state_dict()
+        if not _has_qwen3_keys(state_dict):
             raise NotAMatchError("state dict does not look like a Qwen3 model")
+        # Reject Qwen2.5-VL / Qwen2-VL encoders: they carry a visual tower and must be
+        # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
+        if _has_qwen_vl_visual_tower(state_dict):
+            raise NotAMatchError(
+                "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
+            )
 
     @classmethod
     def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:

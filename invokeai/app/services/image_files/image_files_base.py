@@ -18,6 +18,23 @@ class ImageFileStorageBase(ABC):
         """Gets the internal path to an image or thumbnail."""
         pass
 
+    @property
+    @abstractmethod
+    def image_root(self) -> Path:
+        """Gets the root directory for full-size images."""
+        pass
+
+    @property
+    @abstractmethod
+    def thumbnail_root(self) -> Path:
+        """Gets the root directory for thumbnails."""
+        pass
+
+    @abstractmethod
+    def evict_cache_paths(self, paths: list[Path]) -> None:
+        """Evicts any cached image objects for the provided paths."""
+        pass
+
     # TODO: We need to validate paths before starlette makes the FileResponse, else we get a
     # 500 internal server error. I don't like having this method on the service.
     @abstractmethod
