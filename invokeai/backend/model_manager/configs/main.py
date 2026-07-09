@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
     state_dict_has_any_keys_exact,
 )
+from invokeai.backend.model_manager.configs.qwen3_encoder import _QWEN3_ENCODER_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -1678,6 +1679,13 @@ class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
             raise NotAMatchError("state dict does not look like SDNQ quantized")
 
 
+# Tokenizer class names a Qwen3-encoder pipeline can advertise in model_index.json. Qwen models
+# (incl. Qwen3) use the Qwen2 tokenizer classes, in slow and fast variants. Kept alongside the
+# accepted encoder architectures (_QWEN3_ENCODER_ARCHITECTURES) so submodel discovery recognizes the
+# same compatible components the Qwen3 encoder config accepts.
+_QWEN_TOKENIZER_CLASS_NAMES = {"Qwen2Tokenizer", "Qwen2TokenizerFast"}
+
+
 class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
     """Model config for SDNQ-quantized FLUX.2 models in diffusers format
     (Flux2KleinPipeline / Flux2Pipeline folder with transformer/, text_encoder/, vae/, ...)."""
@@ -1790,13 +1798,13 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
                         model_type=ModelType.Main,
                         variant=None,
                     )
-                case "Qwen3ForCausalLM":
+                case name if name in _QWEN3_ENCODER_ARCHITECTURES:
                     submodels[SubModelType.TextEncoder] = SubmodelDefinition(
                         path_or_prefix=(mod.path / key).resolve().as_posix(),
                         model_type=ModelType.Qwen3Encoder,
                         variant=None,
                     )
-                case "Qwen2Tokenizer":
+                case name if name in _QWEN_TOKENIZER_CLASS_NAMES:
                     submodels[SubModelType.Tokenizer] = SubmodelDefinition(
                         path_or_prefix=(mod.path / key).resolve().as_posix(),
                         model_type=ModelType.Qwen3Encoder,
@@ -1914,13 +1922,13 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
                         model_type=ModelType.Main,
                         variant=None,
                     )
-                case "Qwen3ForCausalLM":
+                case name if name in _QWEN3_ENCODER_ARCHITECTURES:
                     submodels[SubModelType.TextEncoder] = SubmodelDefinition(
                         path_or_prefix=(mod.path / key).resolve().as_posix(),
                         model_type=ModelType.Qwen3Encoder,
                         variant=None,
                     )
-                case "Qwen2Tokenizer":
+                case name if name in _QWEN_TOKENIZER_CLASS_NAMES:
                     submodels[SubModelType.Tokenizer] = SubmodelDefinition(
                         path_or_prefix=(mod.path / key).resolve().as_posix(),
                         model_type=ModelType.Qwen3Encoder,
