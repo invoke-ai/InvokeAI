@@ -119,6 +119,11 @@ export const getQueueItem = (itemId: number): Promise<QueueItemDTO> =>
 export const listAllQueueItems = (): Promise<QueueItemDTO[]> =>
   apiFetchJson<QueueItemDTO[]>('/api/v1/queue/default/list_all');
 
+export interface QueueItemResultImageOptions {
+  /** Source graph node ids whose prepared execution results should be read. */
+  resultNodeIds?: readonly string[];
+}
+
 const getImageDTO = async (
   imageName: string,
   queuedAt: string,
@@ -153,10 +158,19 @@ const getImageDTO = async (
   }
 };
 
-const getResultImageNames = (queueItem: QueueItemDTO): string[] => {
+const getResultImageNames = (queueItem: QueueItemDTO, options?: QueueItemResultImageOptions): string[] => {
   const imageNames = new Set<string>();
+  const results = queueItem.session?.results ?? {};
+  const preparedSourceMapping = queueItem.session?.prepared_source_mapping ?? {};
+  const resultNodeIds = options?.resultNodeIds;
+  const resultValues = resultNodeIds
+    ? Object.entries(results)
+        // Backend result keys are prepared execution ids; source ids carry the graph contract.
+        .filter(([nodeId]) => resultNodeIds.includes(preparedSourceMapping[nodeId] ?? nodeId))
+        .map(([, result]) => result)
+    : Object.values(results);
 
-  for (const result of Object.values(queueItem.session?.results ?? {})) {
+  for (const result of resultValues) {
     if (!result || typeof result !== 'object') {
       continue;
     }
@@ -188,12 +202,13 @@ const getResultImageNames = (queueItem: QueueItemDTO): string[] => {
 export const getQueueItemResultImages = async (
   itemId: number,
   sourceQueueItemId: string,
-  queuedAt: string
+  queuedAt: string,
+  options?: QueueItemResultImageOptions
 ): Promise<ImageDTO[]> => {
   const queueItem = await getQueueItem(itemId);
 
   const images = await Promise.all(
-    getResultImageNames(queueItem).map((imageName) => getImageDTO(imageName, queuedAt, sourceQueueItemId))
+    getResultImageNames(queueItem, options).map((imageName) => getImageDTO(imageName, queuedAt, sourceQueueItemId))
   );
 
   return images.filter((image): image is ImageDTO => image !== null);

@@ -4,7 +4,7 @@ import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
 import type { GraphContract, Project, QueueItem } from './types';
 
 import { getDefaultGenerateSettings } from './generation/baseGenerationPolicies';
-import { createQueueItemBackendSubmission } from './WorkbenchRuntime';
+import { createQueueItemBackendSubmission, getQueueItemResultImageOptions } from './WorkbenchRuntime';
 import { createInitialWorkbenchState } from './workbenchState';
 
 const model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
@@ -144,5 +144,24 @@ describe('createQueueItemBackendSubmission', () => {
         sourceQueueItemId: 'local-1',
       },
     });
+  });
+});
+
+describe('getQueueItemResultImageOptions', () => {
+  it('limits generated and canvas queue items to the compiled graph output node', () => {
+    const project = createProject();
+
+    expect(getQueueItemResultImageOptions(createQueueItem(project, { sourceId: 'generate' }))).toEqual({
+      resultNodeIds: ['canvas_output'],
+    });
+    expect(getQueueItemResultImageOptions(createQueueItem(project, { sourceId: 'canvas' }))).toEqual({
+      resultNodeIds: ['canvas_output'],
+    });
+  });
+
+  it('leaves workflow result nodes unconstrained', () => {
+    const project = createProject();
+
+    expect(getQueueItemResultImageOptions(createQueueItem(project, { sourceId: 'workflow' }))).toBeUndefined();
   });
 });

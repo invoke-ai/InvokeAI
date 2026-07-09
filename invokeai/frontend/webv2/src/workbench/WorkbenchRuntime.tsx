@@ -16,7 +16,7 @@ import { socketHub } from './backend/socketHub';
 import { createCanvasDimsSync } from './canvasDimsSync';
 import { configureDiagnostics } from './diagnostics/logger';
 import { addImagesToGalleryBoard } from './gallery/api';
-import { getQueueItemResultImages, resumeQueueProcessor } from './generation/api';
+import { getQueueItemResultImages, resumeQueueProcessor, type QueueItemResultImageOptions } from './generation/api';
 import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
 import { shouldSubmitPendingQueueItem } from './queueSubmission';
@@ -49,6 +49,16 @@ type QueueItemBackendSubmission =
   | { kind: 'generate'; request: EnqueueGenerateRequest }
   | { kind: 'workflow'; request: EnqueueWorkflowRequest }
   | { error: string; kind: 'invalid' };
+
+const COMPILED_GENERATE_RESULT_NODE_ID = 'canvas_output';
+
+export const getQueueItemResultImageOptions = (queueItem: QueueItem): QueueItemResultImageOptions | undefined => {
+  if (queueItem.snapshot.sourceId === 'generate' || queueItem.snapshot.sourceId === 'canvas') {
+    return { resultNodeIds: [COMPILED_GENERATE_RESULT_NODE_ID] };
+  }
+
+  return undefined;
+};
 
 export const createQueueItemBackendSubmission = (
   project: Project,
@@ -163,7 +173,11 @@ const routeRunResults = async (
   dispatch: Dispatch<WorkbenchAction>
 ): Promise<void> => {
   try {
-    const allImages = await coordinator.waitForResults(queueItem.id, queueItem.snapshot.submittedAt);
+    const allImages = await coordinator.waitForResults(
+      queueItem.id,
+      queueItem.snapshot.submittedAt,
+      getQueueItemResultImageOptions(queueItem)
+    );
     // A workflow session reports every image its nodes produced; only the
     // non-intermediate outputs are user-facing results.
     const images =
@@ -212,7 +226,10 @@ const routeBackendItemResults = async (
   }
 
   try {
-    const allImages = await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt);
+    const resultImageOptions = getQueueItemResultImageOptions(queueItem);
+    const allImages = resultImageOptions
+      ? await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt, resultImageOptions)
+      : await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt);
     const images =
       queueItem.snapshot.sourceId === 'workflow' ? allImages.filter((image) => !image.isIntermediate) : allImages;
     const selectedBoardId = getSnapshotGalleryBoardId(queueItem);

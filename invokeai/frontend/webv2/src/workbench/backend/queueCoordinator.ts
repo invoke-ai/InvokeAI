@@ -15,6 +15,7 @@ import {
   getQueueItem,
   getQueueItemResultImages,
   listAllQueueItems,
+  type QueueItemResultImageOptions,
 } from '@workbench/generation/api';
 
 import type { SocketHub } from './socketHub';
@@ -109,7 +110,11 @@ export interface QueueCoordinator {
    * Resolves with the result images, throws on failure, and throws
    * `QueueItemCancelledError` on backend-side cancellation.
    */
-  waitForResults(localQueueItemId: string, queuedAt: string): Promise<ImageDTO[]>;
+  waitForResults(
+    localQueueItemId: string,
+    queuedAt: string,
+    options?: QueueItemResultImageOptions
+  ): Promise<ImageDTO[]>;
   cancelRun(request: CancelRunRequest): Promise<void>;
 }
 
@@ -613,7 +618,11 @@ export const createQueueCoordinator = (
     return result;
   };
 
-  const waitForResults = async (localQueueItemId: string, queuedAt: string): Promise<ImageDTO[]> => {
+  const waitForResults = async (
+    localQueueItemId: string,
+    queuedAt: string,
+    options?: QueueItemResultImageOptions
+  ): Promise<ImageDTO[]> => {
     const run = runs.get(localQueueItemId);
 
     if (!run) {
@@ -638,7 +647,9 @@ export const createQueueCoordinator = (
 
       const imagesPerItem = await Promise.all(
         completedBackendItemIds.map((backendItemId) =>
-          api.getQueueItemResultImages(backendItemId, localQueueItemId, queuedAt)
+          options
+            ? api.getQueueItemResultImages(backendItemId, localQueueItemId, queuedAt, options)
+            : api.getQueueItemResultImages(backendItemId, localQueueItemId, queuedAt)
         )
       );
 

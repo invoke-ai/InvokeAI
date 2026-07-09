@@ -246,6 +246,23 @@ describe('queueCoordinator', () => {
     expect(harness.callbacks.onBackendItemCancelled).toHaveBeenCalledWith('local-1', 3);
   });
 
+  it('forwards result image extraction options when waiting for results', async () => {
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z', {
+      resultNodeIds: ['canvas_output'],
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+
+    await resultsPromise;
+
+    expect(harness.api.getQueueItemResultImages).toHaveBeenCalledWith(1, 'local-1', '2026-06-10T00:00:00Z', {
+      resultNodeIds: ['canvas_output'],
+    });
+  });
+
   it('rejects with QueueItemCancelledError when every backend item in a batch is canceled', async () => {
     harness.api.enqueueGenerateGraph.mockResolvedValue({
       batchId: 'batch-1',
