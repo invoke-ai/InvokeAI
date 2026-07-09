@@ -7,13 +7,14 @@ import type { Dispatch } from 'react';
 import { createListCollection, Popover, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { Field, IconButton, Select } from '@workbench/components/ui';
 import { SlidersHorizontalIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AdjustmentsPopover } from './AdjustmentsPopover';
 import { ControlLayerSettings } from './ControlLayerSettings';
 import { InpaintMaskSettings } from './InpaintMaskSettings';
 import { applyStructural, CANVAS_BLEND_MODES } from './layerOps';
+import { clearLayerPropertiesRequest, useLayerPropertiesRequest } from './layerPropertiesRequestStore';
 import { RegionalGuidanceSettings } from './RegionalGuidanceSettings';
 
 const POPOVER_POSITIONING = { placement: 'left-start' } as const;
@@ -48,9 +49,28 @@ interface LayerPropertiesPopoverProps {
  */
 export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropertiesPopoverProps) => {
   const { t } = useTranslation();
+  const [triggerOpen, setTriggerOpen] = useState(false);
+  const request = useLayerPropertiesRequest(layer.id);
+  const isOpen = triggerOpen || request !== null;
+
+  const handleOpenChange = useCallback(
+    (details: { open: boolean }) => {
+      setTriggerOpen(details.open);
+      if (!details.open && request) {
+        clearLayerPropertiesRequest(request.token);
+      }
+    },
+    [request]
+  );
 
   return (
-    <Popover.Root lazyMount positioning={POPOVER_POSITIONING} unmountOnExit>
+    <Popover.Root
+      lazyMount
+      open={isOpen}
+      positioning={POPOVER_POSITIONING}
+      unmountOnExit
+      onOpenChange={handleOpenChange}
+    >
       <Popover.Trigger asChild>
         <IconButton
           aria-label={t('widgets.layers.properties')}
@@ -69,7 +89,12 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
             <Popover.Body p="2.5">
               <Stack gap="2">
                 <LayerBlendModeControl dispatch={dispatch} engine={engine} layer={layer} />
-                <LayerTypeSettings dispatch={dispatch} engine={engine} layer={layer} />
+                <LayerTypeSettings
+                  dispatch={dispatch}
+                  engine={engine}
+                  focusFilter={request?.section === 'filter'}
+                  layer={layer}
+                />
               </Stack>
             </Popover.Body>
           </Popover.Content>
@@ -136,10 +161,12 @@ const LayerBlendModeControl = ({
 const LayerTypeSettings = ({
   dispatch,
   engine,
+  focusFilter,
   layer,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
   engine: CanvasEngine | null;
+  focusFilter: boolean;
   layer: CanvasLayerContract;
 }) => {
   switch (layer.type) {
@@ -148,7 +175,7 @@ const LayerTypeSettings = ({
     case 'regional_guidance':
       return <RegionalGuidanceSettings key={layer.id} engine={engine} layer={layer} />;
     case 'control':
-      return <ControlLayerSettings key={layer.id} engine={engine} layer={layer} />;
+      return <ControlLayerSettings key={layer.id} engine={engine} focusFilter={focusFilter} layer={layer} />;
     case 'raster':
       return <RasterLayerSettings key={layer.id} dispatch={dispatch} engine={engine} layer={layer} />;
   }

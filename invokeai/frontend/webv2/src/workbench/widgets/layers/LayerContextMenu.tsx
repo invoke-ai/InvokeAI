@@ -64,6 +64,7 @@ import {
   getRegionalGuidancePositivePromptPatch,
   getRegionalGuidanceReferenceImagePatch,
 } from './layerOps';
+import { requestLayerProperties } from './layerPropertiesRequestStore';
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 type MenuOpenChange = ComponentProps<typeof Menu.Root>['onOpenChange'];
@@ -384,6 +385,10 @@ const LayerMenu = ({
     void engine?.extractMaskedArea(layer.id);
   }, [engine, layer.id]);
 
+  const handleFilter = useCallback(() => {
+    requestLayerProperties(layer.id, 'filter');
+  }, [layer.id]);
+
   const handleBooleanRaster = useCallback(
     (operation: 'intersect' | 'cutout' | 'cutaway' | 'exclude') => {
       void engine?.booleanMergeRasterLayers(layer.id, operation);
@@ -498,6 +503,9 @@ const LayerMenu = ({
         case 'extract-masked-area':
           handleExtractMaskedArea();
           break;
+        case 'filter':
+          handleFilter();
+          break;
         case 'intersect':
         case 'cutout':
         case 'cutaway':
@@ -564,6 +572,7 @@ const LayerMenu = ({
       handleDuplicate,
       handleExtractMaskedArea,
       handleFitToBbox,
+      handleFilter,
       handleLayerConfigAction,
       handleMerge,
       handleMoveBackward,
@@ -762,6 +771,7 @@ const LAYER_ACTION_ICONS: Record<LayerContextActionId, LucideIcon> = {
   exclude: MergeIcon,
   'extract-masked-area': CropIcon,
   'fit-to-bbox': ImageIcon,
+  filter: SlidersHorizontalIcon,
   'inpaint-denoise-limit': SlidersHorizontalIcon,
   'inpaint-noise': SlidersHorizontalIcon,
   intersect: MergeIcon,

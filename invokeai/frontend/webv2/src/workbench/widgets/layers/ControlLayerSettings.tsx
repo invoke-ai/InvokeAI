@@ -52,6 +52,7 @@ const useSelectedModelBase = (): string | null => {
 
 interface ControlLayerSettingsProps {
   engine: CanvasEngine | null;
+  focusFilter?: boolean;
   layer: CanvasControlLayerContract;
 }
 
@@ -63,7 +64,7 @@ interface ControlLayerSettingsProps {
  * undo stack (`updateCanvasLayerConfig`); the filter preview runs on the utility
  * queue and never mutates the document until "Apply".
  */
-export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProps) => {
+export const ControlLayerSettings = ({ engine, focusFilter = false, layer }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
@@ -337,7 +338,13 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
        * which both resets local state and runs the outgoing instance's
        * unmount cleanup (see its ref-callback below).
        */}
-      <ControlFilterSection key={layer.id} dispatch={dispatch} engine={engine} layer={layer} />
+      <ControlFilterSection
+        key={layer.id}
+        dispatch={dispatch}
+        engine={engine}
+        focusFilter={focusFilter}
+        layer={layer}
+      />
     </Stack>
   );
 };
@@ -353,6 +360,7 @@ type FilterPreviewState =
 interface ControlFilterSectionProps {
   dispatch: ReturnType<typeof useWorkbenchDispatch>;
   engine: CanvasEngine | null;
+  focusFilter: boolean;
   layer: CanvasControlLayerContract;
 }
 
@@ -360,7 +368,7 @@ interface ControlFilterSectionProps {
 const hasFilterableContent = (layer: CanvasControlLayerContract): boolean =>
   layer.source.type === 'image' || (layer.source.type === 'paint' && layer.source.bitmap !== null);
 
-const ControlFilterSection = ({ dispatch, engine, layer }: ControlFilterSectionProps) => {
+const ControlFilterSection = ({ dispatch, engine, focusFilter, layer }: ControlFilterSectionProps) => {
   const { t } = useTranslation();
   const [preview, setPreview] = useState<FilterPreviewState>({ status: 'idle' });
   const abortRef = useRef<AbortController | null>(null);
@@ -548,6 +556,7 @@ const ControlFilterSection = ({ dispatch, engine, layer }: ControlFilterSectionP
 
   const canPreview = !!engine && hasFilterableContent(layer) && preview.status !== 'running';
   const filterValue = useMemo(() => [filterType], [filterType]);
+  const filterTriggerProps = useMemo(() => ({ autoFocus: focusFilter }), [focusFilter]);
 
   return (
     <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" pt="2" ref={sectionRef}>
@@ -557,6 +566,7 @@ const ControlFilterSection = ({ dispatch, engine, layer }: ControlFilterSectionP
           collection={filterCollection}
           positioning={SELECT_POSITIONING}
           size="xs"
+          triggerProps={filterTriggerProps}
           value={filterValue}
           valueText={t(`widgets.layers.control.filters.${filterType}`, filterType)}
           onValueChange={handleFilterTypeChange}

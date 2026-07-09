@@ -77,6 +77,13 @@ describe('getLayerContextActions', () => {
         'copy-to-regional-guidance',
       ])
     );
+    expect(idsFor(layer)).not.toContain('filter');
+
+    const withContent = {
+      ...layer,
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
+    };
+    expect(idsFor(withContent)).toContain('filter');
   });
 
   it('does not expose copy-to-raster for raster layers', () => {

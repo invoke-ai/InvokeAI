@@ -16,6 +16,7 @@ export type LayerContextActionId =
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
   | 'extract-masked-area'
+  | 'filter'
   | 'intersect'
   | 'cutout'
   | 'cutaway'
@@ -75,6 +76,10 @@ const isParametricRasterizable = (layer: CanvasLayerContract): boolean =>
 const isPixelBacked = (layer: CanvasLayerContract): boolean =>
   (layer.type === 'raster' || layer.type === 'control') &&
   (layer.source.type === 'image' || layer.source.type === 'paint');
+
+const hasFilterableControlContent = (layer: CanvasLayerContract): boolean =>
+  layer.type === 'control' &&
+  (layer.source.type === 'image' || (layer.source.type === 'paint' && layer.source.bitmap !== null));
 
 const groupPosition = (ctx: LayerContextActionContext) => getGroupPosition(ctx.layers, ctx.layer.id);
 
@@ -155,6 +160,13 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     isDisabled: (ctx) => !ctx.hasEngine,
     isVisible: (ctx) => ctx.layer.type === 'inpaint_mask',
     labelKey: 'widgets.layers.actions.extractMaskedArea',
+  },
+  {
+    defaultLabel: 'Filter',
+    group: 'edit',
+    id: 'filter',
+    isVisible: (ctx) => hasFilterableControlContent(ctx.layer),
+    labelKey: 'widgets.layers.control.filter',
   },
   {
     defaultLabel: 'Intersect with layer below',
