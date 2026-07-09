@@ -83,7 +83,7 @@ interface Harness {
   uploadImage: ReturnType<typeof vi.fn>;
   flushPendingUploads: ReturnType<typeof vi.fn>;
   events: string[];
-  submittedGraphs: () => { destination: string; graph: any }[];
+  submittedGraphs: () => Extract<WorkbenchAction, { type: 'submitCanvasInvocationSnapshot' }>[];
   notices: () => { message?: string }[];
 }
 
@@ -197,7 +197,7 @@ describe('runCanvasInvocation', () => {
     expect(submitted).toHaveLength(1);
     expect(submitted[0]?.graph.label).toBe('SD 1.5 txt2img');
     // Pure txt2img graph has no image-to-latents encode node.
-    expect(submitted[0]?.graph.backendGraph.nodes.canvas_i2l).toBeUndefined();
+    expect(submitted[0]!.graph.backendGraph!.nodes.canvas_i2l).toBeUndefined();
     expect(harness.notices()).toHaveLength(0);
   });
 
@@ -212,12 +212,39 @@ describe('runCanvasInvocation', () => {
     expect(submitted).toHaveLength(1);
     expect(submitted[0]?.graph.label).toBe('SD 1.5 img2img');
 
-    const nodes = submitted[0]?.graph.backendGraph.nodes;
+    const nodes = submitted[0]!.graph.backendGraph!.nodes;
     const encode = Object.values(nodes).find((node: any) => node.type === 'i2l') as any;
     expect(encode?.image).toEqual({ image_name: 'composite-1.png' });
     // sd-1 is linear: denoising_start = 1 - 0.75.
     expect(nodes.denoise_latents.denoising_start).toBeCloseTo(0.25, 10);
     expect(harness.notices()).toHaveLength(0);
+  });
+
+  it('dispatches resolved prompt and seed metadata with the compiled canvas graph', async () => {
+    const harness = makeHarness();
+    harness.deps.generateValues = {
+      ...harness.deps.generateValues,
+      negativePrompt: 'low quality',
+      positivePrompt: 'a resolved canvas prompt',
+      seed: 123,
+      shouldRandomizeSeed: false,
+    };
+
+    await runCanvasInvocation(harness.deps);
+
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.generate).toMatchObject({
+      negativePromptNodeId: 'negative_prompt',
+      positivePromptNodeId: 'positive_prompt',
+      seedNodeId: 'seed',
+      values: {
+        negativePrompt: 'low quality',
+        positivePrompt: 'a resolved canvas prompt',
+        seed: 123,
+        shouldRandomizeSeed: false,
+      },
+    });
   });
 
   it('threads a Gallery destination through to the snapshot and a durable (non-intermediate) output', async () => {
@@ -231,7 +258,7 @@ describe('runCanvasInvocation', () => {
     expect(submitted).toHaveLength(1);
     expect(submitted[0]?.destination).toBe('gallery');
     // A Gallery destination must produce a durable image, not a staging intermediate.
-    expect(submitted[0]?.graph.backendGraph.nodes.canvas_output.is_intermediate).toBe(false);
+    expect(submitted[0]!.graph.backendGraph!.nodes.canvas_output!.is_intermediate).toBe(false);
   });
 
   it('marks the output intermediate for a Canvas destination (staging)', async () => {
@@ -242,7 +269,7 @@ describe('runCanvasInvocation', () => {
     const submitted = harness.submittedGraphs();
     expect(submitted).toHaveLength(1);
     expect(submitted[0]?.destination).toBe('canvas');
-    expect(submitted[0]?.graph.backendGraph.nodes.canvas_output.is_intermediate).toBe(true);
+    expect(submitted[0]!.graph.backendGraph!.nodes.canvas_output!.is_intermediate).toBe(true);
   });
 
   it('awaits the upload flush before compositing', async () => {
@@ -422,11 +449,11 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
     const submitted = harness.submittedGraphs();
     expect(submitted).toHaveLength(1);
     expect(submitted[0]?.graph.label).toBe('SD 1.5 inpaint');
-    const nodes = submitted[0]?.graph.backendGraph.nodes;
+    const nodes = submitted[0]!.graph.backendGraph!.nodes;
     expect(nodes.create_gradient_mask?.type).toBe('create_gradient_mask');
     expect(nodes.canvas_output?.type).toBe('invokeai_img_blend');
     // The gradient mask consumes the uploaded grayscale mask (base upload is composite-1).
-    expect(nodes.create_gradient_mask?.mask?.image_name).toBeDefined();
+    expect((nodes.create_gradient_mask?.mask as { image_name?: string } | undefined)?.image_name).toBeDefined();
     expect(harness.notices()).toHaveLength(0);
     // The mask layer was rasterized for the grayscale composite.
     expect(harness.events.filter((e) => e === 'getLayerSurface')).not.toHaveLength(0);
@@ -441,7 +468,7 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
     const submitted = harness.submittedGraphs();
     expect(submitted).toHaveLength(1);
     expect(submitted[0]?.graph.label).toBe('SD 1.5 outpaint');
-    const nodes = submitted[0]?.graph.backendGraph.nodes;
+    const nodes = submitted[0]!.graph.backendGraph!.nodes;
     expect(nodes.infill?.type).toBe('infill_lama');
     expect(nodes.image_alpha_to_mask?.type).toBe('tomask');
     expect(nodes.canvas_output?.type).toBe('invokeai_img_blend');

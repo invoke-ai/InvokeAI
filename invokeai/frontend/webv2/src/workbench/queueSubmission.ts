@@ -15,8 +15,9 @@
  * they stack in the queue as `pending` forever and nothing ever generates. That
  * was the canvas→canvas stall: canvas snapshots carry `sourceId: 'canvas'`, which
  * was absent from the loop's allow-list, so each Invoke only produced a dead
- * local row. Canvas items route through the coordinator's workflow path (their
- * graph is fully compiled ahead of time, no generate seed/prompt batch data).
+ * local row. Canvas items use the generate-style backend submission path: the
+ * graph is compiled ahead of time, but prompt/seed batch data still has to ride
+ * along so repeated invokes are not silently run with backend primitive defaults.
  *
  * `upscale` is intentionally excluded: it is not yet an available source
  * (`invocation.ts` marks it `available: false`), so it never produces a snapshot.

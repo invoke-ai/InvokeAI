@@ -423,6 +423,12 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     dispatch({
       backendSupportsCancellation: true,
       destination: deps.destination,
+      generate: {
+        negativePromptNodeId: compiled.negativePromptNodeId,
+        positivePromptNodeId: compiled.positivePromptNodeId,
+        seedNodeId: compiled.seedNodeId,
+        values: settings,
+      },
       graph: compiled.graph,
       projectId,
       type: 'submitCanvasInvocationSnapshot',

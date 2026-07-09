@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch } from 'react';
 
+import type { EnqueueGenerateRequest, EnqueueWorkflowRequest } from './generation/types';
 import type { Project, QueueItem } from './types';
 import type { WorkbenchAction } from './workbenchState';
 
@@ -42,6 +43,91 @@ const getSnapshotBatchCount = (queueItem: QueueItem): number => {
   const batchCount = queueItem.snapshot.widgetStates.generate?.values.batchCount;
 
   return sanitizeBatchCount(batchCount);
+};
+
+type QueueItemBackendSubmission =
+  | { kind: 'generate'; request: EnqueueGenerateRequest }
+  | { kind: 'workflow'; request: EnqueueWorkflowRequest }
+  | { error: string; kind: 'invalid' };
+
+export const createQueueItemBackendSubmission = (
+  project: Project,
+  queueItem: QueueItem
+): QueueItemBackendSubmission => {
+  const graph = queueItem.snapshot.graph.backendGraph;
+
+  if (!graph) {
+    return { error: `${queueItem.snapshot.sourceId} queue item is missing a compiled backend graph.`, kind: 'invalid' };
+  }
+
+  if (queueItem.snapshot.sourceId === 'generate') {
+    const generateValues = normalizeGenerateSettings(queueItem.snapshot.widgetStates.generate?.values);
+
+    if (!generateValues) {
+      return { error: 'generate queue item is missing generation settings.', kind: 'invalid' };
+    }
+
+    return {
+      kind: 'generate',
+      request: {
+        batchCount: generateValues.batchCount,
+        destination: queueItem.snapshot.destination,
+        graph,
+        negativePrompt: generateValues.negativePromptEnabled ? generateValues.negativePrompt : '',
+        negativePromptNodeId: 'negative_prompt',
+        positivePrompt: generateValues.positivePrompt,
+        positivePromptNodeId: 'positive_prompt',
+        projectId: project.id,
+        seed: generateValues.seed,
+        seedNodeId: 'seed',
+        shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
+        sourceQueueItemId: queueItem.id,
+      },
+    };
+  }
+
+  if (queueItem.snapshot.sourceId === 'canvas') {
+    const generate = queueItem.snapshot.generate;
+    // Persisted canvas queue items from before `snapshot.generate` existed still
+    // carry the generate widget snapshot; use it rather than falling back to
+    // backend primitive defaults for prompt/seed.
+    const generateValues = normalizeGenerateSettings(
+      generate ? generate.values : queueItem.snapshot.widgetStates.generate?.values
+    );
+
+    if (!generateValues) {
+      return { error: 'canvas queue item is missing generation submission metadata.', kind: 'invalid' };
+    }
+
+    return {
+      kind: 'generate',
+      request: {
+        batchCount: generateValues.batchCount,
+        destination: queueItem.snapshot.destination,
+        graph,
+        negativePrompt: generateValues.negativePromptEnabled ? generateValues.negativePrompt : '',
+        negativePromptNodeId: generate?.negativePromptNodeId ?? 'negative_prompt',
+        positivePrompt: generateValues.positivePrompt,
+        positivePromptNodeId: generate?.positivePromptNodeId ?? 'positive_prompt',
+        projectId: project.id,
+        seed: generateValues.seed,
+        seedNodeId: generate?.seedNodeId ?? 'seed',
+        shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
+        sourceQueueItemId: queueItem.id,
+      },
+    };
+  }
+
+  return {
+    kind: 'workflow',
+    request: {
+      batchCount: getSnapshotBatchCount(queueItem),
+      destination: queueItem.snapshot.destination,
+      graph,
+      projectId: project.id,
+      sourceQueueItemId: queueItem.id,
+    },
+  };
 };
 
 const selectQueueRevision = createStableSelector((snapshot: { state: { projects: Project[] } }) =>
@@ -157,15 +243,11 @@ const submitQueueItem = (
   queueItem: QueueItem,
   dispatch: Dispatch<WorkbenchAction>
 ): void => {
-  const graph = queueItem.snapshot.graph.backendGraph;
-  const generateValues =
-    queueItem.snapshot.sourceId === 'generate'
-      ? normalizeGenerateSettings(queueItem.snapshot.widgetStates.generate.values)
-      : null;
+  const backendSubmission = createQueueItemBackendSubmission(project, queueItem);
 
-  if (!graph || (queueItem.snapshot.sourceId === 'generate' && !generateValues)) {
+  if (backendSubmission.kind === 'invalid') {
     dispatch({
-      error: `${queueItem.snapshot.sourceId} queue item is missing a compiled backend graph.`,
+      error: backendSubmission.error,
       projectId: project.id,
       queueItemId: queueItem.id,
       status: 'failed',
@@ -174,28 +256,10 @@ const submitQueueItem = (
     return;
   }
 
-  const submission = generateValues
-    ? coordinator.submitGenerate(queueItem.id, {
-        batchCount: generateValues.batchCount,
-        destination: queueItem.snapshot.destination,
-        graph,
-        negativePrompt: generateValues.negativePromptEnabled ? generateValues.negativePrompt : '',
-        negativePromptNodeId: 'negative_prompt',
-        positivePrompt: generateValues.positivePrompt,
-        positivePromptNodeId: 'positive_prompt',
-        projectId: project.id,
-        seed: generateValues.seed,
-        seedNodeId: 'seed',
-        shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
-        sourceQueueItemId: queueItem.id,
-      })
-    : coordinator.submitWorkflow(queueItem.id, {
-        batchCount: getSnapshotBatchCount(queueItem),
-        destination: queueItem.snapshot.destination,
-        graph,
-        projectId: project.id,
-        sourceQueueItemId: queueItem.id,
-      });
+  const submission =
+    backendSubmission.kind === 'generate'
+      ? coordinator.submitGenerate(queueItem.id, backendSubmission.request)
+      : coordinator.submitWorkflow(queueItem.id, backendSubmission.request);
 
   submission
     .then(({ batchId, itemIds }) => {

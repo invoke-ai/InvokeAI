@@ -3,7 +3,7 @@ import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } 
 
 // `generation/types.ts` imports value-less (`import type`) symbols back from this
 // module; both sides are type-only so this doesn't create a runtime cycle.
-import type { GenerateReferenceImage } from './generation/types';
+import type { GenerateReferenceImage, GenerateWidgetValues } from './generation/types';
 import type { WorkbenchLanguage } from './i18n/languages';
 import type { ProjectGraphState } from './workflows/types';
 
@@ -823,6 +823,12 @@ export interface QueueSubmissionSnapshot {
   sourceId: InvocationSourceId;
   destination: ResultDestination;
   graph: GraphContract;
+  generate?: {
+    values: GenerateWidgetValues;
+    negativePromptNodeId: string;
+    positivePromptNodeId: string;
+    seedNodeId: string;
+  };
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
   widgetStates: WidgetStateMap;
   canvas: CanvasStateContractV2;

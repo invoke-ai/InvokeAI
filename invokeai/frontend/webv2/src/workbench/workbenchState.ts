@@ -109,6 +109,8 @@ type CanvasLayerConfigPatch =
     }
   | { layerType: 'inpaint_mask'; mask?: Partial<CanvasMaskContract>; noiseLevel?: number; denoiseLimit?: number };
 
+type QueueGenerateSnapshot = NonNullable<QueueItem['snapshot']['generate']>;
+
 type WorkbenchAction =
   | { type: 'createProject' }
   | { type: 'openProject'; project: Project }
@@ -254,6 +256,7 @@ type WorkbenchAction =
       type: 'submitCanvasInvocationSnapshot';
       backendSupportsCancellation: boolean;
       destination: ResultDestination;
+      generate: QueueGenerateSnapshot;
       graph: GraphContract;
       projectId: string;
     }
@@ -380,6 +383,32 @@ const cloneGraph = (graph: GraphContract): GraphContract => ({
   edges: graph.edges.map((edge) => ({ ...edge })),
   nodes: graph.nodes.map((node) => ({ ...node, inputs: { ...node.inputs } })),
 });
+
+const cloneQueueGenerateSnapshot = (generate: QueueGenerateSnapshot): QueueGenerateSnapshot => ({
+  negativePromptNodeId: generate.negativePromptNodeId,
+  positivePromptNodeId: generate.positivePromptNodeId,
+  seedNodeId: generate.seedNodeId,
+  values: cloneGenerateWidgetValues(generate.values),
+});
+
+const applyQueueGenerateSnapshotToWidgetStates = (
+  widgetStates: WidgetStateMap,
+  generate: QueueGenerateSnapshot | undefined
+): WidgetStateMap => {
+  if (!generate) {
+    return widgetStates;
+  }
+
+  const generateState = widgetStates.generate ?? { id: 'generate', label: 'Generate', values: {}, version: 1 as const };
+
+  return {
+    ...widgetStates,
+    generate: {
+      ...generateState,
+      values: cloneGenerateWidgetValues(generate.values),
+    },
+  };
+};
 
 const clonePlacement = (placement: CanvasPlacementContract): CanvasPlacementContract => ({ ...placement });
 
@@ -1866,12 +1895,13 @@ const routeQueueItemResults = (project: Project, queueItemId: string, images: Ge
 const enqueueCompiledSnapshot = (
   project: Project,
   route: InvocationRoute,
-  compiled: { graph: GraphContract; widgetStates: WidgetStateMap },
+  compiled: { generate?: QueueGenerateSnapshot; graph: GraphContract; widgetStates: WidgetStateMap },
   backendSupportsCancellation: boolean
 ): Project => {
   const submittedAt = now();
   const queueItemId = createId('queue-item');
-  const { graph, widgetStates } = compiled;
+  const { generate, graph } = compiled;
+  const widgetStates = applyQueueGenerateSnapshotToWidgetStates(compiled.widgetStates, generate);
   const graphHistorySnapshot = createGraphHistorySnapshot(`Queue snapshot ${queueItemId}`, graph);
   const generateSettings =
     route.sourceId === 'generate' ? normalizeGenerateSettings(widgetStates.generate.values) : null;
@@ -1881,6 +1911,7 @@ const enqueueCompiledSnapshot = (
     snapshot: {
       canvas: cloneCanvas(project.canvas),
       destination: route.destination,
+      ...(generate ? { generate: cloneQueueGenerateSnapshot(generate) } : {}),
       graph,
       sourceId: route.sourceId,
       submittedAt,
@@ -3053,7 +3084,11 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         enqueueCompiledSnapshot(
           project,
           { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
-          { graph: action.graph, widgetStates: getWidgetStatesSnapshot(project.widgetInstances) },
+          {
+            generate: action.generate,
+            graph: action.graph,
+            widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
+          },
           action.backendSupportsCancellation
         )
       );

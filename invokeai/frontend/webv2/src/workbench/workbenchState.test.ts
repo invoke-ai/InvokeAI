@@ -1988,6 +1988,13 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     expect(getCanvas(state).stagingArea.selectedImageIndex).toBe(0);
   });
 
+  const createCanvasGenerateSnapshot = () => ({
+    negativePromptNodeId: 'negative_prompt',
+    positivePromptNodeId: 'positive_prompt',
+    seedNodeId: 'seed',
+    values: createGenerateValues({ positivePrompt: 'canvas prompt', seed: 101, shouldRandomizeSeed: false }),
+  });
+
   const submitCanvasGeneration = (state: WorkbenchState): { queueItemId: string; state: WorkbenchState } => {
     const graph: GraphContract = {
       edges: [],
@@ -2000,6 +2007,7 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     const next = workbenchReducer(state, {
       backendSupportsCancellation: true,
       destination: 'canvas',
+      generate: createCanvasGenerateSnapshot(),
       graph,
       projectId: state.activeProjectId,
       type: 'submitCanvasInvocationSnapshot',
@@ -2062,6 +2070,17 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     const state = workbenchReducer(initial, {
       backendSupportsCancellation: true,
       destination: 'canvas',
+      generate: {
+        negativePromptNodeId: 'negative_prompt',
+        positivePromptNodeId: 'positive_prompt',
+        seedNodeId: 'seed',
+        values: createGenerateValues({
+          negativePrompt: 'avoid blur',
+          positivePrompt: 'inpaint prompt',
+          seed: 42,
+          shouldRandomizeSeed: false,
+        }),
+      },
       graph,
       projectId: initial.activeProjectId,
       type: 'submitCanvasInvocationSnapshot',
@@ -2072,6 +2091,18 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     expect(queueItem?.snapshot.sourceId).toBe('canvas');
     expect(queueItem?.snapshot.destination).toBe('canvas');
     expect(queueItem?.snapshot.graph.id).toBe('canvas-graph');
+    expect(queueItem?.snapshot.generate).toMatchObject({
+      negativePromptNodeId: 'negative_prompt',
+      positivePromptNodeId: 'positive_prompt',
+      seedNodeId: 'seed',
+      values: { negativePrompt: 'avoid blur', positivePrompt: 'inpaint prompt', seed: 42, shouldRandomizeSeed: false },
+    });
+    expect(queueItem?.snapshot.widgetStates.generate.values).toMatchObject({
+      negativePrompt: 'avoid blur',
+      positivePrompt: 'inpaint prompt',
+      seed: 42,
+      shouldRandomizeSeed: false,
+    });
     expect(getActiveProject(state).invocation.sourceId).toBe('canvas');
   });
 
@@ -2089,6 +2120,7 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     const state = workbenchReducer(initial, {
       backendSupportsCancellation: true,
       destination: 'gallery',
+      generate: createCanvasGenerateSnapshot(),
       graph,
       projectId: initial.activeProjectId,
       type: 'submitCanvasInvocationSnapshot',
@@ -2124,6 +2156,7 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
       destination: 'canvas',
+      generate: createCanvasGenerateSnapshot(),
       graph,
       projectId: originatingProjectId,
       type: 'submitCanvasInvocationSnapshot',
@@ -2148,6 +2181,7 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
     const state = workbenchReducer(initial, {
       backendSupportsCancellation: true,
       destination: 'canvas',
+      generate: createCanvasGenerateSnapshot(),
       graph,
       projectId: 'not-a-real-project',
       type: 'submitCanvasInvocationSnapshot',
