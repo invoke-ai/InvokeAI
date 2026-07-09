@@ -1,11 +1,15 @@
-import type { NumberInput as ChakraNumberInput, SliderValueChangeDetails } from '@chakra-ui/react';
+import type {
+  NumberInput as ChakraNumberInput,
+  SelectValueChangeDetails,
+  SliderValueChangeDetails,
+} from '@chakra-ui/react';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
-import type { CanvasLayerContract, CanvasMaskFillContract } from '@workbench/types';
+import type { CanvasBlendMode, CanvasLayerContract, CanvasMaskFillContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
 
-import { HStack, NumberInput, Stack } from '@chakra-ui/react';
-import { ColorPicker, Field, Slider } from '@workbench/components/ui';
+import { Box, createListCollection, Flex, HStack, NumberInput, Stack } from '@chakra-ui/react';
+import { ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
 import {
   CANVAS_DENOISING_STRENGTH_KEY,
   clampCanvasDenoisingStrength,
@@ -22,9 +26,10 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DenoisingStrengthWave } from './DenoisingStrengthWave';
-import { applyStructural } from './layerOps';
+import { applyStructural, CANVAS_BLEND_MODES } from './layerOps';
 
 const STRENGTH_DEBOUNCE_MS = 250;
+const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 
 const formatStrengthPercent = (value: number): string => `${Math.round(value * 100)}%`;
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
@@ -42,8 +47,8 @@ const selectSelectedLayer = (project: {
   return layers.find((layer) => layer.id === selectedLayerId) ?? null;
 };
 
-const isSameSelection = (left: CanvasLayerContract | null, right: CanvasLayerContract | null): boolean => {
-  if (left?.id !== right?.id || left?.opacity !== right?.opacity) {
+export const isSameSelection = (left: CanvasLayerContract | null, right: CanvasLayerContract | null): boolean => {
+  if (left?.id !== right?.id || left?.opacity !== right?.opacity || left?.blendMode !== right?.blendMode) {
     return false;
   }
   const leftFill = isMaskLayer(left) ? left.mask.fill.color : null;
@@ -64,10 +69,78 @@ export const LayersPanelHeader = () => {
   const layer = useActiveProjectSelector(selectSelectedLayer, isSameSelection);
 
   return (
-    <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md">
-      <DenoisingStrengthControl />
-      <OpacityRow dispatch={dispatch} engine={engine} layer={layer} />
+    <Stack gap="0">
+      <Box borderBottomWidth={1} px="1.5" py="1">
+        <DenoisingStrengthControl />
+      </Box>
+      <Box borderBottomWidth={1} px="1.5" py="1">
+        <Flex align="center" gap="2">
+          <BlendModeControl dispatch={dispatch} engine={engine} layer={layer} />
+          <OpacityRow dispatch={dispatch} engine={engine} layer={layer} />
+        </Flex>
+      </Box>
     </Stack>
+  );
+};
+
+interface BlendModeOption {
+  label: string;
+  value: CanvasBlendMode;
+}
+
+const BlendModeControl = ({
+  dispatch,
+  engine,
+  layer,
+}: {
+  dispatch: Dispatch<WorkbenchAction>;
+  engine: CanvasEngine | null;
+  layer: CanvasLayerContract | null;
+}) => {
+  const { t } = useTranslation();
+  const disabled = !layer;
+  const blendMode = layer?.blendMode ?? 'normal';
+  const blendCollection = useMemo(
+    () =>
+      createListCollection<BlendModeOption>({
+        items: CANVAS_BLEND_MODES.map((mode) => ({ label: t(`widgets.layers.blendModes.${mode}`), value: mode })),
+      }),
+    [t]
+  );
+  const blendValue = useMemo(() => [blendMode], [blendMode]);
+
+  const handleBlendChange = useCallback(
+    ({ value }: SelectValueChangeDetails<BlendModeOption>) => {
+      const mode = value[0] as CanvasBlendMode | undefined;
+      if (!layer || !mode || mode === layer.blendMode) {
+        return;
+      }
+      applyStructural(
+        engine,
+        dispatch,
+        t('widgets.layers.actions.blendMode'),
+        { id: layer.id, patch: { blendMode: mode }, type: 'updateCanvasLayer' },
+        { id: layer.id, patch: { blendMode: layer.blendMode }, type: 'updateCanvasLayer' }
+      );
+    },
+    [dispatch, engine, layer, t]
+  );
+
+  return (
+    <Field disabled={disabled} flex="1.5" label={t('widgets.layers.actions.blendMode')} orientation="horizontal">
+      <Select
+        aria-label={t('widgets.layers.actions.blendMode')}
+        collection={blendCollection}
+        disabled={disabled}
+        minW="7rem"
+        positioning={SELECT_POSITIONING}
+        size="xs"
+        value={blendValue}
+        valueText={t(`widgets.layers.blendModes.${blendMode}`)}
+        w="full"
+        onValueChange={handleBlendChange}
+      />
+    </Field>
   );
 };
 
@@ -154,7 +227,7 @@ const OpacityRow = ({
   );
 
   return (
-    <Field disabled={disabled} label={t('widgets.layers.actions.opacity')}>
+    <Field disabled={disabled} label={t('widgets.layers.actions.opacity')} orientation="horizontal">
       <HStack ref={flushOnUnmountRef} gap="2">
         <NumberInput.Root
           disabled={disabled}
@@ -310,7 +383,7 @@ const DenoisingStrengthControl = () => {
 
   return (
     <Field label={t('widgets.layers.denoisingStrength')} labelEnd={strengthWave} orientation="horizontal">
-      <Stack direction="row" gap="2">
+      <Flex direction="row" gap="2" align="center">
         <Slider
           aria-label={strengthAriaLabel}
           flex="1"
@@ -323,6 +396,7 @@ const DenoisingStrengthControl = () => {
           value={strengthSliderValue}
           withThumbTooltip
           onValueChange={onSliderChange}
+          ms="2"
         />
         <NumberInput.Root
           max={MAX_CANVAS_DENOISING_STRENGTH}
@@ -336,7 +410,7 @@ const DenoisingStrengthControl = () => {
           <NumberInput.Control />
           <NumberInput.Input aria-label={t('widgets.layers.denoisingStrength')} />
         </NumberInput.Root>
-      </Stack>
+      </Flex>
     </Field>
   );
 };
