@@ -36,10 +36,15 @@ class TestZImageSelfContainedSDNQ:
     def test_sdnq_pipeline_with_submodels_falls_back_to_main_model(self):
         main_model = _make_main_model()
         invocation = ZImageModelLoaderInvocation(model=main_model)
-        # SDNQ pipeline config exposing submodels — self-contained.
+        # SDNQ pipeline config exposing all required submodels — self-contained.
         config = SimpleNamespace(
             format=ModelFormat.SDNQQuantized,
-            submodels={SubModelType.VAE: object(), SubModelType.TextEncoder: object()},
+            submodels={
+                SubModelType.Transformer: object(),
+                SubModelType.VAE: object(),
+                SubModelType.TextEncoder: object(),
+                SubModelType.Tokenizer: object(),
+            },
             name="Z-Image Turbo SDNQ",
         )
         context = _make_context(config)
@@ -60,6 +65,20 @@ class TestZImageSelfContainedSDNQ:
         """A single-file SDNQ Z-Image model (no submodels) is not self-contained."""
         invocation = ZImageModelLoaderInvocation(model=_make_main_model())
         config = SimpleNamespace(format=ModelFormat.SDNQQuantized, submodels=None, name="Z-Image single file")
+        context = _make_context(config)
+
+        with pytest.raises(ValueError, match="No VAE source"):
+            invocation.invoke(context)
+
+    def test_partial_sdnq_pipeline_is_not_self_contained(self):
+        """A pipeline that only exposes some submodels (e.g. just the transformer) must not be
+        treated as self-contained — the loader would fail on the missing vae / text_encoder folders."""
+        invocation = ZImageModelLoaderInvocation(model=_make_main_model())
+        config = SimpleNamespace(
+            format=ModelFormat.SDNQQuantized,
+            submodels={SubModelType.Transformer: object()},  # missing VAE / TextEncoder / Tokenizer
+            name="Z-Image partial pipeline",
+        )
         context = _make_context(config)
 
         with pytest.raises(ValueError, match="No VAE source"):

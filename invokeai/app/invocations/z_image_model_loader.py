@@ -142,12 +142,20 @@ class ZImageModelLoaderInvocation(BaseInvocation):
 
     def _get_self_contained_source(self, context: InvocationContext) -> Optional[ModelIdentifierField]:
         """Return the main model as a submodel source when it is a self-contained pipeline that
-        ships its own VAE / Qwen3 submodels. SDNQ-quantized Z-Image pipeline installs expose these
-        submodels (transformer / vae / text_encoder / tokenizer), so the single install can supply
-        every component. Returns None for single-file / GGUF main models that don't have submodels
-        and therefore still require an explicit VAE / Qwen3 source."""
+        ships its own VAE and Qwen3 submodels.
+
+        A truthy ``submodels`` dict is not sufficient: Main_SDNQ_Diffusers_ZImage_Config builds
+        whatever submodels it recognizes from model_index.json, so a partial (or partially
+        recognized) pipeline can expose e.g. only the transformer. The loader then loads the VAE /
+        Qwen3 encoder / tokenizer from fixed ``vae`` / ``text_encoder`` / ``tokenizer`` subfolders, so
+        we only treat the main model as self-contained when all of those submodels are present.
+        Otherwise we fall through and require an explicit VAE / Qwen3 source."""
         config = context.models.get_config(self.model)
-        if config.format == ModelFormat.SDNQQuantized and getattr(config, "submodels", None):
+        if config.format != ModelFormat.SDNQQuantized:
+            return None
+        submodels = getattr(config, "submodels", None) or {}
+        required = {SubModelType.VAE, SubModelType.TextEncoder, SubModelType.Tokenizer}
+        if required.issubset(submodels.keys()):
             return self.model
         return None
 

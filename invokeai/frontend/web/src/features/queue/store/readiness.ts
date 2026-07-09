@@ -321,12 +321,14 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
 
   if (model?.base === 'z-image') {
     // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
-    // encoder as submodels of the main model, so no separate component source is required. Single-
-    // file / GGUF Z-Image models don't have submodels and still need a standalone VAE + Qwen3 (or a
-    // diffusers Qwen3 Source model).
+    // encoder (text_encoder + tokenizer) as submodels of the main model, so no separate component
+    // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
+    // some submodels — so require the specific ones the loader needs. Single-file / GGUF Z-Image
+    // models don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
+    const zImageSubmodels = (model as { submodels?: Record<string, unknown> }).submodels;
     const mainIsSelfContainedPipeline =
       (model as { format?: unknown }).format === 'sdnq_quantized' &&
-      Boolean((model as { submodels?: unknown }).submodels);
+      Boolean(zImageSubmodels?.vae && zImageSubmodels?.text_encoder && zImageSubmodels?.tokenizer);
     if (!mainIsSelfContainedPipeline) {
       // Check if VAE source is available (either separate VAE or Qwen3 Source)
       const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
@@ -790,12 +792,14 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 
   if (model?.base === 'z-image') {
     // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
-    // encoder as submodels of the main model, so no separate component source is required. Single-
-    // file / GGUF Z-Image models don't have submodels and still need a standalone VAE + Qwen3 (or a
-    // diffusers Qwen3 Source model).
+    // encoder (text_encoder + tokenizer) as submodels of the main model, so no separate component
+    // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
+    // some submodels — so require the specific ones the loader needs. Single-file / GGUF Z-Image
+    // models don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
+    const zImageSubmodels = (model as { submodels?: Record<string, unknown> }).submodels;
     const mainIsSelfContainedPipeline =
       (model as { format?: unknown }).format === 'sdnq_quantized' &&
-      Boolean((model as { submodels?: unknown }).submodels);
+      Boolean(zImageSubmodels?.vae && zImageSubmodels?.text_encoder && zImageSubmodels?.tokenizer);
     if (!mainIsSelfContainedPipeline) {
       // Check if VAE source is available (either separate VAE or Qwen3 Source)
       const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;

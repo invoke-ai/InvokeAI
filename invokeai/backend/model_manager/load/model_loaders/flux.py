@@ -554,11 +554,12 @@ class T5EncoderSDNQLoader(ModelLoader):
 
         sd = sdnq_sd_loader(te_dir, compute_dtype=torch.bfloat16)
 
-        # T5's embed_tokens and shared point to the same parameter; the SDNQ state dict only carries one of them.
+        # T5's embed_tokens and shared point to the same parameter; the SDNQ state dict only carries
+        # one of them, so encoder.embed_tokens.weight is expected to be missing (re-tied below). Use
+        # the explicit helper rather than assert, which `python -O` strips (silent partial loads).
         missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False, assign=True)
-        assert len(unexpected_keys) == 0, f"Unexpected keys loading SDNQ T5: {unexpected_keys}"
-        assert set(missing_keys) <= {"encoder.embed_tokens.weight"}, (
-            f"Unexpected missing keys loading SDNQ T5: {missing_keys}"
+        raise_on_incomplete_sdnq_load(
+            "SDNQ T5 encoder", missing_keys, unexpected_keys, allowed_missing={"encoder.embed_tokens.weight"}
         )
         if "encoder.embed_tokens.weight" in missing_keys:
             model.encoder.embed_tokens.weight = model.shared.weight

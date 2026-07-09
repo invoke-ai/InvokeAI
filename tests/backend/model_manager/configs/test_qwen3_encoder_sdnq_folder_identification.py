@@ -89,6 +89,15 @@ def _make_sdnq_qwen3_encoder_folder(root: Path) -> Path:
     return root
 
 
+def _make_sdnq_causal_lm_folder(root: Path) -> Path:
+    """An SDNQ complete causal LM (config.json + tokenizer files at root) — a TextLLM, not an
+    encoder subfolder."""
+    root = _make_sdnq_qwen3_encoder_folder(root)
+    (root / "tokenizer.json").write_text("{}", encoding="utf-8")
+    (root / "tokenizer_config.json").write_text("{}", encoding="utf-8")
+    return root
+
+
 class TestQwen3EncoderSDNQFolderIdentification:
     def test_sdnq_transformer_folder_not_classified_as_qwen3(self, tmp_path: Path):
         root = _make_sdnq_transformer_folder(tmp_path / "sdnq-transformer")
@@ -121,6 +130,17 @@ class TestQwen3EncoderSDNQFolderIdentification:
         mod = ModelOnDisk(root)
         with pytest.raises(NotAMatchError):
             Qwen3Encoder_Qwen3Encoder_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    def test_sdnq_complete_causal_lm_not_classified_as_qwen3_encoder(self, tmp_path: Path):
+        """An SDNQ root folder with config.json + tokenizer files (a complete causal LM / TextLLM)
+        must not be claimed as a Qwen3 *encoder* — mirrors the guard in the unquantized config."""
+        root = _make_sdnq_causal_lm_folder(tmp_path / "sdnq-causal-lm")
+        mod = ModelOnDisk(root)
+        with pytest.raises(NotAMatchError):
+            Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+        result = ModelConfigFactory.from_model_on_disk(root, allow_unknown=True)
+        assert not isinstance(result.config, Qwen3Encoder_SDNQ_Folder_Config)
 
     def test_factory_resolves_sdnq_qwen3_folder_deterministically(self, tmp_path: Path):
         """With the plain config rejecting SDNQ, the factory resolves the folder unambiguously to

@@ -305,6 +305,16 @@ describe('Z-Image readiness checks – generate tab', () => {
     expect(hasZImageVaeReason(reasons)).toBe(true);
     expect(hasZImageQwen3Reason(reasons)).toBe(true);
   });
+
+  it('does not treat a partial SDNQ pipeline (missing vae/text_encoder/tokenizer) as self-contained', () => {
+    const zImageSdnqPartial = {
+      ...zImageSdnqPipelineModel,
+      submodels: { transformer: {} },
+    } as unknown as MainModelConfig;
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildZImageTabArg({ model: zImageSdnqPartial }));
+    expect(hasZImageVaeReason(reasons)).toBe(true);
+    expect(hasZImageQwen3Reason(reasons)).toBe(true);
+  });
 });
 
 describe('FLUX.2 Klein readiness checks – canvas tab', () => {

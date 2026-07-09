@@ -438,6 +438,11 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
         if not matched:
             raise NotAMatchError("directory does not look like an SDNQ-quantized Qwen3 encoder")
 
+        # A root config.json next to tokenizer files is a complete causal LM (TextLLM), not a Qwen3
+        # *encoder* subfolder. Mirror the guard in Qwen3Encoder_Qwen3Encoder_Config so an SDNQ
+        # causal-LM download is left to the TextLLM path instead of being stored as qwen3_encoder.
+        cls._reject_if_complete_causal_lm(mod)
+
         # Being SDNQ-quantized is not enough: an SDNQ transformer, VAE or other component folder
         # also has a quantization_config.json with quant_method="sdnq". Without verifying the folder
         # is actually a Qwen3 encoder, such a folder would be stored as type=qwen3_encoder and only
@@ -447,6 +452,22 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
 
         variant = cls._get_variant_from_dir(mod)
         return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _reject_if_complete_causal_lm(cls, mod: ModelOnDisk) -> None:
+        # Only applies to the root-config layout: an encoder subfolder (text_encoder/config.json) is
+        # unambiguous. When config.json sits at the root next to tokenizer files, this is a complete
+        # causal LM, not a Qwen3 encoder subfolder (matches Qwen3Encoder_Qwen3Encoder_Config).
+        if (mod.path / "text_encoder" / "config.json").exists():
+            return
+        if not (mod.path / "config.json").exists():
+            return
+        tokenizer_files = ("tokenizer.json", "tokenizer.model", "tokenizer_config.json")
+        if any((mod.path / f).exists() for f in tokenizer_files):
+            raise NotAMatchError(
+                "directory looks like a complete causal LM (config.json and tokenizer files at root), "
+                "not a standalone Qwen3 encoder"
+            )
 
     @classmethod
     def _validate_is_qwen3_encoder(cls, mod: ModelOnDisk) -> None:
