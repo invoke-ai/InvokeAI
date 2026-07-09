@@ -10,6 +10,7 @@ import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CURVE_PADDING, CURVE_SIZE, curvePointFromSvg, curvePointToSvg } from './curveEditorMath';
 import { applyStructural } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
@@ -227,8 +228,6 @@ const AdjustmentSlider = ({ adjustmentKey, adjustments, label, onCommit, onLive 
   );
 };
 
-const CURVE_SIZE = 180;
-
 interface CurvesEditorProps {
   adjustments: CanvasAdjustmentsContract;
   /** Render-only preview during a point drag (no history entry). */
@@ -263,17 +262,6 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
     [t]
   );
 
-  const toSvg = (x: number, y: number): { cx: number; cy: number } => ({
-    cx: (x / 255) * CURVE_SIZE,
-    cy: CURVE_SIZE - (y / 255) * CURVE_SIZE,
-  });
-
-  const fromSvg = (px: number, py: number): [number, number] => {
-    const x = Math.max(0, Math.min(255, Math.round((px / CURVE_SIZE) * 255)));
-    const y = Math.max(0, Math.min(255, Math.round(((CURVE_SIZE - py) / CURVE_SIZE) * 255)));
-    return [x, y];
-  };
-
   const svgPointFromEvent = (event: ReactPointerEvent<SVGElement>): { px: number; py: number } => {
     const svg = svgRef.current;
     if (!svg) {
@@ -290,8 +278,7 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
     const lut = buildCurveLut(points);
     let d = '';
     for (let i = 0; i < 256; i += 4) {
-      const cx = (i / 255) * CURVE_SIZE;
-      const cy = CURVE_SIZE - (lut[i] / 255) * CURVE_SIZE;
+      const { cx, cy } = curvePointToSvg(i, lut[i]);
       d += `${i === 0 ? 'M' : 'L'}${cx.toFixed(1)},${cy.toFixed(1)} `;
     }
     return d.trim();
@@ -317,7 +304,7 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
       return;
     }
     const { px, py } = svgPointFromEvent(event);
-    const [nx, ny] = fromSvg(px, py);
+    const [nx, ny] = curvePointFromSvg(px, py);
     const isEndpoint = index === 0 || index === points.length - 1;
     const next = points.map((p, i) => {
       if (i !== index) {
@@ -358,7 +345,7 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
       return;
     }
     const { px, py } = svgPointFromEvent(event);
-    const [nx, ny] = fromSvg(px, py);
+    const [nx, ny] = curvePointFromSvg(px, py);
     if (nx <= 0 || nx >= 255) {
       return;
     }
@@ -403,24 +390,49 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
         onPointerMove={handleMove}
         onPointerUp={handleUp}
         ref={svgRef}
-        style={{ background: 'var(--chakra-colors-bg-inset)', borderRadius: 4, touchAction: 'none', width: '100%' }}
+        style={{
+          background: 'var(--chakra-colors-bg-inset)',
+          border: '1px solid var(--chakra-colors-border-subtle)',
+          borderRadius: 4,
+          touchAction: 'none',
+          width: '100%',
+        }}
         viewBox={`0 0 ${CURVE_SIZE} ${CURVE_SIZE}`}
       >
-        <line stroke="var(--chakra-colors-border-subtle)" x1={0} x2={CURVE_SIZE} y1={CURVE_SIZE} y2={0} />
-        <path d={lutPath} fill="none" stroke="var(--chakra-colors-fg-emphasized)" strokeWidth={1.5} />
+        <line
+          stroke="var(--chakra-colors-border-emphasized)"
+          strokeDasharray="4 4"
+          vectorEffect="non-scaling-stroke"
+          x1={CURVE_PADDING}
+          x2={CURVE_SIZE - CURVE_PADDING}
+          y1={CURVE_SIZE - CURVE_PADDING}
+          y2={CURVE_PADDING}
+        />
+        <path
+          d={lutPath}
+          fill="none"
+          stroke="var(--chakra-colors-accent-solid)"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+        />
         {points.map((p, i) => {
-          const { cx, cy } = toSvg(p[0], p[1]);
+          const { cx, cy } = curvePointToSvg(p[0], p[1]);
           return (
             <circle
               cx={cx}
               cy={cy}
-              fill="var(--chakra-colors-fg-emphasized)"
+              fill="var(--chakra-colors-accent-solid)"
               key={i}
               onContextMenu={(e) => e.preventDefault()}
               onDoubleClick={handleRemove(i)}
               onPointerDown={handlePointDown(i)}
-              r={4}
+              r={5}
+              stroke="var(--chakra-colors-bg-inset)"
+              strokeWidth={2}
               style={{ cursor: 'pointer' }}
+              vectorEffect="non-scaling-stroke"
             />
           );
         })}
