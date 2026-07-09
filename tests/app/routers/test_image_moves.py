@@ -80,6 +80,7 @@ def mock_services() -> InvocationServices:
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
         users=UserService(db),
         image_moves=image_moves,
+        system_prompt_records=None,  # type: ignore
     )
 
 
