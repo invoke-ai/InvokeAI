@@ -89,6 +89,35 @@ def _make_sdnq_qwen3_encoder_folder(root: Path) -> Path:
     return root
 
 
+def _make_sdnq_sharded_qwen2_encoder_folder(root: Path) -> Path:
+    """A sharded SDNQ Qwen encoder folder declaring the compatible Qwen2ForCausalLM architecture.
+
+    The unquantized config accepts Qwen2ForCausalLM, so the SDNQ folder config must too. It must not
+    be rejected by trying to load a sharded state dict (multiple weight files) — the config-class
+    name is the authoritative signal here.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "config.json").write_text(
+        json.dumps({"architectures": ["Qwen2ForCausalLM"], "hidden_size": 2560}), encoding="utf-8"
+    )
+    _write_sdnq_marker(root)
+    save_file(
+        {
+            "model.embed_tokens.weight": torch.zeros(1000, 2560, dtype=torch.uint8),
+            "model.embed_tokens.scale": torch.zeros(1000, 1, dtype=torch.float32),
+        },
+        str(root / "model-00001-of-00002.safetensors"),
+    )
+    save_file(
+        {
+            "model.layers.0.self_attn.q_proj.weight": torch.zeros(64, 32, dtype=torch.uint8),
+            "model.layers.0.self_attn.q_proj.scale": torch.zeros(64, 1, dtype=torch.float32),
+        },
+        str(root / "model-00002-of-00002.safetensors"),
+    )
+    return root
+
+
 def _make_sdnq_causal_lm_folder(root: Path) -> Path:
     """An SDNQ complete causal LM (config.json + tokenizer files at root) — a TextLLM, not an
     encoder subfolder."""
@@ -141,6 +170,13 @@ class TestQwen3EncoderSDNQFolderIdentification:
 
         result = ModelConfigFactory.from_model_on_disk(root, allow_unknown=True)
         assert not isinstance(result.config, Qwen3Encoder_SDNQ_Folder_Config)
+
+    def test_sharded_qwen2_causal_lm_encoder_is_accepted(self, tmp_path: Path):
+        """A sharded SDNQ encoder declaring Qwen2ForCausalLM (a class the unquantized config accepts)
+        must resolve to the SDNQ folder config, not fail identification on the multi-shard load."""
+        root = _make_sdnq_sharded_qwen2_encoder_folder(tmp_path / "sdnq-qwen2-sharded")
+        result = ModelConfigFactory.from_model_on_disk(root, allow_unknown=True)
+        assert isinstance(result.config, Qwen3Encoder_SDNQ_Folder_Config)
 
     def test_factory_resolves_sdnq_qwen3_folder_deterministically(self, tmp_path: Path):
         """With the plain config rejecting SDNQ, the factory resolves the folder unambiguously to

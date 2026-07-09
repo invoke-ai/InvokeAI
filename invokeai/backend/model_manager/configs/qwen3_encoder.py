@@ -187,6 +187,15 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError("state dict looks like GGUF quantized")
 
 
+# Transformers architectures the Qwen3 encoder loader can consume. Kept in one place so the
+# unquantized and SDNQ folder configs accept exactly the same set of compatible class names.
+_QWEN3_ENCODER_ARCHITECTURES = {
+    "Qwen2VLForConditionalGeneration",
+    "Qwen2ForCausalLM",
+    "Qwen3ForCausalLM",
+}
+
+
 class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
     """Configuration for Qwen3 Encoder models in a diffusers-like format.
 
@@ -240,14 +249,7 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
             )
 
         # Qwen3 uses Qwen2VLForConditionalGeneration or similar
-        raise_for_class_name(
-            expected_config_path,
-            {
-                "Qwen2VLForConditionalGeneration",
-                "Qwen2ForCausalLM",
-                "Qwen3ForCausalLM",
-            },
-        )
+        raise_for_class_name(expected_config_path, _QWEN3_ENCODER_ARCHITECTURES)
 
         # Reject SDNQ-quantized encoders so Qwen3Encoder_SDNQ_Folder_Config matches them instead.
         # A real SDNQ Qwen3 encoder has the same Qwen3 config class name as an unquantized one, so
@@ -471,7 +473,10 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
 
     @classmethod
     def _validate_is_qwen3_encoder(cls, mod: ModelOnDisk) -> None:
-        # Strongest signal: a transformers-style config.json naming a Qwen3 architecture.
+        # Strongest signal: a transformers-style config.json naming a compatible Qwen architecture.
+        # Accept exactly the same class names as the unquantized Qwen3Encoder_Qwen3Encoder_Config
+        # (Qwen2VLForConditionalGeneration / Qwen2ForCausalLM / Qwen3ForCausalLM) so a compatible
+        # encoder is not rejected here just because it is SDNQ-quantized.
         for cfg_path in (mod.path / "config.json", mod.path / "text_encoder" / "config.json"):
             if not cfg_path.exists():
                 continue
@@ -484,13 +489,20 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
             class_name = cfg.get("_class_name")
             if isinstance(class_name, str):
                 names.add(class_name)
-            if any("Qwen3" in n for n in names):
+            if names & _QWEN3_ENCODER_ARCHITECTURES:
                 return
 
         # Fallback for folders without a usable config.json: check for Qwen3-specific state-dict
         # keys (model.layers. / model.embed_tokens.weight). An SDNQ transformer/VAE folder has
-        # transformer_blocks. / decoder. keys instead and is correctly rejected here.
-        if _has_qwen3_keys(mod.load_state_dict()):
+        # transformer_blocks. / decoder. keys instead and is correctly rejected here. Loading the
+        # state dict can raise for sharded folders (multiple weight files), so treat that as "no
+        # usable signal" rather than letting it abort identification — the config-class check above
+        # already covers sharded folders that declare a compatible architecture.
+        try:
+            state_dict = mod.load_state_dict()
+        except Exception:
+            state_dict = {}
+        if _has_qwen3_keys(state_dict):
             return
 
         raise NotAMatchError("directory does not look like a Qwen3 encoder (no Qwen3 config class or keys)")

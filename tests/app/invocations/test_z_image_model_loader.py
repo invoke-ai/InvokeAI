@@ -84,6 +84,23 @@ class TestZImageSelfContainedSDNQ:
         with pytest.raises(ValueError, match="No VAE source"):
             invocation.invoke(context)
 
+    def test_validate_diffusers_format_rejects_partial_sdnq_source(self):
+        """A partial SDNQ pipeline selected as the explicit Qwen3 Source must be rejected — otherwise
+        the invocation would emit VAE/text_encoder/tokenizer requests against missing subfolders."""
+        invocation = ZImageModelLoaderInvocation(model=_make_main_model())
+        source = ModelIdentifierField(
+            key="src", hash="h", name="partial", base=BaseModelType.ZImage, type=ModelType.Main
+        )
+        partial = SimpleNamespace(
+            format=ModelFormat.SDNQQuantized,
+            submodels={SubModelType.Transformer: object()},
+            name="Z-Image partial pipeline",
+        )
+        context = _make_context(partial)
+
+        with pytest.raises(ValueError, match="must be a Diffusers-style Z-Image pipeline"):
+            invocation._validate_diffusers_format(context, source, "Qwen3 Source")
+
     def test_non_sdnq_model_still_requires_source(self):
         """A GGUF Z-Image model must still require an explicit VAE / Qwen3 source."""
         invocation = ZImageModelLoaderInvocation(model=_make_main_model())

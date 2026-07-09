@@ -13,6 +13,7 @@ from invokeai.app.invocations.model import (
     Qwen3EncoderField,
     TransformerField,
     VAEField,
+    is_self_contained_sdnq_pipeline,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
@@ -151,11 +152,7 @@ class ZImageModelLoaderInvocation(BaseInvocation):
         we only treat the main model as self-contained when all of those submodels are present.
         Otherwise we fall through and require an explicit VAE / Qwen3 source."""
         config = context.models.get_config(self.model)
-        if config.format != ModelFormat.SDNQQuantized:
-            return None
-        submodels = getattr(config, "submodels", None) or {}
-        required = {SubModelType.VAE, SubModelType.TextEncoder, SubModelType.Tokenizer}
-        if required.issubset(submodels.keys()):
+        if is_self_contained_sdnq_pipeline(config):
             return self.model
         return None
 
@@ -164,12 +161,12 @@ class ZImageModelLoaderInvocation(BaseInvocation):
     ) -> None:
         """Validate that a model exposes the diffusers-style submodel layout (transformer / vae /
         text_encoder / tokenizer subfolders). Plain diffusers Z-Image pipelines satisfy this;
-        SDNQ-quantized ZImagePipeline folders do too because they ship the same submodels. Single-
-        file SDNQ Z-Image checkpoints don't have submodels populated and must still be rejected."""
+        SDNQ-quantized ZImagePipeline folders do too, but only when they ship the VAE + Qwen3
+        submodels. Single-file SDNQ Z-Image checkpoints and partial pipelines are rejected."""
         config = context.models.get_config(model)
         if config.format == ModelFormat.Diffusers:
             return
-        if config.format == ModelFormat.SDNQQuantized and getattr(config, "submodels", None):
+        if is_self_contained_sdnq_pipeline(config):
             return
         raise ValueError(
             f"The {model_name} model must be a Diffusers-style Z-Image pipeline (with VAE / Qwen3 "

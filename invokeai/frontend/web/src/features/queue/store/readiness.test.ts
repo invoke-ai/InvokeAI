@@ -51,6 +51,23 @@ const flux2GGUF9BModel = {
 const kleinVaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
 const kleinQwen3Model = { key: 'qwen3', name: 'Qwen3', base: 'flux2', type: 'qwen3_encoder' };
 
+const flux2SdnqPipelineModel = {
+  key: 'flux2-sdnq',
+  hash: 'h',
+  name: 'FLUX.2 Klein 4B SDNQ',
+  base: 'flux2',
+  type: 'main',
+  format: 'sdnq_quantized',
+  variant: 'klein_4b',
+  submodels: { transformer: {}, vae: {}, text_encoder: {}, tokenizer: {} },
+} as unknown as MainModelConfig;
+
+const flux2SdnqPartialModel = {
+  ...flux2SdnqPipelineModel,
+  key: 'flux2-sdnq-partial',
+  submodels: { transformer: {} },
+} as unknown as MainModelConfig;
+
 const baseDynamicPrompts: DynamicPromptsState = {
   _version: 1,
   maxPrompts: 100,
@@ -218,6 +235,32 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
     );
     expect(hasFlux2VaeReason(reasons)).toBe(false);
     expect(hasFlux2Qwen3Reason(reasons)).toBe(false);
+  });
+});
+
+describe('FLUX.2 Klein SDNQ pipeline readiness checks', () => {
+  it('generate: no errors for a full SDNQ pipeline (self-contained) with no component sources', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: flux2SdnqPipelineModel }));
+    expect(hasFlux2VaeReason(reasons)).toBe(false);
+    expect(hasFlux2Qwen3Reason(reasons)).toBe(false);
+  });
+
+  it('generate: errors for a partial SDNQ pipeline (only transformer submodel) with no sources', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: flux2SdnqPartialModel }));
+    expect(hasFlux2VaeReason(reasons)).toBe(true);
+    expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
+  });
+
+  it('canvas: no errors for a full SDNQ pipeline (self-contained) with no component sources', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildCanvasTabArg({ model: flux2SdnqPipelineModel }) as never);
+    expect(hasFlux2VaeReason(reasons)).toBe(false);
+    expect(hasFlux2Qwen3Reason(reasons)).toBe(false);
+  });
+
+  it('canvas: errors for a partial SDNQ pipeline (only transformer submodel) with no sources', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildCanvasTabArg({ model: flux2SdnqPartialModel }) as never);
+    expect(hasFlux2VaeReason(reasons)).toBe(true);
+    expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
   });
 });
 

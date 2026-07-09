@@ -291,14 +291,16 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
 
   if (model?.base === 'flux2') {
     // A FLUX.2 Klein model is a self-sufficient source when its config exposes the diffusers-style
-    // submodels (transformer/vae/text_encoder/tokenizer). That's the case for both plain Diffusers
-    // pipelines and SDNQ-quantized ZImagePipeline / Flux2KleinPipeline folders. Single-file or
-    // GGUF Klein models don't have submodels and need a standalone VAE + Qwen3 (or a diffusers-
-    // shaped source model installed elsewhere).
+    // submodels (transformer/vae/text_encoder/tokenizer). Plain Diffusers pipelines always do; an
+    // SDNQ pipeline qualifies only when it ships the VAE + Qwen3 (text_encoder + tokenizer) submodels
+    // — a truthy submodels dict is not enough, since a partial pipeline may expose only the
+    // transformer and the backend would then request missing fixed subfolders. Single-file / GGUF
+    // Klein models have no submodels and need a standalone VAE + Qwen3 (or a diffusers source).
+    const flux2Submodels = (model as { submodels?: Record<string, unknown> }).submodels;
     const mainIsPipeline =
       model.format === 'diffusers' ||
       ((model as { format?: unknown }).format === 'sdnq_quantized' &&
-        Boolean((model as { submodels?: unknown }).submodels));
+        Boolean(flux2Submodels?.vae && flux2Submodels?.text_encoder && flux2Submodels?.tokenizer));
     if (!mainIsPipeline) {
       if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
         reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
@@ -634,10 +636,18 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'flux2') {
-    // Non-diffusers FLUX.2 Klein models require standalone VAE and Qwen3 Encoder
-    // unless a diffusers flux2 model is available to extract them from.
+    // A FLUX.2 Klein model is a self-sufficient source when its config exposes the diffusers-style
+    // submodels. Plain Diffusers pipelines always do; an SDNQ pipeline qualifies only when it ships
+    // the VAE + Qwen3 (text_encoder + tokenizer) submodels — a truthy submodels dict is not enough,
+    // since a partial pipeline may expose only the transformer and the backend would then request
+    // missing fixed subfolders. Mirrors the generate-tab check so both tabs behave identically.
+    const flux2Submodels = (model as { submodels?: Record<string, unknown> }).submodels;
+    const mainIsPipeline =
+      model.format === 'diffusers' ||
+      ((model as { format?: unknown }).format === 'sdnq_quantized' &&
+        Boolean(flux2Submodels?.vae && flux2Submodels?.text_encoder && flux2Submodels?.tokenizer));
     // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
-    if (model.format !== 'diffusers') {
+    if (!mainIsPipeline) {
       if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
         reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
       }
