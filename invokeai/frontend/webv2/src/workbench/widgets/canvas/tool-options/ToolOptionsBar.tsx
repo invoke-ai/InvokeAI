@@ -3,6 +3,7 @@ import type { ToolId } from '@workbench/canvas-engine/types';
 import type { ComponentType } from 'react';
 
 import { HStack, Text } from '@chakra-ui/react';
+import { BboxDetailsBar } from '@workbench/widgets/canvas/BboxDetailsBar';
 import { CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
 import { useCanvasActiveTool, useCanvasZoom } from '@workbench/widgets/canvas/engineStoreHooks';
 import { formatZoomPercent } from '@workbench/widgets/canvas/zoomOptions';
@@ -63,15 +64,19 @@ export const ToolOptionsBar = ({
   const zoom = useCanvasZoom(engine);
   const OptionsComponent = TOOL_OPTIONS_COMPONENTS[activeTool];
   const hasDocument = documentWidth !== null && documentHeight !== null;
+  const hasBboxDetails = activeTool === 'bbox';
+  const hasToolControls = OptionsComponent !== undefined || hasBboxDetails;
 
   return (
     <CanvasOptionsBar>
-      {OptionsComponent ? (
+      {hasToolControls ? (
         <HStack align="center" gap="3" minW="0" overflow="hidden">
-          <OptionsComponent engine={engine} />
+          {hasBboxDetails ? <BboxDetailsBar engine={engine} /> : null}
+          {hasBboxDetails && OptionsComponent ? <CanvasFloatingBarDivider /> : null}
+          {OptionsComponent ? <OptionsComponent engine={engine} /> : null}
         </HStack>
       ) : null}
-      {OptionsComponent && hasDocument ? <CanvasFloatingBarDivider /> : null}
+      {hasToolControls && hasDocument ? <CanvasFloatingBarDivider /> : null}
       {hasDocument ? (
         <HStack
           align="center"

@@ -15,7 +15,7 @@ import { Panel } from '@workbench/components/ui';
  * no per-consumer boolean props accrete here.
  */
 export const CanvasFloatingBar = ({ children, ...rest }: PanelProps) => (
-  <Panel density="sm" pointerEvents="auto" rounded="lg" shadow="lg" tone="raised" {...rest}>
+  <Panel density="sm" pointerEvents="auto" rounded="lg" shadow="lg" p="1" tone="surface" {...rest}>
     {children}
   </Panel>
 );

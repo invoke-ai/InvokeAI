@@ -5,7 +5,7 @@ import { CanvasFloatingBar } from '@workbench/widgets/canvas/CanvasFloatingBar';
 
 export const CanvasOptionsBar = ({ children }: { children?: ReactNode }) => (
   <CanvasFloatingBar maxW="full">
-    <HStack align="center" gap="3" minW="0">
+    <HStack align="center" gap="1" minW="0">
       {children}
     </HStack>
   </CanvasFloatingBar>

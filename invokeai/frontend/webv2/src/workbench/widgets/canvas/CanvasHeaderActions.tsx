@@ -5,7 +5,7 @@ import type { Project, WidgetViewProps } from '@workbench/types';
 
 import { Box, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { createNewCanvasStateV2 } from '@workbench/canvasMigration';
-import { ConfirmDialog, IconButton, MenuContent } from '@workbench/components/ui';
+import { ConfirmDialog, IconButton, MenuContent, Tooltip } from '@workbench/components/ui';
 import { useModifierHeld } from '@workbench/useModifierHeld';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
@@ -184,68 +184,58 @@ const CanvasHeaderActionsInner = ({
         </Portal>
       </Menu.Root>
 
-      <IconButton
-        aria-label={t('widgets.canvas.controls.fitToView')}
-        color="fg.muted"
-        size="2xs"
-        variant="ghost"
-        onClick={() => engine.fitToView()}
-      >
-        <MaximizeIcon />
-      </IconButton>
+      <Tooltip content={t('widgets.canvas.controls.fitToView')}>
+        <IconButton color="fg.muted" size="2xs" variant="ghost" onClick={() => engine.fitToView()}>
+          <MaximizeIcon />
+        </IconButton>
+      </Tooltip>
 
-      <IconButton
-        aria-label={t('widgets.canvas.controls.fitBboxToLayers')}
-        color="fg.muted"
-        disabled={!fitLayersRect}
-        size="2xs"
-        variant="ghost"
-        onClick={() => applyFit(fitLayersRect, true)}
-      >
-        <FrameIcon />
-      </IconButton>
+      <Tooltip content={t('widgets.canvas.controls.fitBboxToLayers')}>
+        <IconButton
+          color="fg.muted"
+          disabled={!fitLayersRect}
+          size="2xs"
+          variant="ghost"
+          onClick={() => applyFit(fitLayersRect, true)}
+        >
+          <FrameIcon />
+        </IconButton>
+      </Tooltip>
 
-      <IconButton
-        aria-label={t('widgets.canvas.controls.fitBboxToMasks')}
-        color="fg.muted"
-        disabled={!fitMasksRect}
-        size="2xs"
-        variant="ghost"
-        onClick={() => applyFit(fitMasksRect, false)}
-      >
-        <SquareDashedBottomIcon />
-      </IconButton>
+      <Tooltip content={t('widgets.canvas.controls.fitBboxToMasks')}>
+        <IconButton
+          color="fg.muted"
+          disabled={!fitMasksRect}
+          size="2xs"
+          variant="ghost"
+          onClick={() => applyFit(fitMasksRect, false)}
+        >
+          <SquareDashedBottomIcon />
+        </IconButton>
+      </Tooltip>
 
       <HeaderDivider />
 
-      <IconButton
-        aria-label={t('widgets.canvas.commands.undo')}
-        color="fg.muted"
-        disabled={!canUndo}
-        size="2xs"
-        variant="ghost"
-        onClick={() => engine.undo()}
-      >
-        <Undo2Icon />
-      </IconButton>
+      <Tooltip content={t('widgets.canvas.commands.undo')}>
+        <IconButton color="fg.muted" disabled={!canUndo} size="2xs" variant="ghost" onClick={() => engine.undo()}>
+          <Undo2Icon />
+        </IconButton>
+      </Tooltip>
 
-      <IconButton
-        aria-label={t('widgets.canvas.commands.redo')}
-        color="fg.muted"
-        disabled={!canRedo}
-        size="2xs"
-        variant="ghost"
-        onClick={() => engine.redo()}
-      >
-        <Redo2Icon />
-      </IconButton>
+      <Tooltip content={t('widgets.canvas.commands.redo')}>
+        <IconButton color="fg.muted" disabled={!canRedo} size="2xs" variant="ghost" onClick={() => engine.redo()}>
+          <Redo2Icon />
+        </IconButton>
+      </Tooltip>
 
       <Menu.Root positioning={MENU_POSITIONING}>
-        <Menu.Trigger asChild>
-          <IconButton aria-label={t('widgets.canvas.controls.newSession')} color="fg.muted" size="2xs" variant="ghost">
-            <FilePlusIcon />
-          </IconButton>
-        </Menu.Trigger>
+        <Tooltip content={t('widgets.canvas.controls.newSession')}>
+          <Menu.Trigger asChild>
+            <IconButton color="fg.muted" size="2xs" variant="ghost">
+              <FilePlusIcon />
+            </IconButton>
+          </Menu.Trigger>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="11rem" py="1">
