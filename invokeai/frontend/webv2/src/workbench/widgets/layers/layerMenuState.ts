@@ -14,3 +14,20 @@ export const resolveMenuTargetForRender = (
   liveTarget: CanvasLayerContextMenuTarget | null,
   renameTarget: CanvasLayerContextMenuTarget | null
 ): CanvasLayerContextMenuTarget | null => liveTarget ?? renameTarget;
+
+export interface LayerContextMenuEvent {
+  clientX: number;
+  clientY: number;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+}
+
+export const createLayerMenuTargetFromContextEvent = (
+  layerId: string,
+  event: LayerContextMenuEvent
+): CanvasLayerContextMenuTarget => {
+  event.preventDefault();
+  event.stopPropagation();
+
+  return { layerId, x: event.clientX, y: event.clientY };
+};

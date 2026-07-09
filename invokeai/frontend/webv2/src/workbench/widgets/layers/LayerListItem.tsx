@@ -1,7 +1,7 @@
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { CanvasLayerContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
-import type { Dispatch, KeyboardEvent } from 'react';
+import type { Dispatch, KeyboardEvent, MouseEvent } from 'react';
 
 import { Badge, Box, HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { useSortable } from '@dnd-kit/sortable';
@@ -11,7 +11,8 @@ import { LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { LayerContextMenu } from './LayerContextMenu';
+import { CanvasLayerContextMenu, type CanvasLayerContextMenuTarget, LayerContextMenu } from './LayerContextMenu';
+import { createLayerMenuTargetFromContextEvent } from './layerMenuState';
 import { applyStructural } from './layerOps';
 import { LayerPropertiesPopover } from './LayerPropertiesPopover';
 import { LayerThumbnail } from './LayerThumbnail';
@@ -46,6 +47,7 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: layer.id });
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(layer.name);
+  const [contextMenuTarget, setContextMenuTarget] = useState<CanvasLayerContextMenuTarget | null>(null);
 
   const dndStyle = useMemo(
     () => ({
@@ -124,6 +126,18 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
 
   const handleNameChange = useCallback((event: { target: { value: string } }) => setDraftName(event.target.value), []);
 
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      if (!isSelected) {
+        dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+      }
+      setContextMenuTarget(createLayerMenuTargetFromContextEvent(layer.id, event));
+    },
+    [dispatch, isSelected, layer.id]
+  );
+
+  const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
+
   return (
     <Box ref={setNodeRef} style={dndStyle}>
       <Row
@@ -135,6 +149,7 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
         gap="1.5"
         p="1.5"
         onClick={handleSelect}
+        onContextMenu={handleContextMenu}
       >
         <HStack gap="1.5" w="full">
           <LayerThumbnail engine={engine} layer={layer} />
@@ -184,6 +199,13 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
           </Box>
         </HStack>
       </Row>
+      <CanvasLayerContextMenu
+        dispatch={dispatch}
+        engine={engine}
+        layers={layers}
+        target={contextMenuTarget}
+        onClose={closeContextMenu}
+      />
     </Box>
   );
 };
