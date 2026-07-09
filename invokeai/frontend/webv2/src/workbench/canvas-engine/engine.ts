@@ -319,6 +319,8 @@ export interface CanvasEngine {
    * through the normal bitmap-store path. A no-op for locked/missing/unsupported layers.
    */
   cropLayerToBbox(layerId: string): Promise<boolean>;
+  /** Creates a new raster paint layer above `layerId` from that layer's baked pixels. */
+  copyLayerToRaster(layerId: string): Promise<string | null>;
   /**
    * Rasterizes a parametric (shape/gradient/text) layer to a paint layer: bakes its
    * current appearance into a content-sized paint bitmap (persisted through the
@@ -1219,6 +1221,47 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     notifyLayerPainted(layerId);
     bitmapStore.markLayerDirty(layerId);
     return true;
+  };
+
+  const copyLayerToRaster = async (layerId: string): Promise<string | null> => {
+    if (pipeline.isGestureActive()) {
+      return null;
+    }
+    endNudgeBurst();
+    const doc = mirror.getDocument();
+    const sourceLayer = doc?.layers.find((candidate) => candidate.id === layerId);
+    if (!doc || !sourceLayer) {
+      return null;
+    }
+    const sourceIndex = doc.layers.findIndex((layer) => layer.id === layerId);
+    if (sourceIndex < 0) {
+      return null;
+    }
+    const baked = await exportBakedLayerPixels(layerId, { includeDisabled: true });
+    if (baked.status !== 'ok') {
+      return null;
+    }
+
+    const newId = createLayerId();
+    const layer: CanvasLayerContract = {
+      blendMode: 'normal',
+      id: newId,
+      isEnabled: true,
+      isLocked: false,
+      name: `${sourceLayer.name} copy`,
+      opacity: 1,
+      source: { bitmap: null, offset: { x: baked.rect.x, y: baked.rect.y }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    };
+    store.dispatch({ index: sourceIndex, layer, type: 'addCanvasLayer' });
+
+    const target = layerCache.getOrCreateRect(newId, baked.rect);
+    target.surface.ctx.drawImage(baked.surface.canvas, 0, 0);
+    target.stale = false;
+    notifyLayerPainted(newId);
+    bitmapStore.markLayerDirty(newId);
+    return newId;
   };
 
   /**
@@ -3257,6 +3300,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     commitStructural,
     commitTextEdit,
     cropLayerToBbox,
+    copyLayerToRaster,
     deselect,
     detach,
     dispose,

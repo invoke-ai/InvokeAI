@@ -471,6 +471,67 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('copyLayerToRaster adds a baked paint copy directly above the source layer', async () => {
+    const doc = { ...makeDoc(), layers: [rasterLayer('top'), rasterLayer('a')] };
+    const { store } = createFakeStore(doc);
+    const dispatch = store.dispatch as Mock;
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const engine = createCanvasEngine({
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    const newId = await engine.copyLayerToRaster('a');
+
+    expect(newId).toMatch(/^layer-/);
+    const add = dispatch.mock.calls
+      .map((call) => call[0] as WorkbenchAction)
+      .find((action) => action.type === 'addCanvasLayer');
+    expect(add).toBeDefined();
+    if (add?.type === 'addCanvasLayer' && add.layer.type === 'raster') {
+      expect(add.index).toBe(1);
+      expect(add.layer.id).toBe(newId);
+      expect(add.layer.name).toBe('a copy');
+      expect(add.layer.source).toEqual({ bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' });
+      expect(add.layer.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
+    } else {
+      throw new Error('expected addCanvasLayer with raster copy');
+    }
+    expect(
+      surfaces.some(
+        (surface) =>
+          surface.width === 10 && surface.height === 10 && surface.callLog.some((entry) => entry.op === 'drawImage')
+      )
+    ).toBe(true);
+    engine.dispose();
+  });
+
+  it('copyLayerToRaster returns null for empty layers', async () => {
+    const empty = { ...rasterLayer('empty'), source: { bitmap: null, type: 'paint' } as const };
+    const { store } = createFakeStore({ ...makeDoc(), layers: [empty] });
+    const dispatch = store.dispatch as Mock;
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.copyLayerToRaster('empty')).toBeNull();
+    expect(dispatch).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
   it('setTool switches the active tool and updates the store', () => {
     const { engine } = createEngine();
     const listener = vi.fn();

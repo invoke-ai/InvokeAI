@@ -58,7 +58,13 @@ describe('getLayerContextActions', () => {
   it('exposes control-only transparency and raster conversion actions', () => {
     const layer = createControlLayer('Control', 'control');
 
-    expect(idsFor(layer)).toEqual(expect.arrayContaining(['control-transparency-effect', 'convert-to-raster']));
+    expect(idsFor(layer)).toEqual(
+      expect.arrayContaining(['control-transparency-effect', 'convert-to-raster', 'copy-to-raster'])
+    );
+  });
+
+  it('does not expose copy-to-raster for raster layers', () => {
+    expect(idsFor(paintLayer('raster'))).not.toContain('copy-to-raster');
   });
 
   it('exposes regional guidance add actions only for missing prompts', () => {
@@ -86,6 +92,10 @@ describe('getLayerContextActions', () => {
     expect(actions.find((action) => action.id === 'copy-to-clipboard')?.isDisabled).toBe(true);
     expect(actions.find((action) => action.id === 'crop-to-bbox')?.isDisabled).toBe(true);
     expect(actions.find((action) => action.id === 'merge-down')?.isDisabled).toBe(true);
+
+    const control = createControlLayer('Control', 'control');
+    const controlActions = getLayerContextActions({ hasEngine: false, index: 0, layer: control, layers: [control] });
+    expect(controlActions.find((action) => action.id === 'copy-to-raster')?.isDisabled).toBe(true);
   });
 
   it('disables crop-to-bbox for locked layers', () => {

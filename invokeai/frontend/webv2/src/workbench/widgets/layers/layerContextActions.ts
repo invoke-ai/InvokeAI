@@ -15,6 +15,7 @@ export type LayerContextActionId =
   | 'save-to-assets'
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
+  | 'copy-to-raster'
   | 'rasterize'
   | 'convert-to-control'
   | 'convert-to-raster'
@@ -132,6 +133,14 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     id: 'crop-to-bbox',
     isDisabled: (ctx) => !ctx.hasEngine || ctx.layer.isLocked,
     labelKey: 'widgets.layers.actions.cropLayerToBbox',
+  },
+  {
+    defaultLabel: 'Copy to raster layer',
+    group: 'convert',
+    id: 'copy-to-raster',
+    isDisabled: (ctx) => !ctx.hasEngine,
+    isVisible: (ctx) => ctx.layer.type !== 'raster',
+    labelKey: 'widgets.layers.actions.copyToRasterLayer',
   },
   {
     defaultLabel: 'Rasterize',
