@@ -588,6 +588,10 @@ async def star_videos_in_list(
     current_user: CurrentUserOrDefault,
     video_names: list[str] = Body(description="The list of names of videos to star", embed=True),
 ) -> StarredVideosResult:
+    # Skip — but do not re-raise — auth failures so a foreign name mid-batch doesn't
+    # discard the response payload for items that were already starred. Mirrors
+    # delete_videos_from_list: re-raising turned partial successes into an error-shaped
+    # response, so the client never invalidated caches for the videos that did change.
     starred_videos: set[str] = set()
     affected_boards: set[str] = set()
     for video_name in video_names:
@@ -599,7 +603,7 @@ async def star_videos_in_list(
             starred_videos.add(video_name)
             affected_boards.add(updated.board_id or "none")
         except HTTPException:
-            raise
+            continue
         except Exception:
             pass
     return StarredVideosResult(starred_videos=list(starred_videos), affected_boards=list(affected_boards))
@@ -610,6 +614,7 @@ async def unstar_videos_in_list(
     current_user: CurrentUserOrDefault,
     video_names: list[str] = Body(description="The list of names of videos to unstar", embed=True),
 ) -> UnstarredVideosResult:
+    # See star_videos_in_list: skip foreign names instead of re-raising mid-batch.
     unstarred_videos: set[str] = set()
     affected_boards: set[str] = set()
     for video_name in video_names:
@@ -621,7 +626,7 @@ async def unstar_videos_in_list(
             unstarred_videos.add(video_name)
             affected_boards.add(updated.board_id or "none")
         except HTTPException:
-            raise
+            continue
         except Exception:
             pass
     return UnstarredVideosResult(unstarred_videos=list(unstarred_videos), affected_boards=list(affected_boards))

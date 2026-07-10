@@ -258,6 +258,74 @@ def test_delete_videos_from_list_skips_foreign_items_and_returns_owned(
 
 
 # ---------------------------------------------------------------------------
+# POST /videos/star and /videos/unstar must not re-raise mid-loop either
+# (PR #9163 review fix — same partial-mutation-then-403 pattern as bulk delete)
+# ---------------------------------------------------------------------------
+
+
+def _setup_mixed_ownership_batch(mock_invoker: Invoker, user1_id: str) -> None:
+    """Names beginning with 'mine_' belong to user1, anything else to a stranger."""
+
+    def fake_get_user_id(video_name: str):
+        return user1_id if video_name.startswith("mine_") else "other-user-id"
+
+    mock_invoker.services.video_records.get_user_id.side_effect = fake_get_user_id
+    # When _assert_video_owner falls back to the board check, return no board so the public
+    # fallback path doesn't relax permissions for the foreign video.
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = None
+
+    # The route reads ``updated.board_id`` to build ``affected_boards``; a bare MagicMock
+    # there would fail the response model's Pydantic validation.
+    fake_updated = MagicMock()
+    fake_updated.board_id = None
+    mock_invoker.services.videos.update.return_value = fake_updated
+
+
+def test_star_videos_from_list_skips_foreign_items_and_returns_owned(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """A batch star that includes a video owned by another user must keep going and return
+    200 with the owned items in ``starred_videos``. Previously the route raised 403
+    mid-loop: earlier videos were already mutated, but the error-shaped response carried no
+    payload, so the client never invalidated caches for the successful updates.
+    """
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    _setup_mixed_ownership_batch(mock_invoker, user1.user_id)
+
+    response = client.post(
+        "/api/v1/videos/star",
+        json={"video_names": ["mine_a.mp4", "foreign.mp4", "mine_b.mp4"]},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert set(body["starred_videos"]) == {"mine_a.mp4", "mine_b.mp4"}
+    # The service must have been asked to update the owned names but not the foreign one.
+    update_calls = {call.args[0] for call in mock_invoker.services.videos.update.call_args_list}
+    assert update_calls == {"mine_a.mp4", "mine_b.mp4"}
+
+
+def test_unstar_videos_from_list_skips_foreign_items_and_returns_owned(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    _setup_mixed_ownership_batch(mock_invoker, user1.user_id)
+
+    response = client.post(
+        "/api/v1/videos/unstar",
+        json={"video_names": ["mine_a.mp4", "foreign.mp4", "mine_b.mp4"]},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert set(body["unstarred_videos"]) == {"mine_a.mp4", "mine_b.mp4"}
+    update_calls = {call.args[0] for call in mock_invoker.services.videos.update.call_args_list}
+    assert update_calls == {"mine_a.mp4", "mine_b.mp4"}
+
+
+# ---------------------------------------------------------------------------
 # POST /videos/upload must reject malformed MP4 payloads with 415 (residual
 # verification flagged in JPPhoto's PR #9163 review)
 # ---------------------------------------------------------------------------
