@@ -23,7 +23,7 @@ import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbe
 import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import type { BitmapStore } from './document/bitmapStore';
-import type { EngineStore } from './engine';
+import type { CanvasEngine, EngineStore } from './engine';
 import type { StrokeCommittedEvent } from './tools/tool';
 
 import { createBitmapStore } from './document/bitmapStore';
@@ -1939,7 +1939,7 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     await flushMicrotasks();
     raf.flush();
     expect(thumbnailListener).toHaveBeenCalledTimes(1);
-    expect(engine.stores.thumbnailVersion.get('a')).toBe(1);
+    expect(engine.stores.thumbnailVersion.get('a')).toBe(2);
 
     // The older decode resolves afterwards. It may finish its isolated scratch
     // draw, but it must neither publish nor notify subscribers.
@@ -5858,6 +5858,13 @@ describe('commitRasterFilterResult', () => {
     if (exported.status !== 'ok') {
       throw new Error('expected a filterable export');
     }
+    const invalidateSource = vi.spyOn(engine.canvasOperations, 'invalidateSource');
+    const cleanupPreview = vi.fn(() => invalidateSource.mockClear());
+    engine.canvasOperations.start({
+      cleanupPreview,
+      guard: exported.guard,
+      identity: { kind: 'filter', layerId: layer.id, projectId },
+    });
 
     const result = await engine.commitRasterFilterResult({
       guard: exported.guard,
@@ -5867,6 +5874,9 @@ describe('commitRasterFilterResult', () => {
     });
 
     expect(result).toEqual({ layerId: layer.id, status: 'committed' });
+    expect(cleanupPreview).toHaveBeenCalledOnce();
+    expect(invalidateSource).toHaveBeenCalledWith(projectId, layer.id);
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     const after = engine.getDocument()!.layers[0]!;
     const { adjustments: _adjustments, ...beforeWithoutAdjustments } = before as CanvasRasterLayerContractV2;
     expect(after).toEqual({
@@ -11206,6 +11216,31 @@ describe('engine selection: fill / erase', () => {
     // Undo restores (canRedo becomes available).
     engine.undo();
     expect(engine.stores.canRedo.get()).toBe(true);
+    engine.dispose();
+  });
+
+  it.each([
+    ['paint', (engine: CanvasEngine) => engine.fillSelection()],
+    ['cache clear', (engine: CanvasEngine) => engine.clearCaches()],
+  ] as const)('%s cancels a guarded operation and cleans its preview', async (_label, mutate) => {
+    const { engine } = makeEngine(paintDoc());
+    engine.selectAll();
+    engine.fillSelection();
+    const exported = await engine.exportLayerPixels('paint1');
+    if (exported.status !== 'ok') {
+      throw new Error('expected published paint pixels');
+    }
+    const cleanupPreview = vi.fn();
+    engine.canvasOperations.start({
+      cleanupPreview,
+      guard: exported.guard,
+      identity: { kind: 'select-object', layerId: 'paint1', projectId: 'p1' },
+    });
+
+    await mutate(engine);
+
+    expect(cleanupPreview).toHaveBeenCalledOnce();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     engine.dispose();
   });
 

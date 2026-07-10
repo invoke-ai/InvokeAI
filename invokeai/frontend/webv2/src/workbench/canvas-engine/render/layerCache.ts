@@ -60,6 +60,11 @@ export interface PreparedLayerCacheReplacement {
   readonly surface: RasterSurface;
 }
 
+export interface LayerCacheStoreOptions {
+  /** Called after a cache identity or pixels change; fresh allocations stay silent. */
+  onVersionChange?(layerId: string): void;
+}
+
 /** The imperative store returned by {@link createLayerCacheStore}. */
 export interface LayerCacheStore {
   /** Returns the existing cache entry for a layer, or `undefined`. Touches LRU order. */
@@ -92,6 +97,8 @@ export interface LayerCacheStore {
   prepareReplacement(layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement;
   /** Publishes a detached replacement without allocating, resizing, or drawing. */
   installReplacement(prepared: PreparedLayerCacheReplacement): LayerCacheEntry;
+  /** Marks directly-written pixels current, bumps the version, and notifies observers. */
+  publishPixels(layerId: string): LayerCacheEntry | undefined;
   /** Marks a layer's cache stale and bumps its `version`. */
   invalidate(layerId: string): void;
   /** Drops a layer's cache entry entirely. */
@@ -119,7 +126,10 @@ export interface LayerCacheStore {
 const surfaceBytes = (surface: RasterSurface): number => surface.width * surface.height * BYTES_PER_PIXEL;
 
 /** Creates a per-layer raster cache store backed by the given {@link RasterBackend}. */
-export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore => {
+export const createLayerCacheStore = (
+  backend: RasterBackend,
+  options: LayerCacheStoreOptions = {}
+): LayerCacheStore => {
   const entries = new Map<string, LayerCacheEntry>();
   const bitmaps = new Map<string, ImageBitmap>();
   // Per-id version FLOOR: the highest version each layer id has ever reached,
@@ -130,6 +140,14 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
   // already have cached. Only ever grows; a plain number per id (negligible).
   const versionFloors = new Map<string, number>();
   let tick = 0;
+
+  const notifyVersionChange = (layerId: string): void => {
+    try {
+      options.onVersionChange?.(layerId);
+    } catch {
+      // Cache mutation is already complete; observers cannot roll it back.
+    }
+  };
 
   const touch = (entry: LayerCacheEntry): void => {
     tick += 1;
@@ -161,6 +179,12 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
   const getOrCreate = (layerId: string, width: number, height: number): LayerCacheEntry => {
     const existing = entries.get(layerId);
     if (existing) {
+      const changed =
+        existing.surface.width !== width ||
+        existing.surface.height !== height ||
+        existing.rect.x !== 0 ||
+        existing.rect.y !== 0;
+      const hadPublishedPixels = existing.hasPublishedPixels;
       if (existing.surface.width !== width || existing.surface.height !== height) {
         existing.surface.resize(width, height);
         existing.hasPublishedPixels = false;
@@ -169,6 +193,10 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
       // Origin-anchored: this variant always places the surface at (0, 0).
       existing.rect = { height, width, x: 0, y: 0 };
       touch(existing);
+      if (changed && hadPublishedPixels) {
+        existing.version += 1;
+        notifyVersionChange(layerId);
+      }
       return existing;
     }
     const entry: LayerCacheEntry = {
@@ -260,6 +288,10 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     }
     existing.rect = newRect;
     touch(existing);
+    if (existing.hasPublishedPixels) {
+      existing.version += 1;
+      notifyVersionChange(layerId);
+    }
     return existing;
   };
 
@@ -296,6 +328,19 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     };
     touch(entry);
     entries.set(prepared.layerId, entry);
+    notifyVersionChange(prepared.layerId);
+    return entry;
+  };
+
+  const publishPixels = (layerId: string): LayerCacheEntry | undefined => {
+    const entry = entries.get(layerId);
+    if (!entry) {
+      return undefined;
+    }
+    entry.hasPublishedPixels = true;
+    entry.stale = false;
+    entry.version += 1;
+    notifyVersionChange(layerId);
     return entry;
   };
 
@@ -304,6 +349,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     if (entry) {
       entry.version += 1;
       entry.stale = true;
+      notifyVersionChange(layerId);
     }
   };
 
@@ -312,6 +358,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     if (entry) {
       rememberFloor(entry);
       entries.delete(layerId);
+      notifyVersionChange(layerId);
     }
   };
 
@@ -347,6 +394,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
       entries.delete(entry.layerId);
       evicted.push(entry.layerId);
       total -= surfaceBytes(entry.surface);
+      notifyVersionChange(entry.layerId);
     }
     return evicted;
   };
@@ -391,6 +439,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     installReplacement,
     invalidate,
     prepareReplacement,
+    publishPixels,
     setBitmap,
     version,
   };

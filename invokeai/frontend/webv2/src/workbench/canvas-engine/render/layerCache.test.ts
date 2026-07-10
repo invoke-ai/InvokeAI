@@ -11,6 +11,37 @@ const makeBitmap = () => {
 };
 
 describe('createLayerCacheStore', () => {
+  it('notifies version changes for pixel publication, invalidation, replacement, growth, and deletion', () => {
+    const backend = createTestStubRasterBackend();
+    const onVersionChange = vi.fn();
+    const store = createLayerCacheStore(backend, { onVersionChange });
+
+    store.getOrCreate('layer-1', 10, 10);
+    expect(onVersionChange).not.toHaveBeenCalled();
+
+    store.publishPixels('layer-1');
+    store.growToRect('layer-1', { height: 20, width: 20, x: 0, y: 0 });
+    store.invalidate('layer-1');
+    store.installReplacement(
+      store.prepareReplacement('layer-1', { height: 5, width: 5, x: 0, y: 0 }, backend.createSurface(5, 5))
+    );
+    store.delete('layer-1');
+
+    expect(onVersionChange).toHaveBeenCalledTimes(5);
+    expect(onVersionChange).toHaveBeenCalledWith('layer-1');
+  });
+
+  it('does not notify for ordinary fresh or stale allocation', () => {
+    const onVersionChange = vi.fn();
+    const store = createLayerCacheStore(createTestStubRasterBackend(), { onVersionChange });
+
+    store.getOrCreate('origin', 10, 10);
+    store.getOrCreateRect('rect', { height: 10, width: 10, x: 2, y: 3 });
+    store.growToRect('grown', { height: 10, width: 10, x: 2, y: 3 });
+
+    expect(onVersionChange).not.toHaveBeenCalled();
+  });
+
   it('returns a stable entry identity for the same layer + size', () => {
     const store = createLayerCacheStore(createTestStubRasterBackend());
     const a = store.getOrCreate('layer-1', 100, 50);

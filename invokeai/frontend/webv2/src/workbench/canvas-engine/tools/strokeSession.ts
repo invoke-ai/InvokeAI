@@ -228,7 +228,7 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     // raster layer until pointer-up (and jump on rect growth). This does NOT
     // touch `thumbnailVersion` (only `notifyLayerPainted`/rasterize do), so
     // thumbnails don't churn mid-stroke.
-    entry.version += 1;
+    layers.publishPixels(layerId);
     ctx.invalidate({ layers: [layerId] });
   };
 
@@ -246,7 +246,7 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
         // Bump the version so the adjusted-surface memo (which recomputed over the
         // live stroke) re-derives from the RESTORED pixels — otherwise an adjusted
         // raster layer would keep showing the cancelled stroke's adjusted preview.
-        entry.version += 1;
+        layers.publishPixels(layerId);
         ctx.invalidate({ layers: [layerId] });
       }
     },

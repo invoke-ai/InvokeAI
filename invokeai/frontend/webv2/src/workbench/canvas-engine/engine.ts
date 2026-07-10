@@ -728,7 +728,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const backend = opts.backend ?? createDomRasterBackend();
 
   const viewport = createViewport();
-  const layerCache: LayerCacheStore = createLayerCacheStore(backend);
+  let canvasOperations: CanvasOperationController;
+  const layerCache: LayerCacheStore = createLayerCacheStore(backend, {
+    onVersionChange: (layerId) => canvasOperations?.invalidateSource(projectId, layerId),
+  });
   const stores = createEngineStores();
   // Web-font readiness for text layers: re-rasterizes a text layer once its font
   // resolves (a no-op in node / when `document.fonts` is absent). `undefined`
@@ -984,10 +987,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   /** Bumps a layer's cache version after a direct paint (pixels stay fresh) and recomposites. */
   const notifyLayerPainted = (layerId: string): void => {
-    const entry = layerCache.get(layerId);
+    const entry = layerCache.publishPixels(layerId);
     if (entry) {
-      entry.hasPublishedPixels = true;
-      entry.version += 1;
       stores.thumbnailVersion.set(layerId, entry.version);
       stores.thumbnailStatus.set(layerId, 'ready');
     }
@@ -1335,11 +1336,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           ctx.drawImage(result.surface.canvas, 0, 0);
         }
         currentEntry.rect = { ...result.rect };
-        currentEntry.hasPublishedPixels = true;
-        currentEntry.stale = false;
+        const publishedEntry = layerCache.publishPixels(layer.id);
+        if (!publishedEntry) {
+          return 'stale';
+        }
         trackPublishedLayerImage(currentLayer);
         published = true;
-        stores.thumbnailVersion.set(layer.id, currentEntry.version);
+        stores.thumbnailVersion.set(layer.id, publishedEntry.version);
         stores.thumbnailStatus.set(layer.id, 'ready');
         scheduler.invalidate({ layers: [layer.id] });
         return 'published';
@@ -1427,7 +1430,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return !!entry && liveLayer === guard.layer && entry.version === guard.cacheVersion;
   };
 
-  const canvasOperations = createCanvasOperationController({ isGuardCurrent: isLayerExportGuardCurrent });
+  canvasOperations = createCanvasOperationController({ isGuardCurrent: isLayerExportGuardCurrent });
 
   const ensureLayerCaches = (doc: CanvasDocumentContractV2): void => {
     for (const layer of doc.layers) {

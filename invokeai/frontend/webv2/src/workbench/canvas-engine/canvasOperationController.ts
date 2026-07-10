@@ -16,9 +16,14 @@ export type CanvasOperationState =
 export type CanvasOperationRunResult = 'published' | 'stale' | 'error';
 
 export interface CanvasOperationSession {
-  run<T>(
+  /**
+   * Prepares a preview asynchronously, then commits it synchronously only while
+   * this request and its export guard are still current.
+   */
+  run<T, CommitResult>(
     work: (signal: AbortSignal) => Promise<T>,
-    publish: (result: T) => void | Promise<void>
+    commitPreview: (result: T) => CommitResult,
+    ...asyncCommitNotAllowed: CommitResult extends PromiseLike<unknown> ? [never] : []
   ): Promise<CanvasOperationRunResult>;
   reset(): void;
   cancel(): void;
@@ -66,7 +71,11 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
       return;
     }
     for (const listener of listeners) {
-      listener();
+      try {
+        listener();
+      } catch {
+        // One faulty subscriber must not strand the controller mid-transition.
+      }
     }
   };
 
@@ -83,11 +92,16 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
       return;
     }
     operation.requestToken += 1;
-    operation.requestController?.abort();
+    const requestController = operation.requestController;
     operation.requestController = null;
-    cleanupPreview(operation);
     active = null;
-    publishState({ status: 'idle' });
+    const idleState: CanvasOperationState = { status: 'idle' };
+    state = idleState;
+    requestController?.abort();
+    cleanupPreview(operation);
+    if (active === null && state === idleState) {
+      publishState(idleState);
+    }
   };
 
   const reset = (operation: ActiveOperation): void => {
@@ -95,10 +109,17 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
       return;
     }
     operation.requestToken += 1;
-    operation.requestController?.abort();
+    const requestController = operation.requestController;
     operation.requestController = null;
+    active = null;
+    const idleState: CanvasOperationState = { status: 'idle' };
+    state = idleState;
+    requestController?.abort();
     cleanupPreview(operation);
-    publishState({ error: null, identity: operation.identity, phase: 'ready', status: 'active' });
+    if (!disposed && active === null && state === idleState) {
+      active = operation;
+      publishState({ error: null, identity: operation.identity, phase: 'ready', status: 'active' });
+    }
   };
 
   const isGuardCurrent = (operation: ActiveOperation): boolean => {
@@ -116,10 +137,10 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     operation.requestController === controller &&
     !controller.signal.aborted;
 
-  const run = async <T>(
+  const run = async <T, CommitResult>(
     operation: ActiveOperation,
     work: (signal: AbortSignal) => Promise<T>,
-    publish: (result: T) => void | Promise<void>
+    commitPreview: (result: T) => CommitResult
   ): Promise<CanvasOperationRunResult> => {
     if (disposed || active !== operation) {
       return 'stale';
@@ -131,11 +152,24 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
 
     operation.requestToken += 1;
     const token = operation.requestToken;
-    operation.requestController?.abort();
+    const previousController = operation.requestController;
+    operation.requestController = null;
+    active = null;
+    const idleState: CanvasOperationState = { status: 'idle' };
+    state = idleState;
+    previousController?.abort();
+    cleanupPreview(operation);
+    if (disposed || active !== null || state !== idleState) {
+      return 'stale';
+    }
+
     const controller = new AbortController();
     operation.requestController = controller;
-    cleanupPreview(operation);
+    active = operation;
     publishState({ error: null, identity: operation.identity, phase: 'running', status: 'active' });
+    if (!isCurrentRequest(operation, token, controller)) {
+      return 'stale';
+    }
 
     try {
       const result = await work(controller.signal);
@@ -147,7 +181,7 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
         return 'stale';
       }
 
-      await publish(result);
+      commitPreview(result);
       if (!isCurrentRequest(operation, token, controller)) {
         return 'stale';
       }
@@ -187,6 +221,9 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
 
     if (active) {
       close(active);
+      if (active) {
+        return null;
+      }
     }
     const operation: ActiveOperation = {
       ...options,
@@ -199,7 +236,11 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     return {
       cancel: () => close(operation),
       reset: () => reset(operation),
-      run: (work, publish) => run(operation, work, publish),
+      run: <T, CommitResult>(
+        work: (signal: AbortSignal) => Promise<T>,
+        commitPreview: (result: T) => CommitResult,
+        ..._asyncCommitNotAllowed: CommitResult extends PromiseLike<unknown> ? [never] : []
+      ) => run(operation, work, commitPreview),
     };
   };
 

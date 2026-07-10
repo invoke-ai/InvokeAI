@@ -163,6 +163,113 @@ describe('createCanvasOperationController', () => {
     expect(publishNewer).toHaveBeenCalledWith('newer');
   });
 
+  it('rechecks freshness after synchronous preview commit', async () => {
+    const replacementCleanup = vi.fn();
+    const controller = createCanvasOperationController({ isGuardCurrent: () => true });
+    const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: filterIdentity })!;
+
+    const result = await session.run(
+      () => Promise.resolve('prepared'),
+      () => {
+        controller.start({ cleanupPreview: replacementCleanup, guard, identity: selectObjectIdentity });
+      }
+    );
+
+    expect(result).toBe('stale');
+    expect(controller.getSnapshot()).toMatchObject({ identity: selectObjectIdentity, status: 'active' });
+    expect(replacementCleanup).not.toHaveBeenCalled();
+  });
+
+  it('requires preview commit callbacks to be synchronous', () => {
+    const controller = createCanvasOperationController({ isGuardCurrent: () => true });
+    const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: filterIdentity })!;
+
+    if (Date.now() < 0) {
+      const asyncCommit = (): Promise<void> => Promise.resolve();
+      // @ts-expect-error Preview commit must not yield after the final freshness check.
+      void session.run(() => Promise.resolve('prepared'), asyncCommit);
+    }
+  });
+
+  it('treats AbortError from a superseded request as stale without publishing an error', async () => {
+    const controller = createCanvasOperationController({ isGuardCurrent: () => true });
+    const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: filterIdentity })!;
+    const commitOlder = vi.fn();
+    const older = session.run(
+      (signal) =>
+        new Promise<string>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('superseded', 'AbortError')), { once: true });
+        }),
+      commitOlder
+    );
+
+    const commitNewer = vi.fn();
+    const newer = session.run(() => Promise.resolve('newer'), commitNewer);
+
+    await expect(older).resolves.toBe('stale');
+    await expect(newer).resolves.toBe('published');
+    expect(commitOlder).not.toHaveBeenCalled();
+    expect(commitNewer).toHaveBeenCalledWith('newer');
+    expect(controller.getSnapshot()).toMatchObject({ error: null, phase: 'ready', status: 'active' });
+  });
+
+  it.each(['replacement', 'reset', 'cancel'] as const)(
+    'preserves an operation started reentrantly during %s cleanup',
+    (lifecycle) => {
+      const controller = createCanvasOperationController({ isGuardCurrent: () => true });
+      const replacementCleanup = vi.fn();
+      const cleanupPreview = vi.fn(() => {
+        controller.start({ cleanupPreview: replacementCleanup, guard, identity: selectObjectIdentity });
+      });
+      const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
+
+      if (lifecycle === 'replacement') {
+        controller.start({ cleanupPreview: vi.fn(), guard, identity: filterIdentity });
+      } else if (lifecycle === 'reset') {
+        session.reset();
+      } else {
+        session.cancel();
+      }
+
+      expect(cleanupPreview).toHaveBeenCalledOnce();
+      expect(replacementCleanup).not.toHaveBeenCalled();
+      expect(controller.getSnapshot()).toMatchObject({ identity: selectObjectIdentity, status: 'active' });
+    }
+  );
+
+  it('preserves an operation started reentrantly during request cleanup', async () => {
+    const controller = createCanvasOperationController({ isGuardCurrent: () => true });
+    const replacementCleanup = vi.fn();
+    const cleanupPreview = vi.fn(() => {
+      controller.start({ cleanupPreview: replacementCleanup, guard, identity: selectObjectIdentity });
+    });
+    const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
+    const work = vi.fn(() => Promise.resolve('prepared'));
+
+    await expect(session.run(work, vi.fn())).resolves.toBe('stale');
+
+    expect(cleanupPreview).toHaveBeenCalledOnce();
+    expect(work).not.toHaveBeenCalled();
+    expect(replacementCleanup).not.toHaveBeenCalled();
+    expect(controller.getSnapshot()).toMatchObject({ identity: selectObjectIdentity, status: 'active' });
+  });
+
+  it('contains subscriber exceptions during start and request state transitions', async () => {
+    const controller = createCanvasOperationController({ isGuardCurrent: () => true });
+    const healthyListener = vi.fn();
+    controller.subscribe(() => {
+      throw new Error('listener failed');
+    });
+    controller.subscribe(healthyListener);
+
+    const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: filterIdentity });
+
+    expect(session).not.toBeNull();
+    await expect(session!.run(() => Promise.resolve('ready'), vi.fn())).resolves.toBe('published');
+    expect(healthyListener).toHaveBeenCalledTimes(3);
+    expect(controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
+  });
+
   it('rejects an invalid or mismatched export guard without replacing the active operation', () => {
     const isGuardCurrent = vi.fn((candidate: LayerExportGuard) => candidate === guard);
     const controller = createCanvasOperationController({ isGuardCurrent });
