@@ -2,10 +2,11 @@ import type { ButtonProps, IconButtonProps, SystemStyleObject } from '@invoke-ai
 import { Button, IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
+import { imageAndVideoDropzoneAccept, isVideoFile } from 'common/util/uploadMediaAccept';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
-import type { Accept, FileRejection } from 'react-dropzone';
+import type { FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadBold } from 'react-icons/pi';
@@ -14,30 +15,6 @@ import { uploadVideos, useUploadVideoMutation } from 'services/api/endpoints/vid
 import type { ImageDTO, VideoDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { SetOptional } from 'type-fest';
-
-const addUpperCaseReducer = (acc: string[], ext: string) => {
-  acc.push(ext);
-  acc.push(ext.toUpperCase());
-  return acc;
-};
-
-export const dropzoneAccept: Accept = {
-  'image/png': ['.png'].reduce(addUpperCaseReducer, [] as string[]),
-  'image/jpeg': ['.jpg', '.jpeg', '.png'].reduce(addUpperCaseReducer, [] as string[]),
-  'image/webp': ['.webp'].reduce(addUpperCaseReducer, [] as string[]),
-  'video/mp4': ['.mp4'].reduce(addUpperCaseReducer, [] as string[]),
-  'video/webm': ['.webm'].reduce(addUpperCaseReducer, [] as string[]),
-  'video/quicktime': ['.mov'].reduce(addUpperCaseReducer, [] as string[]),
-};
-
-/** Returns true when the file looks like a video (by MIME or by extension). */
-const isVideoFile = (file: File): boolean => {
-  if (file.type && file.type.startsWith('video/')) {
-    return true;
-  }
-  const name = file.name.toLowerCase();
-  return name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') || name.endsWith('.mkv');
-};
 
 type UseImageUploadButtonArgs =
   | {
@@ -212,7 +189,7 @@ export const useImageUploadButton = ({
     getInputProps: getUploadInputProps,
     open: openUploader,
   } = useDropzone({
-    accept: dropzoneAccept,
+    accept: imageAndVideoDropzoneAccept,
     onDropAccepted,
     onDropRejected,
     disabled: isDisabled,
