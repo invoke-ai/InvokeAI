@@ -1324,6 +1324,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         currentEntry.rect = { ...result.rect };
         currentEntry.hasPublishedPixels = true;
         currentEntry.stale = false;
+        trackPublishedLayerImage(currentLayer);
         stores.thumbnailVersion.set(layer.id, currentEntry.version);
         stores.thumbnailStatus.set(layer.id, 'ready');
         scheduler.invalidate({ layers: [layer.id] });
@@ -1417,11 +1418,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       }
       if (!isRenderableLayer(layer)) {
         continue;
-      }
-
-      const name = layerImageName(layer);
-      if (name) {
-        trackedImageNames.set(layer.id, name);
       }
 
       // Ensure a cache entry exists WITHOUT resizing an existing one: a paint
@@ -1823,6 +1819,28 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     layerCache.deleteBitmap(imageName);
   };
 
+  const untrackLayerImage = (layerId: string): void => {
+    const imageName = trackedImageNames.get(layerId);
+    if (!imageName) {
+      return;
+    }
+    trackedImageNames.delete(layerId);
+    releaseBitmapIfUnreferenced(imageName);
+  };
+
+  const trackPublishedLayerImage = (layer: CanvasLayerContract): void => {
+    const previous = trackedImageNames.get(layer.id);
+    const current = layerImageName(layer);
+    if (current) {
+      trackedImageNames.set(layer.id, current);
+    } else {
+      trackedImageNames.delete(layer.id);
+    }
+    if (previous && previous !== current) {
+      releaseBitmapIfUnreferenced(previous);
+    }
+  };
+
   const dropLayer = (layerId: string): void => {
     cancelLayerRasterization(layerId);
     // Generation-cancel persistence before the id can be restored by undo/redo.
@@ -1837,11 +1855,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     adjustedSurfaceCache.delete(layerId);
     stores.thumbnailVersion.delete(layerId);
     stores.thumbnailStatus.delete(layerId);
-    const imageName = trackedImageNames.get(layerId);
-    trackedImageNames.delete(layerId);
-    if (imageName) {
-      releaseBitmapIfUnreferenced(imageName);
-    }
+    untrackLayerImage(layerId);
   };
 
   // ---- Staged generation preview ------------------------------------------
@@ -2239,6 +2253,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       for (const layerId of trackedIds) {
         if (!present.has(layerId)) {
           dropLayer(layerId);
+        } else {
+          untrackLayerImage(layerId);
         }
       }
       // A wholesale replacement can reuse a layer id with a DIFFERENT source, so
@@ -2311,6 +2327,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         // paint-bitmap ref the bitmap store just applied — the cache already
         // holds those pixels, so re-rasterizing would needlessly re-fetch and
         // could flicker. Any other swap invalidates → re-rasterizes.
+        untrackLayerImage(id);
         const source = getLayerSourceById(id);
         if (bitmapStore.isSelfEcho(id, source)) {
           continue;

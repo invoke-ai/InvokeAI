@@ -2448,6 +2448,97 @@ describe('requestLayerThumbnail', () => {
     engine.dispose();
   });
 
+  it('releases a detached thumbnail bitmap when its layer source is replaced', async () => {
+    const bitmap = recordingBitmap('detached-replaced');
+    const backend = createTestStubRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(bitmap));
+    const doc = { ...makeDoc(), layers: [rasterLayer('a', { imageName: 'old' })] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('ready');
+    setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'new' })] });
+
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('releases a detached thumbnail bitmap when its layer is deleted', async () => {
+    const bitmap = recordingBitmap('detached-deleted');
+    const backend = createTestStubRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(bitmap));
+    const doc = { ...makeDoc(), layers: [rasterLayer('a', { imageName: 'old' })] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('ready');
+    setDocument({ ...doc, layers: [] });
+
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('preserves a shared thumbnail bitmap until the last layer is deleted', async () => {
+    const bitmap = recordingBitmap('shared-deleted');
+    const backend = createTestStubRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(bitmap));
+    const first = rasterLayer('a', { imageName: 'shared' });
+    const second = rasterLayer('b', { imageName: 'shared' });
+    const doc = { ...makeDoc(), layers: [first, second] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect(await engine.requestLayerThumbnail('a')).toBe('ready');
+    expect(await engine.requestLayerThumbnail('b')).toBe('ready');
+
+    setDocument({ ...doc, layers: [second] });
+    expect(bitmap.close).not.toHaveBeenCalled();
+    setDocument({ ...doc, layers: [] });
+
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('preserves a shared thumbnail bitmap until the last layer changes source', async () => {
+    const bitmap = recordingBitmap('shared-replaced');
+    const backend = createTestStubRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(bitmap));
+    const first = rasterLayer('a', { imageName: 'shared' });
+    const second = rasterLayer('b', { imageName: 'shared' });
+    const doc = { ...makeDoc(), layers: [first, second] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect(await engine.requestLayerThumbnail('a')).toBe('ready');
+    expect(await engine.requestLayerThumbnail('b')).toBe('ready');
+
+    const firstChanged = rasterLayer('a', { imageName: 'first-new' });
+    setDocument({ ...doc, layers: [firstChanged, second] });
+    expect(bitmap.close).not.toHaveBeenCalled();
+    setDocument({ ...doc, layers: [firstChanged, rasterLayer('b', { imageName: 'second-new' })] });
+
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
   it('deduplicates concurrent requests for the same source version', async () => {
     const pending = createDeferred<Blob>();
     const resolver = vi.fn(() => pending.promise);
