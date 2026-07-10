@@ -63,7 +63,7 @@ describe('getLayerContextMenuLayout', () => {
         items: ['arrange(move-to-front,move-forward,move-backward,move-to-back)', 'duplicate'],
         presentation: 'row',
       },
-      { id: 'primary', items: ['transform', 'rename', 'fit-to-bbox', 'adjustments'], presentation: 'list' },
+      { id: 'primary', items: ['transform', 'rename', 'fit-to-bbox', 'adjustments', 'filter'], presentation: 'list' },
       {
         id: 'operations',
         items: [

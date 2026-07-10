@@ -23,8 +23,8 @@ import { useActiveProjectId, useWorkbenchStore } from '@workbench/WorkbenchConte
 import { useEffect, useState } from 'react';
 
 /** Fetches a persisted image asset to a `Blob` for the engine's rasterizers. */
-const createImageResolver = (): ImageResolver => async (imageName) => {
-  const response = await fetch(getImageFullUrl(imageName));
+const createImageResolver = (): ImageResolver => async (imageName, signal) => {
+  const response = await fetch(getImageFullUrl(imageName), { signal });
   if (!response.ok) {
     throw new Error(`Failed to load canvas image "${imageName}" (${response.status})`);
   }

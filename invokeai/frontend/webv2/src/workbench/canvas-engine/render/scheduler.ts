@@ -97,7 +97,14 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
     if (!hasPending(pending)) {
       return;
     }
-    frameHandle = requestFrame(runFrame);
+    try {
+      frameHandle = requestFrame(runFrame);
+    } catch {
+      // Rendering is ancillary to the document mutation that requested it. A
+      // faulty host scheduler must not make that already-applied mutation look
+      // failed; retain the pending flags so a later invalidation can retry.
+      frameHandle = null;
+    }
   };
 
   const invalidate = (payload: InvalidatePayload): void => {

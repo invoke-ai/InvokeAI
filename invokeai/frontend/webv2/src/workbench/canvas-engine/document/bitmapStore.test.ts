@@ -33,10 +33,14 @@ const drainUntil = async (predicate: () => boolean, maxTicks = 50): Promise<void
 };
 
 interface HarnessOptions {
+  encodeSurface?: (surface: RasterSurface) => Promise<Blob>;
+  hashBlob?: (blob: Blob) => Promise<string>;
   uploadImage?: (blob: Blob) => Promise<CanvasImageUploadResult>;
   maxUploadAttempts?: number;
+  onError?: (error: unknown, layerId: string) => void;
   /** The layer-local content-rect origin the surface sits at (default 0,0). */
   offset?: { x: number; y: number };
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /** The default source: a plain paint layer, matching every pre-existing test's assumption. */
@@ -50,7 +54,9 @@ const createHarness = (options: HarnessOptions = {}) => {
 
   let offset = options.offset ?? { x: 0, y: 0 };
 
-  const encodeSurface = vi.fn(() => Promise.resolve(new Blob([encoded], { type: 'image/png' })));
+  const encodeSurface = vi.fn(
+    options.encodeSurface ?? (() => Promise.resolve(new Blob([encoded], { type: 'image/png' })))
+  );
   const uploadImage =
     options.uploadImage ??
     vi.fn(
@@ -66,11 +72,12 @@ const createHarness = (options: HarnessOptions = {}) => {
     getLayerSource: () => source,
     getLayerSurface: () => ({ offset, surface }),
     // Deterministic content hash: the encoded blob's own text.
-    hashBlob: (blob) => blob.text(),
+    hashBlob: options.hashBlob ?? ((blob) => blob.text()),
     maxUploadAttempts: options.maxUploadAttempts ?? 3,
+    onError: options.onError,
     retryDelaysMs: [1],
     // Immediate backoff so retries don't depend on timer advancement.
-    sleep: () => Promise.resolve(),
+    sleep: options.sleep ?? (() => Promise.resolve()),
     uploadImage,
   });
 
@@ -530,6 +537,214 @@ describe('createBitmapStore', () => {
     expect(h.dispatch).not.toHaveBeenCalled();
     h.store.dispose();
   });
+
+  it.each(['discard', 'reset'] as const)(
+    'does not resurrect dirty persistence when an in-flight upload rejects after %s',
+    async (cancellation) => {
+      const deferred = createDeferred<CanvasImageUploadResult>();
+      const uploadImage = vi.fn(() => deferred.promise);
+      const onError = vi.fn();
+      const h = createHarness({ maxUploadAttempts: 1, onError, uploadImage });
+      h.store.markLayerDirty(LAYER);
+      const barrier = h.store.flushPendingUploads();
+      await drainUntil(() => uploadImage.mock.calls.length >= 1);
+
+      if (cancellation === 'discard') {
+        h.store.discardLayer(LAYER);
+      } else {
+        h.store.reset();
+      }
+      deferred.reject(new Error('obsolete upload failed'));
+      await barrier;
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(uploadImage).toHaveBeenCalledOnce();
+      expect(h.dispatch).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      await h.store.flushPendingUploads();
+      expect(uploadImage).toHaveBeenCalledOnce();
+      h.store.dispose();
+    }
+  );
+
+  it.each(['discard', 'reset'] as const)(
+    'does not resurrect dirty persistence when in-flight encoding rejects after %s',
+    async (cancellation) => {
+      const deferred = createDeferred<Blob>();
+      const encodeSurface = vi.fn(() => deferred.promise);
+      const onError = vi.fn();
+      const h = createHarness({ encodeSurface, onError });
+      h.store.markLayerDirty(LAYER);
+      const barrier = h.store.flushPendingUploads();
+      await drainUntil(() => encodeSurface.mock.calls.length >= 1);
+
+      if (cancellation === 'discard') {
+        h.store.discardLayer(LAYER);
+      } else {
+        h.store.reset();
+      }
+      deferred.reject(new Error('obsolete encode failed'));
+      await barrier;
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(encodeSurface).toHaveBeenCalledOnce();
+      expect(h.uploadImage).not.toHaveBeenCalled();
+      expect(h.dispatch).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      await h.store.flushPendingUploads();
+      expect(encodeSurface).toHaveBeenCalledOnce();
+      h.store.dispose();
+    }
+  );
+
+  it.each(['discard', 'reset'] as const)(
+    'does not hash or upload when in-flight encoding fulfills after %s',
+    async (cancellation) => {
+      const deferred = createDeferred<Blob>();
+      const encodeSurface = vi.fn(() => deferred.promise);
+      const hashBlob = vi.fn((blob: Blob) => blob.text());
+      const h = createHarness({ encodeSurface, hashBlob });
+      h.store.markLayerDirty(LAYER);
+      const barrier = h.store.flushPendingUploads();
+      await drainUntil(() => encodeSurface.mock.calls.length >= 1);
+
+      if (cancellation === 'discard') {
+        h.store.discardLayer(LAYER);
+      } else {
+        h.store.reset();
+      }
+      deferred.resolve(new Blob(['obsolete pixels'], { type: 'image/png' }));
+      await barrier;
+
+      expect(hashBlob).not.toHaveBeenCalled();
+      expect(h.uploadImage).not.toHaveBeenCalled();
+      expect(h.dispatch).not.toHaveBeenCalled();
+      h.store.dispose();
+    }
+  );
+
+  it.each(['discard', 'reset'] as const)(
+    'does not upload when in-flight hashing fulfills after %s',
+    async (cancellation) => {
+      const deferred = createDeferred<string>();
+      const hashBlob = vi.fn(() => deferred.promise);
+      const h = createHarness({ hashBlob });
+      h.store.markLayerDirty(LAYER);
+      const barrier = h.store.flushPendingUploads();
+      await drainUntil(() => hashBlob.mock.calls.length >= 1);
+
+      if (cancellation === 'discard') {
+        h.store.discardLayer(LAYER);
+      } else {
+        h.store.reset();
+      }
+      deferred.resolve('obsolete-hash');
+      await barrier;
+
+      expect(h.uploadImage).not.toHaveBeenCalled();
+      expect(h.dispatch).not.toHaveBeenCalled();
+      h.store.dispose();
+    }
+  );
+
+  it.each(['discard', 'reset'] as const)(
+    'stops obsolete upload retries when %s lands during retry backoff',
+    async (cancellation) => {
+      const backoff = createDeferred<void>();
+      const sleep = vi.fn(() => backoff.promise);
+      const uploadImage = vi.fn(() => Promise.reject(new Error('retry me')));
+      const onError = vi.fn();
+      const h = createHarness({ maxUploadAttempts: 3, onError, sleep, uploadImage });
+      h.store.markLayerDirty(LAYER);
+      const barrier = h.store.flushPendingUploads();
+      await drainUntil(() => sleep.mock.calls.length >= 1);
+      expect(uploadImage).toHaveBeenCalledOnce();
+
+      if (cancellation === 'discard') {
+        h.store.discardLayer(LAYER);
+      } else {
+        h.store.reset();
+      }
+      backoff.resolve();
+      await barrier;
+
+      expect(uploadImage).toHaveBeenCalledOnce();
+      expect(onError).not.toHaveBeenCalled();
+      expect(h.dispatch).not.toHaveBeenCalled();
+      h.store.dispose();
+    }
+  );
+
+  it('allows fresh same-id persistence after repeated idle discards', async () => {
+    const h = createHarness();
+    for (let i = 0; i < 1_000; i += 1) {
+      h.store.discardLayer(`removed-${i}`);
+    }
+
+    h.store.discardLayer(LAYER);
+    h.store.markLayerDirty(LAYER);
+    await h.store.flushPendingUploads();
+
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    expect(h.dispatch).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it('preserves a fresh same-id generation while obsolete encoding settles', async () => {
+    const obsoleteEncode = createDeferred<Blob>();
+    let encodeCall = 0;
+    const encodeSurface = vi.fn(() => {
+      encodeCall += 1;
+      return encodeCall === 1
+        ? obsoleteEncode.promise
+        : Promise.resolve(new Blob(['fresh pixels'], { type: 'image/png' }));
+    });
+    const hashBlob = vi.fn((blob: Blob) => blob.text());
+    const h = createHarness({ encodeSurface, hashBlob });
+    h.store.markLayerDirty(LAYER);
+    const barrier = h.store.flushPendingUploads();
+    await drainUntil(() => encodeSurface.mock.calls.length === 1);
+
+    h.store.discardLayer(LAYER);
+    h.store.markLayerDirty(LAYER);
+    obsoleteEncode.resolve(new Blob(['obsolete pixels'], { type: 'image/png' }));
+    await barrier;
+
+    expect(encodeSurface).toHaveBeenCalledTimes(2);
+    expect(hashBlob).toHaveBeenCalledOnce();
+    expect(await hashBlob.mock.calls[0]![0].text()).toBe('fresh pixels');
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    expect(h.dispatch).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it.each(['discard', 'reset'] as const)(
+    'lets an error observer %s failed persistence without a later dirty resurrection',
+    async (cancellation) => {
+      const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
+      let store: ReturnType<typeof createBitmapStore> | null = null;
+      const onError = vi.fn(() => {
+        if (cancellation === 'discard') {
+          store?.discardLayer(LAYER);
+        } else {
+          store?.reset();
+        }
+      });
+      const h = createHarness({ maxUploadAttempts: 1, onError, uploadImage });
+      store = h.store;
+
+      h.store.markLayerDirty(LAYER);
+      await h.store.flushPendingUploads();
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(uploadImage).toHaveBeenCalledOnce();
+      expect(h.dispatch).not.toHaveBeenCalled();
+      await h.store.flushPendingUploads();
+      expect(uploadImage).toHaveBeenCalledOnce();
+      h.store.dispose();
+    }
+  );
 
   it('does not flush after dispose', async () => {
     const h = createHarness();

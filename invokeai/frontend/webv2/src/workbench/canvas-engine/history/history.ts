@@ -33,6 +33,16 @@ export interface HistoryEntry {
   readonly label: string;
   /** Approximate retained size in bytes (e.g. before+after ImageData byteLength). */
   readonly bytes: number;
+  /**
+   * Opts into failure-atomic replay. When true, History moves this entry only
+   * after `undo`/`redo` returns successfully, so a preparation failure remains
+   * exactly retryable. The callback must leave its domain unchanged on throw.
+   *
+   * Legacy entries default to move-before-replay semantics: a throw is treated
+   * as post-application observer failure and the entry stays on its destination
+   * stack, preventing a retry from applying the same mutation twice.
+   */
+  readonly replayFailureAtomic?: boolean;
   /** Reverts the change. Must not push new history entries. */
   undo(): void;
   /** Re-applies the change. Must not push new history entries. */
@@ -91,7 +101,12 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
 
   const notify = (): void => {
     for (const listener of listeners) {
-      listener();
+      try {
+        listener();
+      } catch {
+        // Stack mutation is already complete. One faulty observer must neither
+        // report a false operation failure nor block later subscribers.
+      }
     }
   };
 
@@ -156,19 +171,58 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
     if (applying || undoStack.length === 0) {
       return;
     }
-    const entry = undoStack.pop();
+    const entry = undoStack.at(-1);
     if (!entry) {
       return;
     }
-    undoBytes -= entry.bytes;
-    redoStack.push(entry);
-    redoBytes += entry.bytes;
+    if (!entry.replayFailureAtomic) {
+      // Legacy callbacks may mutate their domain before an observer throws.
+      // Move first so a retry cannot apply that mutation twice. If replay
+      // clears history, `clear()` owns the notification and the reset wins.
+      undoStack.pop();
+      undoBytes -= entry.bytes;
+      redoStack.push(entry);
+      redoBytes += entry.bytes;
+      let replayError: unknown;
+      let didThrow = false;
+      applying = true;
+      try {
+        entry.undo();
+      } catch (error) {
+        replayError = error;
+        didThrow = true;
+      } finally {
+        applying = false;
+      }
+      if (redoStack.at(-1) === entry) {
+        notify();
+      }
+      if (didThrow) {
+        // Preserve the callback's exact exception value for legacy callers.
+        // eslint-disable-next-line no-throw-literal
+        throw replayError;
+      }
+      return;
+    }
     applying = true;
     try {
       entry.undo();
     } finally {
       applying = false;
     }
+    // A replay callback may intentionally clear history (for example a
+    // synchronous document replacement). Let that reset win; never resurrect
+    // the entry onto the opposite stack after its original stack changed.
+    if (undoStack.at(-1) !== entry) {
+      return;
+    }
+    // Move the entry only after replay succeeds. A fallible callback (for
+    // example detached raster-cache preparation) may throw before applying
+    // anything; keeping the stacks and byte totals untouched makes retry exact.
+    undoStack.pop();
+    undoBytes -= entry.bytes;
+    redoStack.push(entry);
+    redoBytes += entry.bytes;
     notify();
   };
 
@@ -176,19 +230,49 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
     if (applying || redoStack.length === 0) {
       return;
     }
-    const entry = redoStack.pop();
+    const entry = redoStack.at(-1);
     if (!entry) {
       return;
     }
-    redoBytes -= entry.bytes;
-    undoStack.push(entry);
-    undoBytes += entry.bytes;
+    if (!entry.replayFailureAtomic) {
+      redoStack.pop();
+      redoBytes -= entry.bytes;
+      undoStack.push(entry);
+      undoBytes += entry.bytes;
+      let replayError: unknown;
+      let didThrow = false;
+      applying = true;
+      try {
+        entry.redo();
+      } catch (error) {
+        replayError = error;
+        didThrow = true;
+      } finally {
+        applying = false;
+      }
+      if (undoStack.at(-1) === entry) {
+        notify();
+      }
+      if (didThrow) {
+        // Preserve the callback's exact exception value for legacy callers.
+        // eslint-disable-next-line no-throw-literal
+        throw replayError;
+      }
+      return;
+    }
     applying = true;
     try {
       entry.redo();
     } finally {
       applying = false;
     }
+    if (redoStack.at(-1) !== entry) {
+      return;
+    }
+    redoStack.pop();
+    redoBytes -= entry.bytes;
+    undoStack.push(entry);
+    undoBytes += entry.bytes;
     notify();
   };
 

@@ -150,6 +150,7 @@ export type LayerConfigPatchKind =
 const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const;
 const RASTER_ONLY = ['raster'] as const;
 const CONTROL_ONLY = ['control'] as const;
+const RASTER_AND_CONTROL = ['raster', 'control'] as const;
 const INPAINT_ONLY = ['inpaint_mask'] as const;
 const REGIONAL_ONLY = ['regional_guidance'] as const;
 
@@ -178,10 +179,25 @@ const isPixelBacked = (layer: CanvasLayerContract): boolean =>
   (layer.type === 'raster' || layer.type === 'control') &&
   (layer.source.type === 'image' || layer.source.type === 'paint');
 
-const hasFilterableControlContent = (context: LayerContextActionState): boolean =>
-  context.hasSupportedContent &&
-  context.layer.type === 'control' &&
-  (context.layer.source.type === 'image' || context.layer.source.type === 'paint');
+const hasFilterableLayerContent = (context: LayerContextActionState): boolean => {
+  if (!context.hasSupportedContent || (context.layer.type !== 'raster' && context.layer.type !== 'control')) {
+    return false;
+  }
+  const { source } = context.layer;
+  if (source.type === 'image' || source.type === 'paint') {
+    // `hasSupportedContent` distinguishes empty paint from live unpersisted
+    // cache pixels, which are intentionally filterable despite `bitmap: null`.
+    return true;
+  }
+  if (context.layer.type !== 'raster') {
+    return false;
+  }
+  return (
+    source.type === 'text' ||
+    source.type === 'gradient' ||
+    (source.type === 'shape' && (source.kind === 'rect' || source.kind === 'ellipse'))
+  );
+};
 
 const groupPosition = (context: LayerContextActionState) => getGroupPosition(context.document.layers, context.layer.id);
 
@@ -392,11 +408,11 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     icon: SlidersHorizontalIcon,
     id: 'filter',
     isEnabled: hasMutablePixels,
-    isVisible: hasFilterableControlContent,
+    isVisible: hasFilterableLayerContent,
     labelKey: 'widgets.layers.control.filter',
     order: 40,
     section: 'primary',
-    supportedLayerTypes: CONTROL_ONLY,
+    supportedLayerTypes: RASTER_AND_CONTROL,
   },
   {
     defaultLabel: 'Toggle transparency effect',

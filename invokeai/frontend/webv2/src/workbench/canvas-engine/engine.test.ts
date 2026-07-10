@@ -1,4 +1,5 @@
 import type * as AdjustedSurfaceCacheModule from '@workbench/canvas-engine/render/adjustedSurfaceCache';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type {
   RasterCallLogEntry,
   StubRasterBackend,
@@ -132,6 +133,7 @@ const createEngine = () => {
 const createReactiveStore = (
   document: CanvasDocumentContractV2
 ): {
+  listenerCount: () => number;
   setActiveProjectId: (projectId: string) => void;
   setDocument: (next: CanvasDocumentContractV2, documentRevision?: number) => void;
   store: EngineStore;
@@ -149,6 +151,7 @@ const createReactiveStore = (
     }
   };
   return {
+    listenerCount: () => listeners.size,
     setActiveProjectId: (projectId) => {
       activeProjectId = projectId;
       state = { ...state, activeProjectId };
@@ -283,6 +286,29 @@ const createRecordingRasterBackend = (): RecordingRasterBackend => {
 const recordingBitmap = (id: string): ImageBitmap =>
   ({ __recordingId: `bitmap-${id}`, close: vi.fn(), height: 10, width: 10 }) as unknown as ImageBitmap;
 
+/** Recursively follows recording-surface draw edges to a bitmap/surface id. */
+const drawGraphContains = (
+  surface: StubRasterSurface,
+  backend: RecordingRasterBackend,
+  targetId: string,
+  visited = new Set<string>()
+): boolean => {
+  for (const sourceId of backend.drawSourcesFor(surface)) {
+    if (sourceId === targetId) {
+      return true;
+    }
+    if (visited.has(sourceId)) {
+      continue;
+    }
+    visited.add(sourceId);
+    const source = backend.surfaceById(sourceId);
+    if (source && drawGraphContains(source, backend, targetId, visited)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 /** Flushes pending microtasks (promise chains) without depending on fake timers. */
 const flushMicrotasks = (): Promise<void> =>
   new Promise((resolve) => {
@@ -335,6 +361,55 @@ describe('createCanvasEngine', () => {
 
     expect(await engine.exportLayerPixels('hidden')).toEqual({ status: 'disabled' });
     expect((await engine.exportLayerPixels('hidden', { includeDisabled: true })).status).toBe('ok');
+    engine.dispose();
+  });
+
+  it('exportLayerPixels can bake raster adjustments in layer-local space without baking presentation props', async () => {
+    const layer: CanvasRasterLayerContractV2 = {
+      ...(rasterLayer('a') as CanvasRasterLayerContractV2),
+      adjustments: { brightness: 0.25, contrast: 0, saturation: 0 },
+      blendMode: 'multiply',
+      opacity: 0.4,
+      source: {
+        bitmap: { height: 10, imageName: 'local-paint', width: 10 },
+        offset: { x: -4, y: 7 },
+        type: 'paint',
+      },
+      transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 5, y: 6 },
+    };
+    const { store } = createFakeStore({ ...makeDoc(), layers: [layer] });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    const raw = await engine.exportLayerPixels('a');
+    const adjusted = await engine.exportLayerPixels('a', { applyAdjustments: true });
+
+    expect(raw.status).toBe('ok');
+    expect(adjusted.status).toBe('ok');
+    if (raw.status === 'ok' && adjusted.status === 'ok') {
+      expect(adjusted.rect).toEqual({ height: 10, width: 10, x: -4, y: 7 });
+      expect(adjusted.surface).not.toBe(raw.surface);
+      expect(adjusted.surface).toMatchObject({ height: 10, width: 10 });
+      expect(engine.isLayerExportGuardCurrent(adjusted.guard)).toBe(true);
+      expect((raw.surface as StubRasterSurface).callLog.some((entry) => entry.op === 'putImageData')).toBe(false);
+      expect((adjusted.surface as StubRasterSurface).callLog).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ op: 'drawImage' }),
+          { args: [0, 0, 10, 10], op: 'getImageData' },
+          expect.objectContaining({ op: 'putImageData' }),
+        ])
+      );
+      expect(
+        (adjusted.surface as StubRasterSurface).callLog.some(
+          (entry) =>
+            entry.op === 'set' && (entry.args[0] === 'globalAlpha' || entry.args[0] === 'globalCompositeOperation')
+        )
+      ).toBe(false);
+    }
     engine.dispose();
   });
 
@@ -616,6 +691,36 @@ describe('createCanvasEngine', () => {
         ])
       );
     }
+    engine.dispose();
+  });
+
+  it('exportBakedLayerPixels applies adjustments exactly once when explicitly requested', async () => {
+    const layer = {
+      ...rasterLayer('a'),
+      adjustments: { brightness: 0.25, contrast: 0, saturation: 0 },
+    };
+    const { store } = createFakeStore({ ...makeDoc(), layers: [layer] });
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const engine = createCanvasEngine({
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect((await engine.exportBakedLayerPixels('a', { applyAdjustments: true })).status).toBe('ok');
+
+    expect(surfaces.flatMap((surface) => surface.callLog).filter((entry) => entry.op === 'getImageData')).toHaveLength(
+      1
+    );
     engine.dispose();
   });
 
@@ -1226,6 +1331,48 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('copyLayerToRaster redo cache failure cannot be retried into a duplicate layer id', async () => {
+    const { projectId, store } = createReducerBackedStore(makeDoc());
+    const base = createTestStubRasterBackend();
+    let failNextAllocation = false;
+    const engine = createCanvasEngine({
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          if (failNextAllocation) {
+            failNextAllocation = false;
+            throw new Error('copy replay allocation failed');
+          }
+          return base.createSurface(width, height);
+        },
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+
+    const newId = await engine.copyLayerToRaster('a');
+    expect(newId).not.toBeNull();
+    engine.undo();
+    expect(engine.getDocument()!.layers.filter((layer) => layer.id === newId)).toHaveLength(0);
+
+    failNextAllocation = true;
+    expect(() => engine.redo()).toThrow('copy replay allocation failed');
+
+    // The reducer add already landed before cache allocation failed. Legacy
+    // history therefore consumes redo and exposes undo; replaying redo again
+    // must be a no-op rather than inserting the same structural id twice.
+    expect(engine.getDocument()!.layers.filter((layer) => layer.id === newId)).toHaveLength(1);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+    expect(() => engine.redo()).not.toThrow();
+    expect(engine.getDocument()!.layers.filter((layer) => layer.id === newId)).toHaveLength(1);
+
+    engine.undo();
+    expect(engine.getDocument()!.layers.filter((layer) => layer.id === newId)).toHaveLength(0);
+    engine.dispose();
+  });
+
   it('setTool switches the active tool and updates the store', () => {
     const { engine } = createEngine();
     const listener = vi.fn();
@@ -1290,18 +1437,18 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
-  it('dispose removes the store subscription', () => {
+  it('dispose removes both store subscriptions', () => {
     const { engine, unsubscribe } = createEngine();
     expect(unsubscribe).not.toHaveBeenCalled();
     engine.dispose();
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(unsubscribe).toHaveBeenCalledTimes(2);
   });
 
   it('dispose is idempotent', () => {
     const { engine, unsubscribe } = createEngine();
     engine.dispose();
     engine.dispose();
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(unsubscribe).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -3989,6 +4136,1367 @@ describe('setStagedPreview', () => {
   });
 });
 
+describe('commitRasterFilterResult', () => {
+  const durableImage = { height: 10, imageName: 'filtered-result', width: 10 };
+
+  const createReplayFaultBackend = () => {
+    const base = createTestStubRasterBackend();
+    let fault: 'allocation' | 'draw' | null = null;
+    const backend: StubRasterBackend = {
+      ...base,
+      createSurface: (width, height) => {
+        if (fault === 'allocation') {
+          fault = null;
+          throw new Error('replay cache allocation failed');
+        }
+        const surface = base.createSurface(width, height);
+        const ctx = new Proxy(surface.ctx, {
+          get: (target, property, receiver) => {
+            const value = Reflect.get(target, property, receiver);
+            if (property !== 'drawImage' || typeof value !== 'function') {
+              return value;
+            }
+            return (...args: unknown[]) => {
+              if (fault === 'draw') {
+                fault = null;
+                throw new Error('replay cache draw failed');
+              }
+              return Reflect.apply(value, target, args);
+            };
+          },
+        });
+        Object.defineProperty(surface, 'ctx', { value: ctx });
+        return surface;
+      },
+    };
+    return {
+      arm: (next: 'allocation' | 'draw') => {
+        fault = next;
+      },
+      backend,
+    };
+  };
+
+  const filterLayer = (id = 'L'): CanvasRasterLayerContractV2 => ({
+    adjustments: { brightness: 0.2, contrast: -0.1, saturation: 0.3 },
+    blendMode: 'multiply',
+    id,
+    isEnabled: true,
+    isLocked: false,
+    name: id,
+    opacity: 0.6,
+    source: { fill: '#fff', height: 10, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
+    transform: { rotation: 15, scaleX: 2, scaleY: 3, x: 5, y: 6 },
+    type: 'raster',
+  });
+
+  const filterDoc = (layers: CanvasLayerContract[] = [filterLayer()]): CanvasDocumentContractV2 => ({
+    background: 'transparent',
+    bbox: { height: 100, width: 100, x: 0, y: 0 },
+    height: 100,
+    layers,
+    selectedLayerId: layers[0]?.id ?? null,
+    version: 2,
+    width: 100,
+  });
+
+  it('replaces with local paint pixels, clears adjustments, and restores exact state with one history entry', async () => {
+    const layer = filterLayer();
+    const { projectId, store } = createReducerBackedStore(filterDoc([layer]));
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('filtered')));
+    const engine = createCanvasEngine({
+      backend,
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const before = structuredClone(engine.getDocument()!.layers[0]!);
+    const exported = await engine.exportLayerPixels(layer.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
+
+    const result = await engine.commitRasterFilterResult({
+      guard: exported.guard,
+      image: durableImage,
+      mode: 'replace',
+      rect: { height: 10, width: 10, x: -4, y: 7 },
+    });
+
+    expect(result).toEqual({ layerId: layer.id, status: 'committed' });
+    const after = engine.getDocument()!.layers[0]!;
+    const { adjustments: _adjustments, ...beforeWithoutAdjustments } = before as CanvasRasterLayerContractV2;
+    expect(after).toEqual({
+      ...beforeWithoutAdjustments,
+      source: { bitmap: durableImage, offset: { x: -4, y: 7 }, type: 'paint' },
+    });
+    expect(after.transform).toEqual(layer.transform);
+    expect('adjustments' in after).toBe(false);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    const forwardExport = await engine.exportLayerPixels(layer.id);
+    expect(forwardExport.status).toBe('ok');
+    if (forwardExport.status !== 'ok') {
+      throw new Error('expected committed pixels');
+    }
+    const forwardSources = backend.drawSourcesFor(forwardExport.surface as StubRasterSurface);
+
+    engine.undo();
+    expect(engine.getDocument()!.layers[0]).toEqual(before);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    const undoExport = await engine.exportLayerPixels(layer.id);
+    expect(undoExport.status).toBe('ok');
+    if (undoExport.status === 'ok') {
+      const undoSources = backend.drawSourcesFor(undoExport.surface as StubRasterSurface);
+      const beforeSnapshot = backend.surfaceById(undoSources.at(-1)!);
+      expect(beforeSnapshot).toBeDefined();
+      expect(backend.drawSourcesFor(beforeSnapshot!)).toContain(
+        backend.surfaceId(exported.surface as StubRasterSurface)
+      );
+    }
+
+    engine.redo();
+    expect(engine.getDocument()!.layers[0]).toEqual(after);
+    expect(engine.stores.canRedo.get()).toBe(false);
+    const redoExport = await engine.exportLayerPixels(layer.id);
+    expect(redoExport.status).toBe('ok');
+    if (redoExport.status === 'ok') {
+      expect(backend.drawSourcesFor(redoExport.surface as StubRasterSurface)).toEqual(forwardSources);
+    }
+    engine.dispose();
+  });
+
+  it('copies filtered local pixels directly above the source and replays one structural history entry', async () => {
+    const source = filterLayer('source');
+    const below = filterLayer('below');
+    const { projectId, store } = createReducerBackedStore({
+      ...filterDoc([source, below]),
+      selectedLayerId: below.id,
+    });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const sourceBefore = structuredClone(source);
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
+
+    const result = await engine.commitRasterFilterResult({
+      guard: exported.guard,
+      image: durableImage,
+      mode: 'copy',
+      rect: { height: 10, width: 10, x: 3, y: 4 },
+    });
+
+    expect(result.status).toBe('committed');
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed copy');
+    }
+    expect(engine.getDocument()!.layers.map((candidate) => candidate.id)).toEqual([result.layerId, 'source', 'below']);
+    expect(engine.getDocument()!.layers.find((candidate) => candidate.id === 'source')).toEqual(sourceBefore);
+    const copy = engine.getDocument()!.layers[0]!;
+    expect(copy).toMatchObject({
+      blendMode: source.blendMode,
+      isEnabled: source.isEnabled,
+      isLocked: false,
+      opacity: source.opacity,
+      source: { bitmap: durableImage, offset: { x: 3, y: 4 }, type: 'paint' },
+      transform: source.transform,
+      type: 'raster',
+    });
+    expect('adjustments' in copy).toBe(false);
+    expect((await engine.exportLayerPixels(result.layerId)).status).toBe('ok');
+
+    engine.undo();
+    expect(engine.getDocument()!.layers.map((candidate) => candidate.id)).toEqual(['source', 'below']);
+    expect(engine.getDocument()!.selectedLayerId).toBe(below.id);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.redo();
+    expect(engine.getDocument()!.layers.map((candidate) => candidate.id)).toEqual([result.layerId, 'source', 'below']);
+    expect(engine.getDocument()!.selectedLayerId).toBe(result.layerId);
+    expect(engine.getDocument()!.layers[0]).toEqual(copy);
+    expect(engine.stores.canRedo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it.each(['allocation', 'draw'] as const)(
+    'keeps replace undo retryable and exact when detached cache %s fails',
+    async (failure) => {
+      const source = filterLayer('source');
+      const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+      const faults = createReplayFaultBackend();
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: faults.backend,
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable export');
+      }
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode: 'replace',
+        rect: exported.rect,
+      });
+      expect(result.status).toBe('committed');
+      const expectedDocument = structuredClone(engine.getDocument()!);
+      const expectedCache = await engine.exportLayerPixels(source.id);
+      if (expectedCache.status !== 'ok') {
+        throw new Error('expected committed cache pixels');
+      }
+      const expectedCalls = structuredClone((expectedCache.surface as StubRasterSurface).callLog);
+      const adjustedDeletesBefore = adjustedSurfaceCacheDeletes.length;
+      const thumbnailListener = vi.fn();
+      const unsubscribeThumbnail = engine.stores.thumbnailVersion.subscribe(thumbnailListener);
+      bitmapStore.markLayerDirty.mockClear();
+      (store.dispatch as Mock).mockClear();
+      faults.arm(failure);
+
+      expect(() => engine.undo()).toThrow(`replay cache ${failure} failed`);
+
+      expect(engine.getDocument()).toEqual(expectedDocument);
+      expect(engine.stores.canUndo.get()).toBe(true);
+      expect(engine.stores.canRedo.get()).toBe(false);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(thumbnailListener).not.toHaveBeenCalled();
+      expect(adjustedSurfaceCacheDeletes).toHaveLength(adjustedDeletesBefore);
+      const afterFailure = await engine.exportLayerPixels(source.id);
+      expect(afterFailure.status).toBe('ok');
+      if (afterFailure.status === 'ok') {
+        expect(afterFailure.surface).toBe(expectedCache.surface);
+        expect(afterFailure.rect).toEqual(expectedCache.rect);
+        expect(afterFailure.guard.cacheVersion).toBe(expectedCache.guard.cacheVersion);
+        expect((afterFailure.surface as StubRasterSurface).callLog).toEqual(expectedCalls);
+      }
+
+      engine.undo();
+      expect(engine.getDocument()!.layers[0]).toEqual(source);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      expect(engine.stores.canRedo.get()).toBe(true);
+      unsubscribeThumbnail();
+      engine.dispose();
+    }
+  );
+
+  it.each(['allocation', 'draw'] as const)(
+    'keeps replace redo retryable and exact when detached cache %s fails',
+    async (failure) => {
+      const source = filterLayer('source');
+      const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+      const faults = createReplayFaultBackend();
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: faults.backend,
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable export');
+      }
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode: 'replace',
+        rect: exported.rect,
+      });
+      expect(result.status).toBe('committed');
+      const filteredDocument = structuredClone(engine.getDocument()!);
+      engine.undo();
+      const expectedDocument = structuredClone(engine.getDocument()!);
+      const expectedCache = await engine.exportLayerPixels(source.id);
+      if (expectedCache.status !== 'ok') {
+        throw new Error('expected restored source pixels');
+      }
+      const expectedCalls = structuredClone((expectedCache.surface as StubRasterSurface).callLog);
+      const adjustedDeletesBefore = adjustedSurfaceCacheDeletes.length;
+      const thumbnailListener = vi.fn();
+      const unsubscribeThumbnail = engine.stores.thumbnailVersion.subscribe(thumbnailListener);
+      bitmapStore.markLayerDirty.mockClear();
+      (store.dispatch as Mock).mockClear();
+      faults.arm(failure);
+
+      expect(() => engine.redo()).toThrow(`replay cache ${failure} failed`);
+
+      expect(engine.getDocument()).toEqual(expectedDocument);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      expect(engine.stores.canRedo.get()).toBe(true);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(thumbnailListener).not.toHaveBeenCalled();
+      expect(adjustedSurfaceCacheDeletes).toHaveLength(adjustedDeletesBefore);
+      const afterFailure = await engine.exportLayerPixels(source.id);
+      expect(afterFailure.status).toBe('ok');
+      if (afterFailure.status === 'ok') {
+        expect(afterFailure.surface).toBe(expectedCache.surface);
+        expect(afterFailure.rect).toEqual(expectedCache.rect);
+        expect(afterFailure.guard.cacheVersion).toBe(expectedCache.guard.cacheVersion);
+        expect((afterFailure.surface as StubRasterSurface).callLog).toEqual(expectedCalls);
+      }
+
+      engine.redo();
+      expect(engine.getDocument()).toEqual(filteredDocument);
+      expect(engine.stores.canUndo.get()).toBe(true);
+      expect(engine.stores.canRedo.get()).toBe(false);
+      unsubscribeThumbnail();
+      engine.dispose();
+    }
+  );
+
+  it('discards obsolete persistence and keeps the exact durable image ref on replace redo', async () => {
+    const source = filterLayer('source');
+    const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+    const bitmapStore = createSpyBitmapStore();
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
+
+    await expect(
+      engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode: 'replace',
+        rect: exported.rect,
+      })
+    ).resolves.toEqual({ layerId: source.id, status: 'committed' });
+    expect(bitmapStore.discardLayer).toHaveBeenCalledTimes(1);
+
+    engine.undo();
+    bitmapStore.markLayerDirty.mockClear();
+    engine.redo();
+
+    expect(bitmapStore.discardLayer).toHaveBeenCalledTimes(2);
+    expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    const redone = engine.getDocument()!.layers[0];
+    expect(redone).toMatchObject({ source: { bitmap: durableImage, type: 'paint' } });
+    if (redone?.type === 'raster' && redone.source.type === 'paint') {
+      expect(redone.source.bitmap).toEqual(durableImage);
+    }
+    engine.dispose();
+  });
+
+  describe('paint persistence cancellation', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const drainUntil = async (predicate: () => boolean, maxTicks = 50): Promise<void> => {
+      for (let i = 0; i < maxTicks && !predicate(); i += 1) {
+        await Promise.resolve();
+      }
+    };
+
+    const createRealBitmapStoreHarness = async (
+      uploadImage: (blob: Blob) => Promise<{ height: number; imageName: string; width: number }>
+    ) => {
+      vi.stubGlobal('Path2D', class FakePath2D {});
+      const source: CanvasRasterLayerContractV2 = {
+        ...filterLayer('source'),
+        source: {
+          bitmap: { height: 10, imageName: 'before-paint', width: 10 },
+          offset: { x: 0, y: 0 },
+          type: 'paint',
+        },
+      };
+      const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+      const backend = createRecordingRasterBackend();
+      let bitmapCall = 0;
+      backend.createImageBitmap = vi.fn(() =>
+        Promise.resolve(recordingBitmap(bitmapCall++ === 0 ? 'before-paint' : 'filtered-result'))
+      );
+      let placed: { offset: { x: number; y: number }; surface: RasterSurface } | null = null;
+      const bitmapStore = createBitmapStore({
+        debounceMs: 1500,
+        dispatch: store.dispatch,
+        encodeSurface: () => Promise.resolve(new Blob(['unpersisted-paint'], { type: 'image/png' })),
+        getLayerSource: (layerId) => {
+          const layer = store
+            .getState()
+            .projects.find((project) => project.id === projectId)
+            ?.canvas.document.layers.find((candidate) => candidate.id === layerId);
+          return layer?.type === 'raster' || layer?.type === 'control' ? layer.source : null;
+        },
+        getLayerSurface: () => placed,
+        hashBlob: (blob) => blob.text(),
+        maxUploadAttempts: 1,
+        retryDelaysMs: [],
+        sleep: () => Promise.resolve(),
+        uploadImage,
+      });
+      const discardLayer = vi.spyOn(bitmapStore, 'discardLayer');
+      const engine = createCanvasEngine({
+        backend,
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const initial = await engine.exportLayerPixels(source.id);
+      if (initial.status !== 'ok') {
+        throw new Error('expected persisted paint pixels');
+      }
+      engine.selectAll();
+      engine.fillSelection();
+      const refreshPlacement = async (layerId = source.id) => {
+        const exported = await engine.exportLayerPixels(layerId);
+        if (exported.status !== 'ok') {
+          throw new Error('expected live paint pixels');
+        }
+        placed = {
+          offset: { x: exported.rect.x, y: exported.rect.y },
+          surface: exported.surface,
+        };
+        return exported;
+      };
+      const exported = await refreshPlacement();
+      return { backend, bitmapStore, discardLayer, engine, exported, projectId, refreshPlacement, source, store };
+    };
+
+    const bitmapUpdateActions = (store: ReturnType<typeof createReducerBackedStore>['store']) =>
+      (store.dispatch as Mock).mock.calls
+        .map((call) => call[0] as WorkbenchAction)
+        .filter((action) => action.type === 'updateCanvasLayerSource' && action.id === 'source');
+
+    it('cancels pending debounced live-paint persistence before durable replace publication', async () => {
+      vi.useFakeTimers();
+      const uploadImage = vi.fn(() => Promise.resolve({ height: 10, imageName: 'stale-pending-paint', width: 10 }));
+      const harness = await createRealBitmapStoreHarness(uploadImage);
+
+      await expect(
+        harness.engine.commitRasterFilterResult({
+          guard: harness.exported.guard,
+          image: durableImage,
+          mode: 'replace',
+          rect: harness.exported.rect,
+        })
+      ).resolves.toEqual({ layerId: harness.source.id, status: 'committed' });
+      const committed = structuredClone(harness.engine.getDocument()!);
+
+      await vi.advanceTimersByTimeAsync(1500);
+      await harness.bitmapStore.flushPendingUploads();
+
+      expect(harness.discardLayer).toHaveBeenCalledWith(harness.source.id);
+      expect(uploadImage).not.toHaveBeenCalled();
+      expect(bitmapUpdateActions(harness.store)).toHaveLength(0);
+      expect(harness.engine.getDocument()).toEqual(committed);
+      expect(harness.engine.getDocument()!.layers[0]).toMatchObject({
+        source: { bitmap: durableImage, type: 'paint' },
+      });
+      const cache = await harness.engine.exportLayerPixels(harness.source.id);
+      expect(cache.status).toBe('ok');
+      if (cache.status === 'ok') {
+        expect(drawGraphContains(cache.surface as StubRasterSurface, harness.backend, 'bitmap-filtered-result')).toBe(
+          true
+        );
+      }
+
+      const reloadDocument = structuredClone(harness.engine.getDocument()!);
+      harness.engine.dispose();
+      const reloadStore = createReducerBackedStore(reloadDocument);
+      const reloadResolver = vi.fn(() => Promise.resolve(new Blob()));
+      const reloadEngine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver: reloadResolver,
+        projectId: reloadStore.projectId,
+        store: reloadStore.store,
+      });
+      expect((await reloadEngine.exportLayerPixels(harness.source.id)).status).toBe('ok');
+      expect(reloadResolver).toHaveBeenCalledWith(durableImage.imageName);
+      reloadEngine.dispose();
+    });
+
+    it('invalidates a deferred pre-filter upload before it can overwrite the durable replace', async () => {
+      vi.useFakeTimers();
+      const uploaded = createDeferred<{ height: number; imageName: string; width: number }>();
+      const uploadImage = vi.fn(() => uploaded.promise);
+      const harness = await createRealBitmapStoreHarness(uploadImage);
+      const barrier = harness.bitmapStore.flushPendingUploads();
+      await drainUntil(() => uploadImage.mock.calls.length === 1);
+      expect(uploadImage).toHaveBeenCalledOnce();
+
+      await expect(
+        harness.engine.commitRasterFilterResult({
+          guard: harness.exported.guard,
+          image: durableImage,
+          mode: 'replace',
+          rect: harness.exported.rect,
+        })
+      ).resolves.toEqual({ layerId: harness.source.id, status: 'committed' });
+      const committed = structuredClone(harness.engine.getDocument()!);
+      uploaded.resolve({ height: 10, imageName: 'stale-in-flight-paint', width: 10 });
+      await barrier;
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(bitmapUpdateActions(harness.store)).toHaveLength(0);
+      expect(harness.engine.getDocument()).toEqual(committed);
+      const cache = await harness.engine.exportLayerPixels(harness.source.id);
+      expect(cache.status).toBe('ok');
+      if (cache.status === 'ok') {
+        expect(drawGraphContains(cache.surface as StubRasterSurface, harness.backend, 'bitmap-filtered-result')).toBe(
+          true
+        );
+      }
+      harness.engine.dispose();
+    });
+
+    it('redo discards a deferred upload from the restored unpersisted paint snapshot', async () => {
+      vi.useFakeTimers();
+      const uploaded = createDeferred<{ height: number; imageName: string; width: number }>();
+      const uploadImage = vi.fn(() => uploaded.promise);
+      const harness = await createRealBitmapStoreHarness(uploadImage);
+      await expect(
+        harness.engine.commitRasterFilterResult({
+          guard: harness.exported.guard,
+          image: durableImage,
+          mode: 'replace',
+          rect: harness.exported.rect,
+        })
+      ).resolves.toEqual({ layerId: harness.source.id, status: 'committed' });
+      const committed = structuredClone(harness.engine.getDocument()!);
+
+      harness.engine.undo();
+      await harness.refreshPlacement();
+      const barrier = harness.bitmapStore.flushPendingUploads();
+      await drainUntil(() => uploadImage.mock.calls.length === 1);
+      expect(uploadImage).toHaveBeenCalledOnce();
+
+      harness.engine.redo();
+      await harness.refreshPlacement();
+      expect(harness.engine.getDocument()).toEqual(committed);
+      uploaded.resolve({ height: 10, imageName: 'stale-undo-paint', width: 10 });
+      await barrier;
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(harness.discardLayer).toHaveBeenCalledTimes(2);
+      expect(bitmapUpdateActions(harness.store)).toHaveLength(0);
+      expect(harness.engine.getDocument()).toEqual(committed);
+      expect(harness.engine.stores.canUndo.get()).toBe(true);
+      expect(harness.engine.stores.canRedo.get()).toBe(false);
+      const redone = harness.engine.getDocument()!.layers[0];
+      expect(redone).toMatchObject({ source: { bitmap: durableImage, type: 'paint' } });
+      harness.engine.dispose();
+    });
+
+    it('copy undo generation-cancels a deferred upload before redo reuses the layer id', async () => {
+      vi.useFakeTimers();
+      const uploaded = createDeferred<{ height: number; imageName: string; width: number }>();
+      const uploadImage = vi.fn(() => uploaded.promise);
+      const harness = await createRealBitmapStoreHarness(uploadImage);
+      // The harness creates live source paint to establish a guarded export;
+      // this test targets only persistence owned by the subsequently-created copy.
+      harness.bitmapStore.discardLayer(harness.source.id);
+      const copied = await harness.engine.commitRasterFilterResult({
+        guard: harness.exported.guard,
+        image: durableImage,
+        mode: 'copy',
+        rect: harness.exported.rect,
+      });
+      if (copied.status !== 'committed') {
+        throw new Error('expected a committed filtered copy');
+      }
+      const durableCopy = structuredClone(
+        harness.engine.getDocument()!.layers.find((layer) => layer.id === copied.layerId)!
+      );
+
+      harness.engine.selectAll();
+      harness.engine.fillSelection();
+      await harness.refreshPlacement(copied.layerId);
+      const barrier = harness.bitmapStore.flushPendingUploads();
+      await drainUntil(() => uploadImage.mock.calls.length === 1);
+      expect(uploadImage).toHaveBeenCalledOnce();
+
+      // Undo the paint edit, then undo the copy itself. Redo reuses the exact
+      // layer id while the pre-undo upload is still unresolved.
+      harness.engine.undo();
+      await harness.refreshPlacement(copied.layerId);
+      harness.engine.undo();
+      expect((await harness.engine.exportLayerPixels(copied.layerId)).status).toBe('missing');
+      harness.engine.redo();
+      expect(harness.engine.getDocument()!.layers.find((layer) => layer.id === copied.layerId)).toEqual(durableCopy);
+
+      uploaded.resolve({ height: 10, imageName: 'stale-copy-paint', width: 10 });
+      await barrier;
+      await vi.advanceTimersByTimeAsync(3000);
+
+      const staleUpdates = (harness.store.dispatch as Mock).mock.calls
+        .map((call) => call[0] as WorkbenchAction)
+        .filter((action) => action.type === 'updateCanvasLayerSource' && action.id === copied.layerId);
+      expect(staleUpdates).toHaveLength(0);
+      expect(harness.discardLayer).toHaveBeenCalledWith(copied.layerId);
+      expect(harness.engine.getDocument()!.layers.find((layer) => layer.id === copied.layerId)).toEqual(durableCopy);
+      expect(harness.engine.stores.canUndo.get()).toBe(true);
+      const cache = await harness.engine.exportLayerPixels(copied.layerId);
+      expect(cache.status).toBe('ok');
+      if (cache.status === 'ok') {
+        expect(drawGraphContains(cache.surface as StubRasterSurface, harness.backend, 'bitmap-filtered-result')).toBe(
+          true
+        );
+      }
+      harness.engine.dispose();
+    });
+  });
+
+  it.each(['allocation', 'draw'] as const)(
+    'keeps copy redo retryable and exact when detached cache %s fails',
+    async (failure) => {
+      const source = filterLayer('source');
+      const selected = filterLayer('selected');
+      const beforeDocument = { ...filterDoc([source, selected]), selectedLayerId: selected.id };
+      const { projectId, store } = createReducerBackedStore(beforeDocument);
+      const faults = createReplayFaultBackend();
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: faults.backend,
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable export');
+      }
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode: 'copy',
+        rect: exported.rect,
+      });
+      if (result.status !== 'committed') {
+        throw new Error('expected a committed copy');
+      }
+      const copy = structuredClone(engine.getDocument()!.layers[0]!);
+      engine.undo();
+      expect(engine.getDocument()).toEqual(beforeDocument);
+      const adjustedDeletesBefore = adjustedSurfaceCacheDeletes.length;
+      const thumbnailListener = vi.fn();
+      const unsubscribeThumbnail = engine.stores.thumbnailVersion.subscribe(thumbnailListener);
+      bitmapStore.markLayerDirty.mockClear();
+      (store.dispatch as Mock).mockClear();
+      faults.arm(failure);
+
+      expect(() => engine.redo()).toThrow(`replay cache ${failure} failed`);
+
+      expect(engine.getDocument()).toEqual(beforeDocument);
+      expect(engine.getDocument()!.selectedLayerId).toBe(selected.id);
+      expect((await engine.exportLayerPixels(result.layerId)).status).toBe('missing');
+      expect(engine.stores.canUndo.get()).toBe(false);
+      expect(engine.stores.canRedo.get()).toBe(true);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(thumbnailListener).not.toHaveBeenCalled();
+      expect(adjustedSurfaceCacheDeletes).toHaveLength(adjustedDeletesBefore);
+
+      engine.redo();
+      expect(engine.getDocument()!.layers[0]).toEqual(copy);
+      expect(engine.getDocument()!.selectedLayerId).toBe(result.layerId);
+      expect((await engine.exportLayerPixels(result.layerId)).status).toBe('ok');
+      expect(engine.stores.canUndo.get()).toBe(true);
+      expect(engine.stores.canRedo.get()).toBe(false);
+      unsubscribeThumbnail();
+      engine.dispose();
+    }
+  );
+
+  const createGuardHarness = async (
+    imageResolver: (imageName: string, signal?: AbortSignal) => Promise<Blob> = () => Promise.resolve(new Blob())
+  ) => {
+    const layer = filterLayer();
+    const document = filterDoc([layer]);
+    const reactive = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver,
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const exported = await engine.exportLayerPixels(layer.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
+    (reactive.store.dispatch as Mock).mockClear();
+    const commit = (signal?: AbortSignal) =>
+      engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode: 'replace',
+        rect: exported.rect,
+        signal,
+      });
+    return { ...reactive, commit, document, engine, guard: exported.guard, layer };
+  };
+
+  const createPendingGuardHarness = async () => {
+    const decoded = createDeferred<Blob>();
+    const harness = await createGuardHarness(() => decoded.promise);
+    return { ...harness, decoded, pending: harness.commit() };
+  };
+
+  it('returns failed without mutation when the durable image cannot be decoded', async () => {
+    const harness = await createGuardHarness(() => Promise.reject(new Error('decode failed')));
+
+    await expect(harness.commit()).resolves.toEqual({ message: 'decode failed', status: 'failed' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns aborted without starting durable-image decode when already cancelled', async () => {
+    const resolver = vi.fn(() => Promise.resolve(new Blob()));
+    const harness = await createGuardHarness(resolver);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(harness.commit(controller.signal)).resolves.toEqual({ status: 'aborted' });
+    expect(resolver).not.toHaveBeenCalled();
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('passes the exact cancellation signal into durable-image resolution', async () => {
+    const resolver = vi.fn((_imageName: string, _signal?: AbortSignal) => Promise.resolve(new Blob()));
+    const harness = await createGuardHarness(resolver);
+    const controller = new AbortController();
+
+    await expect(harness.commit(controller.signal)).resolves.toMatchObject({ status: 'committed' });
+    expect(resolver).toHaveBeenCalledWith(durableImage.imageName, controller.signal);
+    harness.engine.dispose();
+  });
+
+  it('maps an abort rejection from durable-image resolution to aborted without mutation', async () => {
+    const resolver = vi.fn(() => Promise.reject(new DOMException('cancelled', 'AbortError')));
+    const harness = await createGuardHarness(resolver);
+    const controller = new AbortController();
+
+    await expect(harness.commit(controller.signal)).resolves.toEqual({ status: 'aborted' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns aborted without mutation when cancellation occurs during durable-image decode', async () => {
+    const decoded = createDeferred<Blob>();
+    const harness = await createGuardHarness(() => decoded.promise);
+    const controller = new AbortController();
+
+    const pending = harness.commit(controller.signal);
+    controller.abort();
+    decoded.resolve(new Blob());
+
+    await expect(pending).resolves.toEqual({ status: 'aborted' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns missing without mutation when the source is deleted', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, layers: [] });
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'missing' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns stale without mutation when the source contract changes', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, layers: [{ ...harness.layer, opacity: 0.2 }] });
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'stale' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns locked without mutation when the source becomes locked', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, layers: [{ ...harness.layer, isLocked: true }] });
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'locked' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns unsupported without mutation when the source is no longer raster', async () => {
+    const harness = await createPendingGuardHarness();
+    const { adjustments: _adjustments, ...base } = harness.layer;
+    const control: CanvasLayerContract = {
+      ...base,
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      type: 'control',
+      withTransparencyEffect: false,
+    };
+    harness.setDocument({ ...harness.document, layers: [control] });
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'unsupported' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns stale without mutation after the source cache version changes', async () => {
+    const harness = await createPendingGuardHarness();
+    await harness.engine.clearCaches();
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'stale' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns stale without mutation after document replacement reuses the source layer', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, height: 200, width: 200 }, 1);
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'stale' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns stale without mutation after the active project changes', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setActiveProjectId('p2');
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'stale' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns busy without mutation while a pointer gesture is open', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const harness = await createPendingGuardHarness();
+    const screen = createInputCanvas();
+    const overlay = createInputCanvas();
+    harness.engine.attach(screen.element, overlay.element);
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'busy' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it.each(['replace', 'copy'] as const)(
+    'leaves document, cache, selection, history, and side effects exact when %s cache preparation fails',
+    async (mode) => {
+      const baseBackend = createTestStubRasterBackend();
+      let successfulCreatesBeforeFailure: number | null = null;
+      const backend: StubRasterBackend = {
+        ...baseBackend,
+        createSurface: (width, height) => {
+          if (successfulCreatesBeforeFailure !== null) {
+            if (successfulCreatesBeforeFailure === 0) {
+              throw new Error('filter cache allocation failed');
+            }
+            successfulCreatesBeforeFailure -= 1;
+          }
+          return baseBackend.createSurface(width, height);
+        },
+      };
+      const source = filterLayer('source');
+      const selected = filterLayer('selected');
+      const beforeDocument = { ...filterDoc([source, selected]), selectedLayerId: selected.id };
+      const { projectId, store } = createReducerBackedStore(beforeDocument);
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend,
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable export');
+      }
+      const cacheSurface = exported.surface;
+      const cacheCalls = structuredClone((cacheSurface as StubRasterSurface).callLog);
+      const thumbnailVersion = engine.stores.thumbnailVersion.get(source.id);
+      const thumbnailListener = vi.fn();
+      const unsubscribeThumbnail = engine.stores.thumbnailVersion.subscribe(thumbnailListener);
+      const adjustedDeletesBefore = adjustedSurfaceCacheDeletes.length;
+      bitmapStore.markLayerDirty.mockClear();
+      (store.dispatch as Mock).mockClear();
+
+      // Commit allocates the decoded candidate first. Replace also captures its
+      // before-pixels snapshot. The following allocation is cache preparation.
+      successfulCreatesBeforeFailure = mode === 'replace' ? 2 : 1;
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode,
+        rect: exported.rect,
+      });
+      successfulCreatesBeforeFailure = null;
+
+      expect(result).toEqual({ message: 'filter cache allocation failed', status: 'failed' });
+      expect(engine.getDocument()).toEqual(beforeDocument);
+      expect(engine.getDocument()!.selectedLayerId).toBe(selected.id);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      expect(engine.stores.canUndo.get()).toBe(false);
+      expect(engine.stores.canRedo.get()).toBe(false);
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(thumbnailListener).not.toHaveBeenCalled();
+      expect(engine.stores.thumbnailVersion.get(source.id)).toBe(thumbnailVersion);
+      expect(adjustedSurfaceCacheDeletes).toHaveLength(adjustedDeletesBefore);
+
+      const afterExport = await engine.exportLayerPixels(source.id);
+      expect(afterExport.status).toBe('ok');
+      if (afterExport.status === 'ok') {
+        expect(afterExport.surface).toBe(cacheSurface);
+        expect(afterExport.rect).toEqual(exported.rect);
+        expect(afterExport.guard.cacheVersion).toBe(exported.guard.cacheVersion);
+        expect((afterExport.surface as StubRasterSurface).callLog).toEqual(cacheCalls);
+      }
+
+      unsubscribeThumbnail();
+      engine.dispose();
+    }
+  );
+
+  it.each(['replace', 'copy'] as const)(
+    'leaves document, cache, selection, history, and side effects exact when %s cache preparation draw fails',
+    async (mode) => {
+      const baseBackend = createTestStubRasterBackend();
+      let successfulDrawsBeforeFailure: number | null = null;
+      const backend: StubRasterBackend = {
+        ...baseBackend,
+        createSurface: (width, height) => {
+          const surface = baseBackend.createSurface(width, height);
+          const ctx = new Proxy(surface.ctx, {
+            get: (target, property, receiver) => {
+              const value = Reflect.get(target, property, receiver);
+              if (property !== 'drawImage' || typeof value !== 'function') {
+                return value;
+              }
+              return (...args: unknown[]) => {
+                if (successfulDrawsBeforeFailure !== null) {
+                  if (successfulDrawsBeforeFailure === 0) {
+                    throw new Error('filter cache draw failed');
+                  }
+                  successfulDrawsBeforeFailure -= 1;
+                }
+                return Reflect.apply(value, target, args);
+              };
+            },
+          });
+          Object.defineProperty(surface, 'ctx', { value: ctx });
+          return surface;
+        },
+      };
+      const source = filterLayer('source');
+      const selected = filterLayer('selected');
+      const beforeDocument = { ...filterDoc([source, selected]), selectedLayerId: selected.id };
+      const { projectId, store } = createReducerBackedStore(beforeDocument);
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend,
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable export');
+      }
+      const cacheSurface = exported.surface;
+      const cacheCalls = structuredClone((cacheSurface as StubRasterSurface).callLog);
+      const thumbnailVersion = engine.stores.thumbnailVersion.get(source.id);
+      const thumbnailListener = vi.fn();
+      const unsubscribeThumbnail = engine.stores.thumbnailVersion.subscribe(thumbnailListener);
+      const adjustedDeletesBefore = adjustedSurfaceCacheDeletes.length;
+      bitmapStore.markLayerDirty.mockClear();
+      (store.dispatch as Mock).mockClear();
+
+      // Commit draws the decoded candidate first. Replace also captures its
+      // before-pixels snapshot. The following draw prepares the detached cache.
+      successfulDrawsBeforeFailure = mode === 'replace' ? 2 : 1;
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode,
+        rect: exported.rect,
+      });
+      successfulDrawsBeforeFailure = null;
+
+      expect(result).toEqual({ message: 'filter cache draw failed', status: 'failed' });
+      expect(engine.getDocument()).toEqual(beforeDocument);
+      expect(engine.getDocument()!.selectedLayerId).toBe(selected.id);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      expect(engine.stores.canUndo.get()).toBe(false);
+      expect(engine.stores.canRedo.get()).toBe(false);
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(thumbnailListener).not.toHaveBeenCalled();
+      expect(engine.stores.thumbnailVersion.get(source.id)).toBe(thumbnailVersion);
+      expect(adjustedSurfaceCacheDeletes).toHaveLength(adjustedDeletesBefore);
+
+      const afterExport = await engine.exportLayerPixels(source.id);
+      expect(afterExport.status).toBe('ok');
+      if (afterExport.status === 'ok') {
+        expect(afterExport.surface).toBe(cacheSurface);
+        expect(afterExport.rect).toEqual(exported.rect);
+        expect(afterExport.guard.cacheVersion).toBe(exported.guard.cacheVersion);
+        expect((afterExport.surface as StubRasterSurface).callLog).toEqual(cacheCalls);
+      }
+
+      unsubscribeThumbnail();
+      engine.dispose();
+    }
+  );
+
+  it.each(['replace', 'copy'] as const)(
+    'commits %s after dispatch even when render scheduling throws, without redundant persistence',
+    async (mode) => {
+      const raf = createControllableRaf();
+      vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+      vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+      const source = filterLayer('source');
+      const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable export');
+      }
+      engine.attach(createFakeCanvas().element, createFakeCanvas().element);
+      raf.flush();
+      bitmapStore.markLayerDirty.mockImplementation(() => {
+        throw new Error('unexpected filter result persistence');
+      });
+      vi.stubGlobal('requestAnimationFrame', () => {
+        throw new Error('render scheduling failed');
+      });
+
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode,
+        rect: exported.rect,
+      });
+
+      if (result.status !== 'committed') {
+        throw new Error(`expected a committed result, received ${JSON.stringify(result)}`);
+      }
+      expect(result).toMatchObject({ status: 'committed' });
+      expect(store.dispatch).toHaveBeenCalled();
+      expect(engine.stores.canUndo.get()).toBe(true);
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      engine.dispose();
+    }
+  );
+
+  it.each(['replace', 'copy'] as const)(
+    'commits %s when a thumbnail observer throws, without redundant persistence',
+    async (mode) => {
+      const source = filterLayer('source');
+      const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable export');
+      }
+      const unsubscribeThumbnail = engine.stores.thumbnailVersion.subscribe(() => {
+        throw new Error('thumbnail observer failed');
+      });
+      bitmapStore.markLayerDirty.mockImplementation(() => {
+        throw new Error('unexpected filter result persistence');
+      });
+
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode,
+        rect: exported.rect,
+      });
+
+      expect(result).toMatchObject({ status: 'committed' });
+      expect(store.dispatch).toHaveBeenCalled();
+      expect(engine.stores.canUndo.get()).toBe(true);
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      unsubscribeThumbnail();
+      engine.dispose();
+    }
+  );
+
+  it.each(['replace', 'copy'] as const)(
+    'commits %s when a document observer throws after the reducer applies the mutation',
+    async (mode) => {
+      const source = filterLayer('source');
+      const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable export');
+      }
+      const unsubscribeFault = store.subscribe(() => {
+        throw new Error('document observer failed');
+      });
+
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode,
+        rect: exported.rect,
+      });
+
+      expect(result).toMatchObject({ status: 'committed' });
+      expect(engine.stores.canUndo.get()).toBe(true);
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      if (result.status === 'committed') {
+        expect((await engine.exportLayerPixels(result.layerId)).status).toBe('ok');
+      }
+      unsubscribeFault();
+      engine.dispose();
+    }
+  );
+
+  it('refreshes the mirror and renders the filtered result when an earlier document observer interrupts dispatch', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const source = filterLayer('source');
+    const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+    const unsubscribeFault = store.subscribe(() => {
+      throw new Error('earlier document observer failed');
+    });
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('filtered-result')));
+    const engine = createCanvasEngine({
+      backend,
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
+
+    const result = await engine.commitRasterFilterResult({
+      guard: exported.guard,
+      image: durableImage,
+      mode: 'replace',
+      rect: exported.rect,
+    });
+    unsubscribeFault();
+
+    expect(result).toEqual({ layerId: source.id, status: 'committed' });
+    const reducerDocument = store.getState().projects.find((project) => project.id === projectId)!.canvas.document;
+    expect(reducerDocument.layers[0]).toMatchObject({
+      source: { bitmap: durableImage, type: 'paint' },
+    });
+    expect(engine.getDocument()).toBe(reducerDocument);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    const committedExport = await engine.exportLayerPixels(source.id);
+    expect(committedExport.status).toBe('ok');
+    if (committedExport.status === 'ok') {
+      expect(drawGraphContains(committedExport.surface as StubRasterSurface, backend, 'bitmap-filtered-result')).toBe(
+        true
+      );
+    }
+
+    const screen = createFakeCanvas();
+    engine.attach(screen.element, createFakeCanvas().element);
+    raf.flush();
+    expect(drawGraphContains(screen.surface, backend, 'bitmap-filtered-result')).toBe(true);
+    engine.dispose();
+  });
+
+  it('finishes copy undo and restores the exact prior selection after an applied observer fault', async () => {
+    const source = filterLayer('source');
+    const selected = filterLayer('selected');
+    const beforeDocument = { ...filterDoc([source, selected]), selectedLayerId: selected.id };
+    const { projectId, store } = createReducerBackedStore(beforeDocument);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
+    const result = await engine.commitRasterFilterResult({
+      guard: exported.guard,
+      image: durableImage,
+      mode: 'copy',
+      rect: exported.rect,
+    });
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed copy');
+    }
+    const copy = structuredClone(engine.getDocument()!.layers[0]!);
+    const unsubscribeFault = store.subscribe(() => {
+      throw new Error('copy undo observer failed');
+    });
+
+    expect(() => engine.undo()).not.toThrow();
+
+    expect(engine.getDocument()).toEqual(beforeDocument);
+    expect(engine.getDocument()!.selectedLayerId).toBe(selected.id);
+    expect((await engine.exportLayerPixels(result.layerId)).status).toBe('missing');
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    unsubscribeFault();
+
+    engine.redo();
+    expect(engine.getDocument()!.layers[0]).toEqual(copy);
+    expect(engine.getDocument()!.selectedLayerId).toBe(result.layerId);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it('keeps copy undo retryable when removal fails after restoring the prior selection', async () => {
+    const source = filterLayer('source');
+    const selected = filterLayer('selected');
+    const beforeDocument = { ...filterDoc([source, selected]), selectedLayerId: selected.id };
+    const { dispatch, projectId, store } = createReducerBackedStore(beforeDocument);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
+    const result = await engine.commitRasterFilterResult({
+      guard: exported.guard,
+      image: durableImage,
+      mode: 'copy',
+      rect: exported.rect,
+    });
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed copy');
+    }
+    const reducerDispatch = dispatch.getMockImplementation();
+    if (!reducerDispatch) {
+      throw new Error('expected reducer-backed dispatch');
+    }
+    let failRemoval = true;
+    dispatch.mockImplementation((action: WorkbenchAction) => {
+      if (failRemoval && action.type === 'removeCanvasLayers') {
+        failRemoval = false;
+        throw new Error('copy removal failed');
+      }
+      reducerDispatch(action);
+    });
+
+    expect(() => engine.undo()).toThrow('copy removal failed');
+
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === result.layerId)).toBe(true);
+    expect(engine.getDocument()!.selectedLayerId).toBe(selected.id);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+
+    engine.undo();
+    expect(engine.getDocument()).toEqual(beforeDocument);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    engine.dispose();
+  });
+
+  it.each(['replace', 'copy'] as const)('commits %s when a history-state observer throws', async (mode) => {
+    const source = filterLayer('source');
+    const { projectId, store } = createReducerBackedStore(filterDoc([source]));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
+    const unsubscribeFault = engine.stores.canUndo.subscribe(() => {
+      throw new Error('history observer failed');
+    });
+
+    const result = await engine.commitRasterFilterResult({
+      guard: exported.guard,
+      image: durableImage,
+      mode,
+      rect: exported.rect,
+    });
+
+    expect(result).toMatchObject({ status: 'committed' });
+    expect(engine.stores.canUndo.get()).toBe(true);
+    if (result.status === 'committed') {
+      expect((await engine.exportLayerPixels(result.layerId)).status).toBe('ok');
+    }
+    unsubscribeFault();
+    engine.dispose();
+  });
+});
+
 describe('setFilterPreview', () => {
   const emptyDoc = (): CanvasDocumentContractV2 => ({
     background: 'transparent',
@@ -4017,6 +5525,11 @@ describe('setFilterPreview', () => {
     source: { bitmap: null, type: 'paint' },
     transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
     type: 'raster',
+  });
+
+  const guardableLayer = (id: string): CanvasRasterLayerContractV2 => ({
+    ...(previewableLayer(id) as CanvasRasterLayerContractV2),
+    source: { fill: '#fff', height: 10, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
   });
 
   /** A stub backend whose `createImageBitmap` is deferred, so decodes resolve on demand. */
@@ -4241,6 +5754,421 @@ describe('setFilterPreview', () => {
     await flushMicrotasks();
     expect(raf.pendingCount()).toBeGreaterThan(0);
 
+    engine.dispose();
+  });
+
+  it('publishes a guarded filter preview while the exported layer snapshot remains current', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    await flushMicrotasks();
+    bitmaps.resolveBitmap(0);
+
+    await expect(pending).resolves.toBe('shown');
+    engine.dispose();
+  });
+
+  it('rejects a guarded filter preview when its source changes during decode', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const layer = guardableLayer('L');
+    const document = { ...emptyDoc(), layers: [layer] };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    await flushMicrotasks();
+    setDocument({
+      ...document,
+      layers: [{ ...layer, source: { ...layer.source, fill: '#000' } } as CanvasLayerContract],
+    });
+    bitmaps.resolveBitmap(0);
+
+    await expect(pending).resolves.toBe('stale');
+    engine.dispose();
+  });
+
+  it('rejects a guarded filter preview when raster adjustments change during decode', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const layer = guardableLayer('L');
+    const document = { ...emptyDoc(), layers: [layer] };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    await flushMicrotasks();
+    setDocument({
+      ...document,
+      layers: [{ ...layer, adjustments: { brightness: 0.2, contrast: 0, saturation: 0 } }],
+    });
+    bitmaps.resolveBitmap(0);
+
+    await expect(pending).resolves.toBe('stale');
+    engine.dispose();
+  });
+
+  it('rejects a guarded filter preview when the paint cache version changes during decode', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    await flushMicrotasks();
+    await engine.clearCaches();
+    bitmaps.resolveBitmap(0);
+
+    await expect(pending).resolves.toBe('stale');
+    engine.dispose();
+  });
+
+  it('returns missing when the guarded preview layer is deleted during decode', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    await flushMicrotasks();
+    setDocument({ ...document, layers: [] });
+    bitmaps.resolveBitmap(0);
+
+    await expect(pending).resolves.toBe('missing');
+    engine.dispose();
+  });
+
+  it('rejects a guarded filter preview after document replacement reuses the layer id', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    await flushMicrotasks();
+    setDocument({ ...document, height: 200, width: 200 }, 1);
+    bitmaps.resolveBitmap(0);
+
+    await expect(pending).resolves.toBe('stale');
+    engine.dispose();
+  });
+
+  it('lets only the newest guarded filter preview publish', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+
+    const older = engine.setGuardedFilterPreview('L', { imageName: 'older' }, exported.guard);
+    const newer = engine.setGuardedFilterPreview('L', { imageName: 'newer' }, exported.guard);
+    await flushMicrotasks();
+    bitmaps.resolveBitmap(1);
+    await expect(newer).resolves.toBe('shown');
+    bitmaps.resolveBitmap(0);
+
+    await expect(older).resolves.toBe('stale');
+    engine.dispose();
+  });
+
+  it('rejects a guarded filter preview cleared while decode is pending', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    await flushMicrotasks();
+    engine.setFilterPreview('L', null);
+    bitmaps.resolveBitmap(0);
+
+    await expect(pending).resolves.toBe('stale');
+    engine.dispose();
+  });
+
+  const screenDrawsBitmap = (screen: StubRasterSurface, backend: RecordingRasterBackend, bitmapId: string): boolean =>
+    screen.callLog
+      .filter((entry) => entry.op === 'drawImage')
+      .some((entry) => {
+        const surfaceId = (entry.args[0] as { __recordingId?: string }).__recordingId;
+        const surface = surfaceId ? backend.surfaceById(surfaceId) : undefined;
+        return !!surface && backend.drawSourcesFor(surface).includes(`bitmap-${bitmapId}`);
+      });
+
+  const createPublishedGuardedPreview = async (layer: CanvasRasterLayerContractV2 = guardableLayer('L')) => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const backend = createRecordingRasterBackend();
+    const sourceNeedsBitmap =
+      layer.type === 'raster' &&
+      (layer.source.type === 'image' || (layer.source.type === 'paint' && layer.source.bitmap !== null));
+    let bitmapCall = 0;
+    backend.createImageBitmap = vi.fn(() =>
+      Promise.resolve(recordingBitmap(sourceNeedsBitmap && bitmapCall++ === 0 ? 'layer-source' : 'guarded-preview'))
+    );
+    const document = { ...emptyDoc(), layers: [layer], selectedLayerId: layer.id };
+    const reactive = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend,
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const screen = createFakeCanvas();
+    engine.attach(screen.element, createFakeCanvas().element);
+    raf.flush();
+    const exported = await engine.exportLayerPixels(layer.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+    await expect(
+      engine.setGuardedFilterPreview(layer.id, { imageName: 'guarded-preview' }, exported.guard)
+    ).resolves.toBe('shown');
+    raf.flush();
+    expect(screenDrawsBitmap(screen.surface, backend, 'guarded-preview')).toBe(true);
+    screen.surface.callLog.length = 0;
+    return { backend, document, engine, layer, raf, screen: screen.surface, ...reactive };
+  };
+
+  it('clears a published guarded preview across an active-project away/back transition', async () => {
+    const harness = await createPublishedGuardedPreview();
+
+    harness.setActiveProjectId('p2');
+    harness.setActiveProjectId('p1');
+    harness.screen.callLog.length = 0;
+    harness.engine.stores.checkerboard.set(!harness.engine.stores.checkerboard.get());
+    harness.raf.flush();
+
+    expect(screenDrawsBitmap(harness.screen, harness.backend, 'guarded-preview')).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('rejects an in-flight guarded preview across an active-project away/back transition', async () => {
+    const bitmaps = createDeferredBitmapBackend();
+    const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
+    const reactive = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const exported = await engine.exportLayerPixels('L');
+    if (exported.status !== 'ok') {
+      throw new Error('expected a guardable export');
+    }
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    await flushMicrotasks();
+
+    reactive.setActiveProjectId('p2');
+    reactive.setActiveProjectId('p1');
+    bitmaps.resolveBitmap(0);
+
+    await expect(pending).resolves.toBe('stale');
+    engine.dispose();
+  });
+
+  it('preserves an unguarded control preview across an active-project away/back transition', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('control-preview')));
+    const layer = guardableLayer('L');
+    const reactive = createReactiveStore({ ...emptyDoc(), layers: [layer] });
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const screen = createFakeCanvas();
+    engine.attach(screen.element, createFakeCanvas().element);
+    raf.flush();
+    engine.setFilterPreview('L', { imageName: 'control-preview' });
+    await flushMicrotasks();
+    raf.flush();
+
+    reactive.setActiveProjectId('p2');
+    reactive.setActiveProjectId('p1');
+    screen.surface.callLog.length = 0;
+    engine.stores.checkerboard.set(!engine.stores.checkerboard.get());
+    raf.flush();
+
+    expect(screenDrawsBitmap(screen.surface, backend, 'control-preview')).toBe(true);
+    engine.dispose();
+  });
+
+  it('unsubscribes project-preview lifecycle handling on dispose', () => {
+    const reactive = createReactiveStore(emptyDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+
+    expect(reactive.listenerCount()).toBe(2);
+    engine.dispose();
+    expect(reactive.listenerCount()).toBe(0);
+  });
+
+  it('clears an already-published guarded preview when the source contract changes', async () => {
+    const harness = await createPublishedGuardedPreview();
+    harness.setDocument({
+      ...harness.document,
+      layers: [{ ...harness.layer, source: { ...harness.layer.source, fill: '#000' } } as CanvasLayerContract],
+    });
+    harness.raf.flush();
+
+    expect(screenDrawsBitmap(harness.screen, harness.backend, 'guarded-preview')).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('clears an already-published guarded preview when raster adjustments change', async () => {
+    const harness = await createPublishedGuardedPreview();
+    harness.setDocument({
+      ...harness.document,
+      layers: [{ ...harness.layer, adjustments: { brightness: 0.3, contrast: 0, saturation: 0 } }],
+    });
+    harness.raf.flush();
+
+    expect(screenDrawsBitmap(harness.screen, harness.backend, 'guarded-preview')).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('clears an already-published guarded preview when live paint advances the cache version', async () => {
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const paint: CanvasRasterLayerContractV2 = {
+      ...guardableLayer('L'),
+      source: { bitmap: { height: 10, imageName: 'paint-source', width: 10 }, type: 'paint' },
+      type: 'raster',
+    };
+    const harness = await createPublishedGuardedPreview(paint);
+
+    harness.engine.selectAll();
+    harness.engine.fillSelection();
+    harness.raf.flush();
+
+    expect(screenDrawsBitmap(harness.screen, harness.backend, 'guarded-preview')).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('clears an already-published guarded preview when its cache is invalidated', async () => {
+    const harness = await createPublishedGuardedPreview();
+
+    await harness.engine.clearCaches();
+    harness.raf.flush();
+
+    expect(screenDrawsBitmap(harness.screen, harness.backend, 'guarded-preview')).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('keeps an unguarded control preview across immutable layer edits', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('control-preview')));
+    const layer = guardableLayer('L');
+    const document = { ...emptyDoc(), layers: [layer] };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const screen = createFakeCanvas();
+    engine.attach(screen.element, createFakeCanvas().element);
+    raf.flush();
+
+    engine.setFilterPreview('L', { imageName: 'control-preview' });
+    await flushMicrotasks();
+    raf.flush();
+    screen.surface.callLog.length = 0;
+    setDocument({
+      ...document,
+      layers: [{ ...layer, adjustments: { brightness: 0.3, contrast: 0, saturation: 0 } }],
+    });
+    raf.flush();
+
+    expect(screenDrawsBitmap(screen.surface, backend, 'control-preview')).toBe(true);
     engine.dispose();
   });
 });

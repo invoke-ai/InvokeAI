@@ -79,6 +79,8 @@ export interface DocumentMirrorCallbacks {
 export interface DocumentMirror {
   /** The current mirrored document, or `null` if the project is gone. */
   getDocument(): CanvasDocumentContractV2 | null;
+  /** Synchronously reconciles from store state when ordinary notification was interrupted. */
+  refresh(): void;
   /** Removes the store subscription. */
   dispose(): void;
 }
@@ -230,5 +232,6 @@ export const createDocumentMirror = (
   return {
     dispose: unsubscribe,
     getDocument: () => lastDoc,
+    refresh: handleChange,
   };
 };

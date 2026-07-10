@@ -206,7 +206,11 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   const hashToImage = new Map<string, CanvasImageUploadResult>();
   /** Layer id → the image name most recently dispatched by this store (self-echo guard). */
   const lastApplied = new Map<string, string>();
-  /** Per-layer generation used to invalidate an upload already in flight when its pixels are discarded. */
+  /**
+   * Per-layer generation used only while invalidated work is still in flight.
+   * Idle ids are removed so ordinary layer deletion cannot accumulate permanent
+   * tombstones for the lifetime of the engine.
+   */
   const layerGenerations = new Map<string, number>();
   let disposed = false;
 
@@ -245,18 +249,37 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     hashToImage.set(hash, result);
   };
 
-  const uploadWithRetry = async (blob: Blob): Promise<CanvasImageUploadResult> => {
+  const uploadWithRetry = async (
+    blob: Blob,
+    isCurrentGeneration: () => boolean
+  ): Promise<CanvasImageUploadResult | null> => {
     let lastError: unknown;
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      if (!isCurrentGeneration()) {
+        return null;
+      }
       if (attempt > 0) {
         const delay = retryDelays[Math.min(attempt - 1, retryDelays.length - 1)] ?? 0;
         if (delay > 0) {
           await sleep(delay);
+          if (!isCurrentGeneration()) {
+            return null;
+          }
         }
       }
+      if (!isCurrentGeneration()) {
+        return null;
+      }
       try {
-        return await deps.uploadImage(blob);
+        const result = await deps.uploadImage(blob);
+        if (!isCurrentGeneration()) {
+          return null;
+        }
+        return result;
       } catch (error) {
+        if (!isCurrentGeneration()) {
+          return null;
+        }
         lastError = error;
       }
     }
@@ -266,6 +289,22 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   /** Encodes → hashes → dedupes/uploads → swaps the layer's ref, once. */
   const flushLayer = async (layerId: string): Promise<void> => {
     const generationAtEntry = layerGenerations.get(layerId) ?? 0;
+    const isCurrentGeneration = (): boolean => !disposed && (layerGenerations.get(layerId) ?? 0) === generationAtEntry;
+    const requeueFailure = (error: unknown): void => {
+      if (!isCurrentGeneration()) {
+        return;
+      }
+      // Requeue before notifying. An injected error observer may deliberately
+      // discard/reset this generation; its cancellation must be the final word,
+      // not followed by a stale dirty.add(). Observer exceptions are ancillary.
+      dirty.add(layerId);
+      dirtyReason.set(layerId, 'failure');
+      try {
+        reportError(error, layerId);
+      } catch {
+        // Keep the bounded retry state intact when an observer itself fails.
+      }
+    };
     const placed = deps.getLayerSurface(layerId);
     if (!placed) {
       // Layer or its cache is gone (or empty); nothing to persist.
@@ -301,11 +340,15 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     let blob: Blob;
     try {
       blob = await deps.encodeSurface(surface);
+      if (!isCurrentGeneration()) {
+        return;
+      }
       hash = await hashBlob(blob);
+      if (!isCurrentGeneration()) {
+        return;
+      }
     } catch (error) {
-      reportError(error, layerId);
-      dirty.add(layerId);
-      dirtyReason.set(layerId, 'failure');
+      requeueFailure(error);
       return;
     }
 
@@ -315,22 +358,21 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       touchDedupe(hash, result);
     } else {
       try {
-        result = await uploadWithRetry(blob);
+        const uploaded = await uploadWithRetry(blob, isCurrentGeneration);
+        if (!uploaded) {
+          return;
+        }
+        result = uploaded;
       } catch (error) {
         // Swap-on-success: never dispatch on failure. The old ref stays valid
         // and the layer stays dirty for a later retry.
-        reportError(error, layerId);
-        dirty.add(layerId);
-        dirtyReason.set(layerId, 'failure');
+        requeueFailure(error);
         return;
       }
       rememberDedupe(hash, result);
     }
 
-    if (disposed) {
-      return;
-    }
-    if ((layerGenerations.get(layerId) ?? 0) !== generationAtEntry) {
+    if (!isCurrentGeneration()) {
       return;
     }
     // Re-check the source right before dispatching: `encodeSurface`/`hashBlob`/
@@ -409,6 +451,10 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       // Re-dirtied during the flush (new stroke) or a failure re-queued it.
       if (dirty.has(layerId) && !disposed) {
         scheduleFlush(layerId);
+      } else {
+        // Any invalidated operation for this id has now settled and there is no
+        // successor waiting to inherit its generation. Retire the tombstone.
+        layerGenerations.delete(layerId);
       }
     });
     inFlight.set(layerId, op);
@@ -425,7 +471,14 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   };
 
   const discardLayer = (layerId: string): void => {
-    layerGenerations.set(layerId, (layerGenerations.get(layerId) ?? 0) + 1);
+    if (inFlight.has(layerId)) {
+      // Keep an invalidating generation only while obsolete async work can
+      // still settle. Same-id work arriving before it settles inherits this
+      // generation and is scheduled after the old operation completes.
+      layerGenerations.set(layerId, (layerGenerations.get(layerId) ?? 0) + 1);
+    } else {
+      layerGenerations.delete(layerId);
+    }
     dirty.delete(layerId);
     dirtyReason.delete(layerId);
     lastApplied.delete(layerId);
@@ -475,6 +528,11 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   const reset = (): void => {
     for (const layerId of inFlight.keys()) {
       layerGenerations.set(layerId, (layerGenerations.get(layerId) ?? 0) + 1);
+    }
+    for (const layerId of layerGenerations.keys()) {
+      if (!inFlight.has(layerId)) {
+        layerGenerations.delete(layerId);
+      }
     }
     // Cancel pending debounced flushes and drop dirty state for the OLD document.
     for (const handle of debounceTimers.values()) {

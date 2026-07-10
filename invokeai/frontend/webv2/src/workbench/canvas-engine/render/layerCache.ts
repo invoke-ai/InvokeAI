@@ -47,6 +47,17 @@ export interface LayerCacheEntry {
   lastUsed: number;
 }
 
+/**
+ * A fully-rasterized cache replacement that has not been published to the live
+ * cache map yet. Preparation may allocate/draw and therefore may fail; install
+ * performs only in-memory version/map bookkeeping.
+ */
+export interface PreparedLayerCacheReplacement {
+  readonly layerId: string;
+  readonly rect: Rect;
+  readonly surface: RasterSurface;
+}
+
 /** The imperative store returned by {@link createLayerCacheStore}. */
 export interface LayerCacheStore {
   /** Returns the existing cache entry for a layer, or `undefined`. Touches LRU order. */
@@ -75,6 +86,10 @@ export interface LayerCacheStore {
    * when absent. Returns the entry.
    */
   growToRect(layerId: string, rect: Rect): LayerCacheEntry;
+  /** Clones `pixels` into a detached replacement without mutating the live cache. */
+  prepareReplacement(layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement;
+  /** Publishes a detached replacement without allocating, resizing, or drawing. */
+  installReplacement(prepared: PreparedLayerCacheReplacement): LayerCacheEntry;
   /** Marks a layer's cache stale and bumps its `version`. */
   invalidate(layerId: string): void;
   /** Drops a layer's cache entry entirely. */
@@ -242,6 +257,41 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     return existing;
   };
 
+  const prepareReplacement = (layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement => {
+    const normalizedRect: Rect = {
+      height: Math.max(0, Math.round(rect.height)),
+      width: Math.max(0, Math.round(rect.width)),
+      x: rect.x,
+      y: rect.y,
+    };
+    const surface = backend.createSurface(normalizedRect.width, normalizedRect.height);
+    if (normalizedRect.width > 0 && normalizedRect.height > 0) {
+      surface.ctx.clearRect(0, 0, normalizedRect.width, normalizedRect.height);
+      surface.ctx.drawImage(pixels.canvas, 0, 0);
+    }
+    return { layerId, rect: normalizedRect, surface };
+  };
+
+  const installReplacement = (prepared: PreparedLayerCacheReplacement): LayerCacheEntry => {
+    const existing = entries.get(prepared.layerId);
+    if (existing) {
+      rememberFloor(existing);
+    }
+    const entry: LayerCacheEntry = {
+      lastUsed: 0,
+      layerId: prepared.layerId,
+      rect: prepared.rect,
+      stale: false,
+      surface: prepared.surface,
+      // Directly-published pixels receive the same extra version bump that the
+      // old create-then-notify path applied, while remaining monotonic on swap.
+      version: initialVersion(prepared.layerId) + 1,
+    };
+    touch(entry);
+    entries.set(prepared.layerId, entry);
+    return entry;
+  };
+
   const invalidate = (layerId: string): void => {
     const entry = entries.get(layerId);
     if (entry) {
@@ -331,7 +381,9 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     getOrCreate,
     getOrCreateRect,
     growToRect,
+    installReplacement,
     invalidate,
+    prepareReplacement,
     setBitmap,
     version,
   };

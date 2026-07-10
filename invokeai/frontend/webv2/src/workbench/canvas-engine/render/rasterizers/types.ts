@@ -16,7 +16,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
  * ships with the React shell task; the engine only depends on this seam so it
  * stays node-testable.
  */
-export type ImageResolver = (imageName: string) => Promise<Blob>;
+export type ImageResolver = (imageName: string, signal?: AbortSignal) => Promise<Blob>;
 
 /**
  * The result of rasterizing a source: the surface holding its pixels plus the

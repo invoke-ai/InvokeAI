@@ -67,6 +67,9 @@ const createFakeStore = (projects: FakeProject[]) => {
   const listeners = new Set<() => void>();
   return {
     getState: () => state,
+    replaceStateSilently: (next: { projects: FakeProject[] }) => {
+      state = next;
+    },
     setState: (next: { projects: FakeProject[] }) => {
       state = next;
       for (const listener of listeners) {
@@ -91,6 +94,24 @@ const spyCallbacks = () => ({
 });
 
 describe('createDocumentMirror', () => {
+  it('synchronously refreshes from authoritative state when normal notification was interrupted', () => {
+    const a = rasterLayer('a');
+    const doc = makeDoc([a]);
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const callbacks = spyCallbacks();
+    const mirror = createDocumentMirror(store, 'p1', callbacks);
+    const updated: CanvasDocumentContractV2 = { ...doc, layers: [{ ...a, opacity: 0.5 }] };
+
+    store.replaceStateSilently({ projects: [{ canvas: { ...canvas, document: updated }, id: 'p1' }] });
+    expect(mirror.getDocument()).toBe(doc);
+
+    mirror.refresh();
+
+    expect(mirror.getDocument()).toBe(updated);
+    expect(callbacks.onLayersChanged).toHaveBeenCalledWith(['a'], []);
+  });
+
   it('reports exactly the edited layer id when one layer changes by reference', () => {
     const a = rasterLayer('a');
     const b = rasterLayer('b');

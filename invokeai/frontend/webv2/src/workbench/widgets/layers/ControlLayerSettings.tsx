@@ -1,7 +1,6 @@
 import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { ControlAdapterKind } from '@workbench/generation/canvas/addControlLayers';
-import type { FilterParamSpec } from '@workbench/generation/canvas/filterGraphs';
 import type { CanvasControlAdapterContract, CanvasControlLayerContract } from '@workbench/types';
 
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
@@ -13,7 +12,6 @@ import { makeImageDurable } from '@workbench/gallery/api';
 import { isControlKindSupportedForBase } from '@workbench/generation/canvas/addControlLayers';
 import {
   buildFilterDefaults,
-  CONTROL_FILTERS,
   DEFAULT_CONTROL_FILTER_TYPE,
   getFilterDefinition,
 } from '@workbench/generation/canvas/filterGraphs';
@@ -24,6 +22,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { runControlFilterPreview } from './controlFilterPreview';
+import { LayerFilterControls } from './LayerFilterControls';
 import { applyStructural } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
@@ -397,17 +396,6 @@ const ControlFilterSection = ({ dispatch, engine, focusFilter, layer }: ControlF
     [dispatch, engine, layer.filter, layer.id, t]
   );
 
-  const filterCollection = useMemo(
-    () =>
-      createListCollection({
-        items: CONTROL_FILTERS.map((filter) => ({
-          label: t(`widgets.layers.control.filters.${filter.type}`, filter.type),
-          value: filter.type,
-        })),
-      }),
-    [t]
-  );
-
   const clearPreview = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -440,8 +428,7 @@ const ControlFilterSection = ({ dispatch, engine, focusFilter, layer }: ControlF
   );
 
   const handleFilterTypeChange = useCallback(
-    ({ value }: SelectValueChangeDetails) => {
-      const type = value[0];
+    (type: string) => {
       if (!type || type === filterType) {
         return;
       }
@@ -452,11 +439,9 @@ const ControlFilterSection = ({ dispatch, engine, focusFilter, layer }: ControlF
     [clearPreview, commitFilter, filterType]
   );
 
-  const handleSettingChange = useCallback(
-    (key: string, value: unknown) => {
-      commitFilter(filterType, { ...settings, [key]: value });
-    },
-    [commitFilter, filterType, settings]
+  const handleSettingsChange = useCallback(
+    (nextSettings: Record<string, unknown>) => commitFilter(filterType, nextSettings),
+    [commitFilter, filterType]
   );
 
   const handlePreview = useCallback(async () => {
@@ -555,26 +540,17 @@ const ControlFilterSection = ({ dispatch, engine, focusFilter, layer }: ControlF
   }, [dispatch, engine, layer.id, layer.source, layer.transform, preview, t]);
 
   const canPreview = !!engine && hasFilterableContent(layer) && preview.status !== 'running';
-  const filterValue = useMemo(() => [filterType], [filterType]);
-  const filterTriggerProps = useMemo(() => ({ autoFocus: focusFilter }), [focusFilter]);
 
   return (
     <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" pt="2" ref={sectionRef}>
-      <Field label={t('widgets.layers.control.filter')}>
-        <Select
-          aria-label={t('widgets.layers.control.filter')}
-          collection={filterCollection}
-          positioning={SELECT_POSITIONING}
-          size="xs"
-          triggerProps={filterTriggerProps}
-          value={filterValue}
-          valueText={t(`widgets.layers.control.filters.${filterType}`, filterType)}
-          onValueChange={handleFilterTypeChange}
-        />
-      </Field>
-      {definition?.params.map((param) => (
-        <FilterParamField key={param.key} param={param} value={settings[param.key]} onChange={handleSettingChange} />
-      ))}
+      <LayerFilterControls
+        disabled={false}
+        filterType={filterType}
+        focusFilter={focusFilter}
+        settings={settings}
+        onFilterTypeChange={handleFilterTypeChange}
+        onSettingsChange={handleSettingsChange}
+      />
       <HStack gap="2">
         <Button
           disabled={!canPreview}
@@ -603,103 +579,5 @@ const ControlFilterSection = ({ dispatch, engine, focusFilter, layer }: ControlF
         </Text>
       ) : null}
     </Stack>
-  );
-};
-
-interface FilterParamFieldProps {
-  param: FilterParamSpec;
-  value: unknown;
-  onChange: (key: string, value: unknown) => void;
-}
-
-/** One filter parameter editor (number slider / boolean switch / enum select). */
-const FilterParamField = ({ param, value, onChange }: FilterParamFieldProps) => {
-  const { t } = useTranslation();
-  const label = t(`widgets.layers.control.filterParams.${param.key}`, param.key);
-  const labelAria = useMemo(() => [label], [label]);
-
-  const handleBoolean = useCallback(
-    ({ checked }: { checked: boolean }) => onChange(param.key, checked),
-    [onChange, param.key]
-  );
-  const handleEnum = useCallback(
-    ({ value: next }: SelectValueChangeDetails) => {
-      if (next[0]) {
-        onChange(param.key, next[0]);
-      }
-    },
-    [onChange, param.key]
-  );
-  const handleNumberEnd = useCallback(
-    ({ value: next }: SliderValueChangeDetails) => {
-      const n = next[0];
-      if (n !== undefined && Number.isFinite(n)) {
-        onChange(param.key, param.kind === 'number' && param.integer ? Math.round(n) : n);
-      }
-    },
-    [onChange, param]
-  );
-
-  const enumCollection = useMemo(
-    () =>
-      param.kind === 'enum'
-        ? createListCollection({ items: param.options.map((option) => ({ label: option, value: option })) })
-        : null,
-    [param]
-  );
-  const enumCurrent =
-    param.kind === 'enum' && typeof value === 'string' && param.options.includes(value) ? value : param.default;
-  const enumValue = useMemo(() => [String(enumCurrent)], [enumCurrent]);
-  const numberCurrent = typeof value === 'number' && Number.isFinite(value) ? value : param.default;
-  const numberValue = useMemo(() => [Number(numberCurrent)], [numberCurrent]);
-
-  if (param.kind === 'boolean') {
-    return (
-      <Switch.Root
-        checked={typeof value === 'boolean' ? value : param.default}
-        colorPalette="accent"
-        size="xs"
-        onCheckedChange={handleBoolean}
-      >
-        <Switch.HiddenInput />
-        <Switch.Control>
-          <Switch.Thumb />
-        </Switch.Control>
-        <Switch.Label>
-          <Text fontSize="xs">{label}</Text>
-        </Switch.Label>
-      </Switch.Root>
-    );
-  }
-
-  if (param.kind === 'enum' && enumCollection) {
-    return (
-      <Field label={label}>
-        <Select
-          aria-label={label}
-          collection={enumCollection}
-          positioning={SELECT_POSITIONING}
-          size="xs"
-          value={enumValue}
-          valueText={String(enumCurrent)}
-          onValueChange={handleEnum}
-        />
-      </Field>
-    );
-  }
-
-  return (
-    <Field label={label}>
-      <Slider
-        aria-label={labelAria}
-        max={param.kind === 'number' ? (param.max ?? 255) : 255}
-        min={param.kind === 'number' ? (param.min ?? 0) : 0}
-        size="sm"
-        step={param.kind === 'number' ? (param.step ?? (param.integer ? 1 : 0.01)) : 0.01}
-        value={numberValue}
-        withThumbTooltip
-        onValueChangeEnd={handleNumberEnd}
-      />
-    </Field>
   );
 };

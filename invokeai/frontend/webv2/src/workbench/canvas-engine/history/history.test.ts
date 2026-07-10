@@ -263,3 +263,224 @@ describe('createHistory: re-entrancy guard', () => {
     expect(undos).toBe(1);
   });
 });
+
+describe('createHistory: failure-atomic replay', () => {
+  it('keeps a failed undo on the undo stack and allows an exact retry', () => {
+    const history = createHistory();
+    const listener = vi.fn();
+    let shouldFail = true;
+    const undo = vi.fn(() => {
+      if (shouldFail) {
+        throw new Error('undo preparation failed');
+      }
+    });
+    const redo = vi.fn();
+    history.subscribe(listener);
+    history.push({ bytes: 17, label: 'fallible', redo, replayFailureAtomic: true, undo });
+    listener.mockClear();
+
+    expect(() => history.undo()).toThrow('undo preparation failed');
+    expect(history.canUndo()).toBe(true);
+    expect(history.canRedo()).toBe(false);
+    expect(history.isApplying()).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
+
+    shouldFail = false;
+    history.undo();
+    expect(undo).toHaveBeenCalledTimes(2);
+    expect(history.canUndo()).toBe(false);
+    expect(history.canRedo()).toBe(true);
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a failed redo on the redo stack and allows an exact retry', () => {
+    const history = createHistory();
+    const listener = vi.fn();
+    let shouldFail = true;
+    const undo = vi.fn();
+    const redo = vi.fn(() => {
+      if (shouldFail) {
+        throw new Error('redo preparation failed');
+      }
+    });
+    history.subscribe(listener);
+    history.push({ bytes: 23, label: 'fallible', redo, replayFailureAtomic: true, undo });
+    history.undo();
+    listener.mockClear();
+
+    expect(() => history.redo()).toThrow('redo preparation failed');
+    expect(history.canUndo()).toBe(false);
+    expect(history.canRedo()).toBe(true);
+    expect(history.isApplying()).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
+
+    shouldFail = false;
+    history.redo();
+    expect(redo).toHaveBeenCalledTimes(2);
+    expect(history.canUndo()).toBe(true);
+    expect(history.canRedo()).toBe(false);
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('preserves byte-budget accounting after a failed replay', () => {
+    const log: string[] = [];
+    const history = createHistory({ byteBudget: 20 });
+    let shouldFail = true;
+    history.push(makeEntry('a', log, 10));
+    history.push({
+      bytes: 10,
+      label: 'b',
+      redo: () => log.push('redo:b'),
+      replayFailureAtomic: true,
+      undo: () => {
+        if (shouldFail) {
+          throw new Error('failed');
+        }
+        log.push('undo:b');
+      },
+    });
+
+    expect(() => history.undo()).toThrow('failed');
+    shouldFail = false;
+    history.push(makeEntry('c', log, 10));
+
+    // Correct restored accounting is 30 bytes, so the oldest entry is evicted.
+    history.undo();
+    history.undo();
+    expect(log).toEqual(['undo:c', 'undo:b']);
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it.each([false, true])(
+    'does not resurrect an entry when undo clears history (failure-atomic: %s)',
+    (replayFailureAtomic) => {
+      const history = createHistory();
+      const listener = vi.fn();
+      history.subscribe(listener);
+      history.push({
+        bytes: 10,
+        label: 'clear-on-undo',
+        redo: () => {},
+        replayFailureAtomic,
+        undo: () => history.clear(),
+      });
+      listener.mockClear();
+
+      history.undo();
+
+      expect(history.canUndo()).toBe(false);
+      expect(history.canRedo()).toBe(false);
+      expect(listener).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([false, true])(
+    'does not resurrect an entry when redo clears history (failure-atomic: %s)',
+    (replayFailureAtomic) => {
+      const history = createHistory();
+      const listener = vi.fn();
+      let clearOnRedo = false;
+      history.subscribe(listener);
+      history.push({
+        bytes: 10,
+        label: 'clear-on-redo',
+        redo: () => {
+          if (clearOnRedo) {
+            history.clear();
+          }
+        },
+        replayFailureAtomic,
+        undo: () => {},
+      });
+      history.undo();
+      clearOnRedo = true;
+      listener.mockClear();
+
+      history.redo();
+
+      expect(history.canUndo()).toBe(false);
+      expect(history.canRedo()).toBe(false);
+      expect(listener).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('moves a legacy undo before replay, notifies, and rethrows a post-application failure', () => {
+    const history = createHistory();
+    const listener = vi.fn();
+    const applied: string[] = [];
+    history.subscribe(listener);
+    history.push({
+      bytes: 10,
+      label: 'legacy-fallible-undo',
+      redo: () => applied.push('redo'),
+      undo: () => {
+        applied.push('undo');
+        throw new Error('undo observer failed');
+      },
+    });
+    listener.mockClear();
+
+    expect(() => history.undo()).toThrow('undo observer failed');
+
+    expect(history.canUndo()).toBe(false);
+    expect(history.canRedo()).toBe(true);
+    expect(history.isApplying()).toBe(false);
+    expect(applied).toEqual(['undo']);
+    expect(listener).toHaveBeenCalledOnce();
+
+    history.redo();
+    expect(applied).toEqual(['undo', 'redo']);
+  });
+
+  it('moves a legacy redo before replay, notifies, and rethrows a post-application failure', () => {
+    const history = createHistory();
+    const listener = vi.fn();
+    const applied: string[] = [];
+    let shouldFail = false;
+    history.subscribe(listener);
+    history.push({
+      bytes: 10,
+      label: 'legacy-fallible-redo',
+      redo: () => {
+        applied.push('redo');
+        if (shouldFail) {
+          throw new Error('redo observer failed');
+        }
+      },
+      undo: () => applied.push('undo'),
+    });
+    history.undo();
+    shouldFail = true;
+    listener.mockClear();
+
+    expect(() => history.redo()).toThrow('redo observer failed');
+
+    expect(history.canUndo()).toBe(true);
+    expect(history.canRedo()).toBe(false);
+    expect(history.isApplying()).toBe(false);
+    expect(applied).toEqual(['undo', 'redo']);
+    expect(listener).toHaveBeenCalledOnce();
+
+    history.undo();
+    expect(applied).toEqual(['undo', 'redo', 'undo']);
+  });
+
+  it('isolates listener failures after successful stack mutations', () => {
+    const log: string[] = [];
+    const history = createHistory();
+    const listener = vi.fn();
+    history.subscribe(() => {
+      throw new Error('history listener failed');
+    });
+    history.subscribe(listener);
+
+    expect(() => history.push(makeEntry('a', log))).not.toThrow();
+    expect(() => history.undo()).not.toThrow();
+    expect(() => history.redo()).not.toThrow();
+    expect(() => history.clear()).not.toThrow();
+
+    expect(listener).toHaveBeenCalledTimes(4);
+    expect(history.canUndo()).toBe(false);
+    expect(history.canRedo()).toBe(false);
+  });
+});

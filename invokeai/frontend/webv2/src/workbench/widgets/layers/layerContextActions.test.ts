@@ -168,6 +168,19 @@ describe('layer context action registry', () => {
       'widgets.layers.actions.cropFailed',
       'widgets.layers.actions.cropUnsupported',
       'widgets.layers.actions.cropped',
+      'widgets.layers.rasterFilter.busy',
+      'widgets.layers.rasterFilter.cancel',
+      'widgets.layers.rasterFilter.commitFailure',
+      'widgets.layers.rasterFilter.copy',
+      'widgets.layers.rasterFilter.durabilityFailure',
+      'widgets.layers.rasterFilter.graphFailure',
+      'widgets.layers.rasterFilter.locked',
+      'widgets.layers.rasterFilter.preview',
+      'widgets.layers.rasterFilter.replace',
+      'widgets.layers.rasterFilter.running',
+      'widgets.layers.rasterFilter.stale',
+      'widgets.layers.rasterFilter.title',
+      'widgets.layers.rasterFilter.unsupported',
     ];
 
     for (const key of keys) {
@@ -194,6 +207,7 @@ describe('layer context action registry', () => {
 
     getLayerContextActionDefinition('move-to-front').handler(context);
     getLayerContextActionDefinition('adjustments').handler(context);
+    getLayerContextActionDefinition('filter').handler(context);
     getLayerContextActionDefinition('intersect').handler(context);
     getLayerContextActionDefinition('copy-to-control').handler(context);
     getLayerContextActionDefinition('convert-to-control').handler(context);
@@ -201,6 +215,7 @@ describe('layer context action registry', () => {
 
     expect(effects.reorder).toHaveBeenCalledWith('front', 'move-to-front');
     expect(effects.openProperties).toHaveBeenCalledWith('adjustments');
+    expect(effects.openProperties).toHaveBeenCalledWith('filter');
     expect(effects.booleanMerge).toHaveBeenCalledWith('intersect');
     expect(effects.copyTo).toHaveBeenCalledWith('control');
     expect(effects.convertTo).toHaveBeenCalledWith('control');
@@ -238,6 +253,7 @@ describe('getLayerContextActions', () => {
     const rasterActions = getLayerContextActions(makeState(rasterLayer, { interactionLocked: true }));
     const controlActions = getLayerContextActions(makeState(nonEmptyControlLayer, { interactionLocked: true }));
     expect(byId(rasterActions, 'crop-to-bbox').isDisabled).toBe(true);
+    expect(byId(rasterActions, 'filter').isDisabled).toBe(true);
     expect(byId(rasterActions, 'transform').isDisabled).toBe(true);
     expect(byId(controlActions, 'filter').isDisabled).toBe(true);
     expect(byId(rasterActions, 'copy-to-clipboard').isDisabled).toBe(true);
@@ -331,6 +347,7 @@ describe('getLayerContextActions', () => {
     for (const id of [
       'fit-to-bbox',
       'adjustments',
+      'filter',
       'crop-to-bbox',
       'convert-to-control',
       'intersect',
@@ -377,7 +394,7 @@ describe('getLayerContextActions', () => {
     const noEngine = getLayerContextActions(makeState(rasterLayer, { hasEngine: false }));
     const empty = getLayerContextActions(makeState(rasterLayer, { hasSupportedContent: false }));
 
-    for (const id of ['transform', 'save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['transform', 'filter', 'save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(noEngine, id).isDisabled, id).toBe(true);
     }
     for (const id of ['save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
@@ -461,7 +478,7 @@ describe('getLayerContextActions', () => {
     expect(idsFor(text)).not.toContain('copy-to-inpaint-mask');
   });
 
-  it('exposes control-only transparency, filter, and raster conversion actions', () => {
+  it('exposes control-only transparency and raster conversion actions while filtering supported control content', () => {
     const empty = createControlLayer('Control', 'control-empty');
 
     expect(idsFor(empty, [empty], { hasSupportedContent: false })).toEqual(
@@ -476,6 +493,91 @@ describe('getLayerContextActions', () => {
     expect(idsFor(empty, [empty], { hasSupportedContent: false })).not.toContain('filter');
     expect(idsFor(empty, [empty], { hasSupportedContent: true })).toContain('filter');
     expect(idsFor(nonEmptyControlLayer)).toContain('filter');
+  });
+
+  it('exposes filter for every supported raster source', () => {
+    const layers: CanvasRasterLayerContractV2[] = [
+      paintLayer('filter-image', {
+        source: { image: { height: 10, imageName: 'filter-image', width: 10 }, type: 'image' },
+      }),
+      paintLayer('filter-paint'),
+      paintLayer('filter-text', {
+        source: {
+          align: 'left',
+          color: '#fff',
+          content: 'Filter me',
+          fontFamily: 'Inter',
+          fontSize: 32,
+          fontWeight: 400,
+          lineHeight: 1.2,
+          type: 'text',
+        },
+      }),
+      paintLayer('filter-gradient', {
+        source: {
+          angle: 45,
+          height: 20,
+          kind: 'linear',
+          stops: [
+            { color: '#000', offset: 0 },
+            { color: '#fff', offset: 1 },
+          ],
+          type: 'gradient',
+          width: 20,
+        },
+      }),
+      paintLayer('filter-rect', {
+        source: { fill: '#fff', height: 20, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 20 },
+      }),
+      paintLayer('filter-ellipse', {
+        source: {
+          fill: '#fff',
+          height: 20,
+          kind: 'ellipse',
+          stroke: null,
+          strokeWidth: 0,
+          type: 'shape',
+          width: 20,
+        },
+      }),
+    ];
+
+    for (const layer of layers) {
+      expect(idsFor(layer), layer.id).toContain('filter');
+    }
+  });
+
+  it('hides filter for empty paint and polygon raster sources', () => {
+    const empty = createEmptyPaintLayer('Empty', 'filter-empty');
+    const polygon = paintLayer('filter-polygon', {
+      source: {
+        fill: '#fff',
+        height: 20,
+        kind: 'polygon',
+        points: [
+          { x: 0, y: 0 },
+          { x: 20, y: 0 },
+          { x: 10, y: 20 },
+        ],
+        stroke: null,
+        strokeWidth: 0,
+        type: 'shape',
+        width: 20,
+      },
+    });
+
+    expect(idsFor(empty, [empty], { hasSupportedContent: false })).not.toContain('filter');
+    expect(idsFor(polygon, [polygon], { hasSupportedContent: true })).not.toContain('filter');
+  });
+
+  it('enables raster filter only with an engine, unlocked layer, and unlocked interaction', () => {
+    const unlocked = paintLayer('filter-enabled');
+    expect(byId(getLayerContextActions(makeState(unlocked)), 'filter').isDisabled).toBe(false);
+    expect(byId(getLayerContextActions(makeState(unlocked, { hasEngine: false })), 'filter').isDisabled).toBe(true);
+    expect(byId(getLayerContextActions(makeState({ ...unlocked, isLocked: true })), 'filter').isDisabled).toBe(true);
+    expect(byId(getLayerContextActions(makeState(unlocked, { interactionLocked: true })), 'filter').isDisabled).toBe(
+      true
+    );
   });
 
   it('does not expose copy-to-raster for raster layers', () => {

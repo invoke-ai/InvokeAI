@@ -172,6 +172,32 @@ describe('createRenderScheduler', () => {
     expect(raf.pendingCount()).toBe(1);
   });
 
+  it('retains pending invalidations and retries when the host frame scheduler throws', () => {
+    const raf = createFakeRaf();
+    const render = vi.fn<(flags: RenderFlags) => void>();
+    let shouldThrow = true;
+    const scheduler = createRenderScheduler({
+      cancelFrame: raf.cancelFrame,
+      render,
+      requestFrame: (callback) => {
+        if (shouldThrow) {
+          throw new Error('host scheduler unavailable');
+        }
+        return raf.requestFrame(callback);
+      },
+    });
+
+    expect(() => scheduler.invalidate({ view: true })).not.toThrow();
+    expect(raf.pendingCount()).toBe(0);
+
+    shouldThrow = false;
+    scheduler.invalidate({ overlay: true });
+    raf.flush();
+
+    expect(render).toHaveBeenCalledOnce();
+    expect(render.mock.calls[0]![0]).toMatchObject({ overlay: true, view: true });
+  });
+
   it('reflects paused state via isPaused', () => {
     const raf = createFakeRaf();
     const scheduler = createRenderScheduler({

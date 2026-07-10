@@ -1242,6 +1242,21 @@
         "transparencyEffect": "Transparency effect",
         "weight": "Weight"
       },
+      "rasterFilter": {
+        "busy": "Finish the current canvas interaction, then try again.",
+        "cancel": "Cancel",
+        "commitFailure": "The filtered pixels could not be committed: {{message}}",
+        "copy": "Copy",
+        "durabilityFailure": "The filtered image could not be preserved: {{message}}",
+        "graphFailure": "The filter failed: {{message}}",
+        "locked": "Unlock the layer before applying the filter.",
+        "preview": "Preview",
+        "replace": "Replace",
+        "running": "Running filter…",
+        "stale": "The layer changed while filtering. Preview it again.",
+        "title": "Filter",
+        "unsupported": "This layer content cannot be filtered."
+      },
       "addLayer": "Add layer",
       "adjustments": {
         "brightness": "Brightness",
