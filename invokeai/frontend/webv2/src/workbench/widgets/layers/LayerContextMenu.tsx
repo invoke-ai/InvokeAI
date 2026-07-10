@@ -71,6 +71,7 @@ import {
   getRegionalGuidanceReferenceImagePatch,
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
+import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { SelectObjectDialog } from './SelectObjectDialog';
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
@@ -165,8 +166,8 @@ interface LayerMenuProps {
  * visibility + lock toggles, and delete. Merge-down uses global z-adjacency
  * (compositing order); the arrange actions map to a splice inside the global array.
  *
- * The rename dialog is a SIBLING of `Menu.Root` (not inside its portal) so it
- * survives the menu closing when "Rename" is chosen.
+ * Sibling dialogs live beside `Menu.Root` (not inside its portal) so they
+ * survive the menu closing after their action is chosen.
  */
 const LayerMenu = ({
   dispatch,
@@ -186,6 +187,7 @@ const LayerMenu = ({
   const { t } = useTranslation();
   const notify = useNotify();
   const base = useSelectedModelBase();
+  const workflowAvailability = useLayerWorkflowAvailability();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const { document } = canvas;
@@ -257,14 +259,25 @@ const LayerMenu = ({
 
   const actionState = useMemo<LayerContextActionState>(
     () => ({
+      canRunWorkflow: workflowAvailability.canRunWorkflow,
       document,
       hasEngine: engine !== null,
       hasSupportedContent,
+      hasWorkflowBindings: workflowAvailability.hasWorkflowBindings,
       index,
       interactionLocked,
       layer,
     }),
-    [document, engine, hasSupportedContent, index, interactionLocked, layer]
+    [
+      document,
+      engine,
+      hasSupportedContent,
+      index,
+      interactionLocked,
+      layer,
+      workflowAvailability.canRunWorkflow,
+      workflowAvailability.hasWorkflowBindings,
+    ]
   );
   const actions = useMemo(() => getLayerContextActions(actionState), [actionState]);
   const menuLayout = useMemo(() => getLayerContextMenuLayout(actions), [actions]);
@@ -376,6 +389,7 @@ const LayerMenu = ({
 
   const openRename = useCallback(() => setDialogKind('rename'), [setDialogKind]);
   const closeDialog = useCallback(() => setDialogKind(null), [setDialogKind]);
+  const openRunWorkflow = useCallback(() => setDialogKind('run-workflow'), [setDialogKind]);
   const openSelectObject = useCallback(() => setDialogKind('select-object'), [setDialogKind]);
   const submitRename = useCallback(
     (name: string) => {
@@ -589,6 +603,7 @@ const LayerMenu = ({
       mergeDown: handleMerge,
       openProperties: handleOpenProperties,
       openRename,
+      openRunWorkflow,
       openSelectObject,
       patchConfig: handleLayerConfigAction,
       rasterize: handleRasterize,
@@ -618,6 +633,7 @@ const LayerMenu = ({
       handleToggleVisibility,
       handleTransform,
       openRename,
+      openRunWorkflow,
       openSelectObject,
       reorder,
     ]
@@ -678,6 +694,15 @@ const LayerMenu = ({
       {dialogKind === 'select-object' ? (
         <SelectObjectDialog engine={engine} isOpen layerId={layer.id} onClose={closeDialog} />
       ) : null}
+      {dialogKind === 'run-workflow' ? (
+        <RunLayerWorkflowDialog
+          availability={workflowAvailability}
+          engine={engine}
+          isOpen
+          layerId={layer.id}
+          onClose={closeDialog}
+        />
+      ) : null}
     </>
   );
 };
@@ -709,12 +734,11 @@ export interface CanvasLayerContextMenuTarget {
  * it; `null` closes the menu. The layer and its global index are resolved from
  * `target.layerId` against the live layer list, so the shared items get the exact
  * same inputs the panel passes. Keyed by layer id so switching target resets the
- * menu's rename state.
+ * menu's sibling-dialog state.
  *
- * Choosing "Rename" closes the menu, which nulls `target`. The rename dialog lives
- * inside {@link LayerMenu} (a sibling of the menu), so it must survive that: the
- * wrapper owns the rename-in-flight flag and keeps rendering against the last-known
- * (sticky) target until the dialog closes (F1).
+ * Choosing a sibling-dialog action closes the menu, which nulls `target`. The
+ * wrapper therefore owns the dialog-in-flight state and keeps rendering against
+ * the last-known (sticky) target until the dialog closes (F1).
  */
 export const CanvasLayerContextMenu = ({
   dispatch,
@@ -775,8 +799,8 @@ export const CanvasLayerContextMenu = ({
       layer={layer}
       layers={layers}
       lazyMount
-      // The menu itself is visible only while the live target is set; once "Rename"
-      // closes it (target → null), the subtree stays mounted for the dialog.
+      // The menu itself is visible only while the live target is set; once a
+      // sibling dialog closes it (target → null), the subtree stays mounted.
       open={!!target}
       positioning={positioning}
       unmountOnExit

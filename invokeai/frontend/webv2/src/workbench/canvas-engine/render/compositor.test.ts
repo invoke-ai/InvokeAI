@@ -405,6 +405,26 @@ describe('compositeDocument', () => {
     expect(drawImages).toHaveLength(1);
     expect(drawImages[0]!.args).toEqual([staged.canvas, 5, 5, 40, 40]);
   });
+
+  it('draws a placed staged preview at its candidate opacity and keeps the pending outline opaque', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const target = backend.createSurface(200, 200);
+    const staged = backend.createSurface(23, 17);
+
+    compositeDocument(target, makeDoc([]), caches, VIEW, {
+      stagedPreview: {
+        opacity: 0.35,
+        rect: { height: 34, width: 46, x: -8, y: 13 },
+        surface: staged,
+      },
+    });
+
+    const drawImages = target.callLog.filter((entry) => entry.op === 'drawImage');
+    expect(drawImages).toHaveLength(1);
+    expect(drawImages[0]!.args).toEqual([staged.canvas, -8, 13, 46, 34]);
+    expect(findSet(target.callLog, 'globalAlpha')).toEqual([0.35, 1]);
+  });
 });
 
 describe('compositeDocument — raster adjustments', () => {

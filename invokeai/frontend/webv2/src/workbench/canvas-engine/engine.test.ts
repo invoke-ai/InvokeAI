@@ -4134,6 +4134,48 @@ describe('setStagedPreview', () => {
 
     engine.dispose();
   });
+
+  it('stores an image candidate placement and renders it independently of the current bbox', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+
+    const base = createTestStubRasterBackend();
+    const backend: StubRasterBackend = {
+      ...base,
+      createImageBitmap: () => Promise.resolve({ close: vi.fn(), height: 17, width: 23 } as unknown as ImageBitmap),
+    };
+    const { setDocument, store } = createReactiveStore(emptyDoc({ height: 100, width: 100, x: 50, y: 60 }));
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const screen = createFakeCanvas();
+    engine.attach(screen.element, createFakeCanvas().element);
+
+    engine.setStagedPreview({
+      imageName: 'placed-candidate',
+      placement: { height: 34, opacity: 0.4, width: 46, x: -8, y: 13 },
+    });
+    await flushMicrotasks();
+    raf.flush();
+
+    expect(stagedDraws(screen.surface).at(-1)!.slice(1)).toEqual([-8, 13, 46, 34]);
+    const alphaSets = screen.surface.callLog
+      .filter((entry) => entry.op === 'set' && entry.args[0] === 'globalAlpha')
+      .map((entry) => entry.args[1]);
+    expect(alphaSets).toContain(0.4);
+
+    // A placed candidate no longer follows the bbox, so moving the bbox only
+    // invalidates overlay chrome and must not recomposite every canvas layer.
+    screen.surface.callLog.length = 0;
+    setDocument(emptyDoc({ height: 50, width: 50, x: 2, y: 3 }));
+    raf.flush();
+    expect(stagedDraws(screen.surface)).toHaveLength(0);
+    engine.dispose();
+  });
 });
 
 describe('commitRasterFilterResult', () => {
@@ -5493,6 +5535,886 @@ describe('commitRasterFilterResult', () => {
       expect((await engine.exportLayerPixels(result.layerId)).status).toBe('ok');
     }
     unsubscribeFault();
+    engine.dispose();
+  });
+});
+
+describe('commitGeneratedImageResult', () => {
+  const generatedImage = { height: 18, imageName: 'workflow-result.png', width: 24 };
+  const generatedOrigin = { x: -9, y: 14 };
+
+  const workflowRaster = (id = 'source'): CanvasRasterLayerContractV2 => ({
+    adjustments: { brightness: 0.2, contrast: -0.1, saturation: 0.3 },
+    blendMode: 'multiply',
+    id,
+    isEnabled: true,
+    isLocked: false,
+    name: id,
+    opacity: 0.65,
+    source: { fill: '#fff', height: 10, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
+    transform: { rotation: 0.4, scaleX: 2, scaleY: 3, x: 5, y: 6 },
+    type: 'raster',
+  });
+
+  const workflowControl = (id = 'source'): CanvasLayerContract => ({
+    adapter: {
+      beginEndStepPct: [0.15, 0.85],
+      controlMode: 'more_control',
+      kind: 'controlnet',
+      model: 'control-model',
+      weight: 0.7,
+    },
+    blendMode: 'screen',
+    filter: { settings: { low: 12, high: 90 }, type: 'canny' },
+    id,
+    isEnabled: true,
+    isLocked: false,
+    name: id,
+    opacity: 0.55,
+    source: { fill: '#fff', height: 10, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
+    transform: { rotation: -0.3, scaleX: 1.5, scaleY: 0.75, x: 11, y: -4 },
+    type: 'control',
+    withTransparencyEffect: true,
+  });
+
+  const workflowDocument = (layers: CanvasLayerContract[] = [workflowRaster()]): CanvasDocumentContractV2 => ({
+    background: 'transparent',
+    bbox: { height: 100, width: 100, x: 0, y: 0 },
+    height: 100,
+    layers,
+    selectedLayerId: layers.at(-1)?.id ?? null,
+    version: 2,
+    width: 100,
+  });
+
+  const createGeneratedFaultBackend = () => {
+    const base = createTestStubRasterBackend();
+    let allocationCountdown: number | null = null;
+    let drawCountdown: number | null = null;
+    let createHook: { countdown: number; run: () => void } | null = null;
+    const backend: StubRasterBackend = {
+      ...base,
+      createSurface: (width, height) => {
+        if (allocationCountdown !== null) {
+          if (allocationCountdown === 0) {
+            allocationCountdown = null;
+            throw new Error('generated cache allocation failed');
+          }
+          allocationCountdown -= 1;
+        }
+        if (createHook) {
+          if (createHook.countdown === 0) {
+            const hook = createHook;
+            createHook = null;
+            hook.run();
+          } else {
+            createHook.countdown -= 1;
+          }
+        }
+        const surface = base.createSurface(width, height);
+        const ctx = new Proxy(surface.ctx, {
+          get: (target, property, receiver) => {
+            const value = Reflect.get(target, property, receiver);
+            if (property !== 'drawImage' || typeof value !== 'function') {
+              return value;
+            }
+            return (...args: unknown[]) => {
+              if (drawCountdown !== null) {
+                if (drawCountdown === 0) {
+                  drawCountdown = null;
+                  throw new Error('generated cache draw failed');
+                }
+                drawCountdown -= 1;
+              }
+              return Reflect.apply(value, target, args);
+            };
+          },
+        });
+        Object.defineProperty(surface, 'ctx', { value: ctx });
+        return surface;
+      },
+    };
+    return {
+      armAllocation: (successfulCreates: number) => {
+        allocationCountdown = successfulCreates;
+      },
+      armCreateHook: (successfulCreates: number, run: () => void) => {
+        createHook = { countdown: successfulCreates, run };
+      },
+      armDraw: (successfulDraws: number) => {
+        drawCountdown = successfulDraws;
+      },
+      backend,
+    };
+  };
+
+  it('replaces a raster at the generated origin and native size, clears baked adjustments, and replays exactly', async () => {
+    const source = workflowRaster();
+    const before = structuredClone(source);
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('workflow-result')));
+    const bitmapStore = createSpyBitmapStore();
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
+    const engine = createCanvasEngine({
+      backend,
+      bitmapStore,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+
+    const result = await engine.commitGeneratedImageResult({
+      guard: exported.guard,
+      image: generatedImage,
+      origin: generatedOrigin,
+      target: 'replace',
+    });
+
+    expect(result).toEqual({ layerId: source.id, status: 'committed' });
+    const after = engine.getDocument()!.layers[0]!;
+    expect(after).toEqual({
+      blendMode: source.blendMode,
+      id: source.id,
+      isEnabled: source.isEnabled,
+      isLocked: source.isLocked,
+      name: source.name,
+      opacity: source.opacity,
+      source: { bitmap: generatedImage, offset: generatedOrigin, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    expect('adjustments' in after).toBe(false);
+    const committedPixels = await engine.exportLayerPixels(source.id);
+    expect(committedPixels.status).toBe('ok');
+    if (committedPixels.status === 'ok') {
+      expect(committedPixels.rect).toEqual({ ...generatedOrigin, height: 18, width: 24 });
+      expect(drawGraphContains(committedPixels.surface as StubRasterSurface, backend, 'bitmap-workflow-result')).toBe(
+        true
+      );
+    }
+    expect(engine.stores.canUndo.get()).toBe(true);
+
+    engine.undo();
+    expect(engine.getDocument()!.layers[0]).toEqual(before);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+
+    engine.redo();
+    expect(engine.getDocument()!.layers[0]).toEqual(after);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+    expect(bitmapStore.discardLayer).toHaveBeenCalledTimes(2);
+    engine.dispose();
+  });
+
+  it('replaces a control while preserving adapter, filter, transparency effect, and layer presentation', async () => {
+    const source = workflowControl();
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+
+    await expect(
+      engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target: 'replace',
+      })
+    ).resolves.toEqual({ layerId: source.id, status: 'committed' });
+
+    expect(engine.getDocument()!.layers[0]).toEqual({
+      ...source,
+      source: { bitmap: generatedImage, offset: generatedOrigin, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    });
+    engine.undo();
+    expect(engine.getDocument()!.layers[0]).toEqual(source);
+    engine.redo();
+    expect(engine.getDocument()!.layers[0]).toMatchObject({
+      adapter: source.type === 'control' ? source.adapter : undefined,
+      filter: source.type === 'control' ? source.filter : undefined,
+      withTransparencyEffect: true,
+    });
+    engine.dispose();
+  });
+
+  it('copies a generated result to an unlocked raster immediately above its source and restores selection on undo', async () => {
+    const above = workflowRaster('above');
+    const source = workflowControl('source');
+    const selected = workflowRaster('selected');
+    const document = { ...workflowDocument([above, source, selected]), selectedLayerId: selected.id };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+
+    const result = await engine.commitGeneratedImageResult({
+      guard: exported.guard,
+      image: generatedImage,
+      origin: generatedOrigin,
+      target: 'copy-raster',
+    });
+    if (result.status !== 'committed') {
+      throw new Error(`expected a committed copy, received ${JSON.stringify(result)}`);
+    }
+
+    expect(engine.getDocument()!.layers.map((layer) => layer.id)).toEqual([
+      above.id,
+      result.layerId,
+      source.id,
+      selected.id,
+    ]);
+    expect(engine.getDocument()!.layers[2]).toEqual(source);
+    expect(engine.getDocument()!.layers[1]).toMatchObject({
+      id: result.layerId,
+      isEnabled: true,
+      isLocked: false,
+      opacity: 1,
+      source: { bitmap: generatedImage, offset: generatedOrigin, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    expect(engine.getDocument()!.selectedLayerId).toBe(result.layerId);
+
+    engine.undo();
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.redo();
+    expect(engine.getDocument()!.layers[1]?.id).toBe(result.layerId);
+    expect(engine.getDocument()!.selectedLayerId).toBe(result.layerId);
+    expect(engine.stores.canRedo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  const createPendingGuardHarness = async () => {
+    const source = workflowRaster();
+    const document = workflowDocument([source]);
+    const decoded = createDeferred<Blob>();
+    const reactive = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: (imageName) =>
+        imageName === generatedImage.imageName ? decoded.promise : Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    (reactive.store.dispatch as Mock).mockClear();
+    const pending = engine.commitGeneratedImageResult({
+      guard: exported.guard,
+      image: generatedImage,
+      origin: generatedOrigin,
+      target: 'replace',
+    });
+    return { ...reactive, decoded, document, engine, exported, pending, source };
+  };
+
+  it('returns failed without mutation when the durable generated image cannot be resolved', async () => {
+    const source = workflowRaster();
+    const document = workflowDocument([source]);
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: (imageName) =>
+        imageName === generatedImage.imageName
+          ? Promise.reject(new Error('generated decode failed'))
+          : Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    (store.dispatch as Mock).mockClear();
+
+    await expect(
+      engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target: 'replace',
+      })
+    ).resolves.toEqual({ message: 'generated decode failed', status: 'failed' });
+    expect(engine.getDocument()).toEqual(document);
+    expect(store.dispatch).not.toHaveBeenCalled();
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it('returns missing after decode when the source was deleted', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, layers: [] });
+    harness.decoded.resolve(new Blob());
+    await expect(harness.pending).resolves.toEqual({ status: 'missing' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns locked after decode when the source became locked', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, layers: [{ ...harness.source, isLocked: true }] });
+    harness.decoded.resolve(new Blob());
+    await expect(harness.pending).resolves.toEqual({ status: 'locked' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns unsupported after decode when the source became a mask', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, layers: [maskLayer(harness.source.id)] });
+    harness.decoded.resolve(new Blob());
+    await expect(harness.pending).resolves.toEqual({ status: 'unsupported' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns stale after decode when the immutable source contract changed', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, layers: [{ ...harness.source, opacity: 0.1 }] });
+    harness.decoded.resolve(new Blob());
+    await expect(harness.pending).resolves.toEqual({ status: 'stale' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns stale after decode when the document was replaced with the same source object', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setDocument({ ...harness.document, width: 200 }, 1);
+    harness.decoded.resolve(new Blob());
+    await expect(harness.pending).resolves.toEqual({ status: 'stale' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns stale after decode when another project became active', async () => {
+    const harness = await createPendingGuardHarness();
+    harness.setActiveProjectId('p2');
+    harness.decoded.resolve(new Blob());
+    await expect(harness.pending).resolves.toEqual({ status: 'stale' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns busy after decode while a pointer gesture is open', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const harness = await createPendingGuardHarness();
+    const overlay = createInputCanvas();
+    harness.engine.attach(createInputCanvas().element, overlay.element);
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    harness.decoded.resolve(new Blob());
+    await expect(harness.pending).resolves.toEqual({ status: 'busy' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns aborted without resolving the generated image when already cancelled', async () => {
+    const source = workflowRaster();
+    const resolver = vi.fn(() => Promise.resolve(new Blob()));
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: resolver,
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    resolver.mockClear();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        signal: controller.signal,
+        target: 'replace',
+      })
+    ).resolves.toEqual({ status: 'aborted' });
+    expect(resolver).not.toHaveBeenCalled();
+    expect(engine.getDocument()).toEqual(workflowDocument([source]));
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it('returns aborted during bitmap decode, releases the late bitmap, and never mutates', async () => {
+    const source = workflowRaster();
+    const bitmapDeferred = createDeferred<ImageBitmap>();
+    const bitmap = recordingBitmap('late-generated');
+    const base = createTestStubRasterBackend();
+    const createImageBitmap = vi.fn(() => bitmapDeferred.promise);
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
+    const engine = createCanvasEngine({
+      backend: { ...base, createImageBitmap },
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    const controller = new AbortController();
+    const pending = engine.commitGeneratedImageResult({
+      guard: exported.guard,
+      image: generatedImage,
+      origin: generatedOrigin,
+      signal: controller.signal,
+      target: 'replace',
+    });
+    await vi.waitFor(() => expect(createImageBitmap).toHaveBeenCalledOnce());
+
+    controller.abort();
+    bitmapDeferred.resolve(bitmap);
+
+    await expect(pending).resolves.toEqual({ status: 'aborted' });
+    expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(engine.getDocument()).toEqual(workflowDocument([source]));
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it('returns stale when unpersisted paint pixels change while the generated image resolves', async () => {
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const source: CanvasRasterLayerContractV2 = {
+      ...workflowRaster(),
+      source: {
+        bitmap: { height: 10, imageName: 'workflow-paint-source.png', width: 10 },
+        type: 'paint',
+      },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    };
+    const generatedBlob = createDeferred<Blob>();
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: (imageName) =>
+        imageName === generatedImage.imageName ? generatedBlob.promise : Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    const pending = engine.commitGeneratedImageResult({
+      guard: exported.guard,
+      image: generatedImage,
+      origin: generatedOrigin,
+      target: 'replace',
+    });
+
+    engine.selectAll();
+    engine.fillSelection();
+    const afterPaintEdit = structuredClone(engine.getDocument()!);
+    generatedBlob.resolve(new Blob());
+
+    await expect(pending).resolves.toEqual({ status: 'stale' });
+    expect(engine.getDocument()).toEqual(afterPaintEdit);
+    expect(engine.getDocument()!.layers[0]).not.toMatchObject({ source: { bitmap: generatedImage } });
+    expect(engine.stores.canUndo.get()).toBe(true);
+    engine.dispose();
+  });
+
+  it.each([
+    { successfulCreates: 0, target: 'replace' as const },
+    { successfulCreates: 2, target: 'replace' as const },
+    { successfulCreates: 1, target: 'copy-raster' as const },
+  ])(
+    'leaves document, cache, selection, and history exact when $target allocation fails after $successfulCreates successful creates',
+    async ({ successfulCreates, target }) => {
+      const source = workflowRaster();
+      const selected = workflowRaster('selected');
+      const document = { ...workflowDocument([source, selected]), selectedLayerId: selected.id };
+      const faults = createGeneratedFaultBackend();
+      const bitmap = recordingBitmap('allocation-failure');
+      faults.backend.createImageBitmap = vi.fn(() => Promise.resolve(bitmap));
+      const { projectId, store } = createReducerBackedStore(document);
+      const engine = createCanvasEngine({
+        backend: faults.backend,
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected an exportable workflow source');
+      }
+      const cache = exported.surface;
+      const cacheCalls = structuredClone((cache as StubRasterSurface).callLog);
+      (store.dispatch as Mock).mockClear();
+      faults.armAllocation(successfulCreates);
+
+      const result = await engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target,
+      });
+
+      expect(result).toEqual({ message: 'generated cache allocation failed', status: 'failed' });
+      expect(bitmap.close).toHaveBeenCalledOnce();
+      expect(engine.getDocument()).toEqual(document);
+      expect(engine.getDocument()!.selectedLayerId).toBe(selected.id);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      expect(engine.stores.canUndo.get()).toBe(false);
+      const after = await engine.exportLayerPixels(source.id);
+      expect(after.status).toBe('ok');
+      if (after.status === 'ok') {
+        expect(after.surface).toBe(cache);
+        expect(after.guard.cacheVersion).toBe(exported.guard.cacheVersion);
+        expect((after.surface as StubRasterSurface).callLog).toEqual(cacheCalls);
+      }
+      engine.dispose();
+    }
+  );
+
+  it.each([
+    { successfulDraws: 0, target: 'replace' as const },
+    { successfulDraws: 2, target: 'replace' as const },
+    { successfulDraws: 1, target: 'copy-raster' as const },
+  ])(
+    'leaves document, cache, selection, and history exact when $target draw fails after $successfulDraws successful draws',
+    async ({ successfulDraws, target }) => {
+      const source = workflowRaster();
+      const selected = workflowRaster('selected');
+      const document = { ...workflowDocument([source, selected]), selectedLayerId: selected.id };
+      const faults = createGeneratedFaultBackend();
+      const bitmap = recordingBitmap('draw-failure');
+      faults.backend.createImageBitmap = vi.fn(() => Promise.resolve(bitmap));
+      const { projectId, store } = createReducerBackedStore(document);
+      const engine = createCanvasEngine({
+        backend: faults.backend,
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected an exportable workflow source');
+      }
+      const cache = exported.surface;
+      const cacheCalls = structuredClone((cache as StubRasterSurface).callLog);
+      (store.dispatch as Mock).mockClear();
+      faults.armDraw(successfulDraws);
+
+      const result = await engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target,
+      });
+
+      expect(result).toEqual({ message: 'generated cache draw failed', status: 'failed' });
+      expect(bitmap.close).toHaveBeenCalledOnce();
+      expect(engine.getDocument()).toEqual(document);
+      expect(engine.getDocument()!.selectedLayerId).toBe(selected.id);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      expect(engine.stores.canUndo.get()).toBe(false);
+      const after = await engine.exportLayerPixels(source.id);
+      expect(after.status).toBe('ok');
+      if (after.status === 'ok') {
+        expect(after.surface).toBe(cache);
+        expect(after.guard.cacheVersion).toBe(exported.guard.cacheVersion);
+        expect((after.surface as StubRasterSurface).callLog).toEqual(cacheCalls);
+      }
+      engine.dispose();
+    }
+  );
+
+  it.each([
+    { successfulCreates: 2, target: 'replace' as const },
+    { successfulCreates: 1, target: 'copy-raster' as const },
+  ])(
+    'returns aborted without mutation when $target is cancelled during cache preparation',
+    async ({ successfulCreates, target }) => {
+      const source = workflowRaster();
+      const document = workflowDocument([source]);
+      const faults = createGeneratedFaultBackend();
+      const controller = new AbortController();
+      const { projectId, store } = createReducerBackedStore(document);
+      const engine = createCanvasEngine({
+        backend: faults.backend,
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected an exportable workflow source');
+      }
+      (store.dispatch as Mock).mockClear();
+      faults.armCreateHook(successfulCreates, () => controller.abort());
+
+      await expect(
+        engine.commitGeneratedImageResult({
+          guard: exported.guard,
+          image: generatedImage,
+          origin: generatedOrigin,
+          signal: controller.signal,
+          target,
+        })
+      ).resolves.toEqual({ status: 'aborted' });
+      expect(engine.getDocument()).toEqual(document);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      expect(engine.stores.canUndo.get()).toBe(false);
+      engine.dispose();
+    }
+  );
+
+  it.each([
+    { successfulCreates: 2, target: 'replace' as const },
+    { successfulCreates: 1, target: 'copy-raster' as const },
+  ])('revalidates the exact guard immediately before $target publication', async ({ successfulCreates, target }) => {
+    const source = workflowRaster();
+    const document = workflowDocument([source]);
+    const reactive = createReactiveStore(document);
+    const faults = createGeneratedFaultBackend();
+    const engine = createCanvasEngine({
+      backend: faults.backend,
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    (reactive.store.dispatch as Mock).mockClear();
+    faults.armCreateHook(successfulCreates, () => {
+      reactive.setDocument({ ...document, layers: [{ ...source, opacity: 0.2 }] });
+    });
+
+    await expect(
+      engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target,
+      })
+    ).resolves.toEqual({ status: 'stale' });
+    expect(reactive.store.dispatch).not.toHaveBeenCalled();
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it('keeps replace undo and redo retryable when detached cache preparation fails', async () => {
+    const source = workflowRaster();
+    const document = workflowDocument([source]);
+    const faults = createGeneratedFaultBackend();
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: faults.backend,
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    await expect(
+      engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target: 'replace',
+      })
+    ).resolves.toEqual({ layerId: source.id, status: 'committed' });
+    const committed = structuredClone(engine.getDocument()!);
+
+    faults.armAllocation(0);
+    expect(() => engine.undo()).toThrow('generated cache allocation failed');
+    expect(engine.getDocument()).toEqual(committed);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+
+    engine.undo();
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+
+    faults.armDraw(0);
+    expect(() => engine.redo()).toThrow('generated cache draw failed');
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+
+    engine.redo();
+    expect(engine.getDocument()).toEqual(committed);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it('keeps copy redo retryable, absent, and selection-exact when detached cache preparation fails', async () => {
+    const source = workflowRaster();
+    const selected = workflowRaster('selected');
+    const document = { ...workflowDocument([source, selected]), selectedLayerId: selected.id };
+    const faults = createGeneratedFaultBackend();
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: faults.backend,
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    const result = await engine.commitGeneratedImageResult({
+      guard: exported.guard,
+      image: generatedImage,
+      origin: generatedOrigin,
+      target: 'copy-raster',
+    });
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed workflow copy');
+    }
+    const committed = structuredClone(engine.getDocument()!);
+
+    engine.undo();
+    expect(engine.getDocument()).toEqual(document);
+    faults.armAllocation(0);
+    expect(() => engine.redo()).toThrow('generated cache allocation failed');
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.getDocument()!.selectedLayerId).toBe(selected.id);
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === result.layerId)).toBe(false);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+
+    engine.redo();
+    expect(engine.getDocument()).toEqual(committed);
+    expect(engine.getDocument()!.selectedLayerId).toBe(result.layerId);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it('reloads a replaced generated image from its durable bitmap contract', async () => {
+    const source = workflowRaster();
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    await expect(
+      engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target: 'replace',
+      })
+    ).resolves.toEqual({ layerId: source.id, status: 'committed' });
+    const reloadedDocument = structuredClone(engine.getDocument()!);
+    engine.dispose();
+
+    const reloadedStore = createReducerBackedStore(reloadedDocument);
+    const resolver = vi.fn(() => Promise.resolve(new Blob()));
+    const reloadedEngine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: resolver,
+      projectId: reloadedStore.projectId,
+      store: reloadedStore.store,
+    });
+    expect((await reloadedEngine.exportLayerPixels(source.id)).status).toBe('ok');
+    expect(resolver).toHaveBeenCalledWith(generatedImage.imageName);
+    reloadedEngine.dispose();
+  });
+
+  it('clears an unguarded control-filter preview when replacing the control with a workflow result', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const source = workflowControl();
+    const backend = createRecordingRasterBackend();
+    let bitmapCall = 0;
+    backend.createImageBitmap = vi.fn(() =>
+      Promise.resolve(recordingBitmap(bitmapCall++ === 0 ? 'control-preview' : 'workflow-result'))
+    );
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
+    const engine = createCanvasEngine({
+      backend,
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const screen = createFakeCanvas();
+    engine.attach(screen.element, createFakeCanvas().element);
+    raf.flush();
+    const exported = await engine.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+    engine.setFilterPreview(source.id, { imageName: 'control-preview.png' });
+    await flushMicrotasks();
+    raf.flush();
+    expect(drawGraphContains(screen.surface, backend, 'bitmap-control-preview')).toBe(true);
+    screen.surface.callLog.length = 0;
+
+    await expect(
+      engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target: 'replace',
+      })
+    ).resolves.toEqual({ layerId: source.id, status: 'committed' });
+    raf.flush();
+
+    expect(drawGraphContains(screen.surface, backend, 'bitmap-control-preview')).toBe(false);
+    expect(drawGraphContains(screen.surface, backend, 'bitmap-workflow-result')).toBe(true);
     engine.dispose();
   });
 });

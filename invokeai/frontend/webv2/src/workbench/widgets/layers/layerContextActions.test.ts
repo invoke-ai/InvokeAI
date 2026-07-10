@@ -66,9 +66,11 @@ const makeState = (
 ): LayerContextActionState => {
   const document = overrides.document ?? makeDocument([layer]);
   return {
+    canRunWorkflow: true,
     document,
     hasEngine: true,
     hasSupportedContent: true,
+    hasWorkflowBindings: true,
     index: document.layers.findIndex((entry) => entry.id === layer.id),
     interactionLocked: false,
     layer,
@@ -88,6 +90,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   mergeDown: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),
+  openRunWorkflow: vi.fn(),
   openSelectObject: vi.fn(),
   patchConfig: vi.fn(),
   rasterize: vi.fn(),
@@ -210,6 +213,35 @@ describe('layer context action registry', () => {
       'widgets.layers.selectObject.targetSelection',
       'widgets.layers.selectObject.title',
       'widgets.layers.selectObject.unsupported',
+      'widgets.layers.runWorkflow.aborted',
+      'widgets.layers.runWorkflow.busy',
+      'widgets.layers.runWorkflow.cancel',
+      'widgets.layers.runWorkflow.copyRaster',
+      'widgets.layers.runWorkflow.copySuccess',
+      'widgets.layers.runWorkflow.destination',
+      'widgets.layers.runWorkflow.durabilityFailure',
+      'widgets.layers.runWorkflow.disabled',
+      'widgets.layers.runWorkflow.empty',
+      'widgets.layers.runWorkflow.failed',
+      'widgets.layers.runWorkflow.gallery',
+      'widgets.layers.runWorkflow.gallerySuccess',
+      'widgets.layers.runWorkflow.graphFailure',
+      'widgets.layers.runWorkflow.hydrationFailure',
+      'widgets.layers.runWorkflow.input',
+      'widgets.layers.runWorkflow.locked',
+      'widgets.layers.runWorkflow.missing',
+      'widgets.layers.runWorkflow.noBindings',
+      'widgets.layers.runWorkflow.notReady',
+      'widgets.layers.runWorkflow.output',
+      'widgets.layers.runWorkflow.replace',
+      'widgets.layers.runWorkflow.replaceSuccess',
+      'widgets.layers.runWorkflow.run',
+      'widgets.layers.runWorkflow.running',
+      'widgets.layers.runWorkflow.staging',
+      'widgets.layers.runWorkflow.stagingSuccess',
+      'widgets.layers.runWorkflow.stale',
+      'widgets.layers.runWorkflow.title',
+      'widgets.layers.runWorkflow.unsupported',
     ];
 
     for (const key of keys) {
@@ -238,6 +270,16 @@ describe('layer context action registry', () => {
 
     expect(effects.openSelectObject).toHaveBeenCalledOnce();
     expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.openSelectObject]);
+  });
+
+  it('opens Run Workflow through the registry without starting work itself', () => {
+    const effects = makeEffects();
+    const context = makeRuntimeContext(rasterLayer, { effects });
+
+    getLayerContextActionDefinition('run-workflow').handler(context);
+
+    expect(effects.openRunWorkflow).toHaveBeenCalledOnce();
+    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.openRunWorkflow]);
   });
 
   it('dispatches parameterized registry handlers through injected effects', () => {
@@ -299,6 +341,34 @@ describe('getLayerContextActions', () => {
         (action) => action.id === 'select-object'
       )
     ).toBe(false);
+  });
+
+  it.each([
+    ['raster', true],
+    ['control', true],
+    ['inpaint_mask', false],
+    ['regional_guidance', false],
+  ] as const)('exposes Run Workflow only for exportable %s content with compatible bindings', (type, expected) => {
+    const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'run-workflow');
+    expect(Boolean(action)).toBe(expected);
+  });
+
+  it('hides Run Workflow when the active workflow has no compatible image bindings', () => {
+    expect(
+      getLayerContextActions(makeState(rasterLayer, { hasWorkflowBindings: false })).some(
+        (action) => action.id === 'run-workflow'
+      )
+    ).toBe(false);
+  });
+
+  it.each([
+    ['no runnable binding', { canRunWorkflow: false }],
+    ['missing engine', { hasEngine: false }],
+    ['locked layer', { layer: { ...rasterLayer, isLocked: true } }],
+    ['locked interaction', { interactionLocked: true }],
+  ] as const)('disables Run Workflow for %s', (_label, overrides) => {
+    const layer = 'layer' in overrides ? overrides.layer : rasterLayer;
+    expect(byId(getLayerContextActions(makeState(layer, overrides)), 'run-workflow').isDisabled).toBe(true);
   });
 
   it.each([
@@ -369,6 +439,7 @@ describe('getLayerContextActions', () => {
       'extract-masked-area',
       'filter',
       'select-object',
+      'run-workflow',
       'intersect',
       'cutout',
       'cutaway',
@@ -416,6 +487,7 @@ describe('getLayerContextActions', () => {
       'adjustments',
       'filter',
       'select-object',
+      'run-workflow',
       'crop-to-bbox',
       'convert-to-control',
       'intersect',

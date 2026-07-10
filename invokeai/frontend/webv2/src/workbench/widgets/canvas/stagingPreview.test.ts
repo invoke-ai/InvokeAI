@@ -20,6 +20,18 @@ describe('selectStagedPreviewSource', () => {
     expect(selectStagedPreviewSource({ ...base, selectedImageName: 'img-1' })).toEqual({ imageName: 'img-1' });
   });
 
+  it('carries the selected candidate placement into the image preview', () => {
+    const placement = { height: 240, opacity: 0.4, width: 320, x: 11, y: 17 };
+
+    expect(
+      selectStagedPreviewSource({
+        ...base,
+        selectedImageName: 'img-1',
+        selectedPlacement: placement,
+      })
+    ).toEqual({ imageName: 'img-1', placement });
+  });
+
   it('returns null for a selected candidate when the preview is hidden', () => {
     expect(selectStagedPreviewSource({ ...base, isVisible: false, selectedImageName: 'img-1' })).toBeNull();
   });
@@ -79,5 +91,17 @@ describe('stagedPreviewKey', () => {
     expect(stagedPreviewKey({ dataUrl: 'AA', height: 8, width: 8 })).not.toBe(
       stagedPreviewKey({ dataUrl: 'BB', height: 8, width: 8 })
     );
+  });
+
+  it('includes every image placement field', () => {
+    const placement = { height: 240, opacity: 0.4, width: 320, x: 11, y: 17 };
+    const original = stagedPreviewKey({ imageName: 'a', placement });
+
+    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a' }));
+    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, x: 12 } }));
+    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, y: 18 } }));
+    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, width: 321 } }));
+    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, height: 241 } }));
+    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, opacity: 0.5 } }));
   });
 });

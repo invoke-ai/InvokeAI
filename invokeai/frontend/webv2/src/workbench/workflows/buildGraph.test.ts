@@ -227,6 +227,63 @@ describe('getProjectGraphReadiness', () => {
       })
     ).toEqual({ canInvoke: false, reasons: ['"optional-constrained" has invalid input "count".'] });
   });
+
+  it('treats only explicitly externally satisfied connection inputs as ready', () => {
+    const connectionTemplate = template('connection-sink', {
+      image: input('image', {
+        input: 'connection',
+        required: true,
+        title: 'Layer image',
+        type: { batch: false, cardinality: 'SINGLE', name: 'ImageField' },
+      }),
+      mask: input('mask', {
+        input: 'connection',
+        required: true,
+        title: 'Mask image',
+        type: { batch: false, cardinality: 'SINGLE', name: 'ImageField' },
+      }),
+    });
+    const node = buildInvocationNode(connectionTemplate, { x: 0, y: 0 });
+    const doc = { ...createProjectGraph('external-input'), nodes: [{ ...node, id: 'sink' }] };
+    const snapshot: InvocationTemplatesSnapshot = {
+      error: null,
+      status: 'loaded',
+      templates: { 'connection-sink': connectionTemplate },
+    };
+
+    expect(getProjectGraphReadiness(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
+      canInvoke: false,
+      reasons: ['"connection-sink" is missing a connection for "Mask image".'],
+    });
+    expect(
+      getProjectGraphReadiness(doc, snapshot, {
+        externallySatisfiedInputs: new Set(['sink:image', 'sink:mask']),
+      })
+    ).toEqual({ canInvoke: true, reasons: [] });
+  });
+
+  it('does not let external satisfaction bypass a required direct value', () => {
+    const directTemplate = template('direct-sink', {
+      image: input('image', {
+        input: 'direct',
+        required: true,
+        title: 'Layer image',
+        type: { batch: false, cardinality: 'SINGLE', name: 'ImageField' },
+      }),
+    });
+    const node = buildInvocationNode(directTemplate, { x: 0, y: 0 });
+    const doc = { ...createProjectGraph('external-direct'), nodes: [{ ...node, id: 'sink' }] };
+    const snapshot: InvocationTemplatesSnapshot = {
+      error: null,
+      status: 'loaded',
+      templates: { 'direct-sink': directTemplate },
+    };
+
+    expect(getProjectGraphReadiness(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
+      canInvoke: false,
+      reasons: ['"direct-sink" is missing required input "Layer image".'],
+    });
+  });
 });
 
 describe('compileProjectGraph', () => {

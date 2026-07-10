@@ -83,6 +83,14 @@ const statusEvent = (
 
 const okEnqueue: UtilityEnqueue = () => Promise.resolve({ enqueued: 1, itemIds: [1] });
 
+const createDeferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+};
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -174,12 +182,14 @@ describe('runUtilityGraph — await + settle', () => {
 });
 
 describe('runUtilityGraph — timeout + cancellation', () => {
-  it('rejects with timeout after timeoutMs with no terminal event', async () => {
+  it('rejects with timeout and cancels every accepted backend item', async () => {
     vi.useFakeTimers();
     const fake = createFakeHub();
+    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
     const promise = runUtilityGraph({
+      cancel,
       createId: () => UTIL_ID,
-      enqueue: okEnqueue,
+      enqueue: () => Promise.resolve({ enqueued: 3, itemIds: [11, 12, 13] }),
       graph: { edges: [], id: 'g', nodes: {} },
       hub: fake.hub,
       timeoutMs: 1000,
@@ -187,37 +197,143 @@ describe('runUtilityGraph — timeout + cancellation', () => {
     const assertion = expect(promise).rejects.toMatchObject({ reason: 'timeout' });
     await vi.advanceTimersByTimeAsync(1000);
     await assertion;
+    expect(cancel).toHaveBeenCalledExactlyOnceWith([11, 12, 13]);
     // Listeners cleaned up after timeout.
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
   });
 
-  it('rejects immediately when the signal is already aborted', async () => {
+  it('rejects immediately without enqueueing or canceling when the signal is already aborted', async () => {
     const fake = createFakeHub();
     const controller = new AbortController();
+    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
+    const enqueue = vi.fn(okEnqueue);
     controller.abort();
     const promise = runUtilityGraph({
+      cancel,
       createId: () => UTIL_ID,
-      enqueue: okEnqueue,
+      enqueue,
       graph: { edges: [], id: 'g', nodes: {} },
       hub: fake.hub,
       signal: controller.signal,
     });
     await expect(promise).rejects.toMatchObject({ reason: 'aborted' });
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
   });
 
-  it('rejects aborted when the signal fires mid-flight and detaches listeners', async () => {
+  it('rejects aborted, cancels accepted backend items, and detaches listeners', async () => {
     const fake = createFakeHub();
     const controller = new AbortController();
+    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
     const promise = runUtilityGraph({
+      cancel,
       createId: () => UTIL_ID,
-      enqueue: okEnqueue,
+      enqueue: () => Promise.resolve({ enqueued: 2, itemIds: [21, 22] }),
       graph: { edges: [], id: 'g', nodes: {} },
       hub: fake.hub,
       signal: controller.signal,
     });
+    await Promise.resolve();
     controller.abort();
     await expect(promise).rejects.toMatchObject({ reason: 'aborted' });
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledExactlyOnceWith([21, 22]));
     expect(fake.handlerCount('invocation_complete')).toBe(0);
+  });
+
+  it('rejects promptly, then cancels accepted items when a pending enqueue resolves', async () => {
+    const fake = createFakeHub();
+    const controller = new AbortController();
+    const enqueue = createDeferred<{ enqueued: number; itemIds: number[] }>();
+    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
+    const promise = runUtilityGraph({
+      cancel,
+      createId: () => UTIL_ID,
+      enqueue: () => enqueue.promise,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      signal: controller.signal,
+    });
+    const assertion = expect(promise).rejects.toMatchObject({ reason: 'aborted' });
+
+    controller.abort();
+    await assertion;
+    expect(cancel).not.toHaveBeenCalled();
+
+    enqueue.resolve({ enqueued: 2, itemIds: [31, 32] });
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledExactlyOnceWith([31, 32]));
+  });
+
+  it('cancels at most once across abort, timeout, terminal, and cancellation-failure races', async () => {
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const controller = new AbortController();
+    const enqueue = createDeferred<{ enqueued: number; itemIds: number[] }>();
+    const cancel = vi.fn((_itemIds: number[]) => Promise.reject(new Error('cancel failed')));
+    const promise = runUtilityGraph({
+      cancel,
+      createId: () => UTIL_ID,
+      enqueue: () => enqueue.promise,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      signal: controller.signal,
+      timeoutMs: 1000,
+    });
+    const assertion = expect(promise).rejects.toMatchObject({ reason: 'aborted' });
+
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(1000);
+    fake.emit('queue_item_status_changed', statusEvent('failed'));
+    enqueue.resolve({ enqueued: 2, itemIds: [41, 42] });
+
+    await assertion;
+    await vi.runAllTimersAsync();
+    expect(cancel).toHaveBeenCalledExactlyOnceWith([41, 42]);
+  });
+
+  it('does not cancel when a terminal success wins before a later abort', async () => {
+    const fake = createFakeHub();
+    const controller = new AbortController();
+    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
+    const promise = runUtilityGraph({
+      cancel,
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 2, itemIds: [51, 52] }),
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      signal: controller.signal,
+    });
+    await Promise.resolve();
+
+    fake.emit('invocation_complete', completeEvent());
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
+    controller.abort();
+    await Promise.resolve();
+
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('does not cancel when an aborted pending enqueue later accepts zero items', async () => {
+    const fake = createFakeHub();
+    const controller = new AbortController();
+    const enqueue = createDeferred<{ enqueued: number; itemIds: number[] }>();
+    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
+    const promise = runUtilityGraph({
+      cancel,
+      createId: () => UTIL_ID,
+      enqueue: () => enqueue.promise,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      signal: controller.signal,
+    });
+    const assertion = expect(promise).rejects.toMatchObject({ reason: 'aborted' });
+
+    controller.abort();
+    enqueue.resolve({ enqueued: 0, itemIds: [] });
+
+    await assertion;
+    await Promise.resolve();
+    expect(cancel).not.toHaveBeenCalled();
   });
 
   it('does not use a timeout when timeoutMs is 0', async () => {

@@ -17,7 +17,9 @@
  *    events by our unique origin.
  * 3. Enqueues the graph (listeners are attached first, closing the fast-finish
  *    race), then resolves with the output `imageName` on completion, or rejects
- *    on failure/cancellation/timeout/abort.
+ *    on failure/cancellation/timeout/abort. Abort and timeout also best-effort
+ *    cancel every backend item accepted for this run, including when enqueue
+ *    resolves after the local await has already rejected.
  *
  * Zero React, zero DOM: `hub` and `enqueue` are injected, so this runs in node
  * tests against fakes. Every side-effecting dependency is a parameter.
@@ -28,7 +30,7 @@ import type { SocketHub } from '@workbench/backend/socketHub';
 import type { BackendGraphContract } from '@workbench/types';
 
 import { buildUtilityQueueItemOrigin } from '@workbench/backend/events';
-import { enqueueUtilityGraph } from '@workbench/generation/api';
+import { cancelQueueItems, enqueueUtilityGraph } from '@workbench/generation/api';
 
 /** The default time a utility graph may run before it is abandoned. */
 export const DEFAULT_UTILITY_QUEUE_TIMEOUT_MS = 120_000;
@@ -50,6 +52,9 @@ export type UtilityEnqueue = (request: {
   origin: string;
 }) => Promise<{ itemIds: number[]; enqueued: number }>;
 
+/** The cancellation seam: best-effort cancels accepted backend item ids. */
+export type UtilityCancel = (itemIds: number[]) => Promise<void>;
+
 /** Dependencies for {@link runUtilityGraph} (all injectable for tests). */
 export interface RunUtilityGraphOptions {
   /** The graph to enqueue and await. */
@@ -63,9 +68,11 @@ export interface RunUtilityGraphOptions {
   hub: Pick<SocketHub, 'on'>;
   /** Enqueue seam (defaults to the real utility enqueue API). */
   enqueue?: UtilityEnqueue;
+  /** Cancellation seam (defaults to the real queue cancellation API). */
+  cancel?: UtilityCancel;
   /** Abandon after this many ms (default {@link DEFAULT_UTILITY_QUEUE_TIMEOUT_MS}). `0` disables. */
   timeoutMs?: number;
-  /** Cancels the await (does not itself cancel the backend item). */
+  /** Cancels the await and best-effort cancels accepted backend items. */
   signal?: AbortSignal;
   /** Injectable id source (defaults to `crypto.randomUUID`). */
   createId?: () => string;
@@ -92,6 +99,7 @@ const extractImageName = (result: InvocationCompleteEvent['result'] | undefined)
 export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<UtilityGraphResult> => {
   const { graph, hub, outputNodeId, signal } = options;
   const enqueue = options.enqueue ?? enqueueUtilityGraph;
+  const cancel = options.cancel ?? cancelQueueItems;
   const timeoutMs = options.timeoutMs ?? DEFAULT_UTILITY_QUEUE_TIMEOUT_MS;
   const utilityId = (options.createId ?? (() => crypto.randomUUID()))();
   const origin = buildUtilityQueueItemOrigin(utilityId);
@@ -99,8 +107,36 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
   return new Promise<UtilityGraphResult>((resolve, reject) => {
     let settled = false;
     let capturedImageName: string | null = null;
+    let cancellationRequested = false;
+    let cancellationStarted = false;
+    let enqueueResult: { itemIds: number[]; enqueued: number } | null = null;
     const detachers: Array<() => void> = [];
     let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const cancelAcceptedItems = (): void => {
+      if (
+        !cancellationRequested ||
+        cancellationStarted ||
+        enqueueResult === null ||
+        enqueueResult.enqueued === 0 ||
+        enqueueResult.itemIds.length === 0
+      ) {
+        return;
+      }
+
+      cancellationStarted = true;
+      const itemIds = [...enqueueResult.itemIds];
+      void Promise.resolve()
+        .then(() => cancel(itemIds))
+        .catch(() => {
+          // Cancellation is best-effort and must never mask the original settle reason.
+        });
+    };
+
+    const requestBackendCancellation = (): void => {
+      cancellationRequested = true;
+      cancelAcceptedItems();
+    };
 
     const cleanup = (): void => {
       if (timer !== null) {
@@ -135,6 +171,10 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     };
 
     function onAbort(): void {
+      if (settled) {
+        return;
+      }
+      requestBackendCancellation();
       settleReject(new UtilityQueueError('aborted', 'The utility graph was aborted.'));
     }
 
@@ -184,6 +224,10 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
 
     if (timeoutMs > 0) {
       timer = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        requestBackendCancellation();
         settleReject(new UtilityQueueError('timeout', `The utility graph timed out after ${timeoutMs}ms.`));
       }, timeoutMs);
     }
@@ -192,6 +236,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     // the time this resolves; `settled` guards against a late enqueue result.
     enqueue({ graph, origin })
       .then((result) => {
+        enqueueResult = result;
+        cancelAcceptedItems();
         if (!settled && result.enqueued === 0) {
           settleReject(new UtilityQueueError('enqueue', 'The backend queue did not accept the utility graph.'));
         }

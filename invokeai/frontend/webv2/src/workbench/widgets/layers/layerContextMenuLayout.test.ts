@@ -29,9 +29,11 @@ const makeDocument = (layers: CanvasLayerContract[]): CanvasDocumentContractV2 =
 
 const actionsFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerContract[] = [layer]) =>
   getLayerContextActions({
+    canRunWorkflow: true,
     document: makeDocument([...layers]),
     hasEngine: true,
     hasSupportedContent: true,
+    hasWorkflowBindings: true,
     index: layers.indexOf(layer),
     interactionLocked: false,
     layer,
@@ -65,7 +67,7 @@ describe('getLayerContextMenuLayout', () => {
       },
       {
         id: 'primary',
-        items: ['transform', 'rename', 'fit-to-bbox', 'adjustments', 'filter', 'select-object'],
+        items: ['transform', 'rename', 'fit-to-bbox', 'adjustments', 'filter', 'select-object', 'run-workflow'],
         presentation: 'list',
       },
       {
@@ -113,7 +115,15 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(control)[1]).toEqual({
       id: 'primary',
-      items: ['transform', 'rename', 'fit-to-bbox', 'filter', 'select-object', 'control-transparency-effect'],
+      items: [
+        'transform',
+        'rename',
+        'fit-to-bbox',
+        'filter',
+        'select-object',
+        'run-workflow',
+        'control-transparency-effect',
+      ],
       presentation: 'list',
     });
     expect(summarize(control)[2]).toEqual({

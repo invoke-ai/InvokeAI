@@ -6,6 +6,7 @@
  */
 
 import type { StagedPreviewInput } from '@workbench/canvas-engine/engine';
+import type { CanvasPlacementContract } from '@workbench/types';
 
 /** Inputs to {@link selectStagedPreviewSource}. */
 export interface StagedPreviewSelection {
@@ -17,6 +18,8 @@ export interface StagedPreviewSelection {
   isVisible: boolean;
   /** The currently selected staged candidate's image name, if any. */
   selectedImageName: string | null;
+  /** The selected candidate's world-space placement, if it has one. */
+  selectedPlacement?: CanvasPlacementContract | null;
   /** The current bbox size (document px) — progress frames scale to fill it. */
   bboxWidth: number;
   bboxHeight: number;
@@ -34,9 +37,12 @@ export const selectStagedPreviewSource = ({
   isVisible,
   progressImage,
   selectedImageName,
+  selectedPlacement,
 }: StagedPreviewSelection): StagedPreviewInput | null => {
   if (isVisible && selectedImageName) {
-    return { imageName: selectedImageName };
+    return selectedPlacement
+      ? { imageName: selectedImageName, placement: selectedPlacement }
+      : { imageName: selectedImageName };
   }
   if (isGenerationInFlight && progressImage && bboxWidth > 0 && bboxHeight > 0) {
     // Progress frames are low-res latents of the bbox region; scale to fill it.
@@ -55,7 +61,11 @@ export const stagedPreviewKey = (source: StagedPreviewInput | null): string => {
     return 'none';
   }
   if ('imageName' in source) {
-    return `image:${source.imageName}`;
+    const { placement } = source;
+
+    return placement
+      ? `image:${source.imageName}:${placement.x}:${placement.y}:${placement.width}:${placement.height}:${placement.opacity}`
+      : `image:${source.imageName}`;
   }
   return `data:${source.width}x${source.height}:${source.dataUrl}`;
 };

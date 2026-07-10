@@ -213,6 +213,7 @@ type WorkbenchAction =
     }
   | { type: 'markQueueItemBackendCancelled'; projectId: string; queueItemId: string; backendItemId: number }
   | { type: 'routeQueueItemResults'; projectId: string; queueItemId: string; images: GeneratedImageContract[] }
+  | { type: 'appendCanvasStagingCandidate'; projectId: string; candidate: CanvasStagingCandidateContract }
   | { type: 'setStagedImageIndex'; imageIndex: number }
   | { type: 'cycleStagedImage'; direction: -1 | 1 }
   | { type: 'discardSelectedStagedImage' }
@@ -590,8 +591,16 @@ const stageCanvasResultImages = (
     return project;
   }
 
+  const { bbox } = project.canvas.document;
   const incomingImages = images.map((image, index) =>
-    normalizeStagingCandidate(image, project.canvas.document, sourceBackendItemIds?.[index])
+    normalizeStagingCandidate(
+      {
+        ...image,
+        placement: { height: image.height, opacity: 1, width: image.width, x: bbox.x, y: bbox.y },
+      },
+      project.canvas.document,
+      sourceBackendItemIds?.[index]
+    )
   );
   const existingImages = project.canvas.stagingArea.pendingImages;
   const existingImageKeys = new Set(existingImages.map((image) => `${image.sourceQueueItemId}:${image.imageName}`));
@@ -618,6 +627,32 @@ const stageCanvasResultImages = (
           slotCount,
         }),
         sourceQueueItemId: queueItemId,
+      },
+    },
+  };
+};
+
+const appendCanvasStagingCandidate = (project: Project, candidate: CanvasStagingCandidateContract): Project => {
+  const appendedCandidate = normalizeStagingCandidate(candidate, project.canvas.document);
+  const pendingImages = [...project.canvas.stagingArea.pendingImages, appendedCandidate];
+  const candidateKey = `${appendedCandidate.sourceQueueItemId}:${appendedCandidate.imageName}`;
+  const slots = getCanvasStagingSlots(getCanvasWithPendingImages(project.canvas, pendingImages), project.queue.items);
+  const selectedImageIndex = slots
+    .map((slot) => (slot.kind === 'candidate' ? `${slot.candidate.sourceQueueItemId}:${slot.candidate.imageName}` : ''))
+    .lastIndexOf(candidateKey);
+
+  return {
+    ...project,
+    canvas: {
+      ...project.canvas,
+      stagingArea: {
+        ...project.canvas.stagingArea,
+        areThumbnailsVisible: true,
+        isVisible: true,
+        pendingImageIds: pendingImages.map((image) => image.imageName),
+        pendingImages,
+        selectedImageIndex,
+        sourceQueueItemId: appendedCandidate.sourceQueueItemId,
       },
     },
   };
@@ -2747,6 +2782,11 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         })
       );
     }
+    case 'appendCanvasStagingCandidate': {
+      return updateProjectById(state, action.projectId, (project) =>
+        appendCanvasStagingCandidate(project, action.candidate)
+      );
+    }
     case 'setStagedImageIndex': {
       return updateActiveProject(state, (project) => {
         const selectedImageIndex = clampStagedImageIndex(
@@ -3049,21 +3089,27 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
 
         const acceptedAt = now();
         // Canvas mutations are engine-owned and no longer participate in project
-        // undo, so accept does not `pushUndo`. The layer lands at the bbox origin
-        // (transform x/y = bbox x/y, unscaled), on top, and becomes selected.
-        const { bbox } = project.canvas.document;
+        // undo, so accept does not `pushUndo`. Candidate-specific placement is
+        // applied to the new top-most layer, which becomes selected.
+        const { placement } = stagedImage;
         const layer: CanvasRasterLayerContractV2 = {
           blendMode: 'normal',
           id: createId('layer'),
           isEnabled: true,
           isLocked: false,
           name: `Layer ${project.canvas.document.layers.length + 1}`,
-          opacity: 1,
+          opacity: placement.opacity,
           source: {
             image: { height: stagedImage.height, imageName: stagedImage.imageName, width: stagedImage.width },
             type: 'image',
           },
-          transform: { rotation: 0, scaleX: 1, scaleY: 1, x: bbox.x, y: bbox.y },
+          transform: {
+            rotation: 0,
+            scaleX: stagedImage.width === 0 ? 1 : placement.width / stagedImage.width,
+            scaleY: stagedImage.height === 0 ? 1 : placement.height / stagedImage.height,
+            x: placement.x,
+            y: placement.y,
+          },
           type: 'raster',
         };
 

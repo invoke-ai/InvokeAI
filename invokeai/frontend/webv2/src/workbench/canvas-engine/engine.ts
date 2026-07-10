@@ -126,10 +126,17 @@ import { createViewTool } from './tools/viewTool';
 /**
  * The input to {@link CanvasEngine.setStagedPreview}: either a persisted image
  * (decoded via the engine's `imageResolver`, sized to the decoded pixels — the
- * final staged candidate) or an inline data-URL with explicit document-space
- * dimensions (a live denoise-progress frame, scaled to fill those dims).
+ * final staged candidate, optionally with candidate-specific placement) or an
+ * inline data-URL with explicit document-space dimensions (a live
+ * denoise-progress frame, scaled to fill those dims at the current bbox).
  */
-export type StagedPreviewInput = { imageName: string } | { dataUrl: string; width: number; height: number };
+export interface StagedPreviewPlacement extends Rect {
+  opacity: number;
+}
+
+export type StagedPreviewInput =
+  | { imageName: string; placement?: StagedPreviewPlacement }
+  | { dataUrl: string; width: number; height: number };
 
 /**
  * Result of {@link CanvasEngine.mergeVisibleRasterLayers}: `'merged'` when the
@@ -161,6 +168,21 @@ export interface CommitRasterFilterOptions {
   image: CanvasImageRef;
   rect: Rect;
   mode: 'replace' | 'copy';
+  signal?: AbortSignal;
+}
+
+export type GeneratedImageTarget = 'replace' | 'copy-raster';
+
+export type CommitGeneratedImageResult =
+  | { status: 'committed'; layerId: string }
+  | { status: 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' | 'aborted' }
+  | { status: 'failed'; message: string };
+
+export interface CommitGeneratedImageOptions {
+  guard: LayerExportGuard;
+  image: CanvasImageRef;
+  origin: Vec2;
+  target: GeneratedImageTarget;
   signal?: AbortSignal;
 }
 
@@ -436,6 +458,8 @@ export interface CanvasEngine {
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
   /** Commits a durable raster-filter result only while its export guard remains current. */
   commitRasterFilterResult(options: CommitRasterFilterOptions): Promise<CommitRasterFilterResult>;
+  /** Replaces or copies a layer with a durable generated image while its export guard remains current. */
+  commitGeneratedImageResult(options: CommitGeneratedImageOptions): Promise<CommitGeneratedImageResult>;
   /** Adds a durable SAM image as a new mask layer while its source export guard remains current. */
   commitMaskImageResult(options: CommitMaskImageResultOptions): Promise<CommitMaskImageResult>;
   /** Creates a new raster paint layer above `layerId` from that layer's baked pixels. */
@@ -564,17 +588,17 @@ export interface CanvasEngine {
    */
   nudgeSelectedLayer(dx: number, dy: number): void;
   /**
-   * Shows a staged generation preview drawn over the CURRENT bbox on the
-   * composited canvas (above committed layers), or clears it with `null`.
+   * Shows a staged generation preview above committed layers, or clears it with
+   * `null`. A final `imageName` candidate may provide its own placement; legacy
+   * candidates and live `dataUrl` progress frames follow the CURRENT bbox.
    *
    * The input is decoded to a surface off the main path — an `imageName` through
-   * the engine's `imageResolver` (the final candidate, drawn at the decoded
-   * pixel size), or a `dataUrl` with explicit dims (a live progress frame,
-   * scaled to those dims). Decoding is async and latest-call-wins: a stale
-   * decode resolving after a newer `setStagedPreview`/clear is discarded
-   * (version-guarded like the rasterize path), so rapid candidate cycling never
-   * flashes an older result. The preview's top-left tracks the bbox at render
-   * time, matching where `acceptStagedImage` places the accepted layer.
+   * the engine's `imageResolver`, or a `dataUrl` with explicit dimensions.
+   * Decoding is async and latest-call-wins: a stale decode resolving after a
+   * newer `setStagedPreview`/clear is discarded (version-guarded like the
+   * rasterize path), so rapid candidate cycling never flashes an older result.
+   * Explicit placement matches candidate acceptance; otherwise the preview's
+   * top-left tracks the bbox at render time.
    */
   setStagedPreview(input: StagedPreviewInput | null): void;
   /**
@@ -776,7 +800,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   // `stagedPreviewToken` version-guards the async decode: every set/clear bumps
   // it, and a decode whose token no longer matches is dropped so a slow decode
   // can't clobber a newer selection (mirrors the rasterize race guard).
-  let stagedPreview: { surface: RasterSurface; width: number; height: number } | null = null;
+  let stagedPreview: {
+    surface: RasterSurface;
+    width: number;
+    height: number;
+    placement?: StagedPreviewPlacement;
+  } | null = null;
   let stagedPreviewToken = 0;
   // Completed-stroke subscribers (persistence P2.2, history P2.3).
   const strokeListeners = new Set<(event: StrokeCommittedEvent) => void>();
@@ -1716,25 +1745,36 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   /** Decodes a staged-preview input to a surface (imageName via resolver, dataUrl via the backend seam). */
   const decodeStagedPreview = async (
     input: StagedPreviewInput
-  ): Promise<{ surface: RasterSurface; width: number; height: number }> => {
+  ): Promise<{ surface: RasterSurface; width: number; height: number; placement?: StagedPreviewPlacement }> => {
     if ('imageName' in input) {
       const blob = await imageResolver(input.imageName);
       const bitmap = await backend.createImageBitmap(blob);
       const width = bitmap.width;
       const height = bitmap.height;
-      const surface = backend.createSurface(width, height);
-      surface.ctx.clearRect(0, 0, width, height);
-      surface.ctx.drawImage(bitmap, 0, 0);
-      bitmap.close();
-      return { height, surface, width };
+      try {
+        const surface = backend.createSurface(width, height);
+        surface.ctx.clearRect(0, 0, width, height);
+        surface.ctx.drawImage(bitmap, 0, 0);
+        return {
+          height,
+          placement: input.placement ? { ...input.placement } : undefined,
+          surface,
+          width,
+        };
+      } finally {
+        bitmap.close();
+      }
     }
     const { dataUrl, height, width } = input;
     const bitmap = await backend.createImageBitmap(dataUrlToBlob(dataUrl));
-    const surface = backend.createSurface(width, height);
-    surface.ctx.clearRect(0, 0, width, height);
-    surface.ctx.drawImage(bitmap, 0, 0, width, height);
-    bitmap.close();
-    return { height, surface, width };
+    try {
+      const surface = backend.createSurface(width, height);
+      surface.ctx.clearRect(0, 0, width, height);
+      surface.ctx.drawImage(bitmap, 0, 0, width, height);
+      return { height, surface, width };
+    } finally {
+      bitmap.close();
+    }
   };
 
   const setStagedPreview = (input: StagedPreviewInput | null): void => {
@@ -1942,6 +1982,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     const needsComposite = flags.all || flags.view || flags.layers.size > 0;
     if (needsComposite) {
       ensureLayerCaches(doc);
+      const stagedPlacement = stagedPreview?.placement;
       compositeDocument(screen, doc, layerCache, view, {
         // Memoized adjusted surfaces for raster layers with brightness/contrast/
         // saturation/curves (not recomputed per frame — see adjustedSurfaceCache).
@@ -1962,11 +2003,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         // Crisp + cheap when zoomed in (nearest-neighbor up-scale), smooth when
         // shrinking (bilinear down-scale). See `shouldSmoothAtZoom`.
         imageSmoothing: shouldSmoothAtZoom(viewport.getZoom()),
-        // The preview's origin follows the CURRENT bbox so it lands exactly where
-        // `acceptStagedImage` would place the accepted layer (bbox x/y, unscaled).
+        // Candidate-specific placement wins for final images. Progress frames
+        // and legacy image inputs continue to follow the CURRENT bbox origin.
         stagedPreview: stagedPreview
           ? {
-              rect: { height: stagedPreview.height, width: stagedPreview.width, x: doc.bbox.x, y: doc.bbox.y },
+              opacity: stagedPlacement?.opacity ?? 1,
+              rect: stagedPlacement
+                ? {
+                    height: stagedPlacement.height,
+                    width: stagedPlacement.width,
+                    x: stagedPlacement.x,
+                    y: stagedPlacement.y,
+                  }
+                : { height: stagedPreview.height, width: stagedPreview.width, x: doc.bbox.x, y: doc.bbox.y },
               surface: stagedPreview.surface,
             }
           : null,
@@ -2029,10 +2078,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const mirror: DocumentMirror = createDocumentMirror(store, projectId, {
     // The bbox rectangle/handles are overlay chrome, so a bbox move is normally
-    // overlay-only (no recomposite). The one exception: a staged-generation
-    // preview is drawn in the COMPOSITE at the current bbox origin, so while one
-    // is active the document must recomposite to reposition it with the bbox.
-    onBboxChanged: () => scheduler.invalidate(stagedPreview ? { all: true } : { overlay: true }),
+    // overlay-only (no recomposite). The one exception: a legacy/progress staged
+    // preview is drawn in the COMPOSITE at the current bbox origin, so it must
+    // recomposite to follow the bbox. Explicitly placed candidates do not.
+    onBboxChanged: () =>
+      scheduler.invalidate(stagedPreview && !stagedPreview.placement ? { all: true } : { overlay: true }),
     onDocumentReplaced: () => {
       rasterDocumentGeneration += 1;
       layerRasterizationJobs.clear();
@@ -2991,6 +3041,225 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           // removal fails before reducer application the failure-atomic history
           // entry can retry without leaving the copy selected or duplicating a
           // structural mutation.
+          dispatchPreparedMutation(
+            { id: selectedLayerId, type: 'setCanvasSelectedLayer' },
+            () => getReducerDocument()?.selectedLayerId === selectedLayerId,
+            () => mirror.getDocument()?.selectedLayerId === selectedLayerId
+          );
+          dispatchPreparedMutation(
+            { ids: [layerId], type: 'removeCanvasLayers' },
+            () => getReducerDocument()?.layers.some((candidate) => candidate.id === layerId) === false,
+            () => mirror.getDocument()?.layers.some((candidate) => candidate.id === layerId) === false
+          );
+        },
+      });
+      return { layerId, status: 'committed' };
+    } catch (error) {
+      if (options.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+        return { status: 'aborted' };
+      }
+      return { message: error instanceof Error ? error.message : String(error), status: 'failed' };
+    }
+  };
+
+  const commitGeneratedImageResult = async (
+    options: CommitGeneratedImageOptions
+  ): Promise<CommitGeneratedImageResult> => {
+    if (options.signal?.aborted) {
+      return { status: 'aborted' };
+    }
+
+    const validateGuard = ():
+      | {
+          document: CanvasDocumentContractV2;
+          liveLayer: Extract<CanvasLayerContract, { type: 'raster' | 'control' }>;
+        }
+      | { result: CommitGeneratedImageResult } => {
+      const document = mirror.getDocument();
+      const liveLayer = document?.layers.find((candidate) => candidate.id === options.guard.layerId);
+      if (!document || !liveLayer) {
+        return { result: { status: 'missing' } };
+      }
+      if (liveLayer.isLocked) {
+        return { result: { status: 'locked' } };
+      }
+      if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
+        return { result: { status: 'unsupported' } };
+      }
+      if (pipeline.isGestureActive()) {
+        return { result: { status: 'busy' } };
+      }
+      if (!isLayerExportGuardCurrent(options.guard)) {
+        return { result: { status: 'stale' } };
+      }
+      return { document, liveLayer };
+    };
+
+    try {
+      const blob = await imageResolver(options.image.imageName, options.signal);
+      if (options.signal?.aborted) {
+        return { status: 'aborted' };
+      }
+
+      const bitmap = await backend.createImageBitmap(blob);
+      if (options.signal?.aborted) {
+        bitmap.close();
+        return { status: 'aborted' };
+      }
+
+      let generatedPixels: RasterSurface;
+      try {
+        generatedPixels = backend.createSurface(options.image.width, options.image.height);
+        generatedPixels.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        generatedPixels.ctx.clearRect(0, 0, options.image.width, options.image.height);
+        generatedPixels.ctx.drawImage(bitmap, 0, 0, options.image.width, options.image.height);
+      } finally {
+        bitmap.close();
+      }
+      if (options.signal?.aborted) {
+        return { status: 'aborted' };
+      }
+
+      const checked = validateGuard();
+      if ('result' in checked) {
+        return checked.result;
+      }
+      const { document, liveLayer } = checked;
+      const image = structuredClone(options.image);
+      const origin = { ...options.origin };
+      const rect = { height: image.height, width: image.width, ...origin };
+      const source = { bitmap: image, offset: origin, type: 'paint' } as const;
+      const identityTransform: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
+
+      const publishSnapshot = (
+        contract: CanvasLayerContract,
+        prepared: ReturnType<LayerCacheStore['prepareReplacement']>,
+        publishOptions: { discardPersistence: boolean; persist: boolean }
+      ): void => {
+        dispatchPreparedMutation(
+          { layer: contract, layerId: liveLayer.id, type: 'replaceCanvasLayer' },
+          () => getReducerDocument()?.layers.find((candidate) => candidate.id === liveLayer.id) === contract,
+          () => mirror.getDocument()?.layers.find((candidate) => candidate.id === liveLayer.id) === contract
+        );
+        if (publishOptions.discardPersistence) {
+          try {
+            bitmapStore.discardLayer(liveLayer.id);
+          } catch {
+            // Persistence generation cancellation is ancillary once the durable
+            // contract has been accepted by the reducer.
+          }
+        }
+        try {
+          clearFilterPreview(liveLayer.id);
+        } catch {
+          // A transient preview is ancillary to the committed document/cache.
+        }
+        installGeneratedPaintCache(prepared, publishOptions.persist);
+      };
+
+      const applySnapshot = (
+        contract: CanvasLayerContract,
+        snapshot: { pixels: RasterSurface; rect: Rect },
+        publishOptions: { discardPersistence: boolean; persist: boolean }
+      ): void => {
+        const prepared = prepareGeneratedPaintCache(liveLayer.id, snapshot.rect, snapshot.pixels);
+        publishSnapshot(contract, prepared, publishOptions);
+      };
+
+      if (options.target === 'replace') {
+        const beforePixels = captureLayerCache(liveLayer, document);
+        if (!beforePixels || beforePixels === 'not-ready') {
+          return { status: 'stale' };
+        }
+        if (options.signal?.aborted) {
+          return { status: 'aborted' };
+        }
+
+        const before = structuredClone(liveLayer);
+        let after: CanvasLayerContract;
+        if (liveLayer.type === 'raster') {
+          const { adjustments: _adjustments, ...base } = structuredClone(liveLayer);
+          after = { ...base, source, transform: identityTransform };
+        } else {
+          after = { ...structuredClone(liveLayer), source, transform: identityTransform };
+        }
+        const afterPixels = { pixels: generatedPixels, rect };
+        const preparedAfter = prepareGeneratedPaintCache(liveLayer.id, rect, generatedPixels);
+
+        if (options.signal?.aborted) {
+          return { status: 'aborted' };
+        }
+        const finalCheck = validateGuard();
+        if ('result' in finalCheck) {
+          return finalCheck.result;
+        }
+
+        endNudgeBurst();
+        publishSnapshot(after, preparedAfter, { discardPersistence: true, persist: false });
+        history.push({
+          bytes:
+            beforePixels.rect.width * beforePixels.rect.height * 4 +
+            afterPixels.rect.width * afterPixels.rect.height * 4 +
+            256,
+          label: 'Replace layer with workflow result',
+          redo: () => applySnapshot(after, afterPixels, { discardPersistence: true, persist: false }),
+          replayFailureAtomic: true,
+          undo: () =>
+            applySnapshot(before, beforePixels, {
+              discardPersistence: false,
+              persist: layerNeedsPixelPersistence(before),
+            }),
+        });
+        return { layerId: liveLayer.id, status: 'committed' };
+      }
+
+      const sourceIndex = document.layers.findIndex((candidate) => candidate.id === liveLayer.id);
+      if (sourceIndex < 0) {
+        return { status: 'missing' };
+      }
+      const layerId = createLayerId();
+      const selectedLayerId = document.selectedLayerId;
+      const copy: CanvasLayerContract = {
+        blendMode: 'normal',
+        id: layerId,
+        isEnabled: true,
+        isLocked: false,
+        name: `${liveLayer.name} workflow result`,
+        opacity: 1,
+        source,
+        transform: identityTransform,
+        type: 'raster',
+      };
+      const publishCopy = (prepared: ReturnType<LayerCacheStore['prepareReplacement']>): void => {
+        dispatchPreparedMutation(
+          { index: sourceIndex, layer: copy, type: 'addCanvasLayer' },
+          () => getReducerDocument()?.layers.some((candidate) => candidate === copy) === true,
+          () => mirror.getDocument()?.layers.some((candidate) => candidate === copy) === true
+        );
+        installGeneratedPaintCache(prepared, false);
+      };
+      const applyCopy = (): void => {
+        const prepared = prepareGeneratedPaintCache(layerId, rect, generatedPixels);
+        publishCopy(prepared);
+      };
+      const preparedCopy = prepareGeneratedPaintCache(layerId, rect, generatedPixels);
+
+      if (options.signal?.aborted) {
+        return { status: 'aborted' };
+      }
+      const finalCheck = validateGuard();
+      if ('result' in finalCheck) {
+        return finalCheck.result;
+      }
+
+      endNudgeBurst();
+      publishCopy(preparedCopy);
+      history.push({
+        bytes: rect.width * rect.height * 4 + 256,
+        label: 'Copy workflow result to raster layer',
+        redo: applyCopy,
+        replayFailureAtomic: true,
+        undo: () => {
           dispatchPreparedMutation(
             { id: selectedLayerId, type: 'setCanvasSelectedLayer' },
             () => getReducerDocument()?.selectedLayerId === selectedLayerId,
@@ -4598,6 +4867,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     attach,
     cancelTextEdit,
     cancelTransform,
+    commitGeneratedImageResult,
     commitOpenTextSession,
     commitLayerConversion,
     commitLayerCopy,

@@ -80,8 +80,8 @@ const STAGED_PREVIEW_OUTLINE_DASH = 6;
 
 /** Optional inputs to {@link compositeDocument}. */
 export interface CompositeOptions {
-  /** A staged generation candidate to draw over its bbox (document space). */
-  stagedPreview?: { surface: RasterSurface; rect: Rect } | null;
+  /** A staged generation candidate to draw at its placement (document space). */
+  stagedPreview?: { surface: RasterSurface; rect: Rect; opacity?: number } | null;
   /**
    * The cached checkerboard pattern tile (see {@link createCheckerboardTile}) to
    * fill the ENTIRE viewport with (the canvas is an unbounded plane — the checker
@@ -360,6 +360,7 @@ export const compositeDocument = (
   if (staged) {
     ctx.save();
     setTransformFromMat(ctx, view);
+    ctx.globalAlpha = staged.opacity ?? 1;
     ctx.drawImage(staged.surface.canvas, staged.rect.x, staged.rect.y, staged.rect.width, staged.rect.height);
     // Keep the outline visually constant regardless of zoom by dividing the
     // document-space stroke by the view scale (√det of the linear part).

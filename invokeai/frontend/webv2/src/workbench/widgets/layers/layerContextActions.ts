@@ -21,6 +21,7 @@ import {
   ScanSearchIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
+  WorkflowIcon,
 } from 'lucide-react';
 
 import type { LayerMoveKind } from './layerGroups';
@@ -45,6 +46,7 @@ export type LayerContextActionId =
   | 'extract-masked-area'
   | 'filter'
   | 'select-object'
+  | 'run-workflow'
   | 'intersect'
   | 'cutout'
   | 'cutaway'
@@ -75,9 +77,11 @@ export type LayerContextMenuSectionId = 'quick' | 'primary' | 'operations' | 'ou
 export type LayerContextSubmenuId = 'arrange' | 'add-modifiers' | 'add-regional' | 'boolean' | 'copy-to' | 'convert-to';
 
 export interface LayerContextActionState {
+  canRunWorkflow: boolean;
   document: CanvasDocumentContractV2;
   hasEngine: boolean;
   hasSupportedContent: boolean;
+  hasWorkflowBindings: boolean;
   index: number;
   interactionLocked: boolean;
   layer: CanvasLayerContract;
@@ -87,6 +91,7 @@ export interface LayerContextActionEffects {
   reorder(kind: LayerMoveKind, actionId: LayerContextActionId): void;
   duplicate(): void;
   openRename(): void;
+  openRunWorkflow(): void;
   openSelectObject(): void;
   transform(): void;
   fitToBbox(): void;
@@ -426,6 +431,18 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     isVisible: (context) => context.hasSupportedContent,
     labelKey: 'widgets.layers.actions.selectObject',
     order: 41,
+    section: 'primary',
+    supportedLayerTypes: RASTER_AND_CONTROL,
+  },
+  {
+    defaultLabel: 'Run workflow',
+    handler: ({ effects }) => effects.openRunWorkflow(),
+    icon: WorkflowIcon,
+    id: 'run-workflow',
+    isEnabled: (context) => context.canRunWorkflow && hasMutablePixels(context),
+    isVisible: (context) => context.hasWorkflowBindings && context.hasSupportedContent,
+    labelKey: 'widgets.layers.actions.runWorkflow',
+    order: 42,
     section: 'primary',
     supportedLayerTypes: RASTER_AND_CONTROL,
   },

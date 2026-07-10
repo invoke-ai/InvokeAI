@@ -192,6 +192,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     isVisible: stagingArea.isVisible,
     progressImage,
     selectedImageName: selectedCandidate?.imageName ?? null,
+    selectedPlacement: selectedCandidate?.placement ?? null,
   });
   const previewKey = stagedPreviewKey(previewSource);
 

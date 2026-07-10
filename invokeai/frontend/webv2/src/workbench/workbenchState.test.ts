@@ -6,6 +6,7 @@ import type {
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
+  CanvasStagingCandidateContract,
   GeneratedImageContract,
   GraphContract,
   Project,
@@ -72,6 +73,15 @@ const createImage = (imageName: string, sourceQueueItemId: string): GeneratedIma
   sourceQueueItemId,
   thumbnailUrl: `/api/v1/images/i/${imageName}/thumbnail`,
   width: 512,
+});
+
+const createStagingCandidate = (
+  imageName: string,
+  sourceQueueItemId: string,
+  placement: CanvasStagingCandidateContract['placement']
+): CanvasStagingCandidateContract => ({
+  ...createImage(imageName, sourceQueueItemId),
+  placement,
 });
 
 const getProject = (state: WorkbenchState, projectId: string): Project => {
@@ -481,6 +491,72 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(activeProject.queue.items).toEqual([]);
   });
 
+  it('appends a workflow candidate to its explicit project and selects its resolved staging slot', () => {
+    let state = createInitialWorkbenchState();
+    const originProjectId = state.activeProjectId;
+    const firstCandidate = createStagingCandidate('first.png', 'layer-workflow:first', {
+      height: 100,
+      opacity: 1,
+      width: 200,
+      x: 5,
+      y: 7,
+    });
+    const appendedCandidate = createStagingCandidate('second.png', 'layer-workflow:second', {
+      height: 240,
+      opacity: 0.45,
+      width: 320,
+      x: 11,
+      y: 17,
+    });
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    const activeProjectId = state.activeProjectId;
+    state = workbenchReducer(state, {
+      candidate: firstCandidate,
+      projectId: originProjectId,
+      type: 'appendCanvasStagingCandidate',
+    });
+    state = workbenchReducer(state, {
+      candidate: appendedCandidate,
+      projectId: originProjectId,
+      type: 'appendCanvasStagingCandidate',
+    });
+
+    const originProject = getProject(state, originProjectId);
+    const slots = getCanvasStagingSlots(originProject.canvas, originProject.queue.items);
+
+    expect(state.activeProjectId).toBe(activeProjectId);
+    expect(originProject.canvas.stagingArea.pendingImages).toEqual([firstCandidate, appendedCandidate]);
+    expect(originProject.canvas.stagingArea.pendingImageIds).toEqual(['first.png', 'second.png']);
+    expect(originProject.canvas.stagingArea.isVisible).toBe(true);
+    expect(originProject.canvas.stagingArea.selectedImageIndex).toBe(1);
+    expect(slots[originProject.canvas.stagingArea.selectedImageIndex]).toMatchObject({
+      candidate: { imageName: 'second.png', placement: appendedCandidate.placement },
+      kind: 'candidate',
+    });
+    expect(getProject(state, activeProjectId).canvas.stagingArea.pendingImages).toEqual([]);
+  });
+
+  it('accepts a workflow candidate at its own placement, scale, and opacity', () => {
+    let state = withEmptyCanvas(createInitialWorkbenchState());
+    const projectId = state.activeProjectId;
+    const candidate = createStagingCandidate('dimension-changing-result.png', 'layer-workflow:request-1', {
+      height: 200,
+      opacity: 0.35,
+      width: 300,
+      x: 31,
+      y: 47,
+    });
+
+    state = workbenchReducer(state, { candidate, projectId, type: 'appendCanvasStagingCandidate' });
+    state = workbenchReducer(state, { type: 'acceptStagedImage' });
+
+    const acceptedLayer = getActiveProject(state).canvas.document.layers[0];
+
+    expect(getRasterLayerImageName(acceptedLayer)).toBe('dimension-changing-result.png');
+    expect(getRasterLayerPlacement(acceptedLayer)).toEqual(candidate.placement);
+  });
+
   it('keeps submitted Generate snapshots immutable after later settings changes', () => {
     let state = submitGenerate(primeGenerate(undefined, { positivePrompt: 'first prompt', shouldRandomizeSeed: true }));
     const firstQueueItem = getActiveProject(state).queue.items[0];
@@ -566,10 +642,11 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(project.canvas.stagingArea.isVisible).toBe(false);
   });
 
-  it('cycles staged canvas candidates and accepts the selected one at the bbox origin', () => {
+  it('normalizes ordinary queue results to the bbox origin and native image size', () => {
     let state = submitGenerate(primeGenerate());
     const queueItem = getActiveProject(state).queue.items[0];
 
+    state = workbenchReducer(state, { bbox: { height: 256, width: 256, x: 40, y: 24 }, type: 'setCanvasBbox' });
     state = workbenchReducer(state, {
       images: [createImage('candidate-1.png', queueItem.id), createImage('candidate-2.png', queueItem.id)],
       projectId: getActiveProject(state).id,
@@ -579,16 +656,20 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, { direction: -1, type: 'cycleStagedImage' });
 
     expect(getActiveProject(state).canvas.stagingArea.selectedImageIndex).toBe(1);
+    expect(getActiveProject(state).canvas.stagingArea.pendingImages[1]?.placement).toEqual({
+      height: 768,
+      opacity: 1,
+      width: 512,
+      x: 40,
+      y: 24,
+    });
 
-    // Move the bbox first so we can prove the accepted layer lands at its origin.
-    state = workbenchReducer(state, { bbox: { height: 256, width: 256, x: 40, y: 24 }, type: 'setCanvasBbox' });
     state = workbenchReducer(state, { type: 'acceptStagedImage' });
 
     let project = getActiveProject(state);
     const acceptedLayer = project.canvas.document.layers[0];
 
     expect(getRasterLayerImageName(acceptedLayer)).toBe('candidate-2.png');
-    // The v2 accept places the raster at the bbox origin, unscaled (P0.2 Deliverable 3).
     expect(getRasterLayerPlacement(acceptedLayer)).toEqual({ height: 768, opacity: 1, width: 512, x: 40, y: 24 });
 
     // Project undo/redo leaves the engine-owned canvas alone.
@@ -646,6 +727,13 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(slots.map((slot) => slot.kind)).toEqual(['candidate', 'placeholder']);
     expect(slots[0]).toMatchObject({ itemIndex: 1, kind: 'candidate', queueItemId: queueItem.id });
     expect(updatedProject.canvas.stagingArea.pendingImages[0]).toMatchObject({ sourceBackendItemId: 11 });
+    expect(updatedProject.canvas.stagingArea.pendingImages[0]?.placement).toEqual({
+      height: 768,
+      opacity: 1,
+      width: 512,
+      x: updatedProject.canvas.document.bbox.x,
+      y: updatedProject.canvas.document.bbox.y,
+    });
     expect(slots[1]).toMatchObject({ itemIndex: 2, queueItemId: queueItem.id });
   });
 

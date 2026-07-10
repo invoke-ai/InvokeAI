@@ -226,6 +226,12 @@ export const getGalleryImagesByNames = async (imageNames: string[]): Promise<Gal
   return body.map(mapImage);
 };
 
+export const getGalleryImageByName = async (imageName: string, signal?: AbortSignal): Promise<GalleryImage> => {
+  const body = await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, { signal });
+
+  return mapImage(body);
+};
+
 /**
  * Date virtual boards have no offset-paginated DTO endpoint; list the ordered
  * names for the date, slice the requested window, then bulk-hydrate DTOs.
@@ -317,20 +323,19 @@ export const imageSaveToGalleryChanges = (): { is_intermediate: false; image_cat
 });
 
 /**
- * The `ImageRecordChanges` body that makes an intermediate image durable WITHOUT
- * surfacing it in the gallery: clearing `is_intermediate` stops it being
- * garbage-collected, but (unlike {@link imageSaveToGalleryChanges}) it leaves
- * `image_category` untouched so it stays out of the gallery's images view. Used
- * when applying a control-filter preview: the chosen image becomes the layer's
- * new source (durable), while the discarded previews GC away as intermediates.
+ * The `ImageRecordChanges` body that makes an intermediate image durable without
+ * changing its category. Clearing `is_intermediate` stops garbage collection;
+ * where the image appears is determined by its existing category. Used when a
+ * utility result becomes a canvas source while discarded previews remain
+ * intermediate and can be collected.
  */
 export const imageMakeDurableChanges = (): { is_intermediate: false } => ({
   is_intermediate: false,
 });
 
 /**
- * Makes a single intermediate image durable (survives GC) without adding it to
- * the gallery, via `PATCH /api/v1/images/i/{image_name}`. Resolves once the PATCH
+ * Makes a single intermediate image durable (survives GC) without changing its
+ * category, via `PATCH /api/v1/images/i/{image_name}`. Resolves once the PATCH
  * succeeds; the caller commits the layer-source swap only after this settles so a
  * failed PATCH never strands the layer pointing at a soon-to-be-collected image.
  */
