@@ -46,7 +46,7 @@ describe('createCanvasOperationController', () => {
     const secondCleanup = vi.fn();
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const first = controller.start({ cleanupPreview: firstCleanup, guard, identity: filterIdentity })!;
-    const publishFirst = vi.fn();
+    const publishFirst = vi.fn((_result: string): undefined => undefined);
     const pending = first.run(() => firstWork.promise, publishFirst);
     firstCleanup.mockClear();
 
@@ -69,10 +69,13 @@ describe('createCanvasOperationController', () => {
     let signal: AbortSignal | undefined;
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
-    const pending = session.run((requestSignal) => {
-      signal = requestSignal;
-      return work.promise;
-    }, vi.fn());
+    const pending = session.run(
+      (requestSignal) => {
+        signal = requestSignal;
+        return work.promise;
+      },
+      vi.fn((): undefined => undefined)
+    );
     cleanupPreview.mockClear();
 
     session.reset();
@@ -95,10 +98,13 @@ describe('createCanvasOperationController', () => {
     let signal: AbortSignal | undefined;
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
-    const pending = session.run((requestSignal) => {
-      signal = requestSignal;
-      return work.promise;
-    }, vi.fn());
+    const pending = session.run(
+      (requestSignal) => {
+        signal = requestSignal;
+        return work.promise;
+      },
+      vi.fn((): undefined => undefined)
+    );
     cleanupPreview.mockClear();
 
     session.cancel();
@@ -116,10 +122,13 @@ describe('createCanvasOperationController', () => {
     let signal: AbortSignal | undefined;
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
-    const pending = session.run((requestSignal) => {
-      signal = requestSignal;
-      return work.promise;
-    }, vi.fn());
+    const pending = session.run(
+      (requestSignal) => {
+        signal = requestSignal;
+        return work.promise;
+      },
+      vi.fn((): undefined => undefined)
+    );
     const listener = vi.fn();
     controller.subscribe(listener);
     cleanupPreview.mockClear();
@@ -139,8 +148,8 @@ describe('createCanvasOperationController', () => {
   it('publishes only the latest request when completions arrive out of order', async () => {
     const older = createDeferred<string>();
     const newer = createDeferred<string>();
-    const publishOlder = vi.fn();
-    const publishNewer = vi.fn();
+    const publishOlder = vi.fn((_result: string): undefined => undefined);
+    const publishNewer = vi.fn((_result: string): undefined => undefined);
     const signals: AbortSignal[] = [];
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: filterIdentity })!;
@@ -172,6 +181,7 @@ describe('createCanvasOperationController', () => {
       () => Promise.resolve('prepared'),
       () => {
         controller.start({ cleanupPreview: replacementCleanup, guard, identity: selectObjectIdentity });
+        return undefined;
       }
     );
 
@@ -186,15 +196,21 @@ describe('createCanvasOperationController', () => {
 
     if (Date.now() < 0) {
       const asyncCommit = (): Promise<void> => Promise.resolve();
+      const voidCommit = (): void => undefined;
+      const maybeAsyncCommit = (): void | Promise<void> => Promise.resolve();
       // @ts-expect-error Preview commit must not yield after the final freshness check.
       void session.run(() => Promise.resolve('prepared'), asyncCommit);
+      // @ts-expect-error Preview commit must explicitly return undefined.
+      void session.run(() => Promise.resolve('prepared'), voidCommit);
+      // @ts-expect-error Preview commit cannot have an async branch.
+      void session.run(() => Promise.resolve('prepared'), maybeAsyncCommit);
     }
   });
 
   it('treats AbortError from a superseded request as stale without publishing an error', async () => {
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: filterIdentity })!;
-    const commitOlder = vi.fn();
+    const commitOlder = vi.fn((_result: string): undefined => undefined);
     const older = session.run(
       (signal) =>
         new Promise<string>((_resolve, reject) => {
@@ -203,7 +219,7 @@ describe('createCanvasOperationController', () => {
       commitOlder
     );
 
-    const commitNewer = vi.fn();
+    const commitNewer = vi.fn((_result: string): undefined => undefined);
     const newer = session.run(() => Promise.resolve('newer'), commitNewer);
 
     await expect(older).resolves.toBe('stale');
@@ -246,7 +262,12 @@ describe('createCanvasOperationController', () => {
     const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
     const work = vi.fn(() => Promise.resolve('prepared'));
 
-    await expect(session.run(work, vi.fn())).resolves.toBe('stale');
+    await expect(
+      session.run(
+        work,
+        vi.fn((): undefined => undefined)
+      )
+    ).resolves.toBe('stale');
 
     expect(cleanupPreview).toHaveBeenCalledOnce();
     expect(work).not.toHaveBeenCalled();
@@ -265,7 +286,12 @@ describe('createCanvasOperationController', () => {
     const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: filterIdentity });
 
     expect(session).not.toBeNull();
-    await expect(session!.run(() => Promise.resolve('ready'), vi.fn())).resolves.toBe('published');
+    await expect(
+      session!.run(
+        () => Promise.resolve('ready'),
+        vi.fn((): undefined => undefined)
+      )
+    ).resolves.toBe('published');
     expect(healthyListener).toHaveBeenCalledTimes(3);
     expect(controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
   });
@@ -290,7 +316,7 @@ describe('createCanvasOperationController', () => {
   it('suppresses a result when its guard becomes invalid during work', async () => {
     let current = true;
     const work = createDeferred<string>();
-    const publish = vi.fn();
+    const publish = vi.fn((_result: string): undefined => undefined);
     const cleanupPreview = vi.fn();
     const controller = createCanvasOperationController({ isGuardCurrent: () => current });
     const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
@@ -331,10 +357,13 @@ describe('createCanvasOperationController', () => {
     let signal: AbortSignal | undefined;
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
-    const pending = session.run((requestSignal) => {
-      signal = requestSignal;
-      return work.promise;
-    }, vi.fn());
+    const pending = session.run(
+      (requestSignal) => {
+        signal = requestSignal;
+        return work.promise;
+      },
+      vi.fn((): undefined => undefined)
+    );
     cleanupPreview.mockClear();
 
     invalidate(controller);
@@ -362,7 +391,7 @@ describe('createCanvasOperationController', () => {
 
   it('suppresses a late result after the operation closes', async () => {
     const work = createDeferred<string>();
-    const publish = vi.fn();
+    const publish = vi.fn((_result: string): undefined => undefined);
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: selectObjectIdentity })!;
     const pending = session.run(() => work.promise, publish);
@@ -382,7 +411,12 @@ describe('createCanvasOperationController', () => {
     const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
     controller.subscribe(listener);
 
-    await expect(session.run(() => Promise.reject(new Error('graph failed')), vi.fn())).resolves.toBe('error');
+    await expect(
+      session.run(
+        () => Promise.reject(new Error('graph failed')),
+        vi.fn((): undefined => undefined)
+      )
+    ).resolves.toBe('error');
 
     expect(controller.getSnapshot()).toEqual({
       error: 'graph failed',
@@ -391,7 +425,7 @@ describe('createCanvasOperationController', () => {
       status: 'active',
     });
 
-    const publish = vi.fn();
+    const publish = vi.fn((_result: string): undefined => undefined);
     await expect(session.run(() => Promise.resolve('recovered'), publish)).resolves.toBe('published');
     expect(publish).toHaveBeenCalledWith('recovered');
     expect(controller.getSnapshot()).toEqual({

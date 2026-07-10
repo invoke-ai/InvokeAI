@@ -18,12 +18,13 @@ export type CanvasOperationRunResult = 'published' | 'stale' | 'error';
 export interface CanvasOperationSession {
   /**
    * Prepares a preview asynchronously, then commits it synchronously only while
-   * this request and its export guard are still current.
+   * this request and its export guard are still current. `commitPreview` must
+   * explicitly return `undefined`; do not cast or erase an async callback to
+   * `() => void`, which TypeScript cannot distinguish from a synchronous one.
    */
-  run<T, CommitResult>(
+  run<T>(
     work: (signal: AbortSignal) => Promise<T>,
-    commitPreview: (result: T) => CommitResult,
-    ...asyncCommitNotAllowed: CommitResult extends PromiseLike<unknown> ? [never] : []
+    commitPreview: (result: T) => undefined
   ): Promise<CanvasOperationRunResult>;
   reset(): void;
   cancel(): void;
@@ -137,10 +138,10 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     operation.requestController === controller &&
     !controller.signal.aborted;
 
-  const run = async <T, CommitResult>(
+  const run = async <T>(
     operation: ActiveOperation,
     work: (signal: AbortSignal) => Promise<T>,
-    commitPreview: (result: T) => CommitResult
+    commitPreview: (result: T) => undefined
   ): Promise<CanvasOperationRunResult> => {
     if (disposed || active !== operation) {
       return 'stale';
@@ -236,11 +237,8 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     return {
       cancel: () => close(operation),
       reset: () => reset(operation),
-      run: <T, CommitResult>(
-        work: (signal: AbortSignal) => Promise<T>,
-        commitPreview: (result: T) => CommitResult,
-        ..._asyncCommitNotAllowed: CommitResult extends PromiseLike<unknown> ? [never] : []
-      ) => run(operation, work, commitPreview),
+      run: <T>(work: (signal: AbortSignal) => Promise<T>, commitPreview: (result: T) => undefined) =>
+        run(operation, work, commitPreview),
     };
   };
 
