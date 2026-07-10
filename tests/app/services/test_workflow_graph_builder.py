@@ -223,6 +223,20 @@ def test_build_graph_from_workflow_uses_default_for_legacy_auto_board_values():
     assert graph.nodes["image-1"].board is None
 
 
+def test_build_graph_from_workflow_uses_default_for_legacy_none_board_values():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("image-1", "blank_image", {"board": "none", "width": 64, "height": 64}),
+            *_build_named_return_nodes(),
+        ],
+        edges=_build_named_return_edges("image-1", "image"),
+    )
+
+    graph = build_graph_from_workflow(workflow)
+
+    assert graph.nodes["image-1"].board is None
+
+
 def test_build_graph_from_workflow_rejects_batch_special_nodes_with_clear_error():
     workflow = _build_workflow(
         nodes=[_build_workflow_node("image-batch-1", "image_batch", {"images": []})],

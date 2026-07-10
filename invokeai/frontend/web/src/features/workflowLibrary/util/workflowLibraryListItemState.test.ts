@@ -15,8 +15,6 @@ describe('workflowLibraryListItemState', () => {
         },
       })
     ).toEqual({
-      showUnsupportedBadge: false,
-      unsupportedMessageKey: null,
       showCallableBadge: false,
       showSharedBadge: false,
       showDefaultIcon: false,
@@ -35,8 +33,6 @@ describe('workflowLibraryListItemState', () => {
         },
       })
     ).toEqual({
-      showUnsupportedBadge: false,
-      unsupportedMessageKey: null,
       showCallableBadge: true,
       showSharedBadge: false,
       showDefaultIcon: false,
@@ -55,8 +51,6 @@ describe('workflowLibraryListItemState', () => {
         },
       })
     ).toEqual({
-      showUnsupportedBadge: false,
-      unsupportedMessageKey: null,
       showCallableBadge: true,
       showSharedBadge: true,
       showDefaultIcon: false,
@@ -75,8 +69,6 @@ describe('workflowLibraryListItemState', () => {
         },
       })
     ).toEqual({
-      showUnsupportedBadge: false,
-      unsupportedMessageKey: null,
       showCallableBadge: true,
       showSharedBadge: false,
       showDefaultIcon: true,
