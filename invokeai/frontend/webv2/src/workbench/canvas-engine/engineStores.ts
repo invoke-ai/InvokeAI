@@ -268,6 +268,17 @@ export interface KeyedVersionStore {
   subscribe(listener: () => void): () => void;
 }
 
+export type LayerThumbnailStatus = 'loading' | 'ready' | 'error';
+
+/** A per-layer thumbnail request state; absence represents `idle`. */
+export interface KeyedThumbnailStatusStore {
+  get(key: string): LayerThumbnailStatus | undefined;
+  set(key: string, value: LayerThumbnailStatus): void;
+  delete(key: string): void;
+  clear(): void;
+  subscribeKey(key: string, listener: () => void): () => void;
+}
+
 const createKeyedVersionStore = (): KeyedVersionStore => {
   const values = new Map<string, number>();
   const keyedListeners = new Map<string, Set<() => void>>();
@@ -316,6 +327,50 @@ const createKeyedVersionStore = (): KeyedVersionStore => {
   };
 };
 
+const createKeyedThumbnailStatusStore = (): KeyedThumbnailStatusStore => {
+  const values = new Map<string, LayerThumbnailStatus>();
+  const keyedListeners = new Map<string, Set<() => void>>();
+  const notify = (key: string): void => {
+    for (const listener of keyedListeners.get(key) ?? []) {
+      listener();
+    }
+  };
+
+  return {
+    clear: () => {
+      const keys = [...values.keys()];
+      values.clear();
+      for (const key of keys) {
+        notify(key);
+      }
+    },
+    delete: (key) => {
+      if (values.delete(key)) {
+        notify(key);
+      }
+    },
+    get: (key) => values.get(key),
+    set: (key, value) => {
+      if (values.get(key) === value) {
+        return;
+      }
+      values.set(key, value);
+      notify(key);
+    },
+    subscribeKey: (key, listener) => {
+      const listeners = keyedListeners.get(key) ?? new Set<() => void>();
+      listeners.add(listener);
+      keyedListeners.set(key, listeners);
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0) {
+          keyedListeners.delete(key);
+        }
+      };
+    },
+  };
+};
+
 /** The bundle of transient stores owned by one engine instance. */
 export interface EngineStores {
   activeTool: ScalarStore<ToolId>;
@@ -323,6 +378,7 @@ export interface EngineStores {
   viewportReady: ScalarStore<boolean>;
   cursor: ScalarStore<string>;
   thumbnailVersion: KeyedVersionStore;
+  thumbnailStatus: KeyedThumbnailStatusStore;
   /** Brush tool options (size / color / opacity / pressure). */
   brushOptions: ScalarStore<BrushOptions>;
   /** Eraser tool options (size / opacity). */
@@ -576,6 +632,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
   thumbnailVersion: createKeyedVersionStore(),
+  thumbnailStatus: createKeyedThumbnailStatusStore(),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
   viewportReady: createScalarStore<boolean>(false),
   zoom: createScalarStore<number>(1),

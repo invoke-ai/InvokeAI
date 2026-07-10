@@ -19,6 +19,51 @@ describe('createLayerCacheStore', () => {
     expect(store.get('layer-1')).toBe(a);
   });
 
+  it('marks new allocations as never published', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+
+    expect(store.getOrCreate('origin', 10, 10).hasPublishedPixels).toBe(false);
+    expect(store.getOrCreateRect('rect', { height: 10, width: 10, x: 2, y: 3 }).hasPublishedPixels).toBe(false);
+    expect(store.growToRect('grown', { height: 10, width: 10, x: 2, y: 3 }).hasPublishedPixels).toBe(false);
+  });
+
+  it('marks installed raster replacements as published', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const prepared = store.prepareReplacement(
+      'layer-1',
+      { height: 10, width: 10, x: 0, y: 0 },
+      backend.createSurface(10, 10)
+    );
+
+    expect(store.installReplacement(prepared).hasPublishedPixels).toBe(true);
+  });
+
+  it('preserves published pixels through invalidation so stale previews remain drawable', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const entry = store.installReplacement(
+      store.prepareReplacement('layer-1', { height: 10, width: 10, x: 0, y: 0 }, backend.createSurface(10, 10))
+    );
+
+    store.invalidate('layer-1');
+
+    expect(entry.stale).toBe(true);
+    expect(entry.hasPublishedPixels).toBe(true);
+  });
+
+  it('resets publication readiness when a resize destroys the old pixels', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const entry = store.installReplacement(
+      store.prepareReplacement('layer-1', { height: 10, width: 10, x: 0, y: 0 }, backend.createSurface(10, 10))
+    );
+
+    store.getOrCreate('layer-1', 20, 20);
+
+    expect(entry.hasPublishedPixels).toBe(false);
+  });
+
   it('resizes the surface (and marks stale) when the requested size changes', () => {
     const store = createLayerCacheStore(createTestStubRasterBackend());
     const entry = store.getOrCreate('layer-1', 100, 50);

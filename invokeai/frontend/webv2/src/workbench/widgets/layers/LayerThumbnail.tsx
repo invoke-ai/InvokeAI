@@ -3,10 +3,10 @@ import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { CanvasLayerContract } from '@workbench/types';
 import type { CSSProperties } from 'react';
 
-import { Box, Icon } from '@chakra-ui/react';
+import { Box, Icon, IconButton } from '@chakra-ui/react';
 import { getImageThumbnailUrl } from '@workbench/gallery/api';
-import { useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
-import { ImageOffIcon } from 'lucide-react';
+import { useLayerThumbnailStatus, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
+import { ImageOffIcon, RefreshCwIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 /** Backing-store cap for the thumbnail canvas (kept ≤128px per the engine contract). */
@@ -30,6 +30,7 @@ const layerImageName = (layer: CanvasLayerContract): string | null =>
 export const LayerThumbnail = ({ engine, layer }: { engine: CanvasEngine | null; layer: CanvasLayerContract }) => {
   // Re-renders (and thus re-runs the ref callback below) when the cache repaints.
   const version = useLayerThumbnailVersion(engine, layer.id);
+  const status = useLayerThumbnailStatus(engine, layer.id);
   const [drawn, setDrawn] = useState(false);
 
   const bindCanvas = useCallback(
@@ -41,14 +42,23 @@ export const LayerThumbnail = ({ engine, layer }: { engine: CanvasEngine | null;
         setDrawn(false);
         return;
       }
+      if (status === 'idle') {
+        void engine.requestLayerThumbnail(layer.id);
+      }
       setDrawn(engine.drawLayerThumbnail(layer.id, canvas, THUMBNAIL_MAX_PX));
     },
     // `version` is a deliberate identity trigger: a repaint bumps it, giving the
     // callback a new identity so React re-runs it and re-blits the cache.
     // react-compiler can't model that implicit use, so it is suppressed here.
     // eslint-disable-next-line react/react-compiler
-    [engine, layer.id, version]
+    [engine, layer.id, status, version]
   );
+
+  const retry = useCallback(() => {
+    if (engine) {
+      void engine.requestLayerThumbnail(layer.id);
+    }
+  }, [engine, layer.id]);
 
   const fallbackImage = layerImageName(layer);
 
@@ -73,6 +83,20 @@ export const LayerThumbnail = ({ engine, layer }: { engine: CanvasEngine | null;
             <Icon as={ImageOffIcon} boxSize="3.5" />
           </Box>
         ))}
+      {status === 'error' ? (
+        <IconButton
+          aria-label={`Retry thumbnail for ${layer.name}`}
+          inset="0"
+          minH="0"
+          minW="0"
+          onClick={retry}
+          position="absolute"
+          size="xs"
+          variant="surface"
+        >
+          <RefreshCwIcon />
+        </IconButton>
+      ) : null}
     </Box>
   );
 };

@@ -30,6 +30,8 @@ export interface LayerCacheEntry {
   readonly layerId: string;
   /** The backing surface holding the layer's rasterized pixels. */
   surface: RasterSurface;
+  /** True only after real pixels have been published into this allocation. */
+  hasPublishedPixels: boolean;
   /**
    * The surface's content bounds in the layer's LOCAL coordinate space. The
    * surface holds `rect.width`×`rect.height` pixels; surface pixel `(sx, sy)`
@@ -161,6 +163,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     if (existing) {
       if (existing.surface.width !== width || existing.surface.height !== height) {
         existing.surface.resize(width, height);
+        existing.hasPublishedPixels = false;
         existing.stale = true;
       }
       // Origin-anchored: this variant always places the surface at (0, 0).
@@ -169,6 +172,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
       return existing;
     }
     const entry: LayerCacheEntry = {
+      hasPublishedPixels: false,
       lastUsed: 0,
       layerId,
       rect: { height, width, x: 0, y: 0 },
@@ -190,6 +194,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     const width = Math.max(0, Math.round(rect.width));
     const height = Math.max(0, Math.round(rect.height));
     const entry: LayerCacheEntry = {
+      hasPublishedPixels: false,
       lastUsed: 0,
       layerId,
       rect: { height, width, x: rect.x, y: rect.y },
@@ -212,6 +217,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
     };
     if (!existing) {
       const entry: LayerCacheEntry = {
+        hasPublishedPixels: false,
         lastUsed: 0,
         layerId,
         rect: targetRect,
@@ -278,6 +284,7 @@ export const createLayerCacheStore = (backend: RasterBackend): LayerCacheStore =
       rememberFloor(existing);
     }
     const entry: LayerCacheEntry = {
+      hasPublishedPixels: true,
       lastUsed: 0,
       layerId: prepared.layerId,
       rect: prepared.rect,

@@ -12,6 +12,7 @@ const BRIGHTEN: CanvasAdjustmentsContract = { brightness: 0.5, contrast: 0, satu
 const CONTRAST: CanvasAdjustmentsContract = { brightness: 0, contrast: 0.5, saturation: 0 };
 
 const makeEntry = (layerId: string, surface: StubRasterSurface, version = 0): LayerCacheEntry => ({
+  hasPublishedPixels: true,
   lastUsed: 0,
   layerId,
   rect: { height: surface.height, width: surface.width, x: 0, y: 0 },

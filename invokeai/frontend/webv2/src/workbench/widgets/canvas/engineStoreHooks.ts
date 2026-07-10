@@ -20,6 +20,7 @@ import type {
   TextEditSession,
   TextToolOptions,
   TransformSession,
+  LayerThumbnailStatus,
 } from '@workbench/canvas-engine/engineStores';
 import type { ToolId } from '@workbench/canvas-engine/types';
 
@@ -41,6 +42,19 @@ export const useLayerThumbnailVersion = (engine: CanvasEngine | null, layerId: s
     [engine, layerId]
   );
   const getSnapshot = useCallback(() => engine?.stores.thumbnailVersion.get(layerId), [engine, layerId]);
+  return useSyncExternalStore(subscribe, getSnapshot);
+};
+
+/** Subscribes to one layer's thumbnail request state; an absent key is idle. */
+export const useLayerThumbnailStatus = (
+  engine: CanvasEngine | null,
+  layerId: string
+): LayerThumbnailStatus | 'idle' => {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => engine?.stores.thumbnailStatus.subscribeKey(layerId, onStoreChange) ?? (() => {}),
+    [engine, layerId]
+  );
+  const getSnapshot = useCallback(() => engine?.stores.thumbnailStatus.get(layerId) ?? 'idle', [engine, layerId]);
   return useSyncExternalStore(subscribe, getSnapshot);
 };
 

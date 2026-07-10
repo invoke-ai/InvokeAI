@@ -248,8 +248,10 @@ interface RasterizationJob {
   version: number;
   documentGeneration: number;
   source: CanvasLayerSourceContract;
-  promise: Promise<'published' | 'stale'>;
+  promise: Promise<'published' | 'stale' | 'error'>;
 }
+
+export type LayerThumbnailRequestResult = 'ready' | 'stale' | 'error' | 'missing' | 'unsupported';
 
 /** Structural equality for JSON-safe canvas contracts (including synthetic mask paint sources). */
 const isDeeplyEqual = (left: unknown, right: unknown): boolean => {
@@ -378,6 +380,8 @@ export interface CanvasEngine {
    * layers panel redraws when a layer's `stores.thumbnailVersion` bumps.
    */
   drawLayerThumbnail(layerId: string, target: HTMLCanvasElement, maxSize: number): boolean;
+  /** Ensures thumbnail pixels exist, independent of canvas attachment or layer visibility. */
+  requestLayerThumbnail(layerId: string): Promise<LayerThumbnailRequestResult>;
   /**
    * Composites the layer identified by `upperLayerId` down INTO the layer
    * directly below it, baking the upper layer's pixels (with its opacity/blend) into a new
@@ -955,8 +959,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const notifyLayerPainted = (layerId: string): void => {
     const entry = layerCache.get(layerId);
     if (entry) {
+      entry.hasPublishedPixels = true;
       entry.version += 1;
       stores.thumbnailVersion.set(layerId, entry.version);
+      stores.thumbnailStatus.set(layerId, 'ready');
     }
     if (filterPreviews.get(layerId)?.guard) {
       clearFilterPreview(layerId);
@@ -967,6 +973,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   /** Invalidates cached pixels and drops only previews tied to that exact cache version. */
   const invalidateLayerCache = (layerId: string): void => {
     layerCache.invalidate(layerId);
+    stores.thumbnailStatus.delete(layerId);
     if (filterPreviews.get(layerId)?.guard) {
       clearFilterPreview(layerId);
     }
@@ -1210,7 +1217,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const getOrStartLayerRasterization = (
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV2
-  ): Promise<'published' | 'stale'> => {
+  ): Promise<'published' | 'stale' | 'error'> => {
     const liveSource = renderableSourceOf(layer);
     if (!liveSource || !isSupportedExportSource(liveSource)) {
       return Promise.resolve('stale');
@@ -1250,8 +1257,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
 
     const scratch = backend.createSurface(contentRect.width, contentRect.height);
-    let settleJob!: (result: 'published' | 'stale') => void;
-    const promise = new Promise<'published' | 'stale'>((resolve) => {
+    let settleJob!: (result: 'published' | 'stale' | 'error') => void;
+    const promise = new Promise<'published' | 'stale' | 'error'>((resolve) => {
       settleJob = resolve;
     });
     const job: RasterizationJob = {
@@ -1289,12 +1296,39 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           ctx.drawImage(result.surface.canvas, 0, 0);
         }
         currentEntry.rect = { ...result.rect };
+        currentEntry.hasPublishedPixels = true;
         currentEntry.stale = false;
         stores.thumbnailVersion.set(layer.id, currentEntry.version);
+        stores.thumbnailStatus.set(layer.id, 'ready');
         scheduler.invalidate({ layers: [layer.id] });
         return 'published';
-      } catch {
-        return 'stale';
+      } catch (error) {
+        const currentDocument = mirror.getDocument();
+        const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
+        if (
+          disposed ||
+          layerRasterizationJobs.get(layer.id) !== job ||
+          rasterDocumentGeneration !== documentGeneration ||
+          !currentLayer ||
+          layerCache.version(layer.id) !== version ||
+          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
+        ) {
+          return 'stale';
+        }
+        stores.thumbnailStatus.set(layer.id, 'error');
+        try {
+          store.dispatch({
+            area: 'canvas-engine',
+            context: { error: error instanceof Error ? error.message : String(error), layerId: layer.id },
+            message: 'Layer thumbnail rasterization failed',
+            namespace: 'canvas',
+            projectId,
+            type: 'recordError',
+          });
+        } catch {
+          // Diagnostics must not turn a handled thumbnail failure into a rejection.
+        }
+        return 'error';
       } finally {
         if (layerRasterizationJobs.get(layer.id) === job) {
           layerRasterizationJobs.delete(layer.id);
@@ -1775,6 +1809,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     layerCache.delete(layerId);
     adjustedSurfaceCache.delete(layerId);
     stores.thumbnailVersion.delete(layerId);
+    stores.thumbnailStatus.delete(layerId);
     const imageName = trackedImageNames.get(layerId);
     trackedImageNames.delete(layerId);
     if (imageName) {
@@ -2085,6 +2120,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       for (const id of evicted) {
         adjustedSurfaceCache.delete(id);
         stores.thumbnailVersion.delete(id);
+        stores.thumbnailStatus.delete(id);
       }
     }
 
@@ -2137,6 +2173,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     onDocumentReplaced: () => {
       rasterDocumentGeneration += 1;
       layerRasterizationJobs.clear();
+      stores.thumbnailStatus.clear();
       // A wholesale document swap — project switch, dims/background change, or a
       // snapshot restore that changes dims — invalidates the pixel history: its
       // entries reference layers/pixels that no longer describe the live document.
@@ -2266,6 +2303,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const unsubscribeProjectPreviewLifecycle = store.subscribe(() => {
     const activeProjectId = store.getState().activeProjectId;
     if (lastActiveProjectId === projectId && activeProjectId !== projectId) {
+      rasterDocumentGeneration += 1;
+      layerRasterizationJobs.clear();
+      stores.thumbnailStatus.clear();
       const ids = new Set<string>(guardedFilterPreviewTokens.keys());
       for (const [layerId, preview] of filterPreviews) {
         if (preview.guard) {
@@ -2577,7 +2617,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const drawLayerThumbnail = (layerId: string, target: HTMLCanvasElement, maxSize: number): boolean => {
     const entry = layerCache.get(layerId);
-    if (!entry) {
+    if (!entry || !entry.hasPublishedPixels) {
       return false;
     }
     const { height, width } = fitThumbnailSize(entry.surface.width, entry.surface.height, maxSize);
@@ -2593,6 +2633,54 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(entry.surface.canvas, 0, 0, width, height);
     return true;
+  };
+
+  const requestLayerThumbnail = async (layerId: string): Promise<LayerThumbnailRequestResult> => {
+    if (disposed) {
+      stores.thumbnailStatus.delete(layerId);
+      return 'missing';
+    }
+    const doc = mirror.getDocument();
+    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
+    if (!doc || !layer) {
+      stores.thumbnailStatus.delete(layerId);
+      return 'missing';
+    }
+    const source = renderableSourceOf(layer);
+    if (!source || !isSupportedExportSource(source)) {
+      stores.thumbnailStatus.delete(layerId);
+      return 'unsupported';
+    }
+    const entry = layerCache.get(layerId);
+    if (entry?.hasPublishedPixels && !entry.stale) {
+      stores.thumbnailStatus.set(layerId, 'ready');
+      return 'ready';
+    }
+
+    stores.thumbnailStatus.set(layerId, 'loading');
+    let result: Awaited<ReturnType<typeof getOrStartLayerRasterization>>;
+    try {
+      result = await getOrStartLayerRasterization(layer, doc);
+    } catch (error) {
+      stores.thumbnailStatus.set(layerId, 'error');
+      try {
+        store.dispatch({
+          area: 'canvas-engine',
+          context: { error: error instanceof Error ? error.message : String(error), layerId },
+          message: 'Layer thumbnail rasterization failed',
+          namespace: 'canvas',
+          projectId,
+          type: 'recordError',
+        });
+      } catch {
+        // Diagnostics must not turn a handled thumbnail failure into a rejection.
+      }
+      return 'error';
+    }
+    if (result === 'published') {
+      return 'ready';
+    }
+    return result;
   };
 
   /**
@@ -4984,6 +5072,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     adjustedSurfaceCache.dispose();
     trackedImageNames.clear();
     layerRasterizationJobs.clear();
+    stores.thumbnailStatus.clear();
     strokeListeners.clear();
   };
 
@@ -5111,6 +5200,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     openTextCreate,
     openTextEdit,
     rasterizeLayer,
+    requestLayerThumbnail,
     replaceSelectionFromImage,
     setTextEditContentReader,
     updateTextEditStyle,

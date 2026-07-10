@@ -2357,6 +2357,210 @@ describe('drawLayerThumbnail', () => {
 
     engine.dispose();
   });
+
+  it('refuses a newly allocated cache until pixels have been published', () => {
+    const pending = createDeferred<Blob>();
+    const { store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => pending.promise,
+      projectId: 'p1',
+      store,
+    });
+    const { calls, target } = createThumbnailTarget();
+
+    void engine.requestLayerThumbnail('a');
+
+    expect(engine.drawLayerThumbnail('a', target, 96)).toBe(false);
+    expect(calls).toHaveLength(0);
+    engine.dispose();
+  });
+});
+
+describe('requestLayerThumbnail', () => {
+  it('rasterizes while detached and publishes thumbnail readiness', async () => {
+    const resolver = vi.fn(() => Promise.resolve(new Blob()));
+    const { store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: resolver,
+      projectId: 'p1',
+      store,
+    });
+
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+    expect(await engine.requestLayerThumbnail('a')).toBe('ready');
+    expect(resolver).toHaveBeenCalledTimes(1);
+    expect(engine.stores.thumbnailStatus.get('a')).toBe('ready');
+    expect(engine.drawLayerThumbnail('a', createThumbnailTarget().target, 96)).toBe(true);
+    engine.dispose();
+  });
+
+  it('rasterizes disabled layers on explicit request', async () => {
+    const layer = { ...makeDoc().layers[0]!, isEnabled: false };
+    const resolver = vi.fn(() => Promise.resolve(new Blob()));
+    const { store } = createReactiveStore({ ...makeDoc(), layers: [layer] });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: resolver,
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('ready');
+    expect(resolver).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('deduplicates concurrent requests for the same source version', async () => {
+    const pending = createDeferred<Blob>();
+    const resolver = vi.fn(() => pending.promise);
+    const { store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: resolver,
+      projectId: 'p1',
+      store,
+    });
+
+    const first = engine.requestLayerThumbnail('a');
+    const second = engine.requestLayerThumbnail('a');
+    expect(resolver).toHaveBeenCalledTimes(1);
+
+    pending.resolve(new Blob());
+    expect(await Promise.all([first, second])).toEqual(['ready', 'ready']);
+    engine.dispose();
+  });
+
+  it('keeps loading until the latest source wins', async () => {
+    const first = createDeferred<Blob>();
+    const second = createDeferred<Blob>();
+    const resolver = vi.fn((imageName: string) => (imageName === 'a' ? first.promise : second.promise));
+    const doc = makeDoc();
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: resolver,
+      projectId: 'p1',
+      store,
+    });
+
+    const oldRequest = engine.requestLayerThumbnail('a');
+    setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'a-v2' })] });
+    const newRequest = engine.requestLayerThumbnail('a');
+
+    first.resolve(new Blob());
+    expect(await oldRequest).toBe('stale');
+    expect(engine.stores.thumbnailStatus.get('a')).toBe('loading');
+
+    second.resolve(new Blob());
+    expect(await newRequest).toBe('ready');
+    expect(engine.stores.thumbnailStatus.get('a')).toBe('ready');
+    engine.dispose();
+  });
+
+  it('reports failures through status and diagnostics, then retries', async () => {
+    const resolver = vi.fn().mockRejectedValueOnce(new Error('decode failed')).mockResolvedValueOnce(new Blob());
+    const { store } = createReactiveStore(makeDoc());
+    const dispatch = store.dispatch as Mock;
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: resolver,
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('error');
+    expect(engine.stores.thumbnailStatus.get('a')).toBe('error');
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ namespace: 'canvas', projectId: 'p1', type: 'recordError' })
+    );
+
+    const retry = engine.requestLayerThumbnail('a');
+    expect(engine.stores.thumbnailStatus.get('a')).toBe('loading');
+    expect(await retry).toBe('ready');
+    expect(resolver).toHaveBeenCalledTimes(2);
+    engine.dispose();
+  });
+
+  it('clears state and rejects stale completion after deletion', async () => {
+    const pending = createDeferred<Blob>();
+    const doc = makeDoc();
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => pending.promise,
+      projectId: 'p1',
+      store,
+    });
+
+    const request = engine.requestLayerThumbnail('a');
+    expect(engine.stores.thumbnailStatus.get('a')).toBe('loading');
+    setDocument({ ...doc, layers: [] });
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+
+    pending.resolve(new Blob());
+    expect(await request).toBe('stale');
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+    expect(engine.drawLayerThumbnail('a', createThumbnailTarget().target, 96)).toBe(false);
+    engine.dispose();
+  });
+
+  it('clears state when the document is replaced', async () => {
+    const doc = makeDoc();
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('ready');
+    setDocument({ ...doc, width: doc.width + 1 }, 1);
+
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+    engine.dispose();
+  });
+
+  it('clears state and rejects stale completion after project change', async () => {
+    const pending = createDeferred<Blob>();
+    const { setActiveProjectId, store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => pending.promise,
+      projectId: 'p1',
+      store,
+    });
+
+    const request = engine.requestLayerThumbnail('a');
+    setActiveProjectId('p2');
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+
+    pending.resolve(new Blob());
+    expect(await request).toBe('stale');
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+    engine.dispose();
+  });
+
+  it('clears state and rejects stale completion after disposal', async () => {
+    const pending = createDeferred<Blob>();
+    const { store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => pending.promise,
+      projectId: 'p1',
+      store,
+    });
+
+    const request = engine.requestLayerThumbnail('a');
+    engine.dispose();
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+
+    pending.resolve(new Blob());
+    expect(await request).toBe('stale');
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+  });
 });
 
 // ---- mergeLayerDown: composites the upper cache into the below local space ----
