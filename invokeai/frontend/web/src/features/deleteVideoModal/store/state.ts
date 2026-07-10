@@ -50,7 +50,7 @@ const deleteVideosWithDialog = async (video_names: string[], store: AppStore): P
   });
 };
 
-const handleDeletions = async (video_names: string[], store: AppStore) => {
+export const handleDeletions = async (video_names: string[], store: AppStore) => {
   const { dispatch, getState } = store;
 
   // Snapshot the polymorphic gallery list and the currently-displayed item *before* the
@@ -64,24 +64,32 @@ const handleDeletions = async (video_names: string[], store: AppStore) => {
   // The backend exposes single-video DELETE today; loop here so the API surface for callers
   // stays "give me a list, I'll handle it" and a future bulk endpoint can be slotted in
   // without touching call sites.
+  const deletedNames = new Set<string>();
   for (const video_name of video_names) {
     try {
       await dispatch(videosApi.endpoints.deleteVideo.initiate({ video_name }, { track: false })).unwrap();
+      deletedNames.add(video_name);
     } catch {
       // Continue with the rest of the batch — partial failures shouldn't leave the user
       // with a broken modal state.
     }
   }
 
-  // If anything in the active selection was deleted, advance to a still-living neighbour
-  // (prev > next) so the Viewer doesn't drop to its empty-state placeholder.
+  // If anything in the active selection was actually deleted, advance to a still-living
+  // neighbour (prev > next) so the Viewer doesn't drop to its empty-state placeholder.
+  // Failed deletions are excluded: those videos still exist, so the selection must not
+  // jump away from them, and they remain valid replacement candidates.
   const stateAfter = getState();
-  if (intersection(stateAfter.gallery.selection, video_names).length > 0) {
-    const replacement =
-      lastSelectedIndex >= 0
-        ? pickSelectionAfterDelete(galleryItemNames, lastSelectedIndex, new Set(video_names))
-        : null;
-    dispatch(imageSelected(replacement));
+  if (intersection(stateAfter.gallery.selection, [...deletedNames]).length > 0) {
+    if (lastSelected && !deletedNames.has(lastSelected)) {
+      // The displayed item survived (its delete failed) — keep viewing it and just prune
+      // the deleted items from the multi-selection.
+      dispatch(imageSelected(lastSelected));
+    } else {
+      const replacement =
+        lastSelectedIndex >= 0 ? pickSelectionAfterDelete(galleryItemNames, lastSelectedIndex, deletedNames) : null;
+      dispatch(imageSelected(replacement));
+    }
   }
 };
 
