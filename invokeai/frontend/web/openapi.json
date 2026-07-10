@@ -970,6 +970,15 @@
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
                     },
                     {
@@ -1291,6 +1300,15 @@
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
                     },
                     {
@@ -1610,6 +1628,15 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -1981,6 +2008,15 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -2376,6 +2412,15 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -3591,6 +3636,15 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -11636,6 +11690,15 @@
           },
           {
             "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+          },
+          {
+            "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+          },
+          {
+            "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+          },
+          {
+            "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -24678,6 +24741,546 @@
           "$ref": "#/components/schemas/LatentsOutput"
         }
       },
+      "Flux2DevLoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a collection of LoRAs to a FLUX.2 [dev] transformer and/or Mistral encoder.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA models and weights. May be a single LoRA or collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "mistral_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MistralEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mistral tokenizer/processor and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Mistral Encoder"
+          },
+          "type": {
+            "const": "flux2_dev_lora_collection_loader",
+            "default": "flux2_dev_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "flux", "flux2", "dev"],
+        "title": "Apply LoRA Collection - FLUX.2 [dev]",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
+        }
+      },
+      "Flux2DevLoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA to a FLUX.2 [dev] transformer and/or its Mistral text encoder.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 0.75,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "mistral_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MistralEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mistral tokenizer/processor and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Mistral Encoder"
+          },
+          "type": {
+            "const": "flux2_dev_lora_loader",
+            "default": "flux2_dev_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "flux", "flux2", "dev"],
+        "title": "Apply LoRA - FLUX.2 [dev]",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
+        }
+      },
+      "Flux2DevLoRALoaderOutput": {
+        "class": "output",
+        "description": "FLUX.2 [dev] LoRA loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "mistral_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MistralEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mistral tokenizer/processor and text encoder",
+            "field_kind": "output",
+            "title": "Mistral Encoder",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux2_dev_lora_loader_output",
+            "default": "flux2_dev_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "mistral_encoder", "type", "type"],
+        "title": "Flux2DevLoRALoaderOutput",
+        "type": "object"
+      },
+      "Flux2DevModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Load a FLUX.2 [dev] transformer plus its Mistral text encoder and VAE.\n\nFLUX.2 [dev] is a 32B guidance-distilled rectified flow transformer that uses\nMistral Small 3.1 (24B) as its sole text encoder, sharing the 32-channel\nAutoencoderKLFlux2 VAE with FLUX.2 Klein.\n\nWhen the transformer is a Diffusers-format checkpoint, both VAE and Mistral\nencoder can be extracted directly from the main model. For single-file\nsafetensors or GGUF transformers, you must supply standalone VAE and\nMistral encoder models, or point at a Diffusers FLUX.2 [dev] checkout for\nsub-model extraction.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "FLUX.2 [dev] model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Transformer",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["main"]
+          },
+          "vae_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone FLUX.2 VAE (AutoencoderKLFlux2). If not provided, the VAE is extracted from the Diffusers source model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["vae"]
+          },
+          "mistral_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Mistral text encoder. Required when the transformer is a single-file safetensors or GGUF without a sibling Diffusers source.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Mistral Encoder",
+            "ui_model_type": ["mistral_encoder"]
+          },
+          "mistral_source_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Diffusers FLUX.2 [dev] model to extract VAE and/or Mistral encoder from. Use this if you don't have separate VAE / Mistral encoder models. Ignored if both are provided separately.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Mistral Source (Diffusers)",
+            "ui_model_base": ["flux2"],
+            "ui_model_format": ["diffusers"],
+            "ui_model_type": ["main"]
+          },
+          "max_seq_len": {
+            "default": 512,
+            "description": "Max sequence length for the Mistral encoder. FLUX.2 [dev] uses 512 by default.",
+            "enum": [256, 512],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 512,
+            "orig_required": false,
+            "title": "Max Seq Length",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux2_dev_model_loader",
+            "default": "flux2_dev_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "flux", "flux2", "dev", "mistral"],
+        "title": "Main Model - FLUX.2 [dev]",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux2DevModelLoaderOutput"
+        }
+      },
+      "Flux2DevModelLoaderOutput": {
+        "class": "output",
+        "description": "FLUX.2 [dev] model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "mistral_encoder": {
+            "$ref": "#/components/schemas/MistralEncoderField",
+            "description": "Mistral tokenizer/processor and text encoder",
+            "field_kind": "output",
+            "title": "Mistral Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "max_seq_len": {
+            "description": "Max sequence length for the Mistral encoder.",
+            "enum": [256, 512],
+            "field_kind": "output",
+            "title": "Max Seq Length",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux2_dev_model_loader_output",
+            "default": "flux2_dev_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "mistral_encoder", "vae", "max_seq_len", "type", "type"],
+        "title": "Flux2DevModelLoaderOutput",
+        "type": "object"
+      },
+      "Flux2DevTextEncoderInvocation": {
+        "category": "prompt",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.1 text encoder.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "mistral_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MistralEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mistral tokenizer/processor and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Mistral Encoder"
+          },
+          "max_seq_len": {
+            "default": 512,
+            "description": "Max sequence length for the Mistral encoder.",
+            "enum": [256, 512],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 512,
+            "orig_required": false,
+            "title": "Max Seq Len",
+            "type": "integer"
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TensorField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask defining the region that this conditioning prompt applies to.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "type": {
+            "const": "flux2_dev_text_encoder",
+            "default": "flux2_dev_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "flux", "flux2", "dev", "mistral"],
+        "title": "Prompt - FLUX.2 [dev]",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/FluxConditioningOutput"
+        }
+      },
       "Flux2KleinLoRACollectionLoader": {
         "category": "model",
         "class": "invocation",
@@ -25410,7 +26013,7 @@
       },
       "Flux2VariantType": {
         "type": "string",
-        "enum": ["klein_4b", "klein_4b_base", "klein_9b", "klein_9b_base"],
+        "enum": ["klein_4b", "klein_4b_base", "klein_9b", "klein_9b_base", "dev"],
         "title": "Flux2VariantType",
         "description": "FLUX.2 model variants."
       },
@@ -28990,6 +29593,18 @@
                   "$ref": "#/components/schemas/Flux2DenoiseInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux2DevLoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2DevLoRALoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2DevModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2DevTextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/Flux2KleinLoRACollectionLoader"
                 },
                 {
@@ -29684,6 +30299,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/FloatOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2DevModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/Flux2KleinLoRALoaderOutput"
@@ -36686,6 +37307,18 @@
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2DevLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevLoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevTextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2KleinLoRACollectionLoader"
               },
               {
@@ -37339,6 +37972,12 @@
                 "$ref": "#/components/schemas/FloatOutput"
               },
               {
+                "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevModelLoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2KleinLoRALoaderOutput"
               },
               {
@@ -37834,6 +38473,18 @@
               },
               {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevLoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux2KleinLoRACollectionLoader"
@@ -38645,6 +39296,18 @@
           "flux2_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
+          "flux2_dev_lora_collection_loader": {
+            "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
+          },
+          "flux2_dev_lora_loader": {
+            "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
+          },
+          "flux2_dev_model_loader": {
+            "$ref": "#/components/schemas/Flux2DevModelLoaderOutput"
+          },
+          "flux2_dev_text_encoder": {
+            "$ref": "#/components/schemas/FluxConditioningOutput"
+          },
           "flux2_klein_lora_collection_loader": {
             "$ref": "#/components/schemas/Flux2KleinLoRALoaderOutput"
           },
@@ -39294,6 +39957,10 @@
           "float_range",
           "float_to_int",
           "flux2_denoise",
+          "flux2_dev_lora_collection_loader",
+          "flux2_dev_lora_loader",
+          "flux2_dev_model_loader",
+          "flux2_dev_text_encoder",
           "flux2_klein_lora_collection_loader",
           "flux2_klein_lora_loader",
           "flux2_klein_model_loader",
@@ -39759,6 +40426,18 @@
               },
               {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevLoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux2KleinLoRACollectionLoader"
@@ -40658,6 +41337,18 @@
               },
               {
                 "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevLoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DevTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux2KleinLoRACollectionLoader"
@@ -49729,7 +50420,7 @@
           "variant"
         ],
         "title": "Main_Diffusers_Flux2_Config",
-        "description": "Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."
+        "description": "Model config for FLUX.2 models in diffusers format (FLUX.2 Klein and FLUX.2 [dev])."
       },
       "Main_Diffusers_QwenImage_Config": {
         "properties": {
@@ -55070,6 +55761,485 @@
           "$ref": "#/components/schemas/VAEOutput"
         }
       },
+      "MistralEncoderField": {
+        "description": "Field for the Mistral text encoder used by FLUX.2 [dev].\n\nThe \"tokenizer\" submodel actually points to the multimodal processor (AutoProcessor /\nMistral3Processor), which wraps the tokenizer plus the chat template needed by FLUX.2.",
+        "properties": {
+          "tokenizer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load tokenizer / processor submodel"
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load text_encoder submodel"
+          },
+          "loras": {
+            "description": "LoRAs to apply on model loading",
+            "items": {
+              "$ref": "#/components/schemas/LoRAField"
+            },
+            "title": "Loras",
+            "type": "array"
+          }
+        },
+        "required": ["tokenizer", "text_encoder"],
+        "title": "MistralEncoderField",
+        "type": "object"
+      },
+      "MistralEncoder_Checkpoint_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "mistral_encoder",
+            "title": "Type",
+            "default": "mistral_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/MistralVariantType",
+            "description": "Mistral text encoder variant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only",
+          "variant"
+        ],
+        "title": "MistralEncoder_Checkpoint_Config",
+        "description": "Configuration for a single-file Mistral text encoder (safetensors).\n\nAccepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3\n(BFL canonical / upstream Mistral 3.x single-files). The loader uses the\ndetected variant to decide whether to keep or strip the final RMSNorm."
+      },
+      "MistralEncoder_Diffusers_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "mistral_encoder",
+            "title": "Type",
+            "default": "mistral_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "mistral_encoder",
+            "title": "Format",
+            "default": "mistral_encoder"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/MistralVariantType",
+            "description": "Mistral text encoder variant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "base",
+          "type",
+          "format",
+          "cpu_only",
+          "variant"
+        ],
+        "title": "MistralEncoder_Diffusers_Config",
+        "description": "Configuration for a Mistral text encoder in HuggingFace transformers/diffusers folder layout.\n\nMatches:\n- Full pipelines downloaded as just the `text_encoder/` subfolder\n  (e.g. `black-forest-labs/FLUX.2-dev/text_encoder/`)\n- Quantized variants such as `diffusers/FLUX.2-dev-bnb-4bit/text_encoder/`\n\nDoes NOT match a full FLUX.2 pipeline directory \u2014 those are picked up by the\n`Main_Diffusers_Flux2_Config` instead.\n\nAccepts both:\n- 30-layer \"cow\" distillation (recommended, produces the cleanest output)\n- 40-layer Mistral Small 3 (BFL canonical / upstream Mistral 3.x \u2014 also works,\n  slightly weaker prompt adherence than cow in our tests)\n\nThe variant field records which one was probed so the loader can decide\nwhether to keep the final RMSNorm (40-layer) or strip it (30-layer cow)."
+      },
+      "MistralEncoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "mistral_encoder",
+            "title": "Type",
+            "default": "mistral_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/MistralVariantType",
+            "description": "Mistral text encoder variant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only",
+          "variant"
+        ],
+        "title": "MistralEncoder_GGUF_Config",
+        "description": "Configuration for a GGUF-quantized Mistral text encoder.\n\nAccepts both 30-layer cow GGUFs and 40-layer Mistral Small 3 GGUFs \u2014 see\n``MistralEncoder_Checkpoint_Config`` for variant handling."
+      },
+      "MistralVariantType": {
+        "type": "string",
+        "enum": ["cow_mistral3_small", "mistral3_24b"],
+        "title": "MistralVariantType",
+        "description": "Mistral text encoder variants used by FLUX.2 [dev]."
+      },
       "ModelFormat": {
         "type": "string",
         "enum": [
@@ -55085,6 +56255,7 @@
           "t5_encoder",
           "qwen3_encoder",
           "qwen_vl_encoder",
+          "mistral_encoder",
           "bnb_quantized_int8b",
           "bnb_quantized_nf4b",
           "gguf_quantized",
@@ -55522,6 +56693,15 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -56096,6 +57276,15 @@
                     "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
                   },
                   {
@@ -56553,6 +57742,15 @@
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
               },
               {
+                "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
               },
               {
@@ -56858,6 +58056,15 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -57260,6 +58467,9 @@
                 "$ref": "#/components/schemas/Qwen3VariantType"
               },
               {
+                "$ref": "#/components/schemas/MistralVariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -57398,6 +58608,7 @@
           "t5_encoder",
           "qwen3_encoder",
           "qwen_vl_encoder",
+          "mistral_encoder",
           "spandrel_image_to_image",
           "siglip",
           "flux_redux",
@@ -57614,6 +58825,15 @@
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -66860,6 +68080,9 @@
                 "$ref": "#/components/schemas/Qwen3VariantType"
               },
               {
+                "$ref": "#/components/schemas/MistralVariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -67018,6 +68241,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/MistralVariantType"
               },
               {
                 "type": "null"
@@ -67950,6 +69176,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/MistralVariantType"
               },
               {
                 "type": "null"
