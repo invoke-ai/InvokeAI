@@ -165,6 +165,7 @@ describe('savedWorkflowFieldUtils', () => {
       query: 'landscape',
       categories: ['user', 'default'],
       is_public: undefined,
+      callable: true,
     });
     expect(getSavedWorkflowPickerSharedQueryArg('landscape')).toMatchObject({
       page: 0,
@@ -172,6 +173,7 @@ describe('savedWorkflowFieldUtils', () => {
       query: 'landscape',
       categories: ['user'],
       is_public: true,
+      callable: true,
     });
   });
 

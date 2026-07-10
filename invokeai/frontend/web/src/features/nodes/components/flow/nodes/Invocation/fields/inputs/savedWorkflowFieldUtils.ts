@@ -28,6 +28,7 @@ const baseSavedWorkflowPickerQueryArg = {
   direction: 'ASC',
   tags: [] as string[],
   has_been_opened: undefined,
+  callable: true,
 } as const;
 
 export const getSavedWorkflowPickerOwnedQueryArg = (query = '') => ({
