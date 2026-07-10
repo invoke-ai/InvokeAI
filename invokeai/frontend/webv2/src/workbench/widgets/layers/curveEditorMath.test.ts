@@ -1,6 +1,39 @@
-import { describe, expect, it } from 'vitest';
+import type { CanvasAdjustmentsContract } from '@workbench/types';
 
-import { curvePointFromSvg, curvePointToSvg, getCurveGridCoordinates, resolveCurveDragEnd } from './curveEditorMath';
+import { describe, expect, it, vi } from 'vitest';
+
+import { curvePointFromSvg, curvePointToSvg, finishCurveDragResult, getCurveGridCoordinates } from './curveEditorMath';
+
+const BEFORE: CanvasAdjustmentsContract = {
+  brightness: 0,
+  contrast: 0,
+  curves: {
+    b: [
+      [0, 0],
+      [255, 255],
+    ],
+    g: [
+      [0, 0],
+      [255, 255],
+    ],
+    r: [
+      [0, 0],
+      [255, 255],
+    ],
+  },
+  saturation: 0,
+};
+
+const CURRENT: CanvasAdjustmentsContract = {
+  ...BEFORE,
+  curves: {
+    ...BEFORE.curves!,
+    r: [
+      [0, 32],
+      [255, 255],
+    ],
+  },
+};
 
 describe('curve editor coordinates', () => {
   it('insets endpoints so handles are fully visible', () => {
@@ -18,29 +51,25 @@ describe('curve editor coordinates', () => {
     expect(getCurveGridCoordinates()).toEqual([6, 48, 90, 132, 174]);
   });
 
-  it('restores pre-drag points without a commit when cancelled', () => {
-    const before = [
-      [0, 0],
-      [255, 255],
-    ];
-    const current = [
-      [0, 32],
-      [255, 255],
-    ];
+  it('restores the pre-drag snapshot without committing when cancelled after a live change', () => {
+    const onPreview = vi.fn();
+    const onCommit = vi.fn();
 
-    expect(resolveCurveDragEnd(true, before, current)).toEqual({ commit: null, restore: before });
+    finishCurveDragResult({ before: BEFORE, cancelled: true, current: CURRENT, onCommit, onPreview });
+
+    expect(onPreview).toHaveBeenCalledTimes(1);
+    expect(onPreview).toHaveBeenCalledWith(BEFORE);
+    expect(onCommit).not.toHaveBeenCalled();
   });
 
-  it('commits changed points without restoring when completed', () => {
-    const before = [
-      [0, 0],
-      [255, 255],
-    ];
-    const current = [
-      [0, 32],
-      [255, 255],
-    ];
+  it('commits the current snapshot without restoring on pointer up', () => {
+    const onPreview = vi.fn();
+    const onCommit = vi.fn();
 
-    expect(resolveCurveDragEnd(false, before, current)).toEqual({ commit: current, restore: null });
+    finishCurveDragResult({ before: BEFORE, cancelled: false, current: CURRENT, onCommit, onPreview });
+
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(CURRENT);
+    expect(onPreview).not.toHaveBeenCalled();
   });
 });

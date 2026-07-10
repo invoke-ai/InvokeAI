@@ -15,8 +15,8 @@ import {
   CURVE_SIZE,
   curvePointFromSvg,
   curvePointToSvg,
+  finishCurveDragResult,
   getCurveGridCoordinates,
-  resolveCurveDragEnd,
 } from './curveEditorMath';
 import { applyStructural } from './layerOps';
 
@@ -30,6 +30,20 @@ const IDENTITY_CURVE: [number, number][] = [
   [0, 0],
   [255, 255],
 ];
+
+const withCurve = (
+  base: CanvasAdjustmentsContract,
+  channel: CurveChannel,
+  points: [number, number][]
+): CanvasAdjustmentsContract => ({
+  ...base,
+  curves: {
+    b: base.curves?.b ?? IDENTITY_CURVE,
+    g: base.curves?.g ?? IDENTITY_CURVE,
+    r: base.curves?.r ?? IDENTITY_CURVE,
+    [channel]: points,
+  },
+});
 
 const formatSigned = (value: number): string => `${value > 0 ? '+' : ''}${Math.round(value * 100)}`;
 
@@ -108,29 +122,12 @@ const AdjustmentsControls = ({ adjustments, engine, layer }: AdjustmentsControls
     commit(t('widgets.layers.adjustments.reset'), { ...DEFAULT_ADJUSTMENTS }, adjustments);
   }, [adjustments, commit, t]);
 
-  const withCurve = useCallback(
-    (
-      base: CanvasAdjustmentsContract,
-      channel: CurveChannel,
-      points: [number, number][]
-    ): CanvasAdjustmentsContract => ({
-      ...base,
-      curves: {
-        b: base.curves?.b ?? IDENTITY_CURVE,
-        g: base.curves?.g ?? IDENTITY_CURVE,
-        r: base.curves?.r ?? IDENTITY_CURVE,
-        [channel]: points,
-      },
-    }),
-    []
-  );
-
   // Live (render-only) during a curve-point drag: preview without pushing history.
   const handleCurveLive = useCallback(
     (channel: CurveChannel, points: [number, number][]) => {
       patchLive(withCurve(adjustments, channel, points));
     },
-    [adjustments, patchLive, withCurve]
+    [adjustments, patchLive]
   );
 
   const handleCurveCancel = useCallback((before: CanvasAdjustmentsContract) => patchLive(before), [patchLive]);
@@ -140,10 +137,10 @@ const AdjustmentsControls = ({ adjustments, engine, layer }: AdjustmentsControls
   // `adjustments` has already advanced via the live previews), so it undoes the
   // WHOLE gesture rather than the last frame.
   const handleCurveCommit = useCallback(
-    (channel: CurveChannel, points: [number, number][], before: CanvasAdjustmentsContract) => {
-      commit(t('widgets.layers.adjustments.curves'), withCurve(before, channel, points), before);
+    (current: CanvasAdjustmentsContract, before: CanvasAdjustmentsContract) => {
+      commit(t('widgets.layers.adjustments.curves'), current, before);
     },
-    [commit, t, withCurve]
+    [commit, t]
   );
 
   return (
@@ -249,7 +246,7 @@ interface CurvesEditorProps {
   /** Restores the pre-drag snapshot when the browser cancels a gesture. */
   onCancel: (before: CanvasAdjustmentsContract) => void;
   /** Commits one history entry for a completed gesture, undoing to `before`. */
-  onCommit: (channel: CurveChannel, points: [number, number][], before: CanvasAdjustmentsContract) => void;
+  onCommit: (current: CanvasAdjustmentsContract, before: CanvasAdjustmentsContract) => void;
 }
 
 /** A compact per-channel curves editor (SVG): drag points, click to add, double-click to remove. */
@@ -357,12 +354,13 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
     beforeRef.current = null;
     latestPointsRef.current = null;
     if (wasDragging && before && finalPoints) {
-      const resolution = resolveCurveDragEnd(cancelled, before, finalPoints);
-      if (resolution.commit) {
-        onCommit(channel, resolution.commit, before);
-      } else if (resolution.restore) {
-        onCancel(resolution.restore);
-      }
+      finishCurveDragResult({
+        before,
+        cancelled,
+        current: withCurve(before, channel, finalPoints),
+        onCommit: (current) => onCommit(current, before),
+        onPreview: onCancel,
+      });
     }
   };
 
@@ -379,7 +377,7 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
       return;
     }
     const next = [...points, [nx, ny] as [number, number]].sort((a, b) => a[0] - b[0]);
-    onCommit(channel, next, adjustments);
+    onCommit(withCurve(adjustments, channel, next), adjustments);
   };
 
   const handleRemove = (index: number) => (event: ReactPointerEvent<SVGCircleElement>) => {
@@ -388,8 +386,11 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
       return;
     }
     onCommit(
-      channel,
-      points.filter((_, i) => i !== index),
+      withCurve(
+        adjustments,
+        channel,
+        points.filter((_, i) => i !== index)
+      ),
       adjustments
     );
   };

@@ -1,3 +1,5 @@
+import type { CanvasAdjustmentsContract } from '@workbench/types';
+
 export const CURVE_SIZE = 180;
 export const CURVE_PADDING = 6;
 
@@ -7,12 +9,27 @@ const clamp255 = (value: number): number => Math.max(0, Math.min(255, value));
 export const getCurveGridCoordinates = (): number[] =>
   Array.from({ length: 5 }, (_, index) => CURVE_PADDING + (index / 4) * CURVE_DRAW_SIZE);
 
-export const resolveCurveDragEnd = <TRestore, TCommit>(
-  cancelled: boolean,
-  before: TRestore,
-  current: TCommit
-): { commit: TCommit | null; restore: TRestore | null } =>
-  cancelled ? { commit: null, restore: before } : { commit: current, restore: null };
+interface FinishCurveDragResultArgs {
+  cancelled: boolean;
+  before: CanvasAdjustmentsContract;
+  current: CanvasAdjustmentsContract;
+  onPreview: (adjustments: CanvasAdjustmentsContract) => void;
+  onCommit: (adjustments: CanvasAdjustmentsContract) => void;
+}
+
+export const finishCurveDragResult = ({
+  before,
+  cancelled,
+  current,
+  onCommit,
+  onPreview,
+}: FinishCurveDragResultArgs): void => {
+  if (cancelled) {
+    onPreview(before);
+    return;
+  }
+  onCommit(current);
+};
 
 export const curvePointToSvg = (x: number, y: number): { cx: number; cy: number } => ({
   cx: CURVE_PADDING + (clamp255(x) / 255) * CURVE_DRAW_SIZE,
