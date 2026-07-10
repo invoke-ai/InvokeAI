@@ -55,19 +55,20 @@ import {
   createCheckerboardTile,
   shouldSmoothAtZoom,
 } from '@workbench/canvas-engine/render/compositor';
+import { renderControlTransparency } from '@workbench/canvas-engine/render/controlTransparency';
 import { createFontLoader, domFontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
 import {
   createLayerCacheStore,
   type LayerCacheEntry,
   type LayerCacheStore,
 } from '@workbench/canvas-engine/render/layerCache';
-import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill';
+import { colorizeMask, createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill';
 import { renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
 import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
 import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
 import { textFontString, type TextSource } from '@workbench/canvas-engine/render/rasterizers/textRasterizer';
 import { createRenderScheduler } from '@workbench/canvas-engine/render/scheduler';
-import { fitThumbnailSize } from '@workbench/canvas-engine/render/thumbnail';
+import { fitThumbnailSize, getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
 import { ANTS_STEP_PX, createAntsAnimator, type AntsAnimator } from '@workbench/canvas-engine/selection/marchingAnts';
 import { eraseMaskedRegion, fillMaskedRegion } from '@workbench/canvas-engine/selection/selectionOps';
 import { createSelectionState, type SelectionState } from '@workbench/canvas-engine/selection/selectionState';
@@ -759,6 +760,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const trackedImageNames = new Map<string, string>();
   /** Every live layer's source image, including layers that have never rasterized. */
   const mirroredLayerImageNames = new Map<string, string>();
+  /** Display-only thumbnail inputs mirrored separately from source-cache identity. */
+  const thumbnailDisplayKeys = new Map<string, string>();
   /** The newest isolated rasterization job for each layer id. */
   const layerRasterizationJobs = new Map<string, RasterizationJob>();
   /** All physically running jobs, including canceled jobs superseded in the per-layer map. */
@@ -2268,7 +2271,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       const doc = mirror.getDocument();
       const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
       mirroredLayerImageNames.clear();
+      thumbnailDisplayKeys.clear();
       for (const layer of doc?.layers ?? []) {
+        thumbnailDisplayKeys.set(layer.id, getLayerThumbnailDisplayKey(layer));
         const imageName = layerImageName(layer);
         if (imageName) {
           mirroredLayerImageNames.set(layer.id, imageName);
@@ -2326,7 +2331,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       const session = stores.transformSession.get();
       const textSession = stores.textEditSession.get();
       for (const id of ids) {
+        const layer = doc?.layers.find((candidate) => candidate.id === id);
         if (!present.has(id)) {
+          thumbnailDisplayKeys.delete(id);
           dropLayer(id);
           const previousImageName = previousImageNames.get(id);
           if (previousImageName) {
@@ -2354,6 +2361,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           clearFilterPreview(id);
         }
         if (!sourceChanged.has(id)) {
+          if (layer) {
+            const displayKey = getLayerThumbnailDisplayKey(layer);
+            if (thumbnailDisplayKeys.get(id) !== displayKey) {
+              thumbnailDisplayKeys.set(id, displayKey);
+              const currentVersion = stores.thumbnailVersion.get(id);
+              // Cache versions are positive. Negative display tokens cannot
+              // collide with the next cache publication and suppress its redraw.
+              stores.thumbnailVersion.set(
+                id,
+                currentVersion !== undefined && currentVersion < 0 ? currentVersion - 1 : -1
+              );
+            }
+          }
           // Prop/transform-only change (opacity, blend, lock, visibility,
           // rename, nudge): the layer object was replaced but its SOURCE
           // reference is unchanged, so the rasterized pixels are still valid.
@@ -2370,6 +2390,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         // paint-bitmap ref the bitmap store just applied — the cache already
         // holds those pixels, so re-rasterizing would needlessly re-fetch and
         // could flicker. Any other swap invalidates → re-rasterizes.
+        if (layer) {
+          thumbnailDisplayKeys.set(id, getLayerThumbnailDisplayKey(layer));
+        }
         untrackLayerImage(id);
         const previousImageName = previousImageNames.get(id);
         if (previousImageName) {
@@ -2387,6 +2410,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   });
 
   for (const layer of mirror.getDocument()?.layers ?? []) {
+    thumbnailDisplayKeys.set(layer.id, getLayerThumbnailDisplayKey(layer));
     const imageName = layerImageName(layer);
     if (imageName) {
       mirroredLayerImageNames.set(layer.id, imageName);
@@ -2715,7 +2739,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const drawLayerThumbnail = (layerId: string, target: HTMLCanvasElement, maxSize: number): boolean => {
     const entry = layerCache.get(layerId);
-    if (!entry || !entry.hasPublishedPixels) {
+    const layer = mirror.getDocument()?.layers.find((candidate) => candidate.id === layerId);
+    if (!entry || !entry.hasPublishedPixels || !layer) {
       return false;
     }
     const { height, width } = fitThumbnailSize(entry.surface.width, entry.surface.height, maxSize);
@@ -2729,7 +2754,31 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     target.width = width;
     target.height = height;
     ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(entry.surface.canvas, 0, 0, width, height);
+
+    const checkerPattern = ctx.createPattern(getCheckerboardTile().canvas as CanvasImageSource, 'repeat');
+    if (checkerPattern) {
+      ctx.fillStyle = checkerPattern;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    let displaySurface = entry.surface;
+    if (layer.type === 'raster') {
+      displaySurface = getAdjustedSurface(layer, entry) ?? displaySurface;
+    } else if (layer.type === 'control' && layer.withTransparencyEffect) {
+      displaySurface = renderControlTransparency(backend, displaySurface, displaySurface.width, displaySurface.height);
+    } else if (layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') {
+      const { fill } = layer.mask;
+      displaySurface = colorizeMask(
+        backend,
+        displaySurface,
+        displaySurface.width,
+        displaySurface.height,
+        fill,
+        getMaskPatternTile(fill.style, fill.color)
+      );
+    }
+    ctx.globalAlpha = layer.opacity;
+    ctx.drawImage(displaySurface.canvas as CanvasImageSource, 0, 0, width, height);
     return true;
   };
 

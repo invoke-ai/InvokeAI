@@ -2355,6 +2355,47 @@ describe('commitStructural', () => {
 
 // ---- drawLayerThumbnail: cache-backed layer previews --------------------
 
+const controlLayerForThumbnail = (id: string): CanvasLayerContract =>
+  ({
+    adapter: {
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      kind: 'controlnet',
+      model: null,
+      weight: 1,
+    },
+    blendMode: 'normal',
+    id,
+    isEnabled: true,
+    isLocked: false,
+    name: id,
+    opacity: 1,
+    source: { image: { height: 10, imageName: id, width: 10 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect: true,
+  }) as CanvasLayerContract;
+
+const thumbnailMaskLayer = (id: string, type: 'inpaint_mask' | 'regional_guidance'): CanvasLayerContract =>
+  ({
+    autoNegative: true,
+    blendMode: 'normal',
+    id,
+    isEnabled: true,
+    isLocked: false,
+    mask: {
+      bitmap: { height: 10, imageName: id, width: 10 },
+      fill: { color: '#e07575', style: 'diagonal' },
+    },
+    name: id,
+    negativePrompt: null,
+    opacity: 1,
+    positivePrompt: null,
+    referenceImages: [],
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type,
+  }) as CanvasLayerContract;
+
 const createThumbnailTarget = (): {
   calls: { args: unknown[]; op: string }[];
   target: HTMLCanvasElement;
@@ -2362,7 +2403,16 @@ const createThumbnailTarget = (): {
   const calls: { args: unknown[]; op: string }[] = [];
   const ctx = {
     clearRect: (...args: unknown[]) => calls.push({ args, op: 'clearRect' }),
+    createPattern: (...args: unknown[]) => {
+      calls.push({ args, op: 'createPattern' });
+      return 'checker-pattern';
+    },
     drawImage: (...args: unknown[]) => calls.push({ args, op: 'drawImage' }),
+    fillRect: (...args: unknown[]) => calls.push({ args, op: 'fillRect' }),
+    globalAlpha: 1,
+    set fillStyle(value: unknown) {
+      calls.push({ args: [value], op: 'fillStyle' });
+    },
   };
   const target = { getContext: () => ctx, height: 0, width: 0 } as unknown as HTMLCanvasElement;
   return { calls, target };
@@ -2402,8 +2452,152 @@ describe('drawLayerThumbnail', () => {
     // 10x10 never upscales, so the target keeps the source dimensions.
     expect(target.width).toBe(10);
     expect(target.height).toBe(10);
-    expect(calls.map((call) => call.op)).toEqual(['clearRect', 'drawImage']);
+    expect(calls.map((call) => call.op)).toEqual(['clearRect', 'createPattern', 'fillStyle', 'fillRect', 'drawImage']);
 
+    engine.dispose();
+  });
+
+  it('draws adjusted raster pixels over the checkerboard', async () => {
+    const layer = {
+      ...rasterLayer('a'),
+      adjustments: { brightness: 0.2, contrast: -0.1, saturation: 0.3 },
+    } as CanvasRasterLayerContractV2;
+    const backend = createTestStubRasterBackend();
+    const createSurface = vi.spyOn(backend, 'createSurface');
+    const { store } = createReactiveStore({ ...makeDoc(), layers: [layer] });
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    await engine.requestLayerThumbnail('a');
+    const surfaceCountBeforeDraw = createSurface.mock.calls.length;
+
+    const { calls, target } = createThumbnailTarget();
+    expect(engine.drawLayerThumbnail('a', target, 96)).toBe(true);
+    expect(createSurface.mock.calls.length).toBeGreaterThan(surfaceCountBeforeDraw);
+    const createdSurfaces = createSurface.mock.results
+      .slice(surfaceCountBeforeDraw)
+      .map((result) => result.value as StubRasterSurface);
+    expect(createdSurfaces.some((surface) => surface.callLog.some((call) => call.op === 'getImageData'))).toBe(true);
+    const operations = calls.map((call) => call.op);
+    expect(operations.indexOf('fillRect')).toBeLessThan(operations.lastIndexOf('drawImage'));
+    engine.dispose();
+  });
+
+  it.each([
+    ['control transparency', { ...controlLayerForThumbnail('a'), withTransparencyEffect: true }, 'getImageData'],
+    ['inpaint mask fill', thumbnailMaskLayer('a', 'inpaint_mask'), 'source-in'],
+    ['regional mask fill', thumbnailMaskLayer('a', 'regional_guidance'), 'source-in'],
+  ])('renders %s pixels over the checkerboard', async (_name, layer, expectedEffect) => {
+    const backend = createTestStubRasterBackend();
+    const createSurface = vi.spyOn(backend, 'createSurface');
+    const { store } = createReactiveStore({ ...makeDoc(), layers: [layer as CanvasLayerContract] });
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    await engine.requestLayerThumbnail('a');
+    const surfaceCountBeforeDraw = createSurface.mock.calls.length;
+
+    const { calls, target } = createThumbnailTarget();
+    expect(engine.drawLayerThumbnail('a', target, 96)).toBe(true);
+    expect(createSurface.mock.calls.length).toBeGreaterThan(surfaceCountBeforeDraw);
+    const createdSurfaces = createSurface.mock.results
+      .slice(surfaceCountBeforeDraw)
+      .map((result) => result.value as StubRasterSurface);
+    expect(
+      createdSurfaces.some((surface) =>
+        surface.callLog.some(
+          (call) => call.op === expectedEffect || (call.op === 'set' && call.args[1] === expectedEffect)
+        )
+      )
+    ).toBe(true);
+    expect(calls.map((call) => call.op)).toContain('fillRect');
+    expect(calls.at(-1)?.op).toBe('drawImage');
+    engine.dispose();
+  });
+
+  it.each([
+    [
+      'raster adjustments',
+      rasterLayer('a'),
+      (layer: CanvasLayerContract) => ({
+        ...layer,
+        adjustments: { brightness: 0.25, contrast: 0, saturation: 0 },
+      }),
+    ],
+    [
+      'control transparency',
+      controlLayerForThumbnail('a'),
+      (layer: CanvasLayerContract) => ({ ...layer, withTransparencyEffect: false }),
+    ],
+    [
+      'inpaint mask fill',
+      thumbnailMaskLayer('a', 'inpaint_mask'),
+      (layer: CanvasLayerContract) => ({
+        ...layer,
+        mask: { ...('mask' in layer ? layer.mask : {}), fill: { color: '#00ff00', style: 'solid' } },
+      }),
+    ],
+    [
+      'regional mask fill',
+      thumbnailMaskLayer('a', 'regional_guidance'),
+      (layer: CanvasLayerContract) => ({
+        ...layer,
+        mask: { ...('mask' in layer ? layer.mask : {}), fill: { color: '#00ff00', style: 'solid' } },
+      }),
+    ],
+  ])(
+    'invalidates the keyed thumbnail version when %s changes without changing the source',
+    async (_name, layer, edit) => {
+      const doc = { ...makeDoc(), layers: [layer as CanvasLayerContract] };
+      const { setDocument, store } = createReactiveStore(doc);
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId: 'p1',
+        store,
+      });
+      await engine.requestLayerThumbnail('a');
+      const listener = vi.fn();
+      const unsubscribe = engine.stores.thumbnailVersion.subscribeKey('a', listener);
+
+      setDocument({ ...doc, layers: [edit(layer as CanvasLayerContract) as CanvasLayerContract] });
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      unsubscribe();
+      engine.dispose();
+    }
+  );
+
+  it('does not let display invalidation suppress the next cache-version publication', async () => {
+    const layer = rasterLayer('a');
+    const doc = { ...makeDoc(), layers: [layer] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    await engine.requestLayerThumbnail('a');
+    const listener = vi.fn();
+    const unsubscribe = engine.stores.thumbnailVersion.subscribeKey('a', listener);
+
+    const adjusted = {
+      ...layer,
+      adjustments: { brightness: 0.25, contrast: 0, saturation: 0 },
+    } as CanvasLayerContract;
+    setDocument({ ...doc, layers: [adjusted] });
+    setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'a-v2' })] });
+    await engine.requestLayerThumbnail('a');
+
+    expect(listener).toHaveBeenCalledTimes(2);
+    unsubscribe();
     engine.dispose();
   });
 
