@@ -1941,6 +1941,7 @@
         "layerSavedToAssets": "Layer Saved to Assets",
         "loadedWithWarnings": "Workflow Loaded with Warnings",
         "modelAddedSimple": "Model Added to Queue",
+        "modelDefaultsLoaded": "Model Defaults Loaded",
         "modelImportCanceled": "Model Import Canceled",
         "outOfMemoryError": "Out of Memory Error",
         "outOfMemoryErrorDescLocal": "Follow our <LinkComponent>Low VRAM guide</LinkComponent> to reduce OOMs.",

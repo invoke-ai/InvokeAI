@@ -138,7 +138,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
 
-        toast({ id: 'PARAMETER_SET', title: t('toast.parameterSet', { parameter: 'Default settings' }) });
+        toast({ id: 'PARAMETER_SET', title: t('toast.modelDefaultsLoaded') });
       }
     },
   });
