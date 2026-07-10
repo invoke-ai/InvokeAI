@@ -1609,12 +1609,32 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         };
       }
 
+      const publishSnapshot = (
+        contract: CanvasLayerContract,
+        prepared: ReturnType<LayerCacheStore['prepareReplacement']>
+      ): void => {
+        dispatchPreparedMutation(
+          { layer: contract, layerId, type: 'replaceCanvasLayer' },
+          () => getReducerDocument()?.layers.find((candidate) => candidate.id === layerId) === contract,
+          () => mirror.getDocument()?.layers.find((candidate) => candidate.id === layerId) === contract
+        );
+        // A crop creates a new live-paint incarnation for the same layer id.
+        // Invalidate any pending or in-flight upload from the outgoing pixels
+        // before publishing and dirtying the replacement cache.
+        try {
+          bitmapStore.discardLayer(layerId);
+        } catch {
+          // Persistence bookkeeping is ancillary after reducer acceptance.
+        }
+        installGeneratedPaintCache(prepared);
+      };
       const applySnapshot = (contract: CanvasLayerContract, snapshot: { pixels: RasterSurface; rect: Rect }): void => {
-        store.dispatch({ layer: contract, layerId, type: 'replaceCanvasLayer' });
-        seedGeneratedPaintCache(layerId, snapshot.rect, snapshot.pixels);
+        const prepared = prepareGeneratedPaintCache(layerId, snapshot.rect, snapshot.pixels);
+        publishSnapshot(contract, prepared);
       };
       const afterPixels = { pixels: cropped, rect: cropRect };
-      applySnapshot(after, afterPixels);
+      const preparedAfter = prepareGeneratedPaintCache(layerId, afterPixels.rect, afterPixels.pixels);
+      publishSnapshot(after, preparedAfter);
       history.push({
         bytes:
           beforePixels.rect.width * beforePixels.rect.height * 4 +
@@ -1622,6 +1642,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           256,
         label: 'Crop layer to bbox',
         redo: () => applySnapshot(after, afterPixels),
+        replayFailureAtomic: true,
         undo: () => applySnapshot(before, beforePixels),
       });
       return { status: 'cropped' };
@@ -1666,16 +1687,46 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
       type: 'raster',
     };
+    const selectedLayerId = liveDocument.selectedLayerId;
     const apply = (): void => {
-      store.dispatch({ index: sourceIndex, layer, type: 'addCanvasLayer' });
-      seedGeneratedPaintCache(newId, baked.rect, baked.surface);
+      const prepared = prepareGeneratedPaintCache(newId, baked.rect, baked.surface);
+      dispatchPreparedMutation(
+        {
+          add: { index: sourceIndex, layer },
+          enabledUpdates: [],
+          selectedLayerId: newId,
+          type: 'applyCanvasLayerStackMutation',
+        },
+        () =>
+          getReducerDocument()?.selectedLayerId === newId &&
+          getReducerDocument()?.layers.some((candidate) => candidate === layer) === true,
+        () =>
+          mirror.getDocument()?.selectedLayerId === newId &&
+          mirror.getDocument()?.layers.some((candidate) => candidate === layer) === true
+      );
+      installGeneratedPaintCache(prepared);
     };
     apply();
     history.push({
       bytes: baked.rect.width * baked.rect.height * 4 + 256,
       label: 'Copy layer to raster',
       redo: apply,
-      undo: () => store.dispatch({ ids: [newId], type: 'removeCanvasLayers' }),
+      replayFailureAtomic: true,
+      undo: () =>
+        dispatchPreparedMutation(
+          {
+            enabledUpdates: [],
+            removeIds: [newId],
+            selectedLayerId,
+            type: 'applyCanvasLayerStackMutation',
+          },
+          () =>
+            getReducerDocument()?.selectedLayerId === selectedLayerId &&
+            getReducerDocument()?.layers.some((candidate) => candidate.id === newId) === false,
+          () =>
+            mirror.getDocument()?.selectedLayerId === selectedLayerId &&
+            mirror.getDocument()?.layers.some((candidate) => candidate.id === newId) === false
+        ),
     });
     return newId;
   };
@@ -2607,11 +2658,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
   };
 
-  const seedGeneratedPaintCache = (layerId: string, rect: Rect, pixels: RasterSurface, persist = true): void => {
-    const prepared = prepareGeneratedPaintCache(layerId, rect, pixels);
-    installGeneratedPaintCache(prepared, persist);
-  };
-
   const getReducerDocument = (): CanvasDocumentContractV2 | null =>
     store.getState().projects.find((project) => project.id === projectId)?.canvas.document ?? null;
 
@@ -2620,6 +2666,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     isApplied: () => boolean,
     isMirrored: () => boolean
   ): void => {
+    if (store.getState().activeProjectId !== projectId) {
+      throw new Error('Canvas project is not active');
+    }
     try {
       store.dispatch(action);
     } catch (error) {
@@ -2644,7 +2693,37 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (!isMirrored()) {
         throw error;
       }
+      return;
     }
+
+    // A reducer may reject a guarded transaction by returning the unchanged
+    // state without throwing. Do not install its prepared cache or consume a
+    // failure-atomic history entry unless the authoritative postcondition
+    // actually landed.
+    if (!isApplied()) {
+      throw new Error('Canvas document mutation was rejected');
+    }
+    if (!isMirrored()) {
+      try {
+        mirror.refresh();
+      } catch (refreshError) {
+        if (!isMirrored()) {
+          throw refreshError;
+        }
+      }
+      if (!isMirrored()) {
+        throw new Error('Canvas document mutation was not mirrored');
+      }
+    }
+  };
+
+  /** Conversion reducers clone contracts, so their publication postcondition compares by value. */
+  const documentHasLayerContract = (
+    document: CanvasDocumentContractV2 | null,
+    expected: CanvasLayerContract
+  ): boolean => {
+    const current = document?.layers.find((candidate) => candidate.id === expected.id);
+    return current !== undefined && isDeeplyEqual(current, expected);
   };
 
   const captureLayerCache = (
@@ -2685,10 +2764,25 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (captured === 'not-ready') {
       return false;
     }
+    const selectedLayerId = doc.selectedLayerId;
     const apply = (): void => {
-      store.dispatch({ index, layer, type: 'addCanvasLayer' });
-      if (captured) {
-        seedGeneratedPaintCache(layer.id, captured.rect, captured.pixels, layerNeedsPixelPersistence(layer));
+      const prepared = captured ? prepareGeneratedPaintCache(layer.id, captured.rect, captured.pixels) : null;
+      dispatchPreparedMutation(
+        {
+          add: { index, layer },
+          enabledUpdates: [],
+          selectedLayerId: layer.id,
+          type: 'applyCanvasLayerStackMutation',
+        },
+        () =>
+          getReducerDocument()?.selectedLayerId === layer.id &&
+          getReducerDocument()?.layers.some((candidate) => candidate === layer) === true,
+        () =>
+          mirror.getDocument()?.selectedLayerId === layer.id &&
+          mirror.getDocument()?.layers.some((candidate) => candidate === layer) === true
+      );
+      if (prepared) {
+        installGeneratedPaintCache(prepared, layerNeedsPixelPersistence(layer));
       }
     };
     apply();
@@ -2696,7 +2790,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       bytes: captured ? captured.rect.width * captured.rect.height * 4 + 256 : 256,
       label,
       redo: apply,
-      undo: () => store.dispatch({ ids: [layer.id], type: 'removeCanvasLayers' }),
+      replayFailureAtomic: true,
+      undo: () =>
+        dispatchPreparedMutation(
+          {
+            enabledUpdates: [],
+            removeIds: [layer.id],
+            selectedLayerId,
+            type: 'applyCanvasLayerStackMutation',
+          },
+          () =>
+            getReducerDocument()?.selectedLayerId === selectedLayerId &&
+            getReducerDocument()?.layers.some((candidate) => candidate.id === layer.id) === false,
+          () =>
+            mirror.getDocument()?.selectedLayerId === selectedLayerId &&
+            mirror.getDocument()?.layers.some((candidate) => candidate.id === layer.id) === false
+        ),
     });
     return true;
   };
@@ -2726,9 +2835,21 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return false;
     }
     const apply = (layer: CanvasLayerContract): void => {
-      store.dispatch({ id: layer.id, layer, targetType: layer.type, type: 'convertCanvasLayer' });
-      if (captured) {
-        seedGeneratedPaintCache(layer.id, captured.rect, captured.pixels, layerNeedsPixelPersistence(layer));
+      const prepared = captured ? prepareGeneratedPaintCache(layer.id, captured.rect, captured.pixels) : null;
+      dispatchPreparedMutation(
+        { id: layer.id, layer, targetType: layer.type, type: 'convertCanvasLayer' },
+        () => documentHasLayerContract(getReducerDocument(), layer),
+        () => documentHasLayerContract(mirror.getDocument(), layer)
+      );
+      // Conversion republishes a cache incarnation under the same layer id.
+      // Cancel persistence from the outgoing contract before exposing it.
+      try {
+        bitmapStore.discardLayer(layer.id);
+      } catch {
+        // Persistence bookkeeping is ancillary after reducer acceptance.
+      }
+      if (prepared) {
+        installGeneratedPaintCache(prepared, layerNeedsPixelPersistence(layer));
       }
     };
     const before = structuredClone(current);
@@ -2737,6 +2858,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       bytes: captured ? captured.rect.width * captured.rect.height * 4 + 256 : 256,
       label,
       redo: () => apply(after),
+      replayFailureAtomic: true,
       undo: () => apply(before),
     });
     return true;
@@ -3381,10 +3503,41 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       { id: below.id, isEnabled: below.isEnabled },
     ];
     const disabled = originalEnabled.map(({ id }) => ({ id, isEnabled: false }));
+    const selectedLayerId = liveDocument.selectedLayerId;
+    const hasEnabledState = (
+      document: CanvasDocumentContractV2 | null,
+      updates: readonly { id: string; isEnabled: boolean }[]
+    ): boolean =>
+      updates.every(
+        (update) => document?.layers.find((candidate) => candidate.id === update.id)?.isEnabled === update.isEnabled
+      );
     const apply = (): void => {
-      store.dispatch({ index: liveUpperIndex, layer: resultLayer, type: 'addCanvasLayer' });
-      seedGeneratedPaintCache(resultId, resultRect, resultPixels);
-      store.dispatch({ type: 'setCanvasLayersEnabled', updates: disabled });
+      const prepared = prepareGeneratedPaintCache(resultId, resultRect, resultPixels);
+      dispatchPreparedMutation(
+        {
+          add: { index: liveUpperIndex, layer: resultLayer },
+          enabledUpdates: disabled,
+          selectedLayerId: resultId,
+          type: 'applyCanvasLayerStackMutation',
+        },
+        () => {
+          const document = getReducerDocument();
+          return (
+            document?.selectedLayerId === resultId &&
+            document.layers.some((candidate) => candidate === resultLayer) &&
+            hasEnabledState(document, disabled)
+          );
+        },
+        () => {
+          const document = mirror.getDocument();
+          return (
+            document?.selectedLayerId === resultId &&
+            document.layers.some((candidate) => candidate === resultLayer) &&
+            hasEnabledState(document, disabled)
+          );
+        }
+      );
+      installGeneratedPaintCache(prepared);
     };
 
     apply();
@@ -3392,10 +3545,32 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       bytes: resultRect.width * resultRect.height * 4 + 256,
       label: `Boolean ${operation}`,
       redo: apply,
-      undo: () => {
-        store.dispatch({ ids: [resultId], type: 'removeCanvasLayers' });
-        store.dispatch({ type: 'setCanvasLayersEnabled', updates: originalEnabled });
-      },
+      replayFailureAtomic: true,
+      undo: () =>
+        dispatchPreparedMutation(
+          {
+            enabledUpdates: originalEnabled,
+            removeIds: [resultId],
+            selectedLayerId,
+            type: 'applyCanvasLayerStackMutation',
+          },
+          () => {
+            const document = getReducerDocument();
+            return (
+              document?.selectedLayerId === selectedLayerId &&
+              document.layers.some((candidate) => candidate.id === resultId) === false &&
+              hasEnabledState(document, originalEnabled)
+            );
+          },
+          () => {
+            const document = mirror.getDocument();
+            return (
+              document?.selectedLayerId === selectedLayerId &&
+              document.layers.some((candidate) => candidate.id === resultId) === false &&
+              hasEnabledState(document, originalEnabled)
+            );
+          }
+        ),
     });
     return 'merged';
   };
@@ -3520,9 +3695,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
       type: 'raster',
     };
+    const selectedLayerId = liveDocument.selectedLayerId;
     const apply = (): void => {
-      store.dispatch({ index: maskIndex, layer: resultLayer, type: 'addCanvasLayer' });
-      seedGeneratedPaintCache(resultId, resultRect, resultPixels);
+      const prepared = prepareGeneratedPaintCache(resultId, resultRect, resultPixels);
+      dispatchPreparedMutation(
+        {
+          add: { index: maskIndex, layer: resultLayer },
+          enabledUpdates: [],
+          selectedLayerId: resultId,
+          type: 'applyCanvasLayerStackMutation',
+        },
+        () =>
+          getReducerDocument()?.selectedLayerId === resultId &&
+          getReducerDocument()?.layers.some((candidate) => candidate === resultLayer) === true,
+        () =>
+          mirror.getDocument()?.selectedLayerId === resultId &&
+          mirror.getDocument()?.layers.some((candidate) => candidate === resultLayer) === true
+      );
+      installGeneratedPaintCache(prepared);
     };
 
     apply();
@@ -3530,7 +3720,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       bytes: resultRect.width * resultRect.height * 4 + 256,
       label: 'Extract masked area',
       redo: apply,
-      undo: () => store.dispatch({ ids: [resultId], type: 'removeCanvasLayers' }),
+      replayFailureAtomic: true,
+      undo: () =>
+        dispatchPreparedMutation(
+          {
+            enabledUpdates: [],
+            removeIds: [resultId],
+            selectedLayerId,
+            type: 'applyCanvasLayerStackMutation',
+          },
+          () =>
+            getReducerDocument()?.selectedLayerId === selectedLayerId &&
+            getReducerDocument()?.layers.some((candidate) => candidate.id === resultId) === false,
+          () =>
+            mirror.getDocument()?.selectedLayerId === selectedLayerId &&
+            mirror.getDocument()?.layers.some((candidate) => candidate.id === resultId) === false
+        ),
     });
     return { layerId: resultId, status: 'extracted' };
   };

@@ -18,7 +18,7 @@ import { getCanvasStagingSlots } from './canvasStagingView';
 import { MAX_PROMPT_HISTORY } from './generation/promptHistory';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
-import { createInitialWorkbenchState, nextLayerName, workbenchReducer } from './workbenchState';
+import { createInitialWorkbenchState, nextLayerName, type WorkbenchAction, workbenchReducer } from './workbenchState';
 
 const model: MainModelConfig = {
   base: 'sdxl',
@@ -1861,6 +1861,118 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
 
     // 'a' is already enabled ⇒ no change ⇒ document identity preserved (no selector churn).
     expect(getCanvas(next).document).toBe(before);
+  });
+
+  it('applies and reverses a layer stack mutation atomically while preserving unrelated layer identity', () => {
+    const upper = createRasterLayer('upper');
+    const below = createRasterLayer('below');
+    const unrelated = { ...createRasterLayer('unrelated'), isEnabled: false };
+    const result = createRasterLayer('result');
+    const initial = workbenchReducer(withCanvasLayers(createInitialWorkbenchState(), [unrelated, upper, below]), {
+      id: unrelated.id,
+      type: 'setCanvasSelectedLayer',
+    });
+    const unrelatedBefore = getCanvas(initial).document.layers[0];
+
+    const applied = workbenchReducer(initial, {
+      add: { index: 1, layer: result },
+      enabledUpdates: [
+        { id: upper.id, isEnabled: false },
+        { id: below.id, isEnabled: false },
+      ],
+      selectedLayerId: result.id,
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(applied).toBeDefined();
+    expect(getCanvas(applied).document.layers.map((layer) => [layer.id, layer.isEnabled])).toEqual([
+      ['unrelated', false],
+      ['result', true],
+      ['upper', false],
+      ['below', false],
+    ]);
+    expect(getCanvas(applied).document.selectedLayerId).toBe(result.id);
+    expect(getCanvas(applied).document.layers[0]).toBe(unrelatedBefore);
+
+    const reverted = workbenchReducer(applied, {
+      enabledUpdates: [
+        { id: upper.id, isEnabled: true },
+        { id: below.id, isEnabled: true },
+      ],
+      removeIds: [result.id],
+      selectedLayerId: unrelated.id,
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getCanvas(reverted).document.layers.map((layer) => [layer.id, layer.isEnabled])).toEqual([
+      ['unrelated', false],
+      ['upper', true],
+      ['below', true],
+    ]);
+    expect(getCanvas(reverted).document.selectedLayerId).toBe(unrelated.id);
+    expect(getCanvas(reverted).document.layers[0]).toBe(unrelatedBefore);
+  });
+
+  it('rejects an invalid layer stack mutation without applying any valid fields', () => {
+    const initial = workbenchReducer(
+      withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]),
+      { id: 'b', type: 'setCanvasSelectedLayer' }
+    );
+    const invalidActions = [
+      {
+        add: { index: 0, layer: createRasterLayer('a') },
+        enabledUpdates: [{ id: 'b', isEnabled: false }],
+        selectedLayerId: 'b',
+        type: 'applyCanvasLayerStackMutation',
+      },
+      {
+        enabledUpdates: [{ id: 'a', isEnabled: false }],
+        removeIds: ['missing'],
+        selectedLayerId: 'b',
+        type: 'applyCanvasLayerStackMutation',
+      },
+      {
+        enabledUpdates: [{ id: 'missing', isEnabled: false }],
+        selectedLayerId: 'b',
+        type: 'applyCanvasLayerStackMutation',
+      },
+      {
+        enabledUpdates: [],
+        selectedLayerId: 'missing',
+        type: 'applyCanvasLayerStackMutation',
+      },
+      {
+        enabledUpdates: [{ id: 'a', isEnabled: false }],
+        removeIds: ['a'],
+        selectedLayerId: 'b',
+        type: 'applyCanvasLayerStackMutation',
+      },
+      {
+        add: { index: 0, layer: createRasterLayer('c') },
+        enabledUpdates: [],
+        removeIds: ['a'],
+        selectedLayerId: 'b',
+        type: 'applyCanvasLayerStackMutation',
+      },
+    ] satisfies WorkbenchAction[];
+
+    for (const action of invalidActions) {
+      expect(workbenchReducer(initial, action)).toBe(initial);
+    }
+  });
+
+  it('preserves the layers array for a selection-only layer stack mutation', () => {
+    const initial = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
+    const before = getCanvas(initial).document.layers;
+
+    const next = workbenchReducer(initial, {
+      enabledUpdates: [],
+      selectedLayerId: 'b',
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getCanvas(next).document.layers).toBe(before);
+    expect(getCanvas(next).document.selectedLayerId).toBe('b');
   });
 
   it('duplicates a layer above its source with a copy name and selects the duplicate', () => {

@@ -286,6 +286,92 @@ const createRecordingRasterBackend = (): RecordingRasterBackend => {
 const recordingBitmap = (id: string): ImageBitmap =>
   ({ __recordingId: `bitmap-${id}`, close: vi.fn(), height: 10, width: 10 }) as unknown as ImageBitmap;
 
+/** One-shot allocation/draw faults, armed after a deterministic number of successful calls. */
+const createStructuralFaultBackend = () => {
+  const base = createTestStubRasterBackend();
+  let allocationCountdown: number | null = null;
+  let drawCountdown: number | null = null;
+  const backend: StubRasterBackend = {
+    ...base,
+    createSurface: (width, height) => {
+      if (allocationCountdown !== null) {
+        if (allocationCountdown === 0) {
+          allocationCountdown = null;
+          throw new Error('structural cache allocation failed');
+        }
+        allocationCountdown -= 1;
+      }
+      const surface = base.createSurface(width, height);
+      const ctx = new Proxy(surface.ctx, {
+        get: (target, property, receiver) => {
+          const value = Reflect.get(target, property, receiver);
+          if (property !== 'drawImage' || typeof value !== 'function') {
+            return value;
+          }
+          return (...args: unknown[]) => {
+            if (drawCountdown !== null) {
+              if (drawCountdown === 0) {
+                drawCountdown = null;
+                throw new Error('structural cache draw failed');
+              }
+              drawCountdown -= 1;
+            }
+            return Reflect.apply(value, target, args);
+          };
+        },
+      });
+      Object.defineProperty(surface, 'ctx', { value: ctx });
+      return surface;
+    },
+  };
+
+  return {
+    armAllocation: (successfulCreates: number) => {
+      allocationCountdown = successfulCreates;
+    },
+    armDraw: (successfulDraws: number) => {
+      drawCountdown = successfulDraws;
+    },
+    backend,
+  };
+};
+
+interface LayerCacheTestSnapshot {
+  calls: RasterCallLogEntry[];
+  rect: { height: number; width: number; x: number; y: number };
+  surface: RasterSurface;
+  version: number;
+}
+
+const snapshotLayerCache = async (engine: ReturnType<typeof createCanvasEngine>, layerId: string) => {
+  const exported = await engine.exportLayerPixels(layerId, { includeDisabled: true });
+  if (exported.status !== 'ok') {
+    throw new Error(`Expected a ready cache for ${layerId}, got ${exported.status}`);
+  }
+  return {
+    calls: structuredClone((exported.surface as StubRasterSurface).callLog),
+    rect: { ...exported.rect },
+    surface: exported.surface,
+    version: exported.guard.cacheVersion,
+  } satisfies LayerCacheTestSnapshot;
+};
+
+const expectLayerCacheExact = async (
+  engine: ReturnType<typeof createCanvasEngine>,
+  layerId: string,
+  expectedSnapshot: LayerCacheTestSnapshot
+): Promise<void> => {
+  const actual = await engine.exportLayerPixels(layerId, { includeDisabled: true });
+  expect(actual.status).toBe('ok');
+  if (actual.status !== 'ok') {
+    return;
+  }
+  expect(actual.surface).toBe(expectedSnapshot.surface);
+  expect(actual.rect).toEqual(expectedSnapshot.rect);
+  expect(actual.guard.cacheVersion).toBe(expectedSnapshot.version);
+  expect((actual.surface as StubRasterSurface).callLog).toEqual(expectedSnapshot.calls);
+};
+
 /** Recursively follows recording-surface draw edges to a bitmap/surface id. */
 const drawGraphContains = (
   surface: StubRasterSurface,
@@ -1246,7 +1332,7 @@ describe('createCanvasEngine', () => {
 
   it('copyLayerToRaster adds a baked paint copy directly above the source layer', async () => {
     const doc = { ...makeDoc(), layers: [rasterLayer('top'), rasterLayer('a')] };
-    const { store } = createFakeStore(doc);
+    const { projectId, store } = createReducerBackedStore(doc);
     const dispatch = store.dispatch as Mock;
     const base = createTestStubRasterBackend();
     const surfaces: StubRasterSurface[] = [];
@@ -1260,25 +1346,26 @@ describe('createCanvasEngine', () => {
         },
       },
       imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
+      projectId,
       store,
     });
 
     const newId = await engine.copyLayerToRaster('a');
 
     expect(newId).toMatch(/^layer-/);
-    const add = dispatch.mock.calls
+    const mutation = dispatch.mock.calls
       .map((call) => call[0] as WorkbenchAction)
-      .find((action) => action.type === 'addCanvasLayer');
-    expect(add).toBeDefined();
-    if (add?.type === 'addCanvasLayer' && add.layer.type === 'raster') {
-      expect(add.index).toBe(1);
-      expect(add.layer.id).toBe(newId);
-      expect(add.layer.name).toBe('a copy');
-      expect(add.layer.source).toEqual({ bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' });
-      expect(add.layer.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
+      .find((action) => action.type === 'applyCanvasLayerStackMutation');
+    expect(mutation).toBeDefined();
+    const added = mutation?.type === 'applyCanvasLayerStackMutation' ? mutation.add : undefined;
+    if (added?.layer.type === 'raster') {
+      expect(added.index).toBe(1);
+      expect(added.layer.id).toBe(newId);
+      expect(added.layer.name).toBe('a copy');
+      expect(added.layer.source).toEqual({ bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' });
+      expect(added.layer.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
     } else {
-      throw new Error('expected addCanvasLayer with raster copy');
+      throw new Error('expected atomic layer-stack mutation with raster copy');
     }
     expect(
       surfaces.some(
@@ -1331,7 +1418,7 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
-  it('copyLayerToRaster redo cache failure cannot be retried into a duplicate layer id', async () => {
+  it('copyLayerToRaster redo cache failure leaves the copy absent and retryable', async () => {
     const { projectId, store } = createReducerBackedStore(makeDoc());
     const base = createTestStubRasterBackend();
     let failNextAllocation = false;
@@ -1359,14 +1446,14 @@ describe('createCanvasEngine', () => {
     failNextAllocation = true;
     expect(() => engine.redo()).toThrow('copy replay allocation failed');
 
-    // The reducer add already landed before cache allocation failed. Legacy
-    // history therefore consumes redo and exposes undo; replaying redo again
-    // must be a no-op rather than inserting the same structural id twice.
+    expect(engine.getDocument()!.layers.filter((layer) => layer.id === newId)).toHaveLength(0);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+
+    engine.redo();
     expect(engine.getDocument()!.layers.filter((layer) => layer.id === newId)).toHaveLength(1);
     expect(engine.stores.canUndo.get()).toBe(true);
     expect(engine.stores.canRedo.get()).toBe(false);
-    expect(() => engine.redo()).not.toThrow();
-    expect(engine.getDocument()!.layers.filter((layer) => layer.id === newId)).toHaveLength(1);
 
     engine.undo();
     expect(engine.getDocument()!.layers.filter((layer) => layer.id === newId)).toHaveLength(0);
@@ -3189,6 +3276,599 @@ const createReducerBackedStore = (
   };
 };
 
+describe('structural raster publication failure atomicity', () => {
+  const sentinelLayer = (): CanvasLayerContract => ({
+    ...rasterLayer('selection-sentinel'),
+    isEnabled: false,
+  });
+
+  const createFaultHarness = (document: CanvasDocumentContractV2) => {
+    const faults = createStructuralFaultBackend();
+    const bitmapStore = createSpyBitmapStore();
+    const reducer = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: faults.backend,
+      bitmapStore,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    return { ...reducer, bitmapStore, engine, faults };
+  };
+
+  type StructuralFault = 'allocation' | 'draw';
+  const structuralFaults = ['allocation', 'draw'] as const satisfies readonly StructuralFault[];
+  const armStructuralFault = (
+    faults: ReturnType<typeof createStructuralFaultBackend>,
+    failure: StructuralFault,
+    countdowns: Record<StructuralFault, number>
+  ): void => {
+    if (failure === 'allocation') {
+      faults.armAllocation(countdowns.allocation);
+    } else {
+      faults.armDraw(countdowns.draw);
+    }
+  };
+  const structuralFaultMessage = (failure: StructuralFault): string => `structural cache ${failure} failed`;
+
+  const expectInitialFailureExact = (
+    harness: ReturnType<typeof createFaultHarness>,
+    expectedDocument: CanvasDocumentContractV2
+  ): void => {
+    expect(harness.engine.getDocument()).toBe(expectedDocument);
+    expect(harness.engine.getDocument()).toEqual(expectedDocument);
+    expect(harness.engine.getDocument()!.selectedLayerId).toBe('selection-sentinel');
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(harness.bitmapStore.discardLayer).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(harness.engine.stores.canRedo.get()).toBe(false);
+  };
+
+  it.each(structuralFaults)(
+    'crop keeps document, cache, selection, and history exact when final cache %s fails',
+    async (failure) => {
+      const source = rasterLayer('crop-source');
+      const document: CanvasDocumentContractV2 = {
+        ...makeDoc(),
+        bbox: { height: 7, width: 6, x: 2, y: 3 },
+        layers: [source, sentinelLayer()],
+        selectedLayerId: 'selection-sentinel',
+      };
+      const harness = createFaultHarness(document);
+      const sourceCache = await snapshotLayerCache(harness.engine, source.id);
+      const expectedDocument = harness.engine.getDocument()!;
+      (harness.store.dispatch as Mock).mockClear();
+      harness.bitmapStore.markLayerDirty.mockClear();
+      armStructuralFault(harness.faults, failure, { allocation: 3, draw: 3 });
+
+      await expect(harness.engine.cropLayerToBbox(source.id)).resolves.toEqual({
+        message: structuralFaultMessage(failure),
+        status: 'failed',
+      });
+
+      expectInitialFailureExact(harness, expectedDocument);
+      await expectLayerCacheExact(harness.engine, source.id, sourceCache);
+      harness.engine.dispose();
+    }
+  );
+
+  it.each(structuralFaults)(
+    'commitLayerCopy keeps document, cache, selection, and history exact when final cache %s fails',
+    async (failure) => {
+      const source = rasterLayer('copy-source');
+      const document = { ...makeDoc(), layers: [source, sentinelLayer()], selectedLayerId: 'selection-sentinel' };
+      const harness = createFaultHarness(document);
+      const sourceCache = await snapshotLayerCache(harness.engine, source.id);
+      const expectedDocument = harness.engine.getDocument()!;
+      const copy = { ...structuredClone(source), id: 'copy-result', name: 'Copy result' };
+      (harness.store.dispatch as Mock).mockClear();
+      harness.bitmapStore.markLayerDirty.mockClear();
+      armStructuralFault(harness.faults, failure, { allocation: 1, draw: 1 });
+
+      expect(() => harness.engine.commitLayerCopy('Copy layer', source.id, copy, 0)).toThrow(
+        structuralFaultMessage(failure)
+      );
+
+      expectInitialFailureExact(harness, expectedDocument);
+      expect(harness.engine.getDocument()!.layers.some((layer) => layer.id === copy.id)).toBe(false);
+      await expectLayerCacheExact(harness.engine, source.id, sourceCache);
+      harness.engine.dispose();
+    }
+  );
+
+  it.each(structuralFaults)(
+    'commitLayerConversion keeps document, cache, selection, and history exact when final cache %s fails',
+    async (failure) => {
+      const source = rasterLayer('conversion-source');
+      const document = { ...makeDoc(), layers: [source, sentinelLayer()], selectedLayerId: 'selection-sentinel' };
+      const harness = createFaultHarness(document);
+      const sourceCache = await snapshotLayerCache(harness.engine, source.id);
+      const expectedDocument = harness.engine.getDocument()!;
+      const live = harness.engine.getDocument()!.layers.find((layer) => layer.id === source.id)!;
+      if (live.type !== 'raster') {
+        throw new Error('expected a raster conversion source');
+      }
+      const converted: CanvasLayerContract = {
+        ...structuredClone(live),
+        adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+        type: 'control',
+        withTransparencyEffect: false,
+      };
+      (harness.store.dispatch as Mock).mockClear();
+      harness.bitmapStore.markLayerDirty.mockClear();
+      armStructuralFault(harness.faults, failure, { allocation: 1, draw: 1 });
+
+      expect(() => harness.engine.commitLayerConversion('Convert layer', live, converted)).toThrow(
+        structuralFaultMessage(failure)
+      );
+
+      expectInitialFailureExact(harness, expectedDocument);
+      await expectLayerCacheExact(harness.engine, source.id, sourceCache);
+      harness.engine.dispose();
+    }
+  );
+
+  it.each(structuralFaults)(
+    'copyLayerToRaster keeps document, cache, selection, and history exact when final cache %s fails',
+    async (failure) => {
+      const source = rasterLayer('raster-copy-source');
+      const document = { ...makeDoc(), layers: [source, sentinelLayer()], selectedLayerId: 'selection-sentinel' };
+      const harness = createFaultHarness(document);
+      const sourceCache = await snapshotLayerCache(harness.engine, source.id);
+      const expectedDocument = harness.engine.getDocument()!;
+      (harness.store.dispatch as Mock).mockClear();
+      harness.bitmapStore.markLayerDirty.mockClear();
+      armStructuralFault(harness.faults, failure, { allocation: 1, draw: 1 });
+
+      await expect(harness.engine.copyLayerToRaster(source.id)).rejects.toThrow(structuralFaultMessage(failure));
+
+      expectInitialFailureExact(harness, expectedDocument);
+      await expectLayerCacheExact(harness.engine, source.id, sourceCache);
+      harness.engine.dispose();
+    }
+  );
+
+  it.each(structuralFaults)(
+    'boolean merge keeps document, source caches, selection, and history exact when final cache %s fails',
+    async (failure) => {
+      const pair = twoPaintDoc();
+      const document = {
+        ...pair,
+        layers: [...pair.layers, sentinelLayer()],
+        selectedLayerId: 'selection-sentinel',
+      };
+      const harness = createFaultHarness(document);
+      const upperCache = await snapshotLayerCache(harness.engine, 'upper');
+      const belowCache = await snapshotLayerCache(harness.engine, 'below');
+      const expectedDocument = harness.engine.getDocument()!;
+      (harness.store.dispatch as Mock).mockClear();
+      harness.bitmapStore.markLayerDirty.mockClear();
+      armStructuralFault(harness.faults, failure, { allocation: 3, draw: 4 });
+
+      await expect(harness.engine.booleanMergeRasterLayers('upper', 'intersect')).rejects.toThrow(
+        structuralFaultMessage(failure)
+      );
+
+      expectInitialFailureExact(harness, expectedDocument);
+      await expectLayerCacheExact(harness.engine, 'upper', upperCache);
+      await expectLayerCacheExact(harness.engine, 'below', belowCache);
+      harness.engine.dispose();
+    }
+  );
+
+  it.each(structuralFaults)(
+    'masked extraction keeps document, source caches, selection, and history exact when final cache %s fails',
+    async (failure) => {
+      const pair = twoPaintDoc();
+      const mask: CanvasInpaintMaskLayerContract = {
+        ...maskLayer('atomic-mask'),
+        mask: {
+          bitmap: { height: 20, imageName: 'atomic-mask-bitmap', width: 20 },
+          fill: { color: '#e07575', style: 'diagonal' },
+          offset: { x: 15, y: 25 },
+        },
+      };
+      const document = {
+        ...pair,
+        layers: [mask, ...pair.layers, sentinelLayer()],
+        selectedLayerId: 'selection-sentinel',
+      };
+      const harness = createFaultHarness(document);
+      const maskCache = await snapshotLayerCache(harness.engine, mask.id);
+      const upperCache = await snapshotLayerCache(harness.engine, 'upper');
+      const belowCache = await snapshotLayerCache(harness.engine, 'below');
+      const expectedDocument = harness.engine.getDocument()!;
+      (harness.store.dispatch as Mock).mockClear();
+      harness.bitmapStore.markLayerDirty.mockClear();
+      armStructuralFault(harness.faults, failure, { allocation: 2, draw: 4 });
+
+      await expect(harness.engine.extractMaskedArea(mask.id)).rejects.toThrow(structuralFaultMessage(failure));
+
+      expectInitialFailureExact(harness, expectedDocument);
+      await expectLayerCacheExact(harness.engine, mask.id, maskCache);
+      await expectLayerCacheExact(harness.engine, 'upper', upperCache);
+      await expectLayerCacheExact(harness.engine, 'below', belowCache);
+      harness.engine.dispose();
+    }
+  );
+
+  const createCropReplayHarness = async () => {
+    const source = rasterLayer('crop-replay-source');
+    const document: CanvasDocumentContractV2 = {
+      ...makeDoc(),
+      bbox: { height: 7, width: 6, x: 2, y: 3 },
+      layers: [source, sentinelLayer()],
+      selectedLayerId: 'selection-sentinel',
+    };
+    const harness = createFaultHarness(document);
+    await snapshotLayerCache(harness.engine, source.id);
+    await expect(harness.engine.cropLayerToBbox(source.id)).resolves.toEqual({ status: 'cropped' });
+    return { ...harness, originalDocument: document, source };
+  };
+
+  it.each(structuralFaults)(
+    'crop undo cache-%s failure leaves the committed state exact and retryable',
+    async (failure) => {
+      const harness = await createCropReplayHarness();
+      const committedDocument = harness.engine.getDocument()!;
+      const committedCache = await snapshotLayerCache(harness.engine, harness.source.id);
+      armStructuralFault(harness.faults, failure, { allocation: 0, draw: 0 });
+
+      expect(() => harness.engine.undo()).toThrow(structuralFaultMessage(failure));
+
+      expect(harness.engine.getDocument()).toBe(committedDocument);
+      expect(harness.engine.getDocument()).toEqual(committedDocument);
+      expect(harness.engine.stores.canUndo.get()).toBe(true);
+      expect(harness.engine.stores.canRedo.get()).toBe(false);
+      await expectLayerCacheExact(harness.engine, harness.source.id, committedCache);
+      harness.engine.undo();
+      expect(harness.engine.getDocument()).toEqual(harness.originalDocument);
+      harness.engine.dispose();
+    }
+  );
+
+  it.each(structuralFaults)(
+    'crop redo cache-%s failure leaves the restored state exact and retryable',
+    async (failure) => {
+      const harness = await createCropReplayHarness();
+      const committedDocument = structuredClone(harness.engine.getDocument()!);
+      harness.engine.undo();
+      const restoredDocument = harness.engine.getDocument()!;
+      const restoredCache = await snapshotLayerCache(harness.engine, harness.source.id);
+      armStructuralFault(harness.faults, failure, { allocation: 0, draw: 0 });
+
+      expect(() => harness.engine.redo()).toThrow(structuralFaultMessage(failure));
+
+      expect(harness.engine.getDocument()).toBe(restoredDocument);
+      expect(harness.engine.getDocument()).toEqual(harness.originalDocument);
+      expect(harness.engine.stores.canUndo.get()).toBe(false);
+      expect(harness.engine.stores.canRedo.get()).toBe(true);
+      await expectLayerCacheExact(harness.engine, harness.source.id, restoredCache);
+      harness.engine.redo();
+      expect(harness.engine.getDocument()).toEqual(committedDocument);
+      harness.engine.dispose();
+    }
+  );
+
+  it('commitLayerCopy redo cache-draw failure leaves the restored state exact and retryable', async () => {
+    const source = rasterLayer('copy-replay-source');
+    const copy = { ...structuredClone(source), id: 'copy-replay-result', name: 'Copy replay result' };
+    const document = { ...makeDoc(), layers: [source, sentinelLayer()], selectedLayerId: 'selection-sentinel' };
+    const harness = createFaultHarness(document);
+    const originalCache = await snapshotLayerCache(harness.engine, source.id);
+    const originalDocument = harness.engine.getDocument()!;
+    expect(harness.engine.commitLayerCopy('Copy layer', source.id, copy, 0)).toBe(true);
+    const committedDocument = structuredClone(harness.engine.getDocument()!);
+    harness.engine.undo();
+    const restoredDocument = harness.engine.getDocument()!;
+    harness.faults.armDraw(0);
+
+    expect(() => harness.engine.redo()).toThrow('structural cache draw failed');
+
+    expect(harness.engine.getDocument()).toBe(restoredDocument);
+    expect(harness.engine.getDocument()).toEqual(originalDocument);
+    expect(harness.engine.getDocument()!.layers.some((layer) => layer.id === copy.id)).toBe(false);
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(harness.engine.stores.canRedo.get()).toBe(true);
+    await expectLayerCacheExact(harness.engine, source.id, originalCache);
+    harness.engine.redo();
+    expect(harness.engine.getDocument()).toEqual(committedDocument);
+    expect(harness.engine.getDocument()!.layers.filter((layer) => layer.id === copy.id)).toHaveLength(1);
+    harness.engine.dispose();
+  });
+
+  it('commitLayerConversion keeps failed undo and redo cache preparation exact and retryable', async () => {
+    const source = rasterLayer('conversion-replay-source');
+    const document = { ...makeDoc(), layers: [source, sentinelLayer()], selectedLayerId: 'selection-sentinel' };
+    const harness = createFaultHarness(document);
+    await snapshotLayerCache(harness.engine, source.id);
+    const originalDocument = harness.engine.getDocument()!;
+    const live = originalDocument.layers.find((layer) => layer.id === source.id)!;
+    if (live.type !== 'raster') {
+      throw new Error('expected a raster conversion source');
+    }
+    const converted: CanvasLayerContract = {
+      ...structuredClone(live),
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      type: 'control',
+      withTransparencyEffect: false,
+    };
+    expect(harness.engine.commitLayerConversion('Convert layer', live, converted)).toBe(true);
+    const committedDocument = harness.engine.getDocument()!;
+    const committedCache = await snapshotLayerCache(harness.engine, source.id);
+    harness.faults.armDraw(0);
+
+    expect(() => harness.engine.undo()).toThrow('structural cache draw failed');
+
+    expect(harness.engine.getDocument()).toBe(committedDocument);
+    expect(harness.engine.stores.canUndo.get()).toBe(true);
+    expect(harness.engine.stores.canRedo.get()).toBe(false);
+    await expectLayerCacheExact(harness.engine, source.id, committedCache);
+    harness.engine.undo();
+    expect(harness.engine.getDocument()).toEqual(originalDocument);
+    const restoredDocument = harness.engine.getDocument()!;
+    const restoredCache = await snapshotLayerCache(harness.engine, source.id);
+    harness.faults.armAllocation(0);
+
+    expect(() => harness.engine.redo()).toThrow('structural cache allocation failed');
+
+    expect(harness.engine.getDocument()).toBe(restoredDocument);
+    expect(harness.engine.getDocument()).toEqual(originalDocument);
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(harness.engine.stores.canRedo.get()).toBe(true);
+    await expectLayerCacheExact(harness.engine, source.id, restoredCache);
+    harness.engine.redo();
+    expect(harness.engine.getDocument()).toEqual(committedDocument);
+    harness.engine.dispose();
+  });
+
+  it('boolean redo cache-draw failure leaves sources, selection, and history exact and retryable', async () => {
+    const pair = twoPaintDoc();
+    const document = {
+      ...pair,
+      layers: [...pair.layers, sentinelLayer()],
+      selectedLayerId: 'selection-sentinel',
+    };
+    const harness = createFaultHarness(document);
+    const upperCache = await snapshotLayerCache(harness.engine, 'upper');
+    const belowCache = await snapshotLayerCache(harness.engine, 'below');
+    const originalDocument = harness.engine.getDocument()!;
+    await expect(harness.engine.booleanMergeRasterLayers('upper', 'exclude')).resolves.toBe('merged');
+    const committedDocument = structuredClone(harness.engine.getDocument()!);
+    const resultId = harness.engine.getDocument()!.selectedLayerId!;
+    harness.engine.undo();
+    const restoredDocument = harness.engine.getDocument()!;
+    harness.faults.armDraw(0);
+
+    expect(() => harness.engine.redo()).toThrow('structural cache draw failed');
+
+    expect(harness.engine.getDocument()).toBe(restoredDocument);
+    expect(harness.engine.getDocument()).toEqual(originalDocument);
+    expect(harness.engine.getDocument()!.layers.some((layer) => layer.id === resultId)).toBe(false);
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(harness.engine.stores.canRedo.get()).toBe(true);
+    await expectLayerCacheExact(harness.engine, 'upper', upperCache);
+    await expectLayerCacheExact(harness.engine, 'below', belowCache);
+    harness.engine.redo();
+    expect(harness.engine.getDocument()).toEqual(committedDocument);
+    harness.engine.dispose();
+  });
+
+  it('masked extraction redo cache-draw failure leaves sources, selection, and history exact and retryable', async () => {
+    const pair = twoPaintDoc();
+    const mask: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('extract-replay-mask'),
+      mask: {
+        bitmap: { height: 20, imageName: 'extract-replay-mask-bitmap', width: 20 },
+        fill: { color: '#e07575', style: 'diagonal' },
+        offset: { x: 15, y: 25 },
+      },
+    };
+    const document = {
+      ...pair,
+      layers: [mask, ...pair.layers, sentinelLayer()],
+      selectedLayerId: 'selection-sentinel',
+    };
+    const harness = createFaultHarness(document);
+    const maskCache = await snapshotLayerCache(harness.engine, mask.id);
+    const upperCache = await snapshotLayerCache(harness.engine, 'upper');
+    const belowCache = await snapshotLayerCache(harness.engine, 'below');
+    const originalDocument = harness.engine.getDocument()!;
+    const extracted = await harness.engine.extractMaskedArea(mask.id);
+    expect(extracted.status).toBe('extracted');
+    if (extracted.status !== 'extracted') {
+      throw new Error('expected masked extraction');
+    }
+    const committedDocument = structuredClone(harness.engine.getDocument()!);
+    harness.engine.undo();
+    const restoredDocument = harness.engine.getDocument()!;
+    harness.faults.armDraw(0);
+
+    expect(() => harness.engine.redo()).toThrow('structural cache draw failed');
+
+    expect(harness.engine.getDocument()).toBe(restoredDocument);
+    expect(harness.engine.getDocument()).toEqual(originalDocument);
+    expect(harness.engine.getDocument()!.layers.some((layer) => layer.id === extracted.layerId)).toBe(false);
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(harness.engine.stores.canRedo.get()).toBe(true);
+    await expectLayerCacheExact(harness.engine, mask.id, maskCache);
+    await expectLayerCacheExact(harness.engine, 'upper', upperCache);
+    await expectLayerCacheExact(harness.engine, 'below', belowCache);
+    harness.engine.redo();
+    expect(harness.engine.getDocument()).toEqual(committedDocument);
+    harness.engine.dispose();
+  });
+
+  it('copyLayerToRaster undo restores the exact prior selection', async () => {
+    const source = rasterLayer('selection-copy-source');
+    const document = { ...makeDoc(), layers: [source, sentinelLayer()], selectedLayerId: 'selection-sentinel' };
+    const harness = createFaultHarness(document);
+    const originalDocument = harness.engine.getDocument()!;
+    const copiedId = await harness.engine.copyLayerToRaster(source.id);
+    expect(copiedId).not.toBeNull();
+
+    harness.engine.undo();
+
+    expect(harness.engine.getDocument()).toEqual(originalDocument);
+    expect(harness.engine.getDocument()!.selectedLayerId).toBe('selection-sentinel');
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(harness.engine.stores.canRedo.get()).toBe(true);
+    harness.engine.dispose();
+  });
+
+  it('keeps a reducer-rejected copy undo retryable until its prior selection exists again', async () => {
+    const source = rasterLayer('rejected-undo-source');
+    const sentinel = sentinelLayer();
+    const document = { ...makeDoc(), layers: [source, sentinel], selectedLayerId: sentinel.id };
+    const harness = createFaultHarness(document);
+    const copiedId = await harness.engine.copyLayerToRaster(source.id);
+    expect(copiedId).not.toBeNull();
+
+    harness.store.dispatch({ ids: [sentinel.id], type: 'removeCanvasLayers' });
+    expect(harness.engine.getDocument()!.layers.some((layer) => layer.id === copiedId)).toBe(true);
+
+    expect(() => harness.engine.undo()).toThrow('Canvas document mutation was rejected');
+    expect(harness.engine.getDocument()!.layers.some((layer) => layer.id === copiedId)).toBe(true);
+    expect(harness.engine.stores.canUndo.get()).toBe(true);
+    expect(harness.engine.stores.canRedo.get()).toBe(false);
+
+    harness.store.dispatch({ layer: sentinel, type: 'addCanvasLayer' });
+    expect(() => harness.engine.undo()).not.toThrow();
+    expect(harness.engine.getDocument()!.layers.some((layer) => layer.id === copiedId)).toBe(false);
+    expect(harness.engine.getDocument()!.selectedLayerId).toBe(sentinel.id);
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(harness.engine.stores.canRedo.get()).toBe(true);
+    harness.engine.dispose();
+  });
+
+  it('rejects prepared structural publication before dispatch when this engine project is inactive', () => {
+    const source = rasterLayer('inactive-source');
+    const document = { ...makeDoc(), layers: [source], selectedLayerId: source.id };
+    const harness = createFaultHarness(document);
+    const liveSource = harness.engine.getDocument()!.layers[0]!;
+    const copy = { ...structuredClone(source), id: 'inactive-copy' };
+    harness.store.dispatch({ type: 'createProject' });
+    const otherProjectId = harness.store.getState().activeProjectId;
+    const otherBefore = structuredClone(
+      harness.store.getState().projects.find((project) => project.id === otherProjectId)!.canvas.document
+    );
+    (harness.store.dispatch as Mock).mockClear();
+
+    expect(() => harness.engine.commitLayerCopy('Copy layer', liveSource.id, copy, 0)).toThrow(
+      'Canvas project is not active'
+    );
+
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.store.getState().projects.find((project) => project.id === otherProjectId)!.canvas.document).toEqual(
+      otherBefore
+    );
+    expect(harness.engine.getDocument()).toEqual(document);
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('crop generation-cancels a deferred pre-crop upload before publishing the new paint incarnation', async () => {
+    const source: CanvasRasterLayerContractV2 = {
+      ...(rasterLayer('crop-persistence-source') as CanvasRasterLayerContractV2),
+      source: {
+        bitmap: { height: 10, imageName: 'before-crop-paint', width: 10 },
+        offset: { x: 0, y: 0 },
+        type: 'paint',
+      },
+    };
+    const document: CanvasDocumentContractV2 = {
+      ...makeDoc(),
+      bbox: { height: 7, width: 6, x: 2, y: 3 },
+      layers: [source, sentinelLayer()],
+      selectedLayerId: 'selection-sentinel',
+    };
+    const reducer = createReducerBackedStore(document);
+    const staleUpload = createDeferred<{ height: number; imageName: string; width: number }>();
+    let uploadCount = 0;
+    const uploadImage = vi.fn(() => {
+      uploadCount += 1;
+      return uploadCount === 1
+        ? staleUpload.promise
+        : Promise.resolve({ height: 7, imageName: 'cropped-paint', width: 6 });
+    });
+    let placed: { offset: { x: number; y: number }; surface: RasterSurface } | null = null;
+    const bitmapStore = createBitmapStore({
+      debounceMs: 1500,
+      dispatch: reducer.store.dispatch,
+      encodeSurface: (surface) =>
+        Promise.resolve(new Blob([`${surface.width}x${surface.height}`], { type: 'image/png' })),
+      getLayerSource: (layerId) => {
+        const layer = reducer.store
+          .getState()
+          .projects.find((project) => project.id === reducer.projectId)
+          ?.canvas.document.layers.find((candidate) => candidate.id === layerId);
+        return layer?.type === 'raster' || layer?.type === 'control' ? layer.source : null;
+      },
+      getLayerSurface: () => placed,
+      hashBlob: (blob) => blob.text(),
+      maxUploadAttempts: 1,
+      retryDelaysMs: [],
+      sleep: () => Promise.resolve(),
+      uploadImage,
+    });
+    const discardLayer = vi.spyOn(bitmapStore, 'discardLayer');
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const before = await snapshotLayerCache(engine, source.id);
+    placed = { offset: { x: before.rect.x, y: before.rect.y }, surface: before.surface };
+    bitmapStore.markLayerDirty(source.id);
+    const barrier = bitmapStore.flushPendingUploads();
+    for (let tick = 0; tick < 50 && uploadImage.mock.calls.length === 0; tick += 1) {
+      await Promise.resolve();
+    }
+    expect(uploadImage).toHaveBeenCalledOnce();
+
+    await expect(engine.cropLayerToBbox(source.id)).resolves.toEqual({ status: 'cropped' });
+    const croppedCache = await snapshotLayerCache(engine, source.id);
+    placed = {
+      offset: { x: croppedCache.rect.x, y: croppedCache.rect.y },
+      surface: croppedCache.surface,
+    };
+    staleUpload.resolve({ height: 10, imageName: 'stale-pre-crop-paint', width: 10 });
+    await barrier;
+
+    const bitmapUpdates = (reducer.store.dispatch as Mock).mock.calls
+      .map((call) => call[0] as WorkbenchAction)
+      .filter((action) => action.type === 'updateCanvasLayerSource' && action.id === source.id);
+    expect(discardLayer).toHaveBeenCalledWith(source.id);
+    expect(bitmapUpdates).toHaveLength(1);
+    expect(bitmapUpdates).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: { bitmap: expect.objectContaining({ imageName: 'stale-pre-crop-paint' }) } }),
+      ])
+    );
+    expect(bitmapUpdates[0]).toMatchObject({
+      source: {
+        bitmap: { height: 7, imageName: 'cropped-paint', width: 6 },
+        offset: { x: 2, y: 3 },
+        type: 'paint',
+      },
+    });
+    expect(engine.getDocument()!.selectedLayerId).toBe('selection-sentinel');
+    expect(engine.getDocument()!.layers.find((layer) => layer.id === source.id)).toMatchObject({
+      source: {
+        bitmap: { height: 7, imageName: 'cropped-paint', width: 6 },
+        offset: { x: 2, y: 3 },
+        type: 'paint',
+      },
+    });
+    expect(engine.stores.canUndo.get()).toBe(true);
+    await expectLayerCacheExact(engine, source.id, croppedCache);
+    engine.dispose();
+  });
+});
+
 describe('mergeVisibleRasterLayers', () => {
   /** [upper raster, mask, lower raster] — the interleaved case round 1 no-oped. */
   const interleavedDoc = (): CanvasDocumentContractV2 => {
@@ -4922,12 +5602,32 @@ describe('commitRasterFilterResult', () => {
 
   it('passes the exact cancellation signal into durable-image resolution', async () => {
     const resolver = vi.fn((_imageName: string, _signal?: AbortSignal) => Promise.resolve(new Blob()));
-    const harness = await createGuardHarness(resolver);
+    const layer = filterLayer();
+    const reducer = createReducerBackedStore(filterDoc([layer]));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: resolver,
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const exported = await engine.exportLayerPixels(layer.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected a filterable export');
+    }
     const controller = new AbortController();
 
-    await expect(harness.commit(controller.signal)).resolves.toMatchObject({ status: 'committed' });
+    await expect(
+      engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode: 'replace',
+        rect: exported.rect,
+        signal: controller.signal,
+      })
+    ).resolves.toMatchObject({ status: 'committed' });
     expect(resolver).toHaveBeenCalledWith(durableImage.imageName, controller.signal);
-    harness.engine.dispose();
+    engine.dispose();
   });
 
   it('maps an abort rejection from durable-image resolution to aborted without mutation', async () => {

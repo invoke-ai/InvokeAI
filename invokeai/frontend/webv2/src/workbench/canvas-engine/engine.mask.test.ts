@@ -12,6 +12,7 @@ import type { CanvasDocumentContractV2, CanvasStateContractV2, WorkbenchState } 
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { EngineStore } from './engine';
@@ -88,6 +89,30 @@ const createReactiveStore = (document: CanvasDocumentContractV2) => {
         return () => listeners.delete(listener);
       },
     } as unknown as EngineStore,
+  };
+};
+
+const createReducerBackedStore = (document: CanvasDocumentContractV2) => {
+  let state = createInitialWorkbenchState();
+  const projectId = state.activeProjectId;
+  state = workbenchReducer(state, { document, type: 'replaceCanvasDocument' });
+  const listeners = new Set<() => void>();
+  const dispatch = vi.fn((action: WorkbenchAction) => {
+    state = workbenchReducer(state, action);
+    for (const listener of listeners) {
+      listener();
+    }
+  });
+  return {
+    projectId,
+    store: {
+      dispatch,
+      getState: () => state,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    } as EngineStore,
   };
 };
 
@@ -373,12 +398,12 @@ describe('mask invert', () => {
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
       type: 'raster',
     });
-    const reactive = createReactiveStore(doc);
+    const reducer = createReducerBackedStore(doc);
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store: reactive.store,
+      projectId: reducer.projectId,
+      store: reducer.store,
     });
     const overlay = createInputCanvas();
     const screen = createInputCanvas();

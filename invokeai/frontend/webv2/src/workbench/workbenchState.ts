@@ -237,6 +237,13 @@ type WorkbenchAction =
   | { type: 'acceptStagedImage' }
   | { type: 'clearCanvasStaging' }
   | { type: 'addCanvasLayer'; layer: CanvasLayerContract; index?: number }
+  | {
+      type: 'applyCanvasLayerStackMutation';
+      add?: { index: number; layer: CanvasLayerContract };
+      removeIds?: readonly string[];
+      enabledUpdates: readonly { id: string; isEnabled: boolean }[];
+      selectedLayerId: string | null;
+    }
   | { type: 'removeCanvasLayers'; ids: string[] }
   | { type: 'duplicateCanvasLayer'; sourceId: string; newId: string }
   | { type: 'reorderCanvasLayers'; orderedIds: string[] }
@@ -807,6 +814,67 @@ const setCanvasLayersEnabledInDocument = (
     return { ...layer, isEnabled: next };
   });
   return changed ? { ...document, layers } : document;
+};
+
+const applyCanvasLayerStackMutationToDocument = (
+  document: CanvasDocumentContractV2,
+  action: Extract<WorkbenchAction, { type: 'applyCanvasLayerStackMutation' }>
+): CanvasDocumentContractV2 => {
+  const currentIds = new Set(document.layers.map((layer) => layer.id));
+  if (action.add && ((action.removeIds?.length ?? 0) > 0 || currentIds.has(action.add.layer.id))) {
+    return document;
+  }
+
+  const removeIds = new Set(action.removeIds ?? []);
+  if ([...removeIds].some((id) => !currentIds.has(id))) {
+    return document;
+  }
+
+  const projectedIds = new Set(currentIds);
+  for (const id of removeIds) {
+    projectedIds.delete(id);
+  }
+  if (action.add) {
+    projectedIds.add(action.add.layer.id);
+  }
+  if (
+    action.enabledUpdates.some((update) => !projectedIds.has(update.id)) ||
+    (action.selectedLayerId !== null && !projectedIds.has(action.selectedLayerId))
+  ) {
+    return document;
+  }
+
+  let layers = document.layers;
+  let changed = false;
+  if (action.add) {
+    const insertIndex = Math.min(Math.max(0, Math.round(action.add.index)), layers.length);
+    layers = [...layers.slice(0, insertIndex), action.add.layer, ...layers.slice(insertIndex)];
+    changed = true;
+  }
+  if (removeIds.size > 0) {
+    layers = layers.filter((layer) => !removeIds.has(layer.id));
+    changed = true;
+  }
+
+  const enabledById = new Map(action.enabledUpdates.map((update) => [update.id, update.isEnabled]));
+  let enabledChanged = false;
+  const updatedLayers = layers.map((layer) => {
+    const isEnabled = enabledById.get(layer.id);
+    if (isEnabled === undefined || isEnabled === layer.isEnabled) {
+      return layer;
+    }
+    enabledChanged = true;
+    return { ...layer, isEnabled };
+  });
+  if (enabledChanged) {
+    layers = updatedLayers;
+    changed = true;
+  }
+
+  if (document.selectedLayerId !== action.selectedLayerId) {
+    changed = true;
+  }
+  return changed ? { ...document, layers, selectedLayerId: action.selectedLayerId } : document;
 };
 
 /** After removing the selected layer, selects the nearest surviving layer below it, else above it, else null. */
@@ -3159,6 +3227,11 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     case 'addCanvasLayer': {
       return updateActiveProject(state, (project) =>
         updateCanvasDocument(project, (document) => addCanvasLayerToDocument(document, action.layer, action.index))
+      );
+    }
+    case 'applyCanvasLayerStackMutation': {
+      return updateActiveProject(state, (project) =>
+        updateCanvasDocument(project, (document) => applyCanvasLayerStackMutationToDocument(document, action))
       );
     }
     case 'removeCanvasLayers': {
