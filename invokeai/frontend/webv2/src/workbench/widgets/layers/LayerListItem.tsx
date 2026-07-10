@@ -44,7 +44,7 @@ interface LayerListItemProps {
  */
 export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, layers }: LayerListItemProps) => {
   const { t } = useTranslation();
-  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: layer.id });
+  const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: layer.id });
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(layer.name);
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasLayerContextMenuTarget | null>(null);
@@ -109,11 +109,7 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
 
   const handleNameKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      // Keep every keystroke inside the rename input. The whole row carries
-      // dnd-kit keyboard `listeners` whose activator claims Space/Enter (and
-      // preventDefaults them) to arm a keyboard drag — without this guard, typing
-      // a space in a layer name is eaten and can start a drag. Stop propagation
-      // for ALL keys (not just the two we handle) so nothing bubbles to the row.
+      // Keep rename keystrokes from reaching canvas-level shortcuts.
       event.stopPropagation();
       if (event.key === 'Enter') {
         commitName();
@@ -141,7 +137,6 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
   return (
     <Box ref={setNodeRef} style={dndStyle}>
       <Row
-        {...attributes}
         {...listeners}
         active={isSelected ? 'muted' : undefined}
         cursor={isDragging ? 'grabbing' : 'default'}

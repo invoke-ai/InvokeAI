@@ -6,9 +6,9 @@ import type { LucideIcon } from 'lucide-react';
 import type { Dispatch } from 'react';
 
 import { Collapsible, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { canMergeVisibleRasters } from '@workbench/canvas-engine/document/mergeVisible';
 import { IconButton, toaster, Tooltip } from '@workbench/components/ui';
 import { useActiveProjectName } from '@workbench/WorkbenchContext';
@@ -27,7 +27,6 @@ import { useAddLayer } from './useAddLayer';
 
 const DND_MODIFIERS = [restrictToVerticalAxis, restrictToParentElement];
 const POINTER_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } } as const;
-const KEYBOARD_SENSOR_OPTIONS = { coordinateGetter: sortableKeyboardCoordinates } as const;
 
 interface LayerGroupSectionProps {
   dispatch: Dispatch<WorkbenchAction>;
@@ -60,10 +59,7 @@ export const LayerGroupSection = ({
 }: LayerGroupSectionProps) => {
   const { t } = useTranslation();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, POINTER_SENSOR_OPTIONS),
-    useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS)
-  );
+  const sensors = useSensors(useSensor(PointerSensor, POINTER_SENSOR_OPTIONS));
 
   const globalIndexById = useMemo(() => {
     const map = new Map<string, number>();
