@@ -7,7 +7,7 @@ import type { Invocation, S } from 'services/api/types';
 export const addZImageLoRAs = (
   state: RootState,
   g: Graph,
-  denoise: Invocation<'z_image_denoise'>,
+  denoise: Invocation<'z_image_denoise'> | Invocation<'tiled_z_image_denoise'>,
   modelLoader: Invocation<'z_image_model_loader'>,
   posCond: Invocation<'z_image_text_encoder'>,
   negCond: Invocation<'z_image_text_encoder'> | null
