@@ -17,11 +17,13 @@ Key differences from Z-Image denoise:
 """
 
 import math
+import sys
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
@@ -528,6 +530,29 @@ class AnimaDenoiseInvocation(BaseInvocation):
             )
 
         with ExitStack() as exit_stack:
+            # On Windows + CUDA, opt into cuDNN's flash-attention kernel. torch on
+            # Windows does not ship the native flash-attention backend, so SDPA falls
+            # back to the slower memory-efficient kernel; cuDNN's kernel is ~1.7x faster
+            # for Anima's attention shapes (~6% per denoising step at 1024x1024). The
+            # cuDNN SDP backend sits low in torch's default priority and is never
+            # selected, so we opt in explicitly.
+            #
+            # This is a priority *list*, not a forced kernel: torch picks the first
+            # eligible backend per call, and MATH is always eligible, so it degrades
+            # safely on any GPU/dtype where cuDNN is unavailable. Scoped to Windows +
+            # CUDA — elsewhere torch's default backend is already fast.
+            if device.type == "cuda" and sys.platform == "win32":
+                exit_stack.enter_context(
+                    sdpa_kernel(
+                        [
+                            SDPBackend.CUDNN_ATTENTION,
+                            SDPBackend.FLASH_ATTENTION,
+                            SDPBackend.EFFICIENT_ATTENTION,
+                            SDPBackend.MATH,
+                        ],
+                        set_priority=True,
+                    )
+                )
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
 
             # Apply LoRA models to the transformer.
