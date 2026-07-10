@@ -5,8 +5,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCalendarBold, PiImageSquare } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 import type { VirtualSubBoard } from 'services/api/endpoints/virtual_boards';
 
 const _hover: SystemStyleObject = {
@@ -19,6 +21,7 @@ interface VirtualBoardItemProps {
 
 const VirtualBoardItem = ({ board }: VirtualBoardItemProps) => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const isSelected = selectedBoardId === board.virtual_board_id;
 
@@ -28,15 +31,14 @@ const VirtualBoardItem = ({ board }: VirtualBoardItemProps) => {
     }
   }, [selectedBoardId, board.virtual_board_id, dispatch]);
 
+  const tooltip = `${board.date} — ${t('boards.imagesWithCount', { count: board.image_count })}, ${t(
+    'boards.videosWithCount',
+    { count: board.video_count }
+  )}, ${t('boards.assetsWithCount', { count: board.asset_count })}`;
+
   return (
     <Box position="relative" w="full" h={12}>
-      <Tooltip
-        label={`${board.date} — ${board.image_count} images, ${board.asset_count} assets`}
-        openDelay={1000}
-        placement="right"
-        closeOnScroll
-        p={2}
-      >
+      <Tooltip label={tooltip} openDelay={1000} placement="right" closeOnScroll p={2}>
         <Flex
           onClick={onClick}
           alignItems="center"
@@ -51,7 +53,7 @@ const VirtualBoardItem = ({ board }: VirtualBoardItemProps) => {
           w="full"
           h="full"
         >
-          <CoverImage coverImageName={board.cover_image_name} />
+          <CoverImage coverImageName={board.cover_image_name} coverVideoName={board.cover_video_name} />
           <Flex flex={1} direction="column" minW={0}>
             <Text fontSize="sm" noOfLines={1} fontWeight={isSelected ? 'bold' : 'normal'}>
               {board.board_name}
@@ -60,7 +62,7 @@ const VirtualBoardItem = ({ board }: VirtualBoardItemProps) => {
           <Icon as={PiCalendarBold} fill="base.500" boxSize={4} />
           <Flex justifyContent="flex-end">
             <Text variant="subtext">
-              {board.image_count} | {board.asset_count}
+              {board.image_count + board.video_count} | {board.asset_count}
             </Text>
           </Flex>
         </Flex>
@@ -71,13 +73,24 @@ const VirtualBoardItem = ({ board }: VirtualBoardItemProps) => {
 
 export default memo(VirtualBoardItem);
 
-const CoverImage = ({ coverImageName }: { coverImageName: string | null }) => {
-  const { currentData: coverImage } = useGetImageDTOQuery(coverImageName ?? skipToken);
+const CoverImage = ({
+  coverImageName,
+  coverVideoName,
+}: {
+  coverImageName: string | null;
+  coverVideoName: string | null;
+}) => {
+  // Backend picks a single cover — the newest item of the date, image or video — so at most
+  // one of these queries fires (the other is `skipToken`).
+  const { currentData: coverVideo } = useGetVideoDTOQuery(coverVideoName ?? skipToken);
+  const { currentData: coverImage } = useGetImageDTOQuery(coverVideoName ? skipToken : (coverImageName ?? skipToken));
 
-  if (coverImage) {
+  const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
+
+  if (thumbnailUrl) {
     return (
       <Image
-        src={coverImage.thumbnail_url}
+        src={thumbnailUrl}
         draggable={false}
         objectFit="cover"
         w={10}

@@ -5,6 +5,7 @@ from invokeai.app.services.gallery.gallery_common import GalleryItem, GalleryIte
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 
 class GalleryServiceABC(ABC):
@@ -40,6 +41,20 @@ class GalleryServiceABC(ABC):
         search_term: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
+        created_date: Optional[str] = None,
     ) -> GalleryItemNamesResult:
-        """Returns ordered (kind, name) refs for optimistic UI / virtualized lists."""
+        """Returns ordered (kind, name) refs for optimistic UI / virtualized lists.
+
+        `created_date` restricts the result to items created on the given ISO date — used by
+        date-based virtual boards.
+        """
+        pass
+
+    @abstractmethod
+    def get_dates(
+        self,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> list[VirtualSubBoardDTO]:
+        """Returns date-based virtual sub-boards covering both images and videos."""
         pass

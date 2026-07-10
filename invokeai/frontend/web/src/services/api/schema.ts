@@ -1834,7 +1834,7 @@ export type paths = {
         };
         /**
          * List Virtual Boards By Date
-         * @description Gets a list of virtual sub-boards grouped by date.
+         * @description Gets a list of virtual sub-boards grouped by date. Covers both images and videos.
          */
         get: operations["list_virtual_boards_by_date"];
         put?: never;
@@ -1854,9 +1854,30 @@ export type paths = {
         };
         /**
          * List Virtual Board Image Names By Date
-         * @description Gets ordered image names for a specific date.
+         * @description Gets ordered image names for a specific date. Image-only; kept for API compatibility —
+         *     the UI uses the polymorphic `/by_date/{date}/item_names` endpoint.
          */
         get: operations["list_virtual_board_image_names_by_date"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/virtual_boards/by_date/{date}/item_names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Virtual Board Item Names By Date
+         * @description Gets ordered polymorphic (image + video) item refs for a specific date.
+         */
+        get: operations["list_virtual_board_item_names_by_date"];
         put?: never;
         post?: never;
         delete?: never;
@@ -33744,7 +33765,7 @@ export type components = {
         };
         /**
          * VirtualSubBoardDTO
-         * @description A virtual sub-board computed from image metadata, not stored in the database.
+         * @description A virtual sub-board computed from image/video metadata, not stored in the database.
          */
         VirtualSubBoardDTO: {
             /**
@@ -33773,10 +33794,21 @@ export type components = {
              */
             asset_count: number;
             /**
+             * Video Count
+             * @description The number of videos for this date.
+             * @default 0
+             */
+            video_count?: number;
+            /**
              * Cover Image Name
              * @description The most recent image name for this date.
              */
             cover_image_name?: string | null;
+            /**
+             * Cover Video Name
+             * @description The most recent video name for this date. Set instead of cover_image_name when the newest item for the date is a video.
+             */
+            cover_video_name?: string | null;
         };
         /**
          * WanConditioningField
@@ -40345,6 +40377,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageNamesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_virtual_board_item_names_by_date: {
+        parameters: {
+            query?: {
+                /** @description Whether to sort starred items first */
+                starred_first?: boolean;
+                /** @description The sort direction */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description The categories of items to include */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Search term to filter items */
+                search_term?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The ISO date string, e.g. '2026-03-18' */
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItemNamesResult"];
                 };
             };
             /** @description Validation Error */

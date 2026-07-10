@@ -13,6 +13,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 
 class SqliteGalleryService(GalleryServiceABC):
@@ -112,6 +113,7 @@ class SqliteGalleryService(GalleryServiceABC):
         search_term: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
+        created_date: Optional[str] = None,
     ) -> GalleryItemNamesResult:
         image_half, image_params, _ = self._build_half(
             kind="image",
@@ -123,6 +125,7 @@ class SqliteGalleryService(GalleryServiceABC):
             user_id=user_id,
             is_admin=is_admin,
             names_only=True,
+            created_date=created_date,
         )
         video_half, video_params, _ = self._build_half(
             kind="video",
@@ -134,6 +137,7 @@ class SqliteGalleryService(GalleryServiceABC):
             user_id=user_id,
             is_admin=is_admin,
             names_only=True,
+            created_date=created_date,
         )
 
         if starred_first:
@@ -162,6 +166,90 @@ class SqliteGalleryService(GalleryServiceABC):
         refs = [GalleryItemRef(kind=GalleryItemKind(row["kind"]), name=row["name"]) for row in rows]
         return GalleryItemNamesResult(items=refs, starred_count=starred_count, total_count=len(refs))
 
+    def get_dates(
+        self,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> list[VirtualSubBoardDTO]:
+        image_conditions = " AND images.is_intermediate = 0 "
+        video_conditions = " AND videos.is_intermediate = 0 "
+        image_params: list[Union[int, str, bool]] = []
+        video_params: list[Union[int, str, bool]] = []
+
+        if user_id is not None and not is_admin:
+            image_conditions += " AND images.user_id = ? "
+            image_params.append(user_id)
+            video_conditions += " AND videos.user_id = ? "
+            video_params.append(user_id)
+
+        union = f"""--sql
+            SELECT
+                images.created_at AS created_at,
+                'image' AS kind,
+                images.image_name AS name,
+                images.image_category AS category
+            FROM images
+            WHERE 1=1 {image_conditions}
+            UNION ALL
+            SELECT
+                videos.created_at AS created_at,
+                'video' AS kind,
+                videos.video_name AS name,
+                videos.video_category AS category
+            FROM videos
+            WHERE 1=1 {video_conditions}
+        """
+
+        counts_query = f"""--sql
+        SELECT
+            DATE(created_at) AS date,
+            SUM(CASE WHEN kind = 'image' AND category = 'general' THEN 1 ELSE 0 END) AS image_count,
+            SUM(CASE WHEN kind = 'image' AND category != 'general' THEN 1 ELSE 0 END) AS asset_count,
+            SUM(CASE WHEN kind = 'video' THEN 1 ELSE 0 END) AS video_count
+        FROM ({union})
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC;
+        """
+
+        # SQLite guarantees that bare columns in an aggregate query come from the row that
+        # matched MAX() — so `kind`/`name` here are the newest item of each date, which
+        # becomes the cover.
+        covers_query = f"""--sql
+        SELECT
+            DATE(created_at) AS date,
+            kind,
+            name,
+            MAX(created_at) AS newest
+        FROM ({union})
+        GROUP BY DATE(created_at);
+        """
+
+        with self._db.transaction() as cursor:
+            cursor.execute(counts_query, image_params + video_params)
+            count_rows = cast(list[sqlite3.Row], cursor.fetchall())
+            cursor.execute(covers_query, image_params + video_params)
+            cover_rows = cast(list[sqlite3.Row], cursor.fetchall())
+
+        covers = {row["date"]: (row["kind"], row["name"]) for row in cover_rows}
+
+        boards: list[VirtualSubBoardDTO] = []
+        for row in count_rows:
+            date = row["date"]
+            cover_kind, cover_name = covers.get(date, (None, None))
+            boards.append(
+                VirtualSubBoardDTO(
+                    virtual_board_id=f"by_date:{date}",
+                    board_name=date,
+                    date=date,
+                    image_count=row["image_count"],
+                    asset_count=row["asset_count"],
+                    video_count=row["video_count"],
+                    cover_image_name=cover_name if cover_kind == "image" else None,
+                    cover_video_name=cover_name if cover_kind == "video" else None,
+                )
+            )
+        return boards
+
     def _build_half(
         self,
         kind: str,
@@ -173,6 +261,7 @@ class SqliteGalleryService(GalleryServiceABC):
         user_id: Optional[str],
         is_admin: bool,
         names_only: bool = False,
+        created_date: Optional[str] = None,
     ) -> tuple[str, list[Union[int, str, bool]], str]:
         """Builds one half of the union (either `images` or `videos`).
 
@@ -243,6 +332,10 @@ class SqliteGalleryService(GalleryServiceABC):
         if is_intermediate is not None:
             conditions += f" AND {base_table}.is_intermediate = ? "
             params.append(is_intermediate)
+
+        if created_date is not None:
+            conditions += f" AND DATE({base_table}.created_at) = ? "
+            params.append(created_date)
 
         if board_id == "none":
             conditions += f" AND {join_table}.board_id IS NULL "

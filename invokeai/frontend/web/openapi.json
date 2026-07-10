@@ -7609,7 +7609,7 @@
       "get": {
         "tags": ["virtual_boards"],
         "summary": "List Virtual Boards By Date",
-        "description": "Gets a list of virtual sub-boards grouped by date.",
+        "description": "Gets a list of virtual sub-boards grouped by date. Covers both images and videos.",
         "operationId": "list_virtual_boards_by_date",
         "responses": {
           "200": {
@@ -7638,7 +7638,7 @@
       "get": {
         "tags": ["virtual_boards"],
         "summary": "List Virtual Board Image Names By Date",
-        "description": "Gets ordered image names for a specific date.",
+        "description": "Gets ordered image names for a specific date. Image-only; kept for API compatibility \u2014\nthe UI uses the polymorphic `/by_date/{date}/item_names` endpoint.",
         "operationId": "list_virtual_board_image_names_by_date",
         "security": [
           {
@@ -7727,6 +7727,116 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ImageNamesResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/virtual_boards/by_date/{date}/item_names": {
+      "get": {
+        "tags": ["virtual_boards"],
+        "summary": "List Virtual Board Item Names By Date",
+        "description": "Gets ordered polymorphic (image + video) item refs for a specific date.",
+        "operationId": "list_virtual_board_item_names_by_date",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The ISO date string, e.g. '2026-03-18'",
+              "title": "Date"
+            },
+            "description": "The ISO date string, e.g. '2026-03-18'"
+          },
+          {
+            "name": "starred_first",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to sort starred items first",
+              "default": true,
+              "title": "Starred First"
+            },
+            "description": "Whether to sort starred items first"
+          },
+          {
+            "name": "order_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SQLiteDirection",
+              "description": "The sort direction",
+              "default": "DESC"
+            },
+            "description": "The sort direction"
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImageCategory"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The categories of items to include",
+              "title": "Categories"
+            },
+            "description": "The categories of items to include"
+          },
+          {
+            "name": "search_term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search term to filter items",
+              "title": "Search Term"
+            },
+            "description": "Search term to filter items"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryItemNamesResult"
                 }
               }
             }
@@ -76679,6 +76789,12 @@
             "title": "Asset Count",
             "description": "The number of asset images for this date."
           },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "The number of videos for this date.",
+            "default": 0
+          },
           "cover_image_name": {
             "anyOf": [
               {
@@ -76690,12 +76806,24 @@
             ],
             "title": "Cover Image Name",
             "description": "The most recent image name for this date."
+          },
+          "cover_video_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Video Name",
+            "description": "The most recent video name for this date. Set instead of cover_image_name when the newest item for the date is a video."
           }
         },
         "type": "object",
         "required": ["virtual_board_id", "board_name", "date", "image_count", "asset_count"],
         "title": "VirtualSubBoardDTO",
-        "description": "A virtual sub-board computed from image metadata, not stored in the database."
+        "description": "A virtual sub-board computed from image/video metadata, not stored in the database."
       },
       "WanConditioningField": {
         "description": "A Wan 2.2 conditioning tensor primitive value.\n\nWan conditioning is the UMT5-XXL hidden state for the prompt plus an attention\nmask marking valid (non-padding) tokens.",

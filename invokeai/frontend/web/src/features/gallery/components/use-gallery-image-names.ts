@@ -5,7 +5,8 @@ import { selectGetImageNamesQueryArgs, selectSelectedBoardId } from 'features/ga
 import { getDateFromVirtualBoardId, isVirtualBoardId } from 'features/gallery/store/types';
 import { useMemo } from 'react';
 import { useGetGalleryItemNamesQuery } from 'services/api/endpoints/gallery';
-import { useGetVirtualBoardImageNamesByDateQuery } from 'services/api/endpoints/virtual_boards';
+import { useGetVirtualBoardItemNamesByDateQuery } from 'services/api/endpoints/virtual_boards';
+import type { GalleryItemRef } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 
 const selectFromGalleryItemNamesResult = ({
@@ -13,25 +14,11 @@ const selectFromGalleryItemNamesResult = ({
   isLoading,
   isFetching,
 }: {
-  currentData?: { items: { kind: 'image' | 'video'; name: string }[] };
+  currentData?: { items: GalleryItemRef[] };
   isLoading: boolean;
   isFetching: boolean;
 }) => ({
-  items: currentData?.items ?? (EMPTY_ARRAY as { kind: 'image' | 'video'; name: string }[]),
-  isLoading,
-  isFetching,
-});
-
-const selectFromVirtualBoardResult = ({
-  currentData,
-  isLoading,
-  isFetching,
-}: {
-  currentData?: { image_names: string[] };
-  isLoading: boolean;
-  isFetching: boolean;
-}) => ({
-  imageNames: currentData?.image_names ?? EMPTY_ARRAY,
+  items: currentData?.items ?? (EMPTY_ARRAY as GalleryItemRef[]),
   isLoading,
   isFetching,
 });
@@ -41,17 +28,20 @@ const galleryQueryOptions = {
   selectFromResult: selectFromGalleryItemNamesResult,
 };
 
-const virtualBoardQueryOptions = {
-  refetchOnReconnect: true,
-  selectFromResult: selectFromVirtualBoardResult,
-};
+/**
+ * Flattens polymorphic (kind, name) refs into the ordered name list consumed by the gallery
+ * grid and navigation hotkeys. Video refs must pass through untouched — regular boards and
+ * date-based virtual boards both contain them. Exported for tests.
+ */
+export const itemRefsToNames = (items: GalleryItemRef[]): string[] => items.map((ref) => ref.name);
 
 /**
  * Returns the ordered flat list of gallery item names. Names are polymorphic — both image and
  * video names appear in the same list, interleaved by created_at. Callers that need to know the
  * kind of a particular name use `isVideoName` from `features/gallery/store/types`.
  *
- * Virtual boards (date-based) are image-only for now and call the legacy by-date endpoint.
+ * Virtual boards (date-based) go through their own by-date endpoint, which returns the same
+ * polymorphic (kind, name) refs as the regular gallery names endpoint.
  */
 export const useGalleryImageNames = () => {
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
@@ -64,7 +54,7 @@ export const useGalleryImageNames = () => {
   const galleryResult = useGetGalleryItemNamesQuery(isVirtual ? skipToken : imageQueryArgs, galleryQueryOptions);
 
   const date = isVirtual ? getDateFromVirtualBoardId(selectedBoardId) : '';
-  const virtualResult = useGetVirtualBoardImageNamesByDateQuery(
+  const virtualResult = useGetVirtualBoardItemNamesByDateQuery(
     isVirtual
       ? {
           date,
@@ -74,17 +64,15 @@ export const useGalleryImageNames = () => {
           starred_first: imageQueryArgs.starred_first,
         }
       : skipToken,
-    virtualBoardQueryOptions
+    galleryQueryOptions
   );
 
   // Flat names + isLoading exposed for backward compatibility with the existing callers (paged
   // grid, search, navigation hotkeys). The kind is recoverable from the filename extension.
   const imageNames = useMemo(() => {
-    if (isVirtual) {
-      return virtualResult.imageNames;
-    }
-    return galleryResult.items.map((ref) => ref.name);
-  }, [isVirtual, virtualResult.imageNames, galleryResult.items]);
+    const items = isVirtual ? virtualResult.items : galleryResult.items;
+    return itemRefsToNames(items);
+  }, [isVirtual, virtualResult.items, galleryResult.items]);
 
   return {
     imageNames,

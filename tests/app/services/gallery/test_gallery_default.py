@@ -1,10 +1,18 @@
-"""Regression tests for SqliteGalleryService multiuser isolation.
+"""Regression tests for SqliteGalleryService multiuser isolation and date-based
+virtual boards.
 
-Covers JPPhoto's code-review finding (PR #9163): the gallery /items/ and
-/items/names endpoints returned every user's items when ``board_id`` was
-omitted, because ``_build_half`` only applied a user filter for the explicit
-"none" sentinel. The fix added an ``elif user_id is not None and not is_admin``
-branch; these tests pin the behaviour for both halves of the polymorphic union.
+Covers JPPhoto's code-review findings (PR #9163):
+
+1. The gallery /items/ and /items/names endpoints returned every user's items
+   when ``board_id`` was omitted, because ``_build_half`` only applied a user
+   filter for the explicit "none" sentinel. The fix added an ``elif user_id is
+   not None and not is_admin`` branch; these tests pin the behaviour for both
+   halves of the polymorphic union.
+
+2. Date-based virtual boards were image-only: video-only dates did not appear
+   at all, and mixed dates omitted videos from counts/contents/covers. The
+   gallery service now owns ``get_dates`` and a ``created_date`` filter on
+   ``list_item_names`` so virtual boards cover both kinds.
 """
 
 import pytest
@@ -100,3 +108,102 @@ class TestListItemNamesOmittedBoardIdMultiuser:
             (GalleryItemKind.IMAGE, "alice.png"),
             (GalleryItemKind.VIDEO, "alice.mp4"),
         }
+
+
+def _backdate(services, table: str, name_col: str, name: str, created_at: str) -> None:
+    """Rewrites created_at so tests can build multi-date galleries (save() always stamps now)."""
+    db = services["images"]._db
+    with db.transaction() as cursor:
+        cursor.execute(f"UPDATE {table} SET created_at = ? WHERE {name_col} = ?", (created_at, name))
+
+
+class TestGetDatesPolymorphic:
+    def test_video_only_date_appears(self, services) -> None:
+        # A date with videos and no images must still produce a virtual board — with the
+        # video as its cover, since there is no image to fall back to.
+        _save_video(services["videos"], "only.mp4", user_id="alice")
+        _backdate(services, "videos", "video_name", "only.mp4", "2026-01-02 10:00:00")
+
+        boards = services["gallery"].get_dates(user_id="alice", is_admin=False)
+
+        assert len(boards) == 1
+        board = boards[0]
+        assert board.date == "2026-01-02"
+        assert board.image_count == 0
+        assert board.asset_count == 0
+        assert board.video_count == 1
+        assert board.cover_image_name is None
+        assert board.cover_video_name == "only.mp4"
+
+    def test_mixed_date_counts_both_kinds(self, services) -> None:
+        _save_image(services["images"], "day1.png", user_id="alice")
+        _save_video(services["videos"], "day1.mp4", user_id="alice")
+        _save_video(services["videos"], "day1b.mp4", user_id="alice")
+        _backdate(services, "images", "image_name", "day1.png", "2026-01-03 09:00:00")
+        _backdate(services, "videos", "video_name", "day1.mp4", "2026-01-03 10:00:00")
+        _backdate(services, "videos", "video_name", "day1b.mp4", "2026-01-03 11:00:00")
+
+        boards = services["gallery"].get_dates(user_id="alice", is_admin=False)
+
+        assert len(boards) == 1
+        board = boards[0]
+        assert board.date == "2026-01-03"
+        assert board.image_count == 1
+        assert board.video_count == 2
+        # The newest item of the date is a video, so the cover is the video.
+        assert board.cover_video_name == "day1b.mp4"
+        assert board.cover_image_name is None
+
+    def test_newest_image_wins_cover(self, services) -> None:
+        _save_video(services["videos"], "old.mp4", user_id="alice")
+        _save_image(services["images"], "new.png", user_id="alice")
+        _backdate(services, "videos", "video_name", "old.mp4", "2026-01-04 09:00:00")
+        _backdate(services, "images", "image_name", "new.png", "2026-01-04 10:00:00")
+
+        boards = services["gallery"].get_dates(user_id="alice", is_admin=False)
+
+        assert len(boards) == 1
+        assert boards[0].cover_image_name == "new.png"
+        assert boards[0].cover_video_name is None
+
+    def test_dates_are_user_isolated(self, seeded) -> None:
+        boards = seeded["gallery"].get_dates(user_id="alice", is_admin=False)
+        # alice has one image + one video, both created today.
+        assert len(boards) == 1
+        assert boards[0].image_count == 1
+        assert boards[0].video_count == 1
+
+    def test_admin_sees_all_dates(self, seeded) -> None:
+        boards = seeded["gallery"].get_dates(user_id="alice", is_admin=True)
+        assert len(boards) == 1
+        assert boards[0].image_count == 2
+        assert boards[0].video_count == 2
+
+
+class TestListItemNamesByCreatedDate:
+    def test_returns_only_items_of_date_including_videos(self, services) -> None:
+        _save_image(services["images"], "target.png", user_id="alice")
+        _save_video(services["videos"], "target.mp4", user_id="alice")
+        _save_image(services["images"], "other.png", user_id="alice")
+        _backdate(services, "images", "image_name", "target.png", "2026-01-05 09:00:00")
+        _backdate(services, "videos", "video_name", "target.mp4", "2026-01-05 10:00:00")
+        _backdate(services, "images", "image_name", "other.png", "2026-01-06 09:00:00")
+
+        result = services["gallery"].list_item_names(user_id="alice", is_admin=False, created_date="2026-01-05")
+
+        names = {(item.kind, item.name) for item in result.items}
+        assert names == {
+            (GalleryItemKind.IMAGE, "target.png"),
+            (GalleryItemKind.VIDEO, "target.mp4"),
+        }
+        assert result.total_count == 2
+
+    def test_created_date_is_user_isolated(self, services) -> None:
+        _save_video(services["videos"], "alice-day.mp4", user_id="alice")
+        _save_video(services["videos"], "bob-day.mp4", user_id="bob")
+        _backdate(services, "videos", "video_name", "alice-day.mp4", "2026-01-07 09:00:00")
+        _backdate(services, "videos", "video_name", "bob-day.mp4", "2026-01-07 10:00:00")
+
+        result = services["gallery"].list_item_names(user_id="alice", is_admin=False, created_date="2026-01-07")
+
+        assert [(item.kind, item.name) for item in result.items] == [(GalleryItemKind.VIDEO, "alice-day.mp4")]
