@@ -248,6 +248,25 @@ const createDeferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void
   return { promise, resolve };
 };
 
+const createAbortableImageResolver = () => {
+  const requests = new Map<
+    string,
+    { deferred: ReturnType<typeof createDeferred<Blob>>; signal: AbortSignal | undefined }
+  >();
+  const resolver = vi.fn((imageName: string, signal?: AbortSignal) => {
+    const deferred = createDeferred<Blob>();
+    requests.set(imageName, { deferred, signal });
+    if (signal?.aborted) {
+      return Promise.reject(signal.reason);
+    }
+    return new Promise<Blob>((resolve, reject) => {
+      deferred.promise.then(resolve, reject);
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  });
+  return { requests, resolver };
+};
+
 type RecordingRasterBackend = StubRasterBackend & {
   drawSourcesFor(surface: StubRasterSurface): string[];
   surfaceById(id: string): StubRasterSurface | undefined;
@@ -1784,7 +1803,7 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     // (the deferred is never auto-resolved).
     raf.flush();
     expect(resolver).toHaveBeenCalledTimes(1);
-    expect(resolver).toHaveBeenNthCalledWith(1, 'a');
+    expect(resolver).toHaveBeenNthCalledWith(1, 'a', expect.any(AbortSignal));
 
     // An edit lands mid-flight: same layer id, new object reference, new source.
     setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'a-v2' })] });
@@ -1793,7 +1812,7 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     // longer matches that job, so a fresh isolated job starts immediately.
     raf.flush();
     expect(resolver).toHaveBeenCalledTimes(2);
-    expect(resolver).toHaveBeenNthCalledWith(2, 'a-v2');
+    expect(resolver).toHaveBeenNthCalledWith(2, 'a-v2', expect.any(AbortSignal));
 
     // The newer rasterize wins and publishes while the old decode is pending.
     deferreds.get('a-v2')!.resolve(new Blob());
@@ -2175,7 +2194,7 @@ describe('engine-owned history: stroke → undo → redo', () => {
     await flushMicrotasks();
     raf.flush();
     expect(resolver).toHaveBeenCalledTimes(1);
-    expect(resolver).toHaveBeenNthCalledWith(1, 'src-v1');
+    expect(resolver).toHaveBeenNthCalledWith(1, 'src-v1', expect.any(AbortSignal));
 
     // A revision bump that REUSES layer id 'a' with a DIFFERENT source: the
     // mirror routes this through onDocumentReplaced (a full swap), which a
@@ -2193,7 +2212,7 @@ describe('engine-owned history: stroke → undo → redo', () => {
     await flushMicrotasks();
     raf.flush();
     expect(resolver).toHaveBeenCalledTimes(2);
-    expect(resolver).toHaveBeenNthCalledWith(2, 'src-v2');
+    expect(resolver).toHaveBeenNthCalledWith(2, 'src-v2', expect.any(AbortSignal));
 
     engine.dispose();
   });
@@ -2378,6 +2397,23 @@ describe('drawLayerThumbnail', () => {
 });
 
 describe('requestLayerThumbnail', () => {
+  it('does not start a request while its project is inactive', async () => {
+    const resolver = vi.fn(() => Promise.resolve(new Blob()));
+    const { setActiveProjectId, store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: resolver,
+      projectId: 'p1',
+      store,
+    });
+    setActiveProjectId('p2');
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('stale');
+    expect(resolver).not.toHaveBeenCalled();
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+    engine.dispose();
+  });
+
   it('rasterizes while detached and publishes thumbnail readiness', async () => {
     const resolver = vi.fn(() => Promise.resolve(new Blob()));
     const { store } = createReactiveStore(makeDoc());
@@ -2433,9 +2469,7 @@ describe('requestLayerThumbnail', () => {
   });
 
   it('keeps loading until the latest source wins', async () => {
-    const first = createDeferred<Blob>();
-    const second = createDeferred<Blob>();
-    const resolver = vi.fn((imageName: string) => (imageName === 'a' ? first.promise : second.promise));
+    const { requests, resolver } = createAbortableImageResolver();
     const doc = makeDoc();
     const { setDocument, store } = createReactiveStore(doc);
     const engine = createCanvasEngine({
@@ -2447,13 +2481,13 @@ describe('requestLayerThumbnail', () => {
 
     const oldRequest = engine.requestLayerThumbnail('a');
     setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'a-v2' })] });
+    expect(requests.get('a')?.signal?.aborted).toBe(true);
     const newRequest = engine.requestLayerThumbnail('a');
 
-    first.resolve(new Blob());
     expect(await oldRequest).toBe('stale');
     expect(engine.stores.thumbnailStatus.get('a')).toBe('loading');
 
-    second.resolve(new Blob());
+    requests.get('a-v2')?.deferred.resolve(new Blob());
     expect(await newRequest).toBe('ready');
     expect(engine.stores.thumbnailStatus.get('a')).toBe('ready');
     engine.dispose();
@@ -2484,12 +2518,12 @@ describe('requestLayerThumbnail', () => {
   });
 
   it('clears state and rejects stale completion after deletion', async () => {
-    const pending = createDeferred<Blob>();
+    const { requests, resolver } = createAbortableImageResolver();
     const doc = makeDoc();
     const { setDocument, store } = createReactiveStore(doc);
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
-      imageResolver: () => pending.promise,
+      imageResolver: resolver,
       projectId: 'p1',
       store,
     });
@@ -2497,6 +2531,53 @@ describe('requestLayerThumbnail', () => {
     const request = engine.requestLayerThumbnail('a');
     expect(engine.stores.thumbnailStatus.get('a')).toBe('loading');
     setDocument({ ...doc, layers: [] });
+    expect(requests.get('a')?.signal?.aborted).toBe(true);
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+
+    expect(await request).toBe('stale');
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+    expect(engine.drawLayerThumbnail('a', createThumbnailTarget().target, 96)).toBe(false);
+    engine.dispose();
+  });
+
+  it('clears state when the document is replaced', async () => {
+    const { requests, resolver } = createAbortableImageResolver();
+    const doc = makeDoc();
+    const { setDocument, store } = createReactiveStore(doc);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: resolver,
+      projectId: 'p1',
+      store,
+    });
+
+    const request = engine.requestLayerThumbnail('a');
+    setDocument({ ...doc, width: doc.width + 1 }, 1);
+
+    expect(requests.get('a')?.signal?.aborted).toBe(true);
+    expect(await request).toBe('stale');
+    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
+    engine.dispose();
+  });
+
+  it('clears state and rejects stale completion after project change', async () => {
+    const pending = createDeferred<Blob>();
+    let signal: AbortSignal | undefined;
+    const resolver = vi.fn((_imageName: string, nextSignal?: AbortSignal) => {
+      signal = nextSignal;
+      return pending.promise;
+    });
+    const { setActiveProjectId, store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: resolver,
+      projectId: 'p1',
+      store,
+    });
+
+    const request = engine.requestLayerThumbnail('a');
+    setActiveProjectId('p2');
+    expect(signal?.aborted).toBe(true);
     expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
 
     pending.resolve(new Blob());
@@ -2506,58 +2587,21 @@ describe('requestLayerThumbnail', () => {
     engine.dispose();
   });
 
-  it('clears state when the document is replaced', async () => {
-    const doc = makeDoc();
-    const { setDocument, store } = createReactiveStore(doc);
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store,
-    });
-
-    expect(await engine.requestLayerThumbnail('a')).toBe('ready');
-    setDocument({ ...doc, width: doc.width + 1 }, 1);
-
-    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
-    engine.dispose();
-  });
-
-  it('clears state and rejects stale completion after project change', async () => {
-    const pending = createDeferred<Blob>();
-    const { setActiveProjectId, store } = createReactiveStore(makeDoc());
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      imageResolver: () => pending.promise,
-      projectId: 'p1',
-      store,
-    });
-
-    const request = engine.requestLayerThumbnail('a');
-    setActiveProjectId('p2');
-    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
-
-    pending.resolve(new Blob());
-    expect(await request).toBe('stale');
-    expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
-    engine.dispose();
-  });
-
   it('clears state and rejects stale completion after disposal', async () => {
-    const pending = createDeferred<Blob>();
+    const { requests, resolver } = createAbortableImageResolver();
     const { store } = createReactiveStore(makeDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
-      imageResolver: () => pending.promise,
+      imageResolver: resolver,
       projectId: 'p1',
       store,
     });
 
     const request = engine.requestLayerThumbnail('a');
     engine.dispose();
+    expect(requests.get('a')?.signal?.aborted).toBe(true);
     expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
 
-    pending.resolve(new Blob());
     expect(await request).toBe('stale');
     expect(engine.stores.thumbnailStatus.get('a')).toBeUndefined();
   });
@@ -5550,7 +5594,7 @@ describe('commitRasterFilterResult', () => {
         store: reloadStore.store,
       });
       expect((await reloadEngine.exportLayerPixels(harness.source.id)).status).toBe('ok');
-      expect(reloadResolver).toHaveBeenCalledWith(durableImage.imageName);
+      expect(reloadResolver).toHaveBeenCalledWith(durableImage.imageName, expect.any(AbortSignal));
       reloadEngine.dispose();
     });
 
@@ -7272,7 +7316,7 @@ describe('commitGeneratedImageResult', () => {
       store: reloadedStore.store,
     });
     expect((await reloadedEngine.exportLayerPixels(source.id)).status).toBe('ok');
-    expect(resolver).toHaveBeenCalledWith(generatedImage.imageName);
+    expect(resolver).toHaveBeenCalledWith(generatedImage.imageName, expect.any(AbortSignal));
     reloadedEngine.dispose();
   });
 
@@ -9077,7 +9121,7 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     raf.flush();
 
     // The cache was invalidated and re-rasterized from the new persisted source.
-    expect(resolver).toHaveBeenCalledWith('persisted');
+    expect(resolver).toHaveBeenCalledWith('persisted', expect.any(AbortSignal));
 
     engine.dispose();
   });
@@ -9102,7 +9146,7 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     await flushMicrotasks();
     raf.flush();
     expect(resolver).toHaveBeenCalledTimes(1);
-    expect(resolver).toHaveBeenNthCalledWith(1, 'a');
+    expect(resolver).toHaveBeenNthCalledWith(1, 'a', expect.any(AbortSignal));
 
     // Prop-only edit (opacity), source reference preserved: no re-rasterize.
     const doc = engine.getDocument()!;
@@ -9123,7 +9167,7 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     await flushMicrotasks();
     raf.flush();
     expect(resolver).toHaveBeenCalledTimes(2);
-    expect(resolver).toHaveBeenNthCalledWith(2, 'a-v2');
+    expect(resolver).toHaveBeenNthCalledWith(2, 'a-v2', expect.any(AbortSignal));
 
     engine.dispose();
   });

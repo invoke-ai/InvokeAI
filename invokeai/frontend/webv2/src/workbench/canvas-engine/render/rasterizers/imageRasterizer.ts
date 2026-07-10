@@ -15,12 +15,18 @@ import type { RasterizeDeps, RasterizeResult } from './types';
 
 /** Decodes and caches a bitmap for the given image reference, reusing the store cache. */
 export const resolveBitmap = async (image: CanvasImageRef, deps: RasterizeDeps): Promise<ImageBitmap> => {
+  deps.signal?.throwIfAborted();
   const cached = deps.store.getBitmap(image.imageName);
   if (cached) {
     return cached;
   }
-  const blob = await deps.resolver(image.imageName);
+  const blob = await deps.resolver(image.imageName, deps.signal);
+  deps.signal?.throwIfAborted();
   const bitmap = await deps.backend.createImageBitmap(blob);
+  if (deps.signal?.aborted) {
+    bitmap.close();
+    deps.signal.throwIfAborted();
+  }
   // Another concurrent decode may have populated the cache while we awaited;
   // prefer the already-cached bitmap and close ours to avoid a leak.
   const raced = deps.store.getBitmap(image.imageName);

@@ -34,6 +34,38 @@ const makeDeps = (resolver: ImageResolver, backend: RasterBackend): RasterizeDep
 });
 
 describe('rasterizeSource — image', () => {
+  it('forwards the rasterization abort signal to the image resolver', async () => {
+    const { backend } = createSpyBackend();
+    const controller = new AbortController();
+    const resolver = vi.fn<ImageResolver>(() => Promise.resolve(new Blob()));
+    const deps = { ...makeDeps(resolver, backend), signal: controller.signal };
+
+    await rasterizeSource({ image: imageRef('signaled'), type: 'image' }, deps);
+
+    expect(resolver).toHaveBeenCalledWith('signaled', controller.signal);
+  });
+
+  it('closes a decoded bitmap instead of caching it when cancellation lands during decode', async () => {
+    const { backend } = createSpyBackend();
+    let resolveDecoded!: (bitmap: ImageBitmap) => void;
+    const decoded = new Promise<ImageBitmap>((resolve) => {
+      resolveDecoded = resolve;
+    });
+    const bitmap = { close: vi.fn(), height: 16, width: 32 } as unknown as ImageBitmap;
+    backend.createImageBitmap = vi.fn(() => decoded);
+    const controller = new AbortController();
+    const deps = { ...makeDeps(() => Promise.resolve(new Blob()), backend), signal: controller.signal };
+
+    const rasterized = rasterizeSource({ image: imageRef('cancelled-decode'), type: 'image' }, deps);
+    await Promise.resolve();
+    controller.abort();
+    resolveDecoded(bitmap);
+
+    await expect(rasterized).rejects.toBe(controller.signal.reason);
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    expect(deps.store.getBitmap('cancelled-decode')).toBeUndefined();
+  });
+
   it('decodes via the resolver + backend and caches the bitmap per image name', async () => {
     const { backend, createImageBitmap } = createSpyBackend();
     const resolver = vi.fn<ImageResolver>(() => Promise.resolve(new Blob()));

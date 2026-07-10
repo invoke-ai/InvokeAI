@@ -245,6 +245,7 @@ export type ExportBakedLayerBlobResult =
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' };
 
 interface RasterizationJob {
+  controller: AbortController;
   version: number;
   documentGeneration: number;
   source: CanvasLayerSourceContract;
@@ -757,6 +758,21 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const trackedImageNames = new Map<string, string>();
   /** The newest isolated rasterization job for each layer id. */
   const layerRasterizationJobs = new Map<string, RasterizationJob>();
+  const cancelLayerRasterization = (layerId: string): void => {
+    const job = layerRasterizationJobs.get(layerId);
+    if (!job) {
+      return;
+    }
+    layerRasterizationJobs.delete(layerId);
+    job.controller.abort();
+  };
+  const cancelAllLayerRasterizations = (): void => {
+    const jobs = [...layerRasterizationJobs.values()];
+    layerRasterizationJobs.clear();
+    for (const job of jobs) {
+      job.controller.abort();
+    }
+  };
   /** Invalidates jobs and export guards across wholesale document replacement. */
   let rasterDocumentGeneration = 0;
 
@@ -972,6 +988,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   /** Invalidates cached pixels and drops only previews tied to that exact cache version. */
   const invalidateLayerCache = (layerId: string): void => {
+    cancelLayerRasterization(layerId);
     layerCache.invalidate(layerId);
     stores.thumbnailStatus.delete(layerId);
     if (filterPreviews.get(layerId)?.guard) {
@@ -1183,10 +1200,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   // ---- Rasterization orchestration ---------------------------------------
 
-  const rasterizeDeps = (doc: CanvasDocumentContractV2): RasterizeDeps => ({
+  const rasterizeDeps = (doc: CanvasDocumentContractV2, signal?: AbortSignal): RasterizeDeps => ({
     backend,
     documentSize: { height: doc.height, width: doc.width },
     resolver: imageResolver,
+    signal,
     store: layerCache,
   });
 
@@ -1218,6 +1236,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV2
   ): Promise<'published' | 'stale' | 'error'> => {
+    if (disposed || store.getState().activeProjectId !== projectId) {
+      return Promise.resolve('stale');
+    }
     const liveSource = renderableSourceOf(layer);
     if (!liveSource || !isSupportedExportSource(liveSource)) {
       return Promise.resolve('stale');
@@ -1237,6 +1258,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     ) {
       return existing.promise;
     }
+    cancelLayerRasterization(layer.id);
 
     if (source.type === 'text') {
       fontLoader.ensure(textFontString(source), () => {
@@ -1244,6 +1266,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
         if (
           disposed ||
+          store.getState().activeProjectId !== projectId ||
           !currentLayer ||
           rasterDocumentGeneration !== documentGeneration ||
           layerCache.version(layer.id) !== version ||
@@ -1257,11 +1280,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
 
     const scratch = backend.createSurface(contentRect.width, contentRect.height);
+    const controller = new AbortController();
     let settleJob!: (result: 'published' | 'stale' | 'error') => void;
     const promise = new Promise<'published' | 'stale' | 'error'>((resolve) => {
       settleJob = resolve;
     });
     const job: RasterizationJob = {
+      controller,
       documentGeneration,
       promise,
       source,
@@ -1270,12 +1295,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     layerRasterizationJobs.set(layer.id, job);
     void (async () => {
       try {
-        const result = await rasterizeSource(source, rasterizeDeps(document), scratch);
+        const result = await rasterizeSource(source, rasterizeDeps(document, controller.signal), scratch);
         const currentDocument = mirror.getDocument();
         const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
         const currentEntry = layerCache.get(layer.id);
         if (
           disposed ||
+          store.getState().activeProjectId !== projectId ||
           layerRasterizationJobs.get(layer.id) !== job ||
           rasterDocumentGeneration !== documentGeneration ||
           !currentLayer ||
@@ -1307,6 +1333,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
         if (
           disposed ||
+          store.getState().activeProjectId !== projectId ||
           layerRasterizationJobs.get(layer.id) !== job ||
           rasterDocumentGeneration !== documentGeneration ||
           !currentLayer ||
@@ -1797,7 +1824,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const dropLayer = (layerId: string): void => {
-    layerRasterizationJobs.delete(layerId);
+    cancelLayerRasterization(layerId);
     // Generation-cancel persistence before the id can be restored by undo/redo.
     // A late upload from the removed incarnation must never target a recreated
     // paint layer with the same id.
@@ -2172,7 +2199,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       scheduler.invalidate(stagedPreview && !stagedPreview.placement ? { all: true } : { overlay: true }),
     onDocumentReplaced: () => {
       rasterDocumentGeneration += 1;
-      layerRasterizationJobs.clear();
+      cancelAllLayerRasterizations();
       stores.thumbnailStatus.clear();
       // A wholesale document swap — project switch, dims/background change, or a
       // snapshot restore that changes dims — invalidates the pixel history: its
@@ -2304,7 +2331,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     const activeProjectId = store.getState().activeProjectId;
     if (lastActiveProjectId === projectId && activeProjectId !== projectId) {
       rasterDocumentGeneration += 1;
-      layerRasterizationJobs.clear();
+      cancelAllLayerRasterizations();
       stores.thumbnailStatus.clear();
       const ids = new Set<string>(guardedFilterPreviewTokens.keys());
       for (const [layerId, preview] of filterPreviews) {
@@ -2636,9 +2663,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const requestLayerThumbnail = async (layerId: string): Promise<LayerThumbnailRequestResult> => {
-    if (disposed) {
+    if (disposed || store.getState().activeProjectId !== projectId) {
       stores.thumbnailStatus.delete(layerId);
-      return 'missing';
+      return disposed ? 'missing' : 'stale';
     }
     const doc = mirror.getDocument();
     const layer = doc?.layers.find((candidate) => candidate.id === layerId);
@@ -5040,6 +5067,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return;
     }
     disposed = true;
+    cancelAllLayerRasterizations();
     detach();
     // Drop any open text-edit session (its layer belongs to a document this
     // engine no longer serves).
@@ -5071,7 +5099,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     layerCache.dispose();
     adjustedSurfaceCache.dispose();
     trackedImageNames.clear();
-    layerRasterizationJobs.clear();
     stores.thumbnailStatus.clear();
     strokeListeners.clear();
   };

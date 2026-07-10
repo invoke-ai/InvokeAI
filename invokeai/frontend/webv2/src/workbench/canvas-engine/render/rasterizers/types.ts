@@ -35,6 +35,8 @@ export interface RasterizeDeps {
   backend: RasterBackend;
   /** Fetches image blobs by name for decoding. */
   resolver: ImageResolver;
+  /** Cancels pending image resolution and prevents decode/cache publication. */
+  signal?: AbortSignal;
   /** Holds the decoded-bitmap cache (keyed by image name). */
   store: LayerCacheStore;
   /**
