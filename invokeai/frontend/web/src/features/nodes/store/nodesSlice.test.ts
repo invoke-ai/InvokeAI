@@ -7,6 +7,7 @@ import {
   callSavedWorkflowDynamicFieldsChanged,
   connectorInserted,
   fieldIntegerValueChanged,
+  fieldStringValueChanged,
   nodesChanged,
   nodesSliceConfig,
 } from './nodesSlice';
@@ -272,6 +273,64 @@ describe('callSavedWorkflowDynamicFieldsChanged', () => {
       })
     );
 
+    expect(nextState.edges).toHaveLength(0);
+  });
+
+  it('clears dynamic fields and inbound dynamic field edges when the selected workflow is cleared', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const sourceNode = buildNode(addTemplate);
+    const targetNode = buildNode(callSavedWorkflowTemplate);
+    const workflowIdInput = targetNode.data.inputs.workflow_id;
+    if (!workflowIdInput) {
+      throw new Error('Expected workflow_id input');
+    }
+    workflowIdInput.value = 'workflow-1';
+    state.nodes.push(sourceNode, targetNode);
+
+    const fieldName = 'saved_workflow_input::node-1::a';
+    state.edges.push({
+      id: 'edge-1',
+      type: 'default',
+      source: sourceNode.id,
+      sourceHandle: 'value',
+      target: targetNode.id,
+      targetHandle: fieldName,
+    });
+
+    let nextState = nodesSliceConfig.slice.reducer(
+      state,
+      callSavedWorkflowDynamicFieldsChanged({
+        nodeId: targetNode.id,
+        fields: [
+          {
+            fieldName,
+            fieldTemplate: buildDynamicIntegerTemplate(fieldName),
+            label: 'Left Addend',
+            description: 'The first number',
+            initialValue: 23,
+          },
+        ],
+        edgeIdsToRemove: [],
+      })
+    );
+
+    nextState = nodesSliceConfig.slice.reducer(
+      nextState,
+      fieldStringValueChanged({
+        nodeId: targetNode.id,
+        fieldName: 'workflow_id',
+        value: '',
+      })
+    );
+
+    const clearedNode = nextState.nodes.find((node) => node.id === targetNode.id);
+    if (!clearedNode || clearedNode.type !== 'invocation') {
+      throw new Error('Expected invocation node');
+    }
+
+    expect(clearedNode.data.inputs.workflow_id?.value).toBe('');
+    expect(clearedNode.data.inputs[fieldName]).toBeUndefined();
+    expect(clearedNode.data.dynamicInputTemplates[fieldName]).toBeUndefined();
     expect(nextState.edges).toHaveLength(0);
   });
 });

@@ -182,6 +182,28 @@ const fieldValueReducer = <T extends FieldValue>(
   field.value = result.data;
 };
 
+const clearCallSavedWorkflowDynamicFields = (state: NodesState, nodeId: string) => {
+  const node = state.nodes.find((n) => n.id === nodeId);
+  if (!isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
+    return;
+  }
+
+  for (const fieldName of Object.keys(node.data.inputs)) {
+    if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)) {
+      delete node.data.inputs[fieldName];
+      delete node.data.dynamicInputTemplates[fieldName];
+    }
+  }
+
+  state.edges = state.edges.filter((edge) => {
+    return (
+      edge.type !== 'default' ||
+      edge.target !== nodeId ||
+      !edge.targetHandle?.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)
+    );
+  });
+};
+
 const slice = createSlice({
   name: 'nodes',
   initialState: getInitialState(),
@@ -492,6 +514,9 @@ const slice = createSlice({
     },
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
+      if (action.payload.fieldName === 'workflow_id' && action.payload.value === '') {
+        clearCallSavedWorkflowDynamicFields(state, action.payload.nodeId);
+      }
     },
     fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
       fieldValueReducer(state, action, zStringFieldCollectionValue);

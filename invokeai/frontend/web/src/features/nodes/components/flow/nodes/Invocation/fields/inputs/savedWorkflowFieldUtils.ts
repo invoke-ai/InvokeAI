@@ -6,7 +6,6 @@ import {
 import type { S, WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
-const SAVED_WORKFLOW_PICKER_PAGE_SIZE = 50;
 type SavedWorkflowBadge = 'unsupported' | 'default' | 'shared';
 
 type SavedWorkflowSelectionState =
@@ -24,7 +23,7 @@ export const buildSavedWorkflowOptions = (workflows: WorkflowRecordListItemWithT
 
 const baseSavedWorkflowPickerQueryArg = {
   page: 0,
-  per_page: SAVED_WORKFLOW_PICKER_PAGE_SIZE,
+  per_page: undefined,
   order_by: 'name',
   direction: 'ASC',
   tags: [] as string[],
