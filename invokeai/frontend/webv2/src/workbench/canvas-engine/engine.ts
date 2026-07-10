@@ -757,6 +757,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   /** Layer id → decoded image name, so removed layers can release their bitmaps. */
   const trackedImageNames = new Map<string, string>();
+  /** Every live layer's source image, including layers that have never rasterized. */
+  const mirroredLayerImageNames = new Map<string, string>();
   /** The newest isolated rasterization job for each layer id. */
   const layerRasterizationJobs = new Map<string, RasterizationJob>();
   /** All physically running jobs, including canceled jobs superseded in the per-layer map. */
@@ -2228,6 +2230,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     onBboxChanged: () =>
       scheduler.invalidate(stagedPreview && !stagedPreview.placement ? { all: true } : { overlay: true }),
     onDocumentReplaced: () => {
+      const previousImageNames = [...mirroredLayerImageNames.values()];
       rasterDocumentGeneration += 1;
       cancelAllLayerRasterizations();
       stores.thumbnailStatus.clear();
@@ -2264,6 +2267,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       stores.lassoPreview.set(null);
       const doc = mirror.getDocument();
       const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
+      mirroredLayerImageNames.clear();
+      for (const layer of doc?.layers ?? []) {
+        const imageName = layerImageName(layer);
+        if (imageName) {
+          mirroredLayerImageNames.set(layer.id, imageName);
+        }
+      }
       // Snapshot ids first: dropLayer mutates trackedImageNames during iteration.
       const trackedIds = Array.from(trackedImageNames.keys());
       for (const layerId of trackedIds) {
@@ -2281,6 +2291,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       for (const layerId of present) {
         invalidateLayerCache(layerId);
       }
+      for (const imageName of previousImageNames) {
+        releaseBitmapIfUnreferenced(imageName);
+      }
       // Persistence bookkeeping (the self-echo `lastApplied` map and pending
       // debounced flushes) described the OLD document. Drop it so a reused layer
       // id can't have its next legit persistence dispatch suppressed as a stale
@@ -2293,6 +2306,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       const doc = mirror.getDocument();
       const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
       const sourceChanged = new Set(sourceChangedIds);
+      const previousImageNames = new Map(ids.map((id) => [id, mirroredLayerImageNames.get(id)]));
+      for (const id of ids) {
+        const layer = doc?.layers.find((candidate) => candidate.id === id);
+        const imageName = layer ? layerImageName(layer) : null;
+        if (imageName) {
+          mirroredLayerImageNames.set(id, imageName);
+        } else {
+          mirroredLayerImageNames.delete(id);
+        }
+      }
       // A transform session outlives individual gestures (and any tool switch,
       // including a temp modifier-hold), so it can easily outlive its own layer
       // being deleted out from under it — e.g. deleted via the layers panel
@@ -2305,6 +2328,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       for (const id of ids) {
         if (!present.has(id)) {
           dropLayer(id);
+          const previousImageName = previousImageNames.get(id);
+          if (previousImageName) {
+            releaseBitmapIfUnreferenced(previousImageName);
+          }
           // A control-filter preview (session + decoded surface) belongs to a
           // specific layer; a layer removed out from under an in-flight or
           // already-decoded preview (delete via the layers panel, or an undo
@@ -2344,6 +2371,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         // holds those pixels, so re-rasterizing would needlessly re-fetch and
         // could flicker. Any other swap invalidates → re-rasterizes.
         untrackLayerImage(id);
+        const previousImageName = previousImageNames.get(id);
+        if (previousImageName) {
+          releaseBitmapIfUnreferenced(previousImageName);
+        }
         const source = getLayerSourceById(id);
         if (bitmapStore.isSelfEcho(id, source)) {
           continue;
@@ -2354,6 +2385,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     },
     onStagingChanged: () => scheduler.invalidate({ overlay: true }),
   });
+
+  for (const layer of mirror.getDocument()?.layers ?? []) {
+    const imageName = layerImageName(layer);
+    if (imageName) {
+      mirroredLayerImageNames.set(layer.id, imageName);
+    }
+  }
 
   // A guarded raster-filter preview belongs to one continuous active-project
   // epoch. Switching away invalidates published and in-flight guarded work, so

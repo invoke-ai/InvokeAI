@@ -2589,7 +2589,7 @@ describe('requestLayerThumbnail', () => {
     engine.dispose();
   });
 
-  it('preserves an unpublished decoded bitmap while another live layer references it', async () => {
+  it('releases a deferred shared bitmap when its final never-rasterized image layer is deleted', async () => {
     const bitmap = recordingBitmap('stale-shared-before-publication');
     const first = rasterLayer('a', { imageName: 'shared' });
     const second = rasterLayer('b', { imageName: 'shared' });
@@ -2607,6 +2607,74 @@ describe('requestLayerThumbnail', () => {
 
     expect(await engine.requestLayerThumbnail('a')).toBe('stale');
     expect(bitmap.close).not.toHaveBeenCalled();
+    setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'new' })] });
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('releases a deferred shared bitmap when its final never-rasterized paint source changes', async () => {
+    const bitmap = recordingBitmap('stale-shared-paint');
+    const first = rasterLayer('a', { imageName: 'shared' });
+    const second: CanvasRasterLayerContractV2 = {
+      ...(rasterLayer('b') as CanvasRasterLayerContractV2),
+      source: { bitmap: { height: 10, imageName: 'shared', width: 10 }, type: 'paint' },
+    };
+    const doc = { ...makeDoc(), layers: [first, second] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const backend = createInvalidateDuringBitmapDrawBackend(bitmap, () => {
+      setDocument({ ...doc, layers: [second] });
+    });
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('stale');
+    expect(bitmap.close).not.toHaveBeenCalled();
+    setDocument({
+      ...doc,
+      layers: [{ ...second, source: { bitmap: { height: 10, imageName: 'new', width: 10 }, type: 'paint' } }],
+    });
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('releases a deferred shared bitmap when its final never-rasterized mask bitmap changes', async () => {
+    const bitmap = recordingBitmap('stale-shared-mask');
+    const first = rasterLayer('a', { imageName: 'shared' });
+    const second: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('b'),
+      mask: {
+        ...maskLayer('b').mask,
+        bitmap: { height: 10, imageName: 'shared', width: 10 },
+      },
+    };
+    const doc = { ...makeDoc(), layers: [first, second] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const backend = createInvalidateDuringBitmapDrawBackend(bitmap, () => {
+      setDocument({ ...doc, layers: [second] });
+    });
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('stale');
+    expect(bitmap.close).not.toHaveBeenCalled();
+    setDocument({
+      ...doc,
+      layers: [
+        {
+          ...second,
+          mask: { ...second.mask, bitmap: { height: 10, imageName: 'new', width: 10 } },
+        },
+      ],
+    });
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
     engine.dispose();
   });
 
