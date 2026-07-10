@@ -426,7 +426,8 @@ class _ExecutionMaterializer:
     def _get_collect_iteration_mapping_groups(
         self, input_edges: list[Edge]
     ) -> list[tuple[tuple[int, ...], list[tuple[str, str]]]]:
-        grouped_mappings: dict[tuple[int, ...], list[tuple[str, str]]] = {}
+        prepared_inputs: list[tuple[Edge, str, str, tuple[int, ...]]] = []
+        group_keys: set[tuple[int, ...]] = set()
         for edge in input_edges:
             prepared_nodes = self._get_ordered_prepared_nodes_for_source(edge.source.node_id)
             for prepared_id in prepared_nodes:
@@ -435,14 +436,17 @@ class _ExecutionMaterializer:
                     destination=edge.destination,
                 )
                 group_key = self._get_collect_iteration_group_key(prepared_edge)
-                grouped_mappings.setdefault(group_key, []).append((edge.source.node_id, prepared_id))
+                group_keys.add(group_key)
+                prepared_inputs.append(
+                    (prepared_edge, edge.source.node_id, prepared_id, self._state._get_iteration_path(prepared_id))
+                )
 
         final_group_keys = sorted(
             group_key
-            for group_key in grouped_mappings
+            for group_key in group_keys
             if not any(
                 group_key != other_group_key and other_group_key[: len(group_key)] == group_key
-                for other_group_key in grouped_mappings
+                for other_group_key in group_keys
             )
         )
 
@@ -450,10 +454,19 @@ class _ExecutionMaterializer:
             (
                 group_key,
                 [
-                    mapping
-                    for source_group_key, mappings in sorted(grouped_mappings.items())
-                    if group_key[: len(source_group_key)] == source_group_key
-                    for mapping in mappings
+                    (source_node_id, prepared_id)
+                    for prepared_edge, source_node_id, prepared_id, iteration_path in prepared_inputs
+                    if (
+                        prepared_edge.destination.field == ITEM_FIELD
+                        and (
+                            group_key[: len(iteration_path)] == iteration_path
+                            or iteration_path[: len(group_key)] == group_key
+                        )
+                    )
+                    or (
+                        prepared_edge.destination.field != ITEM_FIELD
+                        and group_key[: len(iteration_path)] == iteration_path
+                    )
                 ],
             )
             for group_key in final_group_keys
@@ -465,13 +478,19 @@ class _ExecutionMaterializer:
         parent_prepared_nodes = {
             node_id: self._get_ordered_prepared_nodes_for_source(node_id) for node_id in parent_node_ids
         }
+        all_iteration_paths = {
+            self._state._get_iteration_path(prepared_id)
+            for prepared_nodes in parent_prepared_nodes.values()
+            for prepared_id in prepared_nodes
+            if self._state._get_iteration_path(prepared_id) != ()
+        }
         iteration_paths = sorted(
-            {
-                self._state._get_iteration_path(prepared_id)
-                for prepared_nodes in parent_prepared_nodes.values()
-                for prepared_id in prepared_nodes
-                if self._state._get_iteration_path(prepared_id) != ()
-            }
+            iteration_path
+            for iteration_path in all_iteration_paths
+            if not any(
+                iteration_path != other_path and other_path[: len(iteration_path)] == iteration_path
+                for other_path in all_iteration_paths
+            )
         )
         if not iteration_paths:
             iteration_paths = [()]
@@ -481,22 +500,22 @@ class _ExecutionMaterializer:
             mapping: list[tuple[str, str]] = []
             for node_id, prepared_nodes in parent_prepared_nodes.items():
                 matching_prepared_node = next(
-                    (
-                        prepared_id
-                        for prepared_id in prepared_nodes
-                        if self._state._get_iteration_path(prepared_id) == iteration_path
+                    iter(
+                        sorted(
+                            (
+                                prepared_id
+                                for prepared_id in prepared_nodes
+                                if iteration_path[: len(self._state._get_iteration_path(prepared_id))]
+                                == self._state._get_iteration_path(prepared_id)
+                            ),
+                            key=lambda prepared_id: (
+                                -len(self._state._get_iteration_path(prepared_id)),
+                                prepared_id,
+                            ),
+                        )
                     ),
                     None,
                 )
-                if matching_prepared_node is None:
-                    matching_prepared_node = next(
-                        (
-                            prepared_id
-                            for prepared_id in prepared_nodes
-                            if self._state._get_iteration_path(prepared_id) == ()
-                        ),
-                        None,
-                    )
                 if matching_prepared_node is None:
                     break
                 mapping.append((node_id, matching_prepared_node))
