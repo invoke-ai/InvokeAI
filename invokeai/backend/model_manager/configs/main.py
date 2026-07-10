@@ -1680,10 +1680,16 @@ class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
 
 # Tokenizer class names a Qwen3-encoder pipeline can advertise in model_index.json. Qwen models
-# (incl. Qwen3) use the Qwen2 tokenizer classes, in slow and fast variants. Kept alongside the
-# accepted encoder architectures (_QWEN3_ENCODER_ARCHITECTURES) so submodel discovery recognizes the
-# same compatible components the Qwen3 encoder config accepts.
+# (incl. Qwen3) use the Qwen2 tokenizer classes, in slow and fast variants.
 _QWEN_TOKENIZER_CLASS_NAMES = {"Qwen2Tokenizer", "Qwen2TokenizerFast"}
+
+# Text-encoder class names the SDNQ pipeline loaders can actually instantiate. The FLUX.2 / Z-Image
+# SDNQ pipeline loaders build a text-only Qwen3ForCausalLM for the discovered text_encoder/ folder,
+# so they cannot load a Qwen-VL model: Qwen2VLForConditionalGeneration ships a visual tower and is a
+# multimodal encoder (handled by the QwenVLEncoder config), not a text encoder. Recording it as a
+# self-contained TextEncoder would mark the pipeline complete even though the loader would fail on
+# the visual-tower weights — so we intentionally narrow it out of the accepted encoder architectures.
+_SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES = _QWEN3_ENCODER_ARCHITECTURES - {"Qwen2VLForConditionalGeneration"}
 
 
 class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
@@ -1798,7 +1804,7 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
                         model_type=ModelType.Main,
                         variant=None,
                     )
-                case name if name in _QWEN3_ENCODER_ARCHITECTURES:
+                case name if name in _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES:
                     submodels[SubModelType.TextEncoder] = SubmodelDefinition(
                         path_or_prefix=(mod.path / key).resolve().as_posix(),
                         model_type=ModelType.Qwen3Encoder,
@@ -1922,7 +1928,7 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
                         model_type=ModelType.Main,
                         variant=None,
                     )
-                case name if name in _QWEN3_ENCODER_ARCHITECTURES:
+                case name if name in _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES:
                     submodels[SubModelType.TextEncoder] = SubmodelDefinition(
                         path_or_prefix=(mod.path / key).resolve().as_posix(),
                         model_type=ModelType.Qwen3Encoder,
