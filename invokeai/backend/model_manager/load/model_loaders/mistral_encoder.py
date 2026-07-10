@@ -392,9 +392,7 @@ class _TekkenRawTextAdapter:
         **_kwargs: Any,
     ) -> dict[str, torch.Tensor]:
         if return_tensors != "pt":
-            raise NotImplementedError(
-                "_TekkenRawTextAdapter only supports return_tensors='pt' " f"(got {return_tensors})"
-            )
+            raise NotImplementedError(f"_TekkenRawTextAdapter only supports return_tensors='pt' (got {return_tensors})")
 
         tokens = self._encode(text)
         if truncation and len(tokens) > max_length:
