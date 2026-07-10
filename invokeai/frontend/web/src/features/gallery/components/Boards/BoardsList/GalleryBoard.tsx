@@ -54,11 +54,13 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     [board.board_id]
   );
 
-  // Videos are counted alongside images in the headline count so a board that only
-  // contains videos doesn't read as empty in the gallery list.
+  // The tooltip gets split counts so videos aren't mislabeled as images; the headline
+  // number below stays combined (images + videos) so a video-only board doesn't read
+  // as empty in the gallery list.
   const boardCounts = useMemo(
     () => ({
-      image_count: board.image_count + (board.video_count ?? 0),
+      image_count: board.image_count,
+      video_count: board.video_count ?? 0,
       asset_count: board.asset_count,
     }),
     [board]

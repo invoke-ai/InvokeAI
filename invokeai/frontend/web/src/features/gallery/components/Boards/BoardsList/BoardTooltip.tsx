@@ -9,6 +9,7 @@ type Props = {
   board: BoardDTO | null;
   boardCounts: {
     image_count: number;
+    video_count: number;
     asset_count: number;
   };
 };
@@ -40,6 +41,7 @@ export const BoardTooltip = ({ board, boardCounts }: Props) => {
         {board && <Text fontWeight="semibold">{board.board_name}</Text>}
         <Text noOfLines={1}>
           {t('boards.imagesWithCount', { count: boardCounts.image_count })},{' '}
+          {t('boards.videosWithCount', { count: boardCounts.video_count })},{' '}
           {t('boards.assetsWithCount', { count: boardCounts.asset_count })}
         </Text>
         {board?.archived && <Text>({t('boards.archived')})</Text>}

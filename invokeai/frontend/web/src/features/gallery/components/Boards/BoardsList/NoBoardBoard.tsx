@@ -76,7 +76,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
             label={
               <BoardTooltip
                 board={null}
-                boardCounts={{ image_count: imagesAndVideosTotal, asset_count: assetsTotal }}
+                boardCounts={{ image_count: imagesTotal, video_count: videosTotal, asset_count: assetsTotal }}
               />
             }
             openDelay={1000}
