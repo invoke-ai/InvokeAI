@@ -48,7 +48,7 @@ import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { fromTRS, invert as invertMatrix } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { createAdjustedSurfaceCache } from '@workbench/canvas-engine/render/adjustedSurfaceCache';
-import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import { applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import {
   blendToComposite,
   compositeDocument,
@@ -2755,30 +2755,42 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     target.height = height;
     ctx.clearRect(0, 0, width, height);
 
+    // Downscale first. Every display effect below works only on this bounded
+    // surface, never on the potentially multi-megapixel layer cache.
+    const thumbnailSurface = backend.createSurface(width, height);
+    const thumbnailCtx = thumbnailSurface.ctx;
+    thumbnailCtx.setTransform(1, 0, 0, 1, 0, 0);
+    thumbnailCtx.clearRect(0, 0, width, height);
+    thumbnailCtx.globalAlpha = 1;
+    thumbnailCtx.globalCompositeOperation = 'source-over';
+    thumbnailCtx.drawImage(entry.surface.canvas, 0, 0, width, height);
+
     const checkerPattern = ctx.createPattern(getCheckerboardTile().canvas as CanvasImageSource, 'repeat');
     if (checkerPattern) {
       ctx.fillStyle = checkerPattern;
       ctx.fillRect(0, 0, width, height);
     }
 
-    let displaySurface = entry.surface;
-    if (layer.type === 'raster') {
-      displaySurface = getAdjustedSurface(layer, entry) ?? displaySurface;
+    let displaySurface = thumbnailSurface;
+    if (layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments)) {
+      const imageData = thumbnailCtx.getImageData(0, 0, width, height);
+      applyAdjustments(imageData, layer.adjustments);
+      thumbnailCtx.putImageData(imageData, 0, 0);
     } else if (layer.type === 'control' && layer.withTransparencyEffect) {
-      displaySurface = renderControlTransparency(backend, displaySurface, displaySurface.width, displaySurface.height);
+      displaySurface = renderControlTransparency(backend, thumbnailSurface, width, height);
     } else if (layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') {
       const { fill } = layer.mask;
       displaySurface = colorizeMask(
         backend,
-        displaySurface,
-        displaySurface.width,
-        displaySurface.height,
+        thumbnailSurface,
+        width,
+        height,
         fill,
         getMaskPatternTile(fill.style, fill.color)
       );
     }
     ctx.globalAlpha = layer.opacity;
-    ctx.drawImage(displaySurface.canvas as CanvasImageSource, 0, 0, width, height);
+    ctx.drawImage(displaySurface.canvas as CanvasImageSource, 0, 0);
     return true;
   };
 

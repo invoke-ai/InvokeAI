@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react';
 
 import { Box, Icon, IconButton } from '@chakra-ui/react';
 import {
+  getLayerThumbnailFallbackRenderState,
   nextLayerThumbnailFallbackStage,
   resolveLayerThumbnailImageRef,
 } from '@workbench/canvas-engine/render/thumbnail';
@@ -45,7 +46,11 @@ const LayerThumbnailContent = ({ engine, layer }: { engine: CanvasEngine | null;
       if (status === 'idle') {
         void engine.requestLayerThumbnail(layer.id);
       }
-      setDrawn(engine.drawLayerThumbnail(layer.id, canvas, THUMBNAIL_MAX_PX));
+      const didDraw = engine.drawLayerThumbnail(layer.id, canvas, THUMBNAIL_MAX_PX);
+      setDrawn(didDraw);
+      if (didDraw) {
+        setFallbackStage('thumbnail');
+      }
     },
     // `version` is a deliberate identity trigger: a repaint bumps it, giving the
     // callback a new identity so React re-runs it and re-blits the cache.
@@ -69,6 +74,7 @@ const LayerThumbnailContent = ({ engine, layer }: { engine: CanvasEngine | null;
         ? getImageThumbnailUrl(fallbackImage.imageName)
         : getImageFullUrl(fallbackImage.imageName)
       : null;
+  const { showFallback, showRetry } = getLayerThumbnailFallbackRenderState(drawn, fallbackStage, status === 'error');
 
   return (
     <Box
@@ -83,7 +89,7 @@ const LayerThumbnailContent = ({ engine, layer }: { engine: CanvasEngine | null;
       w="9"
     >
       <canvas ref={bindCanvas} style={drawn ? CANVAS_STYLE : { display: 'none' }} />
-      {!drawn &&
+      {showFallback &&
         (fallbackUrl ? (
           <img alt={layer.name} onError={onFallbackError} src={fallbackUrl} style={IMG_STYLE} />
         ) : (
@@ -91,7 +97,7 @@ const LayerThumbnailContent = ({ engine, layer }: { engine: CanvasEngine | null;
             <Icon as={ImageOffIcon} boxSize="3.5" />
           </Box>
         ))}
-      {status === 'error' || fallbackStage === 'failed' ? (
+      {showRetry ? (
         <IconButton
           aria-label={`Retry thumbnail for ${layer.name}`}
           inset="0"

@@ -30,11 +30,10 @@ import { createBitmapStore } from './document/bitmapStore';
 import { mergeDownMatrix } from './document/mergeDown';
 import { createCanvasEngine } from './engine';
 
-// Records every layer id the engine tells its adjusted-surface cache to drop, so
-// the layer-removal cleanup wiring (Task 39, finding 2) can be asserted without
-// exposing the cache. The factory wraps the real implementation, preserving all
-// behaviour and only spying on `delete`.
+// Records adjusted-surface cache access without exposing it on the engine. The
+// factory wraps the real implementation, preserving all behaviour.
 const adjustedSurfaceCacheDeletes = vi.hoisted(() => [] as string[]);
+const adjustedSurfaceCacheGets = vi.hoisted(() => [] as string[]);
 
 vi.mock('@workbench/canvas-engine/render/adjustedSurfaceCache', async (importOriginal) => {
   const actual = await importOriginal<typeof AdjustedSurfaceCacheModule>();
@@ -47,6 +46,10 @@ vi.mock('@workbench/canvas-engine/render/adjustedSurfaceCache', async (importOri
         delete: (layerId: string) => {
           adjustedSurfaceCacheDeletes.push(layerId);
           cache.delete(layerId);
+        },
+        get: (...args: Parameters<typeof cache.get>) => {
+          adjustedSurfaceCacheGets.push(args[0]);
+          return cache.get(...args);
         },
       };
     },
@@ -2396,6 +2399,54 @@ const thumbnailMaskLayer = (id: string, type: 'inpaint_mask' | 'regional_guidanc
     type,
   }) as CanvasLayerContract;
 
+const largeThumbnailLayer = (
+  kind: 'raster' | 'control' | 'inpaint_mask' | 'regional_guidance'
+): CanvasLayerContract => {
+  const image = { height: 2048, imageName: `large-${kind}`, width: 4096 };
+  if (kind === 'raster') {
+    return {
+      ...rasterLayer('a'),
+      adjustments: { brightness: 0.25, contrast: -0.1, saturation: 0.3 },
+      source: { bitmap: image, offset: { x: -300, y: 250 }, type: 'paint' },
+    } as CanvasRasterLayerContractV2;
+  }
+  if (kind === 'control') {
+    return { ...controlLayerForThumbnail('a'), source: { image, type: 'image' } } as CanvasLayerContract;
+  }
+  const mask = thumbnailMaskLayer('a', kind);
+  return {
+    ...mask,
+    mask: { ...('mask' in mask ? mask.mask : {}), bitmap: image, offset: { x: -300, y: 250 } },
+  } as CanvasLayerContract;
+};
+
+const createSeededThumbnailBackend = (rgba: [number, number, number, number]): StubRasterBackend => {
+  const backend = createTestStubRasterBackend();
+  const createSurface = backend.createSurface.bind(backend);
+  backend.createSurface = (width, height) => {
+    const surface = createSurface(width, height);
+    const originalCtx = surface.ctx;
+    const ctx = new Proxy(originalCtx, {
+      get(target, property, receiver) {
+        if (property === 'getImageData') {
+          return (x: number, y: number, imageWidth: number, imageHeight: number): ImageData => {
+            target.getImageData(x, y, imageWidth, imageHeight);
+            const data = new Uint8ClampedArray(imageWidth * imageHeight * 4);
+            for (let index = 0; index < data.length; index += 4) {
+              data.set(rgba, index);
+            }
+            return { colorSpace: 'srgb', data, height: imageHeight, width: imageWidth } as ImageData;
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    Object.defineProperty(surface, 'ctx', { value: ctx });
+    return surface;
+  };
+  return backend;
+};
+
 const createThumbnailTarget = (): {
   calls: { args: unknown[]; op: string }[];
   target: HTMLCanvasElement;
@@ -2409,7 +2460,9 @@ const createThumbnailTarget = (): {
     },
     drawImage: (...args: unknown[]) => calls.push({ args, op: 'drawImage' }),
     fillRect: (...args: unknown[]) => calls.push({ args, op: 'fillRect' }),
-    globalAlpha: 1,
+    set globalAlpha(value: unknown) {
+      calls.push({ args: [value], op: 'globalAlpha' });
+    },
     set fillStyle(value: unknown) {
       calls.push({ args: [value], op: 'fillStyle' });
     },
@@ -2452,7 +2505,14 @@ describe('drawLayerThumbnail', () => {
     // 10x10 never upscales, so the target keeps the source dimensions.
     expect(target.width).toBe(10);
     expect(target.height).toBe(10);
-    expect(calls.map((call) => call.op)).toEqual(['clearRect', 'createPattern', 'fillStyle', 'fillRect', 'drawImage']);
+    expect(calls.map((call) => call.op)).toEqual([
+      'clearRect',
+      'createPattern',
+      'fillStyle',
+      'fillRect',
+      'globalAlpha',
+      'drawImage',
+    ]);
 
     engine.dispose();
   });
@@ -2461,8 +2521,9 @@ describe('drawLayerThumbnail', () => {
     const layer = {
       ...rasterLayer('a'),
       adjustments: { brightness: 0.2, contrast: -0.1, saturation: 0.3 },
+      opacity: 0.4,
     } as CanvasRasterLayerContractV2;
-    const backend = createTestStubRasterBackend();
+    const backend = createSeededThumbnailBackend([10, 20, 30, 255]);
     const createSurface = vi.spyOn(backend, 'createSurface');
     const { store } = createReactiveStore({ ...makeDoc(), layers: [layer] });
     const engine = createCanvasEngine({
@@ -2473,16 +2534,23 @@ describe('drawLayerThumbnail', () => {
     });
     await engine.requestLayerThumbnail('a');
     const surfaceCountBeforeDraw = createSurface.mock.calls.length;
+    const adjustedGetCountBeforeDraw = adjustedSurfaceCacheGets.length;
 
     const { calls, target } = createThumbnailTarget();
     expect(engine.drawLayerThumbnail('a', target, 96)).toBe(true);
+    expect(adjustedSurfaceCacheGets).toHaveLength(adjustedGetCountBeforeDraw);
     expect(createSurface.mock.calls.length).toBeGreaterThan(surfaceCountBeforeDraw);
     const createdSurfaces = createSurface.mock.results
       .slice(surfaceCountBeforeDraw)
       .map((result) => result.value as StubRasterSurface);
     expect(createdSurfaces.some((surface) => surface.callLog.some((call) => call.op === 'getImageData'))).toBe(true);
+    const adjustedPixels = createdSurfaces
+      .flatMap((surface) => surface.callLog)
+      .find((call) => call.op === 'putImageData')?.args[0] as ImageData;
+    expect(Array.from(adjustedPixels.data.slice(0, 4))).toEqual([66, 77, 89, 255]);
     const operations = calls.map((call) => call.op);
     expect(operations.indexOf('fillRect')).toBeLessThan(operations.lastIndexOf('drawImage'));
+    expect(calls).toContainEqual({ args: [0.4], op: 'globalAlpha' });
     engine.dispose();
   });
 
@@ -2491,7 +2559,10 @@ describe('drawLayerThumbnail', () => {
     ['inpaint mask fill', thumbnailMaskLayer('a', 'inpaint_mask'), 'source-in'],
     ['regional mask fill', thumbnailMaskLayer('a', 'regional_guidance'), 'source-in'],
   ])('renders %s pixels over the checkerboard', async (_name, layer, expectedEffect) => {
-    const backend = createTestStubRasterBackend();
+    const backend =
+      expectedEffect === 'getImageData'
+        ? createSeededThumbnailBackend([100, 50, 200, 255])
+        : createTestStubRasterBackend();
     const createSurface = vi.spyOn(backend, 'createSurface');
     const { store } = createReactiveStore({ ...makeDoc(), layers: [layer as CanvasLayerContract] });
     const engine = createCanvasEngine({
@@ -2516,10 +2587,67 @@ describe('drawLayerThumbnail', () => {
         )
       )
     ).toBe(true);
+    if (expectedEffect === 'getImageData') {
+      const effectedPixels = createdSurfaces
+        .flatMap((surface) => surface.callLog)
+        .find((call) => call.op === 'putImageData')?.args[0] as ImageData;
+      expect(Array.from(effectedPixels.data.slice(0, 4))).toEqual([100, 50, 200, 125]);
+    } else {
+      expect(
+        createdSurfaces.some((surface) =>
+          surface.callLog.some(
+            (call) =>
+              call.op === 'set' &&
+              (call.args[0] === 'fillStyle' || call.args[0] === 'strokeStyle') &&
+              call.args[1] === '#e07575'
+          )
+        )
+      ).toBe(true);
+    }
     expect(calls.map((call) => call.op)).toContain('fillRect');
     expect(calls.at(-1)?.op).toBe('drawImage');
     engine.dispose();
   });
+
+  it.each(['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const)(
+    'bounds every %s thumbnail effect allocation before processing a large source',
+    async (kind) => {
+      const layer = largeThumbnailLayer(kind);
+      const backend = createTestStubRasterBackend();
+      const createSurface = vi.spyOn(backend, 'createSurface');
+      const { store } = createReactiveStore({ ...makeDoc(), layers: [layer] });
+      const engine = createCanvasEngine({
+        backend,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId: 'p1',
+        store,
+      });
+      await engine.requestLayerThumbnail('a');
+      createSurface.mockClear();
+
+      const { target } = createThumbnailTarget();
+      expect(engine.drawLayerThumbnail('a', target, 96)).toBe(true);
+
+      expect(target.width).toBe(96);
+      expect(target.height).toBe(48);
+      expect(createSurface.mock.calls.length).toBeGreaterThan(0);
+      expect(createSurface.mock.calls.every(([width, height]) => width <= 96 && height <= 96)).toBe(true);
+      const scratch = createSurface.mock.results
+        .map((result) => result.value as StubRasterSurface)
+        .find((surface) =>
+          surface.callLog.some(
+            (call) =>
+              call.op === 'drawImage' &&
+              call.args[1] === 0 &&
+              call.args[2] === 0 &&
+              call.args[3] === 96 &&
+              call.args[4] === 48
+          )
+        );
+      expect(scratch).toBeDefined();
+      engine.dispose();
+    }
+  );
 
   it.each([
     [
@@ -2551,6 +2679,7 @@ describe('drawLayerThumbnail', () => {
         mask: { ...('mask' in layer ? layer.mask : {}), fill: { color: '#00ff00', style: 'solid' } },
       }),
     ],
+    ['opacity', rasterLayer('a'), (layer: CanvasLayerContract) => ({ ...layer, opacity: 0.5 })],
   ])(
     'invalidates the keyed thumbnail version when %s changes without changing the source',
     async (_name, layer, edit) => {

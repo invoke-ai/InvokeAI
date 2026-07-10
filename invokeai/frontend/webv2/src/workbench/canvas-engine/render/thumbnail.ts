@@ -65,14 +65,24 @@ export const resolveLayerThumbnailImageRef = (layer: CanvasLayerContract): Canva
 /** Display-only properties that alter a layer thumbnail without changing its raster cache. */
 export const getLayerThumbnailDisplayKey = (layer: CanvasLayerContract): string => {
   if (layer.type === 'raster') {
-    return `raster:${adjustmentsKey(layer.adjustments)}`;
+    return `raster:${layer.opacity}:${adjustmentsKey(layer.adjustments)}`;
   }
   if (layer.type === 'control') {
-    return `control:${layer.withTransparencyEffect ? 'transparent' : 'opaque'}`;
+    return `control:${layer.opacity}:${layer.withTransparencyEffect ? 'transparent' : 'opaque'}`;
   }
-  return `mask:${layer.mask.fill.style}:${layer.mask.fill.color}`;
+  return `mask:${layer.opacity}:${layer.mask.fill.style}:${layer.mask.fill.color}`;
 };
 
 /** Advances the persisted-image fallback after an image element load failure. */
 export const nextLayerThumbnailFallbackStage = (current: LayerThumbnailFallbackStage): LayerThumbnailFallbackStage =>
   current === 'thumbnail' ? 'full' : 'failed';
+
+/** Pure render policy shared by the thumbnail fallback content and retry overlay. */
+export const getLayerThumbnailFallbackRenderState = (
+  drawn: boolean,
+  fallbackStage: LayerThumbnailFallbackStage,
+  hasRequestError: boolean
+): { showFallback: boolean; showRetry: boolean } => ({
+  showFallback: !drawn,
+  showRetry: !drawn && (hasRequestError || fallbackStage === 'failed'),
+});

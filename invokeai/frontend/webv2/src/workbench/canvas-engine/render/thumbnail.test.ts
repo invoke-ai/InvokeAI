@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   fitThumbnailSize,
+  getLayerThumbnailFallbackRenderState,
   getLayerThumbnailDisplayKey,
   nextLayerThumbnailFallbackStage,
   resolveLayerThumbnailImageRef,
@@ -155,6 +156,9 @@ describe('getLayerThumbnailDisplayKey', () => {
     const mask = maskLayer('inpaint_mask', 'm');
 
     expect(getLayerThumbnailDisplayKey({ ...raster, name: 'renamed' })).toBe(getLayerThumbnailDisplayKey(raster));
+    expect(getLayerThumbnailDisplayKey({ ...raster, opacity: 0.5 })).not.toBe(getLayerThumbnailDisplayKey(raster));
+    expect(getLayerThumbnailDisplayKey({ ...control, opacity: 0.5 })).not.toBe(getLayerThumbnailDisplayKey(control));
+    expect(getLayerThumbnailDisplayKey({ ...mask, opacity: 0.5 })).not.toBe(getLayerThumbnailDisplayKey(mask));
     expect(
       getLayerThumbnailDisplayKey({
         ...raster,
@@ -178,5 +182,21 @@ describe('nextLayerThumbnailFallbackStage', () => {
     expect(nextLayerThumbnailFallbackStage('thumbnail')).toBe('full');
     expect(nextLayerThumbnailFallbackStage('full')).toBe('failed');
     expect(nextLayerThumbnailFallbackStage('failed')).toBe('failed');
+  });
+
+  it('hides a failed URL fallback and its retry overlay after the engine draws successfully', () => {
+    const failed = nextLayerThumbnailFallbackStage(nextLayerThumbnailFallbackStage('thumbnail'));
+    expect(getLayerThumbnailFallbackRenderState(false, failed, false)).toEqual({
+      showFallback: true,
+      showRetry: true,
+    });
+    expect(getLayerThumbnailFallbackRenderState(true, failed, false)).toEqual({
+      showFallback: false,
+      showRetry: false,
+    });
+    expect(getLayerThumbnailFallbackRenderState(true, 'thumbnail', true)).toEqual({
+      showFallback: false,
+      showRetry: false,
+    });
   });
 });
