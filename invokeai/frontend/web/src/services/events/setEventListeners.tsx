@@ -26,6 +26,8 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getControlLayerState, getReferenceImageState } from 'features/controlLayers/store/util';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
+import { fieldValueReset } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast, toastApi } from 'features/toast/toast';
@@ -38,6 +40,7 @@ import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
+import { getUpdatedQueueStatusOnQueueItemStatusChanged } from 'services/events/queueStatusEvents';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import { createWorkflowExecutionCoordinator } from 'services/events/workflowExecutionCoordinator';
 import type { Socket } from 'socket.io-client';
@@ -113,6 +116,65 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     $lastProgressEvent.set(null);
     $loadingModelsCount.set(0);
     setIsConnected(false);
+  });
+
+  const invalidateWorkflowLibrary = () => {
+    dispatch(
+      api.util.invalidateTags([
+        { type: 'Workflow', id: LIST_TAG },
+        'WorkflowTags',
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
+      ])
+    );
+  };
+
+  const clearSavedWorkflowSelection = (workflowId: string) => {
+    const nodes = selectNodesSlice(getState()).nodes;
+
+    for (const node of nodes) {
+      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflow') {
+        continue;
+      }
+
+      if (node.data.inputs.workflow_id?.value !== workflowId) {
+        continue;
+      }
+
+      dispatch(
+        fieldValueReset({
+          nodeId: node.id,
+          fieldName: 'workflow_id',
+          value: '',
+        })
+      );
+    }
+  };
+
+  socket.on('workflow_created', (data) => {
+    log.debug({ data }, 'Workflow created');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_updated', (data) => {
+    log.debug({ data }, 'Workflow updated');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_deleted', (data) => {
+    log.debug({ data }, 'Workflow deleted');
+    invalidateWorkflowLibrary();
+    clearSavedWorkflowSelection(data.workflow_id);
+  });
+
+  socket.on('workflow_access_revoked', (data) => {
+    log.debug({ data }, 'Workflow access revoked');
+    invalidateWorkflowLibrary();
+    const currentUser = getState().auth.user;
+    if (currentUser?.is_admin || currentUser?.user_id === data.user_id) {
+      return;
+    }
+    clearSavedWorkflowSelection(data.workflow_id);
   });
 
   socket.on('invocation_started', (data) => {
@@ -362,6 +424,24 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
+    // Sanitized companion event sent to non-owner queue subscribers in multiuser mode. The
+    // backend sets user_id="redacted" and clears identifiers/error fields. We must not run
+    // payload-driven cache mutations or per-session side effects (node state reset, progress
+    // clear, completion bookkeeping) — those belong to the owner. Just invalidate queue tags
+    // so the non-owner's queue list and badge counts refetch with sanitized data.
+    if (data.user_id === 'redacted') {
+      log.trace({ data }, `Sanitized queue_item_status_changed for item ${data.item_id}`);
+      const tags: ApiTagDescription[] = [
+        'SessionQueueStatus',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: data.item_id },
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ];
+      dispatch(queueApi.util.invalidateTags(tags));
+      return;
+    }
+
     if (!workflowExecutionCoordinator.onQueueItemStatusChanged(data)) {
       return;
     }
@@ -416,6 +496,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         })
       );
     }
+    dispatch(
+      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) =>
+        getUpdatedQueueStatusOnQueueItemStatusChanged(draft, data)
+      )
+    );
 
     // Invalidate caches for things we cannot easily update
     // Invalidate SessionQueueStatus to refetch with user-specific counts
@@ -731,6 +816,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
         const hasIpAdapters = data.parameters.ip_adapters !== undefined;
         const hasRefImages = data.parameters.reference_images !== undefined;
+        // Append mode (POST /api/v1/recall/{queue_id}?append=true): add the
+        // recalled reference images to the existing list instead of replacing
+        // it. The backend passes the flag inside the parameters dict.
+        const append = data.parameters.append === true;
 
         if (hasIpAdapters || hasRefImages) {
           const allRefImagePromises: Promise<RefImageState | null>[] = [];
@@ -874,9 +963,21 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
           }
 
           // Single dispatch after all IP adapter + reference image promises settle.
-          // Always replace:true so stale entries from a previous recall are cleared.
+          // replace:true (the default) clears stale entries from a previous
+          // recall; append mode instead pushes onto the existing list and
+          // deliberately dispatches nothing when no valid states resolved, so
+          // a failed append can never wipe the user's current reference images.
           Promise.all(allRefImagePromises).then((results) => {
             const validStates = results.filter((state): state is RefImageState => state !== null);
+            if (append) {
+              if (validStates.length > 0) {
+                dispatch(refImagesRecalled({ entities: validStates, replace: false }));
+                log.info(
+                  `Appended ${validStates.length} reference image(s) (IP adapters + model-free) to existing list`
+                );
+              }
+              return;
+            }
             dispatch(refImagesRecalled({ entities: validStates, replace: true }));
             if (validStates.length > 0) {
               log.info(

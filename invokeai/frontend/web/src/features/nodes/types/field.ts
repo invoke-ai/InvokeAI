@@ -189,8 +189,16 @@ const zModelIdentifierFieldType = zFieldTypeBase.extend({
   name: z.literal('ModelIdentifierField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zLoRAFieldType = zFieldTypeBase.extend({
+  name: z.literal('LoRAField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zSavedWorkflowFieldType = zFieldTypeBase.extend({
+  name: z.literal('SavedWorkflowField'),
   originalType: zStatelessFieldType.optional(),
 });
 const zFloatGeneratorFieldType = zFieldTypeBase.extend({
@@ -220,8 +228,10 @@ const zStatefulFieldType = z.union([
   zBoardFieldType,
   zStylePresetFieldType,
   zModelIdentifierFieldType,
+  zLoRAFieldType,
   zColorFieldType,
   zSchedulerFieldType,
+  zSavedWorkflowFieldType,
   zFloatGeneratorFieldType,
   zIntegerGeneratorFieldType,
   zStringGeneratorFieldType,
@@ -703,6 +713,56 @@ export const isModelIdentifierFieldInputTemplate =
   buildTemplateTypeGuard<ModelIdentifierFieldInputTemplate>('ModelIdentifierField');
 // #endregion
 
+// #region LoRAField Collection
+/**
+ * A LoRAField pairs a LoRA model identifier with a weight. The backend collection loaders accept
+ * `LoRAField | list[LoRAField]`; we treat this as a stateful, inline-editable collection so the user
+ * can add/remove LoRAs directly on the node. The stored value is always a list (possibly empty).
+ */
+const zLoRAFieldValue = z.object({
+  lora: zModelIdentifierField,
+  weight: z.number(),
+});
+export type LoRAFieldValue = z.infer<typeof zLoRAFieldValue>;
+export const zLoRAFieldCollectionValue = z.array(zLoRAFieldValue).optional();
+
+export const isLoRAFieldCollectionFieldType = (fieldType: FieldType): fieldType is z.infer<typeof zLoRAFieldType> =>
+  fieldType.name === 'LoRAField' &&
+  (fieldType.cardinality === COLLECTION || fieldType.cardinality === SINGLE_OR_COLLECTION);
+
+const zLoRAFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
+  value: zLoRAFieldCollectionValue,
+});
+const zLoRAFieldCollectionInputTemplate = zFieldInputTemplateBase
+  .extend({
+    type: zLoRAFieldType,
+    originalType: zFieldType.optional(),
+    default: zLoRAFieldCollectionValue,
+    maxItems: z.number().int().gte(0).optional(),
+    minItems: z.number().int().gte(0).optional(),
+  })
+  .refine(
+    (val) => {
+      if (val.maxItems !== undefined && val.minItems !== undefined) {
+        return val.maxItems >= val.minItems;
+      }
+      return true;
+    },
+    { message: 'maxItems must be greater than or equal to minItems' }
+  );
+const zLoRAFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zLoRAFieldType,
+});
+export type LoRAFieldCollectionValue = z.infer<typeof zLoRAFieldCollectionValue>;
+export type LoRAFieldCollectionInputInstance = z.infer<typeof zLoRAFieldCollectionInputInstance>;
+export type LoRAFieldCollectionInputTemplate = z.infer<typeof zLoRAFieldCollectionInputTemplate>;
+export const isLoRAFieldCollectionInputInstance = buildInstanceTypeGuard(zLoRAFieldCollectionInputInstance);
+export const isLoRAFieldCollectionInputTemplate = buildTemplateTypeGuard<LoRAFieldCollectionInputTemplate>(
+  'LoRAField',
+  ['COLLECTION', 'SINGLE_OR_COLLECTION']
+);
+// #endregion
+
 // #region SchedulerField
 export const zSchedulerFieldValue = zSchedulerField.optional();
 const zSchedulerFieldInputInstance = zFieldInputInstanceBase.extend({
@@ -721,6 +781,28 @@ export type SchedulerFieldInputInstance = z.infer<typeof zSchedulerFieldInputIns
 export type SchedulerFieldInputTemplate = z.infer<typeof zSchedulerFieldInputTemplate>;
 export const isSchedulerFieldInputInstance = buildInstanceTypeGuard(zSchedulerFieldInputInstance);
 export const isSchedulerFieldInputTemplate = buildTemplateTypeGuard<SchedulerFieldInputTemplate>('SchedulerField');
+// #endregion
+
+// #region SavedWorkflowField
+const zSavedWorkflowFieldValue = z.string();
+const zSavedWorkflowFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zSavedWorkflowFieldValue,
+});
+const zSavedWorkflowFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zSavedWorkflowFieldType,
+  originalType: zFieldType.optional(),
+  default: zSavedWorkflowFieldValue,
+  maxLength: z.number().int().gte(0).optional(),
+  minLength: z.number().int().gte(0).optional(),
+});
+const zSavedWorkflowFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zSavedWorkflowFieldType,
+});
+export type SavedWorkflowFieldInputInstance = z.infer<typeof zSavedWorkflowFieldInputInstance>;
+export type SavedWorkflowFieldInputTemplate = z.infer<typeof zSavedWorkflowFieldInputTemplate>;
+export const isSavedWorkflowFieldInputInstance = buildInstanceTypeGuard(zSavedWorkflowFieldInputInstance);
+export const isSavedWorkflowFieldInputTemplate =
+  buildTemplateTypeGuard<SavedWorkflowFieldInputTemplate>('SavedWorkflowField');
 // #endregion
 
 // #region FloatGeneratorField
@@ -1315,8 +1397,10 @@ export const zStatefulFieldValue = z.union([
   zBoardFieldValue,
   zStylePresetFieldValue,
   zModelIdentifierFieldValue,
+  zLoRAFieldCollectionValue,
   zColorFieldValue,
   zSchedulerFieldValue,
+  zSavedWorkflowFieldValue,
   zFloatGeneratorFieldValue,
   zIntegerGeneratorFieldValue,
   zStringGeneratorFieldValue,
@@ -1344,8 +1428,10 @@ const zStatefulFieldInputInstance = z.union([
   zBoardFieldInputInstance,
   zStylePresetFieldInputInstance,
   zModelIdentifierFieldInputInstance,
+  zLoRAFieldCollectionInputInstance,
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
+  zSavedWorkflowFieldInputInstance,
   zFloatGeneratorFieldInputInstance,
   zIntegerGeneratorFieldInputInstance,
   zStringGeneratorFieldInputInstance,
@@ -1372,9 +1458,10 @@ const zStatefulFieldInputTemplate = z.union([
   zBoardFieldInputTemplate,
   zStylePresetFieldInputTemplate,
   zModelIdentifierFieldInputTemplate,
+  zLoRAFieldCollectionInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
-  zStatelessFieldInputTemplate,
+  zSavedWorkflowFieldInputTemplate,
   zFloatGeneratorFieldInputTemplate,
   zIntegerGeneratorFieldInputTemplate,
   zStringGeneratorFieldInputTemplate,
@@ -1401,8 +1488,10 @@ const zStatefulFieldOutputTemplate = z.union([
   zBoardFieldOutputTemplate,
   zStylePresetFieldOutputTemplate,
   zModelIdentifierFieldOutputTemplate,
+  zLoRAFieldCollectionOutputTemplate,
   zColorFieldOutputTemplate,
   zSchedulerFieldOutputTemplate,
+  zSavedWorkflowFieldOutputTemplate,
   zFloatGeneratorFieldOutputTemplate,
   zIntegerGeneratorFieldOutputTemplate,
   zStringGeneratorFieldOutputTemplate,

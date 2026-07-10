@@ -35,6 +35,8 @@ def build_migration_31() -> Migration:
     This migration adds an image_subfolder column to the images table.
     """
     return Migration(
+        id="migration_31",
+        depends_on="migration_30",
         from_version=30,
         to_version=31,
         callback=Migration31Callback(),
