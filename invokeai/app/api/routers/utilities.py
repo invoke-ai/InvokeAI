@@ -15,8 +15,10 @@ from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditio
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import assert_image_read_access
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.util.dynamicprompts import find_missing_wildcards
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
@@ -52,8 +54,19 @@ async def parse_dynamicprompts(
     """Creates a batch process"""
     max_prompts = min(max_prompts, 10000)
     generator: Union[RandomPromptGenerator, CombinatorialPromptGenerator]
+    error: Optional[str] = None
+
+    # An unknown wildcard used as a variant value sends the combinatorial generator into an infinite
+    # loop, so bail out early with a clear message instead of hanging the request (and with it the UI
+    # preview). The random generator handles unknown wildcards gracefully, so only the combinatorial
+    # path is guarded.
+    if combinatorial:
+        missing_wildcards = find_missing_wildcards(prompt)
+        if missing_wildcards:
+            wildcards = ", ".join(missing_wildcards)
+            return DynamicPromptsResponse(prompts=[prompt], error=f"No values found for wildcard(s): {wildcards}")
+
     try:
-        error: Optional[str] = None
         if combinatorial:
             generator = CombinatorialPromptGenerator()
             prompts = generator.generate(prompt, max_prompts=max_prompts)
@@ -204,6 +217,8 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
 )
 async def image_to_prompt(current_user: CurrentUserOrDefault, body: ImageToPromptRequest) -> ImageToPromptResponse:
     """Generate a descriptive prompt from an image using a vision-language model."""
+    assert_image_move_maintenance_inactive()
+
     # Reuse the image-read access check so non-owners can't probe stored images
     # via this endpoint (mirrors the policy in routers/images.py).
     assert_image_read_access(body.image_name, current_user)

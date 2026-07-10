@@ -364,6 +364,8 @@ def build_migration_1() -> Migration:
     """
 
     migration_1 = Migration(
+        id="migration_1",
+        depends_on=None,
         from_version=0,
         to_version=1,
         callback=Migration1Callback(),

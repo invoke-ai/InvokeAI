@@ -32,6 +32,18 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
 
+    @property
+    def image_root(self) -> Path:
+        return self.__output_folder.resolve()
+
+    @property
+    def thumbnail_root(self) -> Path:
+        return self.__thumbnails_folder.resolve()
+
+    def evict_cache_paths(self, paths: list[Path]) -> None:
+        for path in paths:
+            self.__cache.pop(path.resolve(), None)
+
     def get(self, image_name: str, image_subfolder: str = "") -> PILImageType:
         try:
             image_path = self.get_path(image_name, image_subfolder=image_subfolder)
@@ -85,8 +97,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 compress_level=self.__invoker.services.configuration.pil_compress_level,
             )
 
-            thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(thumbnail_name, thumbnail=True, image_subfolder=image_subfolder)
+            thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
 
             # Ensure thumbnail subfolder directories exist
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,8 +119,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             if image_path in self.__cache:
                 del self.__cache[image_path]
 
-            thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(thumbnail_name, True, image_subfolder=image_subfolder)
+            thumbnail_path = self.get_path(image_name, True, image_subfolder=image_subfolder)
 
             if thumbnail_path.exists():
                 thumbnail_path.unlink()

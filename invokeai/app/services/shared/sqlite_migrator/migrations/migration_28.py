@@ -42,6 +42,8 @@ def build_migration_28() -> Migration:
     - is_public column: controls whether a workflow is shared with all users
     """
     return Migration(
+        id="migration_28",
+        depends_on="migration_27",
         from_version=27,
         to_version=28,
         callback=Migration28Callback(),
