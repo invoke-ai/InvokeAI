@@ -627,6 +627,17 @@
       "validation": {}
     },
     {
+      "category": "GENERATION",
+      "default": 52428800,
+      "description": "Maximum size in bytes for managed file uploads.",
+      "env_var": "INVOKEAI_MAX_FILE_UPLOAD_SIZE_BYTES",
+      "literal_values": [],
+      "name": "max_file_upload_size_bytes",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
       "category": "NODES",
       "default": null,
       "description": "List of nodes to allow. Omit to allow all.",

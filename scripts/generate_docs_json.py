@@ -23,6 +23,7 @@ INTERFACE_NAMES = (
     "ConfigInterface",
     "UtilInterface",
     "BoardsInterface",
+    "FilesInterface",
 )
 
 

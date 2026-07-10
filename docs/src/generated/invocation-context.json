@@ -1,5 +1,5 @@
 {
-  "description": "Provides access to various services and data for the current invocation.\n\nAttributes:\n    images (ImagesInterface): Methods to save, get and update images and their metadata.\n    tensors (TensorsInterface): Methods to save and get tensors, including image, noise, masks, and masked images.\n    conditioning (ConditioningInterface): Methods to save and get conditioning data.\n    models (ModelsInterface): Methods to check if a model exists, get a model, and get a model's info.\n    logger (LoggerInterface): The app logger.\n    config (ConfigInterface): The app config.\n    util (UtilInterface): Utility methods, including a method to check if an invocation was canceled and step callbacks.\n    boards (BoardsInterface): Methods to interact with boards.",
+  "description": "Provides access to various services and data for the current invocation.\n\nAttributes:\n    images (ImagesInterface): Methods to save, get and update images and their metadata.\n    tensors (TensorsInterface): Methods to save and get tensors, including image, noise, masks, and masked images.\n    conditioning (ConditioningInterface): Methods to save and get conditioning data.\n    models (ModelsInterface): Methods to check if a model exists, get a model, and get a model's info.\n    logger (LoggerInterface): The app logger.\n    config (ConfigInterface): The app config.\n    util (UtilInterface): Utility methods, including a method to check if an invocation was canceled and step callbacks.\n    boards (BoardsInterface): Methods to interact with boards.\n    files (FilesInterface): Methods to read managed files uploaded for node inputs.",
   "interfaces": [
     {
       "description": "",
@@ -651,6 +651,63 @@
         }
       ],
       "name": "BoardsInterface"
+    },
+    {
+      "description": "",
+      "methods": [
+        {
+          "description": "Gets metadata for a managed file.",
+          "name": "get_dto",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The managed file ID.",
+              "name": "file_id",
+              "type": "str"
+            }
+          ],
+          "return_type": "FileDTO",
+          "returns": "The file DTO.",
+          "signature": "(file_id: str) -> FileDTO"
+        },
+        {
+          "description": "Gets the server-side path to a managed file.",
+          "name": "get_path",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The managed file ID.",
+              "name": "file_id",
+              "type": "str"
+            }
+          ],
+          "return_type": "Path",
+          "returns": "The path to the managed file on the InvokeAI server.",
+          "signature": "(file_id: str) -> Path"
+        },
+        {
+          "description": "Opens a managed file for reading.",
+          "name": "open",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The managed file ID.",
+              "name": "file_id",
+              "type": "str"
+            },
+            {
+              "default": "'rb'",
+              "description": "The read mode to use. Supported values are \"rb\" and \"r\".",
+              "name": "mode",
+              "type": "str"
+            }
+          ],
+          "return_type": "IO[Any]",
+          "returns": "A readable file object.",
+          "signature": "(file_id: str, mode: str = 'rb') -> IO[Any]"
+        }
+      ],
+      "name": "FilesInterface"
     }
   ],
   "name": "InvocationContext"
