@@ -672,12 +672,7 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
   return new Blob([decodeURIComponent(data)], { type: mime });
 };
 
-/** The image name a layer's source references, if any (raster/control source or mask bitmap). */
-const layerImageName = (layer: CanvasLayerContract): string | null => {
-  const source = renderableSourceOf(layer);
-  if (!source) {
-    return null;
-  }
+const sourceImageName = (source: CanvasLayerSourceContract): string | null => {
   if (source.type === 'image') {
     return source.image.imageName;
   }
@@ -685,6 +680,12 @@ const layerImageName = (layer: CanvasLayerContract): string | null => {
     return source.bitmap?.imageName ?? null;
   }
   return null;
+};
+
+/** The image name a layer's source references, if any (raster/control source or mask bitmap). */
+const layerImageName = (layer: CanvasLayerContract): string | null => {
+  const source = renderableSourceOf(layer);
+  return source ? sourceImageName(source) : null;
 };
 
 /** Mints a fresh layer id for engine-created paint layers. */
@@ -758,6 +759,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const trackedImageNames = new Map<string, string>();
   /** The newest isolated rasterization job for each layer id. */
   const layerRasterizationJobs = new Map<string, RasterizationJob>();
+  /** All physically running jobs, including canceled jobs superseded in the per-layer map. */
+  const activeLayerRasterizationJobs = new Set<RasterizationJob>();
   const cancelLayerRasterization = (layerId: string): void => {
     const job = layerRasterizationJobs.get(layerId);
     if (!job) {
@@ -1293,6 +1296,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       version,
     };
     layerRasterizationJobs.set(layer.id, job);
+    activeLayerRasterizationJobs.add(job);
+    let published = false;
     void (async () => {
       try {
         const result = await rasterizeSource(source, rasterizeDeps(document, controller.signal), scratch);
@@ -1325,6 +1330,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         currentEntry.hasPublishedPixels = true;
         currentEntry.stale = false;
         trackPublishedLayerImage(currentLayer);
+        published = true;
         stores.thumbnailVersion.set(layer.id, currentEntry.version);
         stores.thumbnailStatus.set(layer.id, 'ready');
         scheduler.invalidate({ layers: [layer.id] });
@@ -1360,6 +1366,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       } finally {
         if (layerRasterizationJobs.get(layer.id) === job) {
           layerRasterizationJobs.delete(layer.id);
+        }
+        activeLayerRasterizationJobs.delete(job);
+        const imageName = sourceImageName(source);
+        if (!published && imageName) {
+          releaseBitmapIfUnreferenced(imageName);
         }
       }
     })().then(settleJob, () => settleJob('stale'));
@@ -1813,6 +1824,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     for (const tracked of trackedImageNames.values()) {
       if (tracked === imageName) {
+        return;
+      }
+    }
+    for (const job of activeLayerRasterizationJobs) {
+      if (sourceImageName(job.source) === imageName) {
         return;
       }
     }

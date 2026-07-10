@@ -355,6 +355,36 @@ const createStructuralFaultBackend = () => {
   };
 };
 
+const createInvalidateDuringBitmapDrawBackend = (bitmap: ImageBitmap, onDraw: () => void): StubRasterBackend => {
+  const backend = createTestStubRasterBackend();
+  let invalidated = false;
+  return {
+    ...backend,
+    createImageBitmap: vi.fn(() => Promise.resolve(bitmap)),
+    createSurface: (width, height) => {
+      const surface = backend.createSurface(width, height);
+      const ctx = new Proxy(surface.ctx, {
+        get: (target, property, receiver) => {
+          const value = Reflect.get(target, property, receiver);
+          if (property !== 'drawImage' || typeof value !== 'function') {
+            return value;
+          }
+          return (...args: unknown[]) => {
+            const result = Reflect.apply(value, target, args);
+            if (!invalidated && args[0] === bitmap) {
+              invalidated = true;
+              onDraw();
+            }
+            return result;
+          };
+        },
+      });
+      Object.defineProperty(surface, 'ctx', { value: ctx });
+      return surface;
+    },
+  };
+};
+
 interface LayerCacheTestSnapshot {
   calls: RasterCallLogEntry[];
   rect: { height: number; width: number; x: number; y: number };
@@ -2535,6 +2565,78 @@ describe('requestLayerThumbnail', () => {
     expect(bitmap.close).not.toHaveBeenCalled();
     setDocument({ ...doc, layers: [firstChanged, rasterLayer('b', { imageName: 'second-new' })] });
 
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('releases a decoded bitmap when invalidation lands after cache insertion but before publication', async () => {
+    const bitmap = recordingBitmap('stale-before-publication');
+    const original = rasterLayer('a', { imageName: 'old' });
+    const doc = { ...makeDoc(), layers: [original] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const backend = createInvalidateDuringBitmapDrawBackend(bitmap, () => {
+      setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'new' })] });
+    });
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('stale');
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    engine.dispose();
+  });
+
+  it('preserves an unpublished decoded bitmap while another live layer references it', async () => {
+    const bitmap = recordingBitmap('stale-shared-before-publication');
+    const first = rasterLayer('a', { imageName: 'shared' });
+    const second = rasterLayer('b', { imageName: 'shared' });
+    const doc = { ...makeDoc(), layers: [first, second] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const backend = createInvalidateDuringBitmapDrawBackend(bitmap, () => {
+      setDocument({ ...doc, layers: [rasterLayer('a', { imageName: 'new' }), second] });
+    });
+    const engine = createCanvasEngine({
+      backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+
+    expect(await engine.requestLayerThumbnail('a')).toBe('stale');
+    expect(bitmap.close).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
+  it('preserves an unpublished decoded bitmap until another in-flight consumer settles', async () => {
+    const bitmap = recordingBitmap('stale-shared-in-flight');
+    const secondResolve = createDeferred<Blob>();
+    let resolveCount = 0;
+    const resolver = vi.fn(() => {
+      resolveCount += 1;
+      return resolveCount === 1 ? Promise.resolve(new Blob()) : secondResolve.promise;
+    });
+    const first = rasterLayer('a', { imageName: 'shared' });
+    const second = rasterLayer('b', { imageName: 'shared' });
+    const doc = { ...makeDoc(), layers: [first, second] };
+    const { setDocument, store } = createReactiveStore(doc);
+    const backend = createInvalidateDuringBitmapDrawBackend(bitmap, () => {
+      setDocument({
+        ...doc,
+        layers: [rasterLayer('a', { imageName: 'first-new' }), rasterLayer('b', { imageName: 'second-new' })],
+      });
+    });
+    const engine = createCanvasEngine({ backend, imageResolver: resolver, projectId: 'p1', store });
+
+    const firstRequest = engine.requestLayerThumbnail('a');
+    const secondRequest = engine.requestLayerThumbnail('b');
+    expect(await firstRequest).toBe('stale');
+    expect(bitmap.close).not.toHaveBeenCalled();
+
+    secondResolve.resolve(new Blob());
+    expect(await secondRequest).toBe('stale');
     expect(bitmap.close).toHaveBeenCalledTimes(1);
     engine.dispose();
   });
