@@ -15,6 +15,7 @@ import {
   getSavedWorkflowDynamicEdgeIdsToRemove,
   getSavedWorkflowDynamicFields,
   getSavedWorkflowFormFieldData,
+  getSelectedSavedWorkflow,
   shouldSyncSavedWorkflowDynamicFields,
 } from './callSavedWorkflowFormUtils';
 
@@ -111,6 +112,14 @@ describe('callSavedWorkflowFormUtils', () => {
         workflow: buildWorkflowResponse(),
       })
     ).toBe(true);
+  });
+
+  it('ignores stale saved workflow query data after the selection is cleared or changed', () => {
+    const workflow = buildWorkflowResponse();
+
+    expect(getSelectedSavedWorkflow('', workflow)).toBeUndefined();
+    expect(getSelectedSavedWorkflow('workflow-2', workflow)).toBeUndefined();
+    expect(getSelectedSavedWorkflow('workflow-1', workflow)).toBe(workflow);
   });
 
   it('returns the stored form when it is non-empty and valid', () => {

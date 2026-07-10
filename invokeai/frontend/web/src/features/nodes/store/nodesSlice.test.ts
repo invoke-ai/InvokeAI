@@ -1,5 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import type { IntegerFieldInputTemplate, StringFieldInputTemplate } from 'features/nodes/types/field';
+import { buildNodeFieldElement } from 'features/nodes/types/workflow';
 import { buildConnectorNode } from 'features/nodes/util/node/buildConnectorNode';
 import { describe, expect, it } from 'vitest';
 
@@ -8,6 +9,7 @@ import {
   connectorInserted,
   fieldIntegerValueChanged,
   fieldStringValueChanged,
+  fieldValueReset,
   nodesChanged,
   nodesSliceConfig,
 } from './nodesSlice';
@@ -332,6 +334,125 @@ describe('callSavedWorkflowDynamicFieldsChanged', () => {
     expect(clearedNode.data.inputs[fieldName]).toBeUndefined();
     expect(clearedNode.data.dynamicInputTemplates[fieldName]).toBeUndefined();
     expect(nextState.edges).toHaveLength(0);
+  });
+
+  it('clears dynamic fields from the form when the selected workflow is cleared', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const targetNode = buildNode(callSavedWorkflowTemplate);
+    const workflowIdInput = targetNode.data.inputs.workflow_id;
+    if (!workflowIdInput) {
+      throw new Error('Expected workflow_id input');
+    }
+    workflowIdInput.value = 'workflow-1';
+    state.nodes.push(targetNode);
+
+    const fieldName = 'saved_workflow_input::node-1::a';
+    const formElement = buildNodeFieldElement(targetNode.id, fieldName, addIntegerInputTemplate.type);
+    state.form.elements[formElement.id] = {
+      ...formElement,
+      parentId: state.form.rootElementId,
+    };
+    const rootElement = state.form.elements[state.form.rootElementId];
+    if (!rootElement || rootElement.type !== 'container') {
+      throw new Error('Expected root container');
+    }
+    rootElement.data.children.push(formElement.id);
+    state.formFieldInitialValues[formElement.id] = 23;
+
+    let nextState = nodesSliceConfig.slice.reducer(
+      state,
+      callSavedWorkflowDynamicFieldsChanged({
+        nodeId: targetNode.id,
+        fields: [
+          {
+            fieldName,
+            fieldTemplate: buildDynamicIntegerTemplate(fieldName),
+            label: 'Left Addend',
+            description: 'The first number',
+            initialValue: 23,
+          },
+        ],
+        edgeIdsToRemove: [],
+      })
+    );
+
+    nextState = nodesSliceConfig.slice.reducer(
+      nextState,
+      fieldStringValueChanged({
+        nodeId: targetNode.id,
+        fieldName: 'workflow_id',
+        value: '',
+      })
+    );
+
+    expect(nextState.form.elements[formElement.id]).toBeUndefined();
+    expect(nextState.formFieldInitialValues[formElement.id]).toBeUndefined();
+    const nextRootElement = nextState.form.elements[nextState.form.rootElementId];
+    if (!nextRootElement || nextRootElement.type !== 'container') {
+      throw new Error('Expected root container');
+    }
+    expect(nextRootElement.data.children).not.toContain(formElement.id);
+  });
+
+  it('clears dynamic fields when the selected workflow field is reset to empty', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const sourceNode = buildNode(addTemplate);
+    const targetNode = buildNode(callSavedWorkflowTemplate);
+    const workflowIdInput = targetNode.data.inputs.workflow_id;
+    if (!workflowIdInput) {
+      throw new Error('Expected workflow_id input');
+    }
+    workflowIdInput.value = 'workflow-1';
+    state.nodes.push(sourceNode, targetNode);
+
+    const fieldName = 'saved_workflow_input::node-1::a';
+    const formElement = buildNodeFieldElement(targetNode.id, fieldName, addIntegerInputTemplate.type);
+    state.form.elements[formElement.id] = {
+      ...formElement,
+      parentId: state.form.rootElementId,
+    };
+    const rootElement = state.form.elements[state.form.rootElementId];
+    if (!rootElement || rootElement.type !== 'container') {
+      throw new Error('Expected root container');
+    }
+    rootElement.data.children.push(formElement.id);
+    state.formFieldInitialValues[formElement.id] = 23;
+    state.edges.push(buildEdge(sourceNode.id, 'value', targetNode.id, fieldName));
+
+    let nextState = nodesSliceConfig.slice.reducer(
+      state,
+      callSavedWorkflowDynamicFieldsChanged({
+        nodeId: targetNode.id,
+        fields: [
+          {
+            fieldName,
+            fieldTemplate: buildDynamicIntegerTemplate(fieldName),
+            label: 'Left Addend',
+            description: 'The first number',
+            initialValue: 23,
+          },
+        ],
+        edgeIdsToRemove: [],
+      })
+    );
+
+    nextState = nodesSliceConfig.slice.reducer(
+      nextState,
+      fieldValueReset({
+        nodeId: targetNode.id,
+        fieldName: 'workflow_id',
+        value: '',
+      })
+    );
+
+    const clearedNode = nextState.nodes.find((node) => node.id === targetNode.id);
+    if (!clearedNode || clearedNode.type !== 'invocation') {
+      throw new Error('Expected invocation node');
+    }
+    expect(clearedNode.data.inputs[fieldName]).toBeUndefined();
+    expect(nextState.edges).toHaveLength(0);
+    expect(nextState.form.elements[formElement.id]).toBeUndefined();
+    expect(nextState.formFieldInitialValues[formElement.id]).toBeUndefined();
   });
 });
 

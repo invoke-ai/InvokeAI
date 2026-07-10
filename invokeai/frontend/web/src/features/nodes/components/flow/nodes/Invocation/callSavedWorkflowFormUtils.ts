@@ -316,6 +316,16 @@ export const getSavedWorkflowDynamicFields = (
   return dynamicFields;
 };
 
+export const getSelectedSavedWorkflow = (
+  workflowId: string | null | undefined,
+  workflow: WorkflowResponse | undefined
+): WorkflowResponse | undefined => {
+  if (!workflowId || workflow?.workflow_id !== workflowId) {
+    return undefined;
+  }
+  return workflow;
+};
+
 export const shouldSyncSavedWorkflowDynamicFields = ({
   workflowId,
   workflow,
