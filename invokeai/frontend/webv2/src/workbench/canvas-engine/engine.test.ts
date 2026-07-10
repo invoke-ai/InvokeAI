@@ -910,11 +910,56 @@ describe('createCanvasEngine', () => {
     if (exported.status !== 'ok') {
       throw new Error('expected successful export');
     }
+    const cleanupPreview = vi.fn();
+    engine.canvasOperations.start({
+      cleanupPreview,
+      guard: exported.guard,
+      identity: { kind: 'filter', layerId: 'a', projectId: 'p1' },
+    });
 
     setDocument({ ...document, layers: [{ ...document.layers[0]!, opacity: 0.5 }] });
 
     expect(engine.isLayerExportGuardCurrent(exported.guard)).toBe(false);
+    expect(cleanupPreview).toHaveBeenCalledOnce();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     engine.dispose();
+  });
+
+  it('invalidates a canvas operation when its layer source changes or its layer is removed', async () => {
+    for (const nextLayers of [
+      [
+        {
+          ...makeDoc().layers[0]!,
+          source: { image: { height: 10, imageName: 'replacement', width: 10 }, type: 'image' as const },
+        },
+      ],
+      [],
+    ]) {
+      const document = makeDoc();
+      const { setDocument, store } = createReactiveStore(document);
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId: 'p1',
+        store,
+      });
+      const exported = await engine.exportLayerPixels('a');
+      if (exported.status !== 'ok') {
+        throw new Error('expected successful export');
+      }
+      const cleanupPreview = vi.fn();
+      engine.canvasOperations.start({
+        cleanupPreview,
+        guard: exported.guard,
+        identity: { kind: 'select-object', layerId: 'a', projectId: 'p1' },
+      });
+
+      setDocument({ ...document, layers: nextLayers });
+
+      expect(cleanupPreview).toHaveBeenCalledOnce();
+      expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+      engine.dispose();
+    }
   });
 
   it('invalidates a LayerExportGuard when the document is replaced with the same layer object', async () => {
@@ -931,10 +976,18 @@ describe('createCanvasEngine', () => {
     if (exported.status !== 'ok') {
       throw new Error('expected successful export');
     }
+    const cleanupPreview = vi.fn();
+    engine.canvasOperations.start({
+      cleanupPreview,
+      guard: exported.guard,
+      identity: { kind: 'select-object', layerId: 'a', projectId: 'p1' },
+    });
 
     setDocument({ ...document, layers: document.layers }, 1);
 
     expect(engine.isLayerExportGuardCurrent(exported.guard)).toBe(false);
+    expect(cleanupPreview).toHaveBeenCalledOnce();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     engine.dispose();
   });
 
@@ -952,11 +1005,45 @@ describe('createCanvasEngine', () => {
     if (exported.status !== 'ok') {
       throw new Error('expected successful export');
     }
+    const cleanupPreview = vi.fn();
+    engine.canvasOperations.start({
+      cleanupPreview,
+      guard: exported.guard,
+      identity: { kind: 'filter', layerId: 'a', projectId: 'p1' },
+    });
 
     setActiveProjectId('p2');
 
     expect(engine.isLayerExportGuardCurrent(exported.guard)).toBe(false);
+    expect(cleanupPreview).toHaveBeenCalledOnce();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     engine.dispose();
+  });
+
+  it('disposes the active canvas operation with the engine', async () => {
+    const { engine } = createEngine();
+    const exported = await engine.exportLayerPixels('a');
+    if (exported.status !== 'ok') {
+      throw new Error('expected successful export');
+    }
+    const cleanupPreview = vi.fn();
+    engine.canvasOperations.start({
+      cleanupPreview,
+      guard: exported.guard,
+      identity: { kind: 'filter', layerId: 'a', projectId: 'p1' },
+    });
+
+    engine.dispose();
+
+    expect(cleanupPreview).toHaveBeenCalledOnce();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    expect(
+      engine.canvasOperations.start({
+        cleanupPreview,
+        guard: exported.guard,
+        identity: { kind: 'filter', layerId: 'a', projectId: 'p1' },
+      })
+    ).toBeNull();
   });
 
   it('does not return an encoded layer blob after its export guard becomes stale', async () => {

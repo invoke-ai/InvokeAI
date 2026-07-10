@@ -107,6 +107,7 @@ import {
 import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
 import { uploadCanvasImage } from './backend/canvasImages';
+import { createCanvasOperationController, type CanvasOperationController } from './canvasOperationController';
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
 import { mergeDownMatrix } from './document/mergeDown';
@@ -316,6 +317,8 @@ export interface CanvasEngineOptions {
 /** The public engine handle. */
 export interface CanvasEngine {
   readonly projectId: string;
+  /** The single active guarded canvas operation and its React-free external-store state. */
+  readonly canvasOperations: CanvasOperationController;
   /** The pan/zoom viewport. */
   getViewport(): Viewport;
   /** The transient stores React subscribes to. */
@@ -1424,6 +1427,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return !!entry && liveLayer === guard.layer && entry.version === guard.cacheVersion;
   };
 
+  const canvasOperations = createCanvasOperationController({ isGuardCurrent: isLayerExportGuardCurrent });
+
   const ensureLayerCaches = (doc: CanvasDocumentContractV2): void => {
     for (const layer of doc.layers) {
       // The layer's rasterizable source: a raster/control `source`, or a mask
@@ -2233,6 +2238,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     onBboxChanged: () =>
       scheduler.invalidate(stagedPreview && !stagedPreview.placement ? { all: true } : { overlay: true }),
     onDocumentReplaced: () => {
+      canvasOperations.invalidateDocument(projectId);
       const previousImageNames = [...mirroredLayerImageNames.values()];
       rasterDocumentGeneration += 1;
       cancelAllLayerRasterizations();
@@ -2308,6 +2314,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     },
     onLayerOrderChanged: () => scheduler.invalidate({ all: true }),
     onLayersChanged: (ids, sourceChangedIds) => {
+      for (const id of sourceChangedIds) {
+        canvasOperations.invalidateSource(projectId, id);
+      }
+      for (const id of ids) {
+        canvasOperations.invalidateLayer(projectId, id);
+      }
       const doc = mirror.getDocument();
       const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
       const sourceChanged = new Set(sourceChangedIds);
@@ -2425,6 +2437,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const unsubscribeProjectPreviewLifecycle = store.subscribe(() => {
     const activeProjectId = store.getState().activeProjectId;
     if (lastActiveProjectId === projectId && activeProjectId !== projectId) {
+      canvasOperations.invalidateProject(projectId);
       rasterDocumentGeneration += 1;
       cancelAllLayerRasterizations();
       stores.thumbnailStatus.clear();
@@ -5199,6 +5212,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return;
     }
     disposed = true;
+    canvasOperations.dispose();
     cancelAllLayerRasterizations();
     detach();
     // Drop any open text-edit session (its layer belongs to a document this
@@ -5312,6 +5326,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   return {
     applyTransform,
     booleanMergeRasterLayers,
+    canvasOperations,
     clearCaches,
     clearHistory,
     clearMask,
