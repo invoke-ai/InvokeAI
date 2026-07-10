@@ -230,11 +230,18 @@ const CanvasHeaderActionsInner = ({
 
       <Menu.Root positioning={MENU_POSITIONING}>
         <Tooltip content={t('widgets.canvas.controls.newSession')}>
-          <Menu.Trigger asChild>
-            <IconButton color="fg.muted" size="2xs" variant="ghost">
-              <FilePlusIcon />
-            </IconButton>
-          </Menu.Trigger>
+          <span style={{ display: 'inline-flex' }}>
+            <Menu.Trigger asChild>
+              <IconButton
+                aria-label={t('widgets.canvas.controls.newSession')}
+                color="fg.muted"
+                size="2xs"
+                variant="ghost"
+              >
+                <FilePlusIcon />
+              </IconButton>
+            </Menu.Trigger>
+          </span>
         </Tooltip>
         <Portal>
           <Menu.Positioner>
