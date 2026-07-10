@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { LayerContextMenuItem, LayerContextMenuSection, LayerContextSubmenuId } from './layerContextMenuLayout';
 import type { LayerMoveKind } from './layerGroups';
+import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 import type { LayerPropertiesSection } from './layerPropertiesRequestStore';
 
 import {
@@ -70,6 +71,7 @@ import {
   getRegionalGuidanceReferenceImagePatch,
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
+import { SelectObjectDialog } from './SelectObjectDialog';
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 type MenuOpenChange = ComponentProps<typeof Menu.Root>['onOpenChange'];
@@ -143,12 +145,12 @@ interface LayerMenuProps {
   lazyMount?: boolean;
   unmountOnExit?: boolean;
   /**
-   * Controlled rename-in-flight state. When provided (canvas right-click), the
-   * parent owns it so the rename dialog survives the menu closing (F1). Undefined
-   * ⇒ the menu keeps this state internally (panel).
+   * Controlled sibling-dialog state. When provided (canvas right-click), the
+   * parent owns it so dialogs survive the menu closing. Undefined means the menu
+   * keeps this state internally (panel).
    */
-  isRenaming?: boolean;
-  onRenamingChange?: (isRenaming: boolean) => void;
+  dialogKind?: LayerMenuDialogKind | null;
+  onDialogKindChange?: (kind: LayerMenuDialogKind | null) => void;
 }
 
 /**
@@ -178,8 +180,8 @@ const LayerMenu = ({
   onOpenChange,
   lazyMount,
   unmountOnExit,
-  isRenaming: controlledRenaming,
-  onRenamingChange,
+  dialogKind: controlledDialogKind,
+  onDialogKindChange,
 }: LayerMenuProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -198,16 +200,16 @@ const LayerMenu = ({
   const hasSupportedContent = engine
     ? engine.hasExportableLayerContent(layer.id)
     : hasPureExportableLayerContent(layer, document);
-  const [internalRenaming, setInternalRenaming] = useState(false);
-  // Controlled (canvas) vs. uncontrolled (panel): the canvas parent owns the flag
-  // so the rename dialog outlives the menu closing. The panel keeps it internally.
-  const isRenaming = controlledRenaming ?? internalRenaming;
-  const setRenaming = useCallback(
-    (next: boolean) => {
-      setInternalRenaming(next);
-      onRenamingChange?.(next);
+  const [internalDialogKind, setInternalDialogKind] = useState<LayerMenuDialogKind | null>(null);
+  // Controlled (canvas) vs. uncontrolled (panel): the canvas parent owns the
+  // dialog kind so its sibling survives menu close; panel rows keep it locally.
+  const dialogKind = controlledDialogKind !== undefined ? controlledDialogKind : internalDialogKind;
+  const setDialogKind = useCallback(
+    (next: LayerMenuDialogKind | null) => {
+      setInternalDialogKind(next);
+      onDialogKindChange?.(next);
     },
-    [onRenamingChange]
+    [onDialogKindChange]
   );
 
   const patchBase = useCallback(
@@ -372,8 +374,9 @@ const LayerMenu = ({
     patchBase(t('widgets.layers.actions.toggleLock'), { isLocked: !layer.isLocked }, { isLocked: layer.isLocked });
   }, [layer.isLocked, patchBase, t]);
 
-  const openRename = useCallback(() => setRenaming(true), [setRenaming]);
-  const closeRename = useCallback(() => setRenaming(false), [setRenaming]);
+  const openRename = useCallback(() => setDialogKind('rename'), [setDialogKind]);
+  const closeDialog = useCallback(() => setDialogKind(null), [setDialogKind]);
+  const openSelectObject = useCallback(() => setDialogKind('select-object'), [setDialogKind]);
   const submitRename = useCallback(
     (name: string) => {
       patchBase(t('widgets.layers.actions.rename'), { name }, { name: layer.name });
@@ -586,6 +589,7 @@ const LayerMenu = ({
       mergeDown: handleMerge,
       openProperties: handleOpenProperties,
       openRename,
+      openSelectObject,
       patchConfig: handleLayerConfigAction,
       rasterize: handleRasterize,
       reorder: (kind, actionId) => reorder(kind, getActionLabel(actionId)),
@@ -614,6 +618,7 @@ const LayerMenu = ({
       handleToggleVisibility,
       handleTransform,
       openRename,
+      openSelectObject,
       reorder,
     ]
   );
@@ -663,13 +668,16 @@ const LayerMenu = ({
       </Menu.Root>
       <RenameDialog
         initialName={layer.name}
-        isOpen={isRenaming}
+        isOpen={dialogKind === 'rename'}
         label={t('widgets.layers.actions.rename')}
         submitLabel={t('widgets.layers.actions.rename')}
         title={t('widgets.layers.actions.rename')}
-        onClose={closeRename}
+        onClose={closeDialog}
         onSubmit={submitRename}
       />
+      {dialogKind === 'select-object' ? (
+        <SelectObjectDialog engine={engine} isOpen layerId={layer.id} onClose={closeDialog} />
+      ) : null}
     </>
   );
 };
@@ -721,12 +729,10 @@ export const CanvasLayerContextMenu = ({
   target: CanvasLayerContextMenuTarget | null;
   onClose: () => void;
 }) => {
-  // The layer a pending rename is anchored to. Captured when the dialog opens (the
-  // live `target` is still set then) and cleared when it closes — set only inside
-  // the rename callback, never during render, so the rename dialog survives the menu
-  // closing (which nulls `target`).
-  const [renameTarget, setRenameTarget] = useState<CanvasLayerContextMenuTarget | null>(null);
-  const renderTarget = resolveMenuTargetForRender(target, renameTarget);
+  // The layer a pending sibling dialog is anchored to. Captured while the live
+  // target still exists, then retained until the dialog closes.
+  const [dialogState, setDialogState] = useState<LayerMenuDialogState | null>(null);
+  const renderTarget = resolveMenuTargetForRender(target, dialogState);
 
   const index = renderTarget ? layers.findIndex((entry) => entry.id === renderTarget.layerId) : -1;
   const layer = index >= 0 ? layers[index] : undefined;
@@ -748,9 +754,9 @@ export const CanvasLayerContextMenu = ({
     },
     [onClose]
   );
-  const handleRenamingChange = useCallback(
-    (renaming: boolean) => {
-      setRenameTarget(renaming ? target : null);
+  const handleDialogKindChange = useCallback(
+    (kind: LayerMenuDialogKind | null) => {
+      setDialogState(kind && target ? { kind, target } : null);
     },
     [target]
   );
@@ -763,9 +769,9 @@ export const CanvasLayerContextMenu = ({
     <LayerMenu
       key={renderTarget.layerId}
       dispatch={dispatch}
+      dialogKind={dialogState?.kind ?? null}
       engine={engine}
       index={index}
-      isRenaming={renameTarget !== null}
       layer={layer}
       layers={layers}
       lazyMount
@@ -775,7 +781,7 @@ export const CanvasLayerContextMenu = ({
       positioning={positioning}
       unmountOnExit
       onOpenChange={handleOpenChange}
-      onRenamingChange={handleRenamingChange}
+      onDialogKindChange={handleDialogKindChange}
     />
   );
 };

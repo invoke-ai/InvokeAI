@@ -94,6 +94,14 @@ import {
   transformOverlayGeometry,
 } from '@workbench/canvas-engine/transform/transformMath';
 import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
+import {
+  createInpaintMaskFromImage,
+  createRegionalGuidanceFromImage,
+  DEFAULT_INPAINT_MASK_FILL,
+  nextInpaintMaskName,
+  nextRegionalGuidanceFillColor,
+  nextRegionalGuidanceName,
+} from '@workbench/widgets/layers/layerOps';
 
 import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
@@ -155,6 +163,25 @@ export interface CommitRasterFilterOptions {
   mode: 'replace' | 'copy';
   signal?: AbortSignal;
 }
+
+export type ReplaceSelectionFromImageResult =
+  | { status: 'selected' }
+  | { status: 'aborted' | 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' }
+  | { status: 'failed'; message: string };
+
+export type MaskImageResultTarget = 'inpaint_mask' | 'regional_guidance';
+
+export interface CommitMaskImageResultOptions {
+  guard: LayerExportGuard;
+  image: CanvasImageRef;
+  rect: Rect;
+  target: MaskImageResultTarget;
+  signal?: AbortSignal;
+}
+
+export type CommitMaskImageResult =
+  | { status: 'committed'; layerId: string }
+  | { status: 'aborted' | 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' };
 
 /**
  * Result of {@link CanvasEngine.exportRasterLayersToPsd}: `'exported'` on
@@ -409,6 +436,8 @@ export interface CanvasEngine {
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
   /** Commits a durable raster-filter result only while its export guard remains current. */
   commitRasterFilterResult(options: CommitRasterFilterOptions): Promise<CommitRasterFilterResult>;
+  /** Adds a durable SAM image as a new mask layer while its source export guard remains current. */
+  commitMaskImageResult(options: CommitMaskImageResultOptions): Promise<CommitMaskImageResult>;
   /** Creates a new raster paint layer above `layerId` from that layer's baked pixels. */
   copyLayerToRaster(layerId: string): Promise<string | null>;
   /**
@@ -502,6 +531,13 @@ export interface CanvasEngine {
   selectAll(): void;
   /** Clears the selection (`mod+d` / Escape when idle). */
   deselect(): void;
+  /** Replaces the transient selection from a guarded alpha-bearing image result. */
+  replaceSelectionFromImage(
+    guard: LayerExportGuard,
+    image: CanvasImageRef,
+    rect: Rect,
+    signal?: AbortSignal
+  ): Promise<ReplaceSelectionFromImageResult>;
   /** Inverts the selection within the document (`mod+shift+i`). */
   invertSelection(): void;
   /** Clears an inpaint/regional mask as one undoable edit, preserving its non-pixel settings. */
@@ -950,9 +986,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   let antsPhase = 0;
 
   const onSelectionChanged = (): void => {
-    stores.hasSelection.set(selection.hasSelection());
-    updateAntsAnimation();
-    scheduler.invalidate({ overlay: true });
+    // Selection state is already authoritative before this notification runs.
+    // Keep each derived UI/render notification independent and best-effort so a
+    // faulty observer cannot make an applied selection report false failure.
+    try {
+      stores.hasSelection.set(selection.hasSelection());
+    } catch {
+      // The scalar store commits before notifying observers.
+    }
+    try {
+      updateAntsAnimation();
+    } catch {
+      // A later selection mutation/attach transition reconciles animation.
+    }
+    try {
+      scheduler.invalidate({ overlay: true });
+    } catch {
+      // The next render invalidation will draw the authoritative selection.
+    }
   };
 
   const selection: SelectionState = createSelectionState({
@@ -2511,6 +2562,41 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     installGeneratedPaintCache(prepared, persist);
   };
 
+  const getReducerDocument = (): CanvasDocumentContractV2 | null =>
+    store.getState().projects.find((project) => project.id === projectId)?.canvas.document ?? null;
+
+  const dispatchPreparedMutation = (
+    action: WorkbenchAction,
+    isApplied: () => boolean,
+    isMirrored: () => boolean
+  ): void => {
+    try {
+      store.dispatch(action);
+    } catch (error) {
+      // Store subscribers run after the reducer has accepted an action. A
+      // faulty observer must not strand an applied document mutation before
+      // its matching engine state and history are published. Preserve real
+      // reducer/dispatch failures by swallowing only when the exact intended
+      // postcondition is visible in the authoritative reducer state.
+      if (!isApplied()) {
+        throw error;
+      }
+      // Notification may have been interrupted before DocumentMirror's
+      // subscriber ran. Reconcile it synchronously from authoritative state
+      // before publishing follow-up state or history.
+      try {
+        mirror.refresh();
+      } catch (refreshError) {
+        if (!isMirrored()) {
+          throw refreshError;
+        }
+      }
+      if (!isMirrored()) {
+        throw error;
+      }
+    }
+  };
+
   const captureLayerCache = (
     layer: CanvasLayerContract,
     doc: CanvasDocumentContractV2
@@ -2606,6 +2692,157 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return true;
   };
 
+  const replaceSelectionFromImage = async (
+    guard: LayerExportGuard,
+    image: CanvasImageRef,
+    rect: Rect,
+    signal?: AbortSignal
+  ): Promise<ReplaceSelectionFromImageResult> => {
+    if (signal?.aborted) {
+      return { status: 'aborted' };
+    }
+    try {
+      const blob = await imageResolver(image.imageName, signal);
+      if (signal?.aborted) {
+        return { status: 'aborted' };
+      }
+      const bitmap = await backend.createImageBitmap(blob);
+      if (signal?.aborted) {
+        bitmap.close();
+        return { status: 'aborted' };
+      }
+      let pixels: RasterSurface;
+      try {
+        // Allocation belongs to the decoded bitmap's lifetime too. If it throws,
+        // the finally block must still release the browser bitmap.
+        pixels = backend.createSurface(image.width, image.height);
+        pixels.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        pixels.ctx.clearRect(0, 0, image.width, image.height);
+        pixels.ctx.drawImage(bitmap, 0, 0, image.width, image.height);
+      } finally {
+        bitmap.close();
+      }
+      if (signal?.aborted) {
+        return { status: 'aborted' };
+      }
+
+      const document = mirror.getDocument();
+      const liveLayer = document?.layers.find((candidate) => candidate.id === guard.layerId);
+      if (!document || !liveLayer) {
+        return { status: 'missing' };
+      }
+      if (liveLayer.isLocked) {
+        return { status: 'locked' };
+      }
+      if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
+        return { status: 'unsupported' };
+      }
+      if (pipeline.isGestureActive()) {
+        return { status: 'busy' };
+      }
+      if (!isLayerExportGuardCurrent(guard)) {
+        return { status: 'stale' };
+      }
+      if (signal?.aborted) {
+        return { status: 'aborted' };
+      }
+
+      selection.replaceMask({ rect: { ...rect }, surface: pixels });
+      return { status: 'selected' };
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+        return { status: 'aborted' };
+      }
+      return { message: error instanceof Error ? error.message : String(error), status: 'failed' };
+    }
+  };
+
+  const commitMaskImageResult = (options: CommitMaskImageResultOptions): Promise<CommitMaskImageResult> => {
+    if (options.signal?.aborted) {
+      return Promise.resolve({ status: 'aborted' });
+    }
+    const document = mirror.getDocument();
+    const liveLayer = document?.layers.find((candidate) => candidate.id === options.guard.layerId);
+    if (!document || !liveLayer) {
+      return Promise.resolve({ status: 'missing' });
+    }
+    if (liveLayer.isLocked) {
+      return Promise.resolve({ status: 'locked' });
+    }
+    if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
+      return Promise.resolve({ status: 'unsupported' });
+    }
+    if (pipeline.isGestureActive()) {
+      return Promise.resolve({ status: 'busy' });
+    }
+    if (!isLayerExportGuardCurrent(options.guard)) {
+      return Promise.resolve({ status: 'stale' });
+    }
+    if (options.signal?.aborted) {
+      return Promise.resolve({ status: 'aborted' });
+    }
+
+    const sourceIndex = document.layers.findIndex((candidate) => candidate.id === liveLayer.id);
+    if (sourceIndex < 0) {
+      return Promise.resolve({ status: 'missing' });
+    }
+    const names = document.layers.map((layer) => layer.name);
+    const layerId = createLayerId();
+    const layer =
+      options.target === 'inpaint_mask'
+        ? createInpaintMaskFromImage({
+            fill: DEFAULT_INPAINT_MASK_FILL,
+            id: layerId,
+            image: options.image,
+            name: nextInpaintMaskName(names),
+            rect: options.rect,
+          })
+        : createRegionalGuidanceFromImage({
+            fill: {
+              color: nextRegionalGuidanceFillColor(
+                document.layers.filter((candidate) => candidate.type === 'regional_guidance').length
+              ),
+              style: 'solid',
+            },
+            id: layerId,
+            image: options.image,
+            name: nextRegionalGuidanceName(names),
+            rect: options.rect,
+          });
+    const selectedLayerId = document.selectedLayerId;
+    const apply = (): void =>
+      dispatchPreparedMutation(
+        { index: sourceIndex, layer, type: 'addCanvasLayer' },
+        () => getReducerDocument()?.layers.some((candidate) => candidate === layer) === true,
+        () => mirror.getDocument()?.layers.some((candidate) => candidate === layer) === true
+      );
+
+    endNudgeBurst();
+    apply();
+    history.push({
+      bytes: 256,
+      label: options.target === 'inpaint_mask' ? 'Create inpaint mask from object' : 'Create region from object',
+      redo: apply,
+      replayFailureAtomic: true,
+      undo: () => {
+        // Restore selection first. It is idempotent, so a pre-dispatch removal
+        // failure leaves the history entry retryable without duplicating a
+        // structural mutation or losing the caller's prior selection.
+        dispatchPreparedMutation(
+          { id: selectedLayerId, type: 'setCanvasSelectedLayer' },
+          () => getReducerDocument()?.selectedLayerId === selectedLayerId,
+          () => mirror.getDocument()?.selectedLayerId === selectedLayerId
+        );
+        dispatchPreparedMutation(
+          { ids: [layerId], type: 'removeCanvasLayers' },
+          () => getReducerDocument()?.layers.some((candidate) => candidate.id === layerId) === false,
+          () => mirror.getDocument()?.layers.some((candidate) => candidate.id === layerId) === false
+        );
+      },
+    });
+    return Promise.resolve({ layerId, status: 'committed' });
+  };
+
   const commitRasterFilterResult = async (options: CommitRasterFilterOptions): Promise<CommitRasterFilterResult> => {
     if (options.signal?.aborted) {
       return { status: 'aborted' };
@@ -2657,42 +2894,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       const image = structuredClone(options.image);
       const rect = { ...options.rect };
       const paintSource = { bitmap: image, offset: { x: rect.x, y: rect.y }, type: 'paint' } as const;
-      const getReducerDocument = (): CanvasDocumentContractV2 | null =>
-        store.getState().projects.find((project) => project.id === projectId)?.canvas.document ?? null;
-      const dispatchPreparedMutation = (
-        action: WorkbenchAction,
-        isApplied: () => boolean,
-        isMirrored: () => boolean
-      ): void => {
-        try {
-          store.dispatch(action);
-        } catch (error) {
-          // Store subscribers run after the reducer has accepted an action. A
-          // faulty observer must not strand an applied document mutation before
-          // its already-prepared cache and history are published. Preserve real
-          // reducer/dispatch failures by swallowing only when the exact intended
-          // postcondition is visible in the authoritative reducer state.
-          if (!isApplied()) {
-            throw error;
-          }
-          // Notification may have been interrupted before DocumentMirror's
-          // subscriber ran. Reconcile it synchronously from authoritative state
-          // before publishing cache/history so the engine cannot commit against
-          // a stale document. Observer errors after mirror convergence are
-          // ancillary and must not veto the applied reducer mutation.
-          try {
-            mirror.refresh();
-          } catch (refreshError) {
-            if (!isMirrored()) {
-              throw refreshError;
-            }
-          }
-          if (!isMirrored()) {
-            throw error;
-          }
-        }
-      };
-
       if (options.mode === 'replace') {
         const beforePixels = captureLayerCache(liveLayer, document);
         if (!beforePixels || beforePixels === 'not-ready') {
@@ -4400,6 +4601,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     commitOpenTextSession,
     commitLayerConversion,
     commitLayerCopy,
+    commitMaskImageResult,
     commitRasterFilterResult,
     commitStructural,
     commitTextEdit,
@@ -4434,6 +4636,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     openTextCreate,
     openTextEdit,
     rasterizeLayer,
+    replaceSelectionFromImage,
     setTextEditContentReader,
     updateTextEditStyle,
     getViewport: () => viewport,

@@ -63,7 +63,11 @@ describe('getLayerContextMenuLayout', () => {
         items: ['arrange(move-to-front,move-forward,move-backward,move-to-back)', 'duplicate'],
         presentation: 'row',
       },
-      { id: 'primary', items: ['transform', 'rename', 'fit-to-bbox', 'adjustments', 'filter'], presentation: 'list' },
+      {
+        id: 'primary',
+        items: ['transform', 'rename', 'fit-to-bbox', 'adjustments', 'filter', 'select-object'],
+        presentation: 'list',
+      },
       {
         id: 'operations',
         items: [
@@ -109,7 +113,7 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(control)[1]).toEqual({
       id: 'primary',
-      items: ['transform', 'rename', 'fit-to-bbox', 'filter', 'control-transparency-effect'],
+      items: ['transform', 'rename', 'fit-to-bbox', 'filter', 'select-object', 'control-transparency-effect'],
       presentation: 'list',
     });
     expect(summarize(control)[2]).toEqual({

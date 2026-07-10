@@ -3,17 +3,21 @@ import type { CanvasLayerContextMenuTarget } from './LayerContextMenu';
 /**
  * Which layer the canvas right-click menu should render for.
  *
- * Choosing "Rename" closes the menu, which nulls the live `target`. But the rename
- * dialog is a sibling of the menu inside the same subtree — if the wrapper stopped
- * rendering the moment `target` went null, the dialog would unmount before it ever
- * painted (the F1 bug). So while a rename is in flight the wrapper keeps a captured
- * `renameTarget` (set when the dialog opens, cleared when it closes) and falls back
- * to it, keeping the subtree — and thus the dialog — mounted until the rename ends.
+ * Opening a sibling dialog closes the menu, which nulls the live `target`. The
+ * wrapper keeps a captured dialog target until that dialog closes so the shared
+ * subtree remains mounted for rename, Select Object, and future workflow actions.
  */
+export type LayerMenuDialogKind = 'rename' | 'select-object' | 'run-workflow';
+
+export interface LayerMenuDialogState {
+  kind: LayerMenuDialogKind;
+  target: CanvasLayerContextMenuTarget;
+}
+
 export const resolveMenuTargetForRender = (
   liveTarget: CanvasLayerContextMenuTarget | null,
-  renameTarget: CanvasLayerContextMenuTarget | null
-): CanvasLayerContextMenuTarget | null => liveTarget ?? renameTarget;
+  dialogState: LayerMenuDialogState | null
+): CanvasLayerContextMenuTarget | null => liveTarget ?? dialogState?.target ?? null;
 
 export interface LayerContextMenuEvent {
   clientX: number;

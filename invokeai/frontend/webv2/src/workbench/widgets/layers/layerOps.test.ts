@@ -22,7 +22,9 @@ import {
   copyRegionalGuidanceToInpaintMask,
   createControlLayer,
   createEmptyPaintLayer,
+  createInpaintMaskFromImage,
   createInpaintMaskLayer,
+  createRegionalGuidanceFromImage,
   createRegionalGuidanceLayer,
   createRegionalGuidanceLayerWithRefImage,
   createRegionalReferenceImage,
@@ -207,6 +209,67 @@ describe('createInpaintMaskLayer', () => {
     const a = createInpaintMaskLayer('m');
     const b = createInpaintMaskLayer('m');
     expect(a.id).not.toBe(b.id);
+  });
+});
+
+describe('image-backed mask layer factories', () => {
+  const image = { height: 13, imageName: 'selected-object.png', width: 17 };
+  const rect = { height: 13, width: 17, x: -4, y: 9 };
+
+  it('builds a complete inpaint mask contract with the image at the world rect', () => {
+    expect(
+      createInpaintMaskFromImage({
+        fill: { color: '#123456', style: 'crosshatch' },
+        id: 'mask-result',
+        image,
+        name: 'Inpaint Mask 2',
+        rect,
+      })
+    ).toEqual({
+      blendMode: 'normal',
+      id: 'mask-result',
+      isEnabled: true,
+      isLocked: false,
+      mask: {
+        bitmap: image,
+        fill: { color: '#123456', style: 'crosshatch' },
+        offset: { x: -4, y: 9 },
+      },
+      name: 'Inpaint Mask 2',
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'inpaint_mask',
+    });
+  });
+
+  it('builds a complete regional-guidance contract with preserved defaults', () => {
+    expect(
+      createRegionalGuidanceFromImage({
+        fill: { color: '#83d683', style: 'solid' },
+        id: 'regional-result',
+        image,
+        name: 'Regional Guidance 3',
+        rect,
+      })
+    ).toEqual({
+      autoNegative: false,
+      blendMode: 'normal',
+      id: 'regional-result',
+      isEnabled: true,
+      isLocked: false,
+      mask: {
+        bitmap: image,
+        fill: { color: '#83d683', style: 'solid' },
+        offset: { x: -4, y: 9 },
+      },
+      name: 'Regional Guidance 3',
+      negativePrompt: null,
+      opacity: 0.5,
+      positivePrompt: null,
+      referenceImages: [],
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'regional_guidance',
+    });
   });
 });
 

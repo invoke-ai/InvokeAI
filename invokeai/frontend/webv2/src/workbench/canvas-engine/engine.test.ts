@@ -5497,6 +5497,808 @@ describe('commitRasterFilterResult', () => {
   });
 });
 
+describe('replaceSelectionFromImage', () => {
+  const resultImage = { height: 10, imageName: 'sam-result.png', width: 10 };
+  const resultRect = { height: 10, width: 10, x: -7, y: 13 };
+
+  const sourceLayer = (): CanvasRasterLayerContractV2 => ({
+    blendMode: 'normal',
+    id: 'sam-source',
+    isEnabled: true,
+    isLocked: false,
+    name: 'SAM source',
+    opacity: 1,
+    source: { fill: '#fff', height: 10, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: -7, y: 13 },
+    type: 'raster',
+  });
+
+  const sourceDocument = (layer: CanvasLayerContract = sourceLayer()): CanvasDocumentContractV2 => ({
+    background: 'transparent',
+    bbox: { height: 100, width: 100, x: 0, y: 0 },
+    height: 100,
+    layers: [layer],
+    selectedLayerId: layer.id,
+    version: 2,
+    width: 100,
+  });
+
+  const alphaBackend = (alpha: number): StubRasterBackend => {
+    const base = createTestStubRasterBackend();
+    return {
+      ...base,
+      createSurface: (width, height) => {
+        const surface = base.createSurface(width, height);
+        Object.defineProperty(surface.ctx, 'getImageData', {
+          value: (_x: number, _y: number, readWidth: number, readHeight: number) => {
+            const data = new Uint8ClampedArray(readWidth * readHeight * 4);
+            for (let index = 3; index < data.length; index += 4) {
+              data[index] = alpha;
+            }
+            return { colorSpace: 'srgb', data, height: readHeight, width: readWidth } as ImageData;
+          },
+        });
+        return surface;
+      },
+    };
+  };
+
+  const createHarness = async ({
+    alpha = 0,
+    backend = alphaBackend(alpha),
+    imageResolver = () => Promise.resolve(new Blob()),
+    seedSelection = true,
+  }: {
+    alpha?: number;
+    backend?: StubRasterBackend;
+    imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
+    seedSelection?: boolean;
+  } = {}) => {
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const layer = sourceLayer();
+    const document = sourceDocument(layer);
+    const reactive = createReactiveStore(document);
+    const engine = createCanvasEngine({ backend, imageResolver, projectId: 'p1', store: reactive.store });
+    const exported = await engine.exportLayerPixels(layer.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an export guard');
+    }
+    if (seedSelection) {
+      engine.selectAll();
+    }
+    (reactive.store.dispatch as Mock).mockClear();
+    return { ...reactive, document, engine, guard: exported.guard, layer };
+  };
+
+  const createPendingHarness = async () => {
+    const decoded = createDeferred<Blob>();
+    const harness = await createHarness({ imageResolver: () => decoded.promise });
+    const pending = harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect);
+    return { ...harness, decoded, pending };
+  };
+
+  it('decodes and places a non-empty alpha result into the transient selection', async () => {
+    const imageResolver = vi.fn((_imageName: string, _signal?: AbortSignal) => Promise.resolve(new Blob()));
+    const harness = await createHarness({ alpha: 255, imageResolver, seedSelection: false });
+
+    await expect(harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect)).resolves.toEqual({
+      status: 'selected',
+    });
+    expect(imageResolver).toHaveBeenCalledWith(resultImage.imageName, undefined);
+    expect(harness.engine.stores.hasSelection.get()).toBe(true);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('reports selected when a has-selection observer throws after the replacement is applied', async () => {
+    const harness = await createHarness({ alpha: 255, seedSelection: false });
+    const unsubscribeFault = harness.engine.stores.hasSelection.subscribe(() => {
+      throw new Error('selection state observer failed');
+    });
+
+    await expect(harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect)).resolves.toEqual({
+      status: 'selected',
+    });
+
+    expect(harness.engine.stores.hasSelection.get()).toBe(true);
+    unsubscribeFault();
+    harness.engine.dispose();
+  });
+
+  it('reports selected and clears derived selection state for an empty mask without clearing the prior surface', async () => {
+    const base = alphaBackend(0);
+    const surfaces: StubRasterSurface[] = [];
+    const backend: StubRasterBackend = {
+      ...base,
+      createSurface: (width, height) => {
+        const surface = base.createSurface(width, height);
+        surfaces.push(surface);
+        return surface;
+      },
+    };
+    const harness = await createHarness({ backend });
+    const priorMask = surfaces.at(-1);
+    if (!priorMask) {
+      throw new Error('expected a seeded selection surface');
+    }
+    const priorMaskClear = vi.fn(() => {
+      throw new Error('prior selection surface must not be cleared');
+    });
+    Object.defineProperty(priorMask.ctx, 'clearRect', { value: priorMaskClear });
+
+    await expect(harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect)).resolves.toEqual({
+      status: 'selected',
+    });
+
+    expect(priorMaskClear).not.toHaveBeenCalled();
+    expect(harness.engine.stores.hasSelection.get()).toBe(false);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('closes the decoded bitmap and preserves selection when replacement-surface allocation fails', async () => {
+    const base = alphaBackend(255);
+    const close = vi.fn();
+    let failAllocation = false;
+    const backend: StubRasterBackend = {
+      ...base,
+      createImageBitmap: vi.fn(() =>
+        Promise.resolve({ close, height: resultImage.height, width: resultImage.width } as unknown as ImageBitmap)
+      ),
+      createSurface: (width, height) => {
+        if (failAllocation) {
+          throw new Error('selection surface allocation failed');
+        }
+        return base.createSurface(width, height);
+      },
+    };
+    const harness = await createHarness({ backend });
+    failAllocation = true;
+
+    await expect(harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect)).resolves.toEqual({
+      message: 'selection surface allocation failed',
+      status: 'failed',
+    });
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(harness.engine.stores.hasSelection.get()).toBe(true);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns aborted before decode without touching the existing selection', async () => {
+    const imageResolver = vi.fn(() => Promise.resolve(new Blob()));
+    const harness = await createHarness({ imageResolver });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect, controller.signal)
+    ).resolves.toEqual({ status: 'aborted' });
+    expect(imageResolver).not.toHaveBeenCalled();
+    expect(harness.engine.stores.hasSelection.get()).toBe(true);
+    harness.engine.dispose();
+  });
+
+  it('returns aborted when cancellation lands during image resolution', async () => {
+    const decoded = createDeferred<Blob>();
+    const harness = await createHarness({ imageResolver: () => decoded.promise });
+    const controller = new AbortController();
+
+    const pending = harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect, controller.signal);
+    controller.abort();
+    decoded.resolve(new Blob());
+
+    await expect(pending).resolves.toEqual({ status: 'aborted' });
+    expect(harness.engine.stores.hasSelection.get()).toBe(true);
+    harness.engine.dispose();
+  });
+
+  it('returns aborted and closes the bitmap when cancellation lands during bitmap decode', async () => {
+    const bitmap = createDeferred<ImageBitmap>();
+    const close = vi.fn();
+    const backend = { ...alphaBackend(0), createImageBitmap: vi.fn(() => bitmap.promise) };
+    const harness = await createHarness({ backend });
+    const controller = new AbortController();
+
+    const pending = harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect, controller.signal);
+    await vi.waitFor(() => expect(backend.createImageBitmap).toHaveBeenCalledOnce());
+    controller.abort();
+    bitmap.resolve({ close, height: 10, width: 10 } as unknown as ImageBitmap);
+
+    await expect(pending).resolves.toEqual({ status: 'aborted' });
+    expect(close).toHaveBeenCalledOnce();
+    expect(harness.engine.stores.hasSelection.get()).toBe(true);
+    harness.engine.dispose();
+  });
+
+  it('returns failed on decode failure without touching the existing selection', async () => {
+    const harness = await createHarness({ imageResolver: () => Promise.reject(new Error('SAM decode failed')) });
+
+    await expect(harness.engine.replaceSelectionFromImage(harness.guard, resultImage, resultRect)).resolves.toEqual({
+      message: 'SAM decode failed',
+      status: 'failed',
+    });
+    expect(harness.engine.stores.hasSelection.get()).toBe(true);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it.each([
+    {
+      expected: 'missing',
+      label: 'source deletion',
+      mutate: (harness: Awaited<ReturnType<typeof createHarness>>) =>
+        harness.setDocument({ ...harness.document, layers: [] }),
+    },
+    {
+      expected: 'stale',
+      label: 'source contract edit',
+      mutate: (harness: Awaited<ReturnType<typeof createHarness>>) =>
+        harness.setDocument({ ...harness.document, layers: [{ ...harness.layer, opacity: 0.5 }] }),
+    },
+    {
+      expected: 'locked',
+      label: 'source lock',
+      mutate: (harness: Awaited<ReturnType<typeof createHarness>>) =>
+        harness.setDocument({ ...harness.document, layers: [{ ...harness.layer, isLocked: true }] }),
+    },
+    {
+      expected: 'unsupported',
+      label: 'source type change',
+      mutate: (harness: Awaited<ReturnType<typeof createHarness>>) => {
+        const { source: _source, ...base } = harness.layer;
+        const mask: CanvasInpaintMaskLayerContract = {
+          ...base,
+          mask: { bitmap: null, fill: { color: '#fff', style: 'solid' } },
+          type: 'inpaint_mask',
+        };
+        harness.setDocument({ ...harness.document, layers: [mask] });
+      },
+    },
+    {
+      expected: 'stale',
+      label: 'active project switch',
+      mutate: (harness: Awaited<ReturnType<typeof createHarness>>) => harness.setActiveProjectId('p2'),
+    },
+    {
+      expected: 'stale',
+      label: 'document replacement reusing the layer',
+      mutate: (harness: Awaited<ReturnType<typeof createHarness>>) => harness.setDocument({ ...harness.document }, 1),
+    },
+  ] as const)('refuses $label without mutating the selection', async ({ expected, mutate }) => {
+    const harness = await createPendingHarness();
+    mutate(harness);
+    const selectionAfterExternalChange = harness.engine.stores.hasSelection.get();
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: expected });
+    expect(harness.engine.stores.hasSelection.get()).toBe(selectionAfterExternalChange);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns busy for an open pointer gesture without mutating the selection', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const harness = await createPendingHarness();
+    const screen = createInputCanvas();
+    const overlay = createInputCanvas();
+    harness.engine.attach(screen.element, overlay.element);
+    raf.flush();
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'busy' });
+    expect(harness.engine.stores.hasSelection.get()).toBe(true);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('returns stale after an unpersisted paint-cache edit without mutating the selection', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal('Path2D', class FakePath2D {});
+    const decoded = createDeferred<Blob>();
+    const document = paintDoc();
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: alphaBackend(0),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => decoded.promise,
+      projectId,
+      store,
+    });
+    const screen = createInputCanvas();
+    const overlay = createInputCanvas();
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    engine.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    overlay.fire('pointermove', pointerAt(8, 8));
+    overlay.fire('pointerup', pointerAt(8, 8, { buttons: 0 }));
+    const exported = await engine.exportLayerPixels('paint1');
+    if (exported.status !== 'ok') {
+      throw new Error('expected live paint pixels');
+    }
+    engine.selectAll();
+    const pending = engine.replaceSelectionFromImage(exported.guard, resultImage, resultRect);
+
+    overlay.fire('pointerdown', pointerAt(15, 15));
+    overlay.fire('pointermove', pointerAt(18, 18));
+    overlay.fire('pointerup', pointerAt(18, 18, { buttons: 0 }));
+    decoded.resolve(new Blob());
+
+    await expect(pending).resolves.toEqual({ status: 'stale' });
+    expect(engine.stores.hasSelection.get()).toBe(true);
+    engine.dispose();
+  });
+});
+
+describe('commitMaskImageResult', () => {
+  const resultImage = { height: 12, imageName: 'durable-sam-result.png', width: 16 };
+  const resultRect = { height: 12, width: 16, x: -5, y: 7 };
+
+  const source = (): CanvasRasterLayerContractV2 => ({
+    blendMode: 'normal',
+    id: 'source',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Source',
+    opacity: 1,
+    source: { fill: '#fff', height: 12, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 16 },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: -5, y: 7 },
+    type: 'raster',
+  });
+
+  const existingInpaint = (): CanvasInpaintMaskLayerContract => ({
+    blendMode: 'normal',
+    id: 'existing-mask',
+    isEnabled: true,
+    isLocked: false,
+    mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
+    name: 'Inpaint Mask 1',
+    opacity: 1,
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'inpaint_mask',
+  });
+
+  const existingRegional = (): CanvasLayerContract => ({
+    autoNegative: false,
+    blendMode: 'normal',
+    id: 'existing-region',
+    isEnabled: true,
+    isLocked: false,
+    mask: { bitmap: null, fill: { color: '#83d683', style: 'solid' } },
+    name: 'Regional Guidance 1',
+    negativePrompt: null,
+    opacity: 0.5,
+    positivePrompt: null,
+    referenceImages: [],
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'regional_guidance',
+  });
+
+  const docFor = (target: 'inpaint_mask' | 'regional_guidance'): CanvasDocumentContractV2 => {
+    const layer = source();
+    const below = { ...source(), id: 'below', name: 'Below' };
+    return {
+      background: 'transparent',
+      bbox: { height: 100, width: 100, x: 0, y: 0 },
+      height: 100,
+      layers: [target === 'inpaint_mask' ? existingInpaint() : existingRegional(), layer, below],
+      selectedLayerId: below.id,
+      version: 2,
+      width: 100,
+    };
+  };
+
+  it.each([
+    {
+      expected: {
+        blendMode: 'normal',
+        isEnabled: true,
+        isLocked: false,
+        mask: {
+          bitmap: resultImage,
+          fill: { color: '#e07575', style: 'diagonal' },
+          offset: { x: -5, y: 7 },
+        },
+        name: 'Inpaint Mask 2',
+        opacity: 1,
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'inpaint_mask',
+      },
+      target: 'inpaint_mask',
+    },
+    {
+      expected: {
+        autoNegative: false,
+        blendMode: 'normal',
+        isEnabled: true,
+        isLocked: false,
+        mask: {
+          bitmap: resultImage,
+          fill: { color: '#fae150', style: 'solid' },
+          offset: { x: -5, y: 7 },
+        },
+        name: 'Regional Guidance 2',
+        negativePrompt: null,
+        opacity: 0.5,
+        positivePrompt: null,
+        referenceImages: [],
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'regional_guidance',
+      },
+      target: 'regional_guidance',
+    },
+  ] as const)(
+    'adds a complete $target directly above the source with one exact history entry',
+    async ({ expected, target }) => {
+      const document = docFor(target);
+      const { projectId, store } = createReducerBackedStore(document);
+      const bitmapStore = createSpyBitmapStore();
+      const imageResolver = vi.fn(() => Promise.resolve(new Blob()));
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore,
+        imageResolver,
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels('source');
+      if (exported.status !== 'ok') {
+        throw new Error('expected an export guard');
+      }
+
+      const result = await engine.commitMaskImageResult({
+        guard: exported.guard,
+        image: resultImage,
+        rect: resultRect,
+        target,
+      });
+
+      expect(result.status).toBe('committed');
+      if (result.status !== 'committed') {
+        throw new Error('expected a committed mask');
+      }
+      const created = engine.getDocument()!.layers.find((layer) => layer.id === result.layerId)!;
+      expect(created).toEqual({ ...expected, id: result.layerId });
+      expect(engine.getDocument()!.layers.map((layer) => layer.id)).toEqual([
+        document.layers[0]!.id,
+        result.layerId,
+        'source',
+        'below',
+      ]);
+      expect(engine.getDocument()!.selectedLayerId).toBe(result.layerId);
+      expect(imageResolver).not.toHaveBeenCalled();
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(engine.stores.canUndo.get()).toBe(true);
+
+      engine.undo();
+      expect(engine.getDocument()).toEqual(document);
+      expect(engine.getDocument()!.selectedLayerId).toBe('below');
+      expect(engine.stores.canUndo.get()).toBe(false);
+      expect(engine.stores.canRedo.get()).toBe(true);
+
+      engine.redo();
+      expect(engine.getDocument()!.layers.find((layer) => layer.id === result.layerId)).toEqual(created);
+      expect(engine.getDocument()!.selectedLayerId).toBe(result.layerId);
+      expect(engine.stores.canUndo.get()).toBe(true);
+      expect(engine.stores.canRedo.get()).toBe(false);
+      engine.dispose();
+    }
+  );
+
+  it('commits and refreshes the document mirror when an earlier observer throws after the reducer adds the mask', async () => {
+    const document = docFor('inpaint_mask');
+    const { projectId, store } = createReducerBackedStore(document);
+    const unsubscribeFault = store.subscribe(() => {
+      throw new Error('earlier mask observer failed');
+    });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels('source');
+    if (exported.status !== 'ok') {
+      throw new Error('expected an export guard');
+    }
+
+    const result = await engine.commitMaskImageResult({
+      guard: exported.guard,
+      image: resultImage,
+      rect: resultRect,
+      target: 'inpaint_mask',
+    });
+    unsubscribeFault();
+
+    expect(result.status).toBe('committed');
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed mask');
+    }
+    expect(engine.getDocument()).toBe(
+      store.getState().projects.find((project) => project.id === projectId)!.canvas.document
+    );
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === result.layerId)).toBe(true);
+    expect(engine.stores.canUndo.get()).toBe(true);
+
+    engine.undo();
+    expect(engine.getDocument()).toEqual(document);
+    engine.dispose();
+  });
+
+  it('finishes mask undo exactly when document observers throw after both reducer mutations', async () => {
+    const document = docFor('regional_guidance');
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels('source');
+    if (exported.status !== 'ok') {
+      throw new Error('expected an export guard');
+    }
+    const result = await engine.commitMaskImageResult({
+      guard: exported.guard,
+      image: resultImage,
+      rect: resultRect,
+      target: 'regional_guidance',
+    });
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed mask');
+    }
+    const unsubscribeFault = store.subscribe(() => {
+      throw new Error('mask undo observer failed');
+    });
+
+    expect(() => engine.undo()).not.toThrow();
+
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.getDocument()!.selectedLayerId).toBe('below');
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    unsubscribeFault();
+    engine.dispose();
+  });
+
+  it('keeps mask undo failure-atomic when restoring the prior selection fails before reducer application', async () => {
+    const document = docFor('inpaint_mask');
+    const { dispatch, projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels('source');
+    if (exported.status !== 'ok') {
+      throw new Error('expected an export guard');
+    }
+    const result = await engine.commitMaskImageResult({
+      guard: exported.guard,
+      image: resultImage,
+      rect: resultRect,
+      target: 'inpaint_mask',
+    });
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed mask');
+    }
+    const committedDocument = structuredClone(engine.getDocument()!);
+    const reducerDispatch = dispatch.getMockImplementation();
+    if (!reducerDispatch) {
+      throw new Error('expected reducer-backed dispatch');
+    }
+    let failSelection = true;
+    dispatch.mockImplementation((action: WorkbenchAction) => {
+      if (failSelection && action.type === 'setCanvasSelectedLayer') {
+        failSelection = false;
+        throw new Error('mask selection restore failed');
+      }
+      reducerDispatch(action);
+    });
+
+    expect(() => engine.undo()).toThrow('mask selection restore failed');
+
+    expect(engine.getDocument()).toEqual(committedDocument);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+
+    engine.undo();
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    engine.dispose();
+  });
+
+  it('keeps mask undo retryable when removal fails after restoring the prior selection', async () => {
+    const document = docFor('regional_guidance');
+    const { dispatch, projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exportLayerPixels('source');
+    if (exported.status !== 'ok') {
+      throw new Error('expected an export guard');
+    }
+    const result = await engine.commitMaskImageResult({
+      guard: exported.guard,
+      image: resultImage,
+      rect: resultRect,
+      target: 'regional_guidance',
+    });
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed mask');
+    }
+    const reducerDispatch = dispatch.getMockImplementation();
+    if (!reducerDispatch) {
+      throw new Error('expected reducer-backed dispatch');
+    }
+    let failRemoval = true;
+    dispatch.mockImplementation((action: WorkbenchAction) => {
+      if (failRemoval && action.type === 'removeCanvasLayers') {
+        failRemoval = false;
+        throw new Error('mask removal failed');
+      }
+      reducerDispatch(action);
+    });
+
+    expect(() => engine.undo()).toThrow('mask removal failed');
+
+    expect(engine.getDocument()!.layers.some((layer) => layer.id === result.layerId)).toBe(true);
+    expect(engine.getDocument()!.selectedLayerId).toBe('below');
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
+
+    engine.undo();
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    engine.dispose();
+  });
+
+  const guardHarness = async () => {
+    const layer = source();
+    const document: CanvasDocumentContractV2 = { ...docFor('inpaint_mask'), layers: [layer] };
+    const reactive = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const exported = await engine.exportLayerPixels(layer.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an export guard');
+    }
+    (reactive.store.dispatch as Mock).mockClear();
+    return { ...reactive, document, engine, guard: exported.guard, layer };
+  };
+
+  it('returns aborted before any mask mutation', async () => {
+    const harness = await guardHarness();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      harness.engine.commitMaskImageResult({
+        guard: harness.guard,
+        image: resultImage,
+        rect: resultRect,
+        signal: controller.signal,
+        target: 'inpaint_mask',
+      })
+    ).resolves.toEqual({ status: 'aborted' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it.each([
+    {
+      expected: 'missing',
+      label: 'source deletion',
+      mutate: (harness: Awaited<ReturnType<typeof guardHarness>>) =>
+        harness.setDocument({ ...harness.document, layers: [] }),
+    },
+    {
+      expected: 'stale',
+      label: 'source contract edit',
+      mutate: (harness: Awaited<ReturnType<typeof guardHarness>>) =>
+        harness.setDocument({ ...harness.document, layers: [{ ...harness.layer, opacity: 0.4 }] }),
+    },
+    {
+      expected: 'locked',
+      label: 'source lock',
+      mutate: (harness: Awaited<ReturnType<typeof guardHarness>>) =>
+        harness.setDocument({ ...harness.document, layers: [{ ...harness.layer, isLocked: true }] }),
+    },
+    {
+      expected: 'unsupported',
+      label: 'source type change',
+      mutate: (harness: Awaited<ReturnType<typeof guardHarness>>) => {
+        const { source: _source, ...base } = harness.layer;
+        const mask: CanvasInpaintMaskLayerContract = {
+          ...base,
+          mask: { bitmap: null, fill: { color: '#fff', style: 'solid' } },
+          type: 'inpaint_mask',
+        };
+        harness.setDocument({ ...harness.document, layers: [mask] });
+      },
+    },
+    {
+      expected: 'stale',
+      label: 'active project switch',
+      mutate: (harness: Awaited<ReturnType<typeof guardHarness>>) => harness.setActiveProjectId('p2'),
+    },
+    {
+      expected: 'stale',
+      label: 'document replacement',
+      mutate: (harness: Awaited<ReturnType<typeof guardHarness>>) => harness.setDocument({ ...harness.document }, 1),
+    },
+    {
+      expected: 'stale',
+      label: 'cache invalidation',
+      mutate: (harness: Awaited<ReturnType<typeof guardHarness>>) => harness.engine.clearCaches(),
+    },
+  ] as const)('refuses $label without adding a mask or history', async ({ expected, mutate }) => {
+    const harness = await guardHarness();
+    await mutate(harness);
+
+    await expect(
+      harness.engine.commitMaskImageResult({
+        guard: harness.guard,
+        image: resultImage,
+        rect: resultRect,
+        target: 'regional_guidance',
+      })
+    ).resolves.toEqual({ status: expected });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+
+  it('returns busy during an open pointer gesture without adding a mask', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const harness = await guardHarness();
+    const screen = createInputCanvas();
+    const overlay = createInputCanvas();
+    harness.engine.attach(screen.element, overlay.element);
+    raf.flush();
+    overlay.fire('pointerdown', pointerAt(5, 5));
+
+    await expect(
+      harness.engine.commitMaskImageResult({
+        guard: harness.guard,
+        image: resultImage,
+        rect: resultRect,
+        target: 'inpaint_mask',
+      })
+    ).resolves.toEqual({ status: 'busy' });
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    harness.engine.dispose();
+  });
+});
+
 describe('setFilterPreview', () => {
   const emptyDoc = (): CanvasDocumentContractV2 => ({
     background: 'transparent',

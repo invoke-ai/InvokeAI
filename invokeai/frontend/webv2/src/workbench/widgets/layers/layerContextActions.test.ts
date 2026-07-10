@@ -88,6 +88,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   mergeDown: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),
+  openSelectObject: vi.fn(),
   patchConfig: vi.fn(),
   rasterize: vi.fn(),
   reorder: vi.fn(),
@@ -181,6 +182,34 @@ describe('layer context action registry', () => {
       'widgets.layers.rasterFilter.stale',
       'widgets.layers.rasterFilter.title',
       'widgets.layers.rasterFilter.unsupported',
+      'widgets.layers.selectObject.aborted',
+      'widgets.layers.selectObject.busy',
+      'widgets.layers.selectObject.cancel',
+      'widgets.layers.selectObject.durabilityFailure',
+      'widgets.layers.selectObject.disabled',
+      'widgets.layers.selectObject.empty',
+      'widgets.layers.selectObject.failed',
+      'widgets.layers.selectObject.locked',
+      'widgets.layers.selectObject.model',
+      'widgets.layers.selectObject.modelHuge',
+      'widgets.layers.selectObject.modelSam2Large',
+      'widgets.layers.selectObject.missing',
+      'widgets.layers.selectObject.notReady',
+      'widgets.layers.selectObject.prompt',
+      'widgets.layers.selectObject.promptPlaceholder',
+      'widgets.layers.selectObject.refine',
+      'widgets.layers.selectObject.run',
+      'widgets.layers.selectObject.running',
+      'widgets.layers.selectObject.selectionSuccess',
+      'widgets.layers.selectObject.inpaintMaskSuccess',
+      'widgets.layers.selectObject.regionalGuidanceSuccess',
+      'widgets.layers.selectObject.stale',
+      'widgets.layers.selectObject.target',
+      'widgets.layers.selectObject.targetInpaintMask',
+      'widgets.layers.selectObject.targetRegionalGuidance',
+      'widgets.layers.selectObject.targetSelection',
+      'widgets.layers.selectObject.title',
+      'widgets.layers.selectObject.unsupported',
     ];
 
     for (const key of keys) {
@@ -199,6 +228,16 @@ describe('layer context action registry', () => {
     const context = makeRuntimeContext(rasterLayer, { effects: { ...makeEffects(), transform } });
     getLayerContextActionDefinition('transform').handler(context);
     expect(transform).toHaveBeenCalledOnce();
+  });
+
+  it('opens Select Object through the registry without starting work itself', () => {
+    const effects = makeEffects();
+    const context = makeRuntimeContext(rasterLayer, { effects });
+
+    getLayerContextActionDefinition('select-object').handler(context);
+
+    expect(effects.openSelectObject).toHaveBeenCalledOnce();
+    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.openSelectObject]);
   });
 
   it('dispatches parameterized registry handlers through injected effects', () => {
@@ -242,6 +281,33 @@ describe('getLayerContextActions', () => {
   ] as const)('exposes transform only for engine-supported %s layers', (type, expected) => {
     const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'transform');
     expect(Boolean(action)).toBe(expected);
+  });
+
+  it.each([
+    ['raster', true],
+    ['control', true],
+    ['inpaint_mask', false],
+    ['regional_guidance', false],
+  ] as const)('exposes Select Object only for exportable %s content', (type, expected) => {
+    const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'select-object');
+    expect(Boolean(action)).toBe(expected);
+  });
+
+  it('hides Select Object without supported source content', () => {
+    expect(
+      getLayerContextActions(makeState(rasterLayer, { hasSupportedContent: false })).some(
+        (action) => action.id === 'select-object'
+      )
+    ).toBe(false);
+  });
+
+  it.each([
+    ['missing engine', { hasEngine: false }],
+    ['locked layer', { layer: { ...rasterLayer, isLocked: true } }],
+    ['locked interaction', { interactionLocked: true }],
+  ] as const)('disables Select Object for %s', (_label, overrides) => {
+    const layer = 'layer' in overrides ? overrides.layer : rasterLayer;
+    expect(byId(getLayerContextActions(makeState(layer, overrides)), 'select-object').isDisabled).toBe(true);
   });
 
   it('disables transform for a hidden layer', () => {
@@ -302,6 +368,7 @@ describe('getLayerContextActions', () => {
       'crop-to-bbox',
       'extract-masked-area',
       'filter',
+      'select-object',
       'intersect',
       'cutout',
       'cutaway',
@@ -348,6 +415,7 @@ describe('getLayerContextActions', () => {
       'fit-to-bbox',
       'adjustments',
       'filter',
+      'select-object',
       'crop-to-bbox',
       'convert-to-control',
       'intersect',

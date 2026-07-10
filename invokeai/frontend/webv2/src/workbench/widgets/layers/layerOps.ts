@@ -13,11 +13,13 @@ import type {
   CanvasControlAdapterContract,
   CanvasControlLayerContract,
   CanvasDocumentContractV2,
+  CanvasImageRef,
   CanvasInpaintMaskLayerContract,
   CanvasLayerBaseContract,
   CanvasLayerContract,
   CanvasLayerSourceContract,
   CanvasMaskContract,
+  CanvasMaskFillContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/types';
@@ -197,6 +199,34 @@ export const createRegionalGuidanceLayer = (
   referenceImages: [],
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'regional_guidance',
+});
+
+export interface CreateMaskLayerFromImageInput {
+  image: CanvasImageRef;
+  rect: Rect;
+  id: string;
+  name: string;
+  fill: CanvasMaskFillContract;
+}
+
+export const createInpaintMaskFromImage = (input: CreateMaskLayerFromImageInput): CanvasInpaintMaskLayerContract => ({
+  ...createInpaintMaskLayer(input.name, input.id),
+  mask: {
+    bitmap: { ...input.image },
+    fill: { ...input.fill },
+    offset: { x: input.rect.x, y: input.rect.y },
+  },
+});
+
+export const createRegionalGuidanceFromImage = (
+  input: CreateMaskLayerFromImageInput
+): CanvasRegionalGuidanceLayerContract => ({
+  ...createRegionalGuidanceLayer(input.name, 0, input.id),
+  mask: {
+    bitmap: { ...input.image },
+    fill: { ...input.fill },
+    offset: { x: input.rect.x, y: input.rect.y },
+  },
 });
 
 /** Mints a fresh regional-guidance reference-image id. */

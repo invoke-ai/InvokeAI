@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { CanvasLayerContextMenuTarget } from './LayerContextMenu';
 
-import { createLayerMenuTargetFromContextEvent, resolveMenuTargetForRender } from './layerMenuState';
+import {
+  createLayerMenuTargetFromContextEvent,
+  type LayerMenuDialogKind,
+  resolveMenuTargetForRender,
+} from './layerMenuState';
 
 const target = (layerId: string): CanvasLayerContextMenuTarget => ({ layerId, x: 10, y: 20 });
 
@@ -12,18 +16,27 @@ describe('resolveMenuTargetForRender', () => {
     expect(resolveMenuTargetForRender(live, null)).toBe(live);
   });
 
-  it('renders nothing with no live target and no pending rename', () => {
+  it('renders nothing with no live target and no pending dialog', () => {
     expect(resolveMenuTargetForRender(null, null)).toBeNull();
   });
 
-  it('falls back to the captured rename target after the menu closes (F1: dialog survives)', () => {
-    const renaming = target('a');
-    expect(resolveMenuTargetForRender(null, renaming)).toBe(renaming);
+  it.each(['rename', 'select-object', 'run-workflow'] as const)(
+    'falls back to the captured %s target after the menu closes',
+    (kind: LayerMenuDialogKind) => {
+      const dialogTarget = target('a');
+      expect(resolveMenuTargetForRender(null, { kind, target: dialogTarget })).toBe(dialogTarget);
+    }
+  );
+
+  it('prefers the live target over a pending dialog target when both exist', () => {
+    const live = target('b');
+    expect(resolveMenuTargetForRender(live, { kind: 'select-object', target: target('a') })).toBe(live);
   });
 
-  it('prefers the live target over the rename target when both exist', () => {
-    const live = target('b');
-    expect(resolveMenuTargetForRender(live, target('a'))).toBe(live);
+  it('clears the sticky target after dialog close', () => {
+    const dialogState = { kind: 'select-object', target: target('a') } as const;
+    expect(resolveMenuTargetForRender(null, dialogState)).toBe(dialogState.target);
+    expect(resolveMenuTargetForRender(null, null)).toBeNull();
   });
 });
 

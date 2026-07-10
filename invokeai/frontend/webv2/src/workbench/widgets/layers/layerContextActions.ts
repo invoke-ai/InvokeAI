@@ -18,6 +18,7 @@ import {
   MergeIcon,
   PencilIcon,
   SaveIcon,
+  ScanSearchIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
 } from 'lucide-react';
@@ -43,6 +44,7 @@ export type LayerContextActionId =
   | 'crop-to-bbox'
   | 'extract-masked-area'
   | 'filter'
+  | 'select-object'
   | 'intersect'
   | 'cutout'
   | 'cutaway'
@@ -85,6 +87,7 @@ export interface LayerContextActionEffects {
   reorder(kind: LayerMoveKind, actionId: LayerContextActionId): void;
   duplicate(): void;
   openRename(): void;
+  openSelectObject(): void;
   transform(): void;
   fitToBbox(): void;
   openProperties(section: LayerPropertiesSection): void;
@@ -411,6 +414,18 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     isVisible: hasFilterableLayerContent,
     labelKey: 'widgets.layers.control.filter',
     order: 40,
+    section: 'primary',
+    supportedLayerTypes: RASTER_AND_CONTROL,
+  },
+  {
+    defaultLabel: 'Select object',
+    handler: ({ effects }) => effects.openSelectObject(),
+    icon: ScanSearchIcon,
+    id: 'select-object',
+    isEnabled: hasMutablePixels,
+    isVisible: (context) => context.hasSupportedContent,
+    labelKey: 'widgets.layers.actions.selectObject',
+    order: 41,
     section: 'primary',
     supportedLayerTypes: RASTER_AND_CONTROL,
   },

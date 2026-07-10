@@ -65,6 +65,8 @@ export interface SelectionState {
   containsPoint(p: Vec2): boolean;
   /** Applies a committed lasso path against the mask with the given boolean op. */
   commit(commit: SelectionCommit): void;
+  /** Replaces the selection with an alpha-bearing surface placed in document space. */
+  replaceMask(mask: PlacedSurface): void;
   /** Selects the whole `domain` rectangle (the engine passes `content ∪ bbox`). */
   selectAll(domain: Rect): void;
   /**
@@ -205,6 +207,58 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
     onChange();
   };
 
+  const replaceMask = (next: PlacedSurface): void => {
+    const rect = roundOut(next.rect);
+    const publishEmptyReplacement = (): void => {
+      // Replacing from a valid empty alpha result should not clear the old
+      // surface in place: clearSurface() is fallible and would run after the
+      // logical selection flags had already changed. Detach the old surface and
+      // atomically publish an empty selection instead; it is reclaimed by GC.
+      mask = null;
+      maskRect = null;
+      commits = [];
+      selectionBounds = null;
+      selected = false;
+      onChange();
+    };
+    if (isEmpty(rect) || next.surface.width <= 0 || next.surface.height <= 0) {
+      publishEmptyReplacement();
+      return;
+    }
+
+    const source = next.surface.ctx.getImageData(0, 0, next.surface.width, next.surface.height);
+    let hasAlpha = false;
+    for (let index = 3; index < source.data.length; index += 4) {
+      if (source.data[index] !== 0) {
+        hasAlpha = true;
+        break;
+      }
+    }
+    if (!hasAlpha) {
+      publishEmptyReplacement();
+      return;
+    }
+
+    const copiedData = new Uint8ClampedArray(source.data);
+    const copied =
+      typeof ImageData === 'undefined'
+        ? ({ colorSpace: source.colorSpace, data: copiedData, height: source.height, width: source.width } as ImageData)
+        : new ImageData(copiedData, source.width, source.height);
+    // Prepare every fallible replacement artifact before publishing any state.
+    // If allocation, pixel upload, or Path2D construction fails, the exact prior
+    // selection remains authoritative and the engine may safely report failure.
+    const nextMask = backend.createSurface(rect.width, rect.height);
+    nextMask.ctx.putImageData(copied, 0, 0);
+    const nextPath = rectPath(createPath2D, rect);
+
+    mask = nextMask;
+    maskRect = rect;
+    commits = [{ bounds: rect, op: 'replace', path: nextPath }];
+    selectionBounds = rect;
+    selected = true;
+    onChange();
+  };
+
   const commit = (next: SelectionCommit): void => {
     if (!getDocumentSize()) {
       // No active document ⇒ no selection surface to build.
@@ -339,6 +393,7 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
     hasSelection: () => selected,
     invert,
     mask: () => (selected && mask && maskRect ? { rect: maskRect, surface: mask } : null),
+    replaceMask,
     selectAll,
   };
 };
