@@ -16,6 +16,7 @@ import {
   curvePointFromSvg,
   curvePointToSvg,
   getCurveGridCoordinates,
+  resolveCurveDragEnd,
 } from './curveEditorMath';
 import { applyStructural } from './layerOps';
 
@@ -341,7 +342,7 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
     onLive(channel, next);
   };
 
-  const finishDrag = (event: ReactPointerEvent<SVGSVGElement>, commitDrag: boolean) => {
+  const finishDrag = (event: ReactPointerEvent<SVGSVGElement>, cancelled: boolean) => {
     const wasDragging = dragIndexRef.current !== null;
     const dragTarget = dragTargetRef.current;
     if (dragTarget?.hasPointerCapture(event.pointerId)) {
@@ -355,15 +356,18 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
     const finalPoints = latestPointsRef.current;
     beforeRef.current = null;
     latestPointsRef.current = null;
-    if (wasDragging && before && finalPoints && commitDrag) {
-      onCommit(channel, finalPoints, before);
-    } else if (wasDragging && before && finalPoints) {
-      onCancel(before);
+    if (wasDragging && before && finalPoints) {
+      const resolution = resolveCurveDragEnd(cancelled, before, finalPoints);
+      if (resolution.commit) {
+        onCommit(channel, resolution.commit, before);
+      } else if (resolution.restore) {
+        onCancel(resolution.restore);
+      }
     }
   };
 
-  const handleUp = (event: ReactPointerEvent<SVGSVGElement>) => finishDrag(event, true);
-  const handleCancel = (event: ReactPointerEvent<SVGSVGElement>) => finishDrag(event, false);
+  const handleUp = (event: ReactPointerEvent<SVGSVGElement>) => finishDrag(event, false);
+  const handleCancel = (event: ReactPointerEvent<SVGSVGElement>) => finishDrag(event, true);
 
   const handleAdd = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (dragIndexRef.current !== null) {

@@ -7,6 +7,13 @@ const clamp255 = (value: number): number => Math.max(0, Math.min(255, value));
 export const getCurveGridCoordinates = (): number[] =>
   Array.from({ length: 5 }, (_, index) => CURVE_PADDING + (index / 4) * CURVE_DRAW_SIZE);
 
+export const resolveCurveDragEnd = <TRestore, TCommit>(
+  cancelled: boolean,
+  before: TRestore,
+  current: TCommit
+): { commit: TCommit | null; restore: TRestore | null } =>
+  cancelled ? { commit: null, restore: before } : { commit: current, restore: null };
+
 export const curvePointToSvg = (x: number, y: number): { cx: number; cy: number } => ({
   cx: CURVE_PADDING + (clamp255(x) / 255) * CURVE_DRAW_SIZE,
   cy: CURVE_SIZE - CURVE_PADDING - (clamp255(y) / 255) * CURVE_DRAW_SIZE,

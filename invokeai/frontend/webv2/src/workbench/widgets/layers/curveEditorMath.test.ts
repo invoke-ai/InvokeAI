@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { curvePointFromSvg, curvePointToSvg, getCurveGridCoordinates } from './curveEditorMath';
+import { curvePointFromSvg, curvePointToSvg, getCurveGridCoordinates, resolveCurveDragEnd } from './curveEditorMath';
 
 describe('curve editor coordinates', () => {
   it('insets endpoints so handles are fully visible', () => {
@@ -16,5 +16,31 @@ describe('curve editor coordinates', () => {
 
   it('places the grid at quarter intervals within the inset plot', () => {
     expect(getCurveGridCoordinates()).toEqual([6, 48, 90, 132, 174]);
+  });
+
+  it('restores pre-drag points without a commit when cancelled', () => {
+    const before = [
+      [0, 0],
+      [255, 255],
+    ];
+    const current = [
+      [0, 32],
+      [255, 255],
+    ];
+
+    expect(resolveCurveDragEnd(true, before, current)).toEqual({ commit: null, restore: before });
+  });
+
+  it('commits changed points without restoring when completed', () => {
+    const before = [
+      [0, 0],
+      [255, 255],
+    ];
+    const current = [
+      [0, 32],
+      [255, 255],
+    ];
+
+    expect(resolveCurveDragEnd(false, before, current)).toEqual({ commit: current, restore: null });
   });
 });
