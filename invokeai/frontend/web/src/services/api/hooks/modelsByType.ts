@@ -156,7 +156,6 @@ export const selectQwenVLEncoderModels = buildModelsSelector(isQwenVLEncoderMode
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffusersMainModelConfig);
-export const selectMistralEncoderModels = buildModelsSelector(isMistralEncoderModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
 export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();

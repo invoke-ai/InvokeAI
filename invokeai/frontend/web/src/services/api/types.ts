@@ -471,7 +471,7 @@ const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainMo
   return config.type === 'main' && config.base === 'flux2' && config.name.toLowerCase().includes('9b');
 };
 
-export const isFlux2DevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+const isFlux2DevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux2' && config.variant === 'dev';
 };
 

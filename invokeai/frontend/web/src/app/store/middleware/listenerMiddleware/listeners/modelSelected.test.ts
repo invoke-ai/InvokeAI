@@ -172,7 +172,6 @@ function buildMockState(overrides: Record<string, unknown> = {}) {
       kleinQwen3EncoderModel: null,
       flux2DevVaeModel: null,
       flux2DevMistralEncoderModel: null,
-      flux2DevSourceModel: null,
       zImageScheduler: 'euler',
       ...overrides,
     },
