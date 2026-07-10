@@ -1,8 +1,16 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Flex, IconButton, Kbd, Text, Tooltip } from '@invoke-ai/ui-library';
 import type { AppThunkDispatch } from 'app/store/store';
+import {
+  areHotkeyStringsEquivalent,
+  formatHotkeyStringForPlatform,
+  getHotkeyKeyFromEvent,
+  getHotkeyStringAliases,
+  IS_MAC_OS,
+  normalizeHotkeyKey,
+} from 'features/system/components/HotkeysModal/hotkeyStrings';
 import type { Hotkey, HotkeyConflictInfo } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { IS_MAC_OS } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { useKeyboardLayoutMap } from 'features/system/components/HotkeysModal/useKeyboardLayoutMap';
 import { hotkeyChanged, hotkeyReset } from 'features/system/store/hotkeysSlice';
 import type { TFunction } from 'i18next';
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -14,30 +22,6 @@ import {
   PiTrashBold,
   PiXBold,
 } from 'react-icons/pi';
-
-// Normalize key names for consistent storage
-// Maps platform-specific modifier keys to the cross-platform 'mod' format used by react-hotkeys-hook
-// On Mac: Meta (Command) → mod
-// On Linux/Windows: Control → mod
-const normalizeKey = (key: string): string => {
-  const keyMap: Record<string, string> = IS_MAC_OS
-    ? {
-        Meta: 'mod',
-        Command: 'mod',
-        Control: 'ctrl',
-        Alt: 'alt',
-        Shift: 'shift',
-        ' ': 'space',
-      }
-    : {
-        Control: 'mod', // On non-Mac, Ctrl is the primary modifier (mapped to 'mod')
-        Meta: 'meta', // Windows key - rarely used for hotkeys
-        Alt: 'alt',
-        Shift: 'shift',
-        ' ': 'space',
-      };
-  return keyMap[key] || key.toLowerCase();
-};
 
 // Order of modifiers for consistent output
 // 'mod' is the cross-platform primary modifier (Cmd on Mac, Ctrl on Linux/Windows)
@@ -51,7 +35,7 @@ const isModifierKey = (key: string): boolean => {
 
 // Build hotkey string from pressed keys
 const buildHotkeyString = (keys: Set<string>): string | null => {
-  const normalizedKeys = Array.from(keys).map(normalizeKey);
+  const normalizedKeys = Array.from(keys).map((key) => normalizeHotkeyKey(key));
   const modifiers = normalizedKeys.filter((k) => MODIFIER_ORDER.includes(k));
   const regularKeys = normalizedKeys.filter((k) => !MODIFIER_ORDER.includes(k));
 
@@ -65,14 +49,6 @@ const buildHotkeyString = (keys: Set<string>): string | null => {
 
   // Combine modifiers + regular key (only use first regular key)
   return [...sortedModifiers, regularKeys[0]].join('+');
-};
-
-// Format key for display (platform-aware)
-const formatKeyForDisplay = (key: string): string => {
-  if (IS_MAC_OS) {
-    return key.replaceAll('mod', 'cmd').replaceAll('alt', 'option');
-  }
-  return key.replaceAll('mod', 'ctrl');
 };
 
 type HotkeyEditProps = {
@@ -129,25 +105,30 @@ const HotkeyItem = memo(
   }: HotkeyItemProps) => {
     const [recordedKey, setRecordedKey] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
+    const keyboardLayoutMap = useKeyboardLayoutMap();
 
-    // Memoize key parts to avoid repeated split calls
-    const keyParts = useMemo(() => keyString.split('+'), [keyString]);
-    const displayKeyParts = useMemo(() => keyParts.map(formatKeyForDisplay), [keyParts]);
+    const displayKeyParts = useMemo(
+      () => formatHotkeyStringForPlatform(keyString, IS_MAC_OS, keyboardLayoutMap),
+      [keyboardLayoutMap, keyString]
+    );
 
     // Check if the recorded key conflicts with another hotkey
     const conflict = useMemo(() => {
       if (!recordedKey) {
         return null;
       }
-      const existingHotkey = conflictMap.get(recordedKey);
-      if (!existingHotkey) {
-        return null;
+      for (const recordedKeyAlias of getHotkeyStringAliases(recordedKey)) {
+        const existingHotkey = conflictMap.get(recordedKeyAlias);
+        if (!existingHotkey) {
+          continue;
+        }
+        // Don't flag conflict if it's the same hotkey we're editing
+        if (existingHotkey.fullId === currentHotkeyId) {
+          continue;
+        }
+        return existingHotkey;
       }
-      // Don't flag conflict if it's the same hotkey we're editing
-      if (existingHotkey.fullId === currentHotkeyId) {
-        return null;
-      }
-      return existingHotkey;
+      return null;
     }, [recordedKey, conflictMap, currentHotkeyId]);
 
     // Start recording when entering edit mode
@@ -196,7 +177,7 @@ const HotkeyItem = memo(
         if (e.metaKey) {
           keys.add('Meta');
         }
-        keys.add(e.key);
+        keys.add(getHotkeyKeyFromEvent(e.key, e.code));
 
         const hotkeyString = buildHotkeyString(keys);
         if (hotkeyString) {
@@ -259,7 +240,9 @@ const HotkeyItem = memo(
     const renderHotkeyKeys = () => {
       if (isEditing) {
         const displayKey = recordedKey ?? keyString;
-        const parts = displayKey.split('+').map(formatKeyForDisplay);
+        const parts = recordedKey
+          ? formatHotkeyStringForPlatform(displayKey, IS_MAC_OS, keyboardLayoutMap)
+          : displayKeyParts;
         const hasConflict = conflict !== null;
 
         return (
@@ -527,8 +510,8 @@ export const HotkeyListItem = memo(({ lastItem, hotkey, sx, conflictMap, t, disp
         return;
       }
 
-      // Skip saving hotkey if it already exists in the list
-      if (hotkeyKeys.includes(newHotkey)) {
+      // Skip saving hotkey if it already exists in the list, including legacy glyph aliases.
+      if (hotkeyKeys.some((hotkeyKey, i) => i !== index && areHotkeyStringsEquivalent(hotkeyKey, newHotkey))) {
         setEditingIndex(null);
         return;
       }
