@@ -4,6 +4,9 @@ export const CURVE_PADDING = 6;
 const CURVE_DRAW_SIZE = CURVE_SIZE - CURVE_PADDING * 2;
 const clamp255 = (value: number): number => Math.max(0, Math.min(255, value));
 
+export const getCurveGridCoordinates = (): number[] =>
+  Array.from({ length: 5 }, (_, index) => CURVE_PADDING + (index / 4) * CURVE_DRAW_SIZE);
+
 export const curvePointToSvg = (x: number, y: number): { cx: number; cy: number } => ({
   cx: CURVE_PADDING + (clamp255(x) / 255) * CURVE_DRAW_SIZE,
   cy: CURVE_SIZE - CURVE_PADDING - (clamp255(y) / 255) * CURVE_DRAW_SIZE,

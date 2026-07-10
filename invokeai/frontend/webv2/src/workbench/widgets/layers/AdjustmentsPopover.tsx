@@ -10,7 +10,13 @@ import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CURVE_PADDING, CURVE_SIZE, curvePointFromSvg, curvePointToSvg } from './curveEditorMath';
+import {
+  CURVE_PADDING,
+  CURVE_SIZE,
+  curvePointFromSvg,
+  curvePointToSvg,
+  getCurveGridCoordinates,
+} from './curveEditorMath';
 import { applyStructural } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
@@ -126,6 +132,8 @@ const AdjustmentsControls = ({ adjustments, engine, layer }: AdjustmentsControls
     [adjustments, patchLive, withCurve]
   );
 
+  const handleCurveCancel = useCallback((before: CanvasAdjustmentsContract) => patchLive(before), [patchLive]);
+
   // Single history entry per gesture (drag end, click-add, dbl-click-remove). The
   // `before` snapshot is captured at gesture start by the editor (during a drag
   // `adjustments` has already advanced via the live previews), so it undoes the
@@ -160,7 +168,12 @@ const AdjustmentsControls = ({ adjustments, engine, layer }: AdjustmentsControls
         onCommit={handleScalarCommit}
         onLive={handleScalarLive}
       />
-      <CurvesEditor adjustments={adjustments} onCommit={handleCurveCommit} onLive={handleCurveLive} />
+      <CurvesEditor
+        adjustments={adjustments}
+        onCancel={handleCurveCancel}
+        onCommit={handleCurveCommit}
+        onLive={handleCurveLive}
+      />
       <Button size="xs" variant="ghost" onClick={handleReset}>
         {t('widgets.layers.adjustments.reset')}
       </Button>
@@ -232,12 +245,14 @@ interface CurvesEditorProps {
   adjustments: CanvasAdjustmentsContract;
   /** Render-only preview during a point drag (no history entry). */
   onLive: (channel: CurveChannel, points: [number, number][]) => void;
+  /** Restores the pre-drag snapshot when the browser cancels a gesture. */
+  onCancel: (before: CanvasAdjustmentsContract) => void;
   /** Commits one history entry for a completed gesture, undoing to `before`. */
   onCommit: (channel: CurveChannel, points: [number, number][], before: CanvasAdjustmentsContract) => void;
 }
 
 /** A compact per-channel curves editor (SVG): drag points, click to add, double-click to remove. */
-const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
+const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorProps) => {
   const { t } = useTranslation();
   const [channel, setChannel] = useState<CurveChannel>('r');
   const dragIndexRef = useRef<number | null>(null);
@@ -248,6 +263,7 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
   // the scalar sliders' live/commit split — no per-frame undo-stack flooding).
   const beforeRef = useRef<CanvasAdjustmentsContract | null>(null);
   const latestPointsRef = useRef<[number, number][] | null>(null);
+  const dragTargetRef = useRef<Element | null>(null);
 
   const points = useMemo<[number, number][]>(() => {
     const raw = adjustments.curves?.[channel];
@@ -283,6 +299,7 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
     }
     return d.trim();
   }, [points]);
+  const gridCoordinates = getCurveGridCoordinates();
 
   const handleChannelChange = useCallback(
     ({ value }: { value: string[] }) => setChannel((value[0] as CurveChannel) ?? 'r'),
@@ -291,8 +308,9 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
 
   const handlePointDown = (index: number) => (event: ReactPointerEvent<SVGCircleElement>) => {
     event.stopPropagation();
-    (event.target as Element).setPointerCapture?.(event.pointerId);
+    event.currentTarget.setPointerCapture(event.pointerId);
     dragIndexRef.current = index;
+    dragTargetRef.current = event.currentTarget;
     // Snapshot the pre-drag state once, for a single whole-drag history entry.
     beforeRef.current = adjustments;
     latestPointsRef.current = null;
@@ -323,22 +341,29 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
     onLive(channel, next);
   };
 
-  const handleUp = (event: ReactPointerEvent<SVGSVGElement>) => {
+  const finishDrag = (event: ReactPointerEvent<SVGSVGElement>, commitDrag: boolean) => {
     const wasDragging = dragIndexRef.current !== null;
-    if (wasDragging) {
-      (event.target as Element).releasePointerCapture?.(event.pointerId);
+    const dragTarget = dragTargetRef.current;
+    if (dragTarget?.hasPointerCapture(event.pointerId)) {
+      dragTarget.releasePointerCapture(event.pointerId);
     }
     dragIndexRef.current = null;
+    dragTargetRef.current = null;
     // Commit the whole drag as one history entry (only if the point actually
     // moved — a click with no move streams no previews and needs no commit).
     const before = beforeRef.current;
     const finalPoints = latestPointsRef.current;
     beforeRef.current = null;
     latestPointsRef.current = null;
-    if (wasDragging && before && finalPoints) {
+    if (wasDragging && before && finalPoints && commitDrag) {
       onCommit(channel, finalPoints, before);
+    } else if (wasDragging && before && finalPoints) {
+      onCancel(before);
     }
   };
+
+  const handleUp = (event: ReactPointerEvent<SVGSVGElement>) => finishDrag(event, true);
+  const handleCancel = (event: ReactPointerEvent<SVGSVGElement>) => finishDrag(event, false);
 
   const handleAdd = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (dragIndexRef.current !== null) {
@@ -387,20 +412,56 @@ const CurvesEditor = ({ adjustments, onCommit, onLive }: CurvesEditorProps) => {
       <svg
         height={CURVE_SIZE}
         onDoubleClick={handleAdd}
+        onPointerCancel={handleCancel}
         onPointerMove={handleMove}
         onPointerUp={handleUp}
         ref={svgRef}
         style={{
           background: 'var(--chakra-colors-bg-inset)',
-          border: '1px solid var(--chakra-colors-border-subtle)',
           borderRadius: 4,
           touchAction: 'none',
           width: '100%',
         }}
         viewBox={`0 0 ${CURVE_SIZE} ${CURVE_SIZE}`}
       >
-        <line
+        <rect
+          fill="var(--chakra-colors-bg-inset)"
+          height={CURVE_SIZE - CURVE_PADDING * 2}
+          width={CURVE_SIZE - CURVE_PADDING * 2}
+          x={CURVE_PADDING}
+          y={CURVE_PADDING}
+        />
+        <g stroke="var(--chakra-colors-fg-grid)">
+          {gridCoordinates.map((coordinate) => (
+            <g key={coordinate}>
+              <line
+                vectorEffect="non-scaling-stroke"
+                x1={coordinate}
+                x2={coordinate}
+                y1={CURVE_PADDING}
+                y2={CURVE_SIZE - CURVE_PADDING}
+              />
+              <line
+                vectorEffect="non-scaling-stroke"
+                x1={CURVE_PADDING}
+                x2={CURVE_SIZE - CURVE_PADDING}
+                y1={coordinate}
+                y2={coordinate}
+              />
+            </g>
+          ))}
+        </g>
+        <rect
+          fill="none"
+          height={CURVE_SIZE - CURVE_PADDING * 2}
           stroke="var(--chakra-colors-border-emphasized)"
+          vectorEffect="non-scaling-stroke"
+          width={CURVE_SIZE - CURVE_PADDING * 2}
+          x={CURVE_PADDING}
+          y={CURVE_PADDING}
+        />
+        <line
+          stroke="var(--chakra-colors-fg-muted)"
           strokeDasharray="4 4"
           vectorEffect="non-scaling-stroke"
           x1={CURVE_PADDING}

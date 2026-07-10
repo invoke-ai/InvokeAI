@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { curvePointFromSvg, curvePointToSvg } from './curveEditorMath';
+import { curvePointFromSvg, curvePointToSvg, getCurveGridCoordinates } from './curveEditorMath';
 
 describe('curve editor coordinates', () => {
   it('insets endpoints so handles are fully visible', () => {
@@ -12,5 +12,9 @@ describe('curve editor coordinates', () => {
     expect(curvePointFromSvg(90, 90)).toEqual([128, 128]);
     expect(curvePointFromSvg(-20, 220)).toEqual([0, 0]);
     expect(curvePointFromSvg(220, -20)).toEqual([255, 255]);
+  });
+
+  it('places the grid at quarter intervals within the inset plot', () => {
+    expect(getCurveGridCoordinates()).toEqual([6, 48, 90, 132, 174]);
   });
 });
