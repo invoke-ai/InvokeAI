@@ -410,7 +410,7 @@ export interface CanvasEngine {
   /** Selects the requested raster/control layer, starts Select Object, and activates the SAM tool. */
   startSelectObject(layerId: string): StartSelectObjectSessionResult;
   /** Starts one engine-owned guarded filter operation for a raster or control layer. */
-  startFilterOperation(layerId: string): StartFilterOperationResult;
+  startFilterOperation(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
   updateFilterOperation(draft: LayerFilterSettings): void;
   processFilterOperation(): Promise<void>;
   resetFilterOperation(settings: Record<string, unknown>): void;
@@ -3245,7 +3245,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     stores.filterSession.set(null);
   };
 
-  const startFilterOperation = (layerId: string): StartFilterOperationResult => {
+  const startFilterOperation = (layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult => {
     const document = mirror.getDocument();
     const layer = document?.layers.find((candidate) => candidate.id === layerId);
     if (!document || !layer) {
@@ -3264,11 +3264,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!guard) {
       return 'not-ready';
     }
-    const definition = getFilterDefinition(layer.filter?.type ?? DEFAULT_CONTROL_FILTER_TYPE);
+    const initialType = layer.filter?.type ?? recommendedFilterType ?? DEFAULT_CONTROL_FILTER_TYPE;
+    const definition = getFilterDefinition(initialType);
     const initialFilter = layer.filter ? structuredClone(layer.filter) : null;
     const draft = initialFilter ?? {
       settings: definition ? buildFilterDefaults(definition) : {},
-      type: DEFAULT_CONTROL_FILTER_TYPE,
+      type: definition?.type ?? DEFAULT_CONTROL_FILTER_TYPE,
     };
 
     clearOwnedSelectObjectSession();

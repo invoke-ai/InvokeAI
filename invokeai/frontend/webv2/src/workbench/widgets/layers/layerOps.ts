@@ -287,16 +287,36 @@ export const createRegionalGuidanceLayerWithRefImage = (
 /**
  * The legacy-default control adapter for a freshly created control layer
  * (`features/controlLayers/store/util.ts` `initialControlNet`): a ControlNet with
- * weight 1, an active range of the first 75% of steps, `balanced` control mode,
+ * weight 0.75, an active range of the first 75% of steps, `balanced` control mode,
  * and no model selected yet.
  */
-export const DEFAULT_CONTROL_ADAPTER: CanvasControlAdapterContract = {
-  beginEndStepPct: [0, 0.75],
-  controlMode: 'balanced',
-  kind: 'controlnet',
-  model: null,
-  weight: 1,
+export const CONTROL_ADAPTER_DEFAULTS: Readonly<
+  Record<CanvasControlAdapterContract['kind'], CanvasControlAdapterContract>
+> = {
+  control_lora: {
+    beginEndStepPct: [0, 0.75],
+    controlMode: null,
+    kind: 'control_lora',
+    model: null,
+    weight: 0.75,
+  },
+  controlnet: {
+    beginEndStepPct: [0, 0.75],
+    controlMode: 'balanced',
+    kind: 'controlnet',
+    model: null,
+    weight: 0.75,
+  },
+  t2i_adapter: {
+    beginEndStepPct: [0, 0.75],
+    controlMode: null,
+    kind: 't2i_adapter',
+    model: null,
+    weight: 0.75,
+  },
 };
+
+export const DEFAULT_CONTROL_ADAPTER = CONTROL_ADAPTER_DEFAULTS.controlnet;
 
 /** The next free "Control Layer N" name given the existing layer names (N ≥ 1, first gap). */
 export const nextControlLayerName = (existingNames: readonly string[]): string => {

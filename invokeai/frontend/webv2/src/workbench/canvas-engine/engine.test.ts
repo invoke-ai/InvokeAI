@@ -9195,6 +9195,34 @@ describe('guarded filter previews', () => {
     engine.dispose();
   });
 
+  it('starts an unfiltered layer with a recommendation but preserves an existing manual filter and Cancel', async () => {
+    const unfiltered = guardableLayer('recommended');
+    const manual = {
+      ...guardableLayer('manual'),
+      filter: { settings: { coarse: true }, type: 'lineart_edge_detection' },
+    };
+    const document = { ...emptyDoc(), layers: [unfiltered, manual] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels('recommended')).status).toBe('ok');
+    expect(engine.startFilterOperation('recommended', 'normal_map')).toBe('started');
+    expect(engine.stores.filterSession.get()?.draft).toEqual({ settings: {}, type: 'normal_map' });
+    engine.cancelFilterOperation();
+    expect(engine.getDocument()).toEqual(document);
+
+    expect((await engine.exportLayerPixels('manual')).status).toBe('ok');
+    expect(engine.startFilterOperation('manual', 'normal_map')).toBe('started');
+    expect(engine.stores.filterSession.get()?.draft).toEqual(manual.filter);
+    engine.cancelFilterOperation();
+    expect(engine.getDocument()).toEqual(document);
+    engine.dispose();
+  });
+
   const filterFlowLayer = (
     type: 'raster' | 'control'
   ): Extract<CanvasLayerContract, { type: 'raster' | 'control' }> => {

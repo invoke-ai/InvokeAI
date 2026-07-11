@@ -36,11 +36,11 @@ const baseGraph = (): TestGraph => ({
   edges: [],
 });
 
-const model = (base: string): ControlModelIdentifier => ({
+const model = (base: string, type = 'controlnet'): ControlModelIdentifier => ({
   key: `model-${base}`,
   name: `Model ${base}`,
   base,
-  type: 'controlnet',
+  type,
 });
 
 const layer = (overrides: Partial<ControlLayerGraphInput> = {}): ControlLayerGraphInput => ({
@@ -211,7 +211,7 @@ describe('addControlLayers — controlnet on flux', () => {
 
 describe('addControlLayers — t2i_adapter on sdxl', () => {
   it('creates a t2i_adapter node with exact fields and wires collector to denoise.t2i_adapter', () => {
-    const m = model('sdxl');
+    const m = model('sdxl', 't2i_adapter');
     const graph = run({
       base: 'sdxl',
       layers: [
@@ -272,7 +272,7 @@ describe('addControlLayers — t2i_adapter on sdxl', () => {
 
 describe('addControlLayers — control_lora on flux', () => {
   it('creates a flux_control_lora_loader wired directly to denoise.control_lora with no collector', () => {
-    const m = model('flux');
+    const m = model('flux', 'control_lora');
     const graph = run({
       base: 'flux',
       layers: [layer({ id: 'CL1', kind: 'control_lora', imageName: 'lora.png', model: m, weight: 0.9 })],
@@ -308,32 +308,26 @@ describe('addControlLayers — control_lora on flux', () => {
 // ---------------------------------------------------------------------------
 
 describe('addControlLayers — control_lora limits', () => {
-  it('adds at most one control_lora; the second layer is skipped', () => {
-    const graph = run({
-      base: 'flux',
-      layers: [
-        layer({ id: 'CL1', kind: 'control_lora', model: model('flux') }),
-        layer({ id: 'CL2', kind: 'control_lora', model: model('flux') }),
-      ],
-    });
-
-    const loraNodes = Object.values(graph.nodes).filter((n) => n.type === 'flux_control_lora_loader');
-    expect(loraNodes).toHaveLength(1);
-    expect(graph.nodes['control_lora_CL1']).toBeDefined();
-    expect(graph.nodes['control_lora_CL2']).toBeUndefined();
+  it('rejects a second control_lora with the shared reason code', () => {
+    expect(() =>
+      run({
+        base: 'flux',
+        layers: [
+          layer({ id: 'CL1', kind: 'control_lora', model: model('flux', 'control_lora') }),
+          layer({ id: 'CL2', kind: 'control_lora', model: model('flux', 'control_lora') }),
+        ],
+      })
+    ).toThrow(/control_lora_limit/);
   });
 
-  it('skips control_lora entirely for a dev_fill main model variant', () => {
-    const graph = run({
-      base: 'flux',
-      modelVariant: 'dev_fill',
-      layers: [layer({ id: 'CL1', kind: 'control_lora', model: model('flux') })],
-    });
-
-    expect(Object.values(graph.nodes).some((n) => n.type === 'flux_control_lora_loader')).toBe(false);
-    // Only the denoise node remains.
-    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents']);
-    expect(graph.edges).toHaveLength(0);
+  it('rejects control_lora for a dev_fill main model variant', () => {
+    expect(() =>
+      run({
+        base: 'flux',
+        modelVariant: 'dev_fill',
+        layers: [layer({ id: 'CL1', kind: 'control_lora', model: model('flux', 'control_lora') })],
+      })
+    ).toThrow(/flux_fill_control_lora/);
   });
 });
 
@@ -373,28 +367,30 @@ describe('addControlLayers — per-layer separation', () => {
 // 8. Unsupported kind for base is silently skipped
 // ---------------------------------------------------------------------------
 
-describe('addControlLayers — unsupported kind skipped', () => {
-  it('adds nothing for a t2i_adapter layer on flux', () => {
-    const graph = run({
-      base: 'flux',
-      layers: [layer({ id: 'X', kind: 't2i_adapter', model: model('flux') })],
-    });
-
-    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents']);
-    expect(graph.edges).toHaveLength(0);
+describe('addControlLayers — unsupported kind rejected', () => {
+  it('rejects a t2i_adapter layer on flux', () => {
+    expect(() =>
+      run({
+        base: 'flux',
+        layers: [layer({ id: 'X', kind: 't2i_adapter', model: model('flux', 't2i_adapter') })],
+      })
+    ).toThrow(/unsupported_adapter/);
   });
 
-  it('skips only unsupported layers while keeping supported ones', () => {
-    const graph = run({
-      base: 'flux',
-      layers: [
-        layer({ id: 'skip', kind: 't2i_adapter', model: model('flux') }),
-        layer({ id: 'keep', kind: 'controlnet', model: model('flux') }),
-      ],
-    });
+  it('rejects a mixed set containing an unsupported layer', () => {
+    expect(() =>
+      run({
+        base: 'flux',
+        layers: [
+          layer({ id: 'skip', kind: 't2i_adapter', model: model('flux', 't2i_adapter') }),
+          layer({ id: 'keep', kind: 'controlnet', model: model('flux') }),
+        ],
+      })
+    ).toThrow(/unsupported_adapter/);
+  });
 
-    expect(graph.nodes['t2i_adapter_skip']).toBeUndefined();
-    expect(graph.nodes['control_net_keep']).toBeDefined();
+  it('rejects a graph input whose resolved model has an incompatible base', () => {
+    expect(() => run({ base: 'sd-1', layers: [layer({ model: model('sdxl') })] })).toThrow(/incompatible_base/);
   });
 });
 

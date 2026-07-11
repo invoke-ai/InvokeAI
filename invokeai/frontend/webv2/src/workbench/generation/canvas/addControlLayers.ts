@@ -24,11 +24,15 @@ import type { BackendGraphContract, BackendInvocationContract } from '@workbench
 
 import { addEdge, addNode } from '@workbench/generation/graphBuilder';
 
+import type { ControlAdapterKind } from './controlValidation';
+
+import { getControlValidationReason } from './controlValidation';
+
 /** The deterministic denoise node id every canvas base graph uses. */
 export const CONTROL_DENOISE_NODE_ID = 'denoise_latents';
 
 /** The control-adapter kinds a control layer can carry. */
-export type ControlAdapterKind = 'controlnet' | 't2i_adapter' | 'control_lora';
+export type { ControlAdapterKind } from './controlValidation';
 
 /** A resolved control-adapter model identifier (the backend model field shape). */
 export interface ControlModelIdentifier {
@@ -57,16 +61,7 @@ export interface ControlLayerGraphInput {
  * True when `base` supports control adapters of `kind` (legacy support matrix).
  * `controlMode` and adapter-model base compatibility are validated separately.
  */
-export const isControlKindSupportedForBase = (base: string, kind: ControlAdapterKind): boolean => {
-  switch (kind) {
-    case 'controlnet':
-      return base === 'sd-1' || base === 'sdxl' || base === 'flux';
-    case 't2i_adapter':
-      return base === 'sd-1' || base === 'sdxl';
-    case 'control_lora':
-      return base === 'flux';
-  }
-};
+export { isControlKindSupportedForBase } from './controlValidation';
 
 /** Options for {@link addControlLayers}. */
 export interface AddControlLayersOptions {
@@ -82,9 +77,9 @@ export interface AddControlLayersOptions {
 const controlNetNodeType = (base: string): string => (base === 'flux' ? 'flux_controlnet' : 'controlnet');
 
 /**
- * Grafts control layers onto a built canvas base graph. Assumes every input is
- * already validated (supported base+kind, compatible non-null model, non-empty
- * content) — use {@link getControlLayerRejectionReason} to filter first. Wires:
+ * Grafts control layers onto a built canvas base graph. Revalidates support,
+ * model compatibility, the Control LoRA limit, and FLUX Fill restrictions so a
+ * caller cannot bypass the same shared validation used by invoke and UI. Wires:
  * - controlnet → `control_net_collector` (collect) → `denoise.control`;
  * - t2i_adapter → `t2i_adapter_collector` (collect) → `denoise.t2i_adapter`;
  * - control_lora → `denoise.control_lora` directly (FLUX, first layer only).
@@ -98,7 +93,7 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
 
   let controlNetCollector: BackendInvocationContract | null = null;
   let t2iAdapterCollector: BackendInvocationContract | null = null;
-  let controlLoraAdded = false;
+  let controlLoraCount = 0;
 
   const ensureControlNetCollector = (): BackendInvocationContract => {
     if (!controlNetCollector) {
@@ -117,8 +112,15 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
   };
 
   for (const layer of layers) {
-    if (!isControlKindSupportedForBase(base, layer.kind)) {
-      continue;
+    const reason = getControlValidationReason({
+      adapterModel: layer.model,
+      controlLoraIndex: layer.kind === 'control_lora' ? controlLoraCount : 0,
+      kind: layer.kind,
+      mainBase: base,
+      mainVariant: modelVariant,
+    });
+    if (reason) {
+      throw new Error(`Invalid control layer: ${reason}`);
     }
 
     if (layer.kind === 'controlnet') {
@@ -148,10 +150,6 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
       });
       addEdge(graph, node, 't2i_adapter', ensureT2iAdapterCollector(), 'item');
     } else {
-      // control_lora — FLUX only, at most one, never with a FLUX Fill main model.
-      if (controlLoraAdded || modelVariant === 'dev_fill') {
-        continue;
-      }
       const node = addNode(graph, {
         id: `control_lora_${layer.id}`,
         image: { image_name: layer.imageName },
@@ -160,7 +158,7 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         weight: layer.weight,
       });
       addEdge(graph, node, 'control_lora', denoise, 'control_lora');
-      controlLoraAdded = true;
+      controlLoraCount += 1;
     }
   }
 };
@@ -178,7 +176,7 @@ export const getControlLayerRejectionReason = (params: {
   layerName: string;
   hasContent: boolean;
   kind: ControlAdapterKind;
-  adapterModel: { base: string } | null;
+  adapterModel: { base: string; type?: string } | null;
   mainBase: string;
   mainVariant?: string;
 }): string | null => {
@@ -187,17 +185,27 @@ export const getControlLayerRejectionReason = (params: {
   if (!hasContent) {
     return `Control layer "${layerName}" has no control content.`;
   }
-  if (!adapterModel) {
+  const reason = getControlValidationReason({
+    adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type ?? kind } : null,
+    controlLoraIndex: 0,
+    kind,
+    mainBase,
+    mainVariant,
+  });
+  if (!reason) {
+    return null;
+  }
+  if (reason === 'missing_model') {
     return `Control layer "${layerName}" has no control model selected.`;
   }
-  if (!isControlKindSupportedForBase(mainBase, kind)) {
+  if (reason === 'unsupported_adapter') {
     return `Control layer "${layerName}" is not supported for the selected base model.`;
   }
-  if (adapterModel.base !== mainBase) {
+  if (reason === 'incompatible_base') {
     return `Control layer "${layerName}" uses an incompatible base model.`;
   }
-  if (mainBase === 'flux' && mainVariant === 'dev_fill' && kind === 'control_lora') {
-    return `Control LoRA is not compatible with FLUX Fill.`;
+  if (reason === 'flux_fill_control_lora') {
+    return 'Control LoRA is not compatible with FLUX Fill.';
   }
-  return null;
+  return `Control layer "${layerName}" uses an incompatible control adapter.`;
 };

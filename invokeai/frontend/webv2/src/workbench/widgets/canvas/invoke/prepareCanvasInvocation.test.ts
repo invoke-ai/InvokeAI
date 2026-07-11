@@ -9,6 +9,7 @@ import type {
 } from '@workbench/generation/types';
 import type {
   CanvasDocumentContractV2,
+  CanvasControlLayerContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
   WorkbenchState,
@@ -98,6 +99,7 @@ interface HarnessOptions {
   uploadImage?: (blob: Blob) => Promise<CanvasImageUploadResult>;
   projectId?: string;
   dispatch?: ReturnType<typeof vi.fn<(action: WorkbenchAction) => void>>;
+  models?: RunCanvasInvocationDeps['models'];
 }
 
 const makeHarness = (options: HarnessOptions = {}): Harness => {
@@ -166,6 +168,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     generateValues: generateValuesFor(model),
     getDocument: () => options.document ?? makeDoc([rasterLayer('layer-a')]),
     inFlight: options.inFlight ?? new Set<string>(),
+    models: options.models,
     projectId: options.projectId ?? 'project-1',
     projectSettings: { useCpuNoise: true },
     strength: options.strength ?? 0.75,
@@ -178,6 +181,33 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
 
   return { deps, dispatch, events, flushPendingUploads, notices, submittedGraphs, uploadImage };
 };
+
+const controlLayer = (
+  id: string,
+  overrides: Partial<CanvasControlLayerContract['adapter']> = {},
+  hasContent = true
+): CanvasControlLayerContract => ({
+  adapter: {
+    beginEndStepPct: [0, 1],
+    controlMode: 'balanced',
+    kind: 'controlnet',
+    model: null,
+    weight: 0.75,
+    ...overrides,
+  },
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: hasContent
+    ? { image: { height: 64, imageName: `${id}.png`, width: 64 }, type: 'image' }
+    : { bitmap: null, type: 'paint' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'control',
+  withTransparencyEffect: true,
+});
 
 describe('runCanvasInvocation', () => {
   beforeEach(() => {
@@ -339,6 +369,48 @@ describe('runCanvasInvocation', () => {
     const notices = harness.notices();
     expect(notices).toHaveLength(1);
     expect(notices[0]?.message).toBe('upload exploded');
+  });
+
+  it('blocks invocation with the shared reason code when a nonempty control layer has no model', async () => {
+    const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toHaveLength(1);
+    expect(harness.notices()[0]?.message).toContain('missing_model');
+  });
+
+  it('ignores an empty control layer with no model', async () => {
+    const harness = makeHarness({ document: docWithLayers([controlLayer('control', {}, false)]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+    expect(harness.notices()).toHaveLength(0);
+  });
+
+  it('blocks the second enabled nonempty Control LoRA', async () => {
+    const model = {
+      base: 'flux',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'hash',
+      key: 'control-lora',
+      name: 'Control LoRA',
+      path: 'control-lora',
+      source: 'control-lora',
+      source_type: 'path' as const,
+      type: 'control_lora',
+    };
+    const flux = { ...sd1Model, base: 'flux' as const, key: 'flux', name: 'FLUX' };
+    const harness = makeHarness({
+      document: docWithLayers([
+        controlLayer('first', { kind: 'control_lora', model: model.key }),
+        controlLayer('second', { kind: 'control_lora', model: model.key }),
+      ]),
+      model: flux,
+      models: [model],
+    });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()[0]?.message).toContain('control_lora_limit');
   });
 
   it('ignores a concurrent invoke while a prior prepare for the same project is in flight', async () => {

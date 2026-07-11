@@ -54,7 +54,6 @@ import {
   executeMaskComposite,
   executeRegionalMaskComposite,
 } from '@workbench/canvas-engine/export/compositeForGeneration';
-import { getControlLayerRejectionReason } from '@workbench/generation/canvas/addControlLayers';
 import {
   getRegionalGuidanceRejectionReason,
   isRegionalGuidanceSupportedForBase,
@@ -66,6 +65,7 @@ import {
   planControlComposites,
   planRegionalMaskComposites,
 } from '@workbench/generation/canvas/compositePlan';
+import { getControlValidationReason } from '@workbench/generation/canvas/controlValidation';
 import { resolveGenerateSeed } from '@workbench/generation/graph';
 import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@workbench/generation/settings';
 import { DEFAULT_CANVAS_COMPOSITING } from '@workbench/widgets/canvas/invoke/canvasCompositing';
@@ -121,11 +121,9 @@ const recordNotice = (
 /**
  * Composites + resolves the enabled control layers into graph inputs. Each
  * content-bearing control layer is composited SEPARATELY (never blended) and its
- * adapter model resolved from the loaded models; layers that are invalid for the
- * selected base (unsupported base/kind, no/incompatible model) are skipped
- * silently, mirroring legacy (their warning surfaces in the layer's settings,
- * they never block generation). Content-less control layers are already excluded
- * by `planControlComposites`.
+ * adapter model resolved from the loaded models. Enabled nonempty invalid layers
+ * throw a shared reason code and block invocation; content-less control layers
+ * are already excluded by `planControlComposites` and remain harmless.
  */
 const collectControlLayerInputs = async (
   document: CanvasDocumentContractV2,
@@ -141,6 +139,7 @@ const collectControlLayerInputs = async (
 
   const layerById = new Map(document.layers.map((layer) => [layer.id, layer]));
   const inputs: ControlLayerGraphInput[] = [];
+  let controlLoraCount = 0;
 
   for (const { entry, layerId } of composites) {
     const layer = layerById.get(layerId);
@@ -150,16 +149,18 @@ const collectControlLayerInputs = async (
 
     const { adapter } = layer;
     const resolved = adapter.model ? models?.find((candidate) => candidate.key === adapter.model) : undefined;
-    const rejection = getControlLayerRejectionReason({
-      adapterModel: resolved ? { base: resolved.base } : null,
-      hasContent: true,
+    const rejection = getControlValidationReason({
+      adapterModel: resolved ? { base: resolved.base, type: resolved.type } : null,
+      controlLoraIndex: adapter.kind === 'control_lora' ? controlLoraCount : 0,
       kind: adapter.kind,
-      layerName: layer.name,
       mainBase: model.base,
       mainVariant: model.variant ?? undefined,
     });
     if (rejection || !resolved) {
-      continue;
+      throw new Error(`[${rejection ?? 'missing_model'}] Control layer "${layer.name}" is invalid.`);
+    }
+    if (adapter.kind === 'control_lora') {
+      controlLoraCount += 1;
     }
 
     const result = await executeControlComposite(entry, executorDeps);

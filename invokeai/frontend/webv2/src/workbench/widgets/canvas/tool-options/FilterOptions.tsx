@@ -3,7 +3,11 @@ import type { FilterOperationSessionState } from '@workbench/widgets/layers/filt
 import { HStack, Menu, Portal, Text } from '@chakra-ui/react';
 import { Button, MenuContent } from '@workbench/components/ui';
 import { makeImageDurable } from '@workbench/gallery/api';
-import { buildFilterDefaults, getFilterDefinition } from '@workbench/generation/canvas/filterGraphs';
+import {
+  buildFilterDefaults,
+  getFilterDefinition,
+  isFilterConfigValid,
+} from '@workbench/generation/canvas/filterGraphs';
 import { useFilterSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { LayerFilterControls } from '@workbench/widgets/layers/LayerFilterControls';
 import { ChevronDownIcon } from 'lucide-react';
@@ -24,11 +28,12 @@ export interface FilterActionEligibility {
 export const getFilterActionEligibility = (session: FilterOperationSessionState): FilterActionEligibility => {
   const busy = session.status === 'processing' || session.status === 'committing';
   const hasPreview = session.preview !== null && !busy;
+  const isValid = isFilterConfigValid(session.draft.type, session.draft.settings);
   return {
     canApply: hasPreview,
     canCancel: true,
     canEdit: !busy,
-    canProcess: !busy,
+    canProcess: !busy && isValid,
     canReset: !busy,
     canSave: hasPreview,
   };

@@ -30,6 +30,7 @@ import {
   createRegionalGuidanceLayerWithRefImage,
   createRegionalReferenceImage,
   DEFAULT_CONTROL_ADAPTER,
+  CONTROL_ADAPTER_DEFAULTS,
   DEFAULT_INPAINT_MASK_FILL,
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
@@ -298,6 +299,20 @@ describe('nextInpaintMaskName', () => {
 });
 
 describe('createControlLayer', () => {
+  it('centralizes legacy defaults for every adapter kind', () => {
+    expect(CONTROL_ADAPTER_DEFAULTS).toEqual({
+      control_lora: { beginEndStepPct: [0, 0.75], controlMode: null, kind: 'control_lora', model: null, weight: 0.75 },
+      controlnet: {
+        beginEndStepPct: [0, 0.75],
+        controlMode: 'balanced',
+        kind: 'controlnet',
+        model: null,
+        weight: 0.75,
+      },
+      t2i_adapter: { beginEndStepPct: [0, 0.75], controlMode: null, kind: 't2i_adapter', model: null, weight: 0.75 },
+    });
+  });
+
   it('builds an empty control layer with the legacy-default ControlNet adapter and transparency on', () => {
     const layer = createControlLayer('Control Layer 1', 'c1');
     expect(layer).toMatchObject({
@@ -309,6 +324,7 @@ describe('createControlLayer', () => {
     });
     expect(layer.source).toEqual({ bitmap: null, type: 'paint' });
     expect(layer.adapter).toEqual(DEFAULT_CONTROL_ADAPTER);
+    expect(layer.adapter.weight).toBe(0.75);
     // The default adapter's mutable array must be copied, not shared.
     expect(layer.adapter.beginEndStepPct).not.toBe(DEFAULT_CONTROL_ADAPTER.beginEndStepPct);
     expect(layer.adapter.beginEndStepPct).toEqual([0, 0.75]);

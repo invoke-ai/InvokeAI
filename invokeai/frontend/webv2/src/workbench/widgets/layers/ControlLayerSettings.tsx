@@ -6,13 +6,15 @@ import type { CanvasControlAdapterContract, CanvasControlLayerContract } from '@
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import { Button, Field, Select, Slider } from '@workbench/components/ui';
 import { isControlKindSupportedForBase } from '@workbench/generation/canvas/addControlLayers';
+import { resolveDefaultFilterForModel } from '@workbench/generation/canvas/controlRecommendations';
+import { getControlValidationReason } from '@workbench/generation/canvas/controlValidation';
 import { useModelsSelector } from '@workbench/models/modelsStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { applyStructural, applyStructuralPreview } from './layerOps';
+import { applyStructural, applyStructuralPreview, CONTROL_ADAPTER_DEFAULTS } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
 
@@ -28,14 +30,14 @@ const formatUnitPercent = (value: number): string => `${Math.round(value * 100)}
 const formatWeight = (value: number): string => value.toFixed(2);
 
 /** The main model's base, read from the generate widget values (drives adapter support). */
-const useSelectedModelBase = (): string | null => {
+const useSelectedMainModel = () => {
   const modelKey = useActiveProjectSelector((project) => {
     const values = getProjectWidgetValues(project, 'generate');
     const model = values?.model;
     return model && typeof model === 'object' && 'key' in model ? String((model as { key: unknown }).key) : null;
   });
   const models = useModelsSelector((snapshot) => snapshot.models);
-  return useMemo(() => models.find((model) => model.key === modelKey)?.base ?? null, [models, modelKey]);
+  return useMemo(() => models.find((model) => model.key === modelKey) ?? null, [models, modelKey]);
 };
 
 interface ControlLayerSettingsProps {
@@ -55,7 +57,8 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
-  const base = useSelectedModelBase();
+  const mainModel = useSelectedMainModel();
+  const base = mainModel?.base ?? null;
   const { adapter } = layer;
 
   const commitAdapter = useCallback(
@@ -103,13 +106,14 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
       }
       // Switching kind clears the model (its base/type no longer matches) and, for
       // non-ControlNet kinds, drops the control mode.
+      const defaults = CONTROL_ADAPTER_DEFAULTS[kind];
       commitAdapter(
-        { controlMode: kind === 'controlnet' ? (adapter.controlMode ?? 'balanced') : null, kind, model: null },
-        { controlMode: adapter.controlMode, kind: adapter.kind, model: adapter.model },
+        { ...defaults, beginEndStepPct: [...defaults.beginEndStepPct] },
+        { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct] },
         t('widgets.layers.control.kind')
       );
     },
-    [adapter.controlMode, adapter.kind, adapter.model, commitAdapter, t]
+    [adapter, commitAdapter, t]
   );
 
   const handleModelChange = useCallback(
@@ -117,9 +121,14 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
       const model = value[0] ?? null;
       if (model !== adapter.model) {
         commitAdapter({ model }, { model: adapter.model }, t('widgets.layers.control.model'));
+        const selected = models.find((candidate) => candidate.key === model);
+        const recommendation = resolveDefaultFilterForModel(selected);
+        if (recommendation && !layer.filter && engine?.stores.filterSession.get()?.layerId !== layer.id) {
+          engine?.startFilterOperation(layer.id, recommendation);
+        }
       }
     },
-    [adapter.model, commitAdapter, t]
+    [adapter.model, commitAdapter, engine, layer.filter, layer.id, models, t]
   );
 
   const handleControlModeChange = useCallback(
@@ -242,6 +251,31 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   const rangeAria = useMemo(() => [t('widgets.layers.control.beginStep'), t('widgets.layers.control.endStep')], [t]);
 
   const selectedModelName = modelOptions.find((model) => model.key === adapter.model)?.name;
+  const adapterModel = models.find((model) => model.key === adapter.model) ?? null;
+  const hasContent = engine?.hasExportableLayerContent(layer.id) ?? false;
+  const controlLoraIndex =
+    adapter.kind === 'control_lora' && engine
+      ? (engine
+          .getDocument()
+          ?.layers.filter(
+            (candidate) =>
+              candidate.isEnabled &&
+              candidate.type === 'control' &&
+              candidate.adapter.kind === 'control_lora' &&
+              engine.hasExportableLayerContent(candidate.id)
+          )
+          .findIndex((candidate) => candidate.id === layer.id) ?? 0)
+      : 0;
+  const validationReason =
+    layer.isEnabled && hasContent && mainModel
+      ? getControlValidationReason({
+          adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type } : null,
+          controlLoraIndex: Math.max(0, controlLoraIndex),
+          kind: adapter.kind,
+          mainBase: mainModel.base,
+          mainVariant: mainModel.variant ?? undefined,
+        })
+      : null;
   const startFilter = useCallback(() => engine?.startFilterOperation(layer.id), [engine, layer.id]);
 
   return (
@@ -274,8 +308,8 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         <Slider
           aria-label={weightAria}
           formatValue={formatWeight}
-          max={2}
-          min={-1}
+          max={0.75}
+          min={0}
           size="sm"
           step={0.01}
           value={weightValue}
@@ -328,6 +362,11 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
       <Button disabled={!engine || layer.isLocked} size="xs" variant="outline" onClick={startFilter}>
         {t('widgets.layers.control.filter')}
       </Button>
+      {validationReason ? (
+        <Text color="fg.warning" fontSize="2xs" role="alert">
+          {t(`widgets.layers.control.validation.${validationReason}`)}
+        </Text>
+      ) : null}
     </Stack>
   );
 };

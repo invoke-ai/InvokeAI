@@ -1,13 +1,17 @@
 import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
 import type { FilterParamSpec } from '@workbench/generation/canvas/filterGraphs';
+import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
+import type { ChangeEvent } from 'react';
 
-import { createListCollection, Switch, Text } from '@chakra-ui/react';
+import { createListCollection, Input, Switch, Text } from '@chakra-ui/react';
 import { Field, Select, Slider } from '@workbench/components/ui';
 import { CONTROL_FILTERS, getFilterDefinition } from '@workbench/generation/canvas/filterGraphs';
+import { ModelSelect } from '@workbench/models/components/ModelSelect';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
+const SPANDREL_MODEL_TYPES: ModelTaxonomyType[] = ['spandrel_image_to_image'];
 
 interface LayerFilterControlsProps {
   filterType: string;
@@ -116,6 +120,19 @@ const FilterParamField = ({ disabled, param, value, onChange }: FilterParamField
     },
     [onChange, param]
   );
+  const handleModel = useCallback(
+    (model: ModelConfig | null) => {
+      onChange(
+        param.key,
+        model ? { base: model.base, hash: model.hash, key: model.key, name: model.name, type: model.type } : null
+      );
+    },
+    [onChange, param.key]
+  );
+  const handleString = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onChange(param.key, event.currentTarget.value),
+    [onChange, param.key]
+  );
 
   const enumCollection = useMemo(
     () =>
@@ -162,6 +179,36 @@ const FilterParamField = ({ disabled, param, value, onChange }: FilterParamField
           value={enumValue}
           valueText={String(enumCurrent)}
           onValueChange={handleEnum}
+        />
+      </Field>
+    );
+  }
+
+  if (param.kind === 'model') {
+    const model = typeof value === 'object' && value !== null && 'key' in value ? value : null;
+    return (
+      <Field label={label} required>
+        <ModelSelect
+          disabled={disabled}
+          invalid={!model}
+          modelTypes={SPANDREL_MODEL_TYPES}
+          placeholder={label}
+          size="xs"
+          value={model && typeof model.key === 'string' ? model.key : null}
+          onChange={handleModel}
+        />
+      </Field>
+    );
+  }
+
+  if (param.kind === 'string') {
+    return (
+      <Field label={label}>
+        <Input
+          disabled={disabled}
+          size="xs"
+          value={typeof value === 'string' ? value : param.default}
+          onChange={handleString}
         />
       </Field>
     );

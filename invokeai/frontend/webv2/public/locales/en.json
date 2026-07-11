@@ -1196,6 +1196,10 @@
         "endStep": "End step",
         "filter": "Filter",
         "filterParams": {
+          "amount": "Amount",
+          "autoScale": "Autoscale",
+          "blur_type": "Blur type",
+          "channel": "Channel",
           "coarse": "Coarse",
           "distance_threshold": "Distance threshold",
           "draw_body": "Draw body",
@@ -1205,24 +1209,38 @@
           "low_threshold": "Low threshold",
           "max_faces": "Max faces",
           "min_confidence": "Min confidence",
+          "model": "Image-to-image model",
           "model_size": "Model size",
           "quantize_edges": "Quantize edges",
           "scale_factor": "Scale factor",
+          "scale": "Scale",
+          "scale_values": "Multiply values",
           "score_threshold": "Score threshold",
           "scribble": "Scribble",
-          "tile_size": "Tile size"
+          "tile_size": "Tile size",
+          "noise_color": "Color noise",
+          "noise_type": "Noise type",
+          "radius": "Radius",
+          "size": "Size",
+          "value": "Value"
         },
         "filters": {
+          "adjust_image": "Adjust image",
           "canny_edge_detection": "Canny",
           "color_map": "Color map",
           "content_shuffle": "Content shuffle",
           "depth_anything_depth_estimation": "Depth Anything",
           "dw_openpose_detection": "DW Openpose",
           "hed_edge_detection": "HED",
+          "img_blur": "Blur",
+          "img_noise": "Noise",
+          "lineart_anime_edge_detection": "Lineart Anime",
           "lineart_edge_detection": "Lineart",
           "mediapipe_face_detection": "Mediapipe Face",
           "mlsd_detection": "MLSD",
-          "pidi_edge_detection": "PiDiNet"
+          "normal_map": "Normal map",
+          "pidi_edge_detection": "PiDiNet",
+          "spandrel_filter": "Spandrel"
         },
         "kind": "Adapter type",
         "kinds": {
@@ -1242,6 +1260,14 @@
         "selectModel": "Select a model",
         "stepRange": "Step range",
         "transparencyEffect": "Transparency effect",
+        "validation": {
+          "control_lora_limit": "Only one Control LoRA can be used at a time.",
+          "flux_fill_control_lora": "Control LoRA is not compatible with FLUX Fill.",
+          "incompatible_adapter": "The selected model does not match this adapter type.",
+          "incompatible_base": "The control model is incompatible with the selected base model.",
+          "missing_model": "Select a control model before generating.",
+          "unsupported_adapter": "This control adapter is not supported by the selected base model."
+        },
         "weight": "Weight"
       },
       "rasterFilter": {

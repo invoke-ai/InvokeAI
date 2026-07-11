@@ -22,15 +22,21 @@ const EXPECTED_DEFAULTS: Record<string, Record<string, unknown>> = {
   content_shuffle: { scale_factor: 256 },
   mediapipe_face_detection: { max_faces: 1, min_confidence: 0.5 },
   color_map: { tile_size: 64 },
+  adjust_image: { channel: 'Luminosity (LAB)', value: 1, scale_values: false },
+  lineart_anime_edge_detection: {},
+  normal_map: {},
+  spandrel_filter: { model: null, autoScale: true, scale: 1 },
+  img_blur: { blur_type: 'gaussian', radius: 8 },
+  img_noise: { noise_type: 'gaussian', amount: 0.3, noise_color: true, size: 1 },
 };
 
 const EXPECTED_TYPES = Object.keys(EXPECTED_DEFAULTS);
 
 describe('CONTROL_FILTERS registry', () => {
-  it('contains exactly the ten legacy filter types', () => {
+  it('contains exactly all sixteen legacy filter types', () => {
     const types = CONTROL_FILTERS.map((definition) => definition.type);
-    expect(types).toHaveLength(10);
-    expect(new Set(types).size).toBe(10);
+    expect(types).toHaveLength(16);
+    expect(new Set(types).size).toBe(16);
     expect(types).toEqual(EXPECTED_TYPES);
   });
 
@@ -62,8 +68,11 @@ describe('isSupportedFilterType / getFilterDefinition', () => {
 describe('buildFilterGraph', () => {
   const imageName = 'source-image.png';
 
-  it('builds a single-node graph with default params for every filter', () => {
-    for (const type of EXPECTED_TYPES) {
+  it('builds the direct legacy filter nodes with default params', () => {
+    const directTypes = EXPECTED_TYPES.filter(
+      (type) => !['adjust_image', 'spandrel_filter', 'img_blur', 'img_noise'].includes(type)
+    );
+    for (const type of directTypes) {
       const { graph, outputNodeId } = buildFilterGraph(type, imageName);
 
       expect(outputNodeId).toBe(FILTER_NODE_ID);
@@ -84,6 +93,173 @@ describe('buildFilterGraph', () => {
       // Every default param field is present on the node.
       for (const [key, value] of Object.entries(EXPECTED_DEFAULTS[type])) {
         expect(node[key]).toBe(value);
+      }
+    }
+  });
+
+  it('builds adjust_image as offset or channel multiply', () => {
+    const offset = buildFilterGraph('adjust_image', imageName).graph.nodes[FILTER_NODE_ID] as Record<string, unknown>;
+    expect(offset).toMatchObject({
+      channel: 'Luminosity (LAB)',
+      image: { image_name: imageName },
+      offset: 0,
+      type: 'img_channel_offset',
+    });
+
+    const multiplied = buildFilterGraph('adjust_image', imageName, {
+      channel: 'Red (RGBA)',
+      scale_values: true,
+      value: 1.5,
+    }).graph.nodes[FILTER_NODE_ID] as Record<string, unknown>;
+    expect(multiplied).toMatchObject({
+      channel: 'Red (RGBA)',
+      image: { image_name: imageName },
+      invert_channel: false,
+      scale: 1.5,
+      type: 'img_channel_multiply',
+    });
+  });
+
+  it('builds padded gaussian blur with alpha nudge wiring', () => {
+    const { graph, outputNodeId } = buildFilterGraph('img_blur', imageName);
+    expect(graph.nodes.control_filter_pad).toMatchObject({
+      bottom: 24,
+      image: { image_name: imageName },
+      left: 24,
+      right: 24,
+      top: 24,
+      type: 'img_pad_crop',
+    });
+    expect(graph.nodes[FILTER_NODE_ID]).toMatchObject({ blur_type: 'gaussian', radius: 8, type: 'img_blur' });
+    expect(graph.nodes.control_filter_alpha).toMatchObject({
+      channel: 'Alpha (RGBA)',
+      offset: 1,
+      type: 'img_channel_offset',
+    });
+    expect(graph.edges).toEqual([
+      {
+        destination: { field: 'image', node_id: FILTER_NODE_ID },
+        source: { field: 'image', node_id: 'control_filter_pad' },
+      },
+      {
+        destination: { field: 'image', node_id: 'control_filter_alpha' },
+        source: { field: 'image', node_id: FILTER_NODE_ID },
+      },
+    ]);
+    expect(outputNodeId).toBe('control_filter_alpha');
+  });
+
+  it('builds zero-radius blur directly without padding', () => {
+    const { graph, outputNodeId } = buildFilterGraph('img_blur', imageName, { radius: 0 });
+    expect(Object.keys(graph.nodes)).toEqual([FILTER_NODE_ID]);
+    expect(graph.nodes[FILTER_NODE_ID]).toMatchObject({ image: { image_name: imageName }, radius: 0 });
+    expect(graph.edges).toEqual([]);
+    expect(outputNodeId).toBe(FILTER_NODE_ID);
+  });
+
+  it('builds noise with an uncached rand_int seed edge', () => {
+    const { graph } = buildFilterGraph('img_noise', imageName);
+    expect(graph.nodes[FILTER_NODE_ID]).toMatchObject({ amount: 0.3, noise_color: true, size: 1, type: 'img_noise' });
+    expect(graph.nodes.control_filter_seed).toMatchObject({
+      high: 2147483647,
+      low: 0,
+      type: 'rand_int',
+      use_cache: false,
+    });
+    expect(graph.edges).toContainEqual({
+      destination: { field: 'seed', node_id: FILTER_NODE_ID },
+      source: { field: 'value', node_id: 'control_filter_seed' },
+    });
+  });
+
+  it('builds Spandrel autoscale and direct nodes and rejects a missing model', () => {
+    const model = { base: 'any', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' };
+    expect(() => buildFilterGraph('spandrel_filter', imageName)).toThrow(/model/i);
+    expect(
+      buildFilterGraph('spandrel_filter', imageName, { model, scale: 4 }).graph.nodes[FILTER_NODE_ID]
+    ).toMatchObject({
+      image_to_image_model: model,
+      scale: 4,
+      type: 'spandrel_image_to_image_autoscale',
+    });
+    const direct = buildFilterGraph('spandrel_filter', imageName, { autoScale: false, model }).graph.nodes[
+      FILTER_NODE_ID
+    ] as Record<string, unknown>;
+    expect(direct).toMatchObject({ image_to_image_model: model, type: 'spandrel_image_to_image' });
+    expect(direct.scale).toBeUndefined();
+  });
+
+  it('clamps and coerces persisted numeric settings to declared bounds', () => {
+    const canny = buildFilterGraph('canny_edge_detection', imageName, {
+      high_threshold: 999,
+      low_threshold: -12.8,
+    }).graph.nodes[FILTER_NODE_ID] as Record<string, unknown>;
+    expect(canny.low_threshold).toBe(0);
+    expect(canny.high_threshold).toBe(255);
+
+    const noise = buildFilterGraph('img_noise', imageName, { amount: -2, size: 0.2 }).graph.nodes[
+      FILTER_NODE_ID
+    ] as Record<string, unknown>;
+    expect(noise.amount).toBe(0);
+    expect(noise.size).toBe(1);
+  });
+
+  it('coerces malformed persisted settings for every parameter of all sixteen filters', () => {
+    const model = { base: 'any', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' };
+    for (const definition of CONTROL_FILTERS) {
+      const malformed: Record<string, unknown> = Object.fromEntries(
+        definition.params.map((param) => [param.key, param.kind === 'boolean' ? 'false' : { invalid: true }])
+      );
+      if (definition.type === 'spandrel_filter') {
+        malformed.model = model;
+      }
+      const node = buildFilterGraph(definition.type, imageName, malformed).graph.nodes[FILTER_NODE_ID] as Record<
+        string,
+        unknown
+      >;
+      for (const param of definition.params) {
+        if (param.kind === 'model') {
+          continue;
+        }
+        const projectedKey = definition.type === 'adjust_image' && param.key === 'value' ? 'offset' : param.key;
+        if (definition.type === 'adjust_image' && param.key === 'value') {
+          expect(node[projectedKey], definition.type).toBe(0);
+        } else if (
+          (definition.type !== 'adjust_image' || param.key !== 'scale_values') &&
+          (definition.type !== 'spandrel_filter' || param.key !== 'autoScale')
+        ) {
+          expect(node[projectedKey], `${definition.type}.${param.key}`).toBe(param.default);
+        }
+      }
+    }
+  });
+
+  it('clamps every declared numeric parameter at both bounds', () => {
+    const model = { base: 'any', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' };
+    for (const definition of CONTROL_FILTERS) {
+      for (const param of definition.params) {
+        if (param.kind !== 'number') {
+          continue;
+        }
+        const lowSettings = { model, [param.key]: Number.MIN_SAFE_INTEGER };
+        const highSettings = { model, [param.key]: Number.MAX_SAFE_INTEGER };
+        const low = buildFilterGraph(definition.type, imageName, lowSettings).graph.nodes[FILTER_NODE_ID] as Record<
+          string,
+          unknown
+        >;
+        const high = buildFilterGraph(definition.type, imageName, highSettings).graph.nodes[FILTER_NODE_ID] as Record<
+          string,
+          unknown
+        >;
+        if (definition.type === 'adjust_image' && param.key === 'value') {
+          expect(low.offset).toBe(-255);
+          expect(high.offset).toBe(255);
+        } else if (param.min !== undefined) {
+          expect(low[param.key], `${definition.type}.${param.key}.min`).toBe(param.min);
+        }
+        if (param.max !== undefined && !(definition.type === 'adjust_image' && param.key === 'value')) {
+          expect(high[param.key], `${definition.type}.${param.key}.max`).toBe(param.max);
+        }
       }
     }
   });

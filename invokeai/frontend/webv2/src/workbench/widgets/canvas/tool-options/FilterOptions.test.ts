@@ -50,4 +50,22 @@ describe('getFilterActionEligibility', () => {
       canSave: false,
     });
   });
+
+  it('disables Process for Spandrel until a compatible model is selected', () => {
+    expect(
+      getFilterActionEligibility(state({ draft: { settings: { model: null }, type: 'spandrel_filter' } }))
+    ).toMatchObject({ canProcess: false });
+    expect(
+      getFilterActionEligibility(
+        state({
+          draft: {
+            settings: {
+              model: { base: 'any', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' },
+            },
+            type: 'spandrel_filter',
+          },
+        })
+      )
+    ).toMatchObject({ canProcess: true });
+  });
 });
