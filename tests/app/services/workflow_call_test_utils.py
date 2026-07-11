@@ -23,6 +23,7 @@ from invokeai.app.services.session_processor.workflow_call_runtime import (
     WorkflowCallCoordinator,
     WorkflowCallQueueLifecycle,
 )
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItemNotFoundError
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory
 from tests.dangerously_run_function_in_subprocess import dangerously_run_function_in_subprocess
@@ -913,7 +914,10 @@ class _DummySessionQueue:
         return queue_item
 
     def get_queue_item(self, item_id: int):
-        return self.items[item_id]
+        queue_item = self.items.get(item_id)
+        if queue_item is None:
+            raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
+        return queue_item
 
     def set_queue_item_session(self, item_id: int, session):
         queue_item = self._ensure_queue_item(item_id, session)
@@ -1508,6 +1512,63 @@ def test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(
     ]
     assert len(parent_outputs) == 1
     assert parent_outputs[0].values == {"result": [3]}
+
+
+def test_run_queue_item_tolerates_queue_item_deleted_mid_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    lifecycle = WorkflowCallQueueLifecycle(runner)
+
+    queue_item = SimpleNamespace(
+        item_id=1,
+        status="in_progress",
+        session=None,
+        session_id="session-id",
+        parent_item_id=None,
+    )
+    session_queue.add_queue_item(queue_item)
+
+    # Simulate the queue item being deleted while it is running (e.g. the queue was cleared or the
+    # current item was deleted via the API).
+    def run_and_delete(item) -> None:
+        session_queue.delete_queue_items_by_id([item.item_id])
+
+    monkeypatch.setattr(runner, "run", run_and_delete)
+
+    lifecycle.run_queue_item(queue_item)
+
+    assert session_queue.deleted_item_ids == [1]
+    assert session_queue.completed_item_ids == []
+    assert session_queue.failed_item_ids == []
+    assert events.errors == []
+
+
+def test_run_queue_item_tolerates_parent_deleted_while_child_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    for child_terminal_status in ("completed", "failed", "canceled"):
+        session_queue = _DummySessionQueue()
+        runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+        lifecycle = WorkflowCallQueueLifecycle(runner)
+
+        child_queue_item = SimpleNamespace(
+            item_id=100,
+            status="in_progress",
+            session=None,
+            session_id="child-session-id",
+            parent_item_id=1,
+        )
+        session_queue.add_queue_item(child_queue_item)
+
+        # The parent (item id 1) does not exist in the queue - it was deleted while the child was running.
+        def run_to_terminal_status(item, status=child_terminal_status) -> None:
+            item.status = status
+
+        monkeypatch.setattr(runner, "run", run_to_terminal_status)
+
+        lifecycle.run_queue_item(child_queue_item)
+
+        assert session_queue.canceled_item_ids == []
+        assert session_queue.failed_item_ids == []
+        assert events.errors == []
 
 
 def test_workflow_call_coordinator_cleans_up_enqueued_children_when_boundary_setup_fails(

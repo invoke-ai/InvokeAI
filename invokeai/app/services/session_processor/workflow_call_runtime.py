@@ -8,7 +8,11 @@ from invokeai.app.invocations.call_saved_workflow import (
 )
 from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
 from invokeai.app.services.session_processor.workflow_call_batch import build_child_workflow_session_results
-from invokeai.app.services.session_queue.session_queue_common import NodeFieldValue, SessionQueueItem
+from invokeai.app.services.session_queue.session_queue_common import (
+    NodeFieldValue,
+    SessionQueueItem,
+    SessionQueueItemNotFoundError,
+)
 from invokeai.app.services.shared.graph import GraphExecutionState
 
 if TYPE_CHECKING:
@@ -175,15 +179,19 @@ class WorkflowCallQueueLifecycle:
             error_traceback=error_message,
         )
 
-    def _get_parent_queue_item(self, child_queue_item: SessionQueueItem) -> SessionQueueItem:
+    def _get_parent_queue_item(self, child_queue_item: SessionQueueItem) -> SessionQueueItem | None:
         parent_item_id = child_queue_item.parent_item_id
         if parent_item_id is None:
             raise ValueError("Child workflow queue item is missing parent_item_id metadata.")
-        return self._session_runner._services.session_queue.get_queue_item(parent_item_id)
+        try:
+            return self._session_runner._services.session_queue.get_queue_item(parent_item_id)
+        except SessionQueueItemNotFoundError:
+            # The parent may have been deleted while the child was running (e.g. the queue was cleared).
+            return None
 
     def _resume_parent_from_completed_child(self, child_queue_item: SessionQueueItem) -> None:
         parent_queue_item = self._get_parent_queue_item(child_queue_item)
-        if parent_queue_item.status in ("completed", "failed", "canceled"):
+        if parent_queue_item is None or parent_queue_item.status in ("completed", "failed", "canceled"):
             return
         try:
             output = self.get_child_workflow_return_output(child_queue_item.session)
@@ -200,7 +208,12 @@ class WorkflowCallQueueLifecycle:
                     exclude_item_ids={child_queue_item.item_id},
                 )
             self.fail_waiting_workflow_call(parent_queue_item, str(e))
-            parent_queue_item = self._session_runner._services.session_queue.get_queue_item(parent_queue_item.item_id)
+            try:
+                parent_queue_item = self._session_runner._services.session_queue.get_queue_item(
+                    parent_queue_item.item_id
+                )
+            except SessionQueueItemNotFoundError:
+                return
             if getattr(parent_queue_item, "parent_item_id", None) is not None:
                 self._fail_parent_from_failed_child(parent_queue_item)
             return
@@ -229,7 +242,7 @@ class WorkflowCallQueueLifecycle:
 
     def _fail_parent_from_failed_child(self, child_queue_item: SessionQueueItem) -> None:
         parent_queue_item = self._get_parent_queue_item(child_queue_item)
-        if parent_queue_item.status in ("completed", "failed", "canceled"):
+        if parent_queue_item is None or parent_queue_item.status in ("completed", "failed", "canceled"):
             return
         waiting_frame = parent_queue_item.session.waiting_workflow_call
         if waiting_frame is None:
@@ -244,19 +257,27 @@ class WorkflowCallQueueLifecycle:
             f"The selected saved workflow '{waiting_frame.workflow_id}' failed during child execution."
         )
         self.fail_waiting_workflow_call(parent_queue_item, child_error_message)
-        parent_queue_item = self._session_runner._services.session_queue.get_queue_item(parent_queue_item.item_id)
+        try:
+            parent_queue_item = self._session_runner._services.session_queue.get_queue_item(parent_queue_item.item_id)
+        except SessionQueueItemNotFoundError:
+            return
         if getattr(parent_queue_item, "parent_item_id", None) is not None:
             self._fail_parent_from_failed_child(parent_queue_item)
 
     def _cancel_parent_from_canceled_child(self, child_queue_item: SessionQueueItem) -> None:
         parent_queue_item = self._get_parent_queue_item(child_queue_item)
-        if parent_queue_item.status == "canceled":
+        if parent_queue_item is None or parent_queue_item.status == "canceled":
             return
         self._session_runner._services.session_queue.cancel_queue_item(parent_queue_item.item_id)
 
     def run_queue_item(self, queue_item: SessionQueueItem) -> None:
         self._session_runner.run(queue_item)
-        updated_queue_item = self._session_runner._services.session_queue.get_queue_item(queue_item.item_id)
+        try:
+            updated_queue_item = self._session_runner._services.session_queue.get_queue_item(queue_item.item_id)
+        except SessionQueueItemNotFoundError:
+            # The queue item was deleted while it was running (e.g. the queue was cleared or the current item
+            # was deleted). There is no parent lifecycle work to do for a deleted item.
+            return
         if getattr(updated_queue_item, "parent_item_id", None) is None:
             return
         if updated_queue_item.status == "completed":
