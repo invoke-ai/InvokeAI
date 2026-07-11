@@ -4,7 +4,7 @@ import type {
   CanvasOperationRunResult,
   CanvasOperationSession,
 } from '@workbench/canvas-engine/canvasOperationController';
-import type { ExportBakedLayerBlobResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
+import type { CanvasCompositeExportGuard, ExportCanvasCompositeBlobResult } from '@workbench/canvas-engine/engine';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
 
@@ -18,7 +18,7 @@ export type SelectObjectSessionStatus = 'ready' | 'scheduled' | 'processing' | '
 
 export interface SelectObjectSessionPreview<T> {
   data: T;
-  guard: LayerExportGuard;
+  guard: CanvasCompositeExportGuard;
   image: SelectObjectReadyResult['image'];
   inputHash: string;
   previewId: number;
@@ -37,13 +37,13 @@ export interface SelectObjectSessionState<T> {
   status: SelectObjectSessionStatus;
   error: string | null;
   preview: SelectObjectSessionPreview<T> | null;
-  sourceGuard: LayerExportGuard | null;
+  sourceGuard: CanvasCompositeExportGuard | null;
 }
 
 export interface SelectObjectSessionDeps<T> {
-  captureGuard(layerId: string): LayerExportGuard | null;
+  captureGuard(): CanvasCompositeExportGuard | null;
   controller: CanvasOperationController;
-  exportLayer(layerId: string): Promise<ExportBakedLayerBlobResult>;
+  exportComposite(): Promise<ExportCanvasCompositeBlobResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
   runGraph(
     options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>
@@ -51,12 +51,11 @@ export interface SelectObjectSessionDeps<T> {
   decodePreview(result: SelectObjectReadyResult, signal: AbortSignal): Promise<T>;
   publishPreview(preview: SelectObjectSessionPreview<T>): undefined;
   cleanupPreview(): void;
-  isGuardCurrent(guard: LayerExportGuard): boolean;
+  isGuardCurrent(guard: CanvasCompositeExportGuard): boolean;
 }
 
 export interface CreateSelectObjectSessionOptions<T> {
   projectId: string;
-  layerId: string;
   deps: SelectObjectSessionDeps<T>;
 }
 
@@ -113,11 +112,11 @@ const resultError = (result: Exclude<Awaited<ReturnType<typeof prepareSelectObje
   result.status === 'failed' ? result.message : `Select Object source is ${result.status}.`;
 
 export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionOptions<T>): SelectObjectSession<T> => {
-  const { deps, layerId, projectId } = options;
+  const { deps, projectId } = options;
   let state = defaultState<T>();
   let source: SelectObjectPreparedSource | null = null;
   let operation: CanvasOperationSession | null = null;
-  let operationGuard: LayerExportGuard | null = null;
+  let operationGuard: CanvasCompositeExportGuard | null = null;
   let requestToken = 0;
   let lastPublishedHash: string | null = null;
   let pendingHash: string | null = null;
@@ -161,7 +160,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     publishState({ ...state, preview: null, sourceGuard: null, status: 'ready' });
   };
 
-  const isGuardCurrent = (guard: LayerExportGuard): boolean => {
+  const isGuardCurrent = (guard: CanvasCompositeExportGuard): boolean => {
     try {
       return deps.isGuardCurrent(guard);
     } catch {
@@ -169,11 +168,9 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
   };
 
-  const isSameGuard = (left: LayerExportGuard, right: LayerExportGuard): boolean =>
+  const isSameGuard = (left: CanvasCompositeExportGuard, right: CanvasCompositeExportGuard): boolean =>
     left.projectId === right.projectId &&
-    left.layerId === right.layerId &&
-    left.layer === right.layer &&
-    left.cacheVersion === right.cacheVersion &&
+    left.documentFingerprint === right.documentFingerprint &&
     left.documentGeneration === right.documentGeneration;
 
   unsubscribeController = deps.controller.subscribe(() => {
@@ -210,12 +207,15 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }, 1_000);
   };
 
-  const ensureSource = async (guard: LayerExportGuard, signal: AbortSignal): Promise<SelectObjectPreparedSource> => {
+  const ensureSource = async (
+    guard: CanvasCompositeExportGuard,
+    signal: AbortSignal
+  ): Promise<SelectObjectPreparedSource> => {
     if (source?.guard === guard && isGuardCurrent(guard)) {
       return source;
     }
     source = null;
-    const prepared = await prepareSelectObjectSource(layerId, deps, signal);
+    const prepared = await prepareSelectObjectSource(deps, signal);
     if (prepared.status !== 'ready') {
       throw new Error(resultError(prepared));
     }
@@ -230,7 +230,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     token: number,
     hash: string,
     requestState: SelectObjectSessionState<T>,
-    guard: LayerExportGuard
+    guard: CanvasCompositeExportGuard
   ): Promise<SelectObjectSessionProcessResult> => {
     try {
       if (operationGuard !== guard || !operation) {
@@ -240,7 +240,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
           nextOperation = deps.controller.start({
             cleanupPreview,
             guard,
-            identity: { kind: 'select-object', layerId, projectId },
+            identity: { kind: 'select-object', projectId },
           });
         } finally {
           startingOperation = false;
@@ -372,7 +372,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
     requestToken += 1;
     const token = requestToken;
-    const guard = operationGuard && isGuardCurrent(operationGuard) ? operationGuard : deps.captureGuard(layerId);
+    const guard = operationGuard && isGuardCurrent(operationGuard) ? operationGuard : deps.captureGuard();
     if (!guard || !isGuardCurrent(guard)) {
       publishState({ ...state, error: 'Select Object source is not ready.', status: 'error' });
       return Promise.resolve('error');

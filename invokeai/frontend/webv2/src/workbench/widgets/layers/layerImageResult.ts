@@ -1,5 +1,5 @@
 import type { RunUtilityGraphOptions, UtilityGraphResult } from '@workbench/canvas-engine/backend/utilityQueue';
-import type { ExportBakedLayerBlobResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
+import type { CanvasCompositeExportGuard, ExportCanvasCompositeBlobResult } from '@workbench/canvas-engine/engine';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
 import type { CanvasImageRef } from '@workbench/types';
@@ -10,7 +10,7 @@ export interface SelectObjectReadyResult {
   status: 'ready';
   image: CanvasImageRef;
   rect: Rect;
-  guard: LayerExportGuard;
+  guard: CanvasCompositeExportGuard;
 }
 
 export type SelectObjectRunResult =
@@ -19,7 +19,7 @@ export type SelectObjectRunResult =
   | { status: 'failed'; message: string };
 
 export interface SelectObjectRunnerDeps {
-  exportLayer(layerId: string): Promise<ExportBakedLayerBlobResult>;
+  exportComposite(): Promise<ExportCanvasCompositeBlobResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
   runGraph(
     options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>
@@ -30,7 +30,7 @@ const isAbortError = (error: unknown): boolean => error instanceof Error && erro
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export interface SelectObjectPreparedSource {
-  guard: LayerExportGuard;
+  guard: CanvasCompositeExportGuard;
   imageName: string;
   rect: Rect;
 }
@@ -40,15 +40,14 @@ export type PrepareSelectObjectSourceResult =
   | Exclude<SelectObjectRunResult, SelectObjectReadyResult>;
 
 export const prepareSelectObjectSource = async (
-  layerId: string,
-  deps: Pick<SelectObjectRunnerDeps, 'exportLayer' | 'uploadIntermediate'>,
+  deps: Pick<SelectObjectRunnerDeps, 'exportComposite' | 'uploadIntermediate'>,
   signal?: AbortSignal
 ): Promise<PrepareSelectObjectSourceResult> => {
   if (signal?.aborted) {
     return { status: 'aborted' };
   }
   try {
-    const exported = await deps.exportLayer(layerId);
+    const exported = await deps.exportComposite();
     if (signal?.aborted) {
       return { status: 'aborted' };
     }

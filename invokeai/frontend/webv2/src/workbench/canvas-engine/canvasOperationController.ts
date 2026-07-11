@@ -1,8 +1,10 @@
-import type { LayerExportGuard } from './engine';
+import type { CanvasCompositeExportGuard, LayerExportGuard } from './engine';
 
 export type CanvasOperationIdentity =
-  | { kind: 'select-object'; projectId: string; layerId: string }
+  | { kind: 'select-object'; projectId: string }
   | { kind: 'filter'; projectId: string; layerId: string };
+
+export type CanvasOperationGuard = CanvasCompositeExportGuard | LayerExportGuard;
 
 export type CanvasOperationState =
   | { status: 'idle' }
@@ -32,11 +34,17 @@ export interface CanvasOperationSession {
   cancel(): void;
 }
 
-export interface StartCanvasOperationOptions {
-  identity: CanvasOperationIdentity;
-  guard: LayerExportGuard;
-  cleanupPreview(): void;
-}
+export type StartCanvasOperationOptions =
+  | {
+      identity: Extract<CanvasOperationIdentity, { kind: 'select-object' }>;
+      guard: CanvasCompositeExportGuard;
+      cleanupPreview(): void;
+    }
+  | {
+      identity: Extract<CanvasOperationIdentity, { kind: 'filter' }>;
+      guard: LayerExportGuard;
+      cleanupPreview(): void;
+    };
 
 export interface CanvasOperationController {
   getSnapshot(): CanvasOperationState;
@@ -46,19 +54,20 @@ export interface CanvasOperationController {
   cancel(): void;
   invalidateSource(projectId: string, layerId: string): void;
   invalidateLayer(projectId: string, layerId: string): void;
+  invalidateComposite(projectId: string): void;
   invalidateProject(projectId: string): void;
   invalidateDocument(projectId: string): void;
   dispose(): void;
 }
 
 export interface CanvasOperationControllerDeps {
-  isGuardCurrent(guard: LayerExportGuard): boolean;
+  isGuardCurrent(guard: CanvasOperationGuard): boolean;
 }
 
-interface ActiveOperation extends StartCanvasOperationOptions {
+type ActiveOperation = StartCanvasOperationOptions & {
   requestController: AbortController | null;
   requestToken: number;
-}
+};
 
 const errorMessage = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 
@@ -207,10 +216,15 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
   };
 
   const start = (options: StartCanvasOperationOptions): CanvasOperationSession | null => {
+    const layerIdentityMatches =
+      options.identity.kind === 'filter' &&
+      'layerId' in options.guard &&
+      options.identity.layerId === options.guard.layerId;
+    const compositeIdentityMatches = options.identity.kind === 'select-object' && 'participants' in options.guard;
     if (
       disposed ||
       options.identity.projectId !== options.guard.projectId ||
-      options.identity.layerId !== options.guard.layerId
+      (!layerIdentityMatches && !compositeIdentityMatches)
     ) {
       return null;
     }
@@ -246,7 +260,14 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
   };
 
   const invalidateTarget = (projectId: string, layerId?: string): void => {
-    if (active?.identity.projectId === projectId && (layerId === undefined || active.identity.layerId === layerId)) {
+    if (
+      active?.identity.projectId === projectId &&
+      (layerId === undefined ||
+        (active.identity.kind === 'select-object'
+          ? 'participants' in active.guard &&
+            active.guard.participants.some((participant) => participant.layerId === layerId)
+          : active.identity.layerId === layerId))
+    ) {
       close(active);
     }
   };
@@ -271,6 +292,11 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     },
     getSnapshot: () => state,
     invalidateDocument: (projectId) => invalidateTarget(projectId),
+    invalidateComposite: (projectId) => {
+      if (active?.identity.projectId === projectId && active.identity.kind === 'select-object') {
+        close(active);
+      }
+    },
     invalidateLayer: (projectId, layerId) => invalidateTarget(projectId, layerId),
     invalidateProject: (projectId) => invalidateTarget(projectId),
     invalidateSource: (projectId, layerId) => invalidateTarget(projectId, layerId),

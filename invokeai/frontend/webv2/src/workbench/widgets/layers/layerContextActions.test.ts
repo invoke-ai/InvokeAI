@@ -325,19 +325,19 @@ describe('getLayerContextActions', () => {
   it.each([
     ['raster', true],
     ['control', true],
-    ['inpaint_mask', false],
-    ['regional_guidance', false],
-  ] as const)('exposes Select Object only for exportable %s content', (type, expected) => {
+    ['inpaint_mask', true],
+    ['regional_guidance', true],
+  ] as const)('exposes document-level Select Object from every %s layer context', (type, expected) => {
     const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'select-object');
     expect(Boolean(action)).toBe(expected);
   });
 
-  it('hides Select Object without supported source content', () => {
+  it('keeps Select Object visible without source content', () => {
     expect(
       getLayerContextActions(makeState(rasterLayer, { hasSupportedContent: false })).some(
         (action) => action.id === 'select-object'
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it.each([
@@ -370,12 +370,14 @@ describe('getLayerContextActions', () => {
 
   it.each([
     ['missing engine', { hasEngine: false }],
-    ['disabled layer', { layer: { ...rasterLayer, isEnabled: false } }],
-    ['locked layer', { layer: { ...rasterLayer, isLocked: true } }],
     ['locked interaction', { interactionLocked: true }],
   ] as const)('disables Select Object for %s', (_label, overrides) => {
-    const layer = 'layer' in overrides ? overrides.layer : rasterLayer;
-    expect(byId(getLayerContextActions(makeState(layer, overrides)), 'select-object').isDisabled).toBe(true);
+    expect(byId(getLayerContextActions(makeState(rasterLayer, overrides)), 'select-object').isDisabled).toBe(true);
+  });
+
+  it('disables Select Object for an invalid generation bbox', () => {
+    const document = { ...makeDocument([rasterLayer]), bbox: { height: 100, width: 0, x: 0, y: 0 } };
+    expect(byId(getLayerContextActions(makeState(rasterLayer, { document })), 'select-object').isDisabled).toBe(true);
   });
 
   it('disables transform for a hidden layer', () => {
@@ -484,7 +486,6 @@ describe('getLayerContextActions', () => {
       'fit-to-bbox',
       'adjustments',
       'filter',
-      'select-object',
       'run-workflow',
       'crop-to-bbox',
       'convert-to-control',
@@ -495,6 +496,7 @@ describe('getLayerContextActions', () => {
       expect(byId(actions, id).isDisabled, id).toBe(true);
     }
     expect(byId(actions, 'toggle-lock').isDisabled).toBe(false);
+    expect(byId(actions, 'select-object').isDisabled).toBe(false);
 
     const lockedControl = { ...nonEmptyControlLayer, isLocked: true };
     const controlActions = getLayerContextActions(makeState(lockedControl));

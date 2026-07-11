@@ -964,7 +964,7 @@ describe('createCanvasEngine', () => {
       engine.canvasOperations.start({
         cleanupPreview,
         guard: exported.guard,
-        identity: { kind: 'select-object', layerId: 'a', projectId: 'p1' },
+        identity: { kind: 'filter', layerId: 'a', projectId: 'p1' },
       });
 
       setDocument({ ...document, layers: nextLayers });
@@ -993,7 +993,7 @@ describe('createCanvasEngine', () => {
     engine.canvasOperations.start({
       cleanupPreview,
       guard: exported.guard,
-      identity: { kind: 'select-object', layerId: 'a', projectId: 'p1' },
+      identity: { kind: 'filter', layerId: 'a', projectId: 'p1' },
     });
 
     setDocument({ ...document, layers: document.layers }, 1);
@@ -6847,7 +6847,7 @@ describe('commitRasterFilterResult', () => {
     harness.engine.canvasOperations.start({
       cleanupPreview,
       guard: harness.guard,
-      identity: { kind: 'select-object', layerId: harness.layer.id, projectId: 'p1' },
+      identity: { kind: 'filter', layerId: harness.layer.id, projectId: 'p1' },
     });
 
     harness.decoded.resolve(new Blob());
@@ -6858,7 +6858,7 @@ describe('commitRasterFilterResult', () => {
     expect(harness.engine.stores.canUndo.get()).toBe(false);
     expect(cleanupPreview).not.toHaveBeenCalled();
     expect(harness.engine.canvasOperations.getSnapshot()).toMatchObject({
-      identity: { kind: 'select-object' },
+      identity: { kind: 'filter' },
       status: 'active',
     });
     harness.engine.dispose();
@@ -9219,7 +9219,7 @@ describe('guarded filter previews', () => {
     engine.setInteractionLocked(true);
 
     expect(engine.startFilterOperation(layer.id)).toBe('locked');
-    expect(engine.startSelectObject(layer.id)).toBe('locked');
+    expect(engine.startSelectObject()).toBe('locked');
     expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     expect(engine.stores.filterSession.get()).toBeNull();
     expect(engine.stores.samSession.get()).toBeNull();
@@ -9236,12 +9236,12 @@ describe('guarded filter previews', () => {
       store,
     });
     expect((await engine.exportLayerPixels(layer.id)).status).toBe('ok');
-    expect(engine.startSelectObject(layer.id)).toBe('started');
+    expect(engine.startSelectObject()).toBe('started');
 
     engine.setInteractionLocked(true);
 
     expect(engine.canvasOperations.getSnapshot()).toMatchObject({
-      identity: { kind: 'select-object', layerId: layer.id },
+      identity: { kind: 'select-object' },
       status: 'active',
     });
     expect(engine.stores.samSession.get()).not.toBeNull();
@@ -9428,13 +9428,13 @@ describe('guarded filter previews', () => {
       store,
     });
     expect((await engine.exportLayerPixels('first')).status).toBe('ok');
-    expect(engine.startSelectObject('first')).toBe('started');
+    expect((await engine.exportLayerPixels('second')).status).toBe('ok');
+    expect(engine.startSelectObject()).toBe('started');
     const operation = engine.canvasOperations.getSnapshot();
 
-    expect((await engine.exportLayerPixels('second')).status).toBe('ok');
     expect(engine.startFilterOperation('second', 'normal_map')).toBe('not-ready');
     expect(engine.canvasOperations.getSnapshot()).toEqual(operation);
-    expect(engine.stores.samSession.get()?.layerId).toBe('first');
+    expect(engine.stores.samSession.get()?.sourceRect).toEqual(document.bbox);
     engine.dispose();
   });
 
@@ -9721,7 +9721,7 @@ describe('guarded filter previews', () => {
     const pending = engine.commitFilterOperation('apply', () => promotion);
     await vi.waitFor(() => expect(engine.stores.filterSession.get()?.status).toBe('committing'));
 
-    expect(engine.startSelectObject(source.id)).toBe('started');
+    expect(engine.startSelectObject()).toBe('started');
     resolvePromotion();
     await pending;
 
@@ -9796,7 +9796,7 @@ describe('guarded filter previews', () => {
     expect((await engine.exportLayerPixels('L')).status).toBe('ok');
     expect(engine.startFilterOperation('L')).toBe('started');
 
-    expect(engine.startSelectObject('L')).toBe('started');
+    expect(engine.startSelectObject()).toBe('started');
 
     expect(engine.stores.filterSession.get()).toBeNull();
     expect(engine.stores.samSession.get()).not.toBeNull();
@@ -9855,11 +9855,17 @@ describe('guarded filter previews', () => {
       if (!guard) {
         throw new Error('expected a current operation guard');
       }
-      const operation = engine.canvasOperations.start({
-        cleanupPreview: vi.fn(),
-        guard,
-        identity: { kind, layerId: 'L', projectId },
-      });
+      const operation =
+        kind === 'filter'
+          ? engine.canvasOperations.start({
+              cleanupPreview: vi.fn(),
+              guard,
+              identity: { kind, layerId: 'L', projectId },
+            })
+          : null;
+      if (kind === 'select-object') {
+        expect(engine.startSelectObject()).toBe('started');
+      }
 
       expect(engine.stores.documentEditingLocked.get()).toBe(true);
       engine.undo();
@@ -9884,7 +9890,11 @@ describe('guarded filter previews', () => {
       expect(engine.getDocument()!.layers[0]).toMatchObject({ name: 'Renamed', transform: { x: 0 } });
       expect(engine.canvasOperations.getSnapshot()).toMatchObject({ identity: { kind }, status: 'active' });
 
-      operation?.cancel();
+      if (kind === 'select-object') {
+        engine.cancelSelectObjectSession();
+      } else {
+        operation?.cancel();
+      }
       expect(engine.stores.documentEditingLocked.get()).toBe(false);
       engine.undo();
       expect(engine.getDocument()!.layers[0]?.name).toBe('L');
@@ -11962,14 +11972,14 @@ describe('engine selection: fill / erase', () => {
     engine.canvasOperations.start({
       cleanupPreview,
       guard: exported.guard,
-      identity: { kind: 'select-object', layerId: 'paint1', projectId: 'p1' },
+      identity: { kind: 'filter', layerId: 'paint1', projectId: 'p1' },
     });
 
     engine.fillSelection();
 
     expect(cleanupPreview).not.toHaveBeenCalled();
     expect(engine.canvasOperations.getSnapshot()).toMatchObject({
-      identity: { kind: 'select-object' },
+      identity: { kind: 'filter' },
       status: 'active',
     });
     engine.dispose();
@@ -11987,7 +11997,7 @@ describe('engine selection: fill / erase', () => {
     engine.canvasOperations.start({
       cleanupPreview,
       guard: exported.guard,
-      identity: { kind: 'select-object', layerId: 'paint1', projectId: 'p1' },
+      identity: { kind: 'filter', layerId: 'paint1', projectId: 'p1' },
     });
 
     await engine.clearCaches();
@@ -12667,9 +12677,10 @@ describe('Select Object canvas engine integration', () => {
 
   const createCommittingSamHarness = async (
     imageResolver: (imageName: string, signal?: AbortSignal) => Promise<Blob> = () => Promise.resolve(new Blob()),
-    backend: StubRasterBackend = createTestStubRasterBackend()
+    backend: StubRasterBackend = createTestStubRasterBackend(),
+    bbox: CanvasDocumentContractV2['bbox'] = { height: 100, width: 100, x: 0, y: 0 }
   ) => {
-    const document = samDocument([samLayer('source', -5)]);
+    const document = { ...samDocument([samLayer('source', -5)]), bbox };
     const reactive = createReducerBackedStore(document);
     const engine = createCanvasEngine({
       backend,
@@ -12683,9 +12694,14 @@ describe('Select Object canvas engine integration', () => {
       store: reactive.store,
     });
     await engine.exportLayerPixels('source');
-    engine.startSelectObject('source');
+    engine.startSelectObject();
     engine.updateSelectObjectSession({
-      input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+      input: {
+        bbox: null,
+        excludePoints: [],
+        includePoints: [{ x: bbox.x + 5, y: bbox.y + 5 }],
+        type: 'visual',
+      },
     });
     await engine.processSelectObjectSession();
     return { ...reactive, document, engine };
@@ -12707,16 +12723,15 @@ describe('Select Object canvas engine integration', () => {
   it('starts on the selected supported source, activates the real sam tool, and edits overlay-only', async () => {
     const h = await createSamHarness();
 
-    expect(h.engine.startSelectObject('source')).toBe('started');
+    expect(h.engine.startSelectObject()).toBe('started');
     expect(h.engine.stores.activeTool.get()).toBe('sam');
     expect(h.engine.canvasOperations.getSnapshot()).toMatchObject({
-      identity: { kind: 'select-object', layerId: 'source', projectId: 'p1' },
+      identity: { kind: 'select-object', projectId: 'p1' },
       status: 'active',
     });
     expect(h.engine.stores.samSession.get()).toMatchObject({
       input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
-      layerId: 'source',
-      sourceRect: { height: 20, width: 20, x: 0, y: 0 },
+      sourceRect: { height: 100, width: 100, x: 0, y: 0 },
     });
     h.raf.flush();
     h.screen.surface.callLog.length = 0;
@@ -12732,13 +12747,13 @@ describe('Select Object canvas engine integration', () => {
     h.engine.dispose();
   });
 
-  it('selects an explicit context-action source before starting', async () => {
+  it('starts from every visible participant without changing the selected layer', async () => {
     const h = await createSamHarness({ layers: [samLayer('first'), samLayer('second', 30)] });
 
-    expect(h.engine.startSelectObject('second')).toBe('started');
+    expect(h.engine.startSelectObject()).toBe('started');
 
-    expect(h.store.dispatch).toHaveBeenCalledWith({ id: 'second', type: 'setCanvasSelectedLayer' });
-    expect(h.engine.stores.samSession.get()?.layerId).toBe('second');
+    expect(h.store.dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'setCanvasSelectedLayer' }));
+    expect(h.engine.getDocument()?.selectedLayerId).toBe('first');
     h.engine.dispose();
   });
 
@@ -12832,7 +12847,7 @@ describe('Select Object canvas engine integration', () => {
     const graph = createDeferred<{ imageName: string; origin: string }>();
     const runGraph = vi.fn(() => graph.promise);
     const h = await createSamHarness({ runGraph });
-    expect(h.engine.startSelectObject('source')).toBe('started');
+    expect(h.engine.startSelectObject()).toBe('started');
     const input = { prompt: 'keep this prompt', type: 'prompt' as const };
     expect(h.engine.updateSelectObjectSession({ input, invert: true })).toBe('updated');
     const pending = h.engine.processSelectObjectSession();
@@ -12865,7 +12880,7 @@ describe('Select Object canvas engine integration', () => {
 
       await expect(pending).resolves.not.toEqual({ status: 'selected' });
       expect(h.engine.getDocument()).toEqual(h.document);
-      expect(h.engine.stores.samSession.get()).toMatchObject({ layerId: 'source' });
+      expect(h.engine.stores.samSession.get()).not.toBeNull();
       h.engine.dispose();
     }
   );
@@ -12901,7 +12916,7 @@ describe('Select Object canvas engine integration', () => {
   });
 
   it.each(['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const)(
-    'promotes then atomically saves the guarded preview as %s above its source',
+    'promotes then atomically saves the guarded bbox preview as %s at the top of its group',
     async (target) => {
       const calls: string[] = [];
       const h = await createCommittingSamHarness();
@@ -12920,9 +12935,9 @@ describe('Select Object canvas engine integration', () => {
         throw new Error('expected a saved object layer');
       }
       if (created.type === 'raster' || created.type === 'control') {
-        expect(created.source).toMatchObject({ offset: { x: -5, y: 0 }, type: 'paint' });
+        expect(created.source).toMatchObject({ offset: { x: 0, y: 0 }, type: 'paint' });
       } else {
-        expect(created.mask).toMatchObject({ offset: { x: -5, y: 0 } });
+        expect(created.mask).toMatchObject({ offset: { x: 0, y: 0 } });
       }
       expect(created.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
       expect(h.engine.stores.canUndo.get()).toBe(true);
@@ -12934,6 +12949,24 @@ describe('Select Object canvas engine integration', () => {
       h.engine.dispose();
     }
   );
+
+  it('saves the exact non-zero bbox origin and dimensions independently of source placement', async () => {
+    const bbox = { height: 30, width: 40, x: -11, y: 7 };
+    const h = await createCommittingSamHarness(undefined, undefined, bbox);
+
+    const result = await h.engine.saveSelectObjectSession('raster', () => Promise.resolve());
+
+    expect(result.status).toBe('committed');
+    const created = h.engine.getDocument()?.layers[0];
+    expect(created?.type).toBe('raster');
+    if (created?.type === 'raster') {
+      expect(created.source).toMatchObject({
+        bitmap: { height: bbox.height, width: bbox.width },
+        offset: { x: bbox.x, y: bbox.y },
+      });
+    }
+    h.engine.dispose();
+  });
 
   it('publishes a committing phase and mutually excludes Apply and Save', async () => {
     const h = await createCommittingSamHarness();
@@ -12962,7 +12995,7 @@ describe('Select Object canvas engine integration', () => {
 
       await expect(pending).resolves.not.toMatchObject({ status: 'committed' });
       expect(h.engine.getDocument()).toEqual(h.document);
-      expect(h.engine.stores.samSession.get()).toMatchObject({ layerId: 'source' });
+      expect(h.engine.stores.samSession.get()).not.toBeNull();
       h.engine.dispose();
     }
   );
@@ -12989,7 +13022,7 @@ describe('Select Object canvas engine integration', () => {
 
     await expect(pending).resolves.not.toMatchObject({ status: 'committed' });
     expect(h.engine.getDocument()).toEqual(h.document);
-    expect(h.engine.stores.samSession.get()).toMatchObject({ layerId: 'source' });
+    expect(h.engine.stores.samSession.get()).not.toBeNull();
     h.engine.dispose();
   });
 
@@ -13009,7 +13042,7 @@ describe('Select Object canvas engine integration', () => {
     });
     await engine.exportLayerPixels('first');
     await engine.exportLayerPixels('second');
-    engine.startSelectObject('first');
+    engine.startSelectObject();
     engine.updateSelectObjectSession({
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
@@ -13020,11 +13053,11 @@ describe('Select Object canvas engine integration', () => {
     });
     const oldSave = engine.saveSelectObjectSession('raster', () => durability);
 
-    expect(engine.startSelectObject('second')).toBe('started');
+    expect(engine.startSelectObject()).toBe('started');
     rejectDurability(new Error('old failure'));
 
     await expect(oldSave).resolves.toMatchObject({ status: 'failed' });
-    expect(engine.stores.samSession.get()).toMatchObject({ error: null, layerId: 'second' });
+    expect(engine.stores.samSession.get()).toMatchObject({ error: null });
     engine.dispose();
   });
 
@@ -13045,7 +13078,7 @@ describe('Select Object canvas engine integration', () => {
     });
     await engine.exportLayerPixels('first');
     await engine.exportLayerPixels('second');
-    engine.startSelectObject('first');
+    engine.startSelectObject();
     engine.updateSelectObjectSession({
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
@@ -13054,13 +13087,13 @@ describe('Select Object canvas engine integration', () => {
     const unsubscribe = engine.stores.hasSelection.subscribe(() => {
       if (!replaced && engine.stores.hasSelection.get()) {
         replaced = true;
-        engine.startSelectObject('second');
+        engine.startSelectObject();
       }
     });
 
     await expect(engine.applySelectObjectSession()).resolves.toEqual({ status: 'selected' });
 
-    expect(engine.stores.samSession.get()).toMatchObject({ error: null, layerId: 'second' });
+    expect(engine.stores.samSession.get()).toMatchObject({ error: null });
     unsubscribe();
     engine.dispose();
   });
@@ -13084,7 +13117,7 @@ describe('Select Object canvas engine integration', () => {
       });
       await engine.exportLayerPixels('first');
       await engine.exportLayerPixels('second');
-      engine.startSelectObject('first');
+      engine.startSelectObject();
       engine.updateSelectObjectSession({
         input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
       });
@@ -13097,7 +13130,7 @@ describe('Select Object canvas engine integration', () => {
           sawCommitting = true;
         } else if (sawCommitting && !replaced) {
           replaced = true;
-          expect(engine.startSelectObject('second')).toBe('started');
+          expect(engine.startSelectObject()).toBe('started');
         }
       });
 
@@ -13108,7 +13141,7 @@ describe('Select Object canvas engine integration', () => {
 
       expect(result.status).toBe(kind === 'apply' ? 'selected' : 'committed');
       expect(replaced).toBe(true);
-      expect(engine.stores.samSession.get()).toMatchObject({ error: null, layerId: 'second' });
+      expect(engine.stores.samSession.get()).toMatchObject({ error: null });
       expect(engine.stores.activeTool.get()).toBe('sam');
       unsubscribe();
       engine.dispose();
@@ -13165,7 +13198,7 @@ describe('Select Object canvas engine integration', () => {
 
   it.each(['source', 'project', 'document'] as const)('aborts a pending save on %s invalidation', async (kind) => {
     const h = await createSamHarness();
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
     h.engine.updateSelectObjectSession({
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
@@ -13222,45 +13255,108 @@ describe('Select Object canvas engine integration', () => {
     h.engine.dispose();
   });
 
-  it('processes a sole near-edge point after canonicalizing it to the last source pixel', async () => {
+  it('processes a sole bbox near-edge point after canonicalizing it to the last bbox pixel', async () => {
     const runGraph = vi.fn(() => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }));
     const h = await createSamHarness({ runGraph });
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
 
-    h.overlay.fire('pointerdown', pointerAt(19.8, 19.7));
-    h.overlay.fire('pointerup', pointerAt(19.8, 19.7, { buttons: 0 }));
+    h.overlay.fire('pointerdown', pointerAt(99.8, 99.7));
+    h.overlay.fire('pointerup', pointerAt(99.8, 99.7, { buttons: 0 }));
 
-    expect(h.engine.stores.samSession.get()?.input.includePoints).toEqual([{ x: 19, y: 19 }]);
+    expect(h.engine.stores.samSession.get()?.input.includePoints).toEqual([{ x: 99, y: 99 }]);
     await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
     expect(runGraph).toHaveBeenCalledOnce();
     h.engine.dispose();
   });
 
-  it('rejects missing, disabled, and unsupported selections without activating sam', async () => {
+  it('uses the half-open generation bbox as the only point domain', async () => {
+    const h = await createSamHarness();
+    expect(h.engine.startSelectObject()).toBe('started');
+
+    h.overlay.fire('pointerdown', pointerAt(100, 50));
+    h.overlay.fire('pointerup', pointerAt(100, 50, { buttons: 0 }));
+    h.overlay.fire('pointerdown', pointerAt(-0.01, 50));
+    h.overlay.fire('pointerup', pointerAt(-0.01, 50, { buttons: 0 }));
+    expect(h.engine.stores.samSession.get()?.input.includePoints).toEqual([]);
+
+    h.overlay.fire('pointerdown', pointerAt(99.99, 99.99));
+    h.overlay.fire('pointerup', pointerAt(99.99, 99.99, { buttons: 0 }));
+    expect(h.engine.stores.samSession.get()?.input.includePoints).toEqual([{ x: 99, y: 99 }]);
+    h.engine.dispose();
+  });
+
+  it('keeps viewport changes current but invalidates on bbox and cache changes', async () => {
+    const h = await createSamHarness();
+    expect(h.engine.startSelectObject()).toBe('started');
+
+    h.engine.getViewport().panBy({ x: 20, y: -10 });
+    h.engine.getViewport().zoomAtPoint(2, { x: 50, y: 50 });
+    expect(h.engine.canvasOperations.getSnapshot()).toMatchObject({
+      identity: { kind: 'select-object' },
+      status: 'active',
+    });
+
+    h.setDocument({ ...h.engine.getDocument()!, bbox: { height: 80, width: 90, x: 3, y: 4 } });
+    expect(h.engine.stores.samSession.get()).toBeNull();
+
+    expect(h.engine.startSelectObject()).toBe('started');
+    await h.engine.clearCaches();
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    h.engine.dispose();
+  });
+
+  it('invalidates the composite operation when participant z-order changes', async () => {
+    const h = await createSamHarness({ layers: [samLayer('top'), samLayer('bottom', 30)] });
+    expect(h.engine.startSelectObject()).toBe('started');
+    const document = h.engine.getDocument()!;
+
+    h.setDocument({ ...document, layers: [...document.layers].reverse() });
+
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    expect(h.engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    h.engine.dispose();
+  });
+
+  it('opens on an empty document and reports a clear process-time composite error', async () => {
+    const h = await createSamHarness({ layers: [] });
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 10, y: 10 }], type: 'visual' },
+    });
+
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
+    expect(h.engine.stores.samSession.get()).toMatchObject({
+      error: 'Select Object source is empty.',
+      status: 'error',
+    });
+    h.engine.dispose();
+  });
+
+  it('opens independently of selected layer type, visibility, or document content', async () => {
     const mask: CanvasInpaintMaskLayerContract = {
       ...samLayer('mask'),
       mask: { bitmap: null, fill: { color: '#fff', style: 'solid' } },
       type: 'inpaint_mask',
     };
     const unsupported = await createSamHarness({ layers: [mask] });
-    expect(unsupported.engine.startSelectObject('mask')).toBe('unsupported');
-    expect(unsupported.engine.stores.activeTool.get()).toBe('view');
+    expect(unsupported.engine.startSelectObject()).toBe('started');
+    expect(unsupported.engine.stores.activeTool.get()).toBe('sam');
     unsupported.engine.dispose();
 
     const disabled = await createSamHarness({ layers: [{ ...samLayer('disabled'), isEnabled: false }] });
-    expect(disabled.engine.startSelectObject('disabled')).toBe('disabled');
-    expect(disabled.engine.stores.activeTool.get()).toBe('view');
+    expect(disabled.engine.startSelectObject()).toBe('started');
+    expect(disabled.engine.stores.activeTool.get()).toBe('sam');
     disabled.engine.dispose();
 
     const missing = await createSamHarness({ layers: [] });
-    expect(missing.engine.startSelectObject('missing')).toBe('missing');
-    expect(missing.engine.stores.samSession.get()).toBeNull();
+    expect(missing.engine.startSelectObject()).toBe('started');
+    expect(missing.engine.stores.samSession.get()).not.toBeNull();
     missing.engine.dispose();
   });
 
   it('cancels the owned session and decoded preview on a real tool switch', async () => {
     const h = await createSamHarness();
-    expect(h.engine.startSelectObject('source')).toBe('started');
+    expect(h.engine.startSelectObject()).toBe('started');
     h.engine.updateSelectObjectSession({
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
@@ -13280,7 +13376,7 @@ describe('Select Object canvas engine integration', () => {
     const base = createTestStubRasterBackend();
     const backend = { ...base, createImageBitmap: vi.fn(() => bitmap.promise) };
     const h = await createSamHarness({ backend, imageResolver: () => image.promise });
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
     h.engine.updateSelectObjectSession({
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
@@ -13298,12 +13394,12 @@ describe('Select Object canvas engine integration', () => {
     h.engine.dispose();
   });
 
-  it('isolates only the source layer in the compositor while an isolated preview is published', async () => {
+  it('isolates the same flattened bbox participants in the compositor while a preview is published', async () => {
     const backend = createRecordingRasterBackend();
     backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('sam-mask')));
     const h = await createSamHarness({ backend, layers: [samLayer('source'), samLayer('other', 30)] });
     h.engine.stores.checkerboard.set(false);
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
     h.engine.updateSelectObjectSession({
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
@@ -13311,14 +13407,78 @@ describe('Select Object canvas engine integration', () => {
     h.screen.surface.callLog.length = 0;
     h.raf.flush();
 
-    expect(h.screen.surface.callLog.filter((entry) => entry.op === 'drawImage')).toHaveLength(1);
+    expect(h.screen.surface.callLog.filter((entry) => entry.op === 'drawImage')).toHaveLength(2);
+    expect(h.screen.surface.callLog).toEqual(
+      expect.arrayContaining([
+        { args: [0, 0, 100, 100], op: 'rect' },
+        { args: [], op: 'clip' },
+      ])
+    );
     expect(h.engine.getDocument()!.layers.every((layer) => layer.isEnabled)).toBe(true);
+    h.engine.dispose();
+  });
+
+  it('flattens transformed raster and control participants with display semantics while excluding masks', async () => {
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('decoded')));
+    const raster: CanvasLayerContract = {
+      ...samLayer('adjusted-raster'),
+      adjustments: { brightness: 0.2, contrast: -0.1, saturation: 0.3 },
+      blendMode: 'multiply',
+      opacity: 0.4,
+      source: {
+        bitmap: { height: 10, imageName: 'sparse.png', width: 10 },
+        offset: { x: -4, y: 6 },
+        type: 'paint',
+      },
+      transform: { rotation: 0, scaleX: 2, scaleY: 1.5, x: 12, y: 8 },
+    };
+    const control: CanvasLayerContract = {
+      adapter: { beginEndStepPct: [0, 0.75], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'screen',
+      id: 'control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Control',
+      opacity: 0.65,
+      source: { image: { height: 12, imageName: 'control.png', width: 14 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 30, y: 20 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const mask: CanvasInpaintMaskLayerContract = {
+      ...samLayer('mask'),
+      mask: { bitmap: { height: 20, imageName: 'mask.png', width: 20 }, fill: { color: '#fff', style: 'solid' } },
+      type: 'inpaint_mask',
+    };
+    const h = await createSamHarness({ backend, layers: [mask, control, raster] });
+    h.engine.stores.checkerboard.set(false);
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 35, y: 25 }], type: 'visual' },
+    });
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+    h.screen.surface.callLog.length = 0;
+    h.raf.flush();
+
+    const draws = h.screen.surface.callLog.filter((entry) => entry.op === 'drawImage');
+    expect(draws).toHaveLength(2);
+    expect(h.screen.surface.callLog).toEqual(
+      expect.arrayContaining([
+        { args: ['globalAlpha', 0.4], op: 'set' },
+        { args: ['globalCompositeOperation', 'multiply'], op: 'set' },
+        { args: ['globalAlpha', 0.65], op: 'set' },
+        { args: ['globalCompositeOperation', 'screen'], op: 'set' },
+        { args: [0, 0, 100, 100], op: 'rect' },
+      ])
+    );
+    expect(adjustedSurfaceCacheGets).toContain('adjusted-raster');
     h.engine.dispose();
   });
 
   it('tears down the session when its captured source contract changes', async () => {
     const h = await createSamHarness();
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
 
     h.setDocument({
       ...h.engine.getDocument()!,
@@ -13334,7 +13494,7 @@ describe('Select Object canvas engine integration', () => {
     const output = createDeferred<{ imageName: string; origin: string }>();
     const layers = [samLayer('first'), samLayer('second', 30)];
     const h = await createSamHarness({ layers, runGraph: () => output.promise });
-    h.engine.startSelectObject('first');
+    h.engine.startSelectObject();
     h.engine.updateSelectObjectSession({
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
@@ -13342,18 +13502,18 @@ describe('Select Object canvas engine integration', () => {
     await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('processing'));
 
     h.setDocument({ ...h.engine.getDocument()!, selectedLayerId: 'second' });
-    expect(h.engine.startSelectObject('second')).toBe('started');
-    expect(h.engine.stores.samSession.get()?.layerId).toBe('second');
+    expect(h.engine.startSelectObject()).toBe('started');
+    expect(h.engine.stores.samSession.get()).not.toBeNull();
     output.resolve({ imageName: 'late.png', origin: 'late' });
 
     await expect(pending).resolves.toBe('stale');
-    expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: false, layerId: 'second' });
+    expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: false });
     h.engine.dispose();
   });
 
   it('lets Escape cancel a gesture before a later Escape cancels the operation', async () => {
     const h = await createSamHarness();
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
     h.overlay.fire('pointerdown', pointerAt(5, 5));
     h.overlay.fire('pointermove', pointerAt(15, 15));
     h.overlay.fire('pointercancel', pointerAt(15, 15));
@@ -13368,7 +13528,7 @@ describe('Select Object canvas engine integration', () => {
 
   it('keeps the Select Object operation active while Space temporarily switches to view', async () => {
     const h = await createSamHarness();
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
     h.overlay.fire('pointerenter', {});
 
     h.fireKey('keydown', 'Space', ' ');
@@ -13382,7 +13542,7 @@ describe('Select Object canvas engine integration', () => {
 
   it('does not restore sessionless sam when Escape closes the session during a Space hold', async () => {
     const h = await createSamHarness();
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
     h.overlay.fire('pointerenter', {});
     h.fireKey('keydown', 'Space', ' ');
     expect(h.engine.stores.activeTool.get()).toBe('view');
@@ -13397,7 +13557,7 @@ describe('Select Object canvas engine integration', () => {
 
   it('does not restore sessionless sam when source invalidation closes the session during a Space hold', async () => {
     const h = await createSamHarness();
-    h.engine.startSelectObject('source');
+    h.engine.startSelectObject();
     h.overlay.fire('pointerenter', {});
     h.fireKey('keydown', 'Space', ' ');
 

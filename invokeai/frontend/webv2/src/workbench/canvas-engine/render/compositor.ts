@@ -80,6 +80,8 @@ const STAGED_PREVIEW_OUTLINE_DASH = 6;
 
 /** Optional inputs to {@link compositeDocument}. */
 export interface CompositeOptions {
+  /** Clips document layers to this document-space rect without clipping the background or staged preview. */
+  clipRect?: Rect | null;
   /** A staged generation candidate to draw at its placement (document space). */
   stagedPreview?: { surface: RasterSurface; rect: Rect; opacity?: number } | null;
   /**
@@ -335,6 +337,14 @@ export const compositeDocument = (
   ctx.clearRect(0, 0, target.width, target.height);
   drawBackground(ctx, target, opts.checkerboardTile ?? null);
 
+  if (opts.clipRect) {
+    ctx.save();
+    setTransformFromMat(ctx, view);
+    ctx.beginPath();
+    ctx.rect(opts.clipRect.x, opts.clipRect.y, opts.clipRect.width, opts.clipRect.height);
+    ctx.clip();
+  }
+
   // Composite in STRICT GROUP ORDER (legacy `arrangeEntities` / `CanvasEntityRendererModule`):
   // raster (bottom) < control < regional guidance < inpaint mask (top). This
   // matches the layers panel, which renders these as fixed grouped sections, and
@@ -365,6 +375,10 @@ export const compositeDocument = (
   };
   for (let rank = 0; rank < LAYER_GROUP_COUNT; rank++) {
     drawGroup(rank);
+  }
+
+  if (opts.clipRect) {
+    ctx.restore();
   }
 
   // Staged generation preview over its bbox (document space), with a subtle

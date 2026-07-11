@@ -1,4 +1,4 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/engine';
+import type { CanvasCompositeExportGuard } from '@workbench/canvas-engine/engine';
 import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { createCanvasOperationController } from '@workbench/canvas-engine/canvasOperationController';
@@ -19,14 +19,18 @@ const layer: CanvasRasterLayerContractV2 = {
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: -5, y: 7 },
   type: 'raster',
 };
-const guard: LayerExportGuard = {
-  cacheVersion: 3,
+const guard: CanvasCompositeExportGuard = {
+  bbox: { height: 12, width: 16, x: -5, y: 7 },
+  documentFingerprint: 'document:3',
   documentGeneration: 4,
-  layer,
-  layerId: layer.id,
+  participants: [{ cacheVersion: 3, layer, layerId: layer.id }],
   projectId: 'p1',
 };
-const replacementGuard: LayerExportGuard = { ...guard, cacheVersion: 4 };
+const replacementGuard: CanvasCompositeExportGuard = {
+  ...guard,
+  documentFingerprint: 'document:4',
+  participants: [{ cacheVersion: 4, layer, layerId: layer.id }],
+};
 const rect = { height: 12, width: 16, x: -5, y: 7 };
 const blob = new Blob(['source'], { type: 'image/png' });
 
@@ -39,7 +43,7 @@ const deferred = <T>() => {
 };
 
 const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {}) => {
-  let currentGuard: LayerExportGuard | null = guard;
+  let currentGuard: CanvasCompositeExportGuard | null = guard;
   let controllerSubscriber: (() => void) | null = null;
   const unsubscribe = vi.fn();
   const baseController = createCanvasOperationController({ isGuardCurrent: (candidate) => candidate === currentGuard });
@@ -58,7 +62,7 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
     captureGuard: vi.fn(() => currentGuard),
     controller,
     decodePreview: vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
-    exportLayer: vi.fn(() => Promise.resolve({ blob, guard: currentGuard ?? guard, rect, status: 'ok' as const })),
+    exportComposite: vi.fn(() => Promise.resolve({ blob, guard: currentGuard ?? guard, rect, status: 'ok' as const })),
     isGuardCurrent: (candidate) => candidate === currentGuard,
     publishPreview: vi.fn((): undefined => undefined),
     cleanupPreview: vi.fn(),
@@ -66,7 +70,7 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
     uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'input.png' })),
     ...overrides,
   };
-  const session = createSelectObjectSession({ deps, layerId: layer.id, projectId: 'p1' });
+  const session = createSelectObjectSession({ deps, projectId: 'p1' });
   session.update({ input: { prompt: 'cat', type: 'prompt' } });
   return {
     controller,
@@ -75,7 +79,7 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
       controllerSubscriber?.();
     },
     session,
-    setCurrentGuard(next: LayerExportGuard | null) {
+    setCurrentGuard(next: CanvasCompositeExportGuard | null) {
       currentGuard = next;
     },
     unsubscribe,
@@ -178,13 +182,13 @@ describe('createSelectObjectSession', () => {
     harness.session.update({ input: { prompt: 'dog', type: 'prompt' } });
     await expect(harness.session.process()).resolves.toBe('published');
 
-    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(1);
+    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(1);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(1);
     expect(harness.deps.runGraph).toHaveBeenCalledTimes(2);
     expect(harness.session.getSnapshot().sourceGuard).toBe(guard);
 
     harness.setCurrentGuard(replacementGuard);
-    vi.mocked(harness.deps.exportLayer).mockResolvedValue({
+    vi.mocked(harness.deps.exportComposite).mockResolvedValue({
       blob,
       guard: replacementGuard,
       rect,
@@ -193,7 +197,7 @@ describe('createSelectObjectSession', () => {
     harness.session.update({ input: { prompt: 'bird', type: 'prompt' } });
     await expect(harness.session.process()).resolves.toBe('published');
 
-    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
     expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
   });
@@ -237,7 +241,7 @@ describe('createSelectObjectSession', () => {
 
     expect(newPending).not.toBe(oldPending);
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledTimes(2));
-    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
     older.resolve({ imageName: 'old.png', origin: 'old' });
     await expect(oldPending).resolves.toBe('stale');
     expect(harness.session.process()).toBe(newPending);
@@ -250,22 +254,22 @@ describe('createSelectObjectSession', () => {
   });
 
   it('starts an immediate same-input retry when invalidation aborts an export that ignores its signal', async () => {
-    const oldExport = deferred<Awaited<ReturnType<SelectObjectSessionDeps<string>['exportLayer']>>>();
+    const oldExport = deferred<Awaited<ReturnType<SelectObjectSessionDeps<string>['exportComposite']>>>();
     const harness = createHarness({
-      exportLayer: vi
+      exportComposite: vi
         .fn()
         .mockImplementationOnce(() => oldExport.promise)
         .mockImplementationOnce(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
     });
     const oldPending = harness.session.process();
-    await vi.waitFor(() => expect(harness.deps.exportLayer).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(harness.deps.exportComposite).toHaveBeenCalledOnce());
 
     harness.controller.invalidateSource('p1', layer.id);
     const newPending = harness.session.process();
 
     expect(newPending).not.toBe(oldPending);
     await expect(newPending).resolves.toBe('published');
-    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce();
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
     oldExport.resolve({ blob, guard, rect, status: 'ok' });
@@ -290,7 +294,7 @@ describe('createSelectObjectSession', () => {
 
     expect(newPending).not.toBe(oldPending);
     await expect(newPending).resolves.toBe('published');
-    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
     oldUpload.resolve({ imageName: 'old-input.png' });
@@ -350,10 +354,10 @@ describe('createSelectObjectSession', () => {
     await expect(harness.session.process()).resolves.toBe('published');
 
     harness.setCurrentGuard(replacementGuard);
-    vi.mocked(harness.deps.exportLayer).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
+    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
 
     await expect(harness.session.process()).resolves.toBe('published');
-    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
     expect(harness.deps.runGraph).toHaveBeenCalledTimes(2);
     expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
@@ -367,7 +371,7 @@ describe('createSelectObjectSession', () => {
     await vi.advanceTimersByTimeAsync(500);
     harness.session.update({ input: { prompt: 'second', type: 'prompt' } });
     await vi.advanceTimersByTimeAsync(999);
-    expect(harness.deps.exportLayer).not.toHaveBeenCalled();
+    expect(harness.deps.exportComposite).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
 
@@ -487,7 +491,7 @@ describe('createSelectObjectSession', () => {
 
     await expect(harness.session.process()).resolves.toBe('invalid');
     await vi.runAllTimersAsync();
-    expect(harness.deps.exportLayer).not.toHaveBeenCalled();
+    expect(harness.deps.exportComposite).not.toHaveBeenCalled();
     expect(harness.deps.runGraph).not.toHaveBeenCalled();
   });
 
@@ -524,9 +528,9 @@ describe('createSelectObjectSession', () => {
           boundary === 'decode'
             ? vi.fn(() => wait.promise as Promise<string>)
             : vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
-        exportLayer:
+        exportComposite:
           boundary === 'export'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportLayer']>)
+            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportComposite']>)
             : vi.fn(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
         runGraph:
           boundary === 'queue'
@@ -541,7 +545,7 @@ describe('createSelectObjectSession', () => {
       await vi.waitFor(() => {
         const fn =
           boundary === 'export'
-            ? harness.deps.exportLayer
+            ? harness.deps.exportComposite
             : boundary === 'upload'
               ? harness.deps.uploadIntermediate
               : boundary === 'queue'
@@ -580,9 +584,9 @@ describe('createSelectObjectSession', () => {
           boundary === 'decode'
             ? vi.fn(() => wait.promise as Promise<string>)
             : vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
-        exportLayer:
+        exportComposite:
           boundary === 'export'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportLayer']>)
+            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportComposite']>)
             : vi.fn(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
         runGraph:
           boundary === 'queue'
@@ -598,7 +602,7 @@ describe('createSelectObjectSession', () => {
       await vi.waitFor(() => {
         const fn =
           boundary === 'export'
-            ? harness.deps.exportLayer
+            ? harness.deps.exportComposite
             : boundary === 'upload'
               ? harness.deps.uploadIntermediate
               : boundary === 'queue'

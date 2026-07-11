@@ -37,9 +37,34 @@ const createDeferred = <T>() => {
 };
 
 const filterIdentity = { kind: 'filter' as const, layerId: layer.id, projectId: 'project-1' };
-const selectObjectIdentity = { kind: 'select-object' as const, layerId: layer.id, projectId: 'project-1' };
+const selectObjectIdentity = { kind: 'select-object' as const, projectId: 'project-1' };
+
+const compositeGuard = {
+  bbox: { height: 10, width: 10, x: 0, y: 0 },
+  documentFingerprint: 'document-1',
+  documentGeneration: 1,
+  participants: [{ cacheVersion: 1, layer, layerId: layer.id }],
+  projectId: 'project-1',
+};
+const documentSelectObjectIdentity = { kind: 'select-object' as const, projectId: 'project-1' };
 
 describe('createCanvasOperationController', () => {
+  it('uses document-composite identity and guards for Select Object without a layer sentinel', () => {
+    const controller = createCanvasOperationController({ isGuardCurrent: () => true });
+
+    const session = controller.start({
+      cleanupPreview: vi.fn(),
+      guard: compositeGuard,
+      identity: documentSelectObjectIdentity,
+    });
+
+    expect(session).not.toBeNull();
+    expect(controller.getSnapshot()).toMatchObject({ identity: documentSelectObjectIdentity, status: 'active' });
+    // @ts-expect-error Select Object cannot accept a layer guard.
+    expect(controller.start({ cleanupPreview: vi.fn(), guard, identity: documentSelectObjectIdentity })).toBeNull();
+    // @ts-expect-error Filter cannot accept a document-composite guard.
+    expect(controller.start({ cleanupPreview: vi.fn(), guard: compositeGuard, identity: filterIdentity })).toBeNull();
+  });
   it('replaces the active operation and prevents its stale session from affecting the replacement', async () => {
     const firstWork = createDeferred<string>();
     const firstCleanup = vi.fn();
@@ -50,7 +75,11 @@ describe('createCanvasOperationController', () => {
     const pending = first.run(() => firstWork.promise, publishFirst);
     firstCleanup.mockClear();
 
-    const second = controller.start({ cleanupPreview: secondCleanup, guard, identity: selectObjectIdentity })!;
+    const second = controller.start({
+      cleanupPreview: secondCleanup,
+      guard: compositeGuard,
+      identity: selectObjectIdentity,
+    })!;
 
     expect(firstCleanup).toHaveBeenCalledOnce();
     expect(controller.getSnapshot()).toMatchObject({ identity: selectObjectIdentity, status: 'active' });
@@ -180,7 +209,7 @@ describe('createCanvasOperationController', () => {
     const result = await session.run(
       () => Promise.resolve('prepared'),
       () => {
-        controller.start({ cleanupPreview: replacementCleanup, guard, identity: selectObjectIdentity });
+        controller.start({ cleanupPreview: replacementCleanup, guard: compositeGuard, identity: selectObjectIdentity });
         return undefined;
       }
     );
@@ -235,7 +264,7 @@ describe('createCanvasOperationController', () => {
       const controller = createCanvasOperationController({ isGuardCurrent: () => true });
       const replacementCleanup = vi.fn();
       const cleanupPreview = vi.fn(() => {
-        controller.start({ cleanupPreview: replacementCleanup, guard, identity: selectObjectIdentity });
+        controller.start({ cleanupPreview: replacementCleanup, guard: compositeGuard, identity: selectObjectIdentity });
       });
       const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
 
@@ -257,7 +286,7 @@ describe('createCanvasOperationController', () => {
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const replacementCleanup = vi.fn();
     const cleanupPreview = vi.fn(() => {
-      controller.start({ cleanupPreview: replacementCleanup, guard, identity: selectObjectIdentity });
+      controller.start({ cleanupPreview: replacementCleanup, guard: compositeGuard, identity: selectObjectIdentity });
     });
     const session = controller.start({ cleanupPreview, guard, identity: filterIdentity })!;
     const work = vi.fn(() => Promise.resolve('prepared'));
@@ -393,7 +422,11 @@ describe('createCanvasOperationController', () => {
     const work = createDeferred<string>();
     const publish = vi.fn((_result: string): undefined => undefined);
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
-    const session = controller.start({ cleanupPreview: vi.fn(), guard, identity: selectObjectIdentity })!;
+    const session = controller.start({
+      cleanupPreview: vi.fn(),
+      guard: compositeGuard,
+      identity: selectObjectIdentity,
+    })!;
     const pending = session.run(() => work.promise, publish);
 
     controller.cancel();

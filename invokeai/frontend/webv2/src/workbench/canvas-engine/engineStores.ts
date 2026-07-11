@@ -240,7 +240,6 @@ export type SamSessionInput =
 
 /** Narrow engine-owned Select Object state for canvas tools and future UI subscribers. */
 export interface SamSessionSnapshot {
-  layerId: string;
   sourceRect: Rect;
   input: SamSessionInput;
   pointLabel: SamPointLabel;

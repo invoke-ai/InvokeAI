@@ -18,7 +18,6 @@ const visualSnapshot = (overrides: Partial<SamSessionSnapshot> = {}): SamSession
   input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
   invert: false,
   isolatedPreview: true,
-  layerId: 'source',
   model: 'segment-anything-2-large',
   pointLabel: 'include',
   sourceRect,
