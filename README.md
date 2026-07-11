@@ -6,7 +6,10 @@
 
 [![discord badge]][discord link] [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link] [![CI checks on main badge]][CI checks on main link] [![latest commit to main badge]][latest commit to main link] [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link] [![translation status badge]][translation status link]
 
+[![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
+
 </div>
+
 
 Invoke is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. Invoke offers an industry leading web-based UI, and serves as the foundation for multiple commercial products.
 
@@ -15,12 +18,6 @@ Invoke is a leading creative engine built to empower professionals and enthusias
 - Generate, refine, iterate on images, and build workflows
 
 ![Highlighted Features - Canvas and Workflows](https://github.com/invoke-ai/InvokeAI/assets/31807370/708f7a82-084f-4860-bfbe-e2588c53548d)
-
----
-> ## 📣 Are you a new or returning InvokeAI user?
-> Take our first annual [User's Survey](https://forms.gle/rCE5KuQ7Wfrd1UnS7)
-
----
 
 # Documentation
 
