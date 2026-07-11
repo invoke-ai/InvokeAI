@@ -523,6 +523,11 @@ class _ExecutionMaterializer:
                 mappings.append(mapping)
         return mappings
 
+    def _mark_source_node_empty(self, source_node_id: str) -> None:
+        self._state.source_prepared_mapping[source_node_id] = set()
+        self._state.executed.add(source_node_id)
+        self._state.executed_history.append(source_node_id)
+
     def _get_parent_iteration_mappings(self, next_node_id: str, graph: nx.DiGraph) -> list[list[tuple[str, str]]]:
         parent_node_ids = [source_id for source_id, _ in graph.in_edges(next_node_id)]
         iterator_graph = self.iterator_graph(graph)
@@ -704,6 +709,10 @@ class _ExecutionMaterializer:
                 create_results = self.create_execution_node(next_node_id, iteration_mappings)
                 if create_results is not None:
                     new_node_ids.extend(create_results)
+
+        if not new_node_ids:
+            self._mark_source_node_empty(next_node_id)
+            return next_node_id
 
         return next(iter(new_node_ids), None)
 
@@ -1522,6 +1531,9 @@ class Graph(BaseModel):
             and edge.source.field == COLLECTION_FIELD
             and not self._is_destination_field_list_of_Any(edge)
             and not self._is_destination_field_Any(edge)
+            # A materialized collector may legitimately have no input edges when its upstream iterator had zero
+            # iterations. The source graph has already validated the collector's input and output types.
+            and self._get_input_edges(source_node.id)
         ):
             err = self._is_collector_connection_valid(edge.source.node_id, new_output=edge.destination)
             if err is not None:

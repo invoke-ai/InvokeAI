@@ -14,6 +14,7 @@ from invokeai.app.invocations.primitives import (
     BooleanCollectionOutput,
     BooleanInvocation,
     BooleanOutput,
+    IntegerCollectionInvocation,
 )
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
@@ -457,6 +458,28 @@ def test_graph_state_collects():
     assert isinstance(n6[0], CollectInvocation)
 
     assert sorted(g.results[n6[0].id].collection) == sorted(test_prompts)
+
+
+def test_graph_state_empty_iterator_collects_and_completes():
+    graph = Graph()
+    graph.add_node(IntegerCollectionInvocation(id="collection", collection=[]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(IntegerCollectionInvocation(id="consumer"))
+    graph.add_edge(create_edge("collection", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "consumer", "collection"))
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    assert state.is_complete()
+    prepared_collect_id = next(iter(state.source_prepared_mapping["collect"]))
+    assert state.results[prepared_collect_id].collection == []
+    prepared_consumer_id = next(iter(state.source_prepared_mapping["consumer"]))
+    assert state.results[prepared_consumer_id].collection == []
 
 
 def test_graph_state_resumes_partially_executed_session_after_json_round_trip():
