@@ -539,7 +539,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     error_traceback=error_traceback,
                 )
             except SessionQueueItemNotFoundError:
-                self._invoker.services.logger.warning(f"Could not mark queue item {queue_item.item_id} as failed because it no longer exists in the database.")
+                self._invoker.services.logger.warning(
+                    f"Could not mark queue item {queue_item.item_id} as failed because it no longer exists in the database."
+                )
 
         for callback in self._on_non_fatal_processor_error_callbacks:
             callback(
