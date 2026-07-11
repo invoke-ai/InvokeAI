@@ -55,7 +55,7 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           return;
         }
         case 'control': {
-          const layer = createControlLayer(nextControlLayerName(layerNames));
+          const layer = createControlLayer(nextControlLayerName(layerNames), undefined, base);
           applyStructural(
             engine,
             dispatch,

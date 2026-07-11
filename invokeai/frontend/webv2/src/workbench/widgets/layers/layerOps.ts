@@ -10,7 +10,6 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import type { GenerateReferenceImage } from '@workbench/generation/types';
 import type {
   CanvasBlendMode,
-  CanvasControlAdapterContract,
   CanvasControlLayerContract,
   CanvasDocumentContractV2,
   CanvasImageRef,
@@ -27,6 +26,7 @@ import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
 
 import { getSourceContentRect, isMergeableRasterLayer } from '@workbench/canvas-engine/document/sources';
+import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
 
@@ -290,31 +290,7 @@ export const createRegionalGuidanceLayerWithRefImage = (
  * weight 0.75, an active range of the first 75% of steps, `balanced` control mode,
  * and no model selected yet.
  */
-export const CONTROL_ADAPTER_DEFAULTS: Readonly<
-  Record<CanvasControlAdapterContract['kind'], CanvasControlAdapterContract>
-> = {
-  control_lora: {
-    beginEndStepPct: [0, 1],
-    controlMode: null,
-    kind: 'control_lora',
-    model: null,
-    weight: 0.75,
-  },
-  controlnet: {
-    beginEndStepPct: [0, 0.75],
-    controlMode: 'balanced',
-    kind: 'controlnet',
-    model: null,
-    weight: 0.75,
-  },
-  t2i_adapter: {
-    beginEndStepPct: [0, 1],
-    controlMode: null,
-    kind: 't2i_adapter',
-    model: null,
-    weight: 1,
-  },
-};
+export { CONTROL_ADAPTER_DEFAULTS };
 
 export const CONTROL_WEIGHT_BOUNDS = {
   inputMax: 2,
@@ -351,19 +327,26 @@ export const nextControlLayerName = (existingNames: readonly string[]): string =
  * filter yet — the user paints or drops an image, then optionally previews a
  * filter.
  */
-export const createControlLayer = (name: string, id: string = createLayerId()): CanvasControlLayerContract => ({
-  adapter: { ...DEFAULT_CONTROL_ADAPTER, beginEndStepPct: [...DEFAULT_CONTROL_ADAPTER.beginEndStepPct] },
-  blendMode: 'normal',
-  id,
-  isEnabled: true,
-  isLocked: false,
-  name,
-  opacity: 1,
-  source: { bitmap: null, type: 'paint' },
-  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-  type: 'control',
-  withTransparencyEffect: true,
-});
+export const createControlLayer = (
+  name: string,
+  id: string = createLayerId(),
+  base?: string | null
+): CanvasControlLayerContract => {
+  const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER;
+  return {
+    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct] },
+    blendMode: 'normal',
+    id,
+    isEnabled: true,
+    isLocked: false,
+    name,
+    opacity: 1,
+    source: { bitmap: null, type: 'paint' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect: true,
+  };
+};
 
 /** Returns the transform that fits the layer's unrotated local content into the bbox. */
 export const fitLayerTransformToBbox = (
@@ -500,14 +483,26 @@ const destinationBase = (layer: CanvasLayerContract, id: string, isCopy: boolean
   transform: cloneTransform(layer),
 });
 
-const pixelLayerToControl = (layer: PixelLayer, id: string, isCopy: boolean): CanvasControlLayerContract | null => {
+const pixelLayerToControl = (
+  layer: PixelLayer,
+  id: string,
+  isCopy: boolean,
+  base?: string | null
+): CanvasControlLayerContract | null => {
   const source = clonePixelSource(layer);
   if (!source) {
     return null;
   }
   return {
     ...destinationBase(layer, id, isCopy),
-    adapter: { ...DEFAULT_CONTROL_ADAPTER, beginEndStepPct: [...DEFAULT_CONTROL_ADAPTER.beginEndStepPct] },
+    adapter: {
+      ...(base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER),
+      beginEndStepPct: [
+        ...(base === 'z-image'
+          ? CONTROL_ADAPTER_DEFAULTS.z_image_control.beginEndStepPct
+          : DEFAULT_CONTROL_ADAPTER.beginEndStepPct),
+      ],
+    },
     source,
     type: 'control',
     withTransparencyEffect: true,
@@ -544,8 +539,9 @@ const pixelLayerToRegionalGuidance = (
 
 export const copyRasterToControl = (
   layer: CanvasRasterLayerContractV2,
-  id: string
-): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true);
+  id: string,
+  base?: string | null
+): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true, base);
 
 export const copyRasterToInpaintMask = (
   layer: CanvasRasterLayerContractV2,
@@ -557,8 +553,10 @@ export const copyRasterToRegionalGuidance = (
   id: string
 ): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true);
 
-export const convertRasterToControl = (layer: CanvasRasterLayerContractV2): CanvasControlLayerContract | null =>
-  pixelLayerToControl(layer, layer.id, false);
+export const convertRasterToControl = (
+  layer: CanvasRasterLayerContractV2,
+  base?: string | null
+): CanvasControlLayerContract | null => pixelLayerToControl(layer, layer.id, false, base);
 
 export const convertRasterToInpaintMask = (layer: CanvasRasterLayerContractV2): CanvasInpaintMaskLayerContract | null =>
   pixelLayerToInpaintMask(layer, layer.id, false);
@@ -615,13 +613,14 @@ export const copyRegionalGuidanceToInpaintMask = (
  */
 export const convertRasterControlLayer = (
   layer: CanvasLayerContract,
-  targetType: 'raster' | 'control'
+  targetType: 'raster' | 'control',
+  base?: string | null
 ): CanvasLayerContract | null => {
   if (layer.type === targetType || !canConvertRasterControl(layer)) {
     return null;
   }
   if (layer.type === 'raster' && targetType === 'control') {
-    return convertRasterToControl(layer);
+    return convertRasterToControl(layer, base);
   }
   if (layer.type === 'control' && targetType === 'raster') {
     const source = clonePixelSource(layer);

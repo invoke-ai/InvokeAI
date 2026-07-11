@@ -674,6 +674,32 @@ describe('compileCanvasGraph — control layers (integration)', () => {
     expect(backendGraph.nodes.canvas_output).toBeDefined();
     expect(graph.label).toBe(`${sd1Model.name} img2img`);
   });
+
+  it('grafts a Z-Image control into the real Z-Image base graph', () => {
+    const layer: ControlLayerGraphInput = {
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      id: 'z-control',
+      imageName: 'z-control.png',
+      kind: 'z_image_control',
+      model: { base: 'z-image', key: 'z-control-model', name: 'Z Control', type: 'controlnet' },
+      weight: 0.75,
+    };
+
+    const { backendGraph } = compile(zImageModel, 'txt2img', { controlLayers: [layer] });
+
+    expect(backendGraph.nodes.denoise_latents?.type).toBe('z_image_denoise');
+    expect(backendGraph.nodes['z_image_control_z-control']).toMatchObject({
+      control_context_scale: 0.75,
+      control_model: layer.model,
+      image: { image_name: 'z-control.png' },
+      type: 'z_image_control',
+    });
+    expect(getEdge(backendGraph, 'denoise_latents', 'control')?.source).toEqual({
+      field: 'control',
+      node_id: 'z_image_control_z-control',
+    });
+  });
 });
 
 describe('compileCanvasGraph — regional guidance', () => {

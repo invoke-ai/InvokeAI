@@ -311,6 +311,13 @@ describe('createControlLayer', () => {
         weight: 0.75,
       },
       t2i_adapter: { beginEndStepPct: [0, 1], controlMode: null, kind: 't2i_adapter', model: null, weight: 1 },
+      z_image_control: {
+        beginEndStepPct: [0, 1],
+        controlMode: null,
+        kind: 'z_image_control',
+        model: null,
+        weight: 0.75,
+      },
     });
   });
 
@@ -334,6 +341,10 @@ describe('createControlLayer', () => {
     // The default adapter's mutable array must be copied, not shared.
     expect(layer.adapter.beginEndStepPct).not.toBe(DEFAULT_CONTROL_ADAPTER.beginEndStepPct);
     expect(layer.adapter.beginEndStepPct).toEqual([0, 0.75]);
+  });
+
+  it('uses Z-Image control defaults when created for a Z-Image main model', () => {
+    expect(createControlLayer('Z Control', 'z1', 'z-image').adapter).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
   });
 });
 
@@ -505,6 +516,11 @@ describe('convertRasterControlLayer', () => {
       expect(converted.transform).toEqual(transform);
       expect(converted.adapter).toEqual(DEFAULT_CONTROL_ADAPTER);
     }
+  });
+
+  it('converts raster→control with Z-Image defaults for a Z-Image main model', () => {
+    const converted = convertRasterControlLayer(paintLayer('r'), 'control', 'z-image');
+    expect(converted?.type === 'control' ? converted.adapter : null).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
   });
 
   it('converts control→raster preserving the pixel source and round-trips', () => {

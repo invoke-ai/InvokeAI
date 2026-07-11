@@ -1281,7 +1281,8 @@
         "kinds": {
           "control_lora": "Control LoRA",
           "controlnet": "ControlNet",
-          "t2i_adapter": "T2I Adapter"
+          "t2i_adapter": "T2I Adapter",
+          "z_image_control": "Z-Image ControlNet"
         },
         "mode": "Control mode",
         "model": "Model",
@@ -1301,7 +1302,8 @@
           "incompatible_adapter": "The selected model does not match this adapter type.",
           "incompatible_base": "The control model is incompatible with the selected base model.",
           "missing_model": "Select a control model before generating.",
-          "unsupported_adapter": "This control adapter is not supported by the selected base model."
+          "unsupported_adapter": "This control adapter is not supported by the selected base model.",
+          "z_image_control_limit": "Only one Z-Image control can be used at a time."
         },
         "weight": "Weight"
       },

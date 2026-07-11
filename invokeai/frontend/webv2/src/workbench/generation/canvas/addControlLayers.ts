@@ -12,7 +12,8 @@
  * Per-base + per-kind support (legacy `getControlLayerWarnings` + the graph
  * builders): controlnet on sd-1 / sdxl (`controlnet`) and flux (`flux_controlnet`);
  * t2i_adapter on sd-1 / sdxl; control_lora on flux only (single layer, and never
- * with a FLUX Fill main model). Everything else is rejected upstream.
+ * with a FLUX Fill main model); z_image_control on Z-Image only (single layer).
+ * Everything else is rejected upstream.
  *
  * The executor composites each control layer SEPARATELY (never blended) and
  * passes its own uploaded image name in — so each adapter node references a
@@ -83,6 +84,7 @@ const controlNetNodeType = (base: string): string => (base === 'flux' ? 'flux_co
  * - controlnet → `control_net_collector` (collect) → `denoise.control`;
  * - t2i_adapter → `t2i_adapter_collector` (collect) → `denoise.t2i_adapter`;
  * - control_lora → `denoise.control_lora` directly (FLUX, first layer only).
+ * - z_image_control → `denoise.control` directly (Z-Image, first layer only).
  */
 export const addControlLayers = (graph: BackendGraphContract, options: AddControlLayersOptions): void => {
   const { base, layers, modelVariant } = options;
@@ -94,6 +96,7 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
   let controlNetCollector: BackendInvocationContract | null = null;
   let t2iAdapterCollector: BackendInvocationContract | null = null;
   let controlLoraCount = 0;
+  let zImageControlCount = 0;
 
   const ensureControlNetCollector = (): BackendInvocationContract => {
     if (!controlNetCollector) {
@@ -118,6 +121,7 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
       kind: layer.kind,
       mainBase: base,
       mainVariant: modelVariant,
+      zImageControlIndex: layer.kind === 'z_image_control' ? zImageControlCount : 0,
     });
     if (reason) {
       throw new Error(`Invalid control layer: ${reason}`);
@@ -149,7 +153,7 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         weight: layer.weight,
       });
       addEdge(graph, node, 't2i_adapter', ensureT2iAdapterCollector(), 'item');
-    } else {
+    } else if (layer.kind === 'control_lora') {
       const node = addNode(graph, {
         id: `control_lora_${layer.id}`,
         image: { image_name: layer.imageName },
@@ -159,6 +163,18 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
       });
       addEdge(graph, node, 'control_lora', denoise, 'control_lora');
       controlLoraCount += 1;
+    } else {
+      const node = addNode(graph, {
+        begin_step_percent: layer.beginEndStepPct[0],
+        control_context_scale: layer.weight,
+        control_model: layer.model,
+        end_step_percent: layer.beginEndStepPct[1],
+        id: `z_image_control_${layer.id}`,
+        image: { image_name: layer.imageName },
+        type: 'z_image_control',
+      });
+      addEdge(graph, node, 'control', denoise, 'control');
+      zImageControlCount += 1;
     }
   }
 };

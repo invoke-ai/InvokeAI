@@ -342,7 +342,7 @@ const LayerMenu = ({
     (targetType: CanvasLayerContract['type'], label: string) => {
       const converted =
         layer.type === 'raster' && targetType === 'control'
-          ? convertRasterToControl(layer)
+          ? convertRasterToControl(layer, base)
           : layer.type === 'raster' && targetType === 'inpaint_mask'
             ? convertRasterToInpaintMask(layer)
             : layer.type === 'raster' && targetType === 'regional_guidance'
@@ -372,7 +372,7 @@ const LayerMenu = ({
         );
       }
     },
-    [dispatch, engine, layer, makeStatusError]
+    [base, dispatch, engine, layer, makeStatusError]
   );
 
   const handleToggleVisibility = useCallback(() => {
@@ -528,9 +528,9 @@ const LayerMenu = ({
 
   const handleCopyToControl = useCallback(() => {
     if (layer.type === 'raster') {
-      addCopy(copyRasterToControl(layer, createLayerId()), getActionLabel('copy-to-control'));
+      addCopy(copyRasterToControl(layer, createLayerId(), base), getActionLabel('copy-to-control'));
     }
-  }, [addCopy, getActionLabel, layer]);
+  }, [addCopy, base, getActionLabel, layer]);
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();

@@ -140,6 +140,7 @@ const collectControlLayerInputs = async (
   const layerById = new Map(document.layers.map((layer) => [layer.id, layer]));
   const inputs: ControlLayerGraphInput[] = [];
   let controlLoraCount = 0;
+  let zImageControlCount = 0;
 
   for (const { entry, layerId } of composites) {
     const layer = layerById.get(layerId);
@@ -155,12 +156,16 @@ const collectControlLayerInputs = async (
       kind: adapter.kind,
       mainBase: model.base,
       mainVariant: model.variant ?? undefined,
+      zImageControlIndex: adapter.kind === 'z_image_control' ? zImageControlCount : 0,
     });
     if (rejection || !resolved) {
       throw new Error(`[${rejection ?? 'missing_model'}] Control layer "${layer.name}" is invalid.`);
     }
     if (adapter.kind === 'control_lora') {
       controlLoraCount += 1;
+    }
+    if (adapter.kind === 'z_image_control') {
+      zImageControlCount += 1;
     }
 
     const result = await executeControlComposite(entry, executorDeps);

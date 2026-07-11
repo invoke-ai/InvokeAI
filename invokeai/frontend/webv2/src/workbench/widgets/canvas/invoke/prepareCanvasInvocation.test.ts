@@ -386,6 +386,14 @@ describe('runCanvasInvocation', () => {
     expect(harness.notices()).toHaveLength(0);
   });
 
+  it('ignores a disabled nonempty control layer with no model', async () => {
+    const disabled = { ...controlLayer('control'), isEnabled: false };
+    const harness = makeHarness({ document: docWithLayers([disabled]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+    expect(harness.notices()).toHaveLength(0);
+  });
+
   it('blocks the second enabled nonempty Control LoRA', async () => {
     const model = {
       base: 'flux',
@@ -411,6 +419,94 @@ describe('runCanvasInvocation', () => {
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
     expect(harness.notices()[0]?.message).toContain('control_lora_limit');
+  });
+
+  it('prepares a Z-Image control with exact adapter and model configuration', async () => {
+    const zImage = {
+      ...sd1Model,
+      base: 'z-image' as const,
+      format: 'diffusers' as const,
+      key: 'z-image',
+      name: 'Z-Image',
+    };
+    const controlModel = {
+      base: 'z-image',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'z-control-hash',
+      key: 'z-control',
+      name: 'Z Control',
+      path: 'z-control',
+      source: 'z-control',
+      source_type: 'path' as const,
+      type: 'controlnet',
+    };
+    const harness = makeHarness({
+      document: docWithLayers([
+        controlLayer('z-layer', {
+          beginEndStepPct: [0.15, 0.85],
+          controlMode: null,
+          kind: 'z_image_control',
+          model: controlModel.key,
+          weight: 0.7,
+        }),
+      ]),
+      model: zImage,
+      models: [controlModel],
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    const node = harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['z_image_control_z-layer'];
+    expect(node).toMatchObject({
+      begin_step_percent: 0.15,
+      control_context_scale: 0.7,
+      control_model: {
+        base: 'z-image',
+        hash: 'z-control-hash',
+        key: 'z-control',
+        name: 'Z Control',
+        type: 'controlnet',
+      },
+      end_step_percent: 0.85,
+      type: 'z_image_control',
+    });
+  });
+
+  it('blocks a second enabled nonempty Z-Image control', async () => {
+    const zImage = {
+      ...sd1Model,
+      base: 'z-image' as const,
+      format: 'diffusers' as const,
+      key: 'z-image',
+      name: 'Z-Image',
+    };
+    const controlModel = {
+      base: 'z-image',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'hash',
+      key: 'z-control',
+      name: 'Z Control',
+      path: 'z-control',
+      source: 'z-control',
+      source_type: 'path' as const,
+      type: 'controlnet',
+    };
+    const harness = makeHarness({
+      document: docWithLayers([
+        controlLayer('first', { kind: 'z_image_control', model: controlModel.key }),
+        controlLayer('second', { kind: 'z_image_control', model: controlModel.key }),
+      ]),
+      model: zImage,
+      models: [controlModel],
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()[0]?.message).toContain('z_image_control_limit');
   });
 
   it('ignores a concurrent invoke while a prior prepare for the same project is in flight', async () => {

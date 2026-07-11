@@ -22,6 +22,8 @@ import type {
   CanvasStateContractV2,
 } from './types';
 
+import { normalizeControlAdapter } from './controlAdapters';
+
 export const DEFAULT_CANVAS_DOCUMENT_WIDTH = 1024;
 export const DEFAULT_CANVAS_DOCUMENT_HEIGHT = 1024;
 
@@ -254,7 +256,15 @@ const normalizeCanvasStateV2 = (canvas: Record<string, unknown>): CanvasStateCon
       y: asNumber(bbox.y, 0),
     },
     height,
-    layers: Array.isArray(rawDocument.layers) ? (rawDocument.layers as CanvasDocumentContractV2['layers']) : [],
+    layers: Array.isArray(rawDocument.layers)
+      ? (rawDocument.layers.map((layer) => {
+          if (!isRecord(layer) || layer.type !== 'control') {
+            return layer;
+          }
+          const adapter = normalizeControlAdapter(layer.adapter);
+          return adapter === layer.adapter ? layer : { ...layer, adapter };
+        }) as CanvasDocumentContractV2['layers'])
+      : [],
     selectedLayerId: typeof rawDocument.selectedLayerId === 'string' ? rawDocument.selectedLayerId : null,
     version: 2,
     width,

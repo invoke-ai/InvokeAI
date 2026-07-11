@@ -18,11 +18,17 @@ import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/Workb
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { getCompatibleControlModels } from './controlModelOptions';
 import { applyStructural, applyStructuralPreview, CONTROL_ADAPTER_DEFAULTS, CONTROL_WEIGHT_BOUNDS } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
 
-const CONTROL_ADAPTER_KINDS: readonly ControlAdapterKind[] = ['controlnet', 't2i_adapter', 'control_lora'];
+const CONTROL_ADAPTER_KINDS: readonly ControlAdapterKind[] = [
+  'controlnet',
+  't2i_adapter',
+  'control_lora',
+  'z_image_control',
+];
 const CONTROL_MODES: readonly NonNullable<CanvasControlAdapterContract['controlMode']>[] = [
   'balanced',
   'more_prompt',
@@ -64,6 +70,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;
   const { adapter } = layer;
+  const weightInputMin = adapter.kind === 'z_image_control' ? 0 : CONTROL_WEIGHT_BOUNDS.inputMin;
 
   const commitAdapter = useCallback(
     (next: Partial<CanvasControlAdapterContract>, before: Partial<CanvasControlAdapterContract>, label: string) => {
@@ -78,10 +85,13 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     [dispatch, engine, layer.id]
   );
 
-  // Adapter kinds supported by the selected base (legacy support matrix). With no
-  // model selected, offer all kinds so the layer is still configurable.
+  // Adapter kinds supported by the selected base. Z-Image Control is only shown
+  // when a compatible Z-Image main model is selected.
   const kindOptions = useMemo(
-    () => CONTROL_ADAPTER_KINDS.filter((kind) => !base || isControlKindSupportedForBase(base, kind)),
+    () =>
+      CONTROL_ADAPTER_KINDS.filter((kind) =>
+        base ? isControlKindSupportedForBase(base, kind) : kind !== 'z_image_control'
+      ),
     [base]
   );
   const kindCollection = useMemo(
@@ -94,7 +104,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
 
   // Adapter models matching the current kind + base (mirrors the generate model list).
   const modelOptions = useMemo(
-    () => models.filter((model) => model.type === adapter.kind && (!base || model.base === base)),
+    () => getCompatibleControlModels(models, base, adapter.kind),
     [adapter.kind, base, models]
   );
   const modelCollection = useMemo(
@@ -183,14 +193,14 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
       if (
         !Number.isFinite(valueAsNumber) ||
-        valueAsNumber < CONTROL_WEIGHT_BOUNDS.inputMin ||
+        valueAsNumber < weightInputMin ||
         valueAsNumber > CONTROL_WEIGHT_BOUNDS.inputMax
       ) {
         return;
       }
       commitAdapter({ weight: valueAsNumber }, { weight: adapter.weight }, t('widgets.layers.control.weight'));
     },
-    [adapter.weight, commitAdapter, t]
+    [adapter.weight, commitAdapter, t, weightInputMin]
   );
 
   const rangeBeforeRef = useRef<[number, number] | null>(null);
@@ -287,6 +297,19 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
           )
           .findIndex((candidate) => candidate.id === layer.id) ?? 0)
       : 0;
+  const zImageControlIndex =
+    adapter.kind === 'z_image_control' && engine
+      ? (engine
+          .getDocument()
+          ?.layers.filter(
+            (candidate) =>
+              candidate.isEnabled &&
+              candidate.type === 'control' &&
+              candidate.adapter.kind === 'z_image_control' &&
+              engine.hasExportableLayerContent(candidate.id)
+          )
+          .findIndex((candidate) => candidate.id === layer.id) ?? 0)
+      : 0;
   const validationReason =
     layer.isEnabled && hasContent && mainModel
       ? getControlValidationReason({
@@ -295,6 +318,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
           kind: adapter.kind,
           mainBase: mainModel.base,
           mainVariant: mainModel.variant ?? undefined,
+          zImageControlIndex: Math.max(0, zImageControlIndex),
         })
       : null;
   const startFilter = useCallback(() => engine?.startFilterOperation(layer.id), [engine, layer.id]);
@@ -342,7 +366,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
           />
           <NumberInput.Root
             max={CONTROL_WEIGHT_BOUNDS.inputMax}
-            min={CONTROL_WEIGHT_BOUNDS.inputMin}
+            min={weightInputMin}
             size="xs"
             step={CONTROL_WEIGHT_BOUNDS.step}
             value={weightInputValue}

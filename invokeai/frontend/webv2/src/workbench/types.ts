@@ -551,7 +551,7 @@ export interface CanvasAdjustmentsContract {
 }
 
 export interface CanvasControlAdapterContract {
-  kind: 'controlnet' | 't2i_adapter' | 'control_lora';
+  kind: 'controlnet' | 't2i_adapter' | 'control_lora' | 'z_image_control';
   model: string | null;
   weight: number;
   beginEndStepPct: [number, number];

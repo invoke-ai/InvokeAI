@@ -33,6 +33,73 @@ describe('placementToTransform', () => {
 });
 
 describe('migrateCanvasStateToV2', () => {
+  it('round-trips z-image controls without rewriting persisted adapter kinds', () => {
+    const adapters = [
+      { beginEndStepPct: [0, 0.75], controlMode: 'balanced', kind: 'controlnet', model: 'sd-control', weight: 0.75 },
+      { beginEndStepPct: [0, 1], controlMode: null, kind: 't2i_adapter', model: 't2i', weight: 1 },
+      { beginEndStepPct: [0, 1], controlMode: null, kind: 'control_lora', model: 'flux-control', weight: 0.75 },
+      { beginEndStepPct: [0.2, 0.9], controlMode: null, kind: 'z_image_control', model: 'z-control', weight: 0.7 },
+    ] as const;
+    const layers = adapters.map((adapter, index) => ({
+      adapter,
+      blendMode: 'normal',
+      id: `control-${index}`,
+      isEnabled: true,
+      isLocked: false,
+      name: `Control ${index}`,
+      opacity: 1,
+      source: { bitmap: null, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    }));
+    const state = {
+      ...createEmptyCanvasStateV2(),
+      document: { ...createEmptyCanvasStateV2().document, layers },
+    };
+
+    const migrated = migrateCanvasStateToV2(state);
+
+    expect(migrated.document.layers.map((layer) => (layer.type === 'control' ? layer.adapter : null))).toEqual(
+      adapters
+    );
+  });
+
+  it('normalizes an incomplete persisted Z-Image control with backend defaults', () => {
+    const state = createEmptyCanvasStateV2();
+    const migrated = migrateCanvasStateToV2({
+      ...state,
+      document: {
+        ...state.document,
+        layers: [
+          {
+            adapter: { kind: 'z_image_control', model: 'z-control' },
+            blendMode: 'normal',
+            id: 'z-control',
+            isEnabled: true,
+            isLocked: false,
+            name: 'Z Control',
+            opacity: 1,
+            source: { bitmap: null, type: 'paint' },
+            transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+            type: 'control',
+            withTransparencyEffect: true,
+          },
+        ],
+      },
+    });
+    const layer = migrated.document.layers[0];
+
+    expect(layer?.type).toBe('control');
+    expect(layer?.type === 'control' ? layer.adapter : null).toEqual({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      kind: 'z_image_control',
+      model: 'z-control',
+      weight: 0.75,
+    });
+  });
+
   it('maps a v1 raster layer to a v2 raster layer positioned by transform', () => {
     const v1Canvas = {
       document: {

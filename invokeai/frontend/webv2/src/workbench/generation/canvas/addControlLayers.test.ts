@@ -331,6 +331,56 @@ describe('addControlLayers — control_lora limits', () => {
   });
 });
 
+describe('addControlLayers — Z-Image control', () => {
+  it('creates the exact backend node and connects it directly to Z-Image denoise', () => {
+    const m = model('z-image', 'controlnet');
+    const graph = run({
+      base: 'z-image',
+      layers: [
+        layer({
+          beginEndStepPct: [0.2, 0.9],
+          controlMode: null,
+          id: 'Z1',
+          imageName: 'z-control.png',
+          kind: 'z_image_control',
+          model: m,
+          weight: 0.7,
+        }),
+      ],
+    });
+
+    expect(graph.nodes.z_image_control_Z1).toEqual({
+      begin_step_percent: 0.2,
+      control_context_scale: 0.7,
+      control_model: m,
+      end_step_percent: 0.9,
+      id: 'z_image_control_Z1',
+      image: { image_name: 'z-control.png' },
+      is_intermediate: true,
+      type: 'z_image_control',
+      use_cache: true,
+    });
+    expect(graph.edges).toContainEqual({
+      destination: { field: 'control', node_id: 'denoise_latents' },
+      source: { field: 'control', node_id: 'z_image_control_Z1' },
+    });
+    expect(Object.values(graph.nodes).some((node) => node.type === 'collect')).toBe(false);
+  });
+
+  it('rejects a second Z-Image control because denoise accepts a single field', () => {
+    const m = model('z-image', 'controlnet');
+    expect(() =>
+      run({
+        base: 'z-image',
+        layers: [
+          layer({ id: 'Z1', kind: 'z_image_control', model: m }),
+          layer({ id: 'Z2', kind: 'z_image_control', model: m }),
+        ],
+      })
+    ).toThrow(/z_image_control_limit/);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 7. Two controlnet layers → distinct nodes, one shared collector
 // ---------------------------------------------------------------------------
