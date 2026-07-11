@@ -7,15 +7,10 @@ import { Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { getFocusedRegion } from 'common/hooks/focus';
-import {
-  ACCEPTED_IMAGE_EXTENSIONS,
-  ACCEPTED_IMAGE_TYPES,
-  ACCEPTED_VIDEO_EXTENSIONS,
-  ACCEPTED_VIDEO_TYPES,
-  isVideoFile,
-} from 'common/util/uploadMediaAccept';
+import { isVideoFile } from 'common/util/uploadMediaAccept';
 import { setFileToPaste } from 'features/controlLayers/components/CanvasPasteModal';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
+import { zUploadFile } from 'features/dnd/fullscreenDropzoneAccept';
 import type { DndTargetState } from 'features/dnd/types';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
@@ -27,38 +22,6 @@ import { uploadVideos } from 'services/api/endpoints/videos';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import type { UploadImageArg, UploadVideoArg } from 'services/api/types';
 import { z } from 'zod';
-
-// const MAX_IMAGE_SIZE = 4; //In MegaBytes
-// const sizeInMB = (sizeInBytes: number, decimalsNum = 2) => {
-//   const result = sizeInBytes / (1024 * 1024);
-//   return +result.toFixed(decimalsNum);
-// };
-
-const zUploadFile = z
-  .custom<File>()
-  // .refine(
-  //   (file) => {
-  //     return sizeInMB(file.size) <= MAX_IMAGE_SIZE;
-  //   },
-  //   () => ({ message: `The maximum image size is ${MAX_IMAGE_SIZE}MB` })
-  // )
-  .refine(
-    (file) => {
-      const type = file.type.toLowerCase();
-      return ACCEPTED_IMAGE_TYPES.includes(type) || ACCEPTED_VIDEO_TYPES.includes(type);
-    },
-    { message: `File type is not supported` }
-  )
-  .refine(
-    (file) => {
-      const lower = file.name.toLowerCase();
-      return (
-        ACCEPTED_IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext)) ||
-        ACCEPTED_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext))
-      );
-    },
-    { message: `File extension is not supported` }
-  );
 
 const sx = {
   position: 'absolute',

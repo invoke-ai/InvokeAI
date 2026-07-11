@@ -2,7 +2,7 @@ import type { ButtonProps, IconButtonProps, SystemStyleObject } from '@invoke-ai
 import { Button, IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
-import { imageAndVideoDropzoneAccept, isVideoFile } from 'common/util/uploadMediaAccept';
+import { getUploadDropzoneAccept, partitionUploadFiles } from 'common/util/uploadMediaAccept';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
@@ -20,6 +20,13 @@ type UseImageUploadButtonArgs =
   | {
       isDisabled?: boolean;
       allowMultiple: false;
+      /**
+       * Opt-in for video uploads. The backend only stores videos in the gallery, so a
+       * consumer that wants an image (board covers, ref images, etc.) must NOT set this —
+       * otherwise a selected MP4 would be uploaded to the gallery and its DTO silently
+       * discarded while the requested image action goes nowhere.
+       */
+      allowVideos?: boolean;
       onUpload?: (imageDTO: ImageDTO) => void;
       /** Called when a single dropped file is a video (parallel to onUpload for images). */
       onUploadVideo?: (videoDTO: VideoDTO) => void;
@@ -29,6 +36,7 @@ type UseImageUploadButtonArgs =
   | {
       isDisabled?: boolean;
       allowMultiple: true;
+      allowVideos?: boolean;
       onUpload?: (imageDTOs: ImageDTO[]) => void;
       onUploadVideo?: (videoDTOs: VideoDTO[]) => void;
       onUploadStarted?: (files: File[]) => void;
@@ -61,16 +69,30 @@ export const useImageUploadButton = ({
   onUploadVideo,
   isDisabled,
   allowMultiple,
+  allowVideos = false,
   onUploadStarted,
   onError,
 }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
-  const [uploadImage, request] = useUploadImageMutation();
-  const [uploadVideo] = useUploadVideoMutation();
+  const [uploadImage, imageRequest] = useUploadImageMutation();
+  const [uploadVideo, videoRequest] = useUploadVideoMutation();
   const { t } = useTranslation();
 
   const onDropAccepted = useCallback(
     async (files: File[]) => {
+      // The accept map already excludes videos for image-only consumers, but the file
+      // dialog can bypass it (e.g. "All Files"), so partition again at runtime.
+      const { imageFiles, videoFiles, rejectedFiles } = partitionUploadFiles(files, allowVideos);
+      if (rejectedFiles.length > 0) {
+        log.error({ files: rejectedFiles.map((f) => f.name) }, 'Videos are not accepted by this upload field');
+        toast({
+          id: 'UPLOAD_FAILED',
+          title: t('toast.uploadFailed'),
+          description: t('toast.uploadFailedInvalidUploadDesc'),
+          status: 'error',
+        });
+        return;
+      }
       try {
         if (!allowMultiple) {
           if (files.length > 1) {
@@ -86,7 +108,7 @@ export const useImageUploadButton = ({
           assert(file !== undefined); // should never happen
           onUploadStarted?.(file);
 
-          if (isVideoFile(file)) {
+          if (videoFiles.length > 0) {
             const videoDTO = await uploadVideo({
               file,
               video_category: 'user',
@@ -108,11 +130,6 @@ export const useImageUploadButton = ({
           }
         } else {
           onUploadStarted?.(files);
-
-          // Split the dropped files into images and videos and upload each set through
-          // its own batch helper so a single drop can include a mix.
-          const imageFiles = files.filter((f) => !isVideoFile(f));
-          const videoFiles = files.filter((f) => isVideoFile(f));
 
           let imageDTOs: ImageDTO[] = [];
           if (imageFiles.length > 0) {
@@ -151,14 +168,33 @@ export const useImageUploadButton = ({
         }
       } catch (error) {
         onError?.(error);
+        // Name the media that actually failed — a failed MP4 upload should not claim an
+        // image upload failed. Mixed batches get the media-neutral title.
+        const title =
+          videoFiles.length > 0 && imageFiles.length > 0
+            ? t('toast.uploadFailed')
+            : videoFiles.length > 0
+              ? t('toast.videoUploadFailed')
+              : t('toast.imageUploadFailed');
         toast({
           id: 'UPLOAD_FAILED',
-          title: t('toast.imageUploadFailed'),
+          title,
           status: 'error',
         });
       }
     },
-    [allowMultiple, onUploadStarted, uploadImage, uploadVideo, autoAddBoardId, onUpload, onUploadVideo, onError, t]
+    [
+      allowMultiple,
+      allowVideos,
+      onUploadStarted,
+      uploadImage,
+      uploadVideo,
+      autoAddBoardId,
+      onUpload,
+      onUploadVideo,
+      onError,
+      t,
+    ]
   );
 
   const onDropRejected = useCallback(
@@ -189,7 +225,7 @@ export const useImageUploadButton = ({
     getInputProps: getUploadInputProps,
     open: openUploader,
   } = useDropzone({
-    accept: imageAndVideoDropzoneAccept,
+    accept: getUploadDropzoneAccept(allowVideos),
     onDropAccepted,
     onDropRejected,
     disabled: isDisabled,
@@ -197,7 +233,11 @@ export const useImageUploadButton = ({
     multiple: allowMultiple,
   });
 
-  return { getUploadButtonProps, getUploadInputProps, openUploader, request };
+  // Uploads run through separate image and video mutations; loading state must cover both
+  // or an in-flight MP4 upload would show idle controls and allow double submission.
+  const isUploading = imageRequest.isLoading || videoRequest.isLoading;
+
+  return { getUploadButtonProps, getUploadInputProps, openUploader, isUploading };
 };
 
 const sx = {
@@ -228,7 +268,7 @@ export const UploadImageIconButton = memo(
           sx={sx}
           data-error={isError}
           icon={<PiUploadBold />}
-          isLoading={uploadApi.request.isLoading}
+          isLoading={uploadApi.isUploading}
           {...rest}
           {...uploadApi.getUploadButtonProps()}
         />
@@ -256,7 +296,7 @@ const UploadImageButton = memo((props: UploadImageButtonProps) => {
         sx={sx}
         data-error={isError}
         rightIcon={<PiUploadBold />}
-        isLoading={uploadApi.request.isLoading}
+        isLoading={uploadApi.isUploading}
         {...rest}
         {...uploadApi.getUploadButtonProps()}
       >
@@ -287,7 +327,7 @@ export const UploadMultipleImageButton = ({
         sx={sx}
         data-error={isError}
         icon={<PiUploadBold />}
-        isLoading={uploadApi.request.isLoading}
+        isLoading={uploadApi.isUploading}
         {...rest}
         {...uploadApi.getUploadButtonProps()}
       />

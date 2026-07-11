@@ -1974,6 +1974,7 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "videoUploadFailed": "Video Upload Failed",
         "importFailed": "Import Failed",
         "importSuccessful": "Import Successful",
         "invalidUpload": "Invalid Upload",

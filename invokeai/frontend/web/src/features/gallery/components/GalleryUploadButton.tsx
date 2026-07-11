@@ -4,7 +4,8 @@ import { t } from 'i18next';
 import { memo } from 'react';
 import { PiUploadBold } from 'react-icons/pi';
 
-const UPLOAD_OPTIONS: Parameters<typeof useImageUploadButton>[0] = { allowMultiple: true };
+// The gallery uploader is the one place videos are accepted — every other consumer wants an image.
+const UPLOAD_OPTIONS: Parameters<typeof useImageUploadButton>[0] = { allowMultiple: true, allowVideos: true };
 
 export const GalleryUploadButton = memo(() => {
   const uploadApi = useImageUploadButton(UPLOAD_OPTIONS);

@@ -15,9 +15,13 @@ import { describe, expect, it } from 'vitest';
 import {
   ACCEPTED_VIDEO_EXTENSIONS,
   ACCEPTED_VIDEO_TYPES,
+  getUploadDropzoneAccept,
   imageAndVideoDropzoneAccept,
   imageDropzoneAccept,
+  isAcceptedUploadFile,
+  isImageFile,
   isVideoFile,
+  partitionUploadFiles,
 } from './uploadMediaAccept';
 
 // `isVideoFile` only reads `type` and `name`, so a plain object stands in for a DOM File.
@@ -53,5 +57,46 @@ describe('isVideoFile', () => {
 
   it('rejects images', () => {
     expect(isVideoFile(fakeFile('image.png', 'image/png'))).toBe(false);
+  });
+});
+
+describe('isImageFile / isAcceptedUploadFile', () => {
+  it('accepts a file when either the MIME type or the extension is recognized', () => {
+    // Browsers sometimes supply an empty File.type — the extension must suffice on its own.
+    expect(isAcceptedUploadFile(fakeFile('clip.mp4', ''))).toBe(true);
+    expect(isAcceptedUploadFile(fakeFile('image.png', ''))).toBe(true);
+    // And a recognized MIME type must suffice without a matching extension.
+    expect(isAcceptedUploadFile(fakeFile('pasted-blob', 'image/png'))).toBe(true);
+    expect(isAcceptedUploadFile(fakeFile('pasted-blob', 'video/mp4'))).toBe(true);
+  });
+
+  it('rejects unsupported media', () => {
+    expect(isImageFile(fakeFile('vector.svg', 'image/svg+xml'))).toBe(false);
+    expect(isAcceptedUploadFile(fakeFile('clip.webm', 'video/webm'))).toBe(false);
+    expect(isAcceptedUploadFile(fakeFile('notes.txt', 'text/plain'))).toBe(false);
+  });
+});
+
+describe('video uploads are opt-in per consumer', () => {
+  const mp4 = fakeFile('clip.mp4', 'video/mp4');
+  const png = fakeFile('image.png', 'image/png');
+
+  it('image-only consumers do not advertise video MIME types', () => {
+    expect(Object.keys(getUploadDropzoneAccept(false)).some((mime) => mime.startsWith('video/'))).toBe(false);
+    expect(getUploadDropzoneAccept(true)).toBe(imageAndVideoDropzoneAccept);
+  });
+
+  it('rejects an MP4 submitted to an image-only consumer instead of uploading it', () => {
+    const { imageFiles, videoFiles, rejectedFiles } = partitionUploadFiles([png, mp4], false);
+    expect(imageFiles).toEqual([png]);
+    expect(videoFiles).toEqual([]); // nothing to hand to the video uploader
+    expect(rejectedFiles).toEqual([mp4]);
+  });
+
+  it('routes an MP4 to the video batch when the consumer opted in', () => {
+    const { imageFiles, videoFiles, rejectedFiles } = partitionUploadFiles([png, mp4], true);
+    expect(imageFiles).toEqual([png]);
+    expect(videoFiles).toEqual([mp4]);
+    expect(rejectedFiles).toEqual([]);
   });
 });
