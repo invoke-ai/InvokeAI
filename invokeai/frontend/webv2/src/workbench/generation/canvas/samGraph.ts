@@ -1,6 +1,7 @@
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 import type { BackendGraphContract } from '@workbench/types';
 
+import { documentToExportLocalSamPoint } from '@workbench/canvas-engine/samCoordinates';
 import { addEdge, addNode } from '@workbench/generation/graphBuilder';
 
 export type SamModel = 'segment-anything-2-large' | 'segment-anything-huge';
@@ -88,16 +89,11 @@ export const documentToExportLocalSamInput = (input: SamInput, exportRect: Rect)
     return { bbox: null, excludePoints: [], includePoints: [], type: 'visual' };
   }
 
-  const convertPoint = ({ x, y }: Vec2): Vec2 => ({
-    x: clamp(Math.round(x - exportRect.x), 0, exportRect.width - 1),
-    y: clamp(Math.round(y - exportRect.y), 0, exportRect.height - 1),
-  });
-  const isPointInsideExport = ({ x, y }: Vec2): boolean =>
-    isFinitePoint({ x, y }) &&
-    x >= exportRect.x &&
-    x < exportRect.x + exportRect.width &&
-    y >= exportRect.y &&
-    y < exportRect.y + exportRect.height;
+  const convertPoints = (points: readonly Vec2[]): Vec2[] =>
+    points.flatMap((point) => {
+      const converted = documentToExportLocalSamPoint(point, exportRect);
+      return converted ? [converted] : [];
+    });
   let bbox: Rect | null = null;
   if (input.bbox && isFiniteBox(input.bbox)) {
     const xMin = clamp(Math.round(input.bbox.x - exportRect.x), 0, exportRect.width);
@@ -111,8 +107,8 @@ export const documentToExportLocalSamInput = (input: SamInput, exportRect: Rect)
 
   return {
     bbox,
-    excludePoints: input.excludePoints.filter(isPointInsideExport).map(convertPoint),
-    includePoints: input.includePoints.filter(isPointInsideExport).map(convertPoint),
+    excludePoints: convertPoints(input.excludePoints),
+    includePoints: convertPoints(input.includePoints),
     type: 'visual',
   };
 };

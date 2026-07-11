@@ -63,7 +63,7 @@ describe('SAM bbox geometry', () => {
   });
 
   it('clips points and bbox moves without changing bbox size', () => {
-    expect(clipPointToRect({ x: -5, y: 200 }, source)).toEqual({ x: 10, y: 100 });
+    expect(clipPointToRect({ x: -5, y: 200 }, source)).toEqual({ x: 10, y: 99 });
     expect(moveSamBbox({ height: 20, width: 30, x: 20, y: 30 }, 500, -500, source)).toEqual({
       height: 20,
       width: 30,

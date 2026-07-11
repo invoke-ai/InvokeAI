@@ -96,6 +96,8 @@ export interface PointerPipeline {
    * so a mid-drag swap can't commit against the outgoing document on pointer-up.
    */
   cancelActiveGesture(): void;
+  /** Replaces a matching tool id that a currently-held temporary tool would restore on release. */
+  replaceTemporaryRestoreTool(current: ToolId, replacement: ToolId): void;
   /** Clears hover/gesture/temp-tool state, cancelling any in-flight gesture (called on detach/blur). */
   reset(): void;
 }
@@ -430,6 +432,11 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       deps.updateCursor();
       if (restoreTempAfterGesture && tempHold) {
         endTempTool();
+      }
+    },
+    replaceTemporaryRestoreTool: (current, replacement) => {
+      if (tempHold && priorToolId === current) {
+        priorToolId = replacement;
       }
     },
     reset: () => {

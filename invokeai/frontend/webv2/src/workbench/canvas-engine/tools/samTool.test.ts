@@ -124,6 +124,19 @@ describe('createSamTool', () => {
     expect(h.stores.samSession.get()?.input.bbox).toBeNull();
   });
 
+  it('accepts and canonicalizes a near-edge point but rejects the exact right and bottom edges', () => {
+    const h = createHarness();
+
+    down(h, pointer(99.8, 99.6));
+    up(h, pointer(99.8, 99.6, { buttons: 0 }));
+    down(h, pointer(100, 50));
+    up(h, pointer(100, 50, { buttons: 0 }));
+    down(h, pointer(50, 100));
+    up(h, pointer(50, 100, { buttons: 0 }));
+
+    expect(h.stores.samSession.get()?.input.includePoints).toEqual([{ x: 99, y: 99 }]);
+  });
+
   it('moves the bbox body and resizes a handle while clipping to source bounds', () => {
     const h = createHarness(
       visualSnapshot({

@@ -397,6 +397,31 @@ describe('pointer pipeline: temporary modifier tools', () => {
     expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
   });
 
+  it('replaces a matching pending restore target when its session closes', () => {
+    const h = createHarness({ tools: ['view', 'brush', 'sam'] });
+    h.deps.setTool('sam');
+    h.pipeline.onPointerEnter();
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space' }));
+    expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
+
+    h.pipeline.replaceTemporaryRestoreTool('sam', 'view');
+    h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
+
+    expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
+    expect(h.setTool).not.toHaveBeenCalledWith('sam', { temporary: true });
+  });
+
+  it('does not replace an unrelated temporary restore target', () => {
+    const h = createHarness({ tools: ['view', 'brush', 'sam'] });
+    h.pipeline.onPointerEnter();
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space' }));
+
+    h.pipeline.replaceTemporaryRestoreTool('sam', 'view');
+    h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
+
+    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
+  });
+
   it('does not switch on space when the pointer is not over the canvas', () => {
     const h = createHarness();
     h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space' }));

@@ -132,6 +132,52 @@ describe('compositeDocument', () => {
     expect(drawImages[0]!.args[0]).toBe(caches.get('b')!.surface.canvas);
   });
 
+  it('isolates the named layer even when disabled and suppresses unrelated staged content', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const isolated = caches.getOrCreate('isolated', 10, 10);
+    caches.getOrCreate('other', 10, 10);
+    const filterPreview = backend.createSurface(10, 10);
+    const staged = backend.createSurface(10, 10);
+    const target = backend.createSurface(200, 200);
+
+    compositeDocument(
+      target,
+      makeDoc([rasterLayer('isolated', { isEnabled: false }), rasterLayer('other')]),
+      caches,
+      VIEW,
+      {
+        layerPreviews: new Map([['isolated', filterPreview]]),
+        onlyLayerId: 'isolated',
+        stagedPreview: { rect: { height: 10, width: 10, x: 0, y: 0 }, surface: staged },
+      }
+    );
+
+    const drawImages = target.callLog.filter((entry) => entry.op === 'drawImage');
+    expect(drawImages).toHaveLength(1);
+    expect(drawImages[0]!.args[0]).toBe(isolated.surface.canvas);
+  });
+
+  it('preserves disabled-layer and staged-preview semantics when isolation is absent', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('disabled', 10, 10);
+    const visible = caches.getOrCreate('visible', 10, 10);
+    const staged = backend.createSurface(10, 10);
+    const target = backend.createSurface(200, 200);
+
+    compositeDocument(
+      target,
+      makeDoc([rasterLayer('disabled', { isEnabled: false }), rasterLayer('visible')]),
+      caches,
+      VIEW,
+      { stagedPreview: { rect: { height: 10, width: 10, x: 0, y: 0 }, surface: staged } }
+    );
+
+    const drawImages = target.callLog.filter((entry) => entry.op === 'drawImage');
+    expect(drawImages.map((entry) => entry.args[0])).toEqual([visible.surface.canvas, staged.canvas]);
+  });
+
   it('skips the layer named by skipLayerId (open text-edit session)', () => {
     const backend = createTestStubRasterBackend();
     const caches = createLayerCacheStore(backend);

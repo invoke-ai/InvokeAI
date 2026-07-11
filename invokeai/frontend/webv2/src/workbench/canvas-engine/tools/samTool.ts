@@ -1,6 +1,8 @@
 import type { SamVisualInput } from '@workbench/canvas-engine/engineStores';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
+import { canonicalizeDocumentSamPoint } from '@workbench/canvas-engine/samCoordinates';
+
 import type { SamHitTarget } from './samHitTest';
 import type { Tool, ToolContext } from './tool';
 
@@ -23,9 +25,6 @@ const cloneInput = (input: SamVisualInput): SamVisualInput => ({
   includePoints: input.includePoints.map((point) => ({ ...point })),
   type: 'visual',
 });
-
-const isInside = (point: Vec2, rect: { x: number; y: number; width: number; height: number }): boolean =>
-  point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
 
 const flippedLabel = (label: 'include' | 'exclude'): 'include' | 'exclude' =>
   label === 'include' ? 'exclude' : 'include';
@@ -82,7 +81,7 @@ export const createSamTool = (): Tool => {
         gesture ||
         !snapshot ||
         (input.buttons & PRIMARY_BUTTON) === 0 ||
-        !isInside(input.documentPoint, snapshot.sourceRect)
+        !canonicalizeDocumentSamPoint(input.documentPoint, snapshot.sourceRect)
       ) {
         return;
       }

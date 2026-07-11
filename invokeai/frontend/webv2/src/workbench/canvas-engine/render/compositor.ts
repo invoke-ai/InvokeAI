@@ -136,7 +136,7 @@ export interface CompositeOptions {
    * `null`/absent ⇒ no previews.
    */
   layerPreviews?: ReadonlyMap<string, RasterSurface> | null;
-  /** When set, transiently composites only this layer without mutating document visibility. */
+  /** When set, transiently composites only this layer (even if disabled) and suppresses staged content. */
   onlyLayerId?: string | null;
   /**
    * Returns a raster layer's ADJUSTED cache surface (brightness/contrast/
@@ -279,7 +279,7 @@ const drawCachedLayer = (
   // The cache surface holds pixels for `entry.rect` in layer-local space; draw
   // it at that local origin (offset paint/mask layers place their content off-zero).
   const origin = { x: entry.rect.x, y: entry.rect.y };
-  const preview = opts.layerPreviews?.get(layer.id) ?? null;
+  const preview = opts.onlyLayerId ? null : (opts.layerPreviews?.get(layer.id) ?? null);
   if (preview) {
     // Non-destructive filter preview: stretch the filtered image over the layer's
     // content footprint (through the already-applied layer transform).
@@ -342,7 +342,7 @@ export const compositeDocument = (
       const layer = doc.layers[i];
       if (
         !layer ||
-        !layer.isEnabled ||
+        (!layer.isEnabled && layer.id !== opts.onlyLayerId) ||
         layer.id === opts.skipLayerId ||
         (opts.onlyLayerId && layer.id !== opts.onlyLayerId) ||
         layerGroupRank(layer) !== rank
@@ -364,7 +364,7 @@ export const compositeDocument = (
 
   // Staged generation preview over its bbox (document space), with a subtle
   // dashed outline so the pending result reads distinctly from committed pixels.
-  const staged = opts.stagedPreview;
+  const staged = opts.onlyLayerId ? null : opts.stagedPreview;
   if (staged) {
     ctx.save();
     setTransformFromMat(ctx, view);

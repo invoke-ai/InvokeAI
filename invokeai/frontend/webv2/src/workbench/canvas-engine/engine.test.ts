@@ -11865,8 +11865,17 @@ describe('Select Object canvas engine integration', () => {
     } = {}
   ) => {
     const raf = createControllableRaf();
+    const windowListeners = new Map<string, Set<(event: Event) => void>>();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal('addEventListener', (type: string, listener: (event: Event) => void) => {
+      const listeners = windowListeners.get(type) ?? new Set();
+      listeners.add(listener);
+      windowListeners.set(type, listeners);
+    });
+    vi.stubGlobal('removeEventListener', (type: string, listener: (event: Event) => void) => {
+      windowListeners.get(type)?.delete(listener);
+    });
     const reactive = createReactiveStore(samDocument(options.layers));
     const engine = createCanvasEngine({
       backend: options.backend ?? createTestStubRasterBackend(),
@@ -11885,7 +11894,12 @@ describe('Select Object canvas engine integration', () => {
     raf.flush();
     await flushMicrotasks();
     raf.flush();
-    return { ...reactive, engine, overlay, raf, screen };
+    const fireKey = (type: 'keydown' | 'keyup', code: string, key: string): void => {
+      for (const listener of windowListeners.get(type) ?? []) {
+        listener({ code, key, preventDefault: vi.fn(), repeat: false, target: null } as unknown as Event);
+      }
+    };
+    return { ...reactive, engine, fireKey, overlay, raf, screen };
   };
 
   it('starts on the selected supported source, activates the real sam tool, and edits overlay-only', async () => {
@@ -11909,6 +11923,20 @@ describe('Select Object canvas engine integration', () => {
     expect(h.engine.stores.samSession.get()?.input.includePoints).toEqual([{ x: 5, y: 5 }]);
     expect(h.overlay.surface.callLog.some((entry) => entry.op === 'arc')).toBe(true);
     expect(h.screen.surface.callLog.some((entry) => entry.op === 'clearRect' || entry.op === 'drawImage')).toBe(false);
+    h.engine.dispose();
+  });
+
+  it('processes a sole near-edge point after canonicalizing it to the last source pixel', async () => {
+    const runGraph = vi.fn(() => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }));
+    const h = await createSamHarness({ runGraph });
+    h.engine.startSelectObjectSession();
+
+    h.overlay.fire('pointerdown', pointerAt(19.8, 19.7));
+    h.overlay.fire('pointerup', pointerAt(19.8, 19.7, { buttons: 0 }));
+
+    expect(h.engine.stores.samSession.get()?.input.includePoints).toEqual([{ x: 19, y: 19 }]);
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+    expect(runGraph).toHaveBeenCalledOnce();
     h.engine.dispose();
   });
 
@@ -11987,6 +12015,44 @@ describe('Select Object canvas engine integration', () => {
     h.engine.dispose();
   });
 
+  it('renders a captured disabled source during isolation without mutating its visibility', async () => {
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('sam-mask')));
+    const source: CanvasRasterLayerContractV2 = {
+      ...samLayer('source'),
+      isEnabled: false,
+      source: {
+        fill: '#fff',
+        height: 12_000,
+        kind: 'rect',
+        stroke: null,
+        strokeWidth: 0,
+        type: 'shape',
+        width: 12_000,
+      },
+    };
+    const h = await createSamHarness({ backend, layers: [source, samLayer('other', 30)] });
+    expect(await h.engine.exportLayerPixels(source.id, { includeDisabled: true })).toMatchObject({ status: 'ok' });
+    expect(h.engine.startSelectObjectSession()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+    });
+
+    await h.engine.processSelectObjectSession();
+    h.screen.surface.callLog.length = 0;
+    h.raf.flush();
+
+    expect(h.screen.surface.callLog.filter((entry) => entry.op === 'drawImage')).toHaveLength(1);
+    expect(h.engine.getDocument()!.layers.find((layer) => layer.id === source.id)?.isEnabled).toBe(false);
+    expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: true });
+
+    h.screen.surface.callLog.length = 0;
+    h.engine.stores.checkerboard.set(false);
+    h.raf.flush();
+    expect(h.screen.surface.callLog.filter((entry) => entry.op === 'drawImage')).toHaveLength(1);
+    h.engine.dispose();
+  });
+
   it('tears down the session when its captured source contract changes', async () => {
     const h = await createSamHarness();
     h.engine.startSelectObjectSession();
@@ -12034,6 +12100,38 @@ describe('Select Object canvas engine integration', () => {
 
     h.engine.handleEscapePriority({ gestureWasActive: false });
     expect(h.engine.stores.samSession.get()).toBeNull();
+    h.engine.dispose();
+  });
+
+  it('does not restore sessionless sam when Escape closes the session during a Space hold', async () => {
+    const h = await createSamHarness();
+    h.engine.startSelectObjectSession();
+    h.overlay.fire('pointerenter', {});
+    h.fireKey('keydown', 'Space', ' ');
+    expect(h.engine.stores.activeTool.get()).toBe('view');
+
+    h.fireKey('keydown', 'Escape', 'Escape');
+    h.fireKey('keyup', 'Space', ' ');
+
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    expect(h.engine.stores.activeTool.get()).toBe('view');
+    h.engine.dispose();
+  });
+
+  it('does not restore sessionless sam when source invalidation closes the session during a Space hold', async () => {
+    const h = await createSamHarness();
+    h.engine.startSelectObjectSession();
+    h.overlay.fire('pointerenter', {});
+    h.fireKey('keydown', 'Space', ' ');
+
+    h.setDocument({
+      ...h.engine.getDocument()!,
+      layers: [{ ...h.engine.getDocument()!.layers[0]!, opacity: 0.5 }],
+    });
+    h.fireKey('keyup', 'Space', ' ');
+
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    expect(h.engine.stores.activeTool.get()).toBe('view');
     h.engine.dispose();
   });
 });

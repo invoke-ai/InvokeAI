@@ -2214,6 +2214,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (needsComposite) {
       ensureLayerCaches(doc);
       const stagedPlacement = stagedPreview?.placement;
+      const isolatedLayerId = samPreview?.isolated ? samPreview.guard.layerId : null;
       compositeDocument(screen, doc, layerCache, view, {
         // Memoized adjusted surfaces for raster layers with brightness/contrast/
         // saturation/curves (not recomputed per frame — see adjustedSurfaceCache).
@@ -2228,7 +2229,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           filterPreviews.size > 0
             ? new Map(Array.from(filterPreviews, ([id, decoded]) => [id, decoded.surface]))
             : null,
-        onlyLayerId: samPreview?.isolated ? samPreview.guard.layerId : null,
+        onlyLayerId: isolatedLayerId,
         // Feed the cached checkerboard tile only while the toggle is ON; passing
         // `null` renders transparent documents without a checkerboard.
         checkerboardTile: stores.checkerboard.get() ? getCheckerboardTile() : null,
@@ -2257,7 +2258,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         transformOverrides: transformOverrides.size > 0 ? transformOverrides : null,
       });
 
-      const visibleIds = doc.layers.filter(isRenderableLayer).map((layer) => layer.id);
+      const visibleIds = doc.layers
+        .filter((layer) => layer.id === isolatedLayerId || isRenderableLayer(layer))
+        .map((layer) => layer.id);
       const evicted = layerCache.evictHidden(visibleIds);
       // Prune version-keyed dependents for every evicted id (mirrors dropLayer):
       // the evicted layer's surface is gone, so its adjusted-surface memo and
@@ -2766,6 +2769,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const clearOwnedSelectObjectSession = (): void => {
+    pipeline.replaceTemporaryRestoreTool('sam', 'view');
     const session = selectObjectSession;
     selectObjectSession = null;
     selectObjectUnsubscribe?.();

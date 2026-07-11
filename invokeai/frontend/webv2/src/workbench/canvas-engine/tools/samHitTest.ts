@@ -2,6 +2,7 @@ import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
 import { transformBounds } from '@workbench/canvas-engine/math/rect';
+import { canonicalizeDocumentSamPoint } from '@workbench/canvas-engine/samCoordinates';
 
 import { BBOX_HANDLES, bboxHandleAt, type BboxHandle, isInsideRect } from './bboxHitTest';
 
@@ -51,10 +52,8 @@ export const samHitTest = (options: SamHitTestOptions): SamHitTarget | null => {
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
-export const clipPointToRect = (point: Vec2, bounds: Rect): Vec2 => ({
-  x: clamp(point.x, bounds.x, bounds.x + bounds.width),
-  y: clamp(point.y, bounds.y, bounds.y + bounds.height),
-});
+export const clipPointToRect = (point: Vec2, bounds: Rect): Vec2 =>
+  canonicalizeDocumentSamPoint(point, bounds, true) ?? { x: bounds.x, y: bounds.y };
 
 export const clipRectToRect = (rect: Rect, bounds: Rect): Rect => {
   const left = clamp(rect.x, bounds.x, bounds.x + bounds.width);
