@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import type { ReactNode } from 'react';
 
-import { resolveBottomControlSlots } from './CanvasBottomControls';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it, vi } from 'vitest';
+
+import { CanvasBottomControlsPresentation, resolveBottomControlSlots } from './CanvasBottomControls';
+
+const REGULAR_CONTENT = <span>regular</span>;
+const renderOperation = vi.fn((locked: boolean): ReactNode => <span data-locked={locked}>operation</span>);
 
 describe('canvas bottom controls', () => {
   it.each([
@@ -33,5 +39,38 @@ describe('canvas bottom controls', () => {
     },
   ])('resolves $scenario bottom controls', ({ expected, externalLock, operationKind }) => {
     expect(resolveBottomControlSlots({ isExternalInteractionLocked: externalLock, operationKind })).toEqual(expected);
+  });
+
+  it('mounts active operation content while locked, forwards the lock, and hides regular content', () => {
+    renderOperation.mockClear();
+    const output = renderToStaticMarkup(
+      <CanvasBottomControlsPresentation
+        isExternalInteractionLocked
+        operationKind="filter"
+        regularContent={REGULAR_CONTENT}
+        renderOperation={renderOperation}
+      />
+    );
+
+    expect(output).toContain('data-locked="true"');
+    expect(output).toContain('operation');
+    expect(output).not.toContain('regular');
+    expect(renderOperation).toHaveBeenCalledWith(true);
+  });
+
+  it.each([
+    { externalLock: false, expected: '<span>regular</span>', operationKind: null },
+    { externalLock: true, expected: '', operationKind: null },
+  ])('mounts idle content for externalLock=$externalLock', ({ expected, externalLock, operationKind }) => {
+    expect(
+      renderToStaticMarkup(
+        <CanvasBottomControlsPresentation
+          isExternalInteractionLocked={externalLock}
+          operationKind={operationKind}
+          regularContent={REGULAR_CONTENT}
+          renderOperation={renderOperation}
+        />
+      )
+    ).toBe(expected);
   });
 });

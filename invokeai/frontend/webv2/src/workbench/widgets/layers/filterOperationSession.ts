@@ -1,5 +1,6 @@
 import type {
   CanvasOperationController,
+  CanvasOperationRunResult,
   CanvasOperationSession,
 } from '@workbench/canvas-engine/canvasOperationController';
 import type {
@@ -67,7 +68,8 @@ export interface FilterOperationSession {
   getSnapshot(): FilterOperationSessionState;
   subscribe(listener: () => void): () => void;
   updateDraft(draft: LayerFilterSettings): void;
-  process(): Promise<void>;
+  process(): Promise<CanvasOperationRunResult>;
+  interruptProcessing(): void;
   reset(settings: Record<string, unknown>): void;
   commit(target: FilterCommitTarget): Promise<'committed' | 'blocked' | 'stale'>;
   blockCommit(): void;
@@ -143,9 +145,9 @@ export const createFilterOperationSession = (
     return null;
   }
 
-  const process = async (): Promise<void> => {
+  const process = async (): Promise<CanvasOperationRunResult> => {
     if (disposed) {
-      return;
+      return 'stale';
     }
     const requestDraft = structuredClone(state.draft);
     publish({ ...state, error: null, preview: null, status: 'processing' });
@@ -198,6 +200,7 @@ export const createFilterOperationSession = (
         status: 'error',
       });
     }
+    return result;
   };
 
   const cancelCommit = (): void => {
@@ -297,6 +300,13 @@ export const createFilterOperationSession = (
       listeners.clear();
     },
     getSnapshot: () => state,
+    interruptProcessing: () => {
+      if (disposed || state.status !== 'processing') {
+        return;
+      }
+      operation.interruptProcessing();
+      publish({ ...state, error: null, preview: null, status: 'ready' });
+    },
     process,
     reset: (settings) => {
       if (disposed) {

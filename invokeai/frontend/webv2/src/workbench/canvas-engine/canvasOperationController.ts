@@ -27,6 +27,8 @@ export interface CanvasOperationSession {
     commitPreview: (result: T) => undefined
   ): Promise<CanvasOperationRunResult>;
   reset(): void;
+  /** Aborts only the active request and keeps this operation ready for retry or Cancel. */
+  interruptProcessing(): void;
   cancel(): void;
 }
 
@@ -105,7 +107,7 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     }
   };
 
-  const reset = (operation: ActiveOperation): void => {
+  const interruptProcessing = (operation: ActiveOperation): void => {
     if (active !== operation || disposed) {
       return;
     }
@@ -236,7 +238,8 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
 
     return {
       cancel: () => close(operation),
-      reset: () => reset(operation),
+      interruptProcessing: () => interruptProcessing(operation),
+      reset: () => interruptProcessing(operation),
       run: <T>(work: (signal: AbortSignal) => Promise<T>, commitPreview: (result: T) => undefined) =>
         run(operation, work, commitPreview),
     };
@@ -273,7 +276,7 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     invalidateSource: (projectId, layerId) => invalidateTarget(projectId, layerId),
     reset: () => {
       if (active) {
-        reset(active);
+        interruptProcessing(active);
       }
     },
     start,

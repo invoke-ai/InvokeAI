@@ -9496,20 +9496,25 @@ describe('guarded filter previews', () => {
   it('blocks Filter actions called directly after an external lock and still allows Cancel', async () => {
     const { document, engine } = await createFilterFlowHarness('raster');
     const makeDurable = vi.fn(() => Promise.resolve());
+    const before = engine.stores.filterSession.get();
 
     engine.setInteractionLocked(true);
 
+    expect(engine.updateFilterOperation({ settings: { radius: 99 }, type: 'img_blur' })).toBe('blocked');
+    expect(engine.resetFilterOperation({ radius: 0 })).toBe('blocked');
     await expect(engine.processFilterOperation()).resolves.toBe('blocked');
     await expect(engine.commitFilterOperation('apply', makeDurable)).resolves.toBe('blocked');
     expect(makeDurable).not.toHaveBeenCalled();
     expect(engine.getDocument()).toEqual(document);
-    expect(engine.stores.filterSession.get()?.preview).not.toBeNull();
+    expect(engine.stores.filterSession.get()).toEqual(before);
 
     engine.cancelFilterOperation();
     expect(engine.stores.filterSession.get()).toBeNull();
     expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     engine.setInteractionLocked(false);
     expect(engine.stores.filterSession.get()).toBeNull();
+    expect(engine.updateFilterOperation({ settings: {}, type: 'img_blur' })).toBe('stale');
+    expect(engine.resetFilterOperation({})).toBe('stale');
     engine.dispose();
   });
 
@@ -9528,6 +9533,46 @@ describe('guarded filter previews', () => {
       preview: { imageName: 'filtered.png' },
       status: 'ready',
     });
+    engine.cancelFilterOperation();
+    engine.dispose();
+  });
+
+  it('interrupts Filter processing on an external lock without losing the draft or operation', async () => {
+    const source = filterFlowLayer('raster');
+    const { projectId, store } = createReducerBackedStore({
+      ...emptyDoc(),
+      layers: [source],
+      selectedLayerId: source.id,
+    });
+    const graph = createDeferred<{ height: number; imageName: string; origin: string; output: {}; width: number }>();
+    const runGraph = vi.fn(() => graph.promise);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      filterDeps: {
+        runGraph,
+        uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'filter-input.png' })),
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    expect((await engine.exportLayerPixels(source.id)).status).toBe('ok');
+    expect(engine.startFilterOperation(source.id)).toBe('started');
+    expect(engine.updateFilterOperation({ settings: { radius: 7 }, type: 'img_blur' })).toBe('updated');
+    const pending = engine.processFilterOperation();
+    await vi.waitFor(() => expect(runGraph).toHaveBeenCalledOnce());
+
+    engine.setInteractionLocked(true);
+    graph.resolve({ height: 10, imageName: 'late.png', origin: 'test', output: {}, width: 10 });
+
+    await expect(pending).resolves.toBe('stale');
+    expect(engine.stores.filterSession.get()).toMatchObject({
+      draft: { settings: { radius: 7 }, type: 'img_blur' },
+      preview: null,
+      status: 'ready',
+    });
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
     engine.cancelFilterOperation();
     engine.dispose();
   });
@@ -12724,21 +12769,26 @@ describe('Select Object canvas engine integration', () => {
   it('blocks Select Object actions called directly after an external lock and still allows Cancel', async () => {
     const h = await createCommittingSamHarness();
     const makeDurable = vi.fn(() => Promise.resolve());
+    const before = h.engine.stores.samSession.get();
 
     h.engine.setInteractionLocked(true);
 
-    await expect(h.engine.processSelectObjectSession()).resolves.toBe('stale');
+    expect(h.engine.updateSelectObjectSession({ input: { prompt: 'changed', type: 'prompt' } })).toBe('blocked');
+    expect(h.engine.resetSelectObjectSession()).toBe('blocked');
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('blocked');
     await expect(h.engine.applySelectObjectSession()).resolves.toEqual({ status: 'locked' });
     await expect(h.engine.saveSelectObjectSession('raster', makeDurable)).resolves.toEqual({ status: 'locked' });
     expect(makeDurable).not.toHaveBeenCalled();
     expect(h.engine.getDocument()).toEqual(h.document);
-    expect(h.engine.stores.samSession.get()?.hasPreview).toBe(true);
+    expect(h.engine.stores.samSession.get()).toEqual(before);
 
     h.engine.cancelSelectObjectSession();
     expect(h.engine.stores.samSession.get()).toBeNull();
     expect(h.engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     h.engine.setInteractionLocked(false);
     expect(h.engine.stores.activeTool.get()).toBe('view');
+    expect(h.engine.updateSelectObjectSession({ invert: false })).toBe('stale');
+    expect(h.engine.resetSelectObjectSession()).toBe('stale');
     h.engine.dispose();
   });
 
@@ -12774,6 +12824,26 @@ describe('Select Object canvas engine integration', () => {
     await expect(pending).resolves.not.toEqual({ status: 'selected' });
     expect(h.engine.getDocument()).toEqual(h.document);
     expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: true, status: 'ready' });
+    h.engine.cancelSelectObjectSession();
+    h.engine.dispose();
+  });
+
+  it('interrupts Select Object processing on an external lock without losing inputs or operation', async () => {
+    const graph = createDeferred<{ imageName: string; origin: string }>();
+    const runGraph = vi.fn(() => graph.promise);
+    const h = await createSamHarness({ runGraph });
+    expect(h.engine.startSelectObject('source')).toBe('started');
+    const input = { prompt: 'keep this prompt', type: 'prompt' as const };
+    expect(h.engine.updateSelectObjectSession({ input, invert: true })).toBe('updated');
+    const pending = h.engine.processSelectObjectSession();
+    await vi.waitFor(() => expect(runGraph).toHaveBeenCalledOnce());
+
+    h.engine.setInteractionLocked(true);
+    graph.resolve({ imageName: 'late.png', origin: 'test' });
+
+    await expect(pending).resolves.toBe('stale');
+    expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: false, input, invert: true, status: 'ready' });
+    expect(h.engine.canvasOperations.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
     h.engine.cancelSelectObjectSession();
     h.engine.dispose();
   });

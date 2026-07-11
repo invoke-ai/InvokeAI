@@ -380,6 +380,7 @@ export type StartSelectObjectSessionResult =
 export type StartFilterOperationResult = 'started' | 'missing' | 'disabled' | 'locked' | 'unsupported' | 'not-ready';
 export type CanvasOperationActionResult = 'completed' | 'blocked' | 'stale';
 export type FilterCommitOperationResult = 'committed' | 'blocked' | 'stale';
+export type CanvasOperationMutationResult = 'updated' | 'blocked' | 'stale';
 
 export type SelectObjectSaveTarget = 'raster' | 'control' | MaskImageResultTarget;
 export type SaveSelectObjectSessionResult = CommitGeneratedImageResult | CommitMaskImageResult;
@@ -425,22 +426,22 @@ export interface CanvasEngine {
   startSelectObject(layerId: string): StartSelectObjectSessionResult;
   /** Starts one engine-owned guarded filter operation for a raster or control layer. */
   startFilterOperation(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
-  updateFilterOperation(draft: LayerFilterSettings): void;
+  updateFilterOperation(draft: LayerFilterSettings): CanvasOperationMutationResult;
   processFilterOperation(): Promise<CanvasOperationActionResult>;
-  resetFilterOperation(settings: Record<string, unknown>): void;
+  resetFilterOperation(settings: Record<string, unknown>): CanvasOperationMutationResult;
   commitFilterOperation(
     target: FilterCommitTarget,
     makeImageDurable: (imageName: string) => Promise<void>
   ): Promise<FilterCommitOperationResult>;
   cancelFilterOperation(): void;
-  updateSelectObjectSession(changes: SelectObjectSessionUpdate): void;
+  updateSelectObjectSession(changes: SelectObjectSessionUpdate): CanvasOperationMutationResult;
   processSelectObjectSession(): Promise<SelectObjectSessionProcessResult>;
   applySelectObjectSession(): Promise<ReplaceSelectionFromImageResult>;
   saveSelectObjectSession(
     target: SelectObjectSaveTarget,
     makeImageDurable: (imageName: string) => Promise<void>
   ): Promise<SaveSelectObjectSessionResult>;
-  resetSelectObjectSession(): void;
+  resetSelectObjectSession(): CanvasOperationMutationResult;
   cancelSelectObjectSession(): void;
   disposeSelectObjectSession(): void;
   /** Locks interaction to the view tool; used while staged canvas results await a decision. */
@@ -3048,10 +3049,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return 'started';
   };
 
-  const updateSelectObjectSession = (changes: SelectObjectSessionUpdate): void => {
+  const updateSelectObjectSession = (changes: SelectObjectSessionUpdate): CanvasOperationMutationResult => {
+    if (interactionLocked) {
+      return 'blocked';
+    }
     const session = selectObjectSession;
     if (!session) {
-      return;
+      return 'stale';
     }
     const { pointLabel, ...sessionChanges } = changes;
     const state = session.getSnapshot();
@@ -3069,11 +3073,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     session.update(sessionChanges);
     syncSelectObjectStore();
+    return 'updated';
   };
 
   const processSelectObjectSession = (): Promise<SelectObjectSessionProcessResult> => {
     if (interactionLocked) {
-      return Promise.resolve('stale');
+      return Promise.resolve('blocked');
     }
     invalidateSelectObjectCommit();
     return selectObjectSession?.process() ?? Promise.resolve('stale');
@@ -3235,11 +3240,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return result;
   };
 
-  const resetSelectObjectSession = (): void => {
+  const resetSelectObjectSession = (): CanvasOperationMutationResult => {
+    if (interactionLocked) {
+      return 'blocked';
+    }
     const session = selectObjectSession;
     const guard = selectObjectGuard;
     if (!session || !guard) {
-      return;
+      return 'stale';
     }
     invalidateSelectObjectCommit();
     selectObjectPointLabel = 'include';
@@ -3251,6 +3259,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       identity: { kind: 'select-object', layerId: guard.layerId, projectId },
     });
     syncSelectObjectStore();
+    return 'updated';
   };
 
   const cancelSelectObjectSession = (): void => {
@@ -3387,7 +3396,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return 'started';
   };
 
-  const updateFilterOperation = (draft: LayerFilterSettings): void => filterSession?.updateDraft(draft);
+  const updateFilterOperation = (draft: LayerFilterSettings): CanvasOperationMutationResult => {
+    if (interactionLocked) {
+      return 'blocked';
+    }
+    if (!filterSession) {
+      return 'stale';
+    }
+    filterSession.updateDraft(draft);
+    return 'updated';
+  };
   const processFilterOperation = async (): Promise<CanvasOperationActionResult> => {
     if (interactionLocked) {
       return 'blocked';
@@ -3396,10 +3414,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!session) {
       return 'stale';
     }
-    await session.process();
-    return 'completed';
+    const result = await session.process();
+    return result === 'published' ? 'completed' : 'stale';
   };
-  const resetFilterOperation = (settings: Record<string, unknown>): void => filterSession?.reset(settings);
+  const resetFilterOperation = (settings: Record<string, unknown>): CanvasOperationMutationResult => {
+    if (interactionLocked) {
+      return 'blocked';
+    }
+    if (!filterSession) {
+      return 'stale';
+    }
+    filterSession.reset(settings);
+    return 'updated';
+  };
   const commitFilterOperation = async (
     target: FilterCommitTarget,
     makeImageDurable: (imageName: string) => Promise<void>
@@ -3453,6 +3480,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     interactionLocked = locked;
     if (locked) {
       invalidateSelectObjectCommit();
+      selectObjectSession?.interruptProcessing();
+      filterSession?.interruptProcessing();
       filterSession?.blockCommit();
       pipeline.cancelActiveGesture();
       setTool('view', { temporary: true });
