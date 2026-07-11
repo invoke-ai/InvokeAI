@@ -72,6 +72,7 @@ export interface SelectObjectSession<T> {
   process(): Promise<SelectObjectSessionProcessResult>;
   reset(): void;
   cancel(): void;
+  dispose(): void;
 }
 
 const defaultState = <T>(): SelectObjectSessionState<T> => ({
@@ -118,6 +119,8 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   let pendingProcess: Promise<SelectObjectSessionProcessResult> | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let startingOperation = false;
+  let disposed = false;
+  let unsubscribeController: (() => void) | null = null;
   const listeners = new Set<() => void>();
 
   const publishState = (next: SelectObjectSessionState<T>): void => {
@@ -150,7 +153,10 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
   };
 
-  deps.controller.subscribe(() => {
+  unsubscribeController = deps.controller.subscribe(() => {
+    if (disposed) {
+      return;
+    }
     if (!startingOperation && operation && deps.controller.getSnapshot().status === 'idle') {
       sourceController?.abort();
       sourceController = null;
@@ -167,6 +173,9 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
   const schedule = (): void => {
     clearTimer();
+    if (disposed) {
+      return;
+    }
     if (!state.autoProcess || !isSamDocumentInputValid(state.input)) {
       if (state.status === 'scheduled') {
         publishState({ ...state, status: 'ready' });
@@ -294,6 +303,9 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
   const process = (): Promise<SelectObjectSessionProcessResult> => {
     clearTimer();
+    if (disposed) {
+      return Promise.resolve('stale');
+    }
     if (!isSamDocumentInputValid(state.input)) {
       publishState({ ...state, error: 'A Segment Anything input is required.', status: 'error' });
       return Promise.resolve('invalid');
@@ -316,6 +328,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
     const hash = stableInputHash(state);
     if (hash === pendingHash && pendingProcess) {
+      publishState({ ...state, error: null, status: 'processing' });
       return pendingProcess;
     }
     if (
@@ -326,6 +339,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       operationGuard === state.preview.guard &&
       isGuardCurrent(state.preview.guard)
     ) {
+      publishState({ ...state, error: null, status: 'ready' });
       return Promise.resolve('deduped');
     }
 
@@ -377,20 +391,56 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
   return {
     cancel: () => {
+      if (disposed) {
+        return;
+      }
       cancelCurrent();
       publishState({ ...state, error: null, preview: null, sourceGuard: null, status: 'ready' });
+    },
+    dispose: () => {
+      if (disposed) {
+        return;
+      }
+      disposed = true;
+      clearTimer();
+      requestToken += 1;
+      sourceController?.abort();
+      sourceController = null;
+      pendingHash = null;
+      pendingProcess = null;
+      lastPublishedHash = null;
+      unsubscribeController?.();
+      unsubscribeController = null;
+      operation?.cancel();
+      if (!operation && state.preview) {
+        cleanupPreview();
+      }
+      operation = null;
+      operationGuard = null;
+      source = null;
+      publishState({ ...state, error: null, preview: null, sourceGuard: null, status: 'ready' });
+      listeners.clear();
     },
     getSnapshot: () => state,
     process,
     reset: () => {
+      if (disposed) {
+        return;
+      }
       cancelCurrent();
       publishState(defaultState<T>());
     },
     subscribe: (listener) => {
+      if (disposed) {
+        return () => undefined;
+      }
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
     update: (changes) => {
+      if (disposed) {
+        return;
+      }
       const processingChanged =
         ('input' in changes && changes.input !== state.input) ||
         ('model' in changes && changes.model !== state.model) ||

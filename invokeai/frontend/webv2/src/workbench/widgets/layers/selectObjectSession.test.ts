@@ -40,7 +40,20 @@ const deferred = <T>() => {
 
 const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {}) => {
   let currentGuard: LayerExportGuard | null = guard;
-  const controller = createCanvasOperationController({ isGuardCurrent: (candidate) => candidate === currentGuard });
+  let controllerSubscriber: (() => void) | null = null;
+  const unsubscribe = vi.fn();
+  const baseController = createCanvasOperationController({ isGuardCurrent: (candidate) => candidate === currentGuard });
+  const controller = {
+    ...baseController,
+    subscribe: vi.fn((listener: () => void) => {
+      controllerSubscriber = listener;
+      const detach = baseController.subscribe(listener);
+      return () => {
+        unsubscribe();
+        detach();
+      };
+    }),
+  };
   const deps: SelectObjectSessionDeps<string> = {
     controller,
     decodePreview: vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
@@ -57,10 +70,14 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
   return {
     controller,
     deps,
+    fireControllerSubscriber() {
+      controllerSubscriber?.();
+    },
     session,
     setCurrentGuard(next: LayerExportGuard | null) {
       currentGuard = next;
     },
+    unsubscribe,
   };
 };
 
@@ -142,6 +159,43 @@ describe('createSelectObjectSession', () => {
     await expect(harness.session.process()).resolves.toBe('deduped');
 
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+  });
+
+  it('transitions an identical scheduled auto-run back to ready and preserves its preview', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    await harness.session.process();
+    const preview = harness.session.getSnapshot().preview;
+    const listener = vi.fn();
+    harness.session.subscribe(listener);
+
+    harness.session.update({ autoProcess: true });
+    expect(harness.session.getSnapshot().status).toBe('scheduled');
+    listener.mockClear();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, preview, status: 'ready' });
+    expect(listener).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+  });
+
+  it('transitions an identical scheduled auto-run back to processing when work is already in flight', async () => {
+    vi.useFakeTimers();
+    const graph = deferred<{ imageName: string; origin: string }>();
+    const harness = createHarness({ runGraph: vi.fn(() => graph.promise) });
+    const pending = harness.session.process();
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
+
+    harness.session.update({ autoProcess: true });
+    expect(harness.session.getSnapshot().status).toBe('scheduled');
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'processing' });
+    expect(vi.getTimerCount()).toBe(0);
+    expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+    graph.resolve({ imageName: 'result.png', origin: 'test' });
+    await expect(pending).resolves.toBe('published');
   });
 
   it('does not deduplicate the same hash after its exact source guard is replaced', async () => {
@@ -371,5 +425,62 @@ describe('createSelectObjectSession', () => {
     });
     await vi.runAllTimersAsync();
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+  });
+
+  it('dispose clears scheduling and preview, unsubscribes exactly once, and makes methods inert', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    await harness.session.process();
+    harness.session.update({ autoProcess: true });
+    const listener = vi.fn();
+    harness.session.subscribe(listener);
+    vi.mocked(harness.deps.cleanupPreview).mockClear();
+    listener.mockClear();
+
+    harness.session.dispose();
+    const disposedState = harness.session.getSnapshot();
+
+    expect(disposedState).toMatchObject({ preview: null, sourceGuard: null, status: 'ready' });
+    expect(harness.deps.cleanupPreview).toHaveBeenCalledOnce();
+    expect(harness.unsubscribe).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    listener.mockClear();
+
+    harness.fireControllerSubscriber();
+    harness.session.update({ model: 'segment-anything-huge' });
+    harness.session.reset();
+    harness.session.cancel();
+    harness.session.dispose();
+    const lateListener = vi.fn();
+    harness.session.subscribe(lateListener);
+
+    await expect(harness.session.process()).resolves.toBe('stale');
+    expect(harness.session.getSnapshot()).toBe(disposedState);
+    expect(listener).not.toHaveBeenCalled();
+    expect(lateListener).not.toHaveBeenCalled();
+    expect(harness.unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('dispose aborts in-flight processing and suppresses its completion', async () => {
+    const graph = deferred<{ imageName: string; origin: string }>();
+    const signals: AbortSignal[] = [];
+    const harness = createHarness({
+      runGraph: vi.fn((options) => {
+        if (options.signal) {
+          signals.push(options.signal);
+        }
+        return graph.promise;
+      }),
+    });
+    const pending = harness.session.process();
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
+
+    harness.session.dispose();
+
+    expect(signals[0]?.aborted).toBe(true);
+    graph.resolve({ imageName: 'late.png', origin: 'late' });
+    await expect(pending).resolves.toBe('stale');
+    expect(harness.deps.publishPreview).not.toHaveBeenCalled();
+    expect(harness.unsubscribe).toHaveBeenCalledOnce();
   });
 });
