@@ -32,7 +32,7 @@ import type { FontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RenderScheduler } from '@workbench/canvas-engine/render/scheduler';
 import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
-import type { SamModel } from '@workbench/generation/canvas/samGraph';
+import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
 import type {
   CanvasImageRef,
   CanvasDocumentContractV2,
@@ -53,7 +53,6 @@ import {
   createEngineStores,
   type EngineStores,
   type SamPointLabel,
-  type SamVisualInput,
   type TextToolOptions,
 } from '@workbench/canvas-engine/engineStores';
 import { executePsdExport, planPsdExport } from '@workbench/canvas-engine/export/psdExport';
@@ -112,9 +111,11 @@ import {
 import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
 import {
   createInpaintMaskFromImage,
+  createControlLayer,
   createRegionalGuidanceFromImage,
   DEFAULT_INPAINT_MASK_FILL,
   nextInpaintMaskName,
+  nextControlLayerName,
   nextRegionalGuidanceFillColor,
   nextRegionalGuidanceName,
 } from '@workbench/widgets/layers/layerOps';
@@ -189,7 +190,7 @@ export interface CommitRasterFilterOptions {
   signal?: AbortSignal;
 }
 
-export type GeneratedImageTarget = 'replace' | 'copy-raster';
+export type GeneratedImageTarget = 'replace' | 'copy-raster' | 'copy-control';
 
 export type CommitGeneratedImageResult =
   | { status: 'committed'; layerId: string }
@@ -341,8 +342,11 @@ export interface CanvasEngineOptions {
 
 export type StartSelectObjectSessionResult = 'started' | 'missing' | 'unsupported' | 'not-ready';
 
+export type SelectObjectSaveTarget = 'raster' | 'control' | MaskImageResultTarget;
+export type SaveSelectObjectSessionResult = CommitGeneratedImageResult | CommitMaskImageResult;
+
 export interface SelectObjectSessionUpdate {
-  input?: SamVisualInput;
+  input?: SamInput;
   pointLabel?: SamPointLabel;
   model?: SamModel;
   invert?: boolean;
@@ -368,10 +372,15 @@ export interface CanvasEngine {
   resize(cssWidth: number, cssHeight: number, dpr: number): void;
   /** Activates a tool (deactivating the previous one). */
   setTool(toolId: ToolId, opts?: { temporary?: boolean }): void;
-  /** Starts one Select Object session on the selected raster/control layer and activates the SAM tool. */
-  startSelectObjectSession(): StartSelectObjectSessionResult;
+  /** Selects the requested raster/control layer, starts Select Object, and activates the SAM tool. */
+  startSelectObject(layerId: string): StartSelectObjectSessionResult;
   updateSelectObjectSession(changes: SelectObjectSessionUpdate): void;
   processSelectObjectSession(): Promise<SelectObjectSessionProcessResult>;
+  applySelectObjectSession(): Promise<ReplaceSelectionFromImageResult>;
+  saveSelectObjectSession(
+    target: SelectObjectSaveTarget,
+    makeImageDurable: (imageName: string) => Promise<void>
+  ): Promise<SaveSelectObjectSessionResult>;
   resetSelectObjectSession(): void;
   cancelSelectObjectSession(): void;
   disposeSelectObjectSession(): void;
@@ -847,6 +856,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   let selectObjectGuard: LayerExportGuard | null = null;
   let selectObjectSourceRect: Rect | null = null;
   let selectObjectPointLabel: SamPointLabel = 'include';
+  let selectObjectCommitController: AbortController | null = null;
   let samPreview: SelectObjectSessionPreview<RasterSurface> | null = null;
 
   // The brush/eraser cursor ring, drawn on the overlay (set by the active tool).
@@ -2279,6 +2289,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // While the bbox tool drags, the transient preview stands in for the
     // committed frame so the overlay (rect + handles) tracks the gesture.
     const bboxPreview = stores.bboxPreview.get();
+    const samSession = stores.samSession.get();
     renderOverlay(overlay, {
       bbox: bboxPreview ?? doc.bbox,
       bboxHandles: activeToolId === 'bbox',
@@ -2293,7 +2304,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       gradientPreview: stores.gradientPreview.get(),
       lassoPreview: stores.lassoPreview.get(),
       marchingAnts: selection.hasSelection() ? { paths: selection.antsPaths(), phase: antsPhase } : null,
-      samInput: stores.samSession.get()?.input ?? null,
+      samInput: samSession?.input.type === 'visual' ? samSession.input : null,
       samPreview: samPreview ? { opacity: 0.45, rect: samPreview.rect, surface: samPreview.data } : null,
       bboxOverlay: stores.bboxOverlay.get(),
       ruleOfThirds: stores.ruleOfThirds.get(),
@@ -2716,20 +2727,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return;
     }
     const state = session.getSnapshot();
-    if (state.input.type !== 'visual') {
-      return;
-    }
     stores.samSession.set({
+      applyPolygonRefinement: state.applyPolygonRefinement,
+      autoProcess: state.autoProcess,
       error: state.error,
       hasPreview: state.preview !== null,
-      input: {
-        bbox: state.input.bbox ? { ...state.input.bbox } : null,
-        excludePoints: state.input.excludePoints.map((point) => ({ ...point })),
-        includePoints: state.input.includePoints.map((point) => ({ ...point })),
-        type: 'visual',
-      },
+      input:
+        state.input.type === 'visual'
+          ? {
+              bbox: state.input.bbox ? { ...state.input.bbox } : null,
+              excludePoints: state.input.excludePoints.map((point) => ({ ...point })),
+              includePoints: state.input.includePoints.map((point) => ({ ...point })),
+              type: 'visual',
+            }
+          : { prompt: state.input.prompt, type: 'prompt' },
+      invert: state.invert,
       isolatedPreview: state.isolatedPreview,
       layerId: selectObjectGuard?.layerId ?? '',
+      model: state.model,
       pointLabel: selectObjectPointLabel,
       sourceRect,
       status: state.status,
@@ -2770,6 +2785,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const clearOwnedSelectObjectSession = (): void => {
     pipeline.replaceTemporaryRestoreTool('sam', 'view');
+    selectObjectCommitController?.abort();
+    selectObjectCommitController = null;
+    canvasOperations.cancel();
     const session = selectObjectSession;
     selectObjectSession = null;
     selectObjectUnsubscribe?.();
@@ -2783,9 +2801,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     scheduler.invalidate({ overlay: true });
   };
 
-  const startSelectObjectSession = (): StartSelectObjectSessionResult => {
+  const startSelectObject = (layerId: string): StartSelectObjectSessionResult => {
     const doc = mirror.getDocument();
-    const layer = doc?.layers.find((candidate) => candidate.id === doc.selectedLayerId);
+    if (!doc) {
+      return 'missing';
+    }
+    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
     if (!layer) {
       return 'missing';
     }
@@ -2808,9 +2829,23 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return 'not-ready';
     }
 
+    if (doc.selectedLayerId !== layer.id) {
+      store.dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+    }
+
     clearOwnedSelectObjectSession();
     selectObjectGuard = guard;
     selectObjectSourceRect = sourceRect;
+    const operation = canvasOperations.start({
+      cleanupPreview: clearSamPreview,
+      guard,
+      identity: { kind: 'select-object', layerId: layer.id, projectId },
+    });
+    if (!operation) {
+      selectObjectGuard = null;
+      selectObjectSourceRect = null;
+      return 'not-ready';
+    }
     const queueDeps = opts.selectObjectDeps;
     selectObjectSession = createSelectObjectSession({
       deps: {
@@ -2870,13 +2905,132 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const processSelectObjectSession = (): Promise<SelectObjectSessionProcessResult> =>
     selectObjectSession?.process() ?? Promise.resolve('stale');
 
+  const getCurrentSelectObjectPreview = (): SelectObjectSessionPreview<RasterSurface> | null => {
+    const state = selectObjectSession?.getSnapshot();
+    const preview = state?.preview;
+    if (
+      !state ||
+      state.status === 'processing' ||
+      state.status === 'scheduled' ||
+      !preview ||
+      preview.guard !== selectObjectGuard
+    ) {
+      return null;
+    }
+    return isLayerExportGuardCurrent(preview.guard) ? preview : null;
+  };
+
+  const beginSelectObjectCommit = (): AbortController => {
+    selectObjectCommitController?.abort();
+    const controller = new AbortController();
+    selectObjectCommitController = controller;
+    return controller;
+  };
+
+  const finishSelectObjectCommit = (controller: AbortController): void => {
+    if (selectObjectCommitController === controller) {
+      selectObjectCommitController = null;
+    }
+  };
+
+  const applySelectObjectSession = async (): Promise<ReplaceSelectionFromImageResult> => {
+    const preview = getCurrentSelectObjectPreview();
+    if (!preview) {
+      return { status: 'stale' };
+    }
+    const controller = beginSelectObjectCommit();
+    const result = await replaceSelectionFromImage(preview.guard, preview.image, preview.rect, controller.signal);
+    finishSelectObjectCommit(controller);
+    if (result.status === 'selected') {
+      clearOwnedSelectObjectSession();
+      if (activeToolId === 'sam') {
+        setTool('view');
+      }
+    } else {
+      selectObjectSession?.reportError(
+        result.status === 'failed' ? result.message : `Select Object apply is ${result.status}.`
+      );
+    }
+    return result;
+  };
+
+  const saveSelectObjectSession = async (
+    target: SelectObjectSaveTarget,
+    makeImageDurable: (imageName: string) => Promise<void>
+  ): Promise<SaveSelectObjectSessionResult> => {
+    const preview = getCurrentSelectObjectPreview();
+    if (!preview) {
+      return { status: 'stale' };
+    }
+    const controller = beginSelectObjectCommit();
+    try {
+      await makeImageDurable(preview.image.imageName);
+    } catch (error) {
+      finishSelectObjectCommit(controller);
+      const message = error instanceof Error ? error.message : String(error);
+      selectObjectSession?.reportError(message);
+      return { message, status: 'failed' };
+    }
+    if (getCurrentSelectObjectPreview() !== preview) {
+      finishSelectObjectCommit(controller);
+      return { status: 'stale' };
+    }
+    if (controller.signal.aborted) {
+      finishSelectObjectCommit(controller);
+      return { status: 'aborted' };
+    }
+    let result: SaveSelectObjectSessionResult;
+    try {
+      result =
+        target === 'raster' || target === 'control'
+          ? await commitGeneratedImageResult({
+              guard: preview.guard,
+              image: preview.image,
+              origin: { x: preview.rect.x, y: preview.rect.y },
+              signal: controller.signal,
+              target: target === 'raster' ? 'copy-raster' : 'copy-control',
+            })
+          : await commitMaskImageResult({
+              guard: preview.guard,
+              image: preview.image,
+              rect: preview.rect,
+              signal: controller.signal,
+              target,
+            });
+    } catch (error) {
+      finishSelectObjectCommit(controller);
+      const message = error instanceof Error ? error.message : String(error);
+      selectObjectSession?.reportError(message);
+      return { message, status: 'failed' };
+    }
+    finishSelectObjectCommit(controller);
+    if (result.status === 'committed') {
+      clearOwnedSelectObjectSession();
+      if (activeToolId === 'sam') {
+        setTool('view');
+      }
+    } else {
+      selectObjectSession?.reportError(
+        result.status === 'failed' ? result.message : `Select Object save is ${result.status}.`
+      );
+    }
+    return result;
+  };
+
   const resetSelectObjectSession = (): void => {
-    if (!selectObjectSession) {
+    const session = selectObjectSession;
+    const guard = selectObjectGuard;
+    if (!session || !guard) {
       return;
     }
     selectObjectPointLabel = 'include';
-    selectObjectSession.reset();
-    selectObjectSession.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });
+    session.reset();
+    session.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });
+    canvasOperations.start({
+      cleanupPreview: clearSamPreview,
+      guard,
+      identity: { kind: 'select-object', layerId: guard.layerId, projectId },
+    });
     syncSelectObjectStore();
   };
 
@@ -3884,17 +4038,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       }
       const layerId = createLayerId();
       const selectedLayerId = document.selectedLayerId;
-      const copy: CanvasLayerContract = {
-        blendMode: 'normal',
-        id: layerId,
-        isEnabled: true,
-        isLocked: false,
-        name: `${liveLayer.name} workflow result`,
-        opacity: 1,
-        source,
-        transform: identityTransform,
-        type: 'raster',
-      };
+      const copy: CanvasLayerContract =
+        options.target === 'copy-control'
+          ? {
+              ...createControlLayer(nextControlLayerName(document.layers.map((layer) => layer.name)), layerId),
+              source,
+              transform: identityTransform,
+            }
+          : {
+              blendMode: 'normal',
+              id: layerId,
+              isEnabled: true,
+              isLocked: false,
+              name: `${liveLayer.name} workflow result`,
+              opacity: 1,
+              source,
+              transform: identityTransform,
+              type: 'raster',
+            };
       const publishCopy = (prepared: ReturnType<LayerCacheStore['prepareReplacement']>): void => {
         dispatchPreparedMutation(
           { index: sourceIndex, layer: copy, type: 'addCanvasLayer' },
@@ -3921,7 +4082,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       publishCopy(preparedCopy);
       history.push({
         bytes: rect.width * rect.height * 4 + 256,
-        label: 'Copy workflow result to raster layer',
+        label:
+          options.target === 'copy-control'
+            ? 'Copy workflow result to control layer'
+            : 'Copy workflow result to raster layer',
         redo: applyCopy,
         replayFailureAtomic: true,
         undo: () => {
@@ -5659,8 +5823,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     mergeLayerDown,
     mergeVisibleRasterLayers,
     processSelectObjectSession,
+    applySelectObjectSession,
     resetSelectObjectSession,
-    startSelectObjectSession,
+    saveSelectObjectSession,
+    startSelectObject,
     updateSelectObjectSession,
     openTextCreate,
     openTextEdit,

@@ -72,7 +72,6 @@ import {
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
-import { SelectObjectDialog } from './SelectObjectDialog';
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 type MenuOpenChange = ComponentProps<typeof Menu.Root>['onOpenChange'];
@@ -390,7 +389,18 @@ const LayerMenu = ({
   const openRename = useCallback(() => setDialogKind('rename'), [setDialogKind]);
   const closeDialog = useCallback(() => setDialogKind(null), [setDialogKind]);
   const openRunWorkflow = useCallback(() => setDialogKind('run-workflow'), [setDialogKind]);
-  const openSelectObject = useCallback(() => setDialogKind('select-object'), [setDialogKind]);
+  const startSelectObject = useCallback(
+    (layerId: string) => {
+      if (!engine) {
+        throw makeStatusError('not-ready');
+      }
+      const result = engine.startSelectObject(layerId);
+      if (result !== 'started') {
+        throw makeStatusError(result);
+      }
+    },
+    [engine, makeStatusError]
+  );
   const submitRename = useCallback(
     (name: string) => {
       patchBase(t('widgets.layers.actions.rename'), { name }, { name: layer.name });
@@ -604,7 +614,7 @@ const LayerMenu = ({
       openProperties: handleOpenProperties,
       openRename,
       openRunWorkflow,
-      openSelectObject,
+      startSelectObject,
       patchConfig: handleLayerConfigAction,
       rasterize: handleRasterize,
       reorder: (kind, actionId) => reorder(kind, getActionLabel(actionId)),
@@ -634,7 +644,7 @@ const LayerMenu = ({
       handleTransform,
       openRename,
       openRunWorkflow,
-      openSelectObject,
+      startSelectObject,
       reorder,
     ]
   );
@@ -691,9 +701,6 @@ const LayerMenu = ({
         onClose={closeDialog}
         onSubmit={submitRename}
       />
-      {dialogKind === 'select-object' ? (
-        <SelectObjectDialog engine={engine} isOpen layerId={layer.id} onClose={closeDialog} />
-      ) : null}
       {dialogKind === 'run-workflow' ? (
         <RunLayerWorkflowDialog
           availability={workflowAvailability}

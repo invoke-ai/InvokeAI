@@ -71,6 +71,7 @@ export interface SelectObjectSession<T> {
     >
   ): void;
   process(): Promise<SelectObjectSessionProcessResult>;
+  reportError(message: string): void;
   reset(): void;
   cancel(): void;
   dispose(): void;
@@ -431,6 +432,11 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     },
     getSnapshot: () => state,
     process,
+    reportError: (message) => {
+      if (!disposed) {
+        publishState({ ...state, error: message, status: 'error' });
+      }
+    },
     reset: () => {
       if (disposed) {
         return;

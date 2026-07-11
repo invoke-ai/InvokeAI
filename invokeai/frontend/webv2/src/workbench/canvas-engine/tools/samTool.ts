@@ -39,7 +39,7 @@ export const createSamTool = (): Tool => {
 
   const updateGesture = (ctx: ToolContext, input: PointerInput, state: GestureState): void => {
     const snapshot = ctx.stores.samSession.get();
-    if (!snapshot) {
+    if (!snapshot || snapshot.input.type !== 'visual') {
       return;
     }
     const next = cloneInput(state.startInput);
@@ -80,6 +80,7 @@ export const createSamTool = (): Tool => {
       if (
         gesture ||
         !snapshot ||
+        snapshot.input.type !== 'visual' ||
         (input.buttons & PRIMARY_BUTTON) === 0 ||
         !canonicalizeDocumentSamPoint(input.documentPoint, snapshot.sourceRect)
       ) {
@@ -125,7 +126,7 @@ export const createSamTool = (): Tool => {
       }
 
       const snapshot = ctx.stores.samSession.get();
-      if (!snapshot) {
+      if (!snapshot || snapshot.input.type !== 'visual') {
         return;
       }
       const next = cloneInput(current.startInput);

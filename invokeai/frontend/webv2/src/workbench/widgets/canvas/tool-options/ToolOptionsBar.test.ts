@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TOOL_OPTIONS_COMPONENTS } from './ToolOptionsBar';
+import { resolveCanvasOptionsContent, TOOL_OPTIONS_COMPONENTS } from './ToolOptionsBar';
 
 describe('TOOL_OPTIONS_COMPONENTS', () => {
   it('has an entry for exactly the tools with dedicated options today (bbox, brush, eraser, gradient, lasso, move, shape, text, transform)', () => {
@@ -33,5 +33,12 @@ describe('TOOL_OPTIONS_COMPONENTS', () => {
     for (const component of components) {
       expect(typeof component).toBe('function');
     }
+  });
+
+  it('gives an active canvas operation priority over the active or temporary tool', () => {
+    expect(resolveCanvasOptionsContent({ status: 'active' }, 'sam')).toBe('operation');
+    expect(resolveCanvasOptionsContent({ status: 'active' }, 'view')).toBe('operation');
+    expect(resolveCanvasOptionsContent({ status: 'idle' }, 'brush')).toBe('brush');
+    expect(resolveCanvasOptionsContent({ status: 'idle' }, 'view')).toBeNull();
   });
 });

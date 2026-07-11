@@ -20,7 +20,7 @@ describe('resolveMenuTargetForRender', () => {
     expect(resolveMenuTargetForRender(null, null)).toBeNull();
   });
 
-  it.each(['rename', 'select-object', 'run-workflow'] as const)(
+  it.each(['rename', 'run-workflow'] as const)(
     'falls back to the captured %s target after the menu closes',
     (kind: LayerMenuDialogKind) => {
       const dialogTarget = target('a');
@@ -30,11 +30,11 @@ describe('resolveMenuTargetForRender', () => {
 
   it('prefers the live target over a pending dialog target when both exist', () => {
     const live = target('b');
-    expect(resolveMenuTargetForRender(live, { kind: 'select-object', target: target('a') })).toBe(live);
+    expect(resolveMenuTargetForRender(live, { kind: 'rename', target: target('a') })).toBe(live);
   });
 
   it('clears the sticky target after dialog close', () => {
-    const dialogState = { kind: 'select-object', target: target('a') } as const;
+    const dialogState = { kind: 'rename', target: target('a') } as const;
     expect(resolveMenuTargetForRender(null, dialogState)).toBe(dialogState.target);
     expect(resolveMenuTargetForRender(null, null)).toBeNull();
   });

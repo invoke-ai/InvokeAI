@@ -92,7 +92,7 @@ export interface LayerContextActionEffects {
   duplicate(): void;
   openRename(): void;
   openRunWorkflow(): void;
-  openSelectObject(): void;
+  startSelectObject(layerId: string): void;
   transform(): void;
   fitToBbox(): void;
   openProperties(section: LayerPropertiesSection): void;
@@ -424,7 +424,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Select object',
-    handler: ({ effects }) => effects.openSelectObject(),
+    handler: ({ effects, layer }) => effects.startSelectObject(layer.id),
     icon: ScanSearchIcon,
     id: 'select-object',
     isEnabled: hasMutablePixels,

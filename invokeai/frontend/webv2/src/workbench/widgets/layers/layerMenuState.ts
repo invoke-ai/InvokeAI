@@ -5,9 +5,9 @@ import type { CanvasLayerContextMenuTarget } from './LayerContextMenu';
  *
  * Opening a sibling dialog closes the menu, which nulls the live `target`. The
  * wrapper keeps a captured dialog target until that dialog closes so the shared
- * subtree remains mounted for rename, Select Object, and future workflow actions.
+ * subtree remains mounted for rename and workflow actions.
  */
-export type LayerMenuDialogKind = 'rename' | 'select-object' | 'run-workflow';
+export type LayerMenuDialogKind = 'rename' | 'run-workflow';
 
 export interface LayerMenuDialogState {
   kind: LayerMenuDialogKind;

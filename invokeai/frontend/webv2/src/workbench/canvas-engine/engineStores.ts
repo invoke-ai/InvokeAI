@@ -15,6 +15,7 @@
 
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { SamModel } from '@workbench/generation/canvas/samGraph';
 import type { CanvasLayerSourceContract } from '@workbench/types';
 
 import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
@@ -231,12 +232,20 @@ export interface SamVisualInput {
   bbox: Rect | null;
 }
 
+export type SamSessionInput =
+  | SamVisualInput
+  | { type: 'prompt'; prompt: string; includePoints?: never; excludePoints?: never; bbox?: never };
+
 /** Narrow engine-owned Select Object state for canvas tools and future UI subscribers. */
 export interface SamSessionSnapshot {
   layerId: string;
   sourceRect: Rect;
-  input: SamVisualInput;
+  input: SamSessionInput;
   pointLabel: SamPointLabel;
+  model: SamModel;
+  invert: boolean;
+  applyPolygonRefinement: boolean;
+  autoProcess: boolean;
   isolatedPreview: boolean;
   status: 'ready' | 'scheduled' | 'processing' | 'error';
   error: string | null;

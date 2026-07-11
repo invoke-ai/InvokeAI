@@ -8,12 +8,14 @@
  * `widgets/`) preserves the engine's zero-React boundary.
  */
 
+import type { CanvasOperationState } from '@workbench/canvas-engine/canvasOperationController';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type {
   BboxToolOptions,
   BrushOptions,
   EraserOptions,
   GradientToolOptions,
+  SamSessionSnapshot,
   LassoToolOptions,
   ScalarStore,
   ShapeToolOptions,
@@ -66,6 +68,12 @@ export const useCanvasViewportReady = (engine: CanvasEngine): boolean => useScal
 
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasEngine): ToolId => useScalarStore(engine.stores.activeTool);
+
+export const useCanvasOperation = (engine: CanvasEngine): CanvasOperationState =>
+  useSyncExternalStore(engine.canvasOperations.subscribe, engine.canvasOperations.getSnapshot);
+
+export const useSamSession = (engine: CanvasEngine): SamSessionSnapshot | null =>
+  useScalarStore(engine.stores.samSession);
 
 /** Whether the engine-owned canvas history has an entry to undo (enables the header undo button). */
 export const useCanvasCanUndo = (engine: CanvasEngine): boolean => useScalarStore(engine.stores.canUndo);

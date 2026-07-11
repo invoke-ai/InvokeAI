@@ -150,6 +150,18 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot()).toEqual(expect.objectContaining({ error: 'graph failed', status: 'error' }));
   });
 
+  it('reports routing failures without discarding the preview and Reset clears the error', async () => {
+    const harness = createHarness();
+    await harness.session.process();
+    const preview = harness.session.getSnapshot().preview;
+
+    harness.session.reportError('commit failed');
+
+    expect(harness.session.getSnapshot()).toMatchObject({ error: 'commit failed', preview, status: 'error' });
+    harness.session.reset();
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, preview: null, status: 'ready' });
+  });
+
   it('clears a failed process error when controller source invalidation returns the session to ready', async () => {
     const harness = createHarness({ runGraph: vi.fn(() => Promise.reject(new Error('graph failed'))) });
     await expect(harness.session.process()).resolves.toBe('error');

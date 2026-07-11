@@ -1,3 +1,4 @@
+import type { CanvasOperationState } from '@workbench/canvas-engine/canvasOperationController';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { ToolId } from '@workbench/canvas-engine/types';
 import type { ComponentType } from 'react';
@@ -5,11 +6,12 @@ import type { ComponentType } from 'react';
 import { HStack, Text } from '@chakra-ui/react';
 import { BboxDetailsBar } from '@workbench/widgets/canvas/BboxDetailsBar';
 import { CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
-import { useCanvasActiveTool, useCanvasZoom } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasActiveTool, useCanvasOperation, useCanvasZoom } from '@workbench/widgets/canvas/engineStoreHooks';
 import { formatZoomPercent } from '@workbench/widgets/canvas/zoomOptions';
 
 import { BboxOptions } from './BboxOptions';
 import { BrushOptions } from './BrushOptions';
+import { CanvasOperationBar } from './CanvasOperationBar';
 import { CanvasOptionsBar } from './CanvasOptionsBar';
 import { EraserOptions } from './EraserOptions';
 import { GradientOptions } from './GradientOptions';
@@ -41,6 +43,16 @@ export const TOOL_OPTIONS_COMPONENTS: Partial<Record<ToolId, ComponentType<ToolO
   transform: TransformOptions,
 };
 
+export const resolveCanvasOptionsContent = (
+  operation: Pick<CanvasOperationState, 'status'>,
+  activeTool: ToolId
+): 'operation' | ToolId | null => {
+  if (operation.status === 'active') {
+    return 'operation';
+  }
+  return TOOL_OPTIONS_COMPONENTS[activeTool] ? activeTool : null;
+};
+
 /**
  * The canvas's floating tool-options bar (bottom-center over the surface):
  * contextual controls for the active tool on the left, then the document
@@ -61,8 +73,13 @@ export const ToolOptionsBar = ({
   engine: CanvasEngine;
 }) => {
   const activeTool = useCanvasActiveTool(engine);
+  const operation = useCanvasOperation(engine);
   const zoom = useCanvasZoom(engine);
-  const OptionsComponent = TOOL_OPTIONS_COMPONENTS[activeTool];
+  const content = resolveCanvasOptionsContent(operation, activeTool);
+  if (content === 'operation' && operation.status === 'active') {
+    return <CanvasOperationBar engine={engine} operation={operation} />;
+  }
+  const OptionsComponent = content && content !== 'operation' ? TOOL_OPTIONS_COMPONENTS[content] : undefined;
   const hasDocument = documentWidth !== null && documentHeight !== null;
   const hasBboxDetails = activeTool === 'bbox';
   const hasToolControls = OptionsComponent !== undefined || hasBboxDetails;

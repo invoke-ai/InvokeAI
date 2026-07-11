@@ -11,11 +11,15 @@ import { createSamTool } from './samTool';
 const sourceRect = { height: 100, width: 100, x: 0, y: 0 };
 
 const visualSnapshot = (overrides: Partial<SamSessionSnapshot> = {}): SamSessionSnapshot => ({
+  applyPolygonRefinement: false,
+  autoProcess: false,
   error: null,
   hasPreview: false,
   input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
+  invert: false,
   isolatedPreview: true,
   layerId: 'source',
+  model: 'segment-anything-2-large',
   pointLabel: 'include',
   sourceRect,
   status: 'ready',

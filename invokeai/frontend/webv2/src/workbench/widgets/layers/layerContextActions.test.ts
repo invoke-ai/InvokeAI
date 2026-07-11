@@ -91,7 +91,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   openProperties: vi.fn(),
   openRename: vi.fn(),
   openRunWorkflow: vi.fn(),
-  openSelectObject: vi.fn(),
+  startSelectObject: vi.fn(),
   patchConfig: vi.fn(),
   rasterize: vi.fn(),
   reorder: vi.fn(),
@@ -262,14 +262,16 @@ describe('layer context action registry', () => {
     expect(transform).toHaveBeenCalledOnce();
   });
 
-  it('opens Select Object through the registry without starting work itself', () => {
+  it('starts Select Object for the action layer through the registry', () => {
     const effects = makeEffects();
     const context = makeRuntimeContext(rasterLayer, { effects });
 
     getLayerContextActionDefinition('select-object').handler(context);
 
-    expect(effects.openSelectObject).toHaveBeenCalledOnce();
-    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.openSelectObject]);
+    expect(effects.startSelectObject).toHaveBeenCalledWith(rasterLayer.id);
+    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([
+      effects.startSelectObject,
+    ]);
   });
 
   it('opens Run Workflow through the registry without starting work itself', () => {
