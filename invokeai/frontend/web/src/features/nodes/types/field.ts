@@ -20,6 +20,7 @@ import {
   zModelType,
   zSchedulerField,
   zStylePresetField,
+  zSystemPromptField,
 } from './common';
 
 /**
@@ -176,6 +177,11 @@ const zStylePresetFieldType = zFieldTypeBase.extend({
   originalType: zStatelessFieldType.optional(),
 });
 
+const zSystemPromptFieldType = zFieldTypeBase.extend({
+  name: z.literal('SystemPromptField'),
+  originalType: zStatelessFieldType.optional(),
+});
+
 const zColorFieldType = zFieldTypeBase.extend({
   name: z.literal('ColorField'),
   originalType: zStatelessFieldType.optional(),
@@ -221,6 +227,7 @@ const zStatefulFieldType = z.union([
   zImageFieldType,
   zBoardFieldType,
   zStylePresetFieldType,
+  zSystemPromptFieldType,
   zModelIdentifierFieldType,
   zLoRAFieldType,
   zColorFieldType,
@@ -644,6 +651,27 @@ export type StylePresetFieldInputTemplate = z.infer<typeof zStylePresetFieldInpu
 export const isStylePresetFieldInputInstance = buildInstanceTypeGuard(zStylePresetFieldInputInstance);
 export const isStylePresetFieldInputTemplate =
   buildTemplateTypeGuard<StylePresetFieldInputTemplate>('StylePresetField');
+// #endregion
+
+// #region SystemPromptField
+export const zSystemPromptFieldValue = zSystemPromptField.optional();
+const zSystemPromptFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zSystemPromptFieldValue,
+});
+const zSystemPromptFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zSystemPromptFieldType,
+  originalType: zFieldType.optional(),
+  default: zSystemPromptFieldValue,
+});
+const zSystemPromptFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zSystemPromptFieldType,
+});
+export type SystemPromptFieldValue = z.infer<typeof zSystemPromptFieldValue>;
+export type SystemPromptFieldInputInstance = z.infer<typeof zSystemPromptFieldInputInstance>;
+export type SystemPromptFieldInputTemplate = z.infer<typeof zSystemPromptFieldInputTemplate>;
+export const isSystemPromptFieldInputInstance = buildInstanceTypeGuard(zSystemPromptFieldInputInstance);
+export const isSystemPromptFieldInputTemplate =
+  buildTemplateTypeGuard<SystemPromptFieldInputTemplate>('SystemPromptField');
 // #endregion
 
 // #region ColorField
@@ -1369,6 +1397,7 @@ export const zStatefulFieldValue = z.union([
   zImageFieldCollectionValue,
   zBoardFieldValue,
   zStylePresetFieldValue,
+  zSystemPromptFieldValue,
   zModelIdentifierFieldValue,
   zLoRAFieldCollectionValue,
   zColorFieldValue,
@@ -1399,6 +1428,7 @@ const zStatefulFieldInputInstance = z.union([
   zImageFieldCollectionInputInstance,
   zBoardFieldInputInstance,
   zStylePresetFieldInputInstance,
+  zSystemPromptFieldInputInstance,
   zModelIdentifierFieldInputInstance,
   zLoRAFieldCollectionInputInstance,
   zColorFieldInputInstance,
@@ -1428,6 +1458,7 @@ const zStatefulFieldInputTemplate = z.union([
   zImageFieldCollectionInputTemplate,
   zBoardFieldInputTemplate,
   zStylePresetFieldInputTemplate,
+  zSystemPromptFieldInputTemplate,
   zModelIdentifierFieldInputTemplate,
   zLoRAFieldCollectionInputTemplate,
   zColorFieldInputTemplate,
@@ -1457,6 +1488,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zImageFieldCollectionOutputTemplate,
   zBoardFieldOutputTemplate,
   zStylePresetFieldOutputTemplate,
+  zSystemPromptFieldOutputTemplate,
   zModelIdentifierFieldOutputTemplate,
   zLoRAFieldCollectionOutputTemplate,
   zColorFieldOutputTemplate,

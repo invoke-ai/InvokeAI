@@ -50,6 +50,7 @@ import type {
   StringFieldValue,
   StringGeneratorFieldValue,
   StylePresetFieldValue,
+  SystemPromptFieldValue,
 } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
@@ -73,6 +74,7 @@ import {
   zStringFieldValue,
   zStringGeneratorFieldValue,
   zStylePresetFieldValue,
+  zSystemPromptFieldValue,
 } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode, ConnectorNode } from 'features/nodes/types/invocation';
 import { isConnectorNode, isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
@@ -580,6 +582,9 @@ const slice = createSlice({
     fieldStylePresetValueChanged: (state, action: FieldValueAction<StylePresetFieldValue>) => {
       fieldValueReducer(state, action, zStylePresetFieldValue);
     },
+    fieldSystemPromptValueChanged: (state, action: FieldValueAction<SystemPromptFieldValue>) => {
+      fieldValueReducer(state, action, zSystemPromptFieldValue);
+    },
     fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
       fieldValueReducer(state, action, zImageFieldValue);
     },
@@ -800,6 +805,7 @@ export const {
   fieldBooleanValueChanged,
   fieldColorValueChanged,
   fieldStylePresetValueChanged,
+  fieldSystemPromptValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
   fieldImageCollectionValueChanged,

@@ -253,6 +253,12 @@ class StylePresetField(BaseModel):
     style_preset_id: str = Field(description="The id of the style preset")
 
 
+class SystemPromptField(BaseModel):
+    """A system prompt primitive field"""
+
+    system_prompt_id: str = Field(description="The id of the system prompt")
+
+
 class DenoiseMaskField(BaseModel):
     """An inpaint mask field"""
 

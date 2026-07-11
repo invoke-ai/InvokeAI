@@ -36,6 +36,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   BoardField: 'purple.500',
   BooleanField: 'green.500',
   StylePresetField: 'purple.400',
+  SystemPromptField: 'purple.300',
   CLIPField: 'green.500',
   ColorField: 'pink.300',
   ConditioningField: 'cyan.500',

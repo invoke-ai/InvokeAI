@@ -39,6 +39,7 @@ def _services(**overrides):
         "client_state_persistence": object(),
         "users": object(),
         "image_moves": None,
+        "system_prompt_records": object(),
     }
     services.update(overrides)
     return InvocationServices(**services)

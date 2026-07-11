@@ -15,6 +15,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   SavedWorkflowField: '',
   StringField: '',
   StylePresetField: undefined,
+  SystemPromptField: undefined,
   FloatGeneratorField: undefined,
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,
