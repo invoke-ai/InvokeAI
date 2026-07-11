@@ -165,3 +165,74 @@ class TestCreateRollback:
         # record must still be rolled back.
         invoker.services.board_video_records.remove_video_from_board.assert_not_called()
         invoker.services.video_records.delete.assert_called_once_with("solo.mp4")
+
+    def test_files_rolled_back_when_failure_occurs_after_file_save(self, video_service: VideoService, tmp_path):
+        """The disk layer cleans up after its own save failures, but a failure *after* a
+        successful file save (e.g. building the DTO) must also unwind the files — otherwise
+        they'd sit on disk with no record pointing at them (JPPhoto PR #9163 July-10
+        follow-up)."""
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        self._wire_minimal_create_dependencies(invoker, video_name="late.mp4")
+        invoker.services.video_records.save.return_value = None
+        invoker.services.video_files.save.return_value = None
+        # get_dto reads the record back — make that step explode.
+        invoker.services.video_records.get.side_effect = RuntimeError("db went away")
+
+        with pytest.raises(RuntimeError):
+            video_service.create(
+                source_path=tmp_path / "src.mp4",
+                width=64,
+                height=64,
+                duration=1.0,
+                fps=24.0,
+                video_origin=ResourceOrigin.EXTERNAL,
+                video_category=ImageCategory.GENERAL,
+                board_id=None,
+            )
+
+        invoker.services.video_records.delete.assert_called_once_with("late.mp4")
+        invoker.services.video_files.delete.assert_called_once()
+        assert invoker.services.video_files.delete.call_args.args[0] == "late.mp4"
+
+
+class TestCreateBoardAttachFallback:
+    """Board attachment during create is best-effort, mirroring ImageService.create: a board
+    deleted between the caller's access check and the insert must not destroy a just-generated
+    video. The fallback must be explicit, not silent — the returned DTO reports the actual
+    (missing) board association and a warning is logged (JPPhoto PR #9163 July-10 follow-up).
+    """
+
+    def test_create_succeeds_with_explicit_fallback_when_board_attach_fails(
+        self, video_service: VideoService, tmp_path
+    ):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.names.create_video_name.return_value = "orphan.mp4"
+        invoker.services.configuration.image_subfolder_strategy = "flat"
+        invoker.services.logger = MagicMock()
+
+        invoker.services.video_records.save.return_value = None
+        invoker.services.board_video_records.add_video_to_board.side_effect = Exception("board was deleted")
+        invoker.services.video_files.save.return_value = None
+        # get_dto reads the record and the *actual* board association back.
+        invoker.services.video_records.get.return_value = _make_record(video_name="orphan.mp4")
+        invoker.services.board_video_records.get_board_for_video.return_value = None
+        invoker.services.urls.get_video_url.return_value = "http://localhost/videos/orphan.mp4"
+
+        video_dto = video_service.create(
+            source_path=tmp_path / "src.mp4",
+            width=64,
+            height=64,
+            duration=1.0,
+            fps=24.0,
+            video_origin=ResourceOrigin.EXTERNAL,
+            video_category=ImageCategory.GENERAL,
+            board_id="deleted-board",
+        )
+
+        # The video survives, but the DTO must not claim the requested board attachment
+        # succeeded, and the fallback must be logged.
+        assert video_dto.board_id is None
+        invoker.services.logger.warning.assert_called_once()
+        assert "deleted-board" in invoker.services.logger.warning.call_args.args[0]
+        # Nothing was attached, so nothing should be unwound.
+        invoker.services.board_video_records.remove_video_from_board.assert_not_called()

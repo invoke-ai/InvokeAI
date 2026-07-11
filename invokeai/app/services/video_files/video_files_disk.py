@@ -90,6 +90,14 @@ class DiskVideoFileStorage(VideoFileStorageBase):
                     json.dump(sidecar, f)
                 logger.info(f"Sidecar written: {sidecar_path}")
         except Exception as e:
+            # By this point the source MP4 has usually already been moved into permanent
+            # storage, so bailing out without cleanup would orphan the video (and any
+            # partially written thumbnail/sidecar) on disk with no DB record through which
+            # it can be managed — the caller rolls the record back on this exception.
+            try:
+                self.delete(video_name, video_subfolder=video_subfolder)
+            except Exception as cleanup_err:
+                logger.error(f"Failed to clean up partially saved files for {video_name}: {cleanup_err}")
             raise VideoFileSaveException from e
 
     def delete(self, video_name: str, video_subfolder: str = "") -> None:

@@ -87,6 +87,12 @@ class VideoService(VideoServiceABC):
             )
             record_saved = True
             if board_id is not None:
+                # Board attachment is deliberately best-effort, mirroring ImageService.create:
+                # this is reachable when the board is deleted between the caller's access
+                # check and this insert, and failing the whole create here would destroy a
+                # just-generated video over a cosmetic categorization problem. The returned
+                # DTO reports the video's *actual* board (None on fallback), so callers are
+                # not told the attachment succeeded.
                 try:
                     self.__invoker.services.board_video_records.add_video_to_board(
                         board_id=board_id, video_name=video_name
@@ -129,6 +135,16 @@ class VideoService(VideoServiceABC):
                     self.__invoker.services.logger.error(
                         f"Failed to roll back video record for {video_name}: {str(rollback_err)}"
                     )
+            # The disk layer cleans up after itself when the save fails, but a failure
+            # after a successful file save (e.g. building the DTO) would still leave the
+            # files on disk with no record pointing at them. delete() skips files that
+            # don't exist, so this is a no-op when nothing was written.
+            try:
+                self.__invoker.services.video_files.delete(video_name, video_subfolder=video_subfolder)
+            except Exception as rollback_err:
+                self.__invoker.services.logger.error(
+                    f"Failed to roll back video files for {video_name}: {str(rollback_err)}"
+                )
             if isinstance(e, VideoFileSaveException):
                 self.__invoker.services.logger.error("Failed to save video file")
             else:
