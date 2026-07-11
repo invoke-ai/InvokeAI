@@ -15,6 +15,7 @@ import {
   getSavedWorkflowDynamicEdgeIdsToRemove,
   getSavedWorkflowDynamicFields,
   getSavedWorkflowFormFieldData,
+  getSelectedSavedWorkflow,
   shouldSyncSavedWorkflowDynamicFields,
 } from './callSavedWorkflowFormUtils';
 
@@ -113,6 +114,14 @@ describe('callSavedWorkflowFormUtils', () => {
     ).toBe(true);
   });
 
+  it('ignores stale saved workflow query data after the selection is cleared or changed', () => {
+    const workflow = buildWorkflowResponse();
+
+    expect(getSelectedSavedWorkflow('', workflow)).toBeUndefined();
+    expect(getSelectedSavedWorkflow('workflow-2', workflow)).toBeUndefined();
+    expect(getSelectedSavedWorkflow('workflow-1', workflow)).toBe(workflow);
+  });
+
   it('returns the stored form when it is non-empty and valid', () => {
     const form = getDefaultForm();
     const heading = buildHeading('Workflow Inputs');
@@ -122,6 +131,27 @@ describe('callSavedWorkflowFormUtils', () => {
     const workflow = buildWorkflowResponse({ form });
 
     expect(getRenderableWorkflowForm(workflow, templates)).toBe(form);
+  });
+
+  it('adds exposed fields missing from a non-empty stored form', () => {
+    const form = getDefaultForm();
+    const element = buildNodeFieldElement('node-1', 'a', addInputA.type);
+    form.elements[element.id] = { ...element, parentId: form.rootElementId };
+    getRootChildren(form).push(element.id);
+    const workflow = buildWorkflowResponse({
+      exposedFields: [
+        { nodeId: 'node-1', fieldName: 'a' },
+        { nodeId: 'node-1', fieldName: 'b' },
+      ],
+      form,
+    });
+
+    const dynamicFields = getSavedWorkflowDynamicFields(workflow, templates);
+
+    expect(dynamicFields.map((field) => field.fieldName)).toEqual([
+      'saved_workflow_input::node-1::a',
+      'saved_workflow_input::node-1::b',
+    ]);
   });
 
   it('builds a fallback form from exposed fields when the stored form is empty', () => {
