@@ -103,6 +103,52 @@ describe('createSelectObjectSession', () => {
     });
   });
 
+  it('contains subscriber exceptions so healthy subscribers and processing continue', async () => {
+    const harness = createHarness();
+    const throwing = vi.fn(() => {
+      throw new Error('subscriber failed');
+    });
+    const healthy = vi.fn();
+    harness.session.subscribe(throwing);
+    harness.session.subscribe(healthy);
+
+    expect(() => harness.session.update({ model: 'segment-anything-huge' })).not.toThrow();
+    await expect(harness.session.process()).resolves.toBe('published');
+
+    expect(throwing).toHaveBeenCalled();
+    expect(healthy).toHaveBeenCalled();
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'ready' });
+  });
+
+  it('never publishes error status without an error and returns to ready when update clears it', async () => {
+    const harness = createHarness();
+    const snapshots: Array<{ error: string | null; status: string }> = [];
+    harness.session.subscribe(() => {
+      const { error, status } = harness.session.getSnapshot();
+      snapshots.push({ error, status });
+    });
+    harness.session.update({ input: { prompt: '   ', type: 'prompt' } });
+
+    await expect(harness.session.process()).resolves.toBe('invalid');
+    expect(harness.session.getSnapshot()).toMatchObject({
+      error: 'A Segment Anything input is required.',
+      status: 'error',
+    });
+
+    harness.session.update({ autoProcess: false });
+
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'ready' });
+    expect(snapshots.every(({ error, status }) => status !== 'error' || error !== null)).toBe(true);
+  });
+
+  it('keeps a non-null error whenever processing fails', async () => {
+    const harness = createHarness({ runGraph: vi.fn(() => Promise.reject(new Error('graph failed'))) });
+
+    await expect(harness.session.process()).resolves.toBe('error');
+
+    expect(harness.session.getSnapshot()).toEqual(expect.objectContaining({ error: 'graph failed', status: 'error' }));
+  });
+
   it('reuses an uploaded export only while its exact guard remains current', async () => {
     const harness = createHarness();
 

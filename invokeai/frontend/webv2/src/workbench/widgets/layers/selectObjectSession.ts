@@ -124,9 +124,13 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   const listeners = new Set<() => void>();
 
   const publishState = (next: SelectObjectSessionState<T>): void => {
-    state = next;
+    state = next.status === 'error' && next.error === null ? { ...next, status: 'ready' } : next;
     for (const listener of listeners) {
-      listener();
+      try {
+        listener();
+      } catch {
+        // One faulty subscriber must not interrupt session state transitions.
+      }
     }
   };
 
