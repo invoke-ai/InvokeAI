@@ -147,7 +147,7 @@ describe('compositeDocument', () => {
       caches,
       VIEW,
       {
-        layerPreviews: new Map([['isolated', filterPreview]]),
+        layerPreviews: new Map([['isolated', { rect: { height: 10, width: 10, x: 0, y: 0 }, surface: filterPreview }]]),
         onlyLayerId: 'isolated',
         stagedPreview: { rect: { height: 10, width: 10, x: 0, y: 0 }, surface: staged },
       }
@@ -233,11 +233,12 @@ describe('compositeDocument', () => {
 
     compositeDocument(target, makeDoc([layer]), caches, VIEW, {
       backend,
-      layerPreviews: new Map([['control', preview]]),
+      layerPreviews: new Map([['control', { rect: { height: 14, width: 16, x: -2, y: -3 }, surface: preview }]]),
     });
 
     const draw = target.callLog.find((entry) => entry.op === 'drawImage');
     expect(draw?.args[0]).not.toBe(preview.canvas);
+    expect(draw?.args.slice(1)).toEqual([-2, -3]);
     expect(findSet(target.callLog, 'globalAlpha')).toContain(0.4);
     expect(findSet(target.callLog, 'globalCompositeOperation')).toContain('multiply');
   });

@@ -9164,6 +9164,13 @@ describe('commitMaskImageResult', () => {
 });
 
 describe('guarded filter previews', () => {
+  const spandrelModel = {
+    base: 'any',
+    hash: 'hash',
+    key: 'upscaler',
+    name: 'Upscaler',
+    type: 'spandrel_image_to_image',
+  };
   const emptyDoc = (): CanvasDocumentContractV2 => ({
     background: 'transparent',
     bbox: { height: 100, width: 100, x: 0, y: 0 },
@@ -9232,7 +9239,7 @@ describe('guarded filter previews', () => {
       throw new Error('expected a guardable export');
     }
 
-    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered', rect: exported.rect }, exported.guard);
     await flushMicrotasks();
     bitmaps.resolveBitmap(0);
 
@@ -9247,7 +9254,9 @@ describe('guarded filter previews', () => {
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
       filterDeps: {
-        runGraph: vi.fn(() => Promise.resolve({ imageName: 'filtered', origin: 'canvas', output: {} })),
+        runGraph: vi.fn(() =>
+          Promise.resolve({ height: 10, imageName: 'filtered', origin: 'canvas', output: {}, width: 10 })
+        ),
         uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'input' })),
       },
       imageResolver: () => Promise.resolve(new Blob()),
@@ -9336,7 +9345,9 @@ describe('guarded filter previews', () => {
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
       filterDeps: {
-        runGraph: vi.fn(() => Promise.resolve({ imageName: 'filtered', origin: 'canvas', output: {} })),
+        runGraph: vi.fn(() =>
+          Promise.resolve({ height: 10, imageName: 'filtered', origin: 'canvas', output: {}, width: 10 })
+        ),
         uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'input' })),
       },
       imageResolver: () => Promise.resolve(new Blob()),
@@ -9412,7 +9423,9 @@ describe('guarded filter previews', () => {
       backend: createTestStubRasterBackend(),
       bitmapStore: createSpyBitmapStore(),
       filterDeps: {
-        runGraph: vi.fn(() => Promise.resolve({ imageName: 'filtered.png', origin: 'canvas', output: {} })),
+        runGraph: vi.fn(() =>
+          Promise.resolve({ height: 10, imageName: 'filtered.png', origin: 'canvas', output: {}, width: 10 })
+        ),
         uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'filter-input.png' })),
       },
       imageResolver: () => Promise.resolve(new Blob()),
@@ -9428,6 +9441,81 @@ describe('guarded filter previews', () => {
     });
     return { document, engine, source };
   };
+
+  it.each([
+    {
+      expectedRect: { height: 22, width: 22, x: 1, y: -9 },
+      output: { height: 22, width: 22 },
+      settings: { blur_type: 'gaussian', radius: 2 },
+      target: 'apply',
+      type: 'img_blur',
+    },
+    {
+      expectedRect: { height: 14, width: 14, x: 5, y: -5 },
+      output: { height: 14, width: 14 },
+      settings: { blur_type: 'box', radius: 2 },
+      target: 'raster',
+      type: 'img_blur',
+    },
+    {
+      expectedRect: { height: 30, width: 40, x: 7, y: -3 },
+      output: { height: 30, width: 40 },
+      settings: { autoScale: true, model: spandrelModel, scale: 4 },
+      target: 'control',
+      type: 'spandrel_filter',
+    },
+  ] as const)(
+    'preserves $type/$target output geometry through preview, commit, and one-entry undo/redo',
+    async ({ expectedRect, output, settings, target, type }) => {
+      const source = filterFlowLayer('raster');
+      const document = { ...emptyDoc(), layers: [source], selectedLayerId: source.id };
+      const { projectId, store } = createReducerBackedStore(document);
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore: createSpyBitmapStore(),
+        filterDeps: {
+          runGraph: vi.fn(() =>
+            Promise.resolve({ ...output, imageName: 'filtered.png', origin: 'canvas', output: {} })
+          ),
+          uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'filter-input.png' })),
+        },
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      expect((await engine.exportLayerPixels(source.id)).status).toBe('ok');
+      expect(engine.startFilterOperation(source.id)).toBe('started');
+      engine.updateFilterOperation({ settings: structuredClone(settings), type });
+
+      await engine.processFilterOperation();
+      expect(engine.stores.filterSession.get()?.preview?.rect).toEqual(expectedRect);
+      await engine.commitFilterOperation(target, () => Promise.resolve());
+
+      const committedId = target === 'apply' ? source.id : engine.getDocument()!.layers[0]!.id;
+      const committed = engine.getDocument()!.layers.find((layer) => layer.id === committedId)!;
+      expect(committed.transform).toEqual(source.transform);
+      if (!('source' in committed)) {
+        throw new Error('expected a raster or control filter result');
+      }
+      expect(committed.source).toMatchObject({
+        bitmap: { height: output.height, width: output.width },
+        offset: { x: expectedRect.x, y: expectedRect.y },
+        type: 'paint',
+      });
+      const committedExport = await engine.exportLayerPixels(committedId);
+      expect(committedExport.status === 'ok' ? committedExport.rect : null).toEqual(expectedRect);
+      expect(engine.stores.canUndo.get()).toBe(true);
+
+      engine.undo();
+      expect(engine.getDocument()).toEqual(document);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      engine.redo();
+      const redone = engine.getDocument()!.layers.find((layer) => layer.id === committedId)!;
+      expect(redone).toEqual(committed);
+      expect(engine.stores.canRedo.get()).toBe(false);
+      engine.dispose();
+    }
+  );
 
   it.each(['raster', 'control'] as const)(
     'processes, retries durability, and applies %s with one origin-preserving history entry',
@@ -9522,7 +9610,8 @@ describe('guarded filter previews', () => {
       backend: createTestStubRasterBackend(),
       bitmapStore: createSpyBitmapStore(),
       filterDeps: {
-        runGraph: () => Promise.resolve({ imageName: 'newest-filter.png', origin: 'canvas', output: {} }),
+        runGraph: () =>
+          Promise.resolve({ height: 10, imageName: 'newest-filter.png', origin: 'canvas', output: {}, width: 10 }),
         uploadIntermediate: (_blob, signal) => {
           if (!signal) {
             throw new Error('expected upload cancellation signal');
@@ -9744,7 +9833,7 @@ describe('guarded filter previews', () => {
       throw new Error('expected a guardable export');
     }
 
-    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered', rect: exported.rect }, exported.guard);
     await flushMicrotasks();
     setDocument({
       ...document,
@@ -9772,7 +9861,7 @@ describe('guarded filter previews', () => {
       throw new Error('expected a guardable export');
     }
 
-    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered', rect: exported.rect }, exported.guard);
     await flushMicrotasks();
     setDocument({
       ...document,
@@ -9800,7 +9889,7 @@ describe('guarded filter previews', () => {
       throw new Error('expected a guardable export');
     }
 
-    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered', rect: exported.rect }, exported.guard);
     await flushMicrotasks();
     await engine.clearCaches();
     bitmaps.resolveBitmap(0);
@@ -9824,7 +9913,7 @@ describe('guarded filter previews', () => {
       throw new Error('expected a guardable export');
     }
 
-    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered', rect: exported.rect }, exported.guard);
     await flushMicrotasks();
     setDocument({ ...document, layers: [] });
     bitmaps.resolveBitmap(0);
@@ -9848,7 +9937,7 @@ describe('guarded filter previews', () => {
       throw new Error('expected a guardable export');
     }
 
-    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered', rect: exported.rect }, exported.guard);
     await flushMicrotasks();
     setDocument({ ...document, height: 200, width: 200 }, 1);
     bitmaps.resolveBitmap(0);
@@ -9872,8 +9961,8 @@ describe('guarded filter previews', () => {
       throw new Error('expected a guardable export');
     }
 
-    const older = engine.setGuardedFilterPreview('L', { imageName: 'older' }, exported.guard);
-    const newer = engine.setGuardedFilterPreview('L', { imageName: 'newer' }, exported.guard);
+    const older = engine.setGuardedFilterPreview('L', { imageName: 'older', rect: exported.rect }, exported.guard);
+    const newer = engine.setGuardedFilterPreview('L', { imageName: 'newer', rect: exported.rect }, exported.guard);
     await flushMicrotasks();
     bitmaps.resolveBitmap(1);
     await expect(newer).resolves.toBe('shown');
@@ -9921,7 +10010,7 @@ describe('guarded filter previews', () => {
       throw new Error('expected a guardable export');
     }
     await expect(
-      engine.setGuardedFilterPreview(layer.id, { imageName: 'guarded-preview' }, exported.guard)
+      engine.setGuardedFilterPreview(layer.id, { imageName: 'guarded-preview', rect: exported.rect }, exported.guard)
     ).resolves.toBe('shown');
     raf.flush();
     expect(screenDrawsBitmap(screen.surface, backend, 'guarded-preview')).toBe(true);
@@ -9956,7 +10045,7 @@ describe('guarded filter previews', () => {
     if (exported.status !== 'ok') {
       throw new Error('expected a guardable export');
     }
-    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered' }, exported.guard);
+    const pending = engine.setGuardedFilterPreview('L', { imageName: 'filtered', rect: exported.rect }, exported.guard);
     await flushMicrotasks();
 
     reactive.setActiveProjectId('p2');

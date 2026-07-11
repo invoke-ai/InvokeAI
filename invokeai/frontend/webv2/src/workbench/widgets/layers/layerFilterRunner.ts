@@ -23,9 +23,35 @@ export interface RunLayerFilterOptions {
       graph: BackendGraphContract;
       outputNodeId: string;
       signal?: AbortSignal;
-    }): Promise<{ imageName: string }>;
+    }): Promise<{ height: number; imageName: string; width: number }>;
   };
 }
+
+export const resolveFilterOutputRect = (options: {
+  filterType: string;
+  output: { width: number; height: number };
+  settings?: Record<string, unknown>;
+  source: Rect;
+}): Rect => {
+  if (options.filterType === 'img_blur') {
+    const configuredRadius = options.settings?.radius;
+    const radius =
+      typeof configuredRadius === 'number' && Number.isFinite(configuredRadius)
+        ? Math.min(4_096, Math.max(0, configuredRadius))
+        : 8;
+    const padding = Math.max(0, Math.ceil(radius * (options.settings?.blur_type === 'box' ? 1 : 3)));
+    return {
+      height: options.output.height,
+      width: options.output.width,
+      x: options.source.x - padding,
+      y: options.source.y - padding,
+    };
+  }
+  if (options.filterType === 'spandrel_filter') {
+    return { ...options.output, x: options.source.x, y: options.source.y };
+  }
+  return { ...options.source };
+};
 
 const throwIfAborted = (signal: AbortSignal | undefined): void => {
   if (signal?.aborted) {
@@ -46,10 +72,16 @@ export const runLayerFilter = async (options: RunLayerFilterOptions): Promise<La
     signal: options.signal,
   });
   throwIfAborted(options.signal);
+  const rect = resolveFilterOutputRect({
+    filterType: options.filterType,
+    output,
+    settings: options.settings,
+    source: options.input.rect,
+  });
   return {
-    height: options.input.rect.height,
+    height: rect.height,
     imageName: output.imageName,
-    origin: { x: options.input.rect.x, y: options.input.rect.y },
-    width: options.input.rect.width,
+    origin: { x: rect.x, y: rect.y },
+    width: rect.width,
   };
 };

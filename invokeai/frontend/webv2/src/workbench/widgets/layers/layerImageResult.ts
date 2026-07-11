@@ -21,7 +21,9 @@ export type SelectObjectRunResult =
 export interface SelectObjectRunnerDeps {
   exportLayer(layerId: string): Promise<ExportBakedLayerBlobResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
-  runGraph(options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>): Promise<UtilityGraphResult>;
+  runGraph(
+    options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>
+  ): Promise<Pick<UtilityGraphResult, 'imageName' | 'origin'>>;
 }
 
 const isAbortError = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError';

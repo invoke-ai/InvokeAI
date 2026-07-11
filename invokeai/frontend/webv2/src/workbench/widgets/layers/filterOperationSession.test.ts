@@ -92,8 +92,28 @@ describe('createFilterOperationSession', () => {
     await first;
 
     expect(deps.publishPreview).toHaveBeenCalledOnce();
-    expect(deps.publishPreview).toHaveBeenCalledWith('newer', guard);
+    expect(deps.publishPreview).toHaveBeenCalledWith('newer', { height: 10, width: 10, x: 3, y: 4 }, guard);
     expect(session.getSnapshot().preview?.imageName).toBe('newer');
+  });
+
+  it('publishes and commits the filter output rect instead of the exported source rect', async () => {
+    const deps = createDeps({
+      runFilter: vi.fn(() =>
+        Promise.resolve({ height: 22, imageName: 'blurred', origin: { x: -3, y: -2 }, width: 24 })
+      ),
+    });
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    await session.process();
+    expect(session.getSnapshot().preview?.rect).toEqual({ height: 22, width: 24, x: -3, y: -2 });
+    await session.commit('apply');
+
+    expect(deps.commit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image: { height: 22, imageName: 'blurred', width: 24 },
+        rect: { height: 22, width: 24, x: -3, y: -2 },
+      })
+    );
   });
 
   it('reset selects current filter defaults, clears preview, and keeps the operation active', async () => {

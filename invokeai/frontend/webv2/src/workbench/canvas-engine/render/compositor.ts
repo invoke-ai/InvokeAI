@@ -130,12 +130,12 @@ export interface CompositeOptions {
   maskPatternTile?: ((style: string, color: string) => RasterSurface | null) | null;
   /**
    * Transient per-layer content previews (a non-destructive control-filter
-   * preview): a layer with an entry here draws the preview surface — stretched
-   * over the layer's cached content footprint, through its transform — INSTEAD of
+   * preview): a layer with an entry here draws the preview surface at its returned
+   * layer-local output rect, through the layer transform, INSTEAD of
    * its committed cache, so the document is untouched until the filter is applied.
    * `null`/absent ⇒ no previews.
    */
-  layerPreviews?: ReadonlyMap<string, RasterSurface> | null;
+  layerPreviews?: ReadonlyMap<string, { surface: RasterSurface; rect: Rect }> | null;
   /** When set, transiently composites only this layer (even if disabled) and suppresses staged content. */
   onlyLayerId?: string | null;
   /**
@@ -281,14 +281,14 @@ const drawCachedLayer = (
   const origin = { x: entry.rect.x, y: entry.rect.y };
   const preview = opts.onlyLayerId ? null : (opts.layerPreviews?.get(layer.id) ?? null);
   if (preview) {
-    // Non-destructive filter preview: stretch the filtered image over the layer's
-    // content footprint (through the already-applied layer transform), including
+    // Non-destructive filter preview: draw the full backend output at its
+    // layer-local rect (through the already-applied layer transform), including
     // the same display-only control transparency effect used after commit.
     const displayPreview =
       layer.type === 'control' && layer.withTransparencyEffect && opts.backend
-        ? renderControlTransparency(opts.backend, preview, preview.width, preview.height)
-        : preview;
-    ctx.drawImage(displayPreview.canvas, origin.x, origin.y, entry.rect.width, entry.rect.height);
+        ? renderControlTransparency(opts.backend, preview.surface, preview.surface.width, preview.surface.height)
+        : preview.surface;
+    ctx.drawImage(displayPreview.canvas, preview.rect.x, preview.rect.y);
   } else if (isMaskLayer(layer)) {
     drawMaskLayer(ctx, layer, entry.surface, origin, opts);
   } else if (layer.type === 'control' && layer.withTransparencyEffect && opts.backend) {

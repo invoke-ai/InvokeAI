@@ -47,7 +47,7 @@ export interface FilterOperationSessionDeps {
     settings: Record<string, unknown>;
     signal: AbortSignal;
   }): Promise<LayerFilterResult>;
-  publishPreview(imageName: string, guard: LayerExportGuard): Promise<'shown' | 'missing' | 'stale'>;
+  publishPreview(imageName: string, rect: Rect, guard: LayerExportGuard): Promise<'shown' | 'missing' | 'stale'>;
   clearPreview(): void;
   isGuardCurrent(guard: LayerExportGuard): boolean;
   makeDurable(imageName: string): Promise<void>;
@@ -165,7 +165,8 @@ export const createFilterOperationSession = (
         if (signal.aborted || !deps.isGuardCurrent(guard)) {
           throw new DOMException('The filter request was superseded.', 'AbortError');
         }
-        const shown = await deps.publishPreview(filtered.imageName, guard);
+        const rect = { height: filtered.height, width: filtered.width, ...filtered.origin };
+        const shown = await deps.publishPreview(filtered.imageName, rect, guard);
         if (signal.aborted || !deps.isGuardCurrent(guard)) {
           throw new DOMException('The filter request was superseded.', 'AbortError');
         }
@@ -177,7 +178,7 @@ export const createFilterOperationSession = (
           height: filtered.height,
           imageName: filtered.imageName,
           origin: filtered.origin,
-          rect: exported.rect,
+          rect,
           width: filtered.width,
         } satisfies FilterOperationPreview;
       },

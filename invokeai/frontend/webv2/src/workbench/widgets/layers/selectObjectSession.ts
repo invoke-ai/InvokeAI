@@ -45,7 +45,9 @@ export interface SelectObjectSessionDeps<T> {
   controller: CanvasOperationController;
   exportLayer(layerId: string): Promise<ExportBakedLayerBlobResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
-  runGraph(options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>): Promise<UtilityGraphResult>;
+  runGraph(
+    options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>
+  ): Promise<Pick<UtilityGraphResult, 'imageName' | 'origin'>>;
   decodePreview(result: SelectObjectReadyResult, signal: AbortSignal): Promise<T>;
   publishPreview(preview: SelectObjectSessionPreview<T>): undefined;
   cleanupPreview(): void;

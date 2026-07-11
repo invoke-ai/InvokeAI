@@ -39,7 +39,9 @@ export interface RunLayerWorkflowDeps {
   exportLayer(layerId: string): Promise<ExportBakedLayerBlobResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
   buildGraph(options: BuildLayerWorkflowGraphOptions): BuiltLayerWorkflowGraph;
-  runGraph(options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>): Promise<UtilityGraphResult>;
+  runGraph(
+    options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>
+  ): Promise<Pick<UtilityGraphResult, 'imageName' | 'origin'>>;
   getImage(imageName: string, signal?: AbortSignal): Promise<GalleryImage>;
   makeDurable(imageName: string): Promise<void>;
   saveToGallery(imageName: string): Promise<GalleryImage>;

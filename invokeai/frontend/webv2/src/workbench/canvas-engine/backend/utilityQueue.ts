@@ -12,11 +12,11 @@
  *    (only invoked for coordinator-tracked project runs, which a utility item is
  *    never registered as) never sees it. This is the plan's Risk-4 guard.
  * 2. Attaches raw `socketHub.on` listeners (they survive socket recreation) for
- *    `invocation_complete` (to capture the output image name) and
+ *    `invocation_complete` (to capture the output image name and dimensions) and
  *    `queue_item_status_changed` (to settle on the terminal status), matching
  *    events by our unique origin.
  * 3. Enqueues the graph (listeners are attached first, closing the fast-finish
- *    race), then resolves with the output `imageName` on completion, or rejects
+ *    race), then resolves with the output image metadata on completion, or rejects
  *    on failure/cancellation/timeout/abort. Abort and timeout also best-effort
  *    cancel every backend item accepted for this run, including when enqueue
  *    resolves after the local await has already rejected.
@@ -80,19 +80,34 @@ export interface RunUtilityGraphOptions {
 
 /** The resolved result of a utility graph: its single output image. */
 export interface UtilityGraphResult {
+  height: number;
   imageName: string;
   /** The origin used, for diagnostics/tests. */
   origin: string;
+  width: number;
 }
 
-/** Extracts an image name from an `invocation_complete` result payload, if present. */
-const extractImageName = (result: InvocationCompleteEvent['result'] | undefined): string | null => {
-  const image = (result as { image?: { image_name?: unknown } } | undefined)?.image;
-  return typeof image?.image_name === 'string' ? image.image_name : null;
+/** Extracts the current backend ImageOutput fields from a completion payload. */
+const extractImageOutput = (
+  result: InvocationCompleteEvent['result'] | undefined
+): { height: number; imageName: string; width: number } | null => {
+  const output = result as { height?: unknown; image?: { image_name?: unknown }; width?: unknown } | undefined;
+  if (
+    typeof output?.image?.image_name !== 'string' ||
+    typeof output.width !== 'number' ||
+    !Number.isFinite(output.width) ||
+    output.width <= 0 ||
+    typeof output.height !== 'number' ||
+    !Number.isFinite(output.height) ||
+    output.height <= 0
+  ) {
+    return null;
+  }
+  return { height: output.height, imageName: output.image.image_name, width: output.width };
 };
 
 /**
- * Runs `graph` on the utility queue and resolves with its output image name.
+ * Runs `graph` on the utility queue and resolves with its output image metadata.
  * Never routes into project state (isolated origin). Rejects with a
  * {@link UtilityQueueError} on failure/cancel/timeout/abort/enqueue error.
  */
@@ -106,7 +121,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
 
   return new Promise<UtilityGraphResult>((resolve, reject) => {
     let settled = false;
-    let capturedImageName: string | null = null;
+    let capturedOutput: { height: number; imageName: string; width: number } | null = null;
     let cancellationRequested = false;
     let cancellationStarted = false;
     let enqueueResult: { itemIds: number[]; enqueued: number } | null = null;
@@ -152,13 +167,13 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       }
     };
 
-    const settleResolve = (imageName: string): void => {
+    const settleResolve = (output: { height: number; imageName: string; width: number }): void => {
       if (settled) {
         return;
       }
       settled = true;
       cleanup();
-      resolve({ imageName, origin });
+      resolve({ ...output, origin });
     };
 
     const settleReject = (error: UtilityQueueError): void => {
@@ -188,9 +203,9 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         if (outputNodeId && event.invocation_source_id !== outputNodeId) {
           return;
         }
-        const imageName = extractImageName(event.result);
-        if (imageName) {
-          capturedImageName = imageName;
+        const output = extractImageOutput(event.result);
+        if (output) {
+          capturedOutput = output;
         }
       })
     );
@@ -201,8 +216,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
           return;
         }
         if (event.status === 'completed') {
-          if (capturedImageName) {
-            settleResolve(capturedImageName);
+          if (capturedOutput) {
+            settleResolve(capturedOutput);
           } else {
             settleReject(new UtilityQueueError('no-output', 'The utility graph produced no output image.'));
           }

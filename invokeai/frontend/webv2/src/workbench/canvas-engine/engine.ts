@@ -171,6 +171,11 @@ export type StagedPreviewInput =
   | { imageName: string; placement?: StagedPreviewPlacement }
   | { dataUrl: string; width: number; height: number };
 
+export interface FilterPreviewInput {
+  imageName: string;
+  rect: Rect;
+}
+
 /**
  * Result of {@link CanvasEngine.mergeVisibleRasterLayers}: `'merged'` when the
  * fold ran, `'not-ready'` when a participant's cache is still decoding/stale (the
@@ -340,7 +345,7 @@ export interface CanvasEngineOptions {
       graph: Parameters<typeof runUtilityGraph>[0]['graph'];
       outputNodeId?: string;
       signal?: AbortSignal;
-    }): Promise<UtilityGraphResult>;
+    }): Promise<Pick<UtilityGraphResult, 'imageName' | 'origin'>>;
   };
   /** Injectable filter queue/upload seams; production defaults use intermediate canvas images and the utility queue. */
   filterDeps?: {
@@ -716,7 +721,7 @@ export interface CanvasEngine {
   /** Shows a filter preview only while the exact exported layer snapshot remains current. */
   setGuardedFilterPreview(
     layerId: string,
-    input: StagedPreviewInput,
+    input: FilterPreviewInput,
     guard: LayerExportGuard
   ): Promise<'shown' | 'missing' | 'stale'>;
   /**
@@ -2125,10 +2130,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   // Per-layer guarded filter previews: layerId → decoded filtered surface, plus a
   // per-layer decode token so stale work never overwrites a newer request.
-  const filterPreviews = new Map<
-    string,
-    { surface: RasterSurface; width: number; height: number; guard: LayerExportGuard }
-  >();
+  const filterPreviews = new Map<string, { surface: RasterSurface; rect: Rect; guard: LayerExportGuard }>();
   const filterPreviewTokens = new Map<string, number>();
   /** Current guarded request/publication token per layer. */
   const guardedFilterPreviewTokens = new Map<string, number>();
@@ -2163,7 +2165,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const publishFilterPreview = async (
     layerId: string,
-    input: StagedPreviewInput,
+    input: FilterPreviewInput,
     validate: () => 'shown' | 'missing' | 'stale',
     guard: LayerExportGuard
   ): Promise<'shown' | 'missing' | 'stale'> => {
@@ -2181,7 +2183,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return beforeDecode;
     }
     try {
-      const decoded = await decodeStagedPreview(input);
+      const decoded = await decodeStagedPreview({ imageName: input.imageName });
       const beforePublish = validate();
       if (beforePublish !== 'shown') {
         dropGuardedRequest();
@@ -2192,7 +2194,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         dropGuardedRequest();
         return 'stale';
       }
-      filterPreviews.set(layerId, { ...decoded, guard });
+      filterPreviews.set(layerId, { guard, rect: { ...input.rect }, surface: decoded.surface });
       scheduler.invalidate({ layers: [layerId] });
       return 'shown';
     } catch {
@@ -2204,7 +2206,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const setGuardedFilterPreview = (
     layerId: string,
-    input: StagedPreviewInput,
+    input: FilterPreviewInput,
     guard: LayerExportGuard
   ): Promise<'shown' | 'missing' | 'stale'> => {
     const validate = (): 'shown' | 'missing' | 'stale' => {
@@ -2304,9 +2306,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         // Non-destructive control-filter previews (drawn in place of the layer's
         // committed pixels). Only allocated when a preview is actually active.
         layerPreviews:
-          filterPreviews.size > 0
-            ? new Map(Array.from(filterPreviews, ([id, decoded]) => [id, decoded.surface]))
-            : null,
+          filterPreviews.size > 0 ? new Map(Array.from(filterPreviews, ([id, preview]) => [id, preview])) : null,
         onlyLayerId: isolatedLayerId,
         // Feed the cached checkerboard tile only while the toggle is ON; passing
         // `null` renders transparent documents without a checkerboard.
@@ -3307,7 +3307,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         exportPixels: () => rasterizeLayerPixels(layer.id, { applyAdjustments: true, includeDisabled: true }),
         isGuardCurrent: isLayerExportGuardCurrent,
         makeDurable: (imageName) => filterMakeDurable(imageName),
-        publishPreview: (imageName, previewGuard) => setGuardedFilterPreview(layer.id, { imageName }, previewGuard),
+        publishPreview: (imageName, rect, previewGuard) =>
+          setGuardedFilterPreview(layer.id, { imageName, rect }, previewGuard),
         runFilter: (options) =>
           runLayerFilter({
             ...options,
@@ -3316,7 +3317,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
               runFilterGraph: async ({ graph, outputNodeId, signal }) => {
                 const output = await (queueDeps?.runGraph({ graph, outputNodeId, signal }) ??
                   runUtilityGraph({ graph, hub: socketHub, outputNodeId, signal }));
-                return { imageName: output.imageName };
+                return { height: output.height, imageName: output.imageName, width: output.width };
               },
               uploadIntermediate: async (blob, signal) => {
                 const uploaded = await (queueDeps?.uploadIntermediate(blob, signal) ??

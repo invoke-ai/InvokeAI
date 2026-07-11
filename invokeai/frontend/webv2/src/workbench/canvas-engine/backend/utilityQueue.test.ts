@@ -56,7 +56,7 @@ const completeEvent = (overrides: Partial<InvocationCompleteEvent> = {}): Invoca
   item_id: 1,
   origin: ORIGIN,
   queue_id: 'default',
-  result: { image: { image_name: 'filtered.png' }, type: 'image_output' },
+  result: { height: 48, image: { image_name: 'filtered.png' }, type: 'image_output', width: 64 },
   session_id: 's',
   ...overrides,
 });
@@ -113,7 +113,7 @@ describe('runUtilityGraph — await + settle', () => {
     fake.emit('invocation_complete', completeEvent());
     fake.emit('queue_item_status_changed', statusEvent('completed'));
 
-    await expect(promise).resolves.toEqual({ imageName: 'filtered.png', origin: ORIGIN });
+    await expect(promise).resolves.toEqual({ height: 48, imageName: 'filtered.png', origin: ORIGIN, width: 64 });
     // Both listeners detached on settle.
     expect(fake.handlerCount('invocation_complete')).toBe(0);
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);

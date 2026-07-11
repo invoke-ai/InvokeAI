@@ -62,7 +62,7 @@ export const LayerListItem = ({
 }: LayerListItemProps) => {
   const { t } = useTranslation();
   const interaction = getLayerListItemInteractionState(editingLocked);
-  const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     disabled: interaction.sortableDisabled,
     id: layer.id,
   });
@@ -158,6 +158,7 @@ export const LayerListItem = ({
   return (
     <Box ref={setNodeRef} style={dndStyle}>
       <Row
+        {...(interaction.sortableDisabled ? {} : attributes)}
         {...(interaction.sortableDisabled ? {} : listeners)}
         active={isSelected ? 'muted' : undefined}
         cursor={isDragging ? 'grabbing' : 'default'}

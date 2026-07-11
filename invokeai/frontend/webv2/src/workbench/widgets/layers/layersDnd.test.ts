@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
+import { LAYER_KEYBOARD_SENSOR_OPTIONS } from './layerDndConfig';
 import { moveItem } from './layersDnd';
+
+describe('layer keyboard drag configuration', () => {
+  it('uses Enter alone to start and end, Escape to cancel, and never claims Space', () => {
+    expect(LAYER_KEYBOARD_SENSOR_OPTIONS.keyboardCodes).toEqual({
+      cancel: ['Escape'],
+      end: ['Enter'],
+      start: ['Enter'],
+    });
+    expect(Object.values(LAYER_KEYBOARD_SENSOR_OPTIONS.keyboardCodes).flat()).not.toContain('Space');
+  });
+});
 
 describe('moveItem', () => {
   it('moves an item forward, shifting the rest', () => {

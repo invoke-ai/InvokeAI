@@ -6,7 +6,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { Dispatch } from 'react';
 
 import { Collapsible, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { canMergeVisibleRasters } from '@workbench/canvas-engine/document/mergeVisible';
@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 import type { LayerGroupKey } from './layerGroups';
 
 import { groupAddItemId } from './addLayerMenu';
+import { LAYER_KEYBOARD_SENSOR_OPTIONS } from './layerDndConfig';
 import { canExportRasterPsd, getGroupActions, isGroupAllVisible, planGroupVisibilityToggle } from './layerGroupActions';
 import { reorderWithinGroup } from './layerGroups';
 import { LayerListItem } from './LayerListItem';
@@ -61,7 +62,10 @@ export const LayerGroupSection = ({
   const { t } = useTranslation();
   const editingLocked = useCanvasDocumentEditingLocked(engine);
 
-  const sensors = useSensors(useSensor(PointerSensor, POINTER_SENSOR_OPTIONS));
+  const sensors = useSensors(
+    useSensor(PointerSensor, POINTER_SENSOR_OPTIONS),
+    useSensor(KeyboardSensor, LAYER_KEYBOARD_SENSOR_OPTIONS)
+  );
 
   const globalIndexById = useMemo(() => {
     const map = new Map<string, number>();
