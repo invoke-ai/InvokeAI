@@ -274,11 +274,12 @@ export interface CanvasCompositeExportGuard {
   readonly bbox: Rect;
   readonly documentGeneration: number;
   readonly documentFingerprint: string;
-  readonly participants: readonly {
+  readonly candidates: readonly {
     readonly layerId: string;
     readonly layer: Extract<CanvasLayerContract, { type: 'raster' | 'control' }>;
     readonly cacheVersion: number;
   }[];
+  readonly participants: readonly CanvasCompositeExportGuard['candidates'][number][];
 }
 
 export type ExportCanvasCompositeBlobResult =
@@ -419,6 +420,13 @@ interface SelectObjectCommitOwner {
   previewId: number;
   session: SelectObjectSession<RasterSurface>;
   token: number;
+}
+
+interface SelectObjectExpectedMutation {
+  actionType: 'addCanvasLayer';
+  layer: CanvasLayerContract;
+  layerId: string;
+  owner: SelectObjectCommitOwner;
 }
 
 /** The public engine handle. */
@@ -761,6 +769,10 @@ export interface CanvasEngine {
   contextMenuLayerIdAt(screenPoint: Vec2): string | null;
   /** The current mirrored document, or `null`. */
   getDocument(): CanvasDocumentContractV2 | null;
+  /** The transient selection bounds in document space, or `null`. */
+  getSelectionBounds(): Rect | null;
+  /** The transient selection mask placement in document space, or `null`. */
+  getSelectionMaskRect(): Rect | null;
   /**
    * Debug action: drops every layer's raster/adjusted cache and the
    * checkerboard/mask pattern tiles, then forces a full recomposite so everything
@@ -926,7 +938,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   let selectObjectPointLabel: SamPointLabel = 'include';
   let selectObjectCommitOwner: SelectObjectCommitOwner | null = null;
   let selectObjectCommitToken = 0;
-  let selectObjectOwnMutation = false;
+  let selectObjectExpectedMutation: SelectObjectExpectedMutation | null = null;
   let samPreview: SelectObjectSessionPreview<RasterSurface> | null = null;
   let filterSession: FilterOperationSession | null = null;
   let filterUnsubscribe: (() => void) | null = null;
@@ -1589,16 +1601,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return isLayerExportGuardCurrent(guard) ? guard : null;
   };
 
-  const compositeParticipants = (document: CanvasDocumentContractV2) =>
-    document.layers.flatMap((layer) => {
+  const planCanvasComposite = (document: CanvasDocumentContractV2) => {
+    const candidates: CanvasCompositeExportGuard['candidates'][number][] = [];
+    const participants: CanvasCompositeExportGuard['participants'][number][] = [];
+    const pending: Extract<CanvasLayerContract, { type: 'raster' | 'control' }>[] = [];
+    for (const layer of document.layers) {
       const source = renderableSourceOf(layer);
       if (!layer.isEnabled || (layer.type !== 'raster' && layer.type !== 'control') || !source) {
-        return [];
+        continue;
       }
       const entry = layerCache.get(layer.id);
-      const rect = entry && !isEmpty(entry.rect) ? entry.rect : getSourceContentRect(layer, document);
+      const candidate = { cacheVersion: layerCache.version(layer.id), layer, layerId: layer.id };
+      candidates.push(candidate);
+      if (!entry || entry.stale || layerRasterizationJobs.has(layer.id)) {
+        pending.push(layer);
+        continue;
+      }
+      const rect = entry.rect;
       if (
-        !rect ||
         isEmpty(rect) ||
         intersect(
           document.bbox,
@@ -1615,18 +1635,25 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           )
         ) === null
       ) {
-        return [];
+        continue;
       }
-      return [{ cacheVersion: layerCache.version(layer.id), layer, layerId: layer.id }];
-    });
+      participants.push(candidate);
+    }
+    return { candidates, participants, pending };
+  };
 
-  const compositeFingerprint = (bbox: Rect, participants: CanvasCompositeExportGuard['participants']): string =>
+  const compositeFingerprint = (
+    bbox: Rect,
+    candidates: CanvasCompositeExportGuard['candidates'],
+    participants: CanvasCompositeExportGuard['participants']
+  ): string =>
     JSON.stringify([
       bbox.x,
       bbox.y,
       bbox.width,
       bbox.height,
-      ...participants.map(({ cacheVersion, layer }) => [layer, cacheVersion]),
+      candidates.map(({ cacheVersion, layer }) => [layer, cacheVersion]),
+      participants.map(({ layerId }) => layerId),
     ]);
 
   const captureCanvasCompositeExportGuard = (): CanvasCompositeExportGuard | null => {
@@ -1635,10 +1662,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return null;
     }
     const bbox = { ...document.bbox };
-    const participants = compositeParticipants(document);
+    const { candidates, participants } = planCanvasComposite(document);
     return {
       bbox,
-      documentFingerprint: compositeFingerprint(bbox, participants),
+      candidates,
+      documentFingerprint: compositeFingerprint(bbox, candidates, participants),
       documentGeneration: rasterDocumentGeneration,
       participants,
       projectId,
@@ -1664,15 +1692,21 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     ) {
       return false;
     }
-    const participants = compositeParticipants(document);
+    const { candidates, participants } = planCanvasComposite(document);
     return (
+      candidates.length === guard.candidates.length &&
+      candidates.every(
+        (candidate, index) =>
+          candidate.layer === guard.candidates[index]?.layer &&
+          candidate.cacheVersion === guard.candidates[index]?.cacheVersion
+      ) &&
       participants.length === guard.participants.length &&
       participants.every(
         (participant, index) =>
           participant.layer === guard.participants[index]?.layer &&
           participant.cacheVersion === guard.participants[index]?.cacheVersion
       ) &&
-      compositeFingerprint(guard.bbox, participants) === guard.documentFingerprint
+      compositeFingerprint(guard.bbox, candidates, participants) === guard.documentFingerprint
     );
   };
 
@@ -1683,6 +1717,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     const document = mirror.getDocument();
     if (!document) {
+      return { status: 'not-ready' };
+    }
+    const { pending } = planCanvasComposite(document);
+    if (pending.length > 0) {
+      await Promise.all(pending.map((layer) => getOrStartLayerRasterization(layer, document)));
       return { status: 'not-ready' };
     }
     let hasContent = false;
@@ -2667,7 +2706,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       scheduler.invalidate({ all: true });
     },
     onLayersChanged: (ids, sourceChangedIds) => {
-      if (!selectObjectOwnMutation) {
+      const doc = mirror.getDocument();
+      const expected = selectObjectExpectedMutation;
+      const isExactExpectedMutation =
+        expected !== null &&
+        expected.actionType === 'addCanvasLayer' &&
+        selectObjectCommitOwner === expected.owner &&
+        ids.length === 1 &&
+        ids[0] === expected.layerId &&
+        sourceChangedIds.length === 1 &&
+        sourceChangedIds[0] === expected.layerId &&
+        doc?.layers.find((layer) => layer.id === expected.layerId) === expected.layer;
+      if (expected && !isExactExpectedMutation) {
+        canvasOperations.invalidateComposite(projectId);
+        cancelSelectObjectSession();
+      }
+      if (!isExactExpectedMutation) {
         for (const id of sourceChangedIds) {
           canvasOperations.invalidateSource(projectId, id);
         }
@@ -2675,19 +2729,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           canvasOperations.invalidateLayer(projectId, id);
         }
       }
-      if (!selectObjectOwnMutation && selectObjectGuard && !isCanvasCompositeExportGuardCurrent(selectObjectGuard)) {
+      if (!isExactExpectedMutation && selectObjectGuard && !isCanvasCompositeExportGuardCurrent(selectObjectGuard)) {
         cancelSelectObjectSession();
       }
-      const doc = mirror.getDocument();
       if (
-        !selectObjectOwnMutation &&
+        !isExactExpectedMutation &&
         selectObjectGuard &&
         ids.some((id) => {
           const layer = doc?.layers.find((candidate) => candidate.id === id);
           return (
             !!layer &&
             (layer.type === 'raster' || layer.type === 'control') &&
-            !selectObjectGuard?.participants.some((participant) => participant.layerId === id)
+            !selectObjectGuard?.candidates.some((candidate) => candidate.layerId === id)
           );
         })
       ) {
@@ -3030,7 +3083,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     selectObjectCommitToken += 1;
     const owner = selectObjectCommitOwner;
     selectObjectCommitOwner = null;
-    selectObjectOwnMutation = false;
+    selectObjectExpectedMutation = null;
     owner?.controller.abort();
   };
 
@@ -3041,6 +3094,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const isSelectObjectCommitOwnerCurrent = (owner: SelectObjectCommitOwner): boolean => {
     const state = owner.session.getSnapshot();
+    const expected = selectObjectExpectedMutation;
+    const expectedMutationApplied =
+      expected?.owner === owner &&
+      mirror.getDocument()?.layers.find((layer) => layer.id === expected.layerId) === expected.layer;
     return (
       selectObjectCommitOwner === owner &&
       selectObjectCommitToken === owner.token &&
@@ -3049,7 +3106,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       state.preview?.previewId === owner.previewId &&
       state.preview.inputHash === owner.inputHash &&
       owner.preview.inputHash === owner.inputHash &&
-      (selectObjectOwnMutation || isCanvasCompositeExportGuardCurrent(owner.guard)) &&
+      (expectedMutationApplied || isCanvasCompositeExportGuardCurrent(owner.guard)) &&
       !owner.controller.signal.aborted
     );
   };
@@ -3070,7 +3127,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       session,
       token: ++selectObjectCommitToken,
     };
-    selectObjectOwnMutation = false;
+    selectObjectExpectedMutation = null;
     selectObjectCommitOwner = owner;
     syncSelectObjectStore();
     return owner;
@@ -3081,6 +3138,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return false;
     }
     selectObjectCommitOwner = null;
+    if (selectObjectExpectedMutation?.owner === owner) {
+      selectObjectExpectedMutation = null;
+    }
     syncSelectObjectStore();
     return true;
   };
@@ -4322,7 +4382,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
     endNudgeBurst();
     if (owner === documentEditOwner && selectObjectCommitOwner) {
-      selectObjectOwnMutation = true;
+      selectObjectExpectedMutation = {
+        actionType: 'addCanvasLayer',
+        layer,
+        layerId,
+        owner: selectObjectCommitOwner,
+      };
     }
     apply();
     history.push({
@@ -4813,7 +4878,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
       endNudgeBurst();
       if (owner === documentEditOwner && selectObjectCommitOwner && 'participants' in options.guard) {
-        selectObjectOwnMutation = true;
+        selectObjectExpectedMutation = {
+          actionType: 'addCanvasLayer',
+          layer: copy,
+          layerId,
+          owner: selectObjectCommitOwner,
+        };
       }
       publishCopy(preparedCopy);
       history.push({
@@ -6598,6 +6668,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       uploadImage: (blob) => uploadCanvasImage(blob, { isIntermediate: true }),
     }),
     getDocument: () => mirror.getDocument(),
+    getSelectionBounds: () => selection.bounds(),
+    getSelectionMaskRect: () => selection.mask()?.rect ?? null,
     handleEscapePriority,
     hasExportableLayerContent,
     invertMask,

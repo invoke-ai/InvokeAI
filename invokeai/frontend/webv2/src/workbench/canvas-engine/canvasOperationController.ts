@@ -264,8 +264,7 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
       active?.identity.projectId === projectId &&
       (layerId === undefined ||
         (active.identity.kind === 'select-object'
-          ? 'participants' in active.guard &&
-            active.guard.participants.some((participant) => participant.layerId === layerId)
+          ? 'candidates' in active.guard && active.guard.candidates.some((candidate) => candidate.layerId === layerId)
           : active.identity.layerId === layerId))
     ) {
       close(active);

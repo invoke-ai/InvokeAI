@@ -12635,6 +12635,7 @@ describe('Select Object canvas engine integration', () => {
       imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
       layers?: CanvasLayerContract[];
       runGraph?: () => Promise<{ imageName: string; origin: string }>;
+      uploadIntermediate?: (blob: Blob, signal?: AbortSignal) => Promise<{ imageName: string }>;
     } = {}
   ) => {
     const raf = createControllableRaf();
@@ -12657,7 +12658,7 @@ describe('Select Object canvas engine integration', () => {
       projectId: 'p1',
       selectObjectDeps: {
         runGraph: options.runGraph ?? (() => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' })),
-        uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+        uploadIntermediate: options.uploadIntermediate ?? (() => Promise.resolve({ imageName: 'sam-source.png' })),
       },
       store: reactive.store,
     });
@@ -12777,6 +12778,8 @@ describe('Select Object canvas engine integration', () => {
 
     expect(h.engine.getDocument()).toEqual(h.document);
     expect(h.engine.stores.hasSelection.get()).toBe(true);
+    expect(h.engine.getSelectionBounds()).toEqual(h.document.bbox);
+    expect(h.engine.getSelectionMaskRect()).toEqual(h.document.bbox);
     expect(h.engine.stores.samSession.get()).toBeNull();
     h.engine.dispose();
   });
@@ -13196,6 +13199,49 @@ describe('Select Object canvas engine integration', () => {
     h.engine.dispose();
   });
 
+  it('does not treat a reentrant unrelated layer mutation as the owned Save insertion', async () => {
+    const document = samDocument([samLayer('source')]);
+    const reducer = createReducerBackedStore(document);
+    let engine!: CanvasEngine;
+    let reentered = false;
+    let sessionDuringReentry: ReturnType<CanvasEngine['stores']['samSession']['get']> = null;
+    reducer.store.subscribe(() => {
+      const current = reducer.store.getState().projects[0]?.canvas.document;
+      if (!reentered && current?.layers.length === 2) {
+        reentered = true;
+        reducer.store.dispatch({ id: 'source', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' });
+        sessionDuringReentry = engine.stores.samSession.get();
+      }
+    });
+    engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      selectObjectDeps: {
+        runGraph: () => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }),
+        uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+      },
+      store: reducer.store,
+    });
+    await engine.exportLayerPixels('source');
+    expect(engine.startSelectObject()).toBe('started');
+    engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+    });
+    await expect(engine.processSelectObjectSession()).resolves.toBe('published');
+
+    await expect(engine.saveSelectObjectSession('raster', () => Promise.resolve())).resolves.toMatchObject({
+      status: 'committed',
+    });
+
+    expect(reentered).toBe(true);
+    expect(sessionDuringReentry).toBeNull();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    expect(engine.getDocument()?.layers.find((layer) => layer.id === 'source')?.opacity).toBe(0.5);
+    engine.dispose();
+  });
+
   it.each(['source', 'project', 'document'] as const)('aborts a pending save on %s invalidation', async (kind) => {
     const h = await createSamHarness();
     h.engine.startSelectObject();
@@ -13329,6 +13375,82 @@ describe('Select Object canvas engine integration', () => {
       error: 'Select Object source is empty.',
       status: 'error',
     });
+    h.engine.dispose();
+  });
+
+  it('does not omit a stale outside cache when its new source may enter the bbox', async () => {
+    const nextImage = createDeferred<Blob>();
+    const uploadIntermediate = vi.fn(() => Promise.resolve({ imageName: 'sam-source.png' }));
+    const runGraph = vi.fn(() => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }));
+    const outside = {
+      ...samLayer('moving-source'),
+      source: {
+        bitmap: { height: 10, imageName: 'outside.png', width: 10 },
+        offset: { x: 150, y: 0 },
+        type: 'paint' as const,
+      },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    };
+    const h = await createSamHarness({
+      imageResolver: (imageName) =>
+        imageName === 'inside.png' ? nextImage.promise : Promise.resolve(new Blob(['outside'])),
+      layers: [outside],
+      runGraph,
+      uploadIntermediate,
+    });
+    const document = h.engine.getDocument()!;
+    h.setDocument({
+      ...document,
+      layers: [
+        {
+          ...outside,
+          source: { image: { height: 10, imageName: 'inside.png', width: 10 }, type: 'image' },
+        },
+      ],
+    });
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 2, y: 2 }], type: 'visual' },
+    });
+
+    const firstProcess = h.engine.processSelectObjectSession();
+    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('processing'));
+    expect(runGraph).not.toHaveBeenCalled();
+    expect(uploadIntermediate).not.toHaveBeenCalled();
+    nextImage.resolve(new Blob(['inside']));
+    await expect(firstProcess).resolves.not.toBe('published');
+    expect(h.engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 2, y: 2 }], type: 'visual' },
+    });
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+    expect(uploadIntermediate).toHaveBeenCalledOnce();
+    expect(runGraph).toHaveBeenCalledOnce();
+    h.engine.dispose();
+  });
+
+  it('excludes disabled and authoritatively empty layers from composite readiness', async () => {
+    const imageResolver = vi.fn(() => Promise.reject(new Error('disabled layer must not rasterize')));
+    const empty = {
+      ...samLayer('empty'),
+      source: { bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' as const },
+    };
+    const disabled = {
+      ...samLayer('disabled'),
+      isEnabled: false,
+      source: { image: { height: 10, imageName: 'disabled.png', width: 10 }, type: 'image' as const },
+    };
+    const h = await createSamHarness({ imageResolver, layers: [disabled, empty] });
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+    });
+
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
+    expect(h.engine.stores.samSession.get()?.error).toBe('Select Object source is empty.');
+    expect(imageResolver).not.toHaveBeenCalled();
     h.engine.dispose();
   });
 
@@ -13473,6 +13595,86 @@ describe('Select Object canvas engine integration', () => {
       ])
     );
     expect(adjustedSurfaceCacheGets).toContain('adjusted-raster');
+    h.engine.dispose();
+  });
+
+  it('encodes the exact bbox composite surface with participant order and transforms', async () => {
+    const backend = createRecordingRasterBackend();
+    const encoded: StubRasterSurface[] = [];
+    backend.encodeSurface = vi.fn((surface) => {
+      encoded.push(surface as StubRasterSurface);
+      return Promise.resolve(new Blob(['composite'], { type: 'image/png' }));
+    });
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('decoded')));
+    const raster: CanvasLayerContract = {
+      ...samLayer('raster'),
+      source: {
+        bitmap: { height: 8, imageName: 'raster.png', width: 6 },
+        offset: { x: -4, y: 6 },
+        type: 'paint',
+      },
+      transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 20, y: 30 },
+    };
+    const control: CanvasLayerContract = {
+      adapter: { beginEndStepPct: [0, 0.75], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'normal',
+      id: 'control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Control',
+      opacity: 1,
+      source: { image: { height: 10, imageName: 'control.png', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 40, y: 50 },
+      type: 'control',
+      withTransparencyEffect: false,
+    };
+    const mask: CanvasInpaintMaskLayerContract = {
+      ...samLayer('mask'),
+      mask: { bitmap: { height: 10, imageName: 'mask.png', width: 10 }, fill: { color: '#fff', style: 'solid' } },
+      type: 'inpaint_mask',
+    };
+    const h = await createSamHarness({ backend, layers: [mask, control, raster] });
+    h.setDocument({ ...h.engine.getDocument()!, bbox: { height: 70, width: 80, x: 10, y: 15 } });
+    const rasterExport = await h.engine.exportLayerPixels('raster');
+    const controlExport = await h.engine.exportLayerPixels('control');
+    if (rasterExport.status !== 'ok' || controlExport.status !== 'ok') {
+      throw new Error('expected authoritative participant caches');
+    }
+    await expect(
+      h.engine.setGuardedFilterPreview(
+        'raster',
+        { imageName: 'filter-preview.png', rect: rasterExport.rect },
+        rasterExport.guard
+      )
+    ).resolves.toBe('shown');
+    h.engine.setStagedPreview({ imageName: 'staged.png' });
+    await flushMicrotasks();
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 45, y: 55 }], type: 'visual' },
+    });
+
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+
+    const composite = encoded.find((surface) => surface.width === 80 && surface.height === 70);
+    expect(composite).toBeDefined();
+    const log = composite!.callLog;
+    const draws = log.filter((entry) => entry.op === 'drawImage');
+    expect(draws).toHaveLength(2);
+    expect(backend.drawSourcesFor(composite!)).toEqual([
+      backend.surfaceId(rasterExport.surface as StubRasterSurface),
+      backend.surfaceId(controlExport.surface as StubRasterSurface),
+    ]);
+    expect(draws.map((entry) => entry.args.slice(1))).toEqual([
+      [-4, 6],
+      [0, 0],
+    ]);
+    expect(log.filter((entry) => entry.op === 'setTransform').map((entry) => entry.args)).toEqual(
+      expect.arrayContaining([
+        [2, 0, 0, 3, 10, 15],
+        [1, 0, 0, 1, 30, 35],
+      ])
+    );
     h.engine.dispose();
   });
 

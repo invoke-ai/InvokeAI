@@ -41,6 +41,7 @@ const selectObjectIdentity = { kind: 'select-object' as const, projectId: 'proje
 
 const compositeGuard = {
   bbox: { height: 10, width: 10, x: 0, y: 0 },
+  candidates: [{ cacheVersion: 1, layer, layerId: layer.id }],
   documentFingerprint: 'document-1',
   documentGeneration: 1,
   participants: [{ cacheVersion: 1, layer, layerId: layer.id }],

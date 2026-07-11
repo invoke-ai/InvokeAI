@@ -21,6 +21,7 @@ const layer: CanvasRasterLayerContractV2 = {
 };
 const guard: CanvasCompositeExportGuard = {
   bbox: { height: 12, width: 16, x: -5, y: 7 },
+  candidates: [{ cacheVersion: 3, layer, layerId: layer.id }],
   documentFingerprint: 'document:3',
   documentGeneration: 4,
   participants: [{ cacheVersion: 3, layer, layerId: layer.id }],
@@ -28,6 +29,7 @@ const guard: CanvasCompositeExportGuard = {
 };
 const replacementGuard: CanvasCompositeExportGuard = {
   ...guard,
+  candidates: [{ cacheVersion: 4, layer, layerId: layer.id }],
   documentFingerprint: 'document:4',
   participants: [{ cacheVersion: 4, layer, layerId: layer.id }],
 };
