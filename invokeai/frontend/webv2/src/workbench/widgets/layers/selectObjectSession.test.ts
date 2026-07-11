@@ -138,7 +138,7 @@ describe('createSelectObjectSession', () => {
     harness.session.update({ autoProcess: false });
 
     expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'ready' });
-    expect(snapshots.every(({ error, status }) => status !== 'error' || error !== null)).toBe(true);
+    expect(snapshots.every(({ error, status }) => (status === 'error') === (error !== null))).toBe(true);
   });
 
   it('keeps a non-null error whenever processing fails', async () => {
@@ -147,6 +147,15 @@ describe('createSelectObjectSession', () => {
     await expect(harness.session.process()).resolves.toBe('error');
 
     expect(harness.session.getSnapshot()).toEqual(expect.objectContaining({ error: 'graph failed', status: 'error' }));
+  });
+
+  it('clears a failed process error when controller source invalidation returns the session to ready', async () => {
+    const harness = createHarness({ runGraph: vi.fn(() => Promise.reject(new Error('graph failed'))) });
+    await expect(harness.session.process()).resolves.toBe('error');
+
+    harness.controller.invalidateSource('p1', layer.id);
+
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'ready' });
   });
 
   it('reuses an uploaded export only while its exact guard remains current', async () => {
