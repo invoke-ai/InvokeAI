@@ -38,8 +38,14 @@ import type {
   CanvasDocumentContractV2,
   CanvasLayerContract,
   CanvasLayerSourceContract,
+  CanvasRasterLayerContractV2,
   WorkbenchState,
 } from '@workbench/types';
+import type {
+  FilterCommitTarget,
+  FilterOperationSession,
+  LayerFilterSettings,
+} from '@workbench/widgets/layers/filterOperationSession';
 import type {
   SelectObjectSession,
   SelectObjectSessionPreview,
@@ -109,6 +115,13 @@ import {
   transformOverlayGeometry,
 } from '@workbench/canvas-engine/transform/transformMath';
 import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
+import {
+  buildFilterDefaults,
+  DEFAULT_CONTROL_FILTER_TYPE,
+  getFilterDefinition,
+} from '@workbench/generation/canvas/filterGraphs';
+import { createFilterOperationSession } from '@workbench/widgets/layers/filterOperationSession';
+import { runLayerFilter } from '@workbench/widgets/layers/layerFilterRunner';
 import {
   createInpaintMaskFromImage,
   createControlLayer,
@@ -187,6 +200,8 @@ export interface CommitRasterFilterOptions {
   image: CanvasImageRef;
   rect: Rect;
   mode: 'replace' | 'copy';
+  filter?: LayerFilterSettings;
+  target?: FilterCommitTarget;
   signal?: AbortSignal;
 }
 
@@ -326,6 +341,15 @@ export interface CanvasEngineOptions {
       signal?: AbortSignal;
     }): Promise<UtilityGraphResult>;
   };
+  /** Injectable filter queue/upload seams; production defaults use intermediate canvas images and the utility queue. */
+  filterDeps?: {
+    uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
+    runGraph(options: {
+      graph: Parameters<typeof runUtilityGraph>[0]['graph'];
+      outputNodeId?: string;
+      signal?: AbortSignal;
+    }): Promise<UtilityGraphResult>;
+  };
   /**
    * Overrides the paint-persistence store. Defaults to a real {@link createBitmapStore}
    * wired to the layer cache and the upload backend. Tests inject a fake to
@@ -341,6 +365,7 @@ export interface CanvasEngineOptions {
 }
 
 export type StartSelectObjectSessionResult = 'started' | 'missing' | 'disabled' | 'unsupported' | 'not-ready';
+export type StartFilterOperationResult = 'started' | 'missing' | 'disabled' | 'locked' | 'unsupported' | 'not-ready';
 
 export type SelectObjectSaveTarget = 'raster' | 'control' | MaskImageResultTarget;
 export type SaveSelectObjectSessionResult = CommitGeneratedImageResult | CommitMaskImageResult;
@@ -384,6 +409,16 @@ export interface CanvasEngine {
   setTool(toolId: ToolId, opts?: { temporary?: boolean }): void;
   /** Selects the requested raster/control layer, starts Select Object, and activates the SAM tool. */
   startSelectObject(layerId: string): StartSelectObjectSessionResult;
+  /** Starts one engine-owned guarded filter operation for a raster or control layer. */
+  startFilterOperation(layerId: string): StartFilterOperationResult;
+  updateFilterOperation(draft: LayerFilterSettings): void;
+  processFilterOperation(): Promise<void>;
+  resetFilterOperation(settings: Record<string, unknown>): void;
+  commitFilterOperation(
+    target: FilterCommitTarget,
+    makeImageDurable: (imageName: string) => Promise<void>
+  ): Promise<void>;
+  cancelFilterOperation(): void;
   updateSelectObjectSession(changes: SelectObjectSessionUpdate): void;
   processSelectObjectSession(): Promise<SelectObjectSessionProcessResult>;
   applySelectObjectSession(): Promise<ReplaceSelectionFromImageResult>;
@@ -675,16 +710,6 @@ export interface CanvasEngine {
    * top-left tracks the bbox at render time.
    */
   setStagedPreview(input: StagedPreviewInput | null): void;
-  /**
-   * Shows a NON-DESTRUCTIVE control-filter preview for one layer: the decoded
-   * `imageName` is drawn stretched over that layer's content footprint instead of
-   * its committed pixels, until cleared with `null`. The document is untouched —
-   * "Apply" swaps the layer source (an undoable reducer edit); "Cancel" clears
-   * the preview. Decoding is async + per-layer version-guarded (a stale decode
-   * resolving after a newer set/clear for the same layer is discarded), so a
-   * newer preview or a layer deletion never flashes an old result.
-   */
-  setFilterPreview(layerId: string, input: StagedPreviewInput | null): void;
   /** Shows a filter preview only while the exact exported layer snapshot remains current. */
   setGuardedFilterPreview(
     layerId: string,
@@ -869,6 +894,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   let selectObjectCommitOwner: SelectObjectCommitOwner | null = null;
   let selectObjectCommitToken = 0;
   let samPreview: SelectObjectSessionPreview<RasterSurface> | null = null;
+  let filterSession: FilterOperationSession | null = null;
+  let filterUnsubscribe: (() => void) | null = null;
+  let filterControllerUnsubscribe: (() => void) | null = null;
 
   // The brush/eraser cursor ring, drawn on the overlay (set by the active tool).
   let overlayCursor: OverlayCursor | null = null;
@@ -1067,7 +1095,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       stores.thumbnailVersion.set(layerId, entry.version);
       stores.thumbnailStatus.set(layerId, 'ready');
     }
-    if (filterPreviews.get(layerId)?.guard) {
+    if (filterPreviews.has(layerId)) {
       clearFilterPreview(layerId);
     }
     scheduler.invalidate({ layers: [layerId] });
@@ -1078,7 +1106,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     cancelLayerRasterization(layerId);
     layerCache.invalidate(layerId);
     stores.thumbnailStatus.delete(layerId);
-    if (filterPreviews.get(layerId)?.guard) {
+    if (filterPreviews.has(layerId)) {
       clearFilterPreview(layerId);
     }
   };
@@ -2051,15 +2079,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       });
   };
 
-  // Per-layer filter previews: layerId → decoded filtered surface, plus a per-layer
-  // decode token so a stale decode never overwrites a newer one. Guard metadata is
-  // present only for raster previews; unguarded control-preview semantics stay intact.
+  // Per-layer guarded filter previews: layerId → decoded filtered surface, plus a
+  // per-layer decode token so stale work never overwrites a newer request.
   const filterPreviews = new Map<
     string,
-    { surface: RasterSurface; width: number; height: number; guard?: LayerExportGuard }
+    { surface: RasterSurface; width: number; height: number; guard: LayerExportGuard }
   >();
   const filterPreviewTokens = new Map<string, number>();
-  /** Current guarded request/publication token per layer; unguarded control previews are excluded. */
+  /** Current guarded request/publication token per layer. */
   const guardedFilterPreviewTokens = new Map<string, number>();
 
   /**
@@ -2067,7 +2094,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
    * decode for it is discarded — even if the id is later reused (e.g. an undo
    * that restores a deleted layer must not resurrect a stale decode result
    * that resolves afterward). The token is bumped, never reset/deleted, so a
-   * later `setFilterPreview` for the same id can never collide with a
+   * later guarded preview for the same id can never collide with a
    * still-in-flight decode's captured token.
    */
   const clearFilterPreview = (layerId: string): void => {
@@ -2094,17 +2121,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     layerId: string,
     input: StagedPreviewInput,
     validate: () => 'shown' | 'missing' | 'stale',
-    guard?: LayerExportGuard
+    guard: LayerExportGuard
   ): Promise<'shown' | 'missing' | 'stale'> => {
     const nextToken = (filterPreviewTokens.get(layerId) ?? 0) + 1;
     filterPreviewTokens.set(layerId, nextToken);
-    if (guard) {
-      guardedFilterPreviewTokens.set(layerId, nextToken);
-    } else {
-      // A newer unguarded control preview supersedes any guarded request for
-      // this layer and keeps its existing cross-project session semantics.
-      guardedFilterPreviewTokens.delete(layerId);
-    }
+    guardedFilterPreviewTokens.set(layerId, nextToken);
     const dropGuardedRequest = (): void => {
       if (guardedFilterPreviewTokens.get(layerId) === nextToken) {
         guardedFilterPreviewTokens.delete(layerId);
@@ -2127,7 +2148,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         dropGuardedRequest();
         return 'stale';
       }
-      filterPreviews.set(layerId, guard ? { ...decoded, guard } : decoded);
+      filterPreviews.set(layerId, { ...decoded, guard });
       scheduler.invalidate({ layers: [layerId] });
       return 'shown';
     } catch {
@@ -2135,14 +2156,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       dropGuardedRequest();
       return 'stale';
     }
-  };
-
-  const setFilterPreview = (layerId: string, input: StagedPreviewInput | null): void => {
-    if (input === null) {
-      clearFilterPreview(layerId);
-      return;
-    }
-    void publishFilterPreview(layerId, input, () => 'shown');
   };
 
   const setGuardedFilterPreview = (
@@ -2479,7 +2492,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           continue;
         }
         const preview = filterPreviews.get(id);
-        if (preview?.guard && !isLayerExportGuardCurrent(preview.guard)) {
+        if (preview && !isLayerExportGuardCurrent(preview.guard)) {
           clearFilterPreview(id);
         }
         if (!sourceChanged.has(id)) {
@@ -2539,10 +2552,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
   }
 
-  // A guarded raster-filter preview belongs to one continuous active-project
-  // epoch. Switching away invalidates published and in-flight guarded work, so
-  // returning to this project cannot resurrect it. Unguarded control previews
-  // intentionally retain their existing session semantics.
+  // A guarded filter preview belongs to one continuous active-project epoch.
+  // Switching away invalidates published and in-flight work, so returning to
+  // this project cannot resurrect it.
   let lastActiveProjectId = store.getState().activeProjectId;
   const unsubscribeProjectPreviewLifecycle = store.subscribe(() => {
     const activeProjectId = store.getState().activeProjectId;
@@ -2553,10 +2565,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       cancelAllLayerRasterizations();
       stores.thumbnailStatus.clear();
       const ids = new Set<string>(guardedFilterPreviewTokens.keys());
-      for (const [layerId, preview] of filterPreviews) {
-        if (preview.guard) {
-          ids.add(layerId);
-        }
+      for (const layerId of filterPreviews.keys()) {
+        ids.add(layerId);
       }
       for (const layerId of ids) {
         clearFilterPreview(layerId);
@@ -2664,6 +2674,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     if (stores.transformSession.get()) {
       cancelTransform();
+      return;
+    }
+    if (!gestureWasActive && filterSession) {
+      cancelFilterOperation();
       return;
     }
     if (!gestureWasActive && selectObjectSession) {
@@ -2912,6 +2926,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       store.dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
     }
 
+    clearOwnedFilterSession();
     clearOwnedSelectObjectSession();
     selectObjectGuard = guard;
     selectObjectSourceRect = sourceRect;
@@ -3156,6 +3171,135 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       setTool('view');
     }
   };
+
+  let filterMakeDurable: (imageName: string) => Promise<void> = () =>
+    Promise.reject(new Error('The filter result cannot be preserved.'));
+
+  const syncFilterStore = (): void => {
+    stores.filterSession.set(filterSession?.getSnapshot() ?? null);
+  };
+
+  const clearOwnedFilterSession = (): void => {
+    const session = filterSession;
+    filterSession = null;
+    filterUnsubscribe?.();
+    filterUnsubscribe = null;
+    filterControllerUnsubscribe?.();
+    filterControllerUnsubscribe = null;
+    session?.dispose();
+    stores.filterSession.set(null);
+  };
+
+  const startFilterOperation = (layerId: string): StartFilterOperationResult => {
+    const document = mirror.getDocument();
+    const layer = document?.layers.find((candidate) => candidate.id === layerId);
+    if (!document || !layer) {
+      return 'missing';
+    }
+    if (layer.type !== 'raster' && layer.type !== 'control') {
+      return 'unsupported';
+    }
+    if (!layer.isEnabled) {
+      return 'disabled';
+    }
+    if (layer.isLocked) {
+      return 'locked';
+    }
+    const guard = captureCurrentLayerExportGuard(layer.id);
+    if (!guard) {
+      return 'not-ready';
+    }
+    const definition = getFilterDefinition(layer.filter?.type ?? DEFAULT_CONTROL_FILTER_TYPE);
+    const initialFilter = layer.filter ? structuredClone(layer.filter) : null;
+    const draft = initialFilter ?? {
+      settings: definition ? buildFilterDefaults(definition) : {},
+      type: DEFAULT_CONTROL_FILTER_TYPE,
+    };
+
+    clearOwnedSelectObjectSession();
+    clearOwnedFilterSession();
+    if (document.selectedLayerId !== layer.id) {
+      store.dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+    }
+    const queueDeps = opts.filterDeps;
+    filterSession = createFilterOperationSession({
+      deps: {
+        clearPreview: () => clearFilterPreview(layer.id),
+        commit: ({ draft, guard, image, rect, signal, target }) =>
+          commitRasterFilterResult({
+            filter: draft,
+            guard,
+            image,
+            mode: target === 'apply' ? 'replace' : 'copy',
+            rect,
+            signal,
+            target,
+          }),
+        controller: canvasOperations,
+        exportPixels: () => rasterizeLayerPixels(layer.id, { applyAdjustments: true, includeDisabled: true }),
+        isGuardCurrent: isLayerExportGuardCurrent,
+        makeDurable: (imageName) => filterMakeDurable(imageName),
+        publishPreview: (imageName, previewGuard) => setGuardedFilterPreview(layer.id, { imageName }, previewGuard),
+        runFilter: (options) =>
+          runLayerFilter({
+            ...options,
+            deps: {
+              encodeSurface: (surface) => backend.encodeSurface(surface, 'image/png'),
+              runFilterGraph: async ({ graph, outputNodeId, signal }) => {
+                const output = await (queueDeps?.runGraph({ graph, outputNodeId, signal }) ??
+                  runUtilityGraph({ graph, hub: socketHub, outputNodeId, signal }));
+                return { imageName: output.imageName };
+              },
+              uploadIntermediate: async (blob) => {
+                const uploaded = await (queueDeps?.uploadIntermediate(blob) ??
+                  uploadCanvasImage(blob, { isIntermediate: true }));
+                return { imageName: uploaded.imageName };
+              },
+            },
+          }),
+      },
+      guard,
+      initialDraft: draft,
+      initialFilter,
+      layerType: layer.type,
+    });
+    if (!filterSession) {
+      return 'not-ready';
+    }
+    const installed = filterSession;
+    filterUnsubscribe = installed.subscribe(syncFilterStore);
+    filterControllerUnsubscribe = canvasOperations.subscribe(() => {
+      if (filterSession === installed && canvasOperations.getSnapshot().status === 'idle') {
+        clearOwnedFilterSession();
+      }
+    });
+    syncFilterStore();
+    setTool('view');
+    return 'started';
+  };
+
+  const updateFilterOperation = (draft: LayerFilterSettings): void => filterSession?.updateDraft(draft);
+  const processFilterOperation = (): Promise<void> => filterSession?.process() ?? Promise.resolve();
+  const resetFilterOperation = (settings: Record<string, unknown>): void => filterSession?.reset(settings);
+  const commitFilterOperation = async (
+    target: FilterCommitTarget,
+    makeImageDurable: (imageName: string) => Promise<void>
+  ): Promise<void> => {
+    const session = filterSession;
+    if (!session) {
+      return;
+    }
+    filterMakeDurable = makeImageDurable;
+    await session.commit(target);
+    if (canvasOperations.getSnapshot().status === 'idle' && filterSession === session) {
+      filterSession = null;
+      filterUnsubscribe?.();
+      filterUnsubscribe = null;
+      stores.filterSession.set(null);
+    }
+  };
+
+  const cancelFilterOperation = (): void => clearOwnedFilterSession();
 
   // ---- Public API ---------------------------------------------------------
 
@@ -3462,7 +3606,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     };
     notifyBestEffort(() => adjustedSurfaceCache.delete(layerId));
     notifyBestEffort(() => stores.thumbnailVersion.set(layerId, target.version));
-    if (filterPreviews.get(layerId)?.guard) {
+    if (filterPreviews.has(layerId)) {
       notifyBestEffort(() => clearFilterPreview(layerId));
     }
     notifyBestEffort(() => scheduler.invalidate({ layers: [layerId] }));
@@ -3862,7 +4006,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (liveLayer.isLocked) {
         return { status: 'locked' };
       }
-      if (liveLayer.type !== 'raster') {
+      if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
         return { status: 'unsupported' };
       }
       if (pipeline.isGestureActive()) {
@@ -3885,8 +4029,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           return { status: 'stale' };
         }
         const before = structuredClone(liveLayer);
-        const { adjustments: _adjustments, ...base } = liveLayer;
-        const after: CanvasLayerContract = structuredClone({ ...base, source: paintSource });
+        const after: CanvasLayerContract =
+          liveLayer.type === 'raster'
+            ? (() => {
+                const { adjustments: _adjustments, ...base } = liveLayer;
+                return structuredClone({ ...base, filter: options.filter, source: paintSource });
+              })()
+            : structuredClone({ ...liveLayer, filter: options.filter, source: paintSource });
         const afterPixels = { pixels, rect };
         const publishSnapshot = (
           contract: CanvasLayerContract,
@@ -3946,14 +4095,45 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         return { status: 'missing' };
       }
       const selectedLayerId = document.selectedLayerId;
-      const { adjustments: _adjustments, ...base } = structuredClone(liveLayer);
       const layerId = createLayerId();
-      const copy: CanvasLayerContract = {
-        ...base,
-        id: layerId,
-        name: `${liveLayer.name} filtered`,
-        source: paintSource,
-      };
+      let copy: CanvasLayerContract;
+      if (options.target === 'control') {
+        const base =
+          liveLayer.type === 'control'
+            ? structuredClone(liveLayer)
+            : createControlLayer(`${liveLayer.name} filtered`, layerId);
+        copy = {
+          ...base,
+          filter: options.filter,
+          id: layerId,
+          name: `${liveLayer.name} filtered`,
+          source: paintSource,
+          transform: structuredClone(liveLayer.transform),
+        };
+      } else if (options.target === 'raster' && liveLayer.type === 'control') {
+        copy = {
+          blendMode: liveLayer.blendMode,
+          filter: options.filter,
+          id: layerId,
+          isEnabled: true,
+          isLocked: false,
+          name: `${liveLayer.name} filtered`,
+          opacity: liveLayer.opacity,
+          source: paintSource,
+          transform: structuredClone(liveLayer.transform),
+          type: 'raster',
+        };
+      } else {
+        const { adjustments: _adjustments, ...base } = structuredClone(liveLayer as CanvasRasterLayerContractV2);
+        copy = {
+          ...base,
+          filter: options.filter,
+          id: layerId,
+          name: `${liveLayer.name} filtered`,
+          source: paintSource,
+          type: 'raster',
+        };
+      }
       const apply = (): void => {
         // Prepare the independent live-cache clone before adding the layer. The
         // result image is already durable, so no dirty upload is needed.
@@ -4980,7 +5160,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // entry inside the gesture. The move/bbox tools commit on pointer-UP, by
     // which point the pipeline has already cleared the gesture flag (it is reset
     // before the active tool's `onPointerUp` runs), so their commits still land.
-    if (pipeline.isGestureActive()) {
+    const operation = canvasOperations.getSnapshot();
+    if (pipeline.isGestureActive() || (operation.status === 'active' && operation.identity.kind === 'filter')) {
       return;
     }
     endNudgeBurst();
@@ -5775,6 +5956,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return;
     }
     disposed = true;
+    clearOwnedFilterSession();
     clearOwnedSelectObjectSession();
     canvasOperations.dispose();
     cancelAllLayerRasterizations();
@@ -5899,6 +6081,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     logDebugInfo,
     attach,
     cancelSelectObjectSession,
+    cancelFilterOperation,
     cancelTextEdit,
     cancelTransform,
     commitGeneratedImageResult,
@@ -5907,6 +6090,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     commitLayerCopy,
     commitMaskImageResult,
     commitRasterFilterResult,
+    commitFilterOperation,
     commitStructural,
     commitTextEdit,
     cropLayerToBbox,
@@ -5939,10 +6123,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     mergeLayerDown,
     mergeVisibleRasterLayers,
     processSelectObjectSession,
+    processFilterOperation,
     applySelectObjectSession,
     resetSelectObjectSession,
+    resetFilterOperation,
     saveSelectObjectSession,
     startSelectObject,
+    startFilterOperation,
+    updateFilterOperation,
     updateSelectObjectSession,
     openTextCreate,
     openTextEdit,
@@ -5969,7 +6157,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     },
     resize,
     setBboxGrid: (size) => stores.bboxGrid.set(size > 0 ? size : 1),
-    setFilterPreview,
     setGuardedFilterPreview,
     setInteractionLocked,
     setStagedPreview,

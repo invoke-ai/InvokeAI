@@ -93,6 +93,7 @@ export interface LayerContextActionEffects {
   openRename(): void;
   openRunWorkflow(): void;
   startSelectObject(layerId: string): void;
+  startFilter(layerId: string): void;
   transform(): void;
   fitToBbox(): void;
   openProperties(section: LayerPropertiesSection): void;
@@ -412,7 +413,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Filter',
-    handler: ({ effects }) => effects.openProperties('filter'),
+    handler: ({ effects, layer }) => effects.startFilter(layer.id),
     icon: SlidersHorizontalIcon,
     id: 'filter',
     isEnabled: hasMutablePixels,

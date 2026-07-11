@@ -5,6 +5,7 @@ import type { Dispatch } from 'react';
 
 import { Popover, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui';
+import { useCanvasOperation } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { SlidersHorizontalIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -47,6 +48,8 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
   const [triggerOpen, setTriggerOpen] = useState(false);
   const request = useLayerPropertiesRequest(layer.id);
   const documentRevision = useActiveProjectSelector((project) => project.canvas.documentRevision);
+  const operation = useCanvasOperation(engine);
+  const isFilterActive = operation.status === 'active' && operation.identity.kind === 'filter';
   const isOpen = triggerOpen || request !== null;
 
   const handleOpenChange = useCallback(
@@ -71,6 +74,7 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
         <IconButton
           aria-label={t('widgets.layers.properties')}
           color="fg.subtle"
+          disabled={isFilterActive}
           size="2xs"
           variant="ghost"
           onClick={stopPropagation}
@@ -88,7 +92,6 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
                   dispatch={dispatch}
                   documentRevision={documentRevision}
                   engine={engine}
-                  filterRequestToken={request?.section === 'filter' ? request.token : null}
                   layer={layer}
                 />
               </Stack>
@@ -105,13 +108,11 @@ const LayerTypeSettings = ({
   dispatch,
   documentRevision,
   engine,
-  filterRequestToken,
   layer,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
   documentRevision: number;
   engine: CanvasEngine | null;
-  filterRequestToken: number | null;
   layer: CanvasLayerContract;
 }) => {
   switch (layer.type) {
@@ -120,16 +121,13 @@ const LayerTypeSettings = ({
     case 'regional_guidance':
       return <RegionalGuidanceSettings key={layer.id} engine={engine} layer={layer} />;
     case 'control':
-      return (
-        <ControlLayerSettings key={layer.id} engine={engine} filterRequestToken={filterRequestToken} layer={layer} />
-      );
+      return <ControlLayerSettings key={layer.id} engine={engine} layer={layer} />;
     case 'raster':
       return (
         <RasterLayerSettings
           key={`${engine?.projectId ?? 'none'}-${layer.id}-${documentRevision}`}
           dispatch={dispatch}
           engine={engine}
-          filterRequestToken={filterRequestToken}
           layer={layer}
         />
       );
@@ -140,12 +138,10 @@ const LayerTypeSettings = ({
 const RasterLayerSettings = ({
   dispatch,
   engine,
-  filterRequestToken,
   layer,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
   engine: CanvasEngine | null;
-  filterRequestToken: number | null;
   layer: Extract<CanvasLayerContract, { type: 'raster' }>;
 }) => {
   const { t } = useTranslation();
@@ -187,12 +183,7 @@ const RasterLayerSettings = ({
         {t('widgets.layers.adjustments.title')}
       </Text>
       <AdjustmentsPopover engine={engine} layer={layer} />
-      <RasterLayerFilterSection
-        key={`${layer.id}-${filterRequestToken ?? 'default'}`}
-        engine={engine}
-        focusFilter={filterRequestToken !== null}
-        layer={layer}
-      />
+      <RasterLayerFilterSection engine={engine} layer={layer} />
     </Stack>
   );
 };

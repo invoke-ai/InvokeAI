@@ -582,6 +582,7 @@ export interface CanvasRasterLayerContractV2 extends CanvasLayerBaseContract {
   source: CanvasLayerSourceContract;
   adjustments?: CanvasAdjustmentsContract;
   isTransparencyLocked?: boolean;
+  filter?: { type: string; settings: Record<string, unknown> };
 }
 
 export interface CanvasControlLayerContract extends CanvasLayerBaseContract {

@@ -13,7 +13,7 @@ import { uploadGalleryImage } from '@workbench/gallery/api';
 import { useModelsSelector } from '@workbench/models/modelsStore';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
-import { useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasOperation, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
@@ -190,12 +190,15 @@ const LayerMenu = ({
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const { document } = canvas;
+  const canvasOperation = useCanvasOperation(engine);
   const { bbox } = document;
   const documentRect = useMemo(
     () => ({ height: document.height, width: document.width, x: 0, y: 0 }),
     [document.height, document.width]
   );
-  const interactionLocked = isCanvasInteractionLocked(canvas, queueItems);
+  const interactionLocked =
+    isCanvasInteractionLocked(canvas, queueItems) ||
+    (canvasOperation.status === 'active' && canvasOperation.identity.kind === 'filter');
   // Re-render when live, not-yet-persisted paint/mask pixels change.
   useLayerThumbnailVersion(engine, layer.id);
   const hasSupportedContent = engine
@@ -395,6 +398,18 @@ const LayerMenu = ({
         throw makeStatusError('not-ready');
       }
       const result = engine.startSelectObject(layerId);
+      if (result !== 'started') {
+        throw makeStatusError(result);
+      }
+    },
+    [engine, makeStatusError]
+  );
+  const startFilter = useCallback(
+    (layerId: string) => {
+      if (!engine) {
+        throw makeStatusError('not-ready');
+      }
+      const result = engine.startFilterOperation(layerId);
       if (result !== 'started') {
         throw makeStatusError(result);
       }
@@ -615,6 +630,7 @@ const LayerMenu = ({
       openRename,
       openRunWorkflow,
       startSelectObject,
+      startFilter,
       patchConfig: handleLayerConfigAction,
       rasterize: handleRasterize,
       reorder: (kind, actionId) => reorder(kind, getActionLabel(actionId)),
@@ -645,6 +661,7 @@ const LayerMenu = ({
       openRename,
       openRunWorkflow,
       startSelectObject,
+      startFilter,
       reorder,
     ]
   );

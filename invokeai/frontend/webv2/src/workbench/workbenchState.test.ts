@@ -2121,6 +2121,22 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getCanvas(unchanged).document.layers[0]).toBe(controlLayer);
   });
 
+  it('persists filter settings on raster layers', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('raster')]);
+
+    state = workbenchReducer(state, {
+      config: { filter: { settings: { radius: 4 }, type: 'content_shuffle' }, layerType: 'raster' },
+      id: 'raster',
+      type: 'updateCanvasLayerConfig',
+    });
+
+    const raster = getCanvas(state).document.layers[0];
+    expect(raster?.type).toBe('raster');
+    if (raster?.type === 'raster') {
+      expect(raster.filter).toEqual({ settings: { radius: 4 }, type: 'content_shuffle' });
+    }
+  });
+
   it('applies an inpaint-mask config patch: mask bitmap + offset, fill, noise, denoise-limit', () => {
     let state = withCanvasLayers(createInitialWorkbenchState(), [createInpaintMaskLayer('m')]);
 

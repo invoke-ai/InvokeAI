@@ -17,6 +17,8 @@ import type { LayerTransform } from '@workbench/canvas-engine/transform/transfor
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { SamModel } from '@workbench/generation/canvas/samGraph';
 import type { CanvasLayerSourceContract } from '@workbench/types';
+import type { FilterOperationSessionState } from '@workbench/widgets/layers/filterOperationSession';
+export type { FilterOperationSessionState } from '@workbench/widgets/layers/filterOperationSession';
 
 import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 
@@ -531,6 +533,8 @@ export interface EngineStores {
   snapToGrid: ScalarStore<boolean>;
   /** Active Select Object session state, or `null`; intentionally React-free and narrowly shaped. */
   samSession: ScalarStore<SamSessionSnapshot | null>;
+  /** Active guarded layer-filter session state, independent of any launching view. */
+  filterSession: ScalarStore<FilterOperationSessionState | null>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -646,6 +650,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
+  filterSession: createScalarStore<FilterOperationSessionState | null>(null),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),
   gradientOptions: createScalarStore<GradientToolOptions>(

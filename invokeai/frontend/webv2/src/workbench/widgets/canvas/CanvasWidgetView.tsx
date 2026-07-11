@@ -31,6 +31,7 @@ import {
 } from './canvasSettings';
 import { CanvasSurface } from './CanvasSurface';
 import { resolveCheckerColors } from './checkerColors';
+import { useCanvasOperation } from './engineStoreHooks';
 import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
@@ -73,6 +74,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
   const { document, stagingArea } = canvas;
+  const operation = useCanvasOperation(engine);
 
   // Right-click on the canvas surface: hit-test the layer under the cursor, select
   // it, and open the SAME per-layer context menu the layers panel uses — anchored
@@ -167,7 +169,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       // fresh canvas (F2). `documentRevision` bumps only on those swaps.
       item.snapshot.canvas.documentRevision === canvas.documentRevision
   );
-  const isInteractionLocked = isCanvasInteractionLocked(canvas, queueItems);
+  const isInteractionLocked =
+    isCanvasInteractionLocked(canvas, queueItems) ||
+    (operation?.status === 'active' && operation.identity.kind === 'filter');
 
   useEffect(() => {
     engine?.setInteractionLocked(isInteractionLocked);

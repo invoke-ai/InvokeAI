@@ -97,7 +97,12 @@ type CanvasLayerBasePatch = Partial<
 
 /** Per-layer-type config patch for `updateCanvasLayerConfig`; a mismatched `layerType` is ignored. */
 type CanvasLayerConfigPatch =
-  | { layerType: 'raster'; adjustments?: CanvasAdjustmentsContract; isTransparencyLocked?: boolean }
+  | {
+      layerType: 'raster';
+      adjustments?: CanvasAdjustmentsContract;
+      isTransparencyLocked?: boolean;
+      filter?: CanvasRasterLayerContractV2['filter'];
+    }
   | {
       layerType: 'control';
       adapter?: Partial<CanvasControlAdapterContract>;
@@ -1009,6 +1014,7 @@ const applyCanvasLayerConfigPatch = (
       ...layer,
       ...(Object.hasOwn(config, 'adjustments') ? { adjustments: config.adjustments } : {}),
       ...(Object.hasOwn(config, 'isTransparencyLocked') ? { isTransparencyLocked: config.isTransparencyLocked } : {}),
+      ...(Object.hasOwn(config, 'filter') ? { filter: config.filter } : {}),
     };
   }
 

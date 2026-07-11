@@ -92,6 +92,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   openRename: vi.fn(),
   openRunWorkflow: vi.fn(),
   startSelectObject: vi.fn(),
+  startFilter: vi.fn(),
   patchConfig: vi.fn(),
   rasterize: vi.fn(),
   reorder: vi.fn(),
@@ -292,7 +293,7 @@ describe('layer context action registry', () => {
 
     expect(effects.reorder).toHaveBeenCalledWith('front', 'move-to-front');
     expect(effects.openProperties).toHaveBeenCalledWith('adjustments');
-    expect(effects.openProperties).toHaveBeenCalledWith('filter');
+    expect(effects.startFilter).toHaveBeenCalledWith(rasterLayer.id);
     expect(effects.booleanMerge).toHaveBeenCalledWith('intersect');
     expect(effects.copyTo).toHaveBeenCalledWith('control');
     expect(effects.convertTo).toHaveBeenCalledWith('control');

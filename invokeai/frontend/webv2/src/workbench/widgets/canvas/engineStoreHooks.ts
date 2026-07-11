@@ -15,6 +15,7 @@ import type {
   BrushOptions,
   EraserOptions,
   GradientToolOptions,
+  FilterOperationSessionState,
   SamSessionSnapshot,
   LassoToolOptions,
   ScalarStore,
@@ -69,11 +70,22 @@ export const useCanvasViewportReady = (engine: CanvasEngine): boolean => useScal
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasEngine): ToolId => useScalarStore(engine.stores.activeTool);
 
-export const useCanvasOperation = (engine: CanvasEngine): CanvasOperationState =>
-  useSyncExternalStore(engine.canvasOperations.subscribe, engine.canvasOperations.getSnapshot);
+const IDLE_CANVAS_OPERATION: CanvasOperationState = { status: 'idle' };
+
+export const useCanvasOperation = (engine: CanvasEngine | null): CanvasOperationState => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.canvasOperations.subscribe(listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine?.canvasOperations.getSnapshot() ?? IDLE_CANVAS_OPERATION, [engine]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
 
 export const useSamSession = (engine: CanvasEngine): SamSessionSnapshot | null =>
   useScalarStore(engine.stores.samSession);
+
+export const useFilterSession = (engine: CanvasEngine): FilterOperationSessionState | null =>
+  useScalarStore(engine.stores.filterSession);
 
 /** Whether the engine-owned canvas history has an entry to undo (enables the header undo button). */
 export const useCanvasCanUndo = (engine: CanvasEngine): boolean => useScalarStore(engine.stores.canUndo);
