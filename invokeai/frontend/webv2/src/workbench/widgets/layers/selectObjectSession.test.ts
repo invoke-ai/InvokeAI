@@ -144,6 +144,20 @@ describe('createSelectObjectSession', () => {
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
   });
 
+  it('does not deduplicate the same hash after its exact source guard is replaced', async () => {
+    const harness = createHarness();
+    await expect(harness.session.process()).resolves.toBe('published');
+
+    harness.setCurrentGuard(replacementGuard);
+    vi.mocked(harness.deps.exportLayer).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
+
+    await expect(harness.session.process()).resolves.toBe('published');
+    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
+    expect(harness.deps.runGraph).toHaveBeenCalledTimes(2);
+    expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
+  });
+
   it('debounces auto-processing for one second and manual processing runs immediately', async () => {
     vi.useFakeTimers();
     const harness = createHarness();
@@ -159,6 +173,82 @@ describe('createSelectObjectSession', () => {
     harness.session.update({ input: { prompt: 'manual', type: 'prompt' } });
     await expect(harness.session.process()).resolves.toBe('published');
     expect(harness.deps.runGraph).toHaveBeenCalledTimes(2);
+  });
+
+  it('immediately stales a delayed auto-run when input changes before the replacement debounce', async () => {
+    vi.useFakeTimers();
+    const oldGraph = deferred<{ imageName: string; origin: string }>();
+    const harness = createHarness({ runGraph: vi.fn(() => oldGraph.promise) });
+    harness.session.update({ autoProcess: true });
+    await vi.advanceTimersByTimeAsync(1_000);
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
+
+    harness.session.update({ input: { prompt: 'dog', type: 'prompt' } });
+    expect(harness.session.getSnapshot()).toMatchObject({ preview: null, status: 'scheduled' });
+    oldGraph.resolve({ imageName: 'old.png', origin: 'old' });
+    await vi.advanceTimersByTimeAsync(999);
+
+    expect(harness.deps.publishPreview).not.toHaveBeenCalled();
+    expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['input', { input: { prompt: 'dog', type: 'prompt' as const } }],
+    ['model', { model: 'segment-anything-huge' as const }],
+    ['invert', { invert: true }],
+    ['refinement', { applyPolygonRefinement: true }],
+    ['preview isolation', { isolatedPreview: false }],
+  ] as const)('immediately aborts in-flight work and clears preview for a %s update', async (_label, update) => {
+    const signals: AbortSignal[] = [];
+    const graph = deferred<{ imageName: string; origin: string }>();
+    const harness = createHarness({
+      runGraph: vi.fn((options) => {
+        if (options.signal) {
+          signals.push(options.signal);
+        }
+        return graph.promise;
+      }),
+    });
+    const pending = harness.session.process();
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
+
+    harness.session.update(update);
+
+    expect(signals[0]?.aborted).toBe(true);
+    expect(harness.session.getSnapshot().preview).toBeNull();
+    graph.resolve({ imageName: 'stale.png', origin: 'stale' });
+    await expect(pending).resolves.toBe('stale');
+    expect(harness.deps.publishPreview).not.toHaveBeenCalled();
+  });
+
+  it('clears an already-published preview as soon as processing input changes', async () => {
+    const harness = createHarness();
+    await harness.session.process();
+    vi.mocked(harness.deps.cleanupPreview).mockClear();
+
+    harness.session.update({ model: 'segment-anything-huge' });
+
+    expect(harness.session.getSnapshot()).toMatchObject({ preview: null, status: 'ready' });
+    expect(harness.deps.cleanupPreview).toHaveBeenCalledOnce();
+  });
+
+  it('rejects non-finite document input before hashing or scheduling work', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    harness.session.update({ autoProcess: true });
+    harness.session.update({
+      input: {
+        bbox: null,
+        excludePoints: [],
+        includePoints: [{ x: Number.NaN, y: 1 }],
+        type: 'visual',
+      },
+    });
+
+    await expect(harness.session.process()).resolves.toBe('invalid');
+    await vi.runAllTimersAsync();
+    expect(harness.deps.exportLayer).not.toHaveBeenCalled();
+    expect(harness.deps.runGraph).not.toHaveBeenCalled();
   });
 
   it('publishes only the latest request when graph completions arrive out of order', async () => {

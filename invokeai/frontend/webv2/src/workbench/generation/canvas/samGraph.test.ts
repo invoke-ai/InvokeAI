@@ -2,7 +2,7 @@ import type { BackendGraphEdgeContract } from '@workbench/types';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildSamGraph, documentToExportLocalSamInput } from './samGraph';
+import { buildSamGraph, documentToExportLocalSamInput, isSamDocumentInputValid, isSamInputValid } from './samGraph';
 
 const edge = (
   sourceNodeId: string,
@@ -179,10 +179,77 @@ describe('buildSamGraph', () => {
       })
     ).toThrow(input.type === 'prompt' ? 'A Segment Anything object prompt is required.' : 'visual input is required');
   });
+
+  it.each([
+    {
+      bbox: null,
+      excludePoints: [],
+      includePoints: [{ x: 1.5, y: 2 }],
+      type: 'visual',
+    },
+    {
+      bbox: null,
+      excludePoints: [{ x: Number.NaN, y: 2 }],
+      includePoints: [],
+      type: 'visual',
+    },
+    {
+      bbox: null,
+      excludePoints: [],
+      includePoints: [{ x: 1, y: Number.POSITIVE_INFINITY }],
+      type: 'visual',
+    },
+    {
+      bbox: { height: 2, width: 1.5, x: 0, y: 0 },
+      excludePoints: [],
+      includePoints: [],
+      type: 'visual',
+    },
+    {
+      bbox: { height: 2, width: 1, x: Number.NEGATIVE_INFINITY, y: 0 },
+      excludePoints: [],
+      includePoints: [],
+      type: 'visual',
+    },
+    {
+      bbox: { height: 2, width: 1.5, x: 0, y: 0 },
+      excludePoints: [],
+      includePoints: [{ x: 1, y: 2 }],
+      type: 'visual',
+    },
+    {
+      bbox: { height: 2, width: Number.MAX_VALUE, x: Number.MAX_VALUE, y: 0 },
+      excludePoints: [],
+      includePoints: [],
+      type: 'visual',
+    },
+  ] as const)('rejects backend-invalid coordinates %#', (input) => {
+    expect(isSamInputValid(input)).toBe(false);
+    expect(() =>
+      buildSamGraph({
+        applyPolygonRefinement: false,
+        imageName: 'source.png',
+        input,
+        invert: false,
+        model: 'segment-anything-2-large',
+      })
+    ).toThrow('visual input is required');
+  });
+
+  it('rejects a non-finite document bbox even when a finite point is present', () => {
+    expect(
+      isSamDocumentInputValid({
+        bbox: { height: 2, width: Number.POSITIVE_INFINITY, x: 0, y: 0 },
+        excludePoints: [],
+        includePoints: [{ x: 1.25, y: 2.75 }],
+        type: 'visual',
+      })
+    ).toBe(false);
+  });
 });
 
 describe('documentToExportLocalSamInput', () => {
-  it('subtracts a nonzero export origin, rounds points, and clips them to pixel bounds', () => {
+  it('subtracts a nonzero export origin, rounds finite points, and discards points outside the export', () => {
     expect(
       documentToExportLocalSamInput(
         {
@@ -198,10 +265,36 @@ describe('documentToExportLocalSamInput', () => {
       )
     ).toEqual({
       bbox: null,
-      excludePoints: [{ x: 11, y: 9 }],
+      excludePoints: [],
+      includePoints: [{ x: 5, y: 6 }],
+      type: 'visual',
+    });
+  });
+
+  it('keeps inside edge points while discarding non-finite and outside points', () => {
+    expect(
+      documentToExportLocalSamInput(
+        {
+          bbox: null,
+          excludePoints: [
+            { x: Number.NaN, y: 10 },
+            { x: 20, y: Number.POSITIVE_INFINITY },
+          ],
+          includePoints: [
+            { x: 10, y: 20 },
+            { x: 21.9, y: 29.9 },
+            { x: 22, y: 25 },
+          ],
+          type: 'visual',
+        },
+        { height: 10, width: 12, x: 10, y: 20 }
+      )
+    ).toEqual({
+      bbox: null,
+      excludePoints: [],
       includePoints: [
         { x: 0, y: 0 },
-        { x: 5, y: 6 },
+        { x: 11, y: 9 },
       ],
       type: 'visual',
     });
@@ -243,5 +336,24 @@ describe('documentToExportLocalSamInput', () => {
       throw new Error('Expected visual SAM input.');
     }
     expect(converted.bbox).toBeNull();
+    expect(isSamInputValid(converted)).toBe(false);
+  });
+
+  it.each([
+    { height: 0, width: 30, x: 100, y: 200 },
+    { height: 20, width: 0, x: 100, y: 200 },
+  ])('produces an invalid empty visual input for a zero-size export %#', (exportRect) => {
+    const converted = documentToExportLocalSamInput(
+      {
+        bbox: null,
+        excludePoints: [{ x: 101, y: 201 }],
+        includePoints: [],
+        type: 'visual',
+      },
+      exportRect
+    );
+
+    expect(converted).toEqual({ bbox: null, excludePoints: [], includePoints: [], type: 'visual' });
+    expect(isSamInputValid(converted)).toBe(false);
   });
 });

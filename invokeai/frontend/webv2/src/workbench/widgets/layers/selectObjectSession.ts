@@ -8,7 +8,7 @@ import type { ExportBakedLayerBlobResult, LayerExportGuard } from '@workbench/ca
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
 
-import { isSamInputValid } from '@workbench/generation/canvas/samGraph';
+import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
 
 import type { SelectObjectPreparedSource, SelectObjectReadyResult } from './layerImageResult';
 
@@ -142,6 +142,14 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     publishState({ ...state, preview: null, sourceGuard: null, status: 'ready' });
   };
 
+  const isGuardCurrent = (guard: LayerExportGuard): boolean => {
+    try {
+      return deps.isGuardCurrent(guard);
+    } catch {
+      return false;
+    }
+  };
+
   deps.controller.subscribe(() => {
     if (!startingOperation && operation && deps.controller.getSnapshot().status === 'idle') {
       sourceController?.abort();
@@ -159,7 +167,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
   const schedule = (): void => {
     clearTimer();
-    if (!state.autoProcess || !isSamInputValid(state.input)) {
+    if (!state.autoProcess || !isSamDocumentInputValid(state.input)) {
       if (state.status === 'scheduled') {
         publishState({ ...state, status: 'ready' });
       }
@@ -173,7 +181,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   };
 
   const ensureSource = async (signal: AbortSignal): Promise<SelectObjectPreparedSource> => {
-    if (source && deps.isGuardCurrent(source.guard)) {
+    if (source && isGuardCurrent(source.guard)) {
       return source;
     }
     source = null;
@@ -181,7 +189,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     if (prepared.status !== 'ready') {
       throw new Error(resultError(prepared));
     }
-    if (signal.aborted || !deps.isGuardCurrent(prepared.source.guard)) {
+    if (signal.aborted || !isGuardCurrent(prepared.source.guard)) {
       throw new DOMException('Select Object source became stale.', 'AbortError');
     }
     source = prepared.source;
@@ -267,7 +275,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
           error: controllerState.status === 'active' ? controllerState.error : 'Select Object processing failed.',
           status: 'error',
         });
-      } else if (result === 'stale' && !deps.isGuardCurrent(preparedSource.guard)) {
+      } else if (result === 'stale' && !isGuardCurrent(preparedSource.guard)) {
         clearSource();
       }
       return result;
@@ -286,15 +294,38 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
   const process = (): Promise<SelectObjectSessionProcessResult> => {
     clearTimer();
-    if (!isSamInputValid(state.input)) {
+    if (!isSamDocumentInputValid(state.input)) {
       publishState({ ...state, error: 'A Segment Anything input is required.', status: 'error' });
       return Promise.resolve('invalid');
+    }
+    if (state.sourceGuard && !isGuardCurrent(state.sourceGuard)) {
+      requestToken += 1;
+      sourceController?.abort();
+      sourceController = null;
+      operation?.cancel();
+      if (!operation && state.preview) {
+        cleanupPreview();
+      }
+      source = null;
+      operation = null;
+      operationGuard = null;
+      pendingHash = null;
+      pendingProcess = null;
+      lastPublishedHash = null;
+      publishState({ ...state, preview: null, sourceGuard: null, status: 'ready' });
     }
     const hash = stableInputHash(state);
     if (hash === pendingHash && pendingProcess) {
       return pendingProcess;
     }
-    if (hash === lastPublishedHash) {
+    if (
+      hash === lastPublishedHash &&
+      state.preview !== null &&
+      state.sourceGuard === state.preview.guard &&
+      source?.guard === state.preview.guard &&
+      operationGuard === state.preview.guard &&
+      isGuardCurrent(state.preview.guard)
+    ) {
       return Promise.resolve('deduped');
     }
 
@@ -331,6 +362,19 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     lastPublishedHash = null;
   };
 
+  const invalidateProcessingState = (): void => {
+    requestToken += 1;
+    sourceController?.abort();
+    sourceController = null;
+    pendingHash = null;
+    pendingProcess = null;
+    lastPublishedHash = null;
+    operation?.reset();
+    if (!operation && state.preview) {
+      cleanupPreview();
+    }
+  };
+
   return {
     cancel: () => {
       cancelCurrent();
@@ -347,7 +391,22 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       return () => listeners.delete(listener);
     },
     update: (changes) => {
-      publishState({ ...state, ...changes, error: null });
+      const processingChanged =
+        ('input' in changes && changes.input !== state.input) ||
+        ('model' in changes && changes.model !== state.model) ||
+        ('invert' in changes && changes.invert !== state.invert) ||
+        ('applyPolygonRefinement' in changes && changes.applyPolygonRefinement !== state.applyPolygonRefinement) ||
+        ('isolatedPreview' in changes && changes.isolatedPreview !== state.isolatedPreview);
+      if (processingChanged) {
+        invalidateProcessingState();
+      }
+      publishState({
+        ...state,
+        ...changes,
+        error: null,
+        preview: processingChanged ? null : state.preview,
+        status: processingChanged ? 'ready' : state.status,
+      });
       schedule();
     },
   };
