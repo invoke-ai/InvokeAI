@@ -222,6 +222,27 @@ export interface TextEditSession {
   transform: LayerTransform;
 }
 
+export type SamPointLabel = 'include' | 'exclude';
+
+export interface SamVisualInput {
+  type: 'visual';
+  includePoints: Vec2[];
+  excludePoints: Vec2[];
+  bbox: Rect | null;
+}
+
+/** Narrow engine-owned Select Object state for canvas tools and future UI subscribers. */
+export interface SamSessionSnapshot {
+  layerId: string;
+  sourceRect: Rect;
+  input: SamVisualInput;
+  pointLabel: SamPointLabel;
+  isolatedPreview: boolean;
+  status: 'ready' | 'scheduled' | 'processing' | 'error';
+  error: string | null;
+  hasPreview: boolean;
+}
+
 /** A single-value store, `useSyncExternalStore`-compatible. */
 export interface ScalarStore<T> {
   get(): T;
@@ -499,6 +520,8 @@ export interface EngineStores {
    * Purely an interaction preference — no render effect.
    */
   snapToGrid: ScalarStore<boolean>;
+  /** Active Select Object session state, or `null`; intentionally React-free and narrowly shaped. */
+  samSession: ScalarStore<SamSessionSnapshot | null>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -624,6 +647,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   lassoOptions: createScalarStore<LassoToolOptions>({ ...DEFAULT_LASSO_OPTIONS }, lassoOptionsEqual),
   lassoPreview: createScalarStore<readonly Vec2[] | null>(null),
   ruleOfThirds: createScalarStore<boolean>(false),
+  samSession: createScalarStore<SamSessionSnapshot | null>(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
   shapePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, shapePreviewEqual),
   showBbox: createScalarStore<boolean>(true),

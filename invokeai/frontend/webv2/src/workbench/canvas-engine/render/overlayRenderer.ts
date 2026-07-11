@@ -103,6 +103,10 @@ export interface OverlayState {
    * drawn as a direction indicator. Absent/`null` when idle.
    */
   gradientPreview?: { start: Vec2; end: Vec2 } | null;
+  /** Dedicated Select Object mask preview, already colorized by the engine. */
+  samPreview?: { surface: RasterSurface; rect: Rect; opacity: number } | null;
+  /** Select Object visual prompt geometry in document space. */
+  samInput?: { includePoints: readonly Vec2[]; excludePoints: readonly Vec2[]; bbox: Rect | null } | null;
 }
 
 /** Document-space geometry the overlay draws for an active transform session. */
@@ -367,6 +371,64 @@ const drawGradientPreview = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
+const SAM_BBOX_COLOR = '#f59e0b';
+const SAM_INCLUDE_COLOR = '#22c55e';
+const SAM_EXCLUDE_COLOR = '#ef4444';
+const SAM_POINT_RADIUS_PX = 5;
+const SAM_HANDLE_DRAW_PX = 8;
+
+const drawSamPreview = (ctx: Ctx, state: OverlayState): void => {
+  const preview = state.samPreview;
+  if (!preview) {
+    return;
+  }
+  const { view } = state;
+  ctx.save();
+  ctx.setTransform(view.a, view.b, view.c, view.d, view.e, view.f);
+  ctx.globalAlpha = preview.opacity;
+  ctx.drawImage(preview.surface.canvas, preview.rect.x, preview.rect.y, preview.rect.width, preview.rect.height);
+  ctx.restore();
+};
+
+const drawSamGeometry = (ctx: Ctx, state: OverlayState): void => {
+  const input = state.samInput;
+  if (!input) {
+    return;
+  }
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = SAM_BBOX_COLOR;
+  ctx.setLineDash([...BBOX_DASH]);
+  if (input.bbox) {
+    const screenRect = transformBounds(state.view, input.bbox);
+    ctx.strokeRect(screenRect.x, screenRect.y, screenRect.width, screenRect.height);
+    ctx.setLineDash([]);
+    ctx.fillStyle = BBOX_HANDLE_FILL;
+    const half = SAM_HANDLE_DRAW_PX / 2;
+    for (const handle of BBOX_HANDLES) {
+      const center = bboxHandlePoint(screenRect, handle);
+      ctx.fillRect(center.x - half, center.y - half, SAM_HANDLE_DRAW_PX, SAM_HANDLE_DRAW_PX);
+      ctx.strokeRect(center.x - half, center.y - half, SAM_HANDLE_DRAW_PX, SAM_HANDLE_DRAW_PX);
+    }
+  }
+  ctx.setLineDash([]);
+  for (const [points, color] of [
+    [input.includePoints, SAM_INCLUDE_COLOR],
+    [input.excludePoints, SAM_EXCLUDE_COLOR],
+  ] as const) {
+    ctx.fillStyle = color;
+    ctx.strokeStyle = '#ffffff';
+    for (const point of points) {
+      const screen = applyToPoint(state.view, point);
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, SAM_POINT_RADIUS_PX, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+};
+
 /**
  * Draws the bbox overlay shade: a translucent dark fill over the ENTIRE viewport
  * with the bbox region punched out (even-odd fill rule — the two nested rect paths
@@ -467,6 +529,8 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
     ctx.setLineDash([]);
   }
 
+  drawSamPreview(ctx, state);
+  drawSamGeometry(ctx, state);
   drawLayerOutline(ctx, state);
   drawBboxHandles(ctx, state);
   drawTransformFrame(ctx, state);

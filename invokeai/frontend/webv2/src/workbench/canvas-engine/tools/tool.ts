@@ -13,7 +13,7 @@
  * Zero React, zero import-time side effects.
  */
 
-import type { EngineStores } from '@workbench/canvas-engine/engineStores';
+import type { EngineStores, SamVisualInput } from '@workbench/canvas-engine/engineStores';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
@@ -156,6 +156,8 @@ export interface ToolContext {
    * hot path. Absent in minimal test harnesses.
    */
   getSelectionMask?(): PlacedSurface | null;
+  /** Updates visual SAM input for the active engine-owned Select Object session. */
+  updateSamInput?(input: SamVisualInput): void;
 }
 
 /**

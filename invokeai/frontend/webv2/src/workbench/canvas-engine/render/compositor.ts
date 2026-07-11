@@ -136,6 +136,8 @@ export interface CompositeOptions {
    * `null`/absent ⇒ no previews.
    */
   layerPreviews?: ReadonlyMap<string, RasterSurface> | null;
+  /** When set, transiently composites only this layer without mutating document visibility. */
+  onlyLayerId?: string | null;
   /**
    * Returns a raster layer's ADJUSTED cache surface (brightness/contrast/
    * saturation/curves applied), or `null` when the layer has identity (or no)
@@ -338,7 +340,13 @@ export const compositeDocument = (
   const drawGroup = (rank: number): void => {
     for (let i = doc.layers.length - 1; i >= 0; i--) {
       const layer = doc.layers[i];
-      if (!layer || !layer.isEnabled || layer.id === opts.skipLayerId || layerGroupRank(layer) !== rank) {
+      if (
+        !layer ||
+        !layer.isEnabled ||
+        layer.id === opts.skipLayerId ||
+        (opts.onlyLayerId && layer.id !== opts.onlyLayerId) ||
+        layerGroupRank(layer) !== rank
+      ) {
         continue;
       }
       const entry = caches.get(layer.id);

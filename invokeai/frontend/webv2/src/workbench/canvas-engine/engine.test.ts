@@ -2014,7 +2014,11 @@ const createSpyBitmapStore = (): BitmapStore & {
 const createInputCanvas = (
   width = 100,
   height = 100
-): { element: HTMLCanvasElement; fire: (type: string, event: Partial<PointerEvent>) => void } => {
+): {
+  element: HTMLCanvasElement;
+  fire: (type: string, event: Partial<PointerEvent>) => void;
+  surface: StubRasterSurface;
+} => {
   const surface = createTestStubRasterBackend().createSurface(width, height);
   const listeners = new Map<string, Set<(event: Event) => void>>();
   const element = {
@@ -2038,7 +2042,7 @@ const createInputCanvas = (
       handler({ preventDefault: () => {}, ...event } as unknown as Event);
     }
   };
-  return { element, fire };
+  return { element, fire, surface };
 };
 
 const pointerAt = (x: number, y: number, opts: { button?: number; buttons?: number } = {}): Partial<PointerEvent> => ({
@@ -11826,5 +11830,210 @@ describe('contextMenuLayerIdAt (canvas right-click target)', () => {
     expect(engine.stores.textEditSession.get()).not.toBeNull();
     expect(engine.contextMenuLayerIdAt({ x: 5, y: 5 })).toBeNull();
     engine.dispose();
+  });
+});
+
+describe('Select Object canvas engine integration', () => {
+  const samLayer = (id: string, x = 0): CanvasRasterLayerContractV2 => ({
+    blendMode: 'normal',
+    id,
+    isEnabled: true,
+    isLocked: false,
+    name: id,
+    opacity: 1,
+    source: { fill: '#fff', height: 20, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 20 },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
+    type: 'raster',
+  });
+
+  const samDocument = (layers: CanvasLayerContract[] = [samLayer('source')]): CanvasDocumentContractV2 => ({
+    background: 'transparent',
+    bbox: { height: 100, width: 100, x: 0, y: 0 },
+    height: 100,
+    layers,
+    selectedLayerId: layers[0]?.id ?? null,
+    version: 2,
+    width: 100,
+  });
+
+  const createSamHarness = async (
+    options: {
+      backend?: StubRasterBackend;
+      imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
+      layers?: CanvasLayerContract[];
+      runGraph?: () => Promise<{ imageName: string; origin: string }>;
+    } = {}
+  ) => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const reactive = createReactiveStore(samDocument(options.layers));
+    const engine = createCanvasEngine({
+      backend: options.backend ?? createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: options.imageResolver ?? (() => Promise.resolve(new Blob())),
+      projectId: 'p1',
+      selectObjectDeps: {
+        runGraph: options.runGraph ?? (() => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' })),
+        uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+      },
+      store: reactive.store,
+    });
+    const screen = createInputCanvas();
+    const overlay = createInputCanvas();
+    engine.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    return { ...reactive, engine, overlay, raf, screen };
+  };
+
+  it('starts on the selected supported source, activates the real sam tool, and edits overlay-only', async () => {
+    const h = await createSamHarness();
+
+    expect(h.engine.startSelectObjectSession()).toBe('started');
+    expect(h.engine.stores.activeTool.get()).toBe('sam');
+    expect(h.engine.stores.samSession.get()).toMatchObject({
+      input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
+      layerId: 'source',
+      sourceRect: { height: 20, width: 20, x: 0, y: 0 },
+    });
+    h.raf.flush();
+    h.screen.surface.callLog.length = 0;
+    h.overlay.surface.callLog.length = 0;
+
+    h.overlay.fire('pointerdown', pointerAt(5, 5));
+    h.overlay.fire('pointerup', pointerAt(5, 5, { buttons: 0 }));
+    h.raf.flush();
+
+    expect(h.engine.stores.samSession.get()?.input.includePoints).toEqual([{ x: 5, y: 5 }]);
+    expect(h.overlay.surface.callLog.some((entry) => entry.op === 'arc')).toBe(true);
+    expect(h.screen.surface.callLog.some((entry) => entry.op === 'clearRect' || entry.op === 'drawImage')).toBe(false);
+    h.engine.dispose();
+  });
+
+  it('rejects missing and unsupported selections without activating sam', async () => {
+    const mask: CanvasInpaintMaskLayerContract = {
+      ...samLayer('mask'),
+      mask: { bitmap: null, fill: { color: '#fff', style: 'solid' } },
+      type: 'inpaint_mask',
+    };
+    const unsupported = await createSamHarness({ layers: [mask] });
+    expect(unsupported.engine.startSelectObjectSession()).toBe('unsupported');
+    expect(unsupported.engine.stores.activeTool.get()).toBe('view');
+    unsupported.engine.dispose();
+
+    const missing = await createSamHarness({ layers: [] });
+    expect(missing.engine.startSelectObjectSession()).toBe('missing');
+    expect(missing.engine.stores.samSession.get()).toBeNull();
+    missing.engine.dispose();
+  });
+
+  it('cancels the owned session and decoded preview on a real tool switch', async () => {
+    const h = await createSamHarness();
+    expect(h.engine.startSelectObjectSession()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+    });
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+    expect(h.engine.stores.samSession.get()?.hasPreview).toBe(true);
+
+    h.engine.setTool('view');
+
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    h.engine.dispose();
+  });
+
+  it('suppresses a late preview decode after cancellation and closes its bitmap', async () => {
+    const image = createDeferred<Blob>();
+    const bitmap = createDeferred<ImageBitmap>();
+    const close = vi.fn();
+    const base = createTestStubRasterBackend();
+    const backend = { ...base, createImageBitmap: vi.fn(() => bitmap.promise) };
+    const h = await createSamHarness({ backend, imageResolver: () => image.promise });
+    h.engine.startSelectObjectSession();
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+    });
+    const pending = h.engine.processSelectObjectSession();
+    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('processing'));
+    image.resolve(new Blob());
+    await vi.waitFor(() => expect(backend.createImageBitmap).toHaveBeenCalledOnce());
+
+    h.engine.cancelSelectObjectSession();
+    bitmap.resolve({ close, height: 20, width: 20 } as unknown as ImageBitmap);
+
+    await expect(pending).resolves.toBe('stale');
+    expect(close).toHaveBeenCalledOnce();
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    h.engine.dispose();
+  });
+
+  it('isolates only the source layer in the compositor while an isolated preview is published', async () => {
+    const backend = createRecordingRasterBackend();
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('sam-mask')));
+    const h = await createSamHarness({ backend, layers: [samLayer('source'), samLayer('other', 30)] });
+    h.engine.stores.checkerboard.set(false);
+    h.engine.startSelectObjectSession();
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+    });
+    await h.engine.processSelectObjectSession();
+    h.screen.surface.callLog.length = 0;
+    h.raf.flush();
+
+    expect(h.screen.surface.callLog.filter((entry) => entry.op === 'drawImage')).toHaveLength(1);
+    expect(h.engine.getDocument()!.layers.every((layer) => layer.isEnabled)).toBe(true);
+    h.engine.dispose();
+  });
+
+  it('tears down the session when its captured source contract changes', async () => {
+    const h = await createSamHarness();
+    h.engine.startSelectObjectSession();
+
+    h.setDocument({
+      ...h.engine.getDocument()!,
+      layers: [{ ...h.engine.getDocument()!.layers[0]!, opacity: 0.5 }],
+    });
+
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    expect(h.engine.stores.activeTool.get()).toBe('view');
+    h.engine.dispose();
+  });
+
+  it('owns only the latest session and suppresses in-flight work from the replaced session', async () => {
+    const output = createDeferred<{ imageName: string; origin: string }>();
+    const layers = [samLayer('first'), samLayer('second', 30)];
+    const h = await createSamHarness({ layers, runGraph: () => output.promise });
+    h.engine.startSelectObjectSession();
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+    });
+    const pending = h.engine.processSelectObjectSession();
+    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('processing'));
+
+    h.setDocument({ ...h.engine.getDocument()!, selectedLayerId: 'second' });
+    expect(h.engine.startSelectObjectSession()).toBe('started');
+    expect(h.engine.stores.samSession.get()?.layerId).toBe('second');
+    output.resolve({ imageName: 'late.png', origin: 'late' });
+
+    await expect(pending).resolves.toBe('stale');
+    expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: false, layerId: 'second' });
+    h.engine.dispose();
+  });
+
+  it('lets Escape cancel a gesture before a later Escape cancels the operation', async () => {
+    const h = await createSamHarness();
+    h.engine.startSelectObjectSession();
+    h.overlay.fire('pointerdown', pointerAt(5, 5));
+    h.overlay.fire('pointermove', pointerAt(15, 15));
+    h.overlay.fire('pointercancel', pointerAt(15, 15));
+
+    h.engine.handleEscapePriority({ gestureWasActive: true });
+    expect(h.engine.stores.samSession.get()).not.toBeNull();
+
+    h.engine.handleEscapePriority({ gestureWasActive: false });
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    h.engine.dispose();
   });
 });

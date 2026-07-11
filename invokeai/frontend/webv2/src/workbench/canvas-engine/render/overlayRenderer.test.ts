@@ -124,4 +124,63 @@ describe('renderOverlay', () => {
     const moveTos = target.callLog.filter((e) => e.op === 'moveTo');
     expect(moveTos).toHaveLength(4);
   });
+
+  it('draws the dedicated SAM mask preview before its bbox, handles, and colored points', () => {
+    const backend = createTestStubRasterBackend();
+    const target = backend.createSurface(200, 200);
+    const mask = backend.createSurface(20, 10);
+    renderOverlay(
+      target,
+      baseState({
+        samInput: {
+          bbox: { height: 30, width: 40, x: 20, y: 30 },
+          excludePoints: [{ x: 50, y: 60 }],
+          includePoints: [{ x: 30, y: 40 }],
+        },
+        samPreview: { opacity: 0.45, rect: { height: 10, width: 20, x: 20, y: 30 }, surface: mask },
+        showBbox: false,
+      })
+    );
+
+    const ops = target.callLog.map((entry) => entry.op);
+    const previewIndex = ops.indexOf('drawImage');
+    const bboxIndex = ops.indexOf('strokeRect');
+    const firstPointIndex = ops.indexOf('arc');
+    expect(previewIndex).toBeGreaterThan(-1);
+    expect(bboxIndex).toBeGreaterThan(previewIndex);
+    expect(firstPointIndex).toBeGreaterThan(bboxIndex);
+    expect(findSet(target.callLog, 'fillStyle')).toEqual(expect.arrayContaining(['#22c55e', '#ef4444']));
+  });
+
+  it.each([1, 4])('keeps SAM point and handle drawing screen-constant at %sx zoom', (zoom) => {
+    const backend = createTestStubRasterBackend();
+    const target = backend.createSurface(500, 500);
+    renderOverlay(
+      target,
+      baseState({
+        samInput: {
+          bbox: { height: 30, width: 40, x: 20, y: 30 },
+          excludePoints: [],
+          includePoints: [{ x: 30, y: 40 }],
+        },
+        showBbox: false,
+        view: scale(identity(), zoom),
+      })
+    );
+
+    const point = target.callLog.find((entry) => entry.op === 'arc');
+    const handles = target.callLog.filter((entry) => entry.op === 'fillRect');
+    expect(point?.args[2]).toBe(5);
+    expect(handles).toHaveLength(8);
+    expect(handles.every((entry) => entry.args[2] === 8 && entry.args[3] === 8)).toBe(true);
+  });
+
+  it('draws no SAM preview or geometry after cleanup', () => {
+    const backend = createTestStubRasterBackend();
+    const target = backend.createSurface(200, 200);
+    renderOverlay(target, baseState({ samInput: null, samPreview: null, showBbox: false }));
+
+    expect(target.callLog.some((entry) => entry.op === 'drawImage' || entry.op === 'arc')).toBe(false);
+    expect(target.callLog.filter((entry) => entry.op === 'strokeRect')).toHaveLength(0);
+  });
 });
