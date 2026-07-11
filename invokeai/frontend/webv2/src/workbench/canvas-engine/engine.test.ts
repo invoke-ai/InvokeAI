@@ -9205,6 +9205,55 @@ describe('guarded filter previews', () => {
     source: { fill: '#fff', height: 10, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
   });
 
+  it('interaction lock blocks Filter and Select Object launches without creating sessions', async () => {
+    const layer = guardableLayer('locked-launch');
+    const { store } = createReactiveStore({ ...emptyDoc(), layers: [layer] });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels(layer.id)).status).toBe('ok');
+
+    engine.setInteractionLocked(true);
+
+    expect(engine.startFilterOperation(layer.id)).toBe('locked');
+    expect(engine.startSelectObject(layer.id)).toBe('locked');
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    expect(engine.stores.filterSession.get()).toBeNull();
+    expect(engine.stores.samSession.get()).toBeNull();
+    engine.dispose();
+  });
+
+  it('keeps an active Select Object operation available to cancel while interaction is locked', async () => {
+    const layer = guardableLayer('active-before-lock');
+    const { store } = createReactiveStore({ ...emptyDoc(), layers: [layer] });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels(layer.id)).status).toBe('ok');
+    expect(engine.startSelectObject(layer.id)).toBe('started');
+
+    engine.setInteractionLocked(true);
+
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({
+      identity: { kind: 'select-object', layerId: layer.id },
+      status: 'active',
+    });
+    expect(engine.stores.samSession.get()).not.toBeNull();
+    expect(engine.stores.activeTool.get()).toBe('view');
+
+    engine.setInteractionLocked(false);
+    expect(engine.stores.activeTool.get()).toBe('sam');
+    engine.cancelSelectObjectSession();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    engine.dispose();
+  });
+
   /** A stub backend whose `createImageBitmap` is deferred, so decodes resolve on demand. */
   const createDeferredBitmapBackend = () => {
     const base = createTestStubRasterBackend();

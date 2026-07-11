@@ -18,11 +18,11 @@ import { CanvasLayerContextMenu, type CanvasLayerContextMenuTarget } from '@work
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useCallback, useEffect, useEffectEvent, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { gridSizeForModelBase } from './bboxGrid';
-import { isCanvasInteractionLocked } from './canvasInteractionLock';
+import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
 import {
   CANVAS_SETTINGS,
   CANVAS_SHOW_PROGRESS_KEY,
@@ -35,6 +35,7 @@ import { useCanvasOperation } from './engineStoreHooks';
 import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
+import { CanvasOperationBar } from './tool-options/CanvasOperationBar';
 import { ToolOptionsBar } from './tool-options/ToolOptionsBar';
 import { ToolStrip } from './ToolStrip';
 import { useCanvasEngine } from './useCanvasEngine';
@@ -169,11 +170,14 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       // fresh canvas (F2). `documentRevision` bumps only on those swaps.
       item.snapshot.canvas.documentRevision === canvas.documentRevision
   );
-  const isInteractionLocked =
-    isCanvasInteractionLocked(canvas, queueItems) ||
-    (operation?.status === 'active' && operation.identity.kind === 'filter');
+  const interactionCapabilities = getCanvasInteractionCapabilities({
+    hasStagingSlots,
+    isCanvasGenerationInFlight,
+    operationKind: operation?.status === 'active' ? operation.identity.kind : null,
+  });
+  const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     engine?.setInteractionLocked(isInteractionLocked);
     return () => engine?.setInteractionLocked(false);
   }, [engine, isInteractionLocked]);
@@ -438,7 +442,10 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
             onToggleVisibility={() => dispatch({ type: 'toggleCanvasStagingVisibility' })}
           />
         ) : null}
-        {engine && !isInteractionLocked ? (
+        {engine && operation?.status === 'active' && interactionCapabilities.isOperationChromeVisible ? (
+          <CanvasOperationBar engine={engine} isExternalInteractionLocked={isInteractionLocked} operation={operation} />
+        ) : null}
+        {engine && interactionCapabilities.isRegularToolOptionsVisible ? (
           <ToolOptionsBar documentHeight={document.height} documentWidth={document.width} engine={engine} />
         ) : null}
       </Stack>

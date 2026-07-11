@@ -51,6 +51,17 @@ describe('getFilterActionEligibility', () => {
     });
   });
 
+  it('disables mutating actions under an external interaction lock but preserves Cancel', () => {
+    expect(getFilterActionEligibility(state(), true)).toEqual({
+      canApply: false,
+      canCancel: true,
+      canEdit: false,
+      canProcess: false,
+      canReset: false,
+      canSave: false,
+    });
+  });
+
   it('disables Process for Spandrel until a compatible model is selected', () => {
     expect(
       getFilterActionEligibility(state({ draft: { settings: { model: null }, type: 'spandrel_filter' } }))

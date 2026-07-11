@@ -20,5 +20,36 @@ export const isCanvasStagingActive = ({
   isCanvasGenerationInFlight: boolean;
 }): boolean => hasStagedCandidates || isCanvasGenerationInFlight;
 
+export interface CanvasInteractionCapabilities {
+  areOperationActionsEnabled: boolean;
+  isDocumentEditingLocked: boolean;
+  isOperationChromeVisible: boolean;
+  isRegularToolOptionsVisible: boolean;
+  isSurfaceInteractionLocked: boolean;
+}
+
+export const getCanvasInteractionCapabilities = ({
+  hasStagingSlots,
+  isCanvasGenerationInFlight,
+  operationKind,
+}: {
+  hasStagingSlots: boolean;
+  isCanvasGenerationInFlight: boolean;
+  operationKind: 'filter' | 'select-object' | null;
+}): CanvasInteractionCapabilities => {
+  const isSurfaceInteractionLocked = isCanvasStagingActive({
+    hasStagedCandidates: hasStagingSlots,
+    isCanvasGenerationInFlight,
+  });
+  const isDocumentEditingLocked = operationKind !== null;
+  return {
+    areOperationActionsEnabled: isDocumentEditingLocked && !isSurfaceInteractionLocked,
+    isDocumentEditingLocked,
+    isOperationChromeVisible: isDocumentEditingLocked,
+    isRegularToolOptionsVisible: !isDocumentEditingLocked && !isSurfaceInteractionLocked,
+    isSurfaceInteractionLocked,
+  };
+};
+
 export const isCanvasToolEnabled = (toolId: ToolId, isInteractionLocked: boolean): boolean =>
   !isInteractionLocked || toolId === 'view';

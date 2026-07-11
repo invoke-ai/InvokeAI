@@ -71,4 +71,15 @@ describe('getSamActionEligibility', () => {
       canSave: false,
     });
   });
+
+  it('disables mutating actions under an external interaction lock but preserves Cancel', () => {
+    expect(getSamActionEligibility(snapshot({ hasPreview: true }), true)).toEqual({
+      canApply: false,
+      canCancel: true,
+      canEditInputs: false,
+      canProcess: false,
+      canReset: false,
+      canSave: false,
+    });
+  });
 });

@@ -370,7 +370,13 @@ export interface CanvasEngineOptions {
   fonts?: FontLoadApi | null;
 }
 
-export type StartSelectObjectSessionResult = 'started' | 'missing' | 'disabled' | 'unsupported' | 'not-ready';
+export type StartSelectObjectSessionResult =
+  | 'started'
+  | 'missing'
+  | 'disabled'
+  | 'locked'
+  | 'unsupported'
+  | 'not-ready';
 export type StartFilterOperationResult = 'started' | 'missing' | 'disabled' | 'locked' | 'unsupported' | 'not-ready';
 
 export type SelectObjectSaveTarget = 'raster' | 'control' | MaskImageResultTarget;
@@ -2936,6 +2942,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const startSelectObject = (layerId: string): StartSelectObjectSessionResult => {
+    if (interactionLocked) {
+      return 'locked';
+    }
     const doc = mirror.getDocument();
     if (!doc) {
       return 'missing';
@@ -3247,6 +3256,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const startFilterOperation = (layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult => {
+    if (interactionLocked) {
+      return 'locked';
+    }
     // Recommendations are opportunistic. Never replace an active manual filter,
     // preview, Select Object session, or other canvas operation.
     if (recommendedFilterType && canvasOperations.getSnapshot().status !== 'idle') {
@@ -3399,7 +3411,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     interactionLocked = locked;
     if (locked) {
       pipeline.cancelActiveGesture();
-      setTool('view');
+      setTool('view', { temporary: true });
+    } else if (canvasOperations.getSnapshot().status === 'active' && selectObjectSession) {
+      setTool('sam');
     }
   };
 

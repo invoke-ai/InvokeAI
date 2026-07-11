@@ -25,21 +25,28 @@ export interface FilterActionEligibility {
   canSave: boolean;
 }
 
-export const getFilterActionEligibility = (session: FilterOperationSessionState): FilterActionEligibility => {
+export const getFilterActionEligibility = (
+  session: FilterOperationSessionState,
+  isExternalInteractionLocked = false
+): FilterActionEligibility => {
   const busy = session.status === 'processing' || session.status === 'committing';
-  const hasPreview = session.preview !== null && !busy;
+  const actionsBlocked = busy || isExternalInteractionLocked;
+  const hasPreview = session.preview !== null && !actionsBlocked;
   const isValid = isFilterConfigValid(session.draft.type, session.draft.settings);
   return {
     canApply: hasPreview,
     canCancel: true,
-    canEdit: !busy,
-    canProcess: !busy && isValid,
-    canReset: !busy,
+    canEdit: !actionsBlocked,
+    canProcess: !actionsBlocked && isValid,
+    canReset: !actionsBlocked,
     canSave: hasPreview,
   };
 };
 
-export const FilterOptions = ({ engine }: ToolOptionsComponentProps) => {
+export const FilterOptions = ({
+  engine,
+  isExternalInteractionLocked = false,
+}: ToolOptionsComponentProps & { isExternalInteractionLocked?: boolean }) => {
   const { t } = useTranslation();
   const session = useFilterSession(engine);
   const setType = useCallback(
@@ -75,7 +82,7 @@ export const FilterOptions = ({ engine }: ToolOptionsComponentProps) => {
   if (!session) {
     return null;
   }
-  const eligibility = getFilterActionEligibility(session);
+  const eligibility = getFilterActionEligibility(session, isExternalInteractionLocked);
 
   return (
     <HStack align="center" gap="2" maxW="calc(100vw - 2rem)" overflowX="auto">

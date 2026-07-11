@@ -3,7 +3,12 @@ import type { CanvasStagingCandidateContract, QueueItem, QueueItemStatus } from 
 import { createEmptyCanvasStateV2 } from '@workbench/canvasMigration';
 import { describe, expect, it } from 'vitest';
 
-import { isCanvasInteractionLocked, isCanvasStagingActive, isCanvasToolEnabled } from './canvasInteractionLock';
+import {
+  getCanvasInteractionCapabilities,
+  isCanvasInteractionLocked,
+  isCanvasStagingActive,
+  isCanvasToolEnabled,
+} from './canvasInteractionLock';
 
 const createStagedCandidate = (): CanvasStagingCandidateContract => ({
   height: 512,
@@ -46,6 +51,104 @@ const createQueueItem = ({ revision = 1, status }: { revision?: number; status: 
   }) as QueueItem;
 
 describe('canvas interaction lock', () => {
+  it.each([
+    {
+      expected: {
+        areOperationActionsEnabled: false,
+        isDocumentEditingLocked: false,
+        isOperationChromeVisible: false,
+        isRegularToolOptionsVisible: true,
+        isSurfaceInteractionLocked: false,
+      },
+      generation: false,
+      operationKind: null,
+      staged: false,
+    },
+    {
+      expected: {
+        areOperationActionsEnabled: true,
+        isDocumentEditingLocked: true,
+        isOperationChromeVisible: true,
+        isRegularToolOptionsVisible: false,
+        isSurfaceInteractionLocked: false,
+      },
+      generation: false,
+      operationKind: 'filter' as const,
+      staged: false,
+    },
+    {
+      expected: {
+        areOperationActionsEnabled: true,
+        isDocumentEditingLocked: true,
+        isOperationChromeVisible: true,
+        isRegularToolOptionsVisible: false,
+        isSurfaceInteractionLocked: false,
+      },
+      generation: false,
+      operationKind: 'select-object' as const,
+      staged: false,
+    },
+    {
+      expected: {
+        areOperationActionsEnabled: false,
+        isDocumentEditingLocked: false,
+        isOperationChromeVisible: false,
+        isRegularToolOptionsVisible: false,
+        isSurfaceInteractionLocked: true,
+      },
+      generation: false,
+      operationKind: null,
+      staged: true,
+    },
+    {
+      expected: {
+        areOperationActionsEnabled: false,
+        isDocumentEditingLocked: false,
+        isOperationChromeVisible: false,
+        isRegularToolOptionsVisible: false,
+        isSurfaceInteractionLocked: true,
+      },
+      generation: true,
+      operationKind: null,
+      staged: false,
+    },
+    {
+      expected: {
+        areOperationActionsEnabled: false,
+        isDocumentEditingLocked: true,
+        isOperationChromeVisible: true,
+        isRegularToolOptionsVisible: false,
+        isSurfaceInteractionLocked: true,
+      },
+      generation: false,
+      operationKind: 'filter' as const,
+      staged: true,
+    },
+    {
+      expected: {
+        areOperationActionsEnabled: false,
+        isDocumentEditingLocked: true,
+        isOperationChromeVisible: true,
+        isRegularToolOptionsVisible: false,
+        isSurfaceInteractionLocked: true,
+      },
+      generation: true,
+      operationKind: 'select-object' as const,
+      staged: false,
+    },
+  ])(
+    'separates surface, document, and chrome capabilities for operation=$operationKind staged=$staged generation=$generation',
+    ({ expected, generation, operationKind, staged }) => {
+      expect(
+        getCanvasInteractionCapabilities({
+          hasStagingSlots: staged,
+          isCanvasGenerationInFlight: generation,
+          operationKind,
+        })
+      ).toEqual(expected);
+    }
+  );
+
   it('does not lock an empty canvas', () => {
     expect(isCanvasInteractionLocked(createCanvas(), [])).toBe(false);
   });

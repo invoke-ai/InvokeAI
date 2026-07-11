@@ -77,7 +77,7 @@ export const ToolOptionsBar = ({
   const zoom = useCanvasZoom(engine);
   const content = resolveCanvasOptionsContent(operation, activeTool);
   if (content === 'operation' && operation.status === 'active') {
-    return <CanvasOperationBar engine={engine} operation={operation} />;
+    return <CanvasOperationBar engine={engine} isExternalInteractionLocked={false} operation={operation} />;
   }
   const OptionsComponent = content && content !== 'operation' ? TOOL_OPTIONS_COMPONENTS[content] : undefined;
   const hasDocument = documentWidth !== null && documentHeight !== null;

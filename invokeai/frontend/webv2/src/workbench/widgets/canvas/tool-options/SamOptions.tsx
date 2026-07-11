@@ -23,16 +23,20 @@ export interface SamActionEligibility {
   canSave: boolean;
 }
 
-export const getSamActionEligibility = (session: SamSessionSnapshot): SamActionEligibility => {
+export const getSamActionEligibility = (
+  session: SamSessionSnapshot,
+  isExternalInteractionLocked = false
+): SamActionEligibility => {
   const isProcessing = session.status === 'processing';
   const isCommitting = session.status === 'committing';
-  const hasReadyPreview = session.hasPreview && !isProcessing && !isCommitting;
+  const actionsBlocked = isCommitting || isExternalInteractionLocked;
+  const hasReadyPreview = session.hasPreview && !isProcessing && !actionsBlocked;
   return {
     canApply: hasReadyPreview,
     canCancel: true,
-    canEditInputs: !isCommitting,
-    canProcess: !isProcessing && !isCommitting && isSamDocumentInputValid(session.input),
-    canReset: !isCommitting,
+    canEditInputs: !actionsBlocked,
+    canProcess: !isProcessing && !actionsBlocked && isSamDocumentInputValid(session.input),
+    canReset: !actionsBlocked,
     canSave: hasReadyPreview,
   };
 };
@@ -76,7 +80,10 @@ const SamSaveItem = ({
   );
 };
 
-export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
+export const SamOptions = ({
+  engine,
+  isExternalInteractionLocked = false,
+}: ToolOptionsComponentProps & { isExternalInteractionLocked?: boolean }) => {
   const { t } = useTranslation();
   const session = useSamSession(engine);
 
@@ -119,7 +126,7 @@ export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
     return null;
   }
 
-  const eligibility = getSamActionEligibility(session);
+  const eligibility = getSamActionEligibility(session, isExternalInteractionLocked);
   const isProcessing = session.status === 'processing';
 
   return (
