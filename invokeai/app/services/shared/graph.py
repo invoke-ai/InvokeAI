@@ -698,9 +698,12 @@ class _ExecutionMaterializer:
         new_node_ids: list[str] = []
 
         if isinstance(next_node, CollectInvocation):
-            for iteration_path, iteration_mappings in self._get_collect_iteration_mapping_groups(
+            iteration_mapping_groups = self._get_collect_iteration_mapping_groups(
                 self._state.graph._get_input_edges(next_node_id)
-            ):
+            )
+            if not iteration_mapping_groups:
+                iteration_mapping_groups = [((), [])]
+            for iteration_path, iteration_mappings in iteration_mapping_groups:
                 create_results = self.create_execution_node(next_node_id, iteration_mappings, iteration_path)
                 if create_results is not None:
                     new_node_ids.extend(create_results)
