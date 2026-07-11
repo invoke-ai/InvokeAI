@@ -2,7 +2,7 @@ import type { WorkflowImageBinding } from '@workbench/workflows/layerWorkflow';
 
 import { describe, expect, it } from 'vitest';
 
-import { getLayerWorkflowFailureKey, reconcileLayerWorkflowDialogSelection } from './RunLayerWorkflowDialog';
+import { getLayerWorkflowFailureKey, reconcileLayerWorkflowOperationSelection } from './layerWorkflowAvailability';
 
 const binding = (nodeId: string, fieldName = 'image', label = `${nodeId} → ${fieldName}`): WorkflowImageBinding => ({
   fieldName,
@@ -10,13 +10,13 @@ const binding = (nodeId: string, fieldName = 'image', label = `${nodeId} → ${f
   nodeId,
 });
 
-describe('reconcileLayerWorkflowDialogSelection', () => {
+describe('reconcileLayerWorkflowOperationSelection', () => {
   it('preserves a still-runnable input and output by field identity when availability refreshes', () => {
     const refreshedInput = binding('input', 'image', 'Refreshed input');
     const refreshedOutput = binding('output', 'image', 'Refreshed output');
 
     expect(
-      reconcileLayerWorkflowDialogSelection(
+      reconcileLayerWorkflowOperationSelection(
         {
           destination: 'staging',
           input: binding('input', 'image', 'Old input'),
@@ -34,7 +34,7 @@ describe('reconcileLayerWorkflowDialogSelection', () => {
     const fallbackInput = binding('fallback-input');
 
     expect(
-      reconcileLayerWorkflowDialogSelection(
+      reconcileLayerWorkflowOperationSelection(
         { destination: 'copy-raster', input: binding('stale-input'), output: selectedOutput },
         [selectedOutput, fallbackOutput],
         (output) => (output.nodeId === fallbackOutput.nodeId ? [fallbackInput] : [])
@@ -47,7 +47,7 @@ describe('reconcileLayerWorkflowDialogSelection', () => {
     const fallbackInput = binding('fallback-input');
 
     expect(
-      reconcileLayerWorkflowDialogSelection(
+      reconcileLayerWorkflowOperationSelection(
         { destination: 'replace', input: binding('stale-input'), output: binding('removed-output') },
         [fallbackOutput],
         () => [fallbackInput]

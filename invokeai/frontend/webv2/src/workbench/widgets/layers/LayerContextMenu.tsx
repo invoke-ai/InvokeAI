@@ -71,7 +71,7 @@ import {
   getRegionalGuidanceReferenceImagePatch,
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
-import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
+import { useLayerWorkflowAvailability } from './layerWorkflowAvailability';
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 type MenuOpenChange = ComponentProps<typeof Menu.Root>['onOpenChange'];
@@ -389,7 +389,18 @@ const LayerMenu = ({
 
   const openRename = useCallback(() => setDialogKind('rename'), [setDialogKind]);
   const closeDialog = useCallback(() => setDialogKind(null), [setDialogKind]);
-  const openRunWorkflow = useCallback(() => setDialogKind('run-workflow'), [setDialogKind]);
+  const startWorkflow = useCallback(
+    (layerId: string) => {
+      if (!engine) {
+        throw makeStatusError('not-ready');
+      }
+      const result = engine.startWorkflowOperation(layerId);
+      if (result !== 'started') {
+        throw makeStatusError(result);
+      }
+    },
+    [engine, makeStatusError]
+  );
   const startSelectObject = useCallback(
     (layerId: string) => {
       if (!engine) {
@@ -626,7 +637,7 @@ const LayerMenu = ({
       mergeDown: handleMerge,
       openProperties: handleOpenProperties,
       openRename,
-      openRunWorkflow,
+      startWorkflow,
       startSelectObject,
       startFilter,
       patchConfig: handleLayerConfigAction,
@@ -657,7 +668,7 @@ const LayerMenu = ({
       handleToggleVisibility,
       handleTransform,
       openRename,
-      openRunWorkflow,
+      startWorkflow,
       startSelectObject,
       startFilter,
       reorder,
@@ -716,15 +727,6 @@ const LayerMenu = ({
         onClose={closeDialog}
         onSubmit={submitRename}
       />
-      {dialogKind === 'run-workflow' ? (
-        <RunLayerWorkflowDialog
-          availability={workflowAvailability}
-          engine={engine}
-          isOpen
-          layerId={layer.id}
-          onClose={closeDialog}
-        />
-      ) : null}
     </>
   );
 };

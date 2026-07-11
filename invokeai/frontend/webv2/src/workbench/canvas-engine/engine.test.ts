@@ -9294,6 +9294,35 @@ describe('guarded filter previews', () => {
     engine.dispose();
   });
 
+  it('starts and runs a guarded workflow operation independently of the launching menu', async () => {
+    const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels('L')).status).toBe('ok');
+
+    expect(engine.startWorkflowOperation('L')).toBe('started');
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({
+      identity: { kind: 'workflow', layerId: 'L', projectId: 'p1' },
+      phase: 'ready',
+      status: 'active',
+    });
+    expect(engine.stores.documentEditingLocked.get()).toBe(true);
+
+    const work = vi.fn((_signal: AbortSignal) => Promise.resolve());
+    await expect(engine.runWorkflowOperation(work)).resolves.toBe('published');
+    expect(work).toHaveBeenCalledOnce();
+
+    engine.cancelWorkflowOperation();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    expect(engine.stores.documentEditingLocked.get()).toBe(false);
+    engine.dispose();
+  });
+
   it('refuses ordinary structural editing while a filter operation is active', async () => {
     const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
     const { store } = createReactiveStore(document);
