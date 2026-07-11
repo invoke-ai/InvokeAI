@@ -32,6 +32,10 @@ class AddVideosTablesCallback:
                 is_intermediate BOOLEAN DEFAULT FALSE,
                 starred BOOLEAN DEFAULT FALSE,
                 has_workflow BOOLEAN DEFAULT FALSE,
+                -- Deliberately no FK to users(user_id), matching images/boards/workflows
+                -- (migration_27 adds those user_id columns with an index only): deleting a
+                -- user leaves their media in place for admin review/cleanup rather than
+                -- cascading a row delete that would strand the files on disk.
                 user_id TEXT NOT NULL DEFAULT 'system',
                 video_subfolder TEXT NOT NULL DEFAULT '',
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),

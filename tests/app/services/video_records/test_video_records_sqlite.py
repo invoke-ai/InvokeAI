@@ -11,6 +11,9 @@ import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.users.users_common import UserCreateRequest
+from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
@@ -89,3 +92,48 @@ class TestGetVideoNamesOmittedBoardIdMultiuser:
         # regression there too.
         result = seeded_store.get_video_names(board_id="none", user_id="alice", is_admin=False)
         assert set(result.video_names) == {"alice_1.mp4", "alice_2.mp4"}
+
+
+class TestUserDeletionLifecycle:
+    """Documents the intended videos↔users lifecycle (JPPhoto PR #9163 July-10 follow-up).
+
+    ``videos.user_id`` deliberately has no FK to ``users`` — exactly like ``images``,
+    ``boards`` and ``workflows``, whose user_id columns (migration_27) are index-only.
+    Deleting a user therefore leaves their videos in place instead of cascading a row
+    delete that would strand the files on disk; the orphaned records stay visible to
+    administrators (and only to administrators), who can clean them up or reassign them.
+    These tests pin that platform-wide behavior for videos so any future change to the
+    user-deletion story is a deliberate decision rather than an accident.
+    """
+
+    @pytest.fixture
+    def migrated_db(self) -> SqliteDatabase:
+        config = InvokeAIAppConfig(use_memory_db=True)
+        logger = InvokeAILogger.get_logger(config=config)
+        return create_mock_sqlite_database(config, logger)
+
+    def test_videos_survive_owner_deletion_and_remain_admin_only(self, migrated_db: SqliteDatabase) -> None:
+        users = UserService(migrated_db)
+        store = SqliteVideoRecordStorage(db=migrated_db)
+
+        owner = users.create(
+            UserCreateRequest(
+                email="doomed@example.com",
+                display_name="Doomed User",
+                password="TestPassword123",
+                is_admin=False,
+            )
+        )
+        _save(store, "doomed.mp4", user_id=owner.user_id)
+
+        users.delete(owner.user_id)
+        assert users.get(owner.user_id) is None
+
+        # The record survives, still attributed to the deleted owner...
+        assert store.get_user_id("doomed.mp4") == owner.user_id
+        # ...is visible to admins for cleanup...
+        admin_view = store.get_many(user_id="some-admin", is_admin=True)
+        assert "doomed.mp4" in {v.video_name for v in admin_view.items}
+        # ...and no regular user inherits it.
+        other_view = store.get_many(user_id="bystander", is_admin=False)
+        assert "doomed.mp4" not in {v.video_name for v in other_view.items}
