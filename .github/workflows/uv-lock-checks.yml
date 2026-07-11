@@ -1,6 +1,8 @@
-# Check the `uv` lockfile for consistency with `pyproject.toml`.
+# Check the `uv` lockfile and `pins.json` for consistency with `pyproject.toml`.
 #
-# If this check fails, you should run `uv lock` to update the lockfile.
+# If the lockfile check fails, you should run `uv lock` to update the lockfile.
+# If the pins check fails, update the torch index URLs in `pins.json` to match
+# the `[[tool.uv.index]]` entries in `pyproject.toml` (see scripts/check_pins.py).
 
 name: 'uv lock checks'
 
@@ -54,15 +56,24 @@ jobs:
             uvlock-pyprojecttoml:
               - 'pyproject.toml'
               - 'uv.lock'
+              - 'pins.json'
+              - 'scripts/check_pins.py'
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
         uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: '0.6.10'
+          # Keep this at or above the uv version used to generate uv.lock (revision 3 lock
+          # format requires a modern uv; 0.6.x cannot parse it).
+          version: '0.11.28'
           enable-cache: true
 
       - name: check lockfile
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
         run: uv lock --locked # this will exit with 1 if the lockfile is not consistent with pyproject.toml
+        shell: bash
+
+      - name: check pins.json
+        if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
+        run: python3 scripts/check_pins.py # pins.json is consumed by the launcher; keep its torch index URLs in sync with pyproject.toml
         shell: bash
