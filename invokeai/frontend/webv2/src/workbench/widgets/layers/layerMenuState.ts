@@ -7,7 +7,7 @@ import type { CanvasLayerContextMenuTarget } from './LayerContextMenu';
  * wrapper keeps a captured dialog target until that dialog closes so the shared
  * subtree remains mounted for rename and workflow actions.
  */
-export type LayerMenuDialogKind = 'rename';
+export type LayerMenuDialogKind = 'rename' | 'run-workflow';
 
 export interface LayerMenuDialogState {
   kind: LayerMenuDialogKind;

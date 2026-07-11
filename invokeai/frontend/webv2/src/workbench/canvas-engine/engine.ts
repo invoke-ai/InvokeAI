@@ -137,12 +137,7 @@ import { createSelectObjectSession } from '@workbench/widgets/layers/selectObjec
 import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
 import { uploadCanvasImage } from './backend/canvasImages';
-import {
-  createCanvasOperationController,
-  type CanvasOperationController,
-  type CanvasOperationRunResult,
-  type CanvasOperationSession,
-} from './canvasOperationController';
+import { createCanvasOperationController, type CanvasOperationController } from './canvasOperationController';
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
 import { mergeDownMatrix } from './document/mergeDown';
@@ -371,7 +366,6 @@ export interface CanvasEngineOptions {
 
 export type StartSelectObjectSessionResult = 'started' | 'missing' | 'disabled' | 'unsupported' | 'not-ready';
 export type StartFilterOperationResult = 'started' | 'missing' | 'disabled' | 'locked' | 'unsupported' | 'not-ready';
-export type StartWorkflowOperationResult = StartFilterOperationResult;
 
 export type SelectObjectSaveTarget = 'raster' | 'control' | MaskImageResultTarget;
 export type SaveSelectObjectSessionResult = CommitGeneratedImageResult | CommitMaskImageResult;
@@ -417,10 +411,6 @@ export interface CanvasEngine {
   startSelectObject(layerId: string): StartSelectObjectSessionResult;
   /** Starts one engine-owned guarded filter operation for a raster or control layer. */
   startFilterOperation(layerId: string): StartFilterOperationResult;
-  /** Starts one guarded layer-workflow operation rendered in the canvas controls. */
-  startWorkflowOperation(layerId: string): StartWorkflowOperationResult;
-  runWorkflowOperation(work: (signal: AbortSignal) => Promise<void>): Promise<CanvasOperationRunResult>;
-  cancelWorkflowOperation(): void;
   updateFilterOperation(draft: LayerFilterSettings): void;
   processFilterOperation(): Promise<void>;
   resetFilterOperation(settings: Record<string, unknown>): void;
@@ -909,8 +899,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   let filterSession: FilterOperationSession | null = null;
   let filterUnsubscribe: (() => void) | null = null;
   let filterControllerUnsubscribe: (() => void) | null = null;
-  let workflowOperation: CanvasOperationSession | null = null;
-  let workflowControllerUnsubscribe: (() => void) | null = null;
 
   // The brush/eraser cursor ring, drawn on the overlay (set by the active tool).
   let overlayCursor: OverlayCursor | null = null;
@@ -2704,10 +2692,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       cancelFilterOperation();
       return;
     }
-    if (!gestureWasActive && workflowOperation) {
-      cancelWorkflowOperation();
-      return;
-    }
     if (!gestureWasActive && selectObjectSession) {
       cancelSelectObjectSession();
       return;
@@ -2955,7 +2939,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
 
     clearOwnedFilterSession();
-    clearOwnedWorkflowOperation();
     clearOwnedSelectObjectSession();
     selectObjectGuard = guard;
     selectObjectSourceRect = sourceRect;
@@ -3259,7 +3242,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
     clearOwnedSelectObjectSession();
     clearOwnedFilterSession();
-    clearOwnedWorkflowOperation();
     if (document.selectedLayerId !== layer.id) {
       store.dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
     }
@@ -3345,65 +3327,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const cancelFilterOperation = (): void => clearOwnedFilterSession();
-
-  const clearOwnedWorkflowOperation = (): void => {
-    const operation = workflowOperation;
-    workflowOperation = null;
-    workflowControllerUnsubscribe?.();
-    workflowControllerUnsubscribe = null;
-    operation?.cancel();
-  };
-
-  const startWorkflowOperation = (layerId: string): StartWorkflowOperationResult => {
-    const document = mirror.getDocument();
-    const layer = document?.layers.find((candidate) => candidate.id === layerId);
-    if (!document || !layer) {
-      return 'missing';
-    }
-    if (layer.type !== 'raster' && layer.type !== 'control') {
-      return 'unsupported';
-    }
-    if (!layer.isEnabled) {
-      return 'disabled';
-    }
-    if (layer.isLocked) {
-      return 'locked';
-    }
-    const guard = captureCurrentLayerExportGuard(layer.id);
-    if (!guard) {
-      return 'not-ready';
-    }
-
-    clearOwnedSelectObjectSession();
-    clearOwnedFilterSession();
-    clearOwnedWorkflowOperation();
-    if (document.selectedLayerId !== layer.id) {
-      store.dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
-    }
-    const operation = canvasOperations.start({
-      cleanupPreview: () => undefined,
-      guard,
-      identity: { kind: 'workflow', layerId: layer.id, projectId },
-    });
-    if (!operation) {
-      return 'not-ready';
-    }
-    workflowOperation = operation;
-    workflowControllerUnsubscribe = canvasOperations.subscribe(() => {
-      if (workflowOperation === operation && canvasOperations.getSnapshot().status === 'idle') {
-        workflowOperation = null;
-        workflowControllerUnsubscribe?.();
-        workflowControllerUnsubscribe = null;
-      }
-    });
-    setTool('view');
-    return 'started';
-  };
-
-  const runWorkflowOperation = (work: (signal: AbortSignal) => Promise<void>): Promise<CanvasOperationRunResult> =>
-    workflowOperation?.run(work, () => undefined) ?? Promise.resolve('stale');
-
-  const cancelWorkflowOperation = (): void => clearOwnedWorkflowOperation();
 
   // ---- Public API ---------------------------------------------------------
 
@@ -6108,7 +6031,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     disposed = true;
     clearOwnedFilterSession();
-    clearOwnedWorkflowOperation();
     clearOwnedSelectObjectSession();
     canvasOperations.dispose();
     cancelAllLayerRasterizations();
@@ -6284,9 +6206,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     saveSelectObjectSession,
     startSelectObject,
     startFilterOperation,
-    startWorkflowOperation,
-    runWorkflowOperation,
-    cancelWorkflowOperation,
     updateFilterOperation,
     updateSelectObjectSession,
     openTextCreate,

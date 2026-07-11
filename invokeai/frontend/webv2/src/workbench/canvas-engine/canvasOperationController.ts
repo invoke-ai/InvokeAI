@@ -2,8 +2,7 @@ import type { LayerExportGuard } from './engine';
 
 export type CanvasOperationIdentity =
   | { kind: 'select-object'; projectId: string; layerId: string }
-  | { kind: 'filter'; projectId: string; layerId: string }
-  | { kind: 'workflow'; projectId: string; layerId: string };
+  | { kind: 'filter'; projectId: string; layerId: string };
 
 export type CanvasOperationState =
   | { status: 'idle' }

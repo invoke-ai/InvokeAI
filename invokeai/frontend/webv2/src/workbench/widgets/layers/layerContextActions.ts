@@ -91,7 +91,7 @@ export interface LayerContextActionEffects {
   reorder(kind: LayerMoveKind, actionId: LayerContextActionId): void;
   duplicate(): void;
   openRename(): void;
-  startWorkflow(layerId: string): void;
+  openRunWorkflow(): void;
   startSelectObject(layerId: string): void;
   startFilter(layerId: string): void;
   transform(): void;
@@ -437,7 +437,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Run workflow',
-    handler: ({ effects, layer }) => effects.startWorkflow(layer.id),
+    handler: ({ effects }) => effects.openRunWorkflow(),
     icon: WorkflowIcon,
     id: 'run-workflow',
     isEnabled: (context) => context.canRunWorkflow && hasMutablePixels(context),

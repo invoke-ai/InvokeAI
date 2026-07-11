@@ -90,7 +90,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   mergeDown: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),
-  startWorkflow: vi.fn(),
+  openRunWorkflow: vi.fn(),
   startSelectObject: vi.fn(),
   startFilter: vi.fn(),
   patchConfig: vi.fn(),
@@ -269,14 +269,14 @@ describe('layer context action registry', () => {
     ]);
   });
 
-  it('starts Run Workflow for the action layer through the registry', () => {
+  it('opens Run Workflow through the registry without starting work itself', () => {
     const effects = makeEffects();
     const context = makeRuntimeContext(rasterLayer, { effects });
 
     getLayerContextActionDefinition('run-workflow').handler(context);
 
-    expect(effects.startWorkflow).toHaveBeenCalledWith(rasterLayer.id);
-    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.startWorkflow]);
+    expect(effects.openRunWorkflow).toHaveBeenCalledOnce();
+    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.openRunWorkflow]);
   });
 
   it('dispatches parameterized registry handlers through injected effects', () => {
