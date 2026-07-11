@@ -130,6 +130,61 @@ describe('migrateCanvasStateToV2', () => {
     expect(getAdapter(migrated.snapshots[0]!.document)).toMatchObject({ beginEndStepPct: [0, 1], weight: 0.75 });
   });
 
+  it('keeps valid snapshots and discards malformed snapshot entries without blocking the live canvas', () => {
+    const state = createEmptyCanvasStateV2();
+    const liveLayer = {
+      blendMode: 'normal',
+      id: 'live',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Live',
+      opacity: 1,
+      source: { bitmap: null, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    };
+    const snapshotLayer = {
+      adapter: { kind: 'z_image_control', model: 'z-control' },
+      ...liveLayer,
+      id: 'snapshot-control',
+      name: 'Snapshot Control',
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const validDocument = { ...state.document, layers: [snapshotLayer] };
+
+    const migrated = migrateCanvasStateToV2({
+      ...state,
+      document: { ...state.document, layers: [liveLayer] },
+      snapshots: [
+        { createdAt: 'now', document: validDocument, id: 'valid', name: 'Valid' },
+        null,
+        'malformed',
+        {},
+        { createdAt: 'now', id: 'missing-document', name: 'Missing document' },
+        { createdAt: 'now', document: null, id: 'null-document', name: 'Null document' },
+        {
+          createdAt: 'now',
+          document: { ...state.document, layers: { bad: true } },
+          id: 'malformed-layers',
+          name: 'Malformed layers',
+        },
+      ],
+    });
+
+    expect(migrated.document.layers.map((layer) => layer.id)).toEqual(['live']);
+    expect(migrated.snapshots).toHaveLength(1);
+    expect(migrated.snapshots[0]).toMatchObject({ createdAt: 'now', id: 'valid', name: 'Valid' });
+    const validLayer = migrated.snapshots[0]!.document.layers[0];
+    expect(validLayer?.type === 'control' ? validLayer.adapter : null).toEqual({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      kind: 'z_image_control',
+      model: 'z-control',
+      weight: 0.75,
+    });
+  });
+
   it('maps a v1 raster layer to a v2 raster layer positioned by transform', () => {
     const v1Canvas = {
       document: {

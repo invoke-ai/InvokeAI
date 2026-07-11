@@ -250,14 +250,19 @@ export const normalizeCanvasDocumentControlAdapters = (
   }),
 });
 
-/** Defensively re-normalizes an already-v2 canvas state (fills in anything missing without re-deriving layers). */
-const normalizeCanvasStateV2 = (canvas: Record<string, unknown>): CanvasStateContractV2 => {
-  const rawDocument = isRecord(canvas.document) ? canvas.document : {};
+const normalizeCanvasDocumentV2 = (value: unknown, requireValidLayers: boolean): CanvasDocumentContractV2 | null => {
+  const rawDocument = isRecord(value) ? value : {};
+  if (
+    requireValidLayers &&
+    (!Array.isArray(rawDocument.layers) ||
+      !rawDocument.layers.every((layer) => isRecord(layer) && typeof layer.id === 'string'))
+  ) {
+    return null;
+  }
   const width = asPositiveNumber(rawDocument.width, DEFAULT_CANVAS_DOCUMENT_WIDTH);
   const height = asPositiveNumber(rawDocument.height, DEFAULT_CANVAS_DOCUMENT_HEIGHT);
   const bbox = isRecord(rawDocument.bbox) ? rawDocument.bbox : {};
-
-  const document = normalizeCanvasDocumentControlAdapters({
+  return normalizeCanvasDocumentControlAdapters({
     background:
       rawDocument.background === 'transparent' || isRecord(rawDocument.background)
         ? (rawDocument.background as CanvasDocumentContractV2['background'])
@@ -274,15 +279,33 @@ const normalizeCanvasStateV2 = (canvas: Record<string, unknown>): CanvasStateCon
     version: 2,
     width,
   });
+};
+
+const normalizeCanvasSnapshot = (value: unknown): CanvasStateContractV2['snapshots'][number] | null => {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.name !== 'string' ||
+    typeof value.createdAt !== 'string'
+  ) {
+    return null;
+  }
+  const document = normalizeCanvasDocumentV2(value.document, true);
+  return document ? ({ ...value, document } as CanvasStateContractV2['snapshots'][number]) : null;
+};
+
+/** Defensively re-normalizes an already-v2 canvas state (fills in anything missing without re-deriving layers). */
+const normalizeCanvasStateV2 = (canvas: Record<string, unknown>): CanvasStateContractV2 => {
+  const document = normalizeCanvasDocumentV2(canvas.document, false) ?? createEmptyCanvasDocumentV2();
 
   return {
     document,
     documentRevision: asNumber(canvas.documentRevision, 0),
     snapshots: Array.isArray(canvas.snapshots)
-      ? (canvas.snapshots as CanvasStateContractV2['snapshots']).map((snapshot) => ({
-          ...snapshot,
-          document: normalizeCanvasDocumentControlAdapters(snapshot.document),
-        }))
+      ? canvas.snapshots.flatMap((snapshot) => {
+          const normalized = normalizeCanvasSnapshot(snapshot);
+          return normalized ? [normalized] : [];
+        })
       : [],
     stagingArea: migrateStagingAreaToV2(canvas),
     version: 2,
