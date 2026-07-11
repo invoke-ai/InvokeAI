@@ -13742,6 +13742,9 @@
                   "$ref": "#/components/schemas/ImageField"
                 },
                 {
+                  "$ref": "#/components/schemas/VideoField"
+                },
+                {
                   "items": {
                     "anyOf": [
                       {
@@ -13755,6 +13758,9 @@
                       },
                       {
                         "$ref": "#/components/schemas/ImageField"
+                      },
+                      {
+                        "$ref": "#/components/schemas/VideoField"
                       }
                     ]
                   },
@@ -60916,6 +60922,9 @@
                 "$ref": "#/components/schemas/ImageField"
               },
               {
+                "$ref": "#/components/schemas/VideoField"
+              },
+              {
                 "items": {
                   "anyOf": [
                     {
@@ -60929,6 +60938,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ImageField"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VideoField"
                     }
                   ]
                 },
@@ -76420,17 +76432,17 @@
         "description": "Deserialized video record, enriched for the frontend."
       },
       "VideoField": {
-        "description": "A video primitive field",
         "properties": {
           "video_name": {
-            "description": "The name of the video",
+            "type": "string",
             "title": "Video Name",
-            "type": "string"
+            "description": "The name of the video"
           }
         },
+        "type": "object",
         "required": ["video_name"],
         "title": "VideoField",
-        "type": "object"
+        "description": "A video primitive field"
       },
       "VideoFrameExtractInvocation": {
         "category": "image",
