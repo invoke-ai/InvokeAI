@@ -21,6 +21,7 @@ export interface SelectObjectSessionPreview<T> {
   guard: LayerExportGuard;
   image: SelectObjectReadyResult['image'];
   inputHash: string;
+  previewId: number;
   isolated: boolean;
   rect: Rect;
   sourceImageName: string;
@@ -102,7 +103,7 @@ const stableInputHash = <T>(state: SelectObjectSessionState<T>): string => {
             ? [state.input.bbox.x, state.input.bbox.y, state.input.bbox.width, state.input.bbox.height]
             : null,
         ];
-  return JSON.stringify([input, state.model, state.invert, state.applyPolygonRefinement, state.isolatedPreview]);
+  return JSON.stringify([input, state.model, state.invert, state.applyPolygonRefinement]);
 };
 
 const resultError = (result: Exclude<Awaited<ReturnType<typeof prepareSelectObjectSource>>, { status: 'ready' }>) =>
@@ -282,15 +283,24 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
             guard: processed.guard,
             image: processed.image,
             inputHash: hash,
+            previewId: token,
             isolated: requestState.isolatedPreview,
             rect: processed.rect,
             sourceImageName: preparedSource.imageName,
           } satisfies SelectObjectSessionPreview<T>;
         },
         (preview) => {
-          deps.publishPreview(preview);
+          const publishedPreview =
+            preview.isolated === state.isolatedPreview ? preview : { ...preview, isolated: state.isolatedPreview };
+          deps.publishPreview(publishedPreview);
           lastPublishedHash = hash;
-          publishState({ ...state, error: null, preview, sourceGuard: preview.guard, status: 'ready' });
+          publishState({
+            ...state,
+            error: null,
+            preview: publishedPreview,
+            sourceGuard: preview.guard,
+            status: 'ready',
+          });
           return undefined;
         }
       );
@@ -459,19 +469,28 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
         ('input' in changes && changes.input !== state.input) ||
         ('model' in changes && changes.model !== state.model) ||
         ('invert' in changes && changes.invert !== state.invert) ||
-        ('applyPolygonRefinement' in changes && changes.applyPolygonRefinement !== state.applyPolygonRefinement) ||
-        ('isolatedPreview' in changes && changes.isolatedPreview !== state.isolatedPreview);
+        ('applyPolygonRefinement' in changes && changes.applyPolygonRefinement !== state.applyPolygonRefinement);
+      const isolationChanged = 'isolatedPreview' in changes && changes.isolatedPreview !== state.isolatedPreview;
       if (processingChanged) {
         invalidateProcessingState();
+      }
+      const preview =
+        isolationChanged && state.preview
+          ? { ...state.preview, isolated: changes.isolatedPreview ?? state.isolatedPreview }
+          : state.preview;
+      if (preview && preview !== state.preview) {
+        deps.publishPreview(preview);
       }
       publishState({
         ...state,
         ...changes,
         error: null,
-        preview: processingChanged ? null : state.preview,
+        preview: processingChanged ? null : preview,
         status: processingChanged ? 'ready' : state.status,
       });
-      schedule();
+      if (processingChanged || 'autoProcess' in changes) {
+        schedule();
+      }
     },
   };
 };

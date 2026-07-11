@@ -247,7 +247,7 @@ export interface SamSessionSnapshot {
   applyPolygonRefinement: boolean;
   autoProcess: boolean;
   isolatedPreview: boolean;
-  status: 'ready' | 'scheduled' | 'processing' | 'error';
+  status: 'ready' | 'scheduled' | 'processing' | 'committing' | 'error';
   error: string | null;
   hasPreview: boolean;
 }

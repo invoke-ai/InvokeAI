@@ -340,7 +340,7 @@ export interface CanvasEngineOptions {
   fonts?: FontLoadApi | null;
 }
 
-export type StartSelectObjectSessionResult = 'started' | 'missing' | 'unsupported' | 'not-ready';
+export type StartSelectObjectSessionResult = 'started' | 'missing' | 'disabled' | 'unsupported' | 'not-ready';
 
 export type SelectObjectSaveTarget = 'raster' | 'control' | MaskImageResultTarget;
 export type SaveSelectObjectSessionResult = CommitGeneratedImageResult | CommitMaskImageResult;
@@ -353,6 +353,16 @@ export interface SelectObjectSessionUpdate {
   applyPolygonRefinement?: boolean;
   autoProcess?: boolean;
   isolatedPreview?: boolean;
+}
+
+interface SelectObjectCommitOwner {
+  controller: AbortController;
+  guard: LayerExportGuard;
+  inputHash: string;
+  preview: SelectObjectSessionPreview<RasterSurface>;
+  previewId: number;
+  session: SelectObjectSession<RasterSurface>;
+  token: number;
 }
 
 /** The public engine handle. */
@@ -856,7 +866,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   let selectObjectGuard: LayerExportGuard | null = null;
   let selectObjectSourceRect: Rect | null = null;
   let selectObjectPointLabel: SamPointLabel = 'include';
-  let selectObjectCommitController: AbortController | null = null;
+  let selectObjectCommitOwner: SelectObjectCommitOwner | null = null;
+  let selectObjectCommitToken = 0;
   let samPreview: SelectObjectSessionPreview<RasterSurface> | null = null;
 
   // The brush/eraser cursor ring, drawn on the overlay (set by the active tool).
@@ -2747,9 +2758,62 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       model: state.model,
       pointLabel: selectObjectPointLabel,
       sourceRect,
-      status: state.status,
+      status: selectObjectCommitOwner?.session === session ? 'committing' : state.status,
     });
     scheduler.invalidate({ overlay: true });
+  };
+
+  const invalidateSelectObjectCommit = (): void => {
+    selectObjectCommitToken += 1;
+    const owner = selectObjectCommitOwner;
+    selectObjectCommitOwner = null;
+    owner?.controller.abort();
+    syncSelectObjectStore();
+  };
+
+  const isSelectObjectCommitOwnerCurrent = (owner: SelectObjectCommitOwner): boolean => {
+    const state = owner.session.getSnapshot();
+    return (
+      selectObjectCommitOwner === owner &&
+      selectObjectCommitToken === owner.token &&
+      selectObjectSession === owner.session &&
+      selectObjectGuard === owner.guard &&
+      state.preview?.previewId === owner.previewId &&
+      state.preview.inputHash === owner.inputHash &&
+      owner.preview.inputHash === owner.inputHash &&
+      isLayerExportGuardCurrent(owner.guard) &&
+      !owner.controller.signal.aborted
+    );
+  };
+
+  const beginSelectObjectCommit = (
+    session: SelectObjectSession<RasterSurface>,
+    preview: SelectObjectSessionPreview<RasterSurface>
+  ): SelectObjectCommitOwner | null => {
+    if (selectObjectCommitOwner) {
+      return null;
+    }
+    const owner: SelectObjectCommitOwner = {
+      controller: new AbortController(),
+      guard: preview.guard,
+      inputHash: preview.inputHash,
+      preview,
+      previewId: preview.previewId,
+      session,
+      token: ++selectObjectCommitToken,
+    };
+    selectObjectCommitOwner = owner;
+    syncSelectObjectStore();
+    return owner;
+  };
+
+  const finishSelectObjectCommit = (owner: SelectObjectCommitOwner): boolean => {
+    if (!isSelectObjectCommitOwnerCurrent(owner)) {
+      return false;
+    }
+    selectObjectCommitOwner = null;
+    syncSelectObjectStore();
+    return true;
   };
 
   const decodeSelectObjectPreview = async (
@@ -2785,8 +2849,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const clearOwnedSelectObjectSession = (): void => {
     pipeline.replaceTemporaryRestoreTool('sam', 'view');
-    selectObjectCommitController?.abort();
-    selectObjectCommitController = null;
+    invalidateSelectObjectCommit();
     canvasOperations.cancel();
     const session = selectObjectSession;
     selectObjectSession = null;
@@ -2812,6 +2875,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     if (layer.type !== 'raster' && layer.type !== 'control') {
       return 'unsupported';
+    }
+    if (!layer.isEnabled) {
+      return 'disabled';
     }
     const entry = layerCache.get(layer.id);
     const guard = captureCurrentLayerExportGuard(layer.id);
@@ -2880,7 +2946,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       layerId: layer.id,
       projectId,
     });
-    selectObjectUnsubscribe = selectObjectSession.subscribe(syncSelectObjectStore);
+    const installedSession = selectObjectSession;
+    selectObjectUnsubscribe = installedSession.subscribe(() => {
+      const owner = selectObjectCommitOwner;
+      if (
+        owner?.session === installedSession &&
+        installedSession.getSnapshot().preview?.previewId !== owner.previewId
+      ) {
+        invalidateSelectObjectCommit();
+      }
+      syncSelectObjectStore();
+    });
     selectObjectSession.update({
       input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
     });
@@ -2895,6 +2971,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return;
     }
     const { pointLabel, ...sessionChanges } = changes;
+    const state = session.getSnapshot();
+    const processingChanged =
+      ('input' in sessionChanges && sessionChanges.input !== state.input) ||
+      ('model' in sessionChanges && sessionChanges.model !== state.model) ||
+      ('invert' in sessionChanges && sessionChanges.invert !== state.invert) ||
+      ('applyPolygonRefinement' in sessionChanges &&
+        sessionChanges.applyPolygonRefinement !== state.applyPolygonRefinement);
+    if (processingChanged) {
+      invalidateSelectObjectCommit();
+    }
     if (pointLabel) {
       selectObjectPointLabel = pointLabel;
     }
@@ -2902,8 +2988,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     syncSelectObjectStore();
   };
 
-  const processSelectObjectSession = (): Promise<SelectObjectSessionProcessResult> =>
-    selectObjectSession?.process() ?? Promise.resolve('stale');
+  const processSelectObjectSession = (): Promise<SelectObjectSessionProcessResult> => {
+    invalidateSelectObjectCommit();
+    return selectObjectSession?.process() ?? Promise.resolve('stale');
+  };
 
   const getCurrentSelectObjectPreview = (): SelectObjectSessionPreview<RasterSurface> | null => {
     const state = selectObjectSession?.getSnapshot();
@@ -2920,34 +3008,37 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return isLayerExportGuardCurrent(preview.guard) ? preview : null;
   };
 
-  const beginSelectObjectCommit = (): AbortController => {
-    selectObjectCommitController?.abort();
-    const controller = new AbortController();
-    selectObjectCommitController = controller;
-    return controller;
-  };
-
-  const finishSelectObjectCommit = (controller: AbortController): void => {
-    if (selectObjectCommitController === controller) {
-      selectObjectCommitController = null;
-    }
-  };
-
   const applySelectObjectSession = async (): Promise<ReplaceSelectionFromImageResult> => {
+    const session = selectObjectSession;
     const preview = getCurrentSelectObjectPreview();
-    if (!preview) {
+    if (!session || !preview) {
       return { status: 'stale' };
     }
-    const controller = beginSelectObjectCommit();
-    const result = await replaceSelectionFromImage(preview.guard, preview.image, preview.rect, controller.signal);
-    finishSelectObjectCommit(controller);
+    const owner = beginSelectObjectCommit(session, preview);
+    if (!owner) {
+      return { status: 'busy' };
+    }
+    if (!isSelectObjectCommitOwnerCurrent(owner)) {
+      invalidateSelectObjectCommit();
+      return { status: 'stale' };
+    }
+    const result = await replaceSelectionFromImage(preview.guard, preview.image, preview.rect, owner.controller.signal);
+    if (!isSelectObjectCommitOwnerCurrent(owner)) {
+      return result;
+    }
     if (result.status === 'selected') {
+      if (!finishSelectObjectCommit(owner)) {
+        return result;
+      }
       clearOwnedSelectObjectSession();
       if (activeToolId === 'sam') {
         setTool('view');
       }
     } else {
-      selectObjectSession?.reportError(
+      if (!finishSelectObjectCommit(owner)) {
+        return result;
+      }
+      owner.session.reportError(
         result.status === 'failed' ? result.message : `Select Object apply is ${result.status}.`
       );
     }
@@ -2958,26 +3049,30 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     target: SelectObjectSaveTarget,
     makeImageDurable: (imageName: string) => Promise<void>
   ): Promise<SaveSelectObjectSessionResult> => {
+    const session = selectObjectSession;
     const preview = getCurrentSelectObjectPreview();
-    if (!preview) {
+    if (!session || !preview) {
       return { status: 'stale' };
     }
-    const controller = beginSelectObjectCommit();
+    const owner = beginSelectObjectCommit(session, preview);
+    if (!owner) {
+      return { status: 'busy' };
+    }
+    if (!isSelectObjectCommitOwnerCurrent(owner)) {
+      invalidateSelectObjectCommit();
+      return { status: 'stale' };
+    }
     try {
       await makeImageDurable(preview.image.imageName);
     } catch (error) {
-      finishSelectObjectCommit(controller);
       const message = error instanceof Error ? error.message : String(error);
-      selectObjectSession?.reportError(message);
+      if (finishSelectObjectCommit(owner)) {
+        owner.session.reportError(message);
+      }
       return { message, status: 'failed' };
     }
-    if (getCurrentSelectObjectPreview() !== preview) {
-      finishSelectObjectCommit(controller);
+    if (!isSelectObjectCommitOwnerCurrent(owner)) {
       return { status: 'stale' };
-    }
-    if (controller.signal.aborted) {
-      finishSelectObjectCommit(controller);
-      return { status: 'aborted' };
     }
     let result: SaveSelectObjectSessionResult;
     try {
@@ -2987,30 +3082,39 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
               guard: preview.guard,
               image: preview.image,
               origin: { x: preview.rect.x, y: preview.rect.y },
-              signal: controller.signal,
+              signal: owner.controller.signal,
               target: target === 'raster' ? 'copy-raster' : 'copy-control',
             })
           : await commitMaskImageResult({
               guard: preview.guard,
               image: preview.image,
               rect: preview.rect,
-              signal: controller.signal,
+              signal: owner.controller.signal,
               target,
             });
     } catch (error) {
-      finishSelectObjectCommit(controller);
       const message = error instanceof Error ? error.message : String(error);
-      selectObjectSession?.reportError(message);
+      if (finishSelectObjectCommit(owner)) {
+        owner.session.reportError(message);
+      }
       return { message, status: 'failed' };
     }
-    finishSelectObjectCommit(controller);
+    if (!isSelectObjectCommitOwnerCurrent(owner)) {
+      return result;
+    }
     if (result.status === 'committed') {
+      if (!finishSelectObjectCommit(owner)) {
+        return result;
+      }
       clearOwnedSelectObjectSession();
       if (activeToolId === 'sam') {
         setTool('view');
       }
     } else {
-      selectObjectSession?.reportError(
+      if (!finishSelectObjectCommit(owner)) {
+        return result;
+      }
+      owner.session.reportError(
         result.status === 'failed' ? result.message : `Select Object save is ${result.status}.`
       );
     }
@@ -3023,6 +3127,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!session || !guard) {
       return;
     }
+    invalidateSelectObjectCommit();
     selectObjectPointLabel = 'include';
     session.reset();
     session.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });

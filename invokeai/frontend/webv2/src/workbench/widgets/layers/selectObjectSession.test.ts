@@ -398,7 +398,6 @@ describe('createSelectObjectSession', () => {
     ['model', { model: 'segment-anything-huge' as const }],
     ['invert', { invert: true }],
     ['refinement', { applyPolygonRefinement: true }],
-    ['preview isolation', { isolatedPreview: false }],
   ] as const)('immediately aborts in-flight work and clears preview for a %s update', async (_label, update) => {
     const signals: AbortSignal[] = [];
     const graph = deferred<{ imageName: string; origin: string }>();
@@ -420,6 +419,46 @@ describe('createSelectObjectSession', () => {
     graph.resolve({ imageName: 'stale.png', origin: 'stale' });
     await expect(pending).resolves.toBe('stale');
     expect(harness.deps.publishPreview).not.toHaveBeenCalled();
+  });
+
+  it('changes ready preview isolation without clearing or reprocessing it', async () => {
+    const harness = createHarness();
+    await harness.session.process();
+    const preview = harness.session.getSnapshot().preview;
+    vi.mocked(harness.deps.publishPreview).mockClear();
+    vi.mocked(harness.deps.runGraph).mockClear();
+    vi.mocked(harness.deps.cleanupPreview).mockClear();
+
+    harness.session.update({ isolatedPreview: false });
+
+    expect(harness.session.getSnapshot()).toMatchObject({ isolatedPreview: false });
+    expect(harness.session.getSnapshot().preview).toMatchObject({ data: preview?.data, isolated: false });
+    expect(harness.deps.publishPreview).toHaveBeenCalledOnce();
+    expect(harness.deps.cleanupPreview).not.toHaveBeenCalled();
+    expect(harness.deps.runGraph).not.toHaveBeenCalled();
+  });
+
+  it('changes isolation during processing without aborting or rerunning the request', async () => {
+    const graph = deferred<{ imageName: string; origin: string }>();
+    const signals: AbortSignal[] = [];
+    const harness = createHarness({
+      runGraph: vi.fn((options) => {
+        if (options.signal) {
+          signals.push(options.signal);
+        }
+        return graph.promise;
+      }),
+    });
+    const pending = harness.session.process();
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
+
+    harness.session.update({ isolatedPreview: false });
+    graph.resolve({ imageName: 'result.png', origin: 'test' });
+
+    await expect(pending).resolves.toBe('published');
+    expect(signals[0]?.aborted).toBe(false);
+    expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+    expect(harness.session.getSnapshot().preview).toMatchObject({ isolated: false });
   });
 
   it('clears an already-published preview as soon as processing input changes', async () => {

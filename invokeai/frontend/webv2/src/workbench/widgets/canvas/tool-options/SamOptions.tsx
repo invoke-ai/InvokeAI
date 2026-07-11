@@ -17,6 +17,7 @@ import type { ToolOptionsComponentProps } from './ToolOptionsBar';
 export interface SamActionEligibility {
   canApply: boolean;
   canCancel: boolean;
+  canEditInputs: boolean;
   canProcess: boolean;
   canReset: boolean;
   canSave: boolean;
@@ -24,12 +25,14 @@ export interface SamActionEligibility {
 
 export const getSamActionEligibility = (session: SamSessionSnapshot): SamActionEligibility => {
   const isProcessing = session.status === 'processing';
-  const hasReadyPreview = session.hasPreview && !isProcessing;
+  const isCommitting = session.status === 'committing';
+  const hasReadyPreview = session.hasPreview && !isProcessing && !isCommitting;
   return {
     canApply: hasReadyPreview,
     canCancel: true,
-    canProcess: !isProcessing && isSamDocumentInputValid(session.input),
-    canReset: true,
+    canEditInputs: !isCommitting,
+    canProcess: !isProcessing && !isCommitting && isSamDocumentInputValid(session.input),
+    canReset: !isCommitting,
     canSave: hasReadyPreview,
   };
 };
@@ -59,11 +62,15 @@ const SamSwitch = ({
 
 const SAVE_TARGETS: readonly SelectObjectSaveTarget[] = ['raster', 'control', 'inpaint_mask', 'regional_guidance'];
 
-const SamSaveItem = ({ engine, target }: ToolOptionsComponentProps & { target: SelectObjectSaveTarget }) => {
+const SamSaveItem = ({
+  disabled,
+  engine,
+  target,
+}: ToolOptionsComponentProps & { disabled: boolean; target: SelectObjectSaveTarget }) => {
   const { t } = useTranslation();
   const save = useCallback(() => void engine.saveSelectObjectSession(target, makeImageDurable), [engine, target]);
   return (
-    <Menu.Item value={target} onClick={save}>
+    <Menu.Item disabled={disabled} value={target} onClick={save}>
       <Menu.ItemText>{t(`widgets.layers.selectObject.saveAs_${target}`)}</Menu.ItemText>
     </Menu.Item>
   );
@@ -119,17 +126,20 @@ export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
     <HStack align="center" gap="2" maxW="calc(100vw - 2rem)" overflowX="auto">
       <SamSwitch
         checked={session.autoProcess}
+        disabled={!eligibility.canEditInputs}
         label={t('widgets.layers.selectObject.autoProcess')}
         onChange={setAutoProcess}
       />
       <SamSwitch
         checked={session.isolatedPreview}
+        disabled={!eligibility.canEditInputs}
         label={t('widgets.layers.selectObject.isolatedPreview')}
         onChange={setIsolatedPreview}
       />
       <HStack gap="1" role="tablist">
         <Button
           aria-selected={session.input.type === 'visual'}
+          disabled={!eligibility.canEditInputs}
           role="tab"
           size="xs"
           variant={session.input.type === 'visual' ? 'solid' : 'ghost'}
@@ -139,6 +149,7 @@ export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
         </Button>
         <Button
           aria-selected={session.input.type === 'prompt'}
+          disabled={!eligibility.canEditInputs}
           role="tab"
           size="xs"
           variant={session.input.type === 'prompt' ? 'solid' : 'ghost'}
@@ -147,11 +158,17 @@ export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
           {t('widgets.layers.selectObject.prompt')}
         </Button>
       </HStack>
-      <SamSwitch checked={session.invert} label={t('widgets.layers.selectObject.invert')} onChange={setInvert} />
+      <SamSwitch
+        checked={session.invert}
+        disabled={!eligibility.canEditInputs}
+        label={t('widgets.layers.selectObject.invert')}
+        onChange={setInvert}
+      />
       {session.input.type === 'visual' ? (
         <HStack gap="1">
           <Button
             aria-pressed={session.pointLabel === 'include'}
+            disabled={!eligibility.canEditInputs}
             size="xs"
             variant={session.pointLabel === 'include' ? 'solid' : 'ghost'}
             onClick={setInclude}
@@ -160,6 +177,7 @@ export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
           </Button>
           <Button
             aria-pressed={session.pointLabel === 'exclude'}
+            disabled={!eligibility.canEditInputs}
             size="xs"
             variant={session.pointLabel === 'exclude' ? 'solid' : 'ghost'}
             onClick={setExclude}
@@ -171,13 +189,14 @@ export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
         <Input
           aria-label={t('widgets.layers.selectObject.prompt')}
           autoComplete="off"
+          disabled={!eligibility.canEditInputs}
           size="xs"
           value={session.input.prompt}
           w="12rem"
           onChange={handlePrompt}
         />
       )}
-      <NativeSelect.Root disabled={isProcessing} size="xs" w="10rem">
+      <NativeSelect.Root disabled={isProcessing || !eligibility.canEditInputs} size="xs" w="10rem">
         <NativeSelect.Field
           aria-label={t('widgets.layers.selectObject.model')}
           value={session.model}
@@ -190,7 +209,7 @@ export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
       </NativeSelect.Root>
       <SamSwitch
         checked={session.applyPolygonRefinement}
-        disabled={isProcessing}
+        disabled={isProcessing || !eligibility.canEditInputs}
         label={t('widgets.layers.selectObject.refine')}
         onChange={setRefinement}
       />
@@ -213,7 +232,7 @@ export const SamOptions = ({ engine }: ToolOptionsComponentProps) => {
           <Menu.Positioner>
             <MenuContent minW="11rem" py="1">
               {SAVE_TARGETS.map((target) => (
-                <SamSaveItem key={target} engine={engine} target={target} />
+                <SamSaveItem key={target} disabled={!eligibility.canSave} engine={engine} target={target} />
               ))}
             </MenuContent>
           </Menu.Positioner>

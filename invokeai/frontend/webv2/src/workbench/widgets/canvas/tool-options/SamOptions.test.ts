@@ -58,4 +58,17 @@ describe('getSamActionEligibility', () => {
       canReset: true,
     });
   });
+
+  it('disables every mutating control while committing and keeps Cancel available', () => {
+    const committing = snapshot({ hasPreview: true, status: 'committing' as never });
+
+    expect(getSamActionEligibility(committing)).toEqual({
+      canApply: false,
+      canCancel: true,
+      canEditInputs: false,
+      canProcess: false,
+      canReset: false,
+      canSave: false,
+    });
+  });
 });

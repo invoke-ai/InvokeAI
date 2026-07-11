@@ -185,34 +185,24 @@ describe('layer context action registry', () => {
       'widgets.layers.rasterFilter.stale',
       'widgets.layers.rasterFilter.title',
       'widgets.layers.rasterFilter.unsupported',
-      'widgets.layers.selectObject.aborted',
-      'widgets.layers.selectObject.busy',
-      'widgets.layers.selectObject.cancel',
-      'widgets.layers.selectObject.durabilityFailure',
-      'widgets.layers.selectObject.disabled',
-      'widgets.layers.selectObject.empty',
-      'widgets.layers.selectObject.failed',
-      'widgets.layers.selectObject.locked',
+      'widgets.layers.selectObject.autoProcess',
+      'widgets.layers.selectObject.exclude',
+      'widgets.layers.selectObject.include',
+      'widgets.layers.selectObject.invert',
+      'widgets.layers.selectObject.isolatedPreview',
       'widgets.layers.selectObject.model',
       'widgets.layers.selectObject.modelHuge',
       'widgets.layers.selectObject.modelSam2Large',
-      'widgets.layers.selectObject.missing',
-      'widgets.layers.selectObject.notReady',
       'widgets.layers.selectObject.prompt',
-      'widgets.layers.selectObject.promptPlaceholder',
+      'widgets.layers.selectObject.process',
       'widgets.layers.selectObject.refine',
-      'widgets.layers.selectObject.run',
-      'widgets.layers.selectObject.running',
-      'widgets.layers.selectObject.selectionSuccess',
-      'widgets.layers.selectObject.inpaintMaskSuccess',
-      'widgets.layers.selectObject.regionalGuidanceSuccess',
-      'widgets.layers.selectObject.stale',
-      'widgets.layers.selectObject.target',
-      'widgets.layers.selectObject.targetInpaintMask',
-      'widgets.layers.selectObject.targetRegionalGuidance',
-      'widgets.layers.selectObject.targetSelection',
-      'widgets.layers.selectObject.title',
-      'widgets.layers.selectObject.unsupported',
+      'widgets.layers.selectObject.reset',
+      'widgets.layers.selectObject.saveAs',
+      'widgets.layers.selectObject.saveAs_control',
+      'widgets.layers.selectObject.saveAs_inpaint_mask',
+      'widgets.layers.selectObject.saveAs_raster',
+      'widgets.layers.selectObject.saveAs_regional_guidance',
+      'widgets.layers.selectObject.visual',
       'widgets.layers.runWorkflow.aborted',
       'widgets.layers.runWorkflow.busy',
       'widgets.layers.runWorkflow.cancel',
@@ -247,6 +237,10 @@ describe('layer context action registry', () => {
     for (const key of keys) {
       expect(getEnglishTranslation(key), key).toEqual(expect.any(String));
     }
+  });
+
+  it('provides the disabled-layer reason used when Select Object start is refused', () => {
+    expect(getEnglishTranslation('widgets.layers.actions.disabled')).toBe('Enable the layer before using this action.');
   });
 
   it('throws for an unknown action definition', () => {
@@ -375,6 +369,7 @@ describe('getLayerContextActions', () => {
 
   it.each([
     ['missing engine', { hasEngine: false }],
+    ['disabled layer', { layer: { ...rasterLayer, isEnabled: false } }],
     ['locked layer', { layer: { ...rasterLayer, isLocked: true } }],
     ['locked interaction', { interactionLocked: true }],
   ] as const)('disables Select Object for %s', (_label, overrides) => {

@@ -427,7 +427,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects, layer }) => effects.startSelectObject(layer.id),
     icon: ScanSearchIcon,
     id: 'select-object',
-    isEnabled: hasMutablePixels,
+    isEnabled: hasTransformablePixels,
     isVisible: (context) => context.hasSupportedContent,
     labelKey: 'widgets.layers.actions.selectObject',
     order: 41,
