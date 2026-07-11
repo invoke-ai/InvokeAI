@@ -1,9 +1,13 @@
-import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
+import type {
+  NumberInput as ChakraNumberInput,
+  SelectValueChangeDetails,
+  SliderValueChangeDetails,
+} from '@chakra-ui/react';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { ControlAdapterKind } from '@workbench/generation/canvas/addControlLayers';
 import type { CanvasControlAdapterContract, CanvasControlLayerContract } from '@workbench/types';
 
-import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
+import { createListCollection, HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { Button, Field, Select, Slider } from '@workbench/components/ui';
 import { isControlKindSupportedForBase } from '@workbench/generation/canvas/addControlLayers';
 import { resolveDefaultFilterForModel } from '@workbench/generation/canvas/controlRecommendations';
@@ -14,7 +18,7 @@ import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/Workb
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { applyStructural, applyStructuralPreview, CONTROL_ADAPTER_DEFAULTS } from './layerOps';
+import { applyStructural, applyStructuralPreview, CONTROL_ADAPTER_DEFAULTS, CONTROL_WEIGHT_BOUNDS } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
 
@@ -123,7 +127,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         commitAdapter({ model }, { model: adapter.model }, t('widgets.layers.control.model'));
         const selected = models.find((candidate) => candidate.key === model);
         const recommendation = resolveDefaultFilterForModel(selected);
-        if (recommendation && !layer.filter && engine?.stores.filterSession.get()?.layerId !== layer.id) {
+        if (recommendation && !layer.filter) {
           engine?.startFilterOperation(layer.id, recommendation);
         }
       }
@@ -172,6 +176,19 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         return;
       }
       commitAdapter({ weight: next }, { weight: before }, t('widgets.layers.control.weight'));
+    },
+    [adapter.weight, commitAdapter, t]
+  );
+  const handleWeightInputChange = useCallback(
+    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
+      if (
+        !Number.isFinite(valueAsNumber) ||
+        valueAsNumber < CONTROL_WEIGHT_BOUNDS.inputMin ||
+        valueAsNumber > CONTROL_WEIGHT_BOUNDS.inputMax
+      ) {
+        return;
+      }
+      commitAdapter({ weight: valueAsNumber }, { weight: adapter.weight }, t('widgets.layers.control.weight'));
     },
     [adapter.weight, commitAdapter, t]
   );
@@ -245,7 +262,11 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   const kindValue = useMemo(() => [adapter.kind], [adapter.kind]);
   const modelValue = useMemo(() => (adapter.model ? [adapter.model] : []), [adapter.model]);
   const controlModeValue = useMemo(() => [adapter.controlMode ?? 'balanced'], [adapter.controlMode]);
-  const weightValue = useMemo(() => [adapter.weight], [adapter.weight]);
+  const weightValue = useMemo(
+    () => [Math.min(CONTROL_WEIGHT_BOUNDS.sliderMax, Math.max(CONTROL_WEIGHT_BOUNDS.sliderMin, adapter.weight))],
+    [adapter.weight]
+  );
+  const weightInputValue = String(adapter.weight);
   const rangeValue = useMemo(() => [...adapter.beginEndStepPct], [adapter.beginEndStepPct]);
   const weightAria = useMemo(() => [t('widgets.layers.control.weight')], [t]);
   const rangeAria = useMemo(() => [t('widgets.layers.control.beginStep'), t('widgets.layers.control.endStep')], [t]);
@@ -305,18 +326,33 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         />
       </Field>
       <Field label={t('widgets.layers.control.weight')}>
-        <Slider
-          aria-label={weightAria}
-          formatValue={formatWeight}
-          max={0.75}
-          min={0}
-          size="sm"
-          step={0.01}
-          value={weightValue}
-          withThumbTooltip
-          onValueChange={handleWeightChange}
-          onValueChangeEnd={handleWeightChangeEnd}
-        />
+        <HStack gap="2">
+          <Slider
+            aria-label={weightAria}
+            flex="1"
+            formatValue={formatWeight}
+            max={CONTROL_WEIGHT_BOUNDS.sliderMax}
+            min={CONTROL_WEIGHT_BOUNDS.sliderMin}
+            size="sm"
+            step={CONTROL_WEIGHT_BOUNDS.step}
+            value={weightValue}
+            withThumbTooltip
+            onValueChange={handleWeightChange}
+            onValueChangeEnd={handleWeightChangeEnd}
+          />
+          <NumberInput.Root
+            max={CONTROL_WEIGHT_BOUNDS.inputMax}
+            min={CONTROL_WEIGHT_BOUNDS.inputMin}
+            size="xs"
+            step={CONTROL_WEIGHT_BOUNDS.step}
+            value={weightInputValue}
+            w="20"
+            onValueChange={handleWeightInputChange}
+          >
+            <NumberInput.Control />
+            <NumberInput.Input aria-label={t('widgets.layers.control.weight')} />
+          </NumberInput.Root>
+        </HStack>
       </Field>
       <Field label={t('widgets.layers.control.stepRange')}>
         <Slider

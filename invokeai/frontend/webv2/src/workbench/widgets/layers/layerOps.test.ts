@@ -31,6 +31,7 @@ import {
   createRegionalReferenceImage,
   DEFAULT_CONTROL_ADAPTER,
   CONTROL_ADAPTER_DEFAULTS,
+  CONTROL_WEIGHT_BOUNDS,
   DEFAULT_INPAINT_MASK_FILL,
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
@@ -311,6 +312,11 @@ describe('createControlLayer', () => {
       },
       t2i_adapter: { beginEndStepPct: [0, 0.75], controlMode: null, kind: 't2i_adapter', model: null, weight: 0.75 },
     });
+  });
+
+  it('keeps the 0.75 creation default separate from legacy weight input ranges', () => {
+    expect(DEFAULT_CONTROL_ADAPTER.weight).toBe(0.75);
+    expect(CONTROL_WEIGHT_BOUNDS).toEqual({ inputMax: 2, inputMin: -1, sliderMax: 2, sliderMin: 0, step: 0.05 });
   });
 
   it('builds an empty control layer with the legacy-default ControlNet adapter and transparency on', () => {

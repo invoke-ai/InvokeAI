@@ -1,11 +1,20 @@
-import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
+import type {
+  NumberInput as ChakraNumberInput,
+  SelectValueChangeDetails,
+  SliderValueChangeDetails,
+} from '@chakra-ui/react';
 import type { FilterParamSpec } from '@workbench/generation/canvas/filterGraphs';
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 import type { ChangeEvent } from 'react';
 
-import { createListCollection, Input, Switch, Text } from '@chakra-ui/react';
+import { createListCollection, HStack, Input, NumberInput, Switch, Text } from '@chakra-ui/react';
 import { Field, Select, Slider } from '@workbench/components/ui';
-import { CONTROL_FILTERS, getFilterDefinition } from '@workbench/generation/canvas/filterGraphs';
+import {
+  CONTROL_FILTERS,
+  getFilterDefinition,
+  getFilterNumberBounds,
+  isSpandrelModelIdentifier,
+} from '@workbench/generation/canvas/filterGraphs';
 import { ModelSelect } from '@workbench/models/components/ModelSelect';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -79,6 +88,7 @@ export const LayerFilterControls = ({
           key={param.key}
           disabled={disabled}
           param={param}
+          settings={settings}
           value={settings[param.key]}
           onChange={handleSettingChange}
         />
@@ -90,11 +100,12 @@ export const LayerFilterControls = ({
 interface FilterParamFieldProps {
   disabled: boolean;
   param: FilterParamSpec;
+  settings: Record<string, unknown>;
   value: unknown;
   onChange: (key: string, value: unknown) => void;
 }
 
-const FilterParamField = ({ disabled, param, value, onChange }: FilterParamFieldProps) => {
+const FilterParamField = ({ disabled, param, settings, value, onChange }: FilterParamFieldProps) => {
   const { t } = useTranslation();
   const label = t(`widgets.layers.control.filterParams.${param.key}`, param.key);
   const labelAria = useMemo(() => [label], [label]);
@@ -120,6 +131,14 @@ const FilterParamField = ({ disabled, param, value, onChange }: FilterParamField
     },
     [onChange, param]
   );
+  const handleNumberInput = useCallback(
+    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
+      if (Number.isFinite(valueAsNumber)) {
+        onChange(param.key, param.kind === 'number' && param.integer ? Math.round(valueAsNumber) : valueAsNumber);
+      }
+    },
+    [onChange, param]
+  );
   const handleModel = useCallback(
     (model: ModelConfig | null) => {
       onChange(
@@ -137,15 +156,27 @@ const FilterParamField = ({ disabled, param, value, onChange }: FilterParamField
   const enumCollection = useMemo(
     () =>
       param.kind === 'enum'
-        ? createListCollection({ items: param.options.map((option) => ({ label: option, value: option })) })
+        ? createListCollection({
+            items: param.options.map((option) => ({ label: t(option.labelKey, option.value), value: option.value })),
+          })
         : null,
-    [param]
+    [param, t]
   );
   const enumCurrent =
-    param.kind === 'enum' && typeof value === 'string' && param.options.includes(value) ? value : param.default;
+    param.kind === 'enum' && typeof value === 'string' && param.options.some((option) => option.value === value)
+      ? value
+      : param.default;
+  const enumCurrentOption = param.kind === 'enum' ? param.options.find((option) => option.value === enumCurrent) : null;
+  const enumCurrentLabel = enumCurrentOption
+    ? t(enumCurrentOption.labelKey, enumCurrentOption.value)
+    : String(enumCurrent);
   const enumValue = useMemo(() => [String(enumCurrent)], [enumCurrent]);
   const numberCurrent = typeof value === 'number' && Number.isFinite(value) ? value : param.default;
-  const numberValue = useMemo(() => [Number(numberCurrent)], [numberCurrent]);
+  const numberBounds = param.kind === 'number' ? getFilterNumberBounds(param, settings) : null;
+  const sliderCurrent = numberBounds
+    ? Math.min(numberBounds.sliderMax, Math.max(numberBounds.sliderMin, Number(numberCurrent)))
+    : Number(numberCurrent);
+  const numberValue = useMemo(() => [sliderCurrent], [sliderCurrent]);
 
   if (param.kind === 'boolean') {
     return (
@@ -177,7 +208,7 @@ const FilterParamField = ({ disabled, param, value, onChange }: FilterParamField
           positioning={SELECT_POSITIONING}
           size="xs"
           value={enumValue}
-          valueText={String(enumCurrent)}
+          valueText={enumCurrentLabel}
           onValueChange={handleEnum}
         />
       </Field>
@@ -185,7 +216,7 @@ const FilterParamField = ({ disabled, param, value, onChange }: FilterParamField
   }
 
   if (param.kind === 'model') {
-    const model = typeof value === 'object' && value !== null && 'key' in value ? value : null;
+    const model = isSpandrelModelIdentifier(value) ? (value as { key: string }) : null;
     return (
       <Field label={label} required>
         <ModelSelect
@@ -214,19 +245,39 @@ const FilterParamField = ({ disabled, param, value, onChange }: FilterParamField
     );
   }
 
+  if (param.kind !== 'number' || !numberBounds) {
+    return null;
+  }
+
   return (
     <Field label={label}>
-      <Slider
-        aria-label={labelAria}
-        disabled={disabled}
-        max={param.kind === 'number' ? (param.max ?? 255) : 255}
-        min={param.kind === 'number' ? (param.min ?? 0) : 0}
-        size="sm"
-        step={param.kind === 'number' ? (param.step ?? (param.integer ? 1 : 0.01)) : 0.01}
-        value={numberValue}
-        withThumbTooltip
-        onValueChangeEnd={handleNumberEnd}
-      />
+      <HStack gap="2">
+        <Slider
+          aria-label={labelAria}
+          disabled={disabled}
+          flex="1"
+          max={numberBounds.sliderMax}
+          min={numberBounds.sliderMin}
+          size="sm"
+          step={numberBounds.step}
+          value={numberValue}
+          withThumbTooltip
+          onValueChangeEnd={handleNumberEnd}
+        />
+        <NumberInput.Root
+          disabled={disabled}
+          max={numberBounds.inputMax}
+          min={numberBounds.inputMin}
+          size="xs"
+          step={numberBounds.step}
+          value={String(numberCurrent)}
+          w="20"
+          onValueChange={handleNumberInput}
+        >
+          <NumberInput.Control />
+          <NumberInput.Input aria-label={label} />
+        </NumberInput.Root>
+      </HStack>
     </Field>
   );
 };

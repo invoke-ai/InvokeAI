@@ -3246,6 +3246,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const startFilterOperation = (layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult => {
+    // Recommendations are opportunistic. Never replace an active manual filter,
+    // preview, Select Object session, or other canvas operation.
+    if (recommendedFilterType && canvasOperations.getSnapshot().status !== 'idle') {
+      return 'not-ready';
+    }
     const document = mirror.getDocument();
     const layer = document?.layers.find((candidate) => candidate.id === layerId);
     if (!document || !layer) {
@@ -3253,6 +3258,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     if (layer.type !== 'raster' && layer.type !== 'control') {
       return 'unsupported';
+    }
+    if (recommendedFilterType && layer.filter) {
+      return 'not-ready';
     }
     if (!layer.isEnabled) {
       return 'disabled';

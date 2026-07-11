@@ -60,12 +60,33 @@ describe('getFilterActionEligibility', () => {
         state({
           draft: {
             settings: {
-              model: { base: 'any', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' },
+              model: {
+                base: 'any',
+                hash: 'blake3-hash',
+                key: 'upscale',
+                name: 'Upscaler',
+                type: 'spandrel_image_to_image',
+              },
             },
             type: 'spandrel_filter',
           },
         })
       )
     ).toMatchObject({ canProcess: true });
+  });
+
+  it('disables Process for stale partial Spandrel identifiers', () => {
+    expect(
+      getFilterActionEligibility(
+        state({
+          draft: {
+            settings: {
+              model: { base: 'any', hash: '', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' },
+            },
+            type: 'spandrel_filter',
+          },
+        })
+      )
+    ).toMatchObject({ canProcess: false });
   });
 });

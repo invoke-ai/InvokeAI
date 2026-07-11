@@ -22,9 +22,26 @@ export const FILTER_NODE_ID = 'control_filter';
 
 /** A filter parameter's UI + validation metadata (drives the settings editor). */
 export type FilterParamSpec =
-  | { kind: 'number'; key: string; default: number; min?: number; max?: number; step?: number; integer?: boolean }
+  | {
+      kind: 'number';
+      key: string;
+      default: number;
+      min: number;
+      max: number;
+      step: number;
+      integer?: boolean;
+      sliderMin?: number;
+      sliderMax?: number;
+      coerceMin?: number;
+      dynamicBounds?: 'adjust_value';
+    }
   | { kind: 'boolean'; key: string; default: boolean }
-  | { kind: 'enum'; key: string; default: string; options: readonly string[] }
+  | {
+      kind: 'enum';
+      key: string;
+      default: string;
+      options: readonly { labelKey: string; value: string }[];
+    }
   | { kind: 'string'; key: string; default: string }
   | { kind: 'model'; key: string; default: null; modelType: 'spandrel_image_to_image' };
 
@@ -53,8 +70,8 @@ export const buildFilterDefaults = (definition: FilterDefinition): Record<string
 export const CONTROL_FILTERS: readonly FilterDefinition[] = [
   {
     params: [
-      { default: 100, integer: true, key: 'low_threshold', kind: 'number', max: 255, min: 0 },
-      { default: 200, integer: true, key: 'high_threshold', kind: 'number', max: 255, min: 0 },
+      { default: 100, integer: true, key: 'low_threshold', kind: 'number', max: 255, min: 0, step: 1 },
+      { default: 200, integer: true, key: 'high_threshold', kind: 'number', max: 255, min: 0, step: 1 },
     ],
     type: 'canny_edge_detection',
   },
@@ -64,7 +81,12 @@ export const CONTROL_FILTERS: readonly FilterDefinition[] = [
         default: 'small_v2',
         key: 'model_size',
         kind: 'enum',
-        options: ['large', 'base', 'small', 'small_v2'],
+        options: [
+          { labelKey: 'widgets.layers.control.filterOptions.model_size.large', value: 'large' },
+          { labelKey: 'widgets.layers.control.filterOptions.model_size.base', value: 'base' },
+          { labelKey: 'widgets.layers.control.filterOptions.model_size.small', value: 'small' },
+          { labelKey: 'widgets.layers.control.filterOptions.model_size.small_v2', value: 'small_v2' },
+        ],
       },
     ],
     type: 'depth_anything_depth_estimation',
@@ -87,8 +109,8 @@ export const CONTROL_FILTERS: readonly FilterDefinition[] = [
   },
   {
     params: [
-      { default: 0.1, key: 'score_threshold', kind: 'number', min: 0, step: 0.01 },
-      { default: 20, key: 'distance_threshold', kind: 'number', min: 0, step: 0.1 },
+      { default: 0.1, key: 'score_threshold', kind: 'number', max: 1, min: 0, step: 0.01 },
+      { default: 20, key: 'distance_threshold', kind: 'number', max: 1000, min: 0, sliderMax: 100, step: 1 },
     ],
     type: 'mlsd_detection',
   },
@@ -100,18 +122,20 @@ export const CONTROL_FILTERS: readonly FilterDefinition[] = [
     type: 'pidi_edge_detection',
   },
   {
-    params: [{ default: 256, integer: true, key: 'scale_factor', kind: 'number', min: 1 }],
+    params: [{ default: 256, integer: true, key: 'scale_factor', kind: 'number', max: 4096, min: 0, step: 1 }],
     type: 'content_shuffle',
   },
   {
     params: [
-      { default: 1, integer: true, key: 'max_faces', kind: 'number', min: 1 },
+      { default: 1, integer: true, key: 'max_faces', kind: 'number', max: 20, min: 1, step: 1 },
       { default: 0.5, key: 'min_confidence', kind: 'number', max: 1, min: 0, step: 0.01 },
     ],
     type: 'mediapipe_face_detection',
   },
   {
-    params: [{ default: 64, integer: true, key: 'tile_size', kind: 'number', min: 1 }],
+    params: [
+      { default: 64, integer: true, key: 'tile_size', kind: 'number', max: 4096, min: 1, sliderMax: 256, step: 1 },
+    ],
     type: 'color_map',
   },
   {
@@ -121,26 +145,26 @@ export const CONTROL_FILTERS: readonly FilterDefinition[] = [
         key: 'channel',
         kind: 'enum',
         options: [
-          'Red (RGBA)',
-          'Green (RGBA)',
-          'Blue (RGBA)',
-          'Alpha (RGBA)',
-          'Cyan (CMYK)',
-          'Magenta (CMYK)',
-          'Yellow (CMYK)',
-          'Black (CMYK)',
-          'Hue (HSV)',
-          'Saturation (HSV)',
-          'Value (HSV)',
-          'Luminosity (LAB)',
-          'A (LAB)',
-          'B (LAB)',
-          'Y (YCbCr)',
-          'Cb (YCbCr)',
-          'Cr (YCbCr)',
+          { labelKey: 'widgets.layers.control.filterOptions.channel.red', value: 'Red (RGBA)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.green', value: 'Green (RGBA)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.blue', value: 'Blue (RGBA)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.alpha', value: 'Alpha (RGBA)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.cyan', value: 'Cyan (CMYK)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.magenta', value: 'Magenta (CMYK)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.yellow', value: 'Yellow (CMYK)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.black', value: 'Black (CMYK)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.hue', value: 'Hue (HSV)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.saturation', value: 'Saturation (HSV)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.value', value: 'Value (HSV)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.luminosity', value: 'Luminosity (LAB)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.lab_a', value: 'A (LAB)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.lab_b', value: 'B (LAB)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.y', value: 'Y (YCbCr)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.cb', value: 'Cb (YCbCr)' },
+          { labelKey: 'widgets.layers.control.filterOptions.channel.cr', value: 'Cr (YCbCr)' },
         ],
       },
-      { default: 1, key: 'value', kind: 'number', max: 2, min: 0, step: 0.0025 },
+      { default: 1, dynamicBounds: 'adjust_value', key: 'value', kind: 'number', max: 255, min: 0, step: 0.0025 },
       { default: false, key: 'scale_values', kind: 'boolean' },
     ],
     type: 'adjust_image',
@@ -151,23 +175,42 @@ export const CONTROL_FILTERS: readonly FilterDefinition[] = [
     params: [
       { default: null, key: 'model', kind: 'model', modelType: 'spandrel_image_to_image' },
       { default: true, key: 'autoScale', kind: 'boolean' },
-      { default: 1, key: 'scale', kind: 'number', max: 16, min: 1 },
+      { default: 1, key: 'scale', kind: 'number', max: 16, min: 1, step: 1 },
     ],
     type: 'spandrel_filter',
   },
   {
     params: [
-      { default: 'gaussian', key: 'blur_type', kind: 'enum', options: ['gaussian', 'box'] },
-      { default: 8, key: 'radius', kind: 'number', max: 4096, min: 0, step: 0.1 },
+      {
+        default: 'gaussian',
+        key: 'blur_type',
+        kind: 'enum',
+        options: [
+          { labelKey: 'widgets.layers.control.filterOptions.blur_type.gaussian', value: 'gaussian' },
+          { labelKey: 'widgets.layers.control.filterOptions.blur_type.box', value: 'box' },
+        ],
+      },
+      { coerceMin: 0, default: 8, key: 'radius', kind: 'number', max: 4096, min: 1, sliderMax: 64, step: 0.1 },
     ],
     type: 'img_blur',
   },
   {
     params: [
-      { default: 'gaussian', key: 'noise_type', kind: 'enum', options: ['gaussian', 'salt_and_pepper'] },
+      {
+        default: 'gaussian',
+        key: 'noise_type',
+        kind: 'enum',
+        options: [
+          { labelKey: 'widgets.layers.control.filterOptions.noise_type.gaussian', value: 'gaussian' },
+          {
+            labelKey: 'widgets.layers.control.filterOptions.noise_type.salt_and_pepper',
+            value: 'salt_and_pepper',
+          },
+        ],
+      },
       { default: 0.3, key: 'amount', kind: 'number', max: 1, min: 0, step: 0.01 },
       { default: true, key: 'noise_color', kind: 'boolean' },
-      { default: 1, integer: true, key: 'size', kind: 'number', max: 256, min: 1 },
+      { default: 1, integer: true, key: 'size', kind: 'number', max: 256, min: 1, sliderMax: 16, step: 1 },
     ],
     type: 'img_noise',
   },
@@ -186,20 +229,46 @@ export const getFilterDefinition = (type: string): FilterDefinition | undefined 
 /** True when `type` names a supported control filter. */
 export const isSupportedFilterType = (type: string): boolean => FILTERS_BY_TYPE.has(type);
 
+export interface FilterNumberBounds {
+  inputMax: number;
+  inputMin: number;
+  sliderMax: number;
+  sliderMin: number;
+  step: number;
+}
+
+/** Resolves legacy slider/input ranges, including adjust_image's mode-dependent value maximum. */
+export const getFilterNumberBounds = (
+  param: Extract<FilterParamSpec, { kind: 'number' }>,
+  settings: Record<string, unknown>
+): FilterNumberBounds => {
+  const dynamicMax = param.dynamicBounds === 'adjust_value' && settings.scale_values !== true ? 2 : param.max;
+  return {
+    inputMax: dynamicMax,
+    inputMin: param.min,
+    sliderMax: param.dynamicBounds === 'adjust_value' ? dynamicMax : (param.sliderMax ?? dynamicMax),
+    sliderMin: param.sliderMin ?? param.min,
+    step: param.step,
+  };
+};
+
+const isNonemptyStringField = (value: object, key: string): boolean =>
+  key in value &&
+  typeof (value as Record<string, unknown>)[key] === 'string' &&
+  ((value as Record<string, unknown>)[key] as string).trim().length > 0;
+
+export const isSpandrelModelIdentifier = (value: unknown): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  ['key', 'hash', 'name', 'base', 'type'].every((key) => isNonemptyStringField(value, key)) &&
+  (value as { type: string }).type === 'spandrel_image_to_image';
+
 /** True when settings contain everything required to run the selected filter. */
 export const isFilterConfigValid = (type: string, settings: Record<string, unknown>): boolean => {
   if (type !== 'spandrel_filter') {
     return FILTERS_BY_TYPE.has(type);
   }
-  const model = settings.model;
-  return (
-    typeof model === 'object' &&
-    model !== null &&
-    'key' in model &&
-    typeof model.key === 'string' &&
-    'type' in model &&
-    model.type === 'spandrel_image_to_image'
-  );
+  return isSpandrelModelIdentifier(settings.model);
 };
 
 /** Coerces arbitrary stored settings to the filter's params, falling back to each default. */
@@ -211,25 +280,23 @@ const resolveSettings = (
   for (const param of definition.params) {
     const value = settings?.[param.key];
     if (param.kind === 'number' && typeof value === 'number' && Number.isFinite(value)) {
-      const clamped = Math.min(
-        param.max ?? Number.POSITIVE_INFINITY,
-        Math.max(param.min ?? Number.NEGATIVE_INFINITY, value)
-      );
+      const bounds = getFilterNumberBounds(param, settings ?? {});
+      const clamped = Math.min(bounds.inputMax, Math.max(param.coerceMin ?? bounds.inputMin, value));
       resolved[param.key] = param.integer ? Math.round(clamped) : clamped;
     } else if (param.kind === 'boolean' && typeof value === 'boolean') {
       resolved[param.key] = value;
-    } else if (param.kind === 'enum' && typeof value === 'string' && param.options.includes(value)) {
+    } else if (
+      param.kind === 'enum' &&
+      typeof value === 'string' &&
+      param.options.some((option) => option.value === value)
+    ) {
       resolved[param.key] = value;
     } else if (param.kind === 'string' && typeof value === 'string') {
       resolved[param.key] = value;
     } else if (
       param.kind === 'model' &&
-      typeof value === 'object' &&
-      value !== null &&
-      'key' in value &&
-      typeof value.key === 'string' &&
-      'type' in value &&
-      value.type === param.modelType
+      param.modelType === 'spandrel_image_to_image' &&
+      isSpandrelModelIdentifier(value)
     ) {
       resolved[param.key] = value;
     } else {

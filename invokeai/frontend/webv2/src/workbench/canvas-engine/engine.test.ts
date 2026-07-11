@@ -9216,10 +9216,81 @@ describe('guarded filter previews', () => {
     expect(engine.getDocument()).toEqual(document);
 
     expect((await engine.exportLayerPixels('manual')).status).toBe('ok');
-    expect(engine.startFilterOperation('manual', 'normal_map')).toBe('started');
+    expect(engine.startFilterOperation('manual', 'normal_map')).toBe('not-ready');
+    expect(engine.stores.filterSession.get()).toBeNull();
+    expect(engine.startFilterOperation('manual')).toBe('started');
     expect(engine.stores.filterSession.get()?.draft).toEqual(manual.filter);
     engine.cancelFilterOperation();
     expect(engine.getDocument()).toEqual(document);
+    engine.dispose();
+  });
+
+  it('does not replace another layer filter session with a recommendation', async () => {
+    const first = guardableLayer('first');
+    const second = guardableLayer('second');
+    const document = { ...emptyDoc(), layers: [first, second] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels('first')).status).toBe('ok');
+    expect(engine.startFilterOperation('first')).toBe('started');
+    engine.updateFilterOperation({ settings: { coarse: true }, type: 'lineart_edge_detection' });
+    const active = engine.stores.filterSession.get();
+
+    expect((await engine.exportLayerPixels('second')).status).toBe('ok');
+    expect(engine.startFilterOperation('second', 'normal_map')).toBe('not-ready');
+    expect(engine.stores.filterSession.get()).toEqual(active);
+    engine.dispose();
+  });
+
+  it('does not overwrite a same-layer draft or preview on rapid recommendations', async () => {
+    const layer = guardableLayer('recommended');
+    const document = { ...emptyDoc(), layers: [layer] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      filterDeps: {
+        runGraph: vi.fn(() => Promise.resolve({ imageName: 'filtered', origin: 'canvas', output: {} })),
+        uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'input' })),
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels(layer.id)).status).toBe('ok');
+    expect(engine.startFilterOperation(layer.id, 'normal_map')).toBe('started');
+    engine.updateFilterOperation({ settings: { coarse: true }, type: 'lineart_edge_detection' });
+    await engine.processFilterOperation();
+    const active = engine.stores.filterSession.get();
+
+    expect(engine.startFilterOperation(layer.id, 'canny_edge_detection')).toBe('not-ready');
+    expect(engine.stores.filterSession.get()).toEqual(active);
+    engine.dispose();
+  });
+
+  it('does not replace a different active canvas operation with a recommendation', async () => {
+    const first = guardableLayer('first');
+    const second = guardableLayer('second');
+    const document = { ...emptyDoc(), layers: [first, second] };
+    const { store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels('first')).status).toBe('ok');
+    expect(engine.startSelectObject('first')).toBe('started');
+    const operation = engine.canvasOperations.getSnapshot();
+
+    expect((await engine.exportLayerPixels('second')).status).toBe('ok');
+    expect(engine.startFilterOperation('second', 'normal_map')).toBe('not-ready');
+    expect(engine.canvasOperations.getSnapshot()).toEqual(operation);
+    expect(engine.stores.samSession.get()?.layerId).toBe('first');
     engine.dispose();
   });
 

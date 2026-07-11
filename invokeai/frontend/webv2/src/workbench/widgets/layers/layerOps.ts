@@ -316,6 +316,14 @@ export const CONTROL_ADAPTER_DEFAULTS: Readonly<
   },
 };
 
+export const CONTROL_WEIGHT_BOUNDS = {
+  inputMax: 2,
+  inputMin: -1,
+  sliderMax: 2,
+  sliderMin: 0,
+  step: 0.05,
+} as const;
+
 export const DEFAULT_CONTROL_ADAPTER = CONTROL_ADAPTER_DEFAULTS.controlnet;
 
 /** The next free "Control Layer N" name given the existing layer names (N ≥ 1, first gap). */

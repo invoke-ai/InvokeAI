@@ -6,7 +6,9 @@ import {
   CONTROL_FILTERS,
   DEFAULT_CONTROL_FILTER_TYPE,
   FILTER_NODE_ID,
+  getFilterNumberBounds,
   getFilterDefinition,
+  isFilterConfigValid,
   isSupportedFilterType,
 } from './filterGraphs';
 
@@ -31,6 +33,13 @@ const EXPECTED_DEFAULTS: Record<string, Record<string, unknown>> = {
 };
 
 const EXPECTED_TYPES = Object.keys(EXPECTED_DEFAULTS);
+const SPANDREL_MODEL = {
+  base: 'any',
+  hash: 'blake3-hash',
+  key: 'upscale',
+  name: 'Upscaler',
+  type: 'spandrel_image_to_image',
+};
 
 describe('CONTROL_FILTERS registry', () => {
   it('contains exactly all sixteen legacy filter types', () => {
@@ -48,6 +57,70 @@ describe('CONTROL_FILTERS registry', () => {
 
   it('names canny edge detection as the default control filter', () => {
     expect(DEFAULT_CONTROL_FILTER_TYPE).toBe('canny_edge_detection');
+  });
+
+  it('declares localized labels for every enum option', () => {
+    for (const definition of CONTROL_FILTERS) {
+      for (const param of definition.params) {
+        if (param.kind === 'enum') {
+          expect(
+            param.options.every((option) => option.labelKey.startsWith('widgets.layers.control.filterOptions.'))
+          ).toBe(true);
+        }
+      }
+    }
+  });
+});
+
+describe('getFilterNumberBounds', () => {
+  it.each([
+    [
+      'canny_edge_detection',
+      'low_threshold',
+      {},
+      { inputMax: 255, inputMin: 0, sliderMax: 255, sliderMin: 0, step: 1 },
+    ],
+    [
+      'canny_edge_detection',
+      'high_threshold',
+      {},
+      { inputMax: 255, inputMin: 0, sliderMax: 255, sliderMin: 0, step: 1 },
+    ],
+    ['mlsd_detection', 'score_threshold', {}, { inputMax: 1, inputMin: 0, sliderMax: 1, sliderMin: 0, step: 0.01 }],
+    ['content_shuffle', 'scale_factor', {}, { inputMax: 4096, inputMin: 0, sliderMax: 4096, sliderMin: 0, step: 1 }],
+    ['mediapipe_face_detection', 'max_faces', {}, { inputMax: 20, inputMin: 1, sliderMax: 20, sliderMin: 1, step: 1 }],
+    [
+      'mediapipe_face_detection',
+      'min_confidence',
+      {},
+      { inputMax: 1, inputMin: 0, sliderMax: 1, sliderMin: 0, step: 0.01 },
+    ],
+    ['color_map', 'tile_size', {}, { inputMax: 4096, inputMin: 1, sliderMax: 256, sliderMin: 1, step: 1 }],
+    [
+      'mlsd_detection',
+      'distance_threshold',
+      {},
+      { inputMax: 1000, inputMin: 0, sliderMax: 100, sliderMin: 0, step: 1 },
+    ],
+    ['spandrel_filter', 'scale', {}, { inputMax: 16, inputMin: 1, sliderMax: 16, sliderMin: 1, step: 1 }],
+    ['img_blur', 'radius', {}, { inputMax: 4096, inputMin: 1, sliderMax: 64, sliderMin: 1, step: 0.1 }],
+    ['img_noise', 'amount', {}, { inputMax: 1, inputMin: 0, sliderMax: 1, sliderMin: 0, step: 0.01 }],
+    ['img_noise', 'size', {}, { inputMax: 256, inputMin: 1, sliderMax: 16, sliderMin: 1, step: 1 }],
+  ])('returns legacy slider and numeric bounds for %s.%s', (type, key, settings, expected) => {
+    const param = getFilterDefinition(type)?.params.find((candidate) => candidate.key === key);
+    if (param?.kind !== 'number') {
+      throw new Error(`Missing number param ${type}.${key}`);
+    }
+    expect(getFilterNumberBounds(param, settings)).toEqual(expected);
+  });
+
+  it('changes adjust value bounds with scale_values', () => {
+    const param = getFilterDefinition('adjust_image')?.params.find((candidate) => candidate.key === 'value');
+    if (param?.kind !== 'number') {
+      throw new Error('Missing adjust_image.value');
+    }
+    expect(getFilterNumberBounds(param, { scale_values: false })).toMatchObject({ inputMax: 2, sliderMax: 2 });
+    expect(getFilterNumberBounds(param, { scale_values: true })).toMatchObject({ inputMax: 255, sliderMax: 255 });
   });
 });
 
@@ -118,6 +191,18 @@ describe('buildFilterGraph', () => {
       scale: 1.5,
       type: 'img_channel_multiply',
     });
+
+    const multipliedAtLegacyMax = buildFilterGraph('adjust_image', imageName, {
+      scale_values: true,
+      value: 999,
+    }).graph.nodes[FILTER_NODE_ID] as Record<string, unknown>;
+    expect(multipliedAtLegacyMax.scale).toBe(255);
+
+    const offsetAtMax = buildFilterGraph('adjust_image', imageName, {
+      scale_values: false,
+      value: 255,
+    }).graph.nodes[FILTER_NODE_ID] as Record<string, unknown>;
+    expect(offsetAtMax.offset).toBe(255);
   });
 
   it('builds padded gaussian blur with alpha nudge wiring', () => {
@@ -173,19 +258,17 @@ describe('buildFilterGraph', () => {
   });
 
   it('builds Spandrel autoscale and direct nodes and rejects a missing model', () => {
-    const model = { base: 'any', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' };
     expect(() => buildFilterGraph('spandrel_filter', imageName)).toThrow(/model/i);
     expect(
-      buildFilterGraph('spandrel_filter', imageName, { model, scale: 4 }).graph.nodes[FILTER_NODE_ID]
+      buildFilterGraph('spandrel_filter', imageName, { model: SPANDREL_MODEL, scale: 4 }).graph.nodes[FILTER_NODE_ID]
     ).toMatchObject({
-      image_to_image_model: model,
+      image_to_image_model: SPANDREL_MODEL,
       scale: 4,
       type: 'spandrel_image_to_image_autoscale',
     });
-    const direct = buildFilterGraph('spandrel_filter', imageName, { autoScale: false, model }).graph.nodes[
-      FILTER_NODE_ID
-    ] as Record<string, unknown>;
-    expect(direct).toMatchObject({ image_to_image_model: model, type: 'spandrel_image_to_image' });
+    const direct = buildFilterGraph('spandrel_filter', imageName, { autoScale: false, model: SPANDREL_MODEL }).graph
+      .nodes[FILTER_NODE_ID] as Record<string, unknown>;
+    expect(direct).toMatchObject({ image_to_image_model: SPANDREL_MODEL, type: 'spandrel_image_to_image' });
     expect(direct.scale).toBeUndefined();
   });
 
@@ -205,13 +288,12 @@ describe('buildFilterGraph', () => {
   });
 
   it('coerces malformed persisted settings for every parameter of all sixteen filters', () => {
-    const model = { base: 'any', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' };
     for (const definition of CONTROL_FILTERS) {
       const malformed: Record<string, unknown> = Object.fromEntries(
         definition.params.map((param) => [param.key, param.kind === 'boolean' ? 'false' : { invalid: true }])
       );
       if (definition.type === 'spandrel_filter') {
-        malformed.model = model;
+        malformed.model = SPANDREL_MODEL;
       }
       const node = buildFilterGraph(definition.type, imageName, malformed).graph.nodes[FILTER_NODE_ID] as Record<
         string,
@@ -235,14 +317,13 @@ describe('buildFilterGraph', () => {
   });
 
   it('clamps every declared numeric parameter at both bounds', () => {
-    const model = { base: 'any', key: 'upscale', name: 'Upscaler', type: 'spandrel_image_to_image' };
     for (const definition of CONTROL_FILTERS) {
       for (const param of definition.params) {
         if (param.kind !== 'number') {
           continue;
         }
-        const lowSettings = { model, [param.key]: Number.MIN_SAFE_INTEGER };
-        const highSettings = { model, [param.key]: Number.MAX_SAFE_INTEGER };
+        const lowSettings = { model: SPANDREL_MODEL, [param.key]: Number.MIN_SAFE_INTEGER };
+        const highSettings = { model: SPANDREL_MODEL, [param.key]: Number.MAX_SAFE_INTEGER };
         const low = buildFilterGraph(definition.type, imageName, lowSettings).graph.nodes[FILTER_NODE_ID] as Record<
           string,
           unknown
@@ -255,13 +336,24 @@ describe('buildFilterGraph', () => {
           expect(low.offset).toBe(-255);
           expect(high.offset).toBe(255);
         } else if (param.min !== undefined) {
-          expect(low[param.key], `${definition.type}.${param.key}.min`).toBe(param.min);
+          expect(low[param.key], `${definition.type}.${param.key}.min`).toBe(param.coerceMin ?? param.min);
         }
         if (param.max !== undefined && !(definition.type === 'adjust_image' && param.key === 'value')) {
           expect(high[param.key], `${definition.type}.${param.key}.max`).toBe(param.max);
         }
       }
     }
+  });
+
+  it('requires a complete nonempty backend Spandrel model identifier', () => {
+    expect(isFilterConfigValid('spandrel_filter', { model: SPANDREL_MODEL })).toBe(true);
+    for (const field of ['key', 'hash', 'name', 'base', 'type'] as const) {
+      expect(isFilterConfigValid('spandrel_filter', { model: { ...SPANDREL_MODEL, [field]: '' } }), field).toBe(false);
+    }
+    expect(isFilterConfigValid('spandrel_filter', { model: { ...SPANDREL_MODEL, type: 'controlnet' } })).toBe(false);
+    expect(() => buildFilterGraph('spandrel_filter', imageName, { model: { ...SPANDREL_MODEL, hash: '' } })).toThrow(
+      /model/i
+    );
   });
 
   it('applies valid custom settings, overriding defaults', () => {

@@ -1224,6 +1224,41 @@
           "size": "Size",
           "value": "Value"
         },
+        "filterOptions": {
+          "blur_type": {
+            "box": "Box",
+            "gaussian": "Gaussian"
+          },
+          "channel": {
+            "alpha": "Alpha (RGBA)",
+            "black": "Black (CMYK)",
+            "blue": "Blue (RGBA)",
+            "cb": "Cb (YCbCr)",
+            "cr": "Cr (YCbCr)",
+            "cyan": "Cyan (CMYK)",
+            "green": "Green (RGBA)",
+            "hue": "Hue (HSV)",
+            "lab_a": "A (LAB)",
+            "lab_b": "B (LAB)",
+            "luminosity": "Luminosity (LAB)",
+            "magenta": "Magenta (CMYK)",
+            "red": "Red (RGBA)",
+            "saturation": "Saturation (HSV)",
+            "value": "Value (HSV)",
+            "y": "Y (YCbCr)",
+            "yellow": "Yellow (CMYK)"
+          },
+          "model_size": {
+            "base": "Base",
+            "large": "Large",
+            "small": "Small",
+            "small_v2": "Small v2"
+          },
+          "noise_type": {
+            "gaussian": "Gaussian",
+            "salt_and_pepper": "Salt and pepper"
+          }
+        },
         "filters": {
           "adjust_image": "Adjust image",
           "canny_edge_detection": "Canny",
