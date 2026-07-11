@@ -7,10 +7,10 @@ import type {
   ReplaceSelectionFromImageResult,
 } from '@workbench/canvas-engine/engine';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { SamModel } from '@workbench/generation/canvas/samGraph';
+import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
 import type { CanvasImageRef } from '@workbench/types';
 
-import { buildSamGraph } from '@workbench/generation/canvas/samGraph';
+import { buildSamGraph, documentToExportLocalSamInput } from '@workbench/generation/canvas/samGraph';
 
 export type SelectObjectTarget = 'selection' | 'inpaint_mask' | 'regional_guidance';
 
@@ -50,8 +50,11 @@ export interface SelectObjectRunnerDeps {
 
 export interface RunSelectObjectOptions {
   layerId: string;
-  prompt: string;
+  input?: SamInput;
+  /** Prompt-only compatibility seam for the current dialog. */
+  prompt?: string;
   model: SamModel;
+  invert?: boolean;
   applyPolygonRefinement: boolean;
   signal?: AbortSignal;
   deps: SelectObjectRunnerDeps;
@@ -60,30 +63,73 @@ export interface RunSelectObjectOptions {
 const isAbortError = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError';
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-export const runSelectObject = async (options: RunSelectObjectOptions): Promise<SelectObjectRunResult> => {
-  if (options.signal?.aborted) {
+export interface SelectObjectPreparedSource {
+  guard: LayerExportGuard;
+  imageName: string;
+  rect: Rect;
+}
+
+export type PrepareSelectObjectSourceResult =
+  | { status: 'ready'; source: SelectObjectPreparedSource }
+  | Exclude<SelectObjectRunResult, SelectObjectReadyResult>;
+
+export const prepareSelectObjectSource = async (
+  layerId: string,
+  deps: Pick<SelectObjectRunnerDeps, 'exportLayer' | 'uploadIntermediate'>,
+  signal?: AbortSignal
+): Promise<PrepareSelectObjectSourceResult> => {
+  if (signal?.aborted) {
     return { status: 'aborted' };
   }
   try {
-    const exported = await options.deps.exportLayer(options.layerId);
-    if (options.signal?.aborted) {
+    const exported = await deps.exportLayer(layerId);
+    if (signal?.aborted) {
       return { status: 'aborted' };
     }
     if (exported.status !== 'ok') {
       return exported;
     }
-
-    const uploaded = await options.deps.uploadIntermediate(exported.blob, options.signal);
-    if (options.signal?.aborted) {
+    const uploaded = await deps.uploadIntermediate(exported.blob, signal);
+    if (signal?.aborted) {
       return { status: 'aborted' };
     }
+    return {
+      source: { guard: exported.guard, imageName: uploaded.imageName, rect: exported.rect },
+      status: 'ready',
+    };
+  } catch (error) {
+    if (signal?.aborted || isAbortError(error)) {
+      return { status: 'aborted' };
+    }
+    return { message: errorMessage(error), status: 'failed' };
+  }
+};
+
+export interface ProcessSelectObjectSourceOptions {
+  source: SelectObjectPreparedSource;
+  input: SamInput;
+  model: SamModel;
+  invert: boolean;
+  applyPolygonRefinement: boolean;
+  signal?: AbortSignal;
+  runGraph: SelectObjectRunnerDeps['runGraph'];
+}
+
+export const processSelectObjectSource = async (
+  options: ProcessSelectObjectSourceOptions
+): Promise<SelectObjectRunResult> => {
+  if (options.signal?.aborted) {
+    return { status: 'aborted' };
+  }
+  try {
     const built = buildSamGraph({
       applyPolygonRefinement: options.applyPolygonRefinement,
-      imageName: uploaded.imageName,
+      imageName: options.source.imageName,
+      input: documentToExportLocalSamInput(options.input, options.source.rect),
+      invert: options.invert,
       model: options.model,
-      prompt: options.prompt,
     });
-    const output = await options.deps.runGraph({
+    const output = await options.runGraph({
       graph: built.graph,
       outputNodeId: built.outputNodeId,
       signal: options.signal,
@@ -92,9 +138,13 @@ export const runSelectObject = async (options: RunSelectObjectOptions): Promise<
       return { status: 'aborted' };
     }
     return {
-      guard: exported.guard,
-      image: { height: exported.rect.height, imageName: output.imageName, width: exported.rect.width },
-      rect: exported.rect,
+      guard: options.source.guard,
+      image: {
+        height: options.source.rect.height,
+        imageName: output.imageName,
+        width: options.source.rect.width,
+      },
+      rect: options.source.rect,
       status: 'ready',
     };
   } catch (error) {
@@ -103,6 +153,22 @@ export const runSelectObject = async (options: RunSelectObjectOptions): Promise<
     }
     return { message: errorMessage(error), status: 'failed' };
   }
+};
+
+export const runSelectObject = async (options: RunSelectObjectOptions): Promise<SelectObjectRunResult> => {
+  const prepared = await prepareSelectObjectSource(options.layerId, options.deps, options.signal);
+  if (prepared.status !== 'ready') {
+    return prepared;
+  }
+  return processSelectObjectSource({
+    applyPolygonRefinement: options.applyPolygonRefinement,
+    input: options.input ?? { prompt: options.prompt ?? '', type: 'prompt' },
+    invert: options.invert ?? false,
+    model: options.model,
+    runGraph: options.deps.runGraph,
+    signal: options.signal,
+    source: prepared.source,
+  });
 };
 
 export type SelectObjectRouteResult = ReplaceSelectionFromImageResult | CommitMaskImageResult;
