@@ -314,10 +314,12 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     layer.isEnabled && hasContent && mainModel
       ? getControlValidationReason({
           adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type } : null,
+          beginEndStepPct: adapter.beginEndStepPct,
           controlLoraIndex: Math.max(0, controlLoraIndex),
           kind: adapter.kind,
           mainBase: mainModel.base,
           mainVariant: mainModel.variant ?? undefined,
+          weight: adapter.weight,
           zImageControlIndex: Math.max(0, zImageControlIndex),
         })
       : null;

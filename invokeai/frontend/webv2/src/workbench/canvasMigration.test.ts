@@ -100,6 +100,36 @@ describe('migrateCanvasStateToV2', () => {
     });
   });
 
+  it('normalizes control adapters in both the live document and saved snapshots', () => {
+    const state = createEmptyCanvasStateV2();
+    const invalidLayer = {
+      adapter: { beginEndStepPct: [0.8, 0.2], controlMode: null, kind: 'z_image_control', model: null, weight: -1 },
+      blendMode: 'normal',
+      id: 'z-control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Z Control',
+      opacity: 1,
+      source: { bitmap: null, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const document = { ...state.document, layers: [invalidLayer] };
+    const migrated = migrateCanvasStateToV2({
+      ...state,
+      document,
+      snapshots: [{ createdAt: 'now', document, id: 'snapshot', name: 'Snapshot' }],
+    });
+
+    const getAdapter = (doc: (typeof migrated)['document']) => {
+      const layer = doc.layers[0];
+      return layer?.type === 'control' ? layer.adapter : null;
+    };
+    expect(getAdapter(migrated.document)).toMatchObject({ beginEndStepPct: [0, 1], weight: 0.75 });
+    expect(getAdapter(migrated.snapshots[0]!.document)).toMatchObject({ beginEndStepPct: [0, 1], weight: 0.75 });
+  });
+
   it('maps a v1 raster layer to a v2 raster layer positioned by transform', () => {
     const v1Canvas = {
       document: {

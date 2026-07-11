@@ -49,7 +49,11 @@ import type {
 } from './types';
 import type { ProjectGraphState } from './workflows/types';
 
-import { createNewCanvasStateV2, migrateCanvasStateToV2 } from './canvasMigration';
+import {
+  createNewCanvasStateV2,
+  migrateCanvasStateToV2,
+  normalizeCanvasDocumentControlAdapters,
+} from './canvasMigration';
 import {
   getCanvasStagingSlotCount,
   getCanvasStagingSlots,
@@ -1175,7 +1179,12 @@ const saveCanvasSnapshotToState = (
   ...canvas,
   snapshots: [
     ...canvas.snapshots,
-    { createdAt: snapshot.createdAt, document: structuredClone(canvas.document), id: snapshot.id, name: snapshot.name },
+    {
+      createdAt: snapshot.createdAt,
+      document: normalizeCanvasDocumentControlAdapters(structuredClone(canvas.document)),
+      id: snapshot.id,
+      name: snapshot.name,
+    },
   ],
 });
 
@@ -1187,7 +1196,7 @@ const restoreCanvasSnapshotInState = (canvas: CanvasStateContractV2, snapshotId:
   return snapshot
     ? {
         ...canvas,
-        document: repairSelectedLayerId(structuredClone(snapshot.document)),
+        document: repairSelectedLayerId(normalizeCanvasDocumentControlAdapters(structuredClone(snapshot.document))),
         documentRevision: canvas.documentRevision + 1,
       }
     : canvas;
@@ -3335,7 +3344,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       return updateActiveProject(state, (project) =>
         setCanvasState(project, {
           ...project.canvas,
-          document: repairSelectedLayerId(structuredClone(action.document)),
+          document: repairSelectedLayerId(normalizeCanvasDocumentControlAdapters(structuredClone(action.document))),
           // Wholesale swap: bump the revision so the document mirror clears engine
           // pixel history even when the new document keeps the same dims/layer ids.
           documentRevision: project.canvas.documentRevision + 1,

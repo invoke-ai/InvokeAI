@@ -5,6 +5,7 @@ export type ControlValidationReason =
   | 'unsupported_adapter'
   | 'incompatible_base'
   | 'incompatible_adapter'
+  | 'invalid_adapter_values'
   | 'control_lora_limit'
   | 'z_image_control_limit'
   | 'flux_fill_control_lora';
@@ -24,13 +25,27 @@ export const isControlKindSupportedForBase = (base: string, kind: ControlAdapter
 
 export const getControlValidationReason = (params: {
   adapterModel: { base: string; type: string } | null;
+  beginEndStepPct: [number, number];
   controlLoraIndex: number;
   kind: ControlAdapterKind;
   mainBase: string;
   mainVariant?: string;
+  weight: number;
   zImageControlIndex?: number;
 }): ControlValidationReason | null => {
-  const { adapterModel, controlLoraIndex, kind, mainBase, mainVariant, zImageControlIndex = 0 } = params;
+  const {
+    adapterModel,
+    beginEndStepPct,
+    controlLoraIndex,
+    kind,
+    mainBase,
+    mainVariant,
+    weight,
+    zImageControlIndex = 0,
+  } = params;
+  if (!areControlAdapterValuesValid(kind, weight, beginEndStepPct)) {
+    return 'invalid_adapter_values';
+  }
   if (!adapterModel) {
     return 'missing_model';
   }
@@ -55,3 +70,4 @@ export const getControlValidationReason = (params: {
   }
   return null;
 };
+import { areControlAdapterValuesValid } from '@workbench/controlAdapters';

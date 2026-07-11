@@ -1301,6 +1301,7 @@
           "flux_fill_control_lora": "Control LoRA is not compatible with FLUX Fill.",
           "incompatible_adapter": "The selected model does not match this adapter type.",
           "incompatible_base": "The control model is incompatible with the selected base model.",
+          "invalid_adapter_values": "Control weight and step range must be valid before generating.",
           "missing_model": "Select a control model before generating.",
           "unsupported_adapter": "This control adapter is not supported by the selected base model.",
           "z_image_control_limit": "Only one Z-Image control can be used at a time."

@@ -152,10 +152,12 @@ const collectControlLayerInputs = async (
     const resolved = adapter.model ? models?.find((candidate) => candidate.key === adapter.model) : undefined;
     const rejection = getControlValidationReason({
       adapterModel: resolved ? { base: resolved.base, type: resolved.type } : null,
+      beginEndStepPct: adapter.beginEndStepPct,
       controlLoraIndex: adapter.kind === 'control_lora' ? controlLoraCount : 0,
       kind: adapter.kind,
       mainBase: model.base,
       mainVariant: model.variant ?? undefined,
+      weight: adapter.weight,
       zImageControlIndex: adapter.kind === 'z_image_control' ? zImageControlCount : 0,
     });
     if (rejection || !resolved) {

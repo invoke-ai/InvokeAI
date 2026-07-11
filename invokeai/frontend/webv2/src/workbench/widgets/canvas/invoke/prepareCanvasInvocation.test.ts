@@ -379,6 +379,30 @@ describe('runCanvasInvocation', () => {
     expect(harness.notices()[0]?.message).toContain('missing_model');
   });
 
+  it('blocks invocation when a nonempty control layer has malformed numeric settings', async () => {
+    const model = {
+      base: 'sd-1',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'hash',
+      key: 'controlnet',
+      name: 'ControlNet',
+      path: 'controlnet',
+      source: 'controlnet',
+      source_type: 'path' as const,
+      type: 'controlnet',
+    };
+    const harness = makeHarness({
+      document: docWithLayers([controlLayer('control', { model: model.key, weight: Number.NaN })]),
+      models: [model],
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()[0]?.message).toContain('invalid_adapter_values');
+  });
+
   it('ignores an empty control layer with no model', async () => {
     const harness = makeHarness({ document: docWithLayers([controlLayer('control', {}, false)]) });
     await runCanvasInvocation(harness.deps);

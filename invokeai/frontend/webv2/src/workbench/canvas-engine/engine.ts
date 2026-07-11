@@ -132,6 +132,7 @@ import {
   nextRegionalGuidanceFillColor,
   nextRegionalGuidanceName,
 } from '@workbench/widgets/layers/layerOps';
+import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
 import { createSelectObjectSession } from '@workbench/widgets/layers/selectObjectSession';
 
 import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
@@ -3684,6 +3685,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const getReducerDocument = (): CanvasDocumentContractV2 | null =>
     store.getState().projects.find((project) => project.id === projectId)?.canvas.document ?? null;
+  const getMainModelBase = (): string | null => {
+    const project = store.getState().projects.find((candidate) => candidate.id === projectId);
+    return project ? getSelectedModelBase(project) : null;
+  };
 
   const dispatchPreparedMutation = (
     action: WorkbenchAction,
@@ -4211,7 +4216,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         const base =
           liveLayer.type === 'control'
             ? structuredClone(liveLayer)
-            : createControlLayer(`${liveLayer.name} filtered`, layerId);
+            : createControlLayer(`${liveLayer.name} filtered`, layerId, getMainModelBase());
         copy = {
           ...base,
           filter: options.filter,
@@ -4462,7 +4467,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       const copy: CanvasLayerContract =
         options.target === 'copy-control'
           ? {
-              ...createControlLayer(nextControlLayerName(document.layers.map((layer) => layer.name)), layerId),
+              ...createControlLayer(
+                nextControlLayerName(document.layers.map((layer) => layer.name)),
+                layerId,
+                getMainModelBase()
+              ),
               source,
               transform: identityTransform,
             }

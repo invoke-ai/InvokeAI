@@ -4227,11 +4227,19 @@ describe('extract masked canvas area', () => {
  * multi-step fold.
  */
 const createReducerBackedStore = (
-  document: CanvasDocumentContractV2
+  document: CanvasDocumentContractV2,
+  mainBase?: string
 ): { dispatch: Mock<(action: WorkbenchAction) => void>; projectId: string; store: EngineStore } => {
   let state = createInitialWorkbenchState();
   const projectId = state.projects[0]!.id;
   state = workbenchReducer(state, { document, type: 'replaceCanvasDocument' });
+  if (mainBase) {
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { model: { base: mainBase, key: `${mainBase}-main`, name: `${mainBase} main`, type: 'main' } },
+      widgetId: 'generate',
+    });
+  }
   const listeners = new Set<() => void>();
   const dispatch = vi.fn((action: WorkbenchAction) => {
     state = workbenchReducer(state, action);
@@ -6188,6 +6196,42 @@ describe('commitRasterFilterResult', () => {
     engine.dispose();
   });
 
+  it.each([
+    { base: 'z-image', expectedKind: 'z_image_control' },
+    { base: 'sd-1', expectedKind: 'controlnet' },
+    { base: 'flux', expectedKind: 'controlnet' },
+  ] as const)(
+    'uses $expectedKind defaults when Save Filter As Control runs under $base',
+    async ({ base, expectedKind }) => {
+      const source = filterLayer('source');
+      const { projectId, store } = createReducerBackedStore(filterDoc([source]), base);
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected a filterable raster export');
+      }
+
+      const result = await engine.commitRasterFilterResult({
+        guard: exported.guard,
+        image: durableImage,
+        mode: 'copy',
+        rect: exported.rect,
+        target: 'control',
+      });
+
+      expect(result.status).toBe('committed');
+      const created = engine.getDocument()!.layers[0];
+      expect(created?.type === 'control' ? created.adapter.kind : null).toBe(expectedKind);
+      engine.dispose();
+    }
+  );
+
   it.each(['allocation', 'draw'] as const)(
     'keeps replace undo retryable and exact when detached cache %s fails',
     async (failure) => {
@@ -7511,6 +7555,44 @@ describe('commitGeneratedImageResult', () => {
       backend,
     };
   };
+
+  it.each([
+    { base: 'z-image', expectedKind: 'z_image_control' },
+    { base: 'sd-1', expectedKind: 'controlnet' },
+    { base: 'flux', expectedKind: 'controlnet' },
+  ] as const)(
+    'uses $expectedKind defaults when workflow Copy To Control runs under $base',
+    async ({ base, expectedKind }) => {
+      const source = workflowRaster();
+      const { projectId, store } = createReducerBackedStore(workflowDocument([source]), base);
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const exported = await engine.exportLayerPixels(source.id);
+      if (exported.status !== 'ok') {
+        throw new Error('expected an exportable workflow source');
+      }
+
+      const result = await engine.commitGeneratedImageResult({
+        guard: exported.guard,
+        image: generatedImage,
+        origin: generatedOrigin,
+        target: 'copy-control',
+      });
+
+      expect(result.status).toBe('committed');
+      if (result.status !== 'committed') {
+        throw new Error('expected a committed control copy');
+      }
+      const created = engine.getDocument()!.layers.find((layer) => layer.id === result.layerId);
+      expect(created?.type === 'control' ? created.adapter.kind : null).toBe(expectedKind);
+      engine.dispose();
+    }
+  );
 
   it('replaces a raster at the generated origin and native size, clears baked adjustments, and replays exactly', async () => {
     const source = workflowRaster();

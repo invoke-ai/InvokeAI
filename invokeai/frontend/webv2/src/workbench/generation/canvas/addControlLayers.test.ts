@@ -442,6 +442,10 @@ describe('addControlLayers — unsupported kind rejected', () => {
   it('rejects a graph input whose resolved model has an incompatible base', () => {
     expect(() => run({ base: 'sd-1', layers: [layer({ model: model('sdxl') })] })).toThrow(/incompatible_base/);
   });
+
+  it('rejects malformed numeric adapter values at the graph boundary', () => {
+    expect(() => run({ base: 'sd-1', layers: [layer({ weight: Number.NaN })] })).toThrow(/invalid_adapter_values/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -467,8 +471,10 @@ describe('getControlLayerRejectionReason', () => {
     hasContent: true,
     kind: 'controlnet' as ControlAdapterKind,
     adapterModel: { base: 'sd-1' },
+    beginEndStepPct: [0, 1] as [number, number],
     mainBase: 'sd-1',
     mainVariant: undefined as string | undefined,
+    weight: 0.75,
   };
 
   it('returns null for a valid controlnet on sd-1 with a matching model base', () => {
@@ -512,8 +518,10 @@ describe('getControlLayerRejectionReason', () => {
       hasContent: true,
       kind: 'control_lora',
       adapterModel: { base: 'flux' },
+      beginEndStepPct: [0, 1],
       mainBase: 'flux',
       mainVariant: 'dev_fill',
+      weight: 0.75,
     });
     expect(reason).toEqual(expect.any(String));
     expect(reason).toContain('FLUX Fill');

@@ -117,10 +117,12 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
   for (const layer of layers) {
     const reason = getControlValidationReason({
       adapterModel: layer.model,
+      beginEndStepPct: layer.beginEndStepPct,
       controlLoraIndex: layer.kind === 'control_lora' ? controlLoraCount : 0,
       kind: layer.kind,
       mainBase: base,
       mainVariant: modelVariant,
+      weight: layer.weight,
       zImageControlIndex: layer.kind === 'z_image_control' ? zImageControlCount : 0,
     });
     if (reason) {
@@ -193,20 +195,24 @@ export const getControlLayerRejectionReason = (params: {
   hasContent: boolean;
   kind: ControlAdapterKind;
   adapterModel: { base: string; type?: string } | null;
+  beginEndStepPct: [number, number];
   mainBase: string;
   mainVariant?: string;
+  weight: number;
 }): string | null => {
-  const { adapterModel, hasContent, kind, layerName, mainBase, mainVariant } = params;
+  const { adapterModel, beginEndStepPct, hasContent, kind, layerName, mainBase, mainVariant, weight } = params;
 
   if (!hasContent) {
     return `Control layer "${layerName}" has no control content.`;
   }
   const reason = getControlValidationReason({
     adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type ?? kind } : null,
+    beginEndStepPct,
     controlLoraIndex: 0,
     kind,
     mainBase,
     mainVariant,
+    weight,
   });
   if (!reason) {
     return null;

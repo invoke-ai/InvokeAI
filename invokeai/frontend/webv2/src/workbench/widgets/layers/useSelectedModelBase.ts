@@ -1,7 +1,6 @@
-import { useModelsSelector } from '@workbench/models/modelsStore';
-import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useMemo } from 'react';
+
+import { getSelectedModelBase } from './selectedModel';
 
 /**
  * The main model's base (`sd-1` / `sdxl` / `flux` / …), read from the generate
@@ -10,11 +9,5 @@ import { useMemo } from 'react';
  * flow so a freshly created "regional reference image" mints the base-correct kind.
  */
 export const useSelectedModelBase = (): string | null => {
-  const modelKey = useActiveProjectSelector((project) => {
-    const values = getProjectWidgetValues(project, 'generate');
-    const model = values?.model;
-    return model && typeof model === 'object' && 'key' in model ? String((model as { key: unknown }).key) : null;
-  });
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  return useMemo(() => models.find((model) => model.key === modelKey)?.base ?? null, [models, modelKey]);
+  return useActiveProjectSelector(getSelectedModelBase);
 };

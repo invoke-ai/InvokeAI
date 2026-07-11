@@ -14,13 +14,13 @@ import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
 import { PROMPT_ATTENTION_TARGET_PROPS } from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
 import { PromptTextarea } from '@workbench/widgets/generate/promptFields/PromptTextarea';
 import { FluxReduxControls } from '@workbench/widgets/generate/reference-images/ReferenceImageControls';
-import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ImageIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { applyStructural, applyStructuralPreview, createRegionalReferenceImage } from './layerOps';
+import { useSelectedModelBase } from './useSelectedModelBase';
 
 /** The regional-guidance fields patchable via `updateCanvasLayerConfig`. */
 interface RegionalConfigPatch {
@@ -65,17 +65,6 @@ const referenceImageDropId = (layerId: string, refId: string): string => `region
  * with the header add-layer menu via `layerOps.createRegionalReferenceImage`.
  */
 const createReferenceImage = (base: string | null): GenerateReferenceImage => createRegionalReferenceImage(base);
-
-/** The main model's base, read from the generate widget values (drives ref-image model support). */
-const useSelectedModelBase = (): string | null => {
-  const modelKey = useActiveProjectSelector((project) => {
-    const values = getProjectWidgetValues(project, 'generate');
-    const model = values?.model;
-    return model && typeof model === 'object' && 'key' in model ? String((model as { key: unknown }).key) : null;
-  });
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  return useMemo(() => models.find((model) => model.key === modelKey)?.base ?? null, [models, modelKey]);
-};
 
 interface RegionalGuidanceSettingsProps {
   engine: CanvasEngine | null;

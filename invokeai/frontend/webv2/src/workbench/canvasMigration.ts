@@ -237,6 +237,19 @@ const migrateStagingAreaToV2 = (rawCanvas: Record<string, unknown>): CanvasStagi
 const isCanvasStateV2 = (canvas: unknown): canvas is Record<string, unknown> & { version: 2 } =>
   isRecord(canvas) && canvas.version === 2;
 
+export const normalizeCanvasDocumentControlAdapters = (
+  document: CanvasDocumentContractV2
+): CanvasDocumentContractV2 => ({
+  ...document,
+  layers: document.layers.map((layer) => {
+    if (!isRecord(layer) || layer.type !== 'control') {
+      return layer;
+    }
+    const adapter = normalizeControlAdapter(layer.adapter);
+    return adapter === layer.adapter ? layer : ({ ...layer, adapter } as CanvasDocumentContractV2['layers'][number]);
+  }),
+});
+
 /** Defensively re-normalizes an already-v2 canvas state (fills in anything missing without re-deriving layers). */
 const normalizeCanvasStateV2 = (canvas: Record<string, unknown>): CanvasStateContractV2 => {
   const rawDocument = isRecord(canvas.document) ? canvas.document : {};
@@ -244,7 +257,7 @@ const normalizeCanvasStateV2 = (canvas: Record<string, unknown>): CanvasStateCon
   const height = asPositiveNumber(rawDocument.height, DEFAULT_CANVAS_DOCUMENT_HEIGHT);
   const bbox = isRecord(rawDocument.bbox) ? rawDocument.bbox : {};
 
-  const document: CanvasDocumentContractV2 = {
+  const document = normalizeCanvasDocumentControlAdapters({
     background:
       rawDocument.background === 'transparent' || isRecord(rawDocument.background)
         ? (rawDocument.background as CanvasDocumentContractV2['background'])
@@ -256,24 +269,21 @@ const normalizeCanvasStateV2 = (canvas: Record<string, unknown>): CanvasStateCon
       y: asNumber(bbox.y, 0),
     },
     height,
-    layers: Array.isArray(rawDocument.layers)
-      ? (rawDocument.layers.map((layer) => {
-          if (!isRecord(layer) || layer.type !== 'control') {
-            return layer;
-          }
-          const adapter = normalizeControlAdapter(layer.adapter);
-          return adapter === layer.adapter ? layer : { ...layer, adapter };
-        }) as CanvasDocumentContractV2['layers'])
-      : [],
+    layers: Array.isArray(rawDocument.layers) ? (rawDocument.layers as CanvasDocumentContractV2['layers']) : [],
     selectedLayerId: typeof rawDocument.selectedLayerId === 'string' ? rawDocument.selectedLayerId : null,
     version: 2,
     width,
-  };
+  });
 
   return {
     document,
     documentRevision: asNumber(canvas.documentRevision, 0),
-    snapshots: Array.isArray(canvas.snapshots) ? (canvas.snapshots as CanvasStateContractV2['snapshots']) : [],
+    snapshots: Array.isArray(canvas.snapshots)
+      ? (canvas.snapshots as CanvasStateContractV2['snapshots']).map((snapshot) => ({
+          ...snapshot,
+          document: normalizeCanvasDocumentControlAdapters(snapshot.document),
+        }))
+      : [],
     stagingArea: migrateStagingAreaToV2(canvas),
     version: 2,
   };

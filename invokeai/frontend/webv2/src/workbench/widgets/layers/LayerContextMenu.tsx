@@ -10,11 +10,9 @@ import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engi
 import { deleteLayerActions, duplicateLayerActions } from '@workbench/canvasLayerOps';
 import { IconButton, MenuContent, RenameDialog } from '@workbench/components/ui';
 import { uploadGalleryImage } from '@workbench/gallery/api';
-import { useModelsSelector } from '@workbench/models/modelsStore';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import { useCanvasDocumentEditingLocked, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
-import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
@@ -72,6 +70,7 @@ import {
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
+import { useSelectedModelBase } from './useSelectedModelBase';
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 type MenuOpenChange = ComponentProps<typeof Menu.Root>['onOpenChange'];
@@ -114,17 +113,6 @@ const hasPureExportableLayerContent = (layer: CanvasLayerContract, document: Can
   }
   const contentRect = getSourceContentRect(layer, document);
   return contentRect.width > 0 && contentRect.height > 0;
-};
-
-/** The main model's base, read from the generate widget values (drives regional ref-image support). */
-const useSelectedModelBase = (): string | null => {
-  const modelKey = useActiveProjectSelector((project) => {
-    const values = getProjectWidgetValues(project, 'generate');
-    const model = values?.model;
-    return model && typeof model === 'object' && 'key' in model ? String((model as { key: unknown }).key) : null;
-  });
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  return useMemo(() => models.find((model) => model.key === modelKey)?.base ?? null, [models, modelKey]);
 };
 
 interface LayerMenuProps {

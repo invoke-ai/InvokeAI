@@ -2396,6 +2396,33 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(restored.selectedLayerId).toBe(restored.layers[0]?.id);
   });
 
+  it('normalizes a control adapter when restoring a saved canvas snapshot', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createControlLayer('ctrl')]);
+    state = workbenchReducer(state, { createdAt: 'now', id: 'snap-1', name: 'First', type: 'saveCanvasSnapshot' });
+    const snapshotLayer = getCanvas(state).snapshots[0]!.document.layers[0];
+    if (snapshotLayer?.type !== 'control') {
+      throw new Error('expected a control layer');
+    }
+    snapshotLayer.adapter = {
+      beginEndStepPct: [Number.NaN, 2],
+      controlMode: null,
+      kind: 'z_image_control',
+      model: null,
+      weight: Number.POSITIVE_INFINITY,
+    };
+
+    state = workbenchReducer(state, { snapshotId: 'snap-1', type: 'restoreCanvasSnapshot' });
+
+    const restored = getCanvas(state).document.layers[0];
+    expect(restored?.type === 'control' ? restored.adapter : null).toEqual({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      kind: 'z_image_control',
+      model: null,
+      weight: 0.75,
+    });
+  });
+
   it('saves, restores, and deletes canvas snapshots', () => {
     let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
 
