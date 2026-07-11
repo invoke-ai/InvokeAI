@@ -20,7 +20,7 @@ import { ImageIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { applyStructural, createRegionalReferenceImage } from './layerOps';
+import { applyStructural, applyStructuralPreview, createRegionalReferenceImage } from './layerOps';
 
 /** The regional-guidance fields patchable via `updateCanvasLayerConfig`. */
 interface RegionalConfigPatch {
@@ -193,16 +193,20 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   const handleColorChange = useCallback(
     (hex: string) => {
+      if (
+        !applyStructuralPreview(engine, dispatch, {
+          config: { layerType: 'regional_guidance', mask: { fill: { ...fill, color: hex } } },
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        })
+      ) {
+        return;
+      }
       if (fillBeforeRef.current === null) {
         fillBeforeRef.current = fill;
       }
-      dispatch({
-        config: { layerType: 'regional_guidance', mask: { fill: { ...fill, color: hex } } },
-        id: layer.id,
-        type: 'updateCanvasLayerConfig',
-      });
     },
-    [dispatch, fill, layer.id]
+    [dispatch, engine, fill, layer.id]
   );
 
   const handleColorChangeEnd = useCallback(

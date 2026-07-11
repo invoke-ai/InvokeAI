@@ -18,7 +18,7 @@ import {
   finishCurveDragResult,
   getCurveGridCoordinates,
 } from './curveEditorMath';
-import { applyStructural } from './layerOps';
+import { applyStructural, applyStructuralPreview } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
 
@@ -84,13 +84,13 @@ const AdjustmentsControls = ({ adjustments, engine, layer }: AdjustmentsControls
 
   const patchLive = useCallback(
     (next: CanvasAdjustmentsContract) => {
-      dispatch({
+      applyStructuralPreview(engine, dispatch, {
         config: { adjustments: next, layerType: 'raster' },
         id: layer.id,
         type: 'updateCanvasLayerConfig',
       });
     },
-    [dispatch, layer.id]
+    [dispatch, engine, layer.id]
   );
 
   const commit = useCallback(

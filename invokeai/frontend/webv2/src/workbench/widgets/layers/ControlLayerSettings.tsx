@@ -12,7 +12,7 @@ import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/Workb
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { applyStructural } from './layerOps';
+import { applyStructural, applyStructuralPreview } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
 
@@ -139,16 +139,20 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
       if (next === undefined || !Number.isFinite(next)) {
         return;
       }
+      if (
+        !applyStructuralPreview(engine, dispatch, {
+          config: { adapter: { weight: next }, layerType: 'control' },
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        })
+      ) {
+        return;
+      }
       if (weightBeforeRef.current === null) {
         weightBeforeRef.current = adapter.weight;
       }
-      dispatch({
-        config: { adapter: { weight: next }, layerType: 'control' },
-        id: layer.id,
-        type: 'updateCanvasLayerConfig',
-      });
     },
-    [adapter.weight, dispatch, layer.id]
+    [adapter.weight, dispatch, engine, layer.id]
   );
   const handleWeightChangeEnd = useCallback(
     ({ value }: SliderValueChangeDetails) => {
@@ -169,16 +173,20 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
       if (value.length !== 2) {
         return;
       }
+      if (
+        !applyStructuralPreview(engine, dispatch, {
+          config: { adapter: { beginEndStepPct: [value[0]!, value[1]!] }, layerType: 'control' },
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        })
+      ) {
+        return;
+      }
       if (rangeBeforeRef.current === null) {
         rangeBeforeRef.current = adapter.beginEndStepPct;
       }
-      dispatch({
-        config: { adapter: { beginEndStepPct: [value[0]!, value[1]!] }, layerType: 'control' },
-        id: layer.id,
-        type: 'updateCanvasLayerConfig',
-      });
     },
-    [adapter.beginEndStepPct, dispatch, layer.id]
+    [adapter.beginEndStepPct, dispatch, engine, layer.id]
   );
   const handleRangeChangeEnd = useCallback(
     ({ value }: SliderValueChangeDetails) => {

@@ -13,7 +13,7 @@ import { uploadGalleryImage } from '@workbench/gallery/api';
 import { useModelsSelector } from '@workbench/models/modelsStore';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
-import { useCanvasOperation, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasDocumentEditingLocked, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
@@ -190,15 +190,13 @@ const LayerMenu = ({
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const { document } = canvas;
-  const canvasOperation = useCanvasOperation(engine);
   const { bbox } = document;
   const documentRect = useMemo(
     () => ({ height: document.height, width: document.width, x: 0, y: 0 }),
     [document.height, document.width]
   );
-  const interactionLocked =
-    isCanvasInteractionLocked(canvas, queueItems) ||
-    (canvasOperation.status === 'active' && canvasOperation.identity.kind === 'filter');
+  const documentEditingLocked = useCanvasDocumentEditingLocked(engine);
+  const interactionLocked = isCanvasInteractionLocked(canvas, queueItems) || documentEditingLocked;
   // Re-render when live, not-yet-persisted paint/mask pixels change.
   useLayerThumbnailVersion(engine, layer.id);
   const hasSupportedContent = engine

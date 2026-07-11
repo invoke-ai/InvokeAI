@@ -638,3 +638,16 @@ export const applyStructural = (
     dispatch(forward);
   }
 };
+
+/** Applies a guarded live edit without recording history until the interaction ends. */
+export const applyStructuralPreview = (
+  engine: CanvasEngine | null,
+  dispatch: Dispatch<WorkbenchAction>,
+  action: WorkbenchAction
+): boolean => {
+  if (engine) {
+    return engine.applyStructuralPreview(action);
+  }
+  dispatch(action);
+  return true;
+};

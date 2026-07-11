@@ -218,6 +218,30 @@ describe('compositeDocument', () => {
     expect(findSet(target.callLog, 'globalCompositeOperation')).toContain('multiply');
   });
 
+  it('applies control transparency, opacity, and blend mode to a filter preview', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('control', 10, 10);
+    const preview = backend.createSurface(10, 10);
+    const target = backend.createSurface(100, 100);
+    const layer = {
+      ...controlLayer('control'),
+      blendMode: 'multiply' as const,
+      opacity: 0.4,
+      withTransparencyEffect: true,
+    };
+
+    compositeDocument(target, makeDoc([layer]), caches, VIEW, {
+      backend,
+      layerPreviews: new Map([['control', preview]]),
+    });
+
+    const draw = target.callLog.find((entry) => entry.op === 'drawImage');
+    expect(draw?.args[0]).not.toBe(preview.canvas);
+    expect(findSet(target.callLog, 'globalAlpha')).toContain(0.4);
+    expect(findSet(target.callLog, 'globalCompositeOperation')).toContain('multiply');
+  });
+
   it("maps the 'normal' blend mode to 'source-over'", () => {
     const backend = createTestStubRasterBackend();
     const caches = createLayerCacheStore(backend);

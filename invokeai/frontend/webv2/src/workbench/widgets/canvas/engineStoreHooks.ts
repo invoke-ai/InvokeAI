@@ -93,6 +93,16 @@ export const useCanvasCanUndo = (engine: CanvasEngine): boolean => useScalarStor
 /** Whether the engine-owned canvas history has an entry to redo (enables the header redo button). */
 export const useCanvasCanRedo = (engine: CanvasEngine): boolean => useScalarStore(engine.stores.canRedo);
 
+/** Whether a SAM/filter operation currently excludes ordinary canvas document edits. */
+export const useCanvasDocumentEditingLocked = (engine: CanvasEngine | null): boolean => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.stores.documentEditingLocked.subscribe(listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine?.stores.documentEditingLocked.get() ?? false, [engine]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
+
 /**
  * The brush tool's current options (size / color / opacity / pressure). Write
  * through `engine.stores.brushOptions.set(...)` directly — there is no reducer

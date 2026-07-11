@@ -535,6 +535,8 @@ export interface EngineStores {
   samSession: ScalarStore<SamSessionSnapshot | null>;
   /** Active guarded layer-filter session state, independent of any launching view. */
   filterSession: ScalarStore<FilterOperationSessionState | null>;
+  /** Whether an engine-owned operation currently excludes ordinary document edits. */
+  documentEditingLocked: ScalarStore<boolean>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -650,6 +652,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
+  documentEditingLocked: createScalarStore<boolean>(false),
   filterSession: createScalarStore<FilterOperationSessionState | null>(null),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),

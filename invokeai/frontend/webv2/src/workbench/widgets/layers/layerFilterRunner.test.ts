@@ -29,8 +29,9 @@ describe('runLayerFilter', () => {
           expect(receivedSignal).toBe(signal);
           return Promise.resolve({ imageName: 'output' });
         },
-        uploadIntermediate: (receivedBlob) => {
+        uploadIntermediate: (receivedBlob, receivedSignal) => {
           expect(receivedBlob).toBe(blob);
+          expect(receivedSignal).toBe(signal);
           calls.push('upload');
           return Promise.resolve({ imageName: 'input' });
         },
@@ -107,6 +108,35 @@ describe('runLayerFilter', () => {
       })
     ).rejects.toMatchObject({ name: 'AbortError' });
     expect(calls).toEqual(['encode', 'upload']);
+  });
+
+  it('forwards cancellation into an in-flight upload', async () => {
+    const controller = new AbortController();
+    let uploadSignal: AbortSignal | undefined;
+
+    const pending = runLayerFilter({
+      deps: {
+        encodeSurface: () => Promise.resolve(new Blob()),
+        runFilterGraph: () => Promise.resolve({ imageName: 'output' }),
+        uploadIntermediate: (_blob, signal) => {
+          uploadSignal = signal;
+          return new Promise((_resolve, reject) => {
+            signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+          });
+        },
+      },
+      filterType: 'canny_edge_detection',
+      input: {
+        rect: { height: 1, width: 1, x: 0, y: 0 },
+        surface: createTestStubRasterBackend().createSurface(1, 1),
+      },
+      signal: controller.signal,
+    });
+    await Promise.resolve();
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(uploadSignal).toBe(controller.signal);
   });
 
   it('propagates a filter graph failure', async () => {

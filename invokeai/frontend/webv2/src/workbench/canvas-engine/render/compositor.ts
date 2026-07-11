@@ -282,8 +282,13 @@ const drawCachedLayer = (
   const preview = opts.onlyLayerId ? null : (opts.layerPreviews?.get(layer.id) ?? null);
   if (preview) {
     // Non-destructive filter preview: stretch the filtered image over the layer's
-    // content footprint (through the already-applied layer transform).
-    ctx.drawImage(preview.canvas, origin.x, origin.y, entry.rect.width, entry.rect.height);
+    // content footprint (through the already-applied layer transform), including
+    // the same display-only control transparency effect used after commit.
+    const displayPreview =
+      layer.type === 'control' && layer.withTransparencyEffect && opts.backend
+        ? renderControlTransparency(opts.backend, preview, preview.width, preview.height)
+        : preview;
+    ctx.drawImage(displayPreview.canvas, origin.x, origin.y, entry.rect.width, entry.rect.height);
   } else if (isMaskLayer(layer)) {
     drawMaskLayer(ctx, layer, entry.surface, origin, opts);
   } else if (layer.type === 'control' && layer.withTransparencyEffect && opts.backend) {

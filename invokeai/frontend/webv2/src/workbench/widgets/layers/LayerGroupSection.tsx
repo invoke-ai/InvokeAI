@@ -11,6 +11,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { canMergeVisibleRasters } from '@workbench/canvas-engine/document/mergeVisible';
 import { IconButton, toaster, Tooltip } from '@workbench/components/ui';
+import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectName } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -58,6 +59,7 @@ export const LayerGroupSection = ({
   selectedLayerId,
 }: LayerGroupSectionProps) => {
   const { t } = useTranslation();
+  const editingLocked = useCanvasDocumentEditingLocked(engine);
 
   const sensors = useSensors(useSensor(PointerSensor, POINTER_SENSOR_OPTIONS));
 
@@ -71,6 +73,9 @@ export const LayerGroupSection = ({
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      if (editingLocked) {
+        return;
+      }
       const { active, over } = event;
       if (!over) {
         return;
@@ -87,7 +92,7 @@ export const LayerGroupSection = ({
         { orderedIds: layers.map((layer) => layer.id), type: 'reorderCanvasLayers' }
       );
     },
-    [dispatch, engine, layers, t]
+    [dispatch, editingLocked, engine, layers, t]
   );
 
   const handleToggleCollapse = useCallback(() => onToggleCollapse(groupKey), [groupKey, onToggleCollapse]);
@@ -126,6 +131,7 @@ export const LayerGroupSection = ({
         <GroupActions
           dispatch={dispatch}
           engine={engine}
+          editingLocked={editingLocked}
           groupKey={groupKey}
           groupLayers={groupLayers}
           layers={layers}
@@ -171,12 +177,14 @@ export const LayerGroupSection = ({
  */
 const GroupActions = ({
   dispatch,
+  editingLocked,
   engine,
   groupKey,
   groupLayers,
   layers,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
+  editingLocked: boolean;
   engine: CanvasEngine | null;
   groupKey: LayerGroupKey;
   groupLayers: readonly CanvasLayerContract[];
@@ -189,7 +197,7 @@ const GroupActions = ({
   // Enablement uses the SAME planner the engine op executes (`planMergeVisibleRuns`
   // over the GLOBAL array — run-splitting depends on interleaved non-participants),
   // so the button is enabled exactly when clicking it will merge something.
-  const canMerge = !!engine && groupKey === 'raster' && canMergeVisibleRasters(layers);
+  const canMerge = !editingLocked && !!engine && groupKey === 'raster' && canMergeVisibleRasters(layers);
   const canExport = !!engine && groupKey === 'raster' && canExportRasterPsd(layers);
 
   const handleNew = useCallback(() => addLayer(groupAddItemId(groupKey)), [addLayer, groupKey]);
@@ -254,7 +262,7 @@ const GroupActions = ({
             return (
               <GroupActionButton
                 key={action}
-                disabled={!canExport}
+                disabled={editingLocked || !canExport}
                 icon={FileDownIcon}
                 label={t('widgets.layers.groupActions.exportPsd')}
                 onClick={handleExportPsd}
@@ -264,6 +272,7 @@ const GroupActions = ({
             return (
               <GroupActionButton
                 key={action}
+                disabled={editingLocked}
                 icon={allVisible ? EyeIcon : EyeOffIcon}
                 label={t(allVisible ? 'widgets.layers.groupActions.hideAll' : 'widgets.layers.groupActions.showAll')}
                 onClick={handleToggleVisibility}
@@ -273,6 +282,7 @@ const GroupActions = ({
             return (
               <GroupActionButton
                 key={action}
+                disabled={editingLocked}
                 icon={PlusIcon}
                 label={t('widgets.layers.groupActions.new')}
                 onClick={handleNew}

@@ -5,7 +5,7 @@ import type { Dispatch } from 'react';
 
 import { Popover, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui';
-import { useCanvasOperation } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { SlidersHorizontalIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -48,8 +48,7 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
   const [triggerOpen, setTriggerOpen] = useState(false);
   const request = useLayerPropertiesRequest(layer.id);
   const documentRevision = useActiveProjectSelector((project) => project.canvas.documentRevision);
-  const operation = useCanvasOperation(engine);
-  const isFilterActive = operation.status === 'active' && operation.identity.kind === 'filter';
+  const editingLocked = useCanvasDocumentEditingLocked(engine);
   const isOpen = triggerOpen || request !== null;
 
   const handleOpenChange = useCallback(
@@ -74,7 +73,7 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
         <IconButton
           aria-label={t('widgets.layers.properties')}
           color="fg.subtle"
-          disabled={isFilterActive}
+          disabled={editingLocked}
           size="2xs"
           variant="ghost"
           onClick={stopPropagation}
@@ -87,7 +86,7 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
         <Popover.Positioner>
           <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="20rem">
             <Popover.Body p="2.5">
-              <Stack gap="2">
+              <Stack gap="2" inert={editingLocked}>
                 <LayerTypeSettings
                   dispatch={dispatch}
                   documentRevision={documentRevision}

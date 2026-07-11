@@ -10,6 +10,7 @@ import type { Dispatch } from 'react';
 
 import { Box, createListCollection, Flex, HStack, NumberInput, Stack } from '@chakra-ui/react';
 import { ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
+import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import {
   CANVAS_DENOISING_STRENGTH_KEY,
   clampCanvasDenoisingStrength,
@@ -26,7 +27,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DenoisingStrengthWave } from './DenoisingStrengthWave';
-import { applyStructural, CANVAS_BLEND_MODES } from './layerOps';
+import { applyStructural, applyStructuralPreview, CANVAS_BLEND_MODES } from './layerOps';
 
 const STRENGTH_DEBOUNCE_MS = 250;
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
@@ -56,6 +57,9 @@ export const isSameSelection = (left: CanvasLayerContract | null, right: CanvasL
   return leftFill === rightFill;
 };
 
+export const isLayerEditingDisabled = (layer: CanvasLayerContract | null, editingLocked: boolean): boolean =>
+  !layer || editingLocked;
+
 /**
  * The slimmed Photoshop-style region above the layer groups (round 3): exactly two
  * rows — the global canvas denoising-strength slider + a per-selection Opacity row
@@ -67,6 +71,7 @@ export const LayersPanelHeader = () => {
   const engine = useCanvasEngine();
   const dispatch = useWorkbenchDispatch();
   const layer = useActiveProjectSelector(selectSelectedLayer, isSameSelection);
+  const editingLocked = useCanvasDocumentEditingLocked(engine);
 
   return (
     <Stack gap="0">
@@ -75,8 +80,8 @@ export const LayersPanelHeader = () => {
       </Box>
       <Box borderBottomWidth={1} px="1.5" py="1">
         <Flex align="center" gap="2">
-          <BlendModeControl dispatch={dispatch} engine={engine} layer={layer} />
-          <OpacityRow dispatch={dispatch} engine={engine} layer={layer} />
+          <BlendModeControl dispatch={dispatch} editingLocked={editingLocked} engine={engine} layer={layer} />
+          <OpacityRow dispatch={dispatch} editingLocked={editingLocked} engine={engine} layer={layer} />
         </Flex>
       </Box>
     </Stack>
@@ -90,15 +95,17 @@ interface BlendModeOption {
 
 const BlendModeControl = ({
   dispatch,
+  editingLocked,
   engine,
   layer,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
+  editingLocked: boolean;
   engine: CanvasEngine | null;
   layer: CanvasLayerContract | null;
 }) => {
   const { t } = useTranslation();
-  const disabled = !layer;
+  const disabled = isLayerEditingDisabled(layer, editingLocked);
   const blendMode = layer?.blendMode ?? 'normal';
   const blendCollection = useMemo(
     () =>
@@ -146,10 +153,12 @@ const BlendModeControl = ({
 
 const OpacityRow = ({
   dispatch,
+  editingLocked,
   engine,
   layer,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
+  editingLocked: boolean;
   engine: CanvasEngine | null;
   layer: CanvasLayerContract | null;
 }) => {
@@ -160,7 +169,7 @@ const OpacityRow = ({
   // trigger (both can fire inside one browser event), so `layer.opacity` from the
   // render closure can be stale at commit time.
   const pendingRef = useRef<{ id: string; before: number; latest: number } | null>(null);
-  const disabled = !layer;
+  const disabled = isLayerEditingDisabled(layer, editingLocked);
   const opacityPercent = useMemo(() => String(Math.round((layer?.opacity ?? 1) * 100)), [layer?.opacity]);
 
   // Records ONE history entry spanning the pending gesture (a spinner press,
@@ -191,15 +200,22 @@ const OpacityRow = ({
         commitPending();
       }
       const next = clamp01(valueAsNumber / 100);
+      if (
+        !applyStructuralPreview(engine, dispatch, {
+          id: layer.id,
+          patch: { opacity: next },
+          type: 'updateCanvasLayer',
+        })
+      ) {
+        return;
+      }
       if (pendingRef.current === null) {
         pendingRef.current = { before: layer.opacity, id: layer.id, latest: next };
       } else {
         pendingRef.current.latest = next;
       }
-      // Live, un-recorded update (mirrors the old opacity slider's drag phase).
-      dispatch({ id: layer.id, patch: { opacity: next }, type: 'updateCanvasLayer' });
     },
-    [commitPending, dispatch, layer]
+    [commitPending, dispatch, engine, layer]
   );
 
   // Commit per completed interaction: each spinner click (fires on release, so a
@@ -246,7 +262,9 @@ const OpacityRow = ({
             onKeyUp={handleInputKeyUp}
           />
         </NumberInput.Root>
-        {isMaskLayer(layer) ? <MaskFillSwatch dispatch={dispatch} engine={engine} layer={layer} /> : null}
+        {isMaskLayer(layer) ? (
+          <MaskFillSwatch disabled={editingLocked} dispatch={dispatch} engine={engine} layer={layer} />
+        ) : null}
       </HStack>
     </Field>
   );
@@ -259,10 +277,12 @@ const OpacityRow = ({
  */
 const MaskFillSwatch = ({
   dispatch,
+  disabled,
   engine,
   layer,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
+  disabled: boolean;
   engine: CanvasEngine | null;
   layer: MaskLayer;
 }) => {
@@ -271,19 +291,15 @@ const MaskFillSwatch = ({
   const fill = layer.mask.fill;
 
   const patchFill = useCallback(
-    (next: CanvasMaskFillContract, record: boolean, before?: CanvasMaskFillContract) => {
+    (next: CanvasMaskFillContract, before: CanvasMaskFillContract) => {
       const config =
         layer.type === 'inpaint_mask'
           ? ({ layerType: 'inpaint_mask', mask: { fill: next } } as const)
           : ({ layerType: 'regional_guidance', mask: { fill: next } } as const);
-      if (!record) {
-        dispatch({ config, id: layer.id, type: 'updateCanvasLayerConfig' });
-        return;
-      }
       const inverseConfig =
         layer.type === 'inpaint_mask'
-          ? ({ layerType: 'inpaint_mask', mask: { fill: before ?? next } } as const)
-          : ({ layerType: 'regional_guidance', mask: { fill: before ?? next } } as const);
+          ? ({ layerType: 'inpaint_mask', mask: { fill: before } } as const)
+          : ({ layerType: 'regional_guidance', mask: { fill: before } } as const);
       applyStructural(
         engine,
         dispatch,
@@ -297,30 +313,39 @@ const MaskFillSwatch = ({
 
   const handleColorChange = useCallback(
     (hex: string) => {
+      const next = { ...fill, color: hex };
+      const config =
+        layer.type === 'inpaint_mask'
+          ? ({ layerType: 'inpaint_mask', mask: { fill: next } } as const)
+          : ({ layerType: 'regional_guidance', mask: { fill: next } } as const);
+      if (!applyStructuralPreview(engine, dispatch, { config, id: layer.id, type: 'updateCanvasLayerConfig' })) {
+        return;
+      }
       if (fillBeforeRef.current === null) {
         fillBeforeRef.current = fill;
       }
-      patchFill({ ...fill, color: hex }, false);
     },
-    [fill, patchFill]
+    [dispatch, engine, fill, layer.id, layer.type]
   );
 
   const handleColorChangeEnd = useCallback(
     (hex: string) => {
       const before = fillBeforeRef.current ?? fill;
       fillBeforeRef.current = null;
-      patchFill({ ...before, color: hex }, true, before);
+      patchFill({ ...before, color: hex }, before);
     },
     [fill, patchFill]
   );
 
   return (
-    <ColorPicker
-      aria-label={t('widgets.layers.maskFill.color')}
-      value={fill.color}
-      onValueChange={handleColorChange}
-      onValueChangeEnd={handleColorChangeEnd}
-    />
+    <Box aria-disabled={disabled} inert={disabled} opacity={disabled ? 0.5 : 1}>
+      <ColorPicker
+        aria-label={t('widgets.layers.maskFill.color')}
+        value={fill.color}
+        onValueChange={handleColorChange}
+        onValueChangeEnd={handleColorChangeEnd}
+      />
+    </Box>
   );
 };
 

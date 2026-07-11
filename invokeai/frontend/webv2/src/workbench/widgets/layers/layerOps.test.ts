@@ -5,6 +5,7 @@ import type { WorkbenchAction } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  applyStructuralPreview,
   applyStructural,
   canConvertRasterControl,
   canMergeLayerDown,
@@ -190,6 +191,20 @@ describe('applyStructural', () => {
 
     expect(dispatch).toHaveBeenCalledWith(forward);
     expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('applyStructuralPreview', () => {
+  it('routes a live document edit through the engine guard', () => {
+    const action = { id: 'layer', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' } as const;
+    const applyPreview = vi.fn(() => false);
+    const engine = { applyStructuralPreview: applyPreview } as unknown as CanvasEngine;
+    const dispatch = vi.fn();
+
+    expect(applyStructuralPreview(engine, dispatch, action)).toBe(false);
+
+    expect(applyPreview).toHaveBeenCalledWith(action);
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });
 

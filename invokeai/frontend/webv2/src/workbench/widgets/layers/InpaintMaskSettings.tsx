@@ -8,7 +8,7 @@ import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { applyStructural } from './layerOps';
+import { applyStructural, applyStructuralPreview } from './layerOps';
 
 /** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
 const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
@@ -76,17 +76,20 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
 
   const handleColorChange = useCallback(
     (hex: string) => {
+      if (
+        !applyStructuralPreview(engine, dispatch, {
+          config: { layerType: 'inpaint_mask', mask: { fill: { ...fill, color: hex } } },
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        })
+      ) {
+        return;
+      }
       if (fillBeforeRef.current === null) {
         fillBeforeRef.current = fill;
       }
-      // Live, un-recorded update during the drag (mirrors the opacity slider).
-      dispatch({
-        config: { layerType: 'inpaint_mask', mask: { fill: { ...fill, color: hex } } },
-        id: layer.id,
-        type: 'updateCanvasLayerConfig',
-      });
     },
-    [dispatch, fill, layer.id]
+    [dispatch, engine, fill, layer.id]
   );
 
   const handleColorChangeEnd = useCallback(
@@ -114,12 +117,20 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
       if (next === undefined || !Number.isFinite(next)) {
         return;
       }
+      if (
+        !applyStructuralPreview(engine, dispatch, {
+          config: noiseConfig(next),
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        })
+      ) {
+        return;
+      }
       if (noiseBeforeRef.current === null) {
         noiseBeforeRef.current = noiseLevel;
       }
-      dispatch({ config: noiseConfig(next), id: layer.id, type: 'updateCanvasLayerConfig' });
     },
-    [dispatch, layer.id, noiseLevel]
+    [dispatch, engine, layer.id, noiseLevel]
   );
 
   const handleNoiseChangeEnd = useCallback(
@@ -147,12 +158,20 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
       if (next === undefined || !Number.isFinite(next)) {
         return;
       }
+      if (
+        !applyStructuralPreview(engine, dispatch, {
+          config: denoiseConfig(next),
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        })
+      ) {
+        return;
+      }
       if (denoiseBeforeRef.current === null) {
         denoiseBeforeRef.current = denoiseLimit;
       }
-      dispatch({ config: denoiseConfig(next), id: layer.id, type: 'updateCanvasLayerConfig' });
     },
-    [dispatch, denoiseLimit, layer.id]
+    [dispatch, denoiseLimit, engine, layer.id]
   );
 
   const handleDenoiseChangeEnd = useCallback(

@@ -591,6 +591,8 @@ export interface CanvasEngine {
    * so they share the canvas undo stack with paint edits.
    */
   commitStructural(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): void;
+  /** Applies a guarded live structural preview without adding a history entry. */
+  applyStructuralPreview(action: WorkbenchAction): boolean;
   /** Adds a contract-built layer while preserving the source layer's live cache pixels. */
   commitLayerCopy(label: string, sourceLayerId: string, layer: CanvasLayerContract, index: number): boolean;
   /** Converts the expected immutable live layer while preserving its cache pixels through undo/redo. */
@@ -1555,6 +1557,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   canvasOperations = createCanvasOperationController({ isGuardCurrent: isLayerExportGuardCurrent });
+  const documentEditOwner = Symbol('canvas-operation-document-edit-owner');
+  const syncDocumentEditingLock = (): void => {
+    stores.documentEditingLocked.set(canvasOperations.getSnapshot().status === 'active');
+  };
+  const unsubscribeDocumentEditingLock = canvasOperations.subscribe(syncDocumentEditingLock);
+  const canEditDocument = (owner?: symbol): boolean =>
+    owner === documentEditOwner || !stores.documentEditingLocked.get();
 
   const ensureLayerCaches = (doc: CanvasDocumentContractV2): void => {
     for (const layer of doc.layers) {
@@ -1727,7 +1736,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const cropLayerToBbox = async (layerId: string): Promise<CropLayerResult> => {
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return { status: 'busy' };
     }
     endNudgeBurst();
@@ -1857,6 +1866,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const copyLayerToRaster = async (layerId: string): Promise<string | null> => {
+    if (!canEditDocument()) {
+      return null;
+    }
     if (pipeline.isGestureActive()) {
       return null;
     }
@@ -2964,7 +2976,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           if (signal?.aborted) {
             throw new DOMException('Select Object upload was aborted.', 'AbortError');
           }
-          const uploaded = await uploadCanvasImage(blob, { isIntermediate: true });
+          const uploaded = await uploadCanvasImage(blob, { isIntermediate: true, signal });
           if (signal?.aborted) {
             throw new DOMException('Select Object upload was aborted.', 'AbortError');
           }
@@ -3050,7 +3062,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       invalidateSelectObjectCommit();
       return { status: 'stale' };
     }
-    const result = await replaceSelectionFromImage(preview.guard, preview.image, preview.rect, owner.controller.signal);
+    const result = await replaceSelectionFromImage(
+      preview.guard,
+      preview.image,
+      preview.rect,
+      owner.controller.signal,
+      documentEditOwner
+    );
     if (!isSelectObjectCommitOwnerCurrent(owner)) {
       return result;
     }
@@ -3105,20 +3123,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     try {
       result =
         target === 'raster' || target === 'control'
-          ? await commitGeneratedImageResult({
-              guard: preview.guard,
-              image: preview.image,
-              origin: { x: preview.rect.x, y: preview.rect.y },
-              signal: owner.controller.signal,
-              target: target === 'raster' ? 'copy-raster' : 'copy-control',
-            })
-          : await commitMaskImageResult({
-              guard: preview.guard,
-              image: preview.image,
-              rect: preview.rect,
-              signal: owner.controller.signal,
-              target,
-            });
+          ? await commitGeneratedImageResult(
+              {
+                guard: preview.guard,
+                image: preview.image,
+                origin: { x: preview.rect.x, y: preview.rect.y },
+                signal: owner.controller.signal,
+                target: target === 'raster' ? 'copy-raster' : 'copy-control',
+              },
+              documentEditOwner
+            )
+          : await commitMaskImageResult(
+              {
+                guard: preview.guard,
+                image: preview.image,
+                rect: preview.rect,
+                signal: owner.controller.signal,
+                target,
+              },
+              documentEditOwner
+            );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (finishSelectObjectCommit(owner)) {
@@ -3226,15 +3250,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       deps: {
         clearPreview: () => clearFilterPreview(layer.id),
         commit: ({ draft, guard, image, rect, signal, target }) =>
-          commitRasterFilterResult({
-            filter: draft,
-            guard,
-            image,
-            mode: target === 'apply' ? 'replace' : 'copy',
-            rect,
-            signal,
-            target,
-          }),
+          commitRasterFilterResult(
+            {
+              filter: draft,
+              guard,
+              image,
+              mode: target === 'apply' ? 'replace' : 'copy',
+              rect,
+              signal,
+              target,
+            },
+            documentEditOwner
+          ),
         controller: canvasOperations,
         exportPixels: () => rasterizeLayerPixels(layer.id, { applyAdjustments: true, includeDisabled: true }),
         isGuardCurrent: isLayerExportGuardCurrent,
@@ -3250,9 +3277,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
                   runUtilityGraph({ graph, hub: socketHub, outputNodeId, signal }));
                 return { imageName: output.imageName };
               },
-              uploadIntermediate: async (blob) => {
-                const uploaded = await (queueDeps?.uploadIntermediate(blob) ??
-                  uploadCanvasImage(blob, { isIntermediate: true }));
+              uploadIntermediate: async (blob, signal) => {
+                const uploaded = await (queueDeps?.uploadIntermediate(blob, signal) ??
+                  uploadCanvasImage(blob, { isIntermediate: true, signal }));
                 return { imageName: uploaded.imageName };
               },
             },
@@ -3708,7 +3735,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     layer: CanvasLayerContract,
     index: number
   ): boolean => {
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return false;
     }
     endNudgeBurst();
@@ -3772,7 +3799,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     expectedLiveLayer: CanvasLayerContract,
     after: CanvasLayerContract
   ): boolean => {
-    if (pipeline.isGestureActive() || expectedLiveLayer.id !== after.id || expectedLiveLayer.type === after.type) {
+    if (
+      !canEditDocument() ||
+      pipeline.isGestureActive() ||
+      expectedLiveLayer.id !== after.id ||
+      expectedLiveLayer.type === after.type
+    ) {
       return false;
     }
     endNudgeBurst();
@@ -3825,8 +3857,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     guard: LayerExportGuard,
     image: CanvasImageRef,
     rect: Rect,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    owner?: symbol
   ): Promise<ReplaceSelectionFromImageResult> => {
+    if (!canEditDocument(owner)) {
+      return { status: 'busy' };
+    }
     if (signal?.aborted) {
       return { status: 'aborted' };
     }
@@ -3886,7 +3922,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
   };
 
-  const commitMaskImageResult = (options: CommitMaskImageResultOptions): Promise<CommitMaskImageResult> => {
+  const commitMaskImageResult = (
+    options: CommitMaskImageResultOptions,
+    owner?: symbol
+  ): Promise<CommitMaskImageResult> => {
+    if (!canEditDocument(owner)) {
+      return Promise.resolve({ status: 'busy' });
+    }
     if (options.signal?.aborted) {
       return Promise.resolve({ status: 'aborted' });
     }
@@ -3972,7 +4014,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return Promise.resolve({ layerId, status: 'committed' });
   };
 
-  const commitRasterFilterResult = async (options: CommitRasterFilterOptions): Promise<CommitRasterFilterResult> => {
+  const commitRasterFilterResult = async (
+    options: CommitRasterFilterOptions,
+    owner?: symbol
+  ): Promise<CommitRasterFilterResult> => {
+    if (!canEditDocument(owner)) {
+      return { status: 'busy' };
+    }
     if (options.signal?.aborted) {
       return { status: 'aborted' };
     }
@@ -4178,8 +4226,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const commitGeneratedImageResult = async (
-    options: CommitGeneratedImageOptions
+    options: CommitGeneratedImageOptions,
+    owner?: symbol
   ): Promise<CommitGeneratedImageResult> => {
+    if (!canEditDocument(owner)) {
+      return { status: 'busy' };
+    }
     if (options.signal?.aborted) {
       return { status: 'aborted' };
     }
@@ -4410,7 +4462,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     upperLayerId: string,
     operation: BooleanRasterOperation
   ): Promise<BooleanRasterResult> => {
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return 'busy';
     }
     endNudgeBurst();
@@ -4579,7 +4631,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const extractMaskedArea = async (maskLayerId: string): Promise<ExtractMaskedAreaResult> => {
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return { status: 'busy' };
     }
     endNudgeBurst();
@@ -4748,7 +4800,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // pixels and dispatches a structural collapse under the open stroke session.
     // Matches the commitStructural/nudge guards; this op is not undoable, so the
     // guard is doubly important. The pipeline reports gesture state.
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return false;
     }
     endNudgeBurst();
@@ -4877,6 +4929,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const MAX_MERGE_VISIBLE_STEPS = 256;
 
   const mergeVisibleRasterLayers = (): MergeVisibleResult => {
+    if (!canEditDocument()) {
+      return 'nothing';
+    }
     // Mirrors the mergeLayerDown guard: no pixel work under an open gesture.
     if (pipeline.isGestureActive()) {
       return 'nothing';
@@ -5040,7 +5095,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
    * source.
    */
   const rasterizeLayer = (layerId: string): boolean => {
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return false;
     }
     endNudgeBurst();
@@ -5160,8 +5215,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // entry inside the gesture. The move/bbox tools commit on pointer-UP, by
     // which point the pipeline has already cleared the gesture flag (it is reset
     // before the active tool's `onPointerUp` runs), so their commits still land.
-    const operation = canvasOperations.getSnapshot();
-    if (pipeline.isGestureActive() || (operation.status === 'active' && operation.identity.kind === 'filter')) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return;
     }
     endNudgeBurst();
@@ -5176,6 +5230,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     );
   };
 
+  const applyStructuralPreview = (action: WorkbenchAction): boolean => {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
+      return false;
+    }
+    store.dispatch(action);
+    return true;
+  };
+
   /**
    * Nudges the selected layer by `(dx, dy)` document pixels as a structural,
    * undoable edit. A no-op with no selection or a locked/hidden selected layer.
@@ -5188,7 +5250,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // structural transform under the open stroke session (feeding the cache-wipe
     // path) and interleave a history entry inside the gesture. The pipeline
     // reports gesture state; while a stroke is in progress this is a no-op.
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return;
     }
     const doc = mirror.getDocument();
@@ -5318,6 +5380,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   });
 
   const applyTransform = (): void => {
+    if (!canEditDocument()) {
+      return;
+    }
     // No-op mid-gesture (guarded like commitStructural/merge): apply writes a
     // structural transform (and, for paint, pixels) that must not interleave with
     // an open pointer session. Apply lands on Enter/button, after pointer-up.
@@ -5566,6 +5631,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const commitTextEdit = (content: string, styleChanges?: Partial<TextToolOptions>): void => {
+    if (!canEditDocument()) {
+      return;
+    }
     // Defensive mid-gesture guard (commit is React-driven on blur/mod+enter, so
     // this normally never fires mid-stroke): a structural dispatch must not
     // interleave with an open pointer session. Mirrors commitStructural's guard.
@@ -5641,6 +5709,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
    * clears the session, and the portal's `onBlur` re-commit then no-ops.
    */
   const commitOpenTextSession = (): boolean => {
+    if (!canEditDocument()) {
+      return false;
+    }
     const session = stores.textEditSession.get();
     if (!session) {
       return false;
@@ -5717,6 +5788,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
    * (= document space for identity paint layers).
    */
   const runMaskedSelectionEdit = (kind: 'fill' | 'erase'): void => {
+    if (!canEditDocument()) {
+      return;
+    }
     if (pipeline.isGestureActive()) {
       return;
     }
@@ -5805,7 +5879,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   /** Clears a mask's live pixels and persisted bitmap while retaining prompts, fill, and modifiers. */
   const clearMask = (layerId: string): boolean => {
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return false;
     }
     const doc = mirror.getDocument();
@@ -5876,7 +5950,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
    * a mask, or locked/hidden. Returns whether it ran.
    */
   const invertMask = (layerId: string): boolean => {
-    if (pipeline.isGestureActive()) {
+    if (!canEditDocument() || pipeline.isGestureActive()) {
       return false;
     }
     const doc = mirror.getDocument();
@@ -5964,7 +6038,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // Drop any open text-edit session (its layer belongs to a document this
     // engine no longer serves).
     stores.textEditSession.set(null);
-    // Drop any control-filter previews outright — the engine is going away, so
+    // Drop any guarded filter previews outright — the engine is going away, so
     // there's no render loop left to invalidate for them.
     filterPreviews.clear();
     filterPreviewTokens.clear();
@@ -5984,6 +6058,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     unsubscribeRuleOfThirds();
     unsubscribeHistory();
     unsubscribeProjectPreviewLifecycle();
+    unsubscribeDocumentEditingLock();
     history.clear();
     bitmapStore.dispose();
     mirror.dispose();
@@ -6070,6 +6145,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   return {
+    applyStructuralPreview,
     applyTransform,
     booleanMergeRasterLayers,
     canvasOperations,
@@ -6149,7 +6225,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // state; while a stroke is in progress these are no-ops.
     nudgeSelectedLayer,
     redo: () => {
-      if (pipeline.isGestureActive()) {
+      if (!canEditDocument() || pipeline.isGestureActive()) {
         return;
       }
       endNudgeBurst();
@@ -6164,7 +6240,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     stepBrushSize: stepActiveBrushSize,
     stores,
     undo: () => {
-      if (pipeline.isGestureActive()) {
+      if (!canEditDocument() || pipeline.isGestureActive()) {
         return;
       }
       endNudgeBurst();

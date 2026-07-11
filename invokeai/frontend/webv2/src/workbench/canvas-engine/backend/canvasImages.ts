@@ -41,6 +41,8 @@ export interface UploadCanvasImageOptions {
   fileName?: string;
   /** Injectable `fetch` implementation (defaults to the global). */
   fetch?: typeof globalThis.fetch;
+  /** Cancels the multipart request when its owning operation is superseded. */
+  signal?: AbortSignal;
 }
 
 /** Thrown when a canvas-image upload fails (non-2xx or network error). */
@@ -90,8 +92,12 @@ export const uploadCanvasImage = async (
       body,
       headers,
       method: 'POST',
+      signal: options.signal,
     });
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error;
+    }
     throw new CanvasImageUploadError(
       `Canvas image upload failed: ${error instanceof Error ? error.message : String(error)}`,
       null

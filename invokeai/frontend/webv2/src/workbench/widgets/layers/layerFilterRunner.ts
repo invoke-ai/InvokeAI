@@ -18,7 +18,7 @@ export interface RunLayerFilterOptions {
   signal?: AbortSignal;
   deps: {
     encodeSurface(surface: RasterSurface): Promise<Blob>;
-    uploadIntermediate(blob: Blob): Promise<{ imageName: string }>;
+    uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
     runFilterGraph(options: {
       graph: BackendGraphContract;
       outputNodeId: string;
@@ -37,7 +37,7 @@ export const runLayerFilter = async (options: RunLayerFilterOptions): Promise<La
   throwIfAborted(options.signal);
   const blob = await options.deps.encodeSurface(options.input.surface);
   throwIfAborted(options.signal);
-  const uploaded = await options.deps.uploadIntermediate(blob);
+  const uploaded = await options.deps.uploadIntermediate(blob, options.signal);
   throwIfAborted(options.signal);
   const built = buildFilterGraph(options.filterType, uploaded.imageName, options.settings);
   const output = await options.deps.runFilterGraph({

@@ -36,7 +36,7 @@ import {
   canvasSettingsEqual,
   resolveCanvasSettings,
 } from './canvasSettings';
-import { useCanvasCanRedo, useCanvasCanUndo, useCanvasZoom } from './engineStoreHooks';
+import { useCanvasCanRedo, useCanvasCanUndo, useCanvasDocumentEditingLocked, useCanvasZoom } from './engineStoreHooks';
 import { computeFitBboxToLayers, computeFitBboxToMasks } from './fitBbox';
 import { useCanvasEngine } from './useCanvasEngine';
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';
@@ -81,13 +81,18 @@ const CanvasHeaderActionsInner = ({
   const zoom = useCanvasZoom(engine);
   const canUndo = useCanvasCanUndo(engine);
   const canRedo = useCanvasCanRedo(engine);
+  const editingLocked = useCanvasDocumentEditingLocked(engine);
   const document = useActiveProjectSelector((project) => project.canvas.document);
   const modelBase = useActiveProjectSelector(selectModelBase);
   const settings = useActiveProjectSelector(selectCanvasSettings, canvasSettingsEqual);
 
   const [isNewCanvasOpen, setIsNewCanvasOpen] = useState(false);
   const closeNewCanvas = useCallback(() => setIsNewCanvasOpen(false), []);
-  const openNewCanvas = useCallback(() => setIsNewCanvasOpen(true), []);
+  const openNewCanvas = useCallback(() => {
+    if (!editingLocked) {
+      setIsNewCanvasOpen(true);
+    }
+  }, [editingLocked]);
 
   const setZoom = (value: number) => {
     const viewport = engine.getViewport();
@@ -104,7 +109,7 @@ const CanvasHeaderActionsInner = ({
   // manual bbox-tool edit commits. `refit` re-centers the view afterward (legacy
   // re-fits the stage after fit-to-layers, but not after fit-to-masks).
   const applyFit = (rect: Rect | null, refit: boolean) => {
-    if (!rect) {
+    if (editingLocked || !rect) {
       return;
     }
     engine.commitStructural(
@@ -118,6 +123,9 @@ const CanvasHeaderActionsInner = ({
   };
 
   const confirmNewCanvas = useCallback(() => {
+    if (editingLocked) {
+      return;
+    }
     // A wholesale document replace (seeded with one empty inpaint mask, matching
     // Task 42's new-canvas init) at the current dimensions. The engine's mirror
     // treats this as a document swap and clears the canvas history by design, so
@@ -126,7 +134,7 @@ const CanvasHeaderActionsInner = ({
       document: createNewCanvasStateV2(document.width, document.height).document,
       type: 'replaceCanvasDocument',
     });
-  }, [dispatch, document.height, document.width]);
+  }, [dispatch, document.height, document.width, editingLocked]);
 
   // Commands (hotkey-assignable; catalog ids `canvas.fitBboxToLayers` /
   // `canvas.fitBboxToMasks` / `canvas.newSession`). `useEffectEvent` reads the
@@ -193,7 +201,7 @@ const CanvasHeaderActionsInner = ({
       <Tooltip content={t('widgets.canvas.controls.fitBboxToLayers')}>
         <IconButton
           color="fg.muted"
-          disabled={!fitLayersRect}
+          disabled={editingLocked || !fitLayersRect}
           size="2xs"
           variant="ghost"
           onClick={() => applyFit(fitLayersRect, true)}
@@ -205,7 +213,7 @@ const CanvasHeaderActionsInner = ({
       <Tooltip content={t('widgets.canvas.controls.fitBboxToMasks')}>
         <IconButton
           color="fg.muted"
-          disabled={!fitMasksRect}
+          disabled={editingLocked || !fitMasksRect}
           size="2xs"
           variant="ghost"
           onClick={() => applyFit(fitMasksRect, false)}
@@ -217,13 +225,25 @@ const CanvasHeaderActionsInner = ({
       <HeaderDivider />
 
       <Tooltip content={t('widgets.canvas.commands.undo')}>
-        <IconButton color="fg.muted" disabled={!canUndo} size="2xs" variant="ghost" onClick={() => engine.undo()}>
+        <IconButton
+          color="fg.muted"
+          disabled={editingLocked || !canUndo}
+          size="2xs"
+          variant="ghost"
+          onClick={() => engine.undo()}
+        >
           <Undo2Icon />
         </IconButton>
       </Tooltip>
 
       <Tooltip content={t('widgets.canvas.commands.redo')}>
-        <IconButton color="fg.muted" disabled={!canRedo} size="2xs" variant="ghost" onClick={() => engine.redo()}>
+        <IconButton
+          color="fg.muted"
+          disabled={editingLocked || !canRedo}
+          size="2xs"
+          variant="ghost"
+          onClick={() => engine.redo()}
+        >
           <Redo2Icon />
         </IconButton>
       </Tooltip>
@@ -235,6 +255,7 @@ const CanvasHeaderActionsInner = ({
               <IconButton
                 aria-label={t('widgets.canvas.controls.newSession')}
                 color="fg.muted"
+                disabled={editingLocked}
                 size="2xs"
                 variant="ghost"
               >

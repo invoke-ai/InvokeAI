@@ -4867,6 +4867,30 @@ describe('mergeVisibleRasterLayers', () => {
     engine.dispose();
   });
 
+  it('blocks the group merge without closing an operation and restores it after cancel', async () => {
+    const { engine, raf } = setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const exported = await engine.exportLayerPixels('upper');
+    if (exported.status !== 'ok') {
+      throw new Error('expected an operation guard');
+    }
+    const session = engine.canvasOperations.start({
+      cleanupPreview: vi.fn(),
+      guard: exported.guard,
+      identity: { kind: 'filter', layerId: 'upper', projectId: engine.projectId },
+    });
+
+    expect(engine.mergeVisibleRasterLayers()).toBe('nothing');
+    expect(engine.getDocument()!.layers.map((layer) => layer.id)).toEqual(['upper', 'mid-mask', 'below']);
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({ identity: { kind: 'filter' }, status: 'active' });
+
+    session?.cancel();
+    expect(engine.mergeVisibleRasterLayers()).toBe('merged');
+    engine.dispose();
+  });
+
   it('folds an all-empty run trivially instead of stalling on a half-merged stack (F4)', async () => {
     const base = twoPaintDoc();
     const doc: CanvasDocumentContractV2 = {
@@ -5876,12 +5900,6 @@ describe('commitRasterFilterResult', () => {
       throw new Error('expected a filterable export');
     }
     const invalidateSource = vi.spyOn(engine.canvasOperations, 'invalidateSource');
-    const cleanupPreview = vi.fn(() => invalidateSource.mockClear());
-    engine.canvasOperations.start({
-      cleanupPreview,
-      guard: exported.guard,
-      identity: { kind: 'filter', layerId: layer.id, projectId },
-    });
 
     const result = await engine.commitRasterFilterResult({
       guard: exported.guard,
@@ -5891,7 +5909,6 @@ describe('commitRasterFilterResult', () => {
     });
 
     expect(result).toEqual({ layerId: layer.id, status: 'committed' });
-    expect(cleanupPreview).toHaveBeenCalledOnce();
     expect(invalidateSource).toHaveBeenCalledWith(projectId, layer.id);
     expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     const after = engine.getDocument()!.layers[0]!;
@@ -9070,6 +9087,190 @@ describe('guarded filter previews', () => {
     engine.dispose();
   });
 
+  const filterFlowLayer = (
+    type: 'raster' | 'control'
+  ): Extract<CanvasLayerContract, { type: 'raster' | 'control' }> => {
+    const base = {
+      blendMode: 'multiply' as const,
+      filter: { settings: { radius: 2 }, type: 'content_shuffle' },
+      id: 'filter-source',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Filter source',
+      opacity: 0.6,
+      source: {
+        bitmap: { height: 10, imageName: 'filter-source.png', width: 10 },
+        offset: { x: 7, y: -3 },
+        type: 'paint' as const,
+      },
+      transform: { rotation: 12, scaleX: 2, scaleY: 3, x: 40, y: 50 },
+    };
+    return type === 'raster'
+      ? { ...base, type: 'raster' }
+      : {
+          ...base,
+          adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+          type: 'control',
+          withTransparencyEffect: true,
+        };
+  };
+
+  const createFilterFlowHarness = async (sourceType: 'raster' | 'control') => {
+    const source = filterFlowLayer(sourceType);
+    const document = { ...emptyDoc(), layers: [source], selectedLayerId: source.id };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      filterDeps: {
+        runGraph: vi.fn(() => Promise.resolve({ imageName: 'filtered.png', origin: 'canvas', output: {} })),
+        uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'filter-input.png' })),
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    expect((await engine.exportLayerPixels(source.id)).status).toBe('ok');
+    expect(engine.startFilterOperation(source.id)).toBe('started');
+    await engine.processFilterOperation();
+    expect(engine.stores.filterSession.get()).toMatchObject({
+      preview: { imageName: 'filtered.png' },
+      status: 'ready',
+    });
+    return { document, engine, source };
+  };
+
+  it.each(['raster', 'control'] as const)(
+    'processes, retries durability, and applies %s with one origin-preserving history entry',
+    async (sourceType) => {
+      const { document, engine, source } = await createFilterFlowHarness(sourceType);
+      const makeDurable = vi
+        .fn<(imageName: string) => Promise<void>>()
+        .mockRejectedValueOnce(new Error('promotion failed'))
+        .mockResolvedValueOnce();
+
+      await engine.commitFilterOperation('apply', makeDurable);
+      expect(engine.stores.filterSession.get()).toMatchObject({
+        error: 'promotion failed',
+        preview: { imageName: 'filtered.png' },
+        status: 'error',
+      });
+      expect(engine.canvasOperations.getSnapshot()).toMatchObject({ identity: { kind: 'filter' }, status: 'active' });
+
+      await engine.commitFilterOperation('apply', makeDurable);
+      expect(makeDurable).toHaveBeenCalledTimes(2);
+      expect(engine.stores.filterSession.get()).toBeNull();
+      expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+      expect(engine.getDocument()!.layers[0]).toMatchObject({
+        filter: source.filter,
+        opacity: source.opacity,
+        blendMode: source.blendMode,
+        source: { offset: { x: 7, y: -3 }, type: 'paint' },
+        transform: source.transform,
+        type: sourceType,
+      });
+      expect(engine.stores.canUndo.get()).toBe(true);
+      engine.undo();
+      expect(engine.getDocument()).toEqual(document);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      engine.dispose();
+    }
+  );
+
+  it.each(['raster', 'control'] as const)(
+    'processes and saves as %s above the source with one history entry',
+    async (target) => {
+      const { engine, source } = await createFilterFlowHarness('control');
+
+      await engine.commitFilterOperation(target, () => Promise.resolve());
+
+      expect(engine.stores.filterSession.get()).toBeNull();
+      expect(engine.getDocument()!.layers.map((layer) => layer.type)).toEqual([target, 'control']);
+      expect(engine.getDocument()!.layers[0]).toMatchObject({
+        blendMode: source.blendMode,
+        opacity: source.opacity,
+        source: { offset: { x: 7, y: -3 }, type: 'paint' },
+        transform: source.transform,
+      });
+      expect(engine.stores.canUndo.get()).toBe(true);
+      engine.undo();
+      expect(engine.getDocument()!.layers).toEqual([source]);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      engine.dispose();
+    }
+  );
+
+  it('cancels an in-flight promotion when a replacement operation starts', async () => {
+    const { engine, source } = await createFilterFlowHarness('raster');
+    let resolvePromotion!: () => void;
+    const promotion = new Promise<void>((resolve) => {
+      resolvePromotion = resolve;
+    });
+    const pending = engine.commitFilterOperation('apply', () => promotion);
+    await vi.waitFor(() => expect(engine.stores.filterSession.get()?.status).toBe('committing'));
+
+    expect(engine.startSelectObject(source.id)).toBe('started');
+    resolvePromotion();
+    await pending;
+
+    expect(engine.getDocument()!.layers[0]).toEqual(source);
+    expect(engine.stores.filterSession.get()).toBeNull();
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({
+      identity: { kind: 'select-object' },
+      status: 'active',
+    });
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.dispose();
+  });
+
+  it('aborts an in-flight upload when a newer Process request wins', async () => {
+    const source = filterFlowLayer('raster');
+    const document = { ...emptyDoc(), layers: [source], selectedLayerId: source.id };
+    const { projectId, store } = createReducerBackedStore(document);
+    const uploadSignals: AbortSignal[] = [];
+    let uploadCount = 0;
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      filterDeps: {
+        runGraph: () => Promise.resolve({ imageName: 'newest-filter.png', origin: 'canvas', output: {} }),
+        uploadIntermediate: (_blob, signal) => {
+          if (!signal) {
+            throw new Error('expected upload cancellation signal');
+          }
+          uploadSignals.push(signal);
+          uploadCount += 1;
+          if (uploadCount === 2) {
+            return Promise.resolve({ imageName: 'newest-input.png' });
+          }
+          return new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(new DOMException('superseded', 'AbortError')), {
+              once: true,
+            });
+          });
+        },
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    expect((await engine.exportLayerPixels(source.id)).status).toBe('ok');
+    expect(engine.startFilterOperation(source.id)).toBe('started');
+
+    const older = engine.processFilterOperation();
+    await vi.waitFor(() => expect(uploadSignals).toHaveLength(1));
+    const newer = engine.processFilterOperation();
+    await Promise.all([older, newer]);
+
+    expect(uploadSignals[0]?.aborted).toBe(true);
+    expect(engine.stores.filterSession.get()).toMatchObject({
+      error: null,
+      preview: { imageName: 'newest-filter.png' },
+      status: 'ready',
+    });
+    engine.dispose();
+  });
+
   it('makes filter and Select Object operations mutually exclusive', async () => {
     const document = { ...emptyDoc(), layers: [guardableLayer('L')] };
     const { store } = createReactiveStore(document);
@@ -9118,6 +9319,65 @@ describe('guarded filter previews', () => {
     expect(engine.stores.filterSession.get()).toBeNull();
     engine.dispose();
   });
+
+  it.each(['filter', 'select-object'] as const)(
+    'centrally blocks edits and undo during %s, then restores them after cancel',
+    async (kind) => {
+      const layer = guardableLayer('L');
+      const document = { ...emptyDoc(), layers: [layer], selectedLayerId: layer.id };
+      const { projectId, store } = createReducerBackedStore(document);
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      expect((await engine.exportLayerPixels('L')).status).toBe('ok');
+      engine.commitStructural(
+        'Rename',
+        { id: 'L', patch: { name: 'Renamed' }, type: 'updateCanvasLayer' },
+        { id: 'L', patch: { name: 'L' }, type: 'updateCanvasLayer' }
+      );
+      const guard = engine.captureLayerExportGuard('L');
+      if (!guard) {
+        throw new Error('expected a current operation guard');
+      }
+      const operation = engine.canvasOperations.start({
+        cleanupPreview: vi.fn(),
+        guard,
+        identity: { kind, layerId: 'L', projectId },
+      });
+
+      expect(engine.stores.documentEditingLocked.get()).toBe(true);
+      engine.undo();
+      expect(engine.applyStructuralPreview({ id: 'L', patch: { opacity: 0.2 }, type: 'updateCanvasLayer' })).toBe(
+        false
+      );
+      engine.commitStructural(
+        'Blocked rename',
+        { id: 'L', patch: { name: 'Blocked' }, type: 'updateCanvasLayer' },
+        { id: 'L', patch: { name: 'Renamed' }, type: 'updateCanvasLayer' }
+      );
+      engine.nudgeSelectedLayer(5, 0);
+      await expect(
+        engine.commitRasterFilterResult({
+          guard,
+          image: { height: 10, imageName: 'unauthorized.png', width: 10 },
+          mode: 'replace',
+          rect: { height: 10, width: 10, x: 0, y: 0 },
+        })
+      ).resolves.toEqual({ status: 'busy' });
+
+      expect(engine.getDocument()!.layers[0]).toMatchObject({ name: 'Renamed', transform: { x: 0 } });
+      expect(engine.canvasOperations.getSnapshot()).toMatchObject({ identity: { kind }, status: 'active' });
+
+      operation?.cancel();
+      expect(engine.stores.documentEditingLocked.get()).toBe(false);
+      engine.undo();
+      expect(engine.getDocument()!.layers[0]?.name).toBe('L');
+      engine.dispose();
+    }
+  );
 
   it('invalidates the owned filter session when its guarded source changes', async () => {
     const layer = guardableLayer('L');
@@ -11141,10 +11401,7 @@ describe('engine selection: fill / erase', () => {
     engine.dispose();
   });
 
-  it.each([
-    ['paint', (engine: CanvasEngine) => engine.fillSelection()],
-    ['cache clear', (engine: CanvasEngine) => engine.clearCaches()],
-  ] as const)('%s cancels a guarded operation and cleans its preview', async (_label, mutate) => {
+  it('blocks paint without closing a guarded operation', async () => {
     const { engine } = makeEngine(paintDoc());
     engine.selectAll();
     engine.fillSelection();
@@ -11159,7 +11416,32 @@ describe('engine selection: fill / erase', () => {
       identity: { kind: 'select-object', layerId: 'paint1', projectId: 'p1' },
     });
 
-    await mutate(engine);
+    engine.fillSelection();
+
+    expect(cleanupPreview).not.toHaveBeenCalled();
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({
+      identity: { kind: 'select-object' },
+      status: 'active',
+    });
+    engine.dispose();
+  });
+
+  it('cache clear cancels a guarded operation and cleans its preview', async () => {
+    const { engine } = makeEngine(paintDoc());
+    engine.selectAll();
+    engine.fillSelection();
+    const exported = await engine.exportLayerPixels('paint1');
+    if (exported.status !== 'ok') {
+      throw new Error('expected published paint pixels');
+    }
+    const cleanupPreview = vi.fn();
+    engine.canvasOperations.start({
+      cleanupPreview,
+      guard: exported.guard,
+      identity: { kind: 'select-object', layerId: 'paint1', projectId: 'p1' },
+    });
+
+    await engine.clearCaches();
 
     expect(cleanupPreview).toHaveBeenCalledOnce();
     expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
