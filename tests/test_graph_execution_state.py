@@ -882,6 +882,34 @@ def test_graph_consumer_matches_collector_parents_at_different_iteration_depths(
     ]
 
 
+def test_graph_consumer_reuses_global_parent_for_each_nested_collector_iteration():
+    graph = Graph()
+
+    graph.add_node(RangeInvocation(id="global_collection", start=99, stop=100, step=1))
+    graph.add_node(RangeInvocation(id="outer_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    graph.add_node(IntegerCollectionFromItemTestInvocation(id="inner_collection"))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+    graph.add_node(AddInvocation(id="inner_item", b=0))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(TwoIntegerCollectionsTestInvocation(id="consumer"))
+
+    graph.add_edge(create_edge("global_collection", "collection", "consumer", "second"))
+    graph.add_edge(create_edge("outer_range", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "inner_collection", "value"))
+    graph.add_edge(create_edge("inner_collection", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "inner_item", "a"))
+    graph.add_edge(create_edge("inner_item", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "consumer", "first"))
+
+    g = GraphExecutionState(graph=graph)
+    execute_all_nodes(g)
+
+    consumer_results = sorted(g.results[node_id].collection for node_id in g.source_prepared_mapping["consumer"])
+
+    assert consumer_results == [[0, 1, 99], [10, 11, 99]]
+
+
 def test_graph_validate_self_iterator_without_collection_input_raises_invalid_edge_error():
     """Iterator nodes with no collection input should fail validation cleanly.
 
