@@ -896,6 +896,19 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('captures the current layer export guard synchronously after its cache is ready', async () => {
+    const { engine } = createEngine();
+    await engine.exportLayerPixels('a');
+
+    const guard = engine.captureLayerExportGuard('a');
+
+    expect(guard).not.toBeNull();
+    expect(guard).toMatchObject({ layerId: 'a', projectId: 'p1' });
+    expect(engine.isLayerExportGuardCurrent(guard!)).toBe(true);
+    expect(engine.captureLayerExportGuard('missing')).toBeNull();
+    engine.dispose();
+  });
+
   it('invalidates a LayerExportGuard when the immutable layer contract changes', async () => {
     const document = makeDoc();
     const { setDocument, store } = createReactiveStore(document);

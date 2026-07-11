@@ -55,6 +55,7 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
     }),
   };
   const deps: SelectObjectSessionDeps<string> = {
+    captureGuard: vi.fn(() => currentGuard),
     controller,
     decodePreview: vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
     exportLayer: vi.fn(() => Promise.resolve({ blob, guard: currentGuard ?? guard, rect, status: 'ok' as const })),
@@ -234,6 +235,56 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot().preview?.image.imageName).toBe('new.png');
     await expect(harness.session.process()).resolves.toBe('deduped');
     expect(harness.deps.runGraph).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts an immediate same-input retry when invalidation aborts an export that ignores its signal', async () => {
+    const oldExport = deferred<Awaited<ReturnType<SelectObjectSessionDeps<string>['exportLayer']>>>();
+    const harness = createHarness({
+      exportLayer: vi
+        .fn()
+        .mockImplementationOnce(() => oldExport.promise)
+        .mockImplementationOnce(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
+    });
+    const oldPending = harness.session.process();
+    await vi.waitFor(() => expect(harness.deps.exportLayer).toHaveBeenCalledOnce());
+
+    harness.controller.invalidateSource('p1', layer.id);
+    const newPending = harness.session.process();
+
+    expect(newPending).not.toBe(oldPending);
+    await expect(newPending).resolves.toBe('published');
+    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce();
+    expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+    oldExport.resolve({ blob, guard, rect, status: 'ok' });
+    await expect(oldPending).resolves.toBe('stale');
+    expect(harness.session.getSnapshot().preview?.image.imageName).toBe('result.png');
+    await expect(harness.session.process()).resolves.toBe('deduped');
+  });
+
+  it('starts an immediate same-input retry when invalidation aborts an upload that ignores its signal', async () => {
+    const oldUpload = deferred<{ imageName: string }>();
+    const harness = createHarness({
+      uploadIntermediate: vi
+        .fn()
+        .mockImplementationOnce(() => oldUpload.promise)
+        .mockImplementationOnce(() => Promise.resolve({ imageName: 'new-input.png' })),
+    });
+    const oldPending = harness.session.process();
+    await vi.waitFor(() => expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce());
+
+    harness.controller.invalidateSource('p1', layer.id);
+    const newPending = harness.session.process();
+
+    expect(newPending).not.toBe(oldPending);
+    await expect(newPending).resolves.toBe('published');
+    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
+    expect(harness.deps.runGraph).toHaveBeenCalledOnce();
+    oldUpload.resolve({ imageName: 'old-input.png' });
+    await expect(oldPending).resolves.toBe('stale');
+    expect(harness.session.getSnapshot().preview?.sourceImageName).toBe('new-input.png');
+    await expect(harness.session.process()).resolves.toBe('deduped');
   });
 
   it('deduplicates an identical stable input hash after publication', async () => {

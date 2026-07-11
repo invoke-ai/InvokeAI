@@ -40,6 +40,7 @@ export interface SelectObjectSessionState<T> {
 }
 
 export interface SelectObjectSessionDeps<T> {
+  captureGuard(layerId: string): LayerExportGuard | null;
   controller: CanvasOperationController;
   exportLayer(layerId: string): Promise<ExportBakedLayerBlobResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
@@ -112,7 +113,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   let source: SelectObjectPreparedSource | null = null;
   let operation: CanvasOperationSession | null = null;
   let operationGuard: LayerExportGuard | null = null;
-  let sourceController: AbortController | null = null;
   let requestToken = 0;
   let lastPublishedHash: string | null = null;
   let pendingHash: string | null = null;
@@ -147,8 +147,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
   const clearSource = (): void => {
     requestToken += 1;
-    sourceController?.abort();
-    sourceController = null;
     pendingHash = null;
     pendingProcess = null;
     source = null;
@@ -165,6 +163,13 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       return false;
     }
   };
+
+  const isSameGuard = (left: LayerExportGuard, right: LayerExportGuard): boolean =>
+    left.projectId === right.projectId &&
+    left.layerId === right.layerId &&
+    left.layer === right.layer &&
+    left.cacheVersion === right.cacheVersion &&
+    left.documentGeneration === right.documentGeneration;
 
   unsubscribeController = deps.controller.subscribe(() => {
     if (disposed) {
@@ -200,8 +205,8 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }, 1_000);
   };
 
-  const ensureSource = async (signal: AbortSignal): Promise<SelectObjectPreparedSource> => {
-    if (source && isGuardCurrent(source.guard)) {
+  const ensureSource = async (guard: LayerExportGuard, signal: AbortSignal): Promise<SelectObjectPreparedSource> => {
+    if (source?.guard === guard && isGuardCurrent(guard)) {
       return source;
     }
     source = null;
@@ -209,10 +214,10 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     if (prepared.status !== 'ready') {
       throw new Error(resultError(prepared));
     }
-    if (signal.aborted || !isGuardCurrent(prepared.source.guard)) {
+    if (signal.aborted || !isGuardCurrent(guard) || !isSameGuard(prepared.source.guard, guard)) {
       throw new DOMException('Select Object source became stale.', 'AbortError');
     }
-    source = prepared.source;
+    source = { ...prepared.source, guard };
     return source;
   };
 
@@ -220,33 +225,36 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     token: number,
     hash: string,
     requestState: SelectObjectSessionState<T>,
-    controller: AbortController
+    guard: LayerExportGuard
   ): Promise<SelectObjectSessionProcessResult> => {
     try {
-      const preparedSource = await ensureSource(controller.signal);
-      if (controller.signal.aborted || token !== requestToken) {
-        return 'stale';
-      }
-
-      if (operationGuard !== preparedSource.guard || !operation) {
+      if (operationGuard !== guard || !operation) {
         startingOperation = true;
-        const nextOperation = deps.controller.start({
-          cleanupPreview,
-          guard: preparedSource.guard,
-          identity: { kind: 'select-object', layerId, projectId },
-        });
-        startingOperation = false;
+        let nextOperation: CanvasOperationSession | null = null;
+        try {
+          nextOperation = deps.controller.start({
+            cleanupPreview,
+            guard,
+            identity: { kind: 'select-object', layerId, projectId },
+          });
+        } finally {
+          startingOperation = false;
+        }
         if (!nextOperation) {
           clearSource();
           return 'stale';
         }
         operation = nextOperation;
-        operationGuard = preparedSource.guard;
+        operationGuard = guard;
       }
 
-      publishState({ ...state, sourceGuard: preparedSource.guard, status: 'processing' });
+      publishState({ ...state, sourceGuard: guard, status: 'processing' });
       const result = await operation.run(
         async (signal) => {
+          const preparedSource = await ensureSource(guard, signal);
+          if (signal.aborted || token !== requestToken) {
+            throw new DOMException('Select Object source preparation was aborted.', 'AbortError');
+          }
           const processed = await processSelectObjectSource({
             applyPolygonRefinement: requestState.applyPolygonRefinement,
             input: requestState.input,
@@ -295,16 +303,12 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
           error: controllerState.status === 'active' ? controllerState.error : 'Select Object processing failed.',
           status: 'error',
         });
-      } else if (result === 'stale' && !isGuardCurrent(preparedSource.guard)) {
+      } else if (result === 'stale' && !isGuardCurrent(guard)) {
         clearSource();
       }
       return result;
     } catch (cause) {
-      if (
-        controller.signal.aborted ||
-        token !== requestToken ||
-        (cause instanceof Error && cause.name === 'AbortError')
-      ) {
+      if (token !== requestToken || (cause instanceof Error && cause.name === 'AbortError')) {
         return 'stale';
       }
       publishState({ ...state, error: cause instanceof Error ? cause.message : String(cause), status: 'error' });
@@ -323,8 +327,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
     if (state.sourceGuard && !isGuardCurrent(state.sourceGuard)) {
       requestToken += 1;
-      sourceController?.abort();
-      sourceController = null;
       operation?.cancel();
       if (!operation && state.preview) {
         cleanupPreview();
@@ -356,15 +358,16 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
     requestToken += 1;
     const token = requestToken;
-    sourceController?.abort();
-    const controller = new AbortController();
-    sourceController = controller;
+    const guard = operationGuard && isGuardCurrent(operationGuard) ? operationGuard : deps.captureGuard(layerId);
+    if (!guard || !isGuardCurrent(guard)) {
+      publishState({ ...state, error: 'Select Object source is not ready.', status: 'error' });
+      return Promise.resolve('error');
+    }
     pendingHash = hash;
     publishState({ ...state, error: null, status: 'processing' });
     const requestState = state;
-    const promise = runRequest(token, hash, requestState, controller).finally(() => {
+    const promise = runRequest(token, hash, requestState, guard).finally(() => {
       if (token === requestToken) {
-        sourceController = null;
         pendingHash = null;
         pendingProcess = null;
       }
@@ -376,8 +379,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   const cancelCurrent = (): void => {
     clearTimer();
     requestToken += 1;
-    sourceController?.abort();
-    sourceController = null;
     pendingHash = null;
     pendingProcess = null;
     operation?.cancel();
@@ -389,8 +390,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
   const invalidateProcessingState = (): void => {
     requestToken += 1;
-    sourceController?.abort();
-    sourceController = null;
     pendingHash = null;
     pendingProcess = null;
     lastPublishedHash = null;
@@ -415,8 +414,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       disposed = true;
       clearTimer();
       requestToken += 1;
-      sourceController?.abort();
-      sourceController = null;
       pendingHash = null;
       pendingProcess = null;
       lastPublishedHash = null;

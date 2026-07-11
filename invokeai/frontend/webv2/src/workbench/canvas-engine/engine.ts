@@ -457,6 +457,8 @@ export interface CanvasEngine {
   ): Promise<ExportBakedLayerPixelsResult>;
   /** Encodes {@link exportBakedLayerPixels} as a PNG blob for save/copy/upload actions. */
   exportBakedLayerBlob(layerId: string, options?: ExportBakedLayerPixelsOptions): Promise<ExportBakedLayerBlobResult>;
+  /** Captures the exact current layer/cache/document/project snapshot when its cache is ready. */
+  captureLayerExportGuard(layerId: string): LayerExportGuard | null;
   /** True only while the exact exported layer/cache/document/project snapshot remains live. */
   isLayerExportGuardCurrent(guard: LayerExportGuard): boolean;
   /**
@@ -1428,6 +1430,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     const liveLayer = document?.layers.find((candidate) => candidate.id === guard.layerId);
     const entry = layerCache.get(guard.layerId);
     return !!entry && liveLayer === guard.layer && entry.version === guard.cacheVersion;
+  };
+
+  const captureCurrentLayerExportGuard = (layerId: string): LayerExportGuard | null => {
+    const document = mirror.getDocument();
+    const layer = document?.layers.find((candidate) => candidate.id === layerId);
+    const source = layer ? renderableSourceOf(layer) : null;
+    const entry = layerCache.get(layerId);
+    if (
+      !layer ||
+      !source ||
+      !isSupportedExportSource(source) ||
+      !entry ||
+      entry.stale ||
+      isCurrentRasterizationJob(layer) ||
+      isEmpty(entry.rect)
+    ) {
+      return null;
+    }
+    const guard = captureLayerExportGuard(layer, entry);
+    return isLayerExportGuardCurrent(guard) ? guard : null;
   };
 
   canvasOperations = createCanvasOperationController({ isGuardCurrent: isLayerExportGuardCurrent });
@@ -5330,6 +5352,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     applyTransform,
     booleanMergeRasterLayers,
     canvasOperations,
+    captureLayerExportGuard: captureCurrentLayerExportGuard,
     clearCaches,
     clearHistory,
     clearMask,
