@@ -1558,12 +1558,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   canvasOperations = createCanvasOperationController({ isGuardCurrent: isLayerExportGuardCurrent });
   const documentEditOwner = Symbol('canvas-operation-document-edit-owner');
+  type DocumentEditPermit = { epoch: number; owner?: symbol };
+  let documentEditEpoch = 0;
+  let documentEditingLocked = false;
   const syncDocumentEditingLock = (): void => {
-    stores.documentEditingLocked.set(canvasOperations.getSnapshot().status === 'active');
+    const nextLocked = canvasOperations.getSnapshot().status === 'active';
+    if (nextLocked !== documentEditingLocked) {
+      documentEditingLocked = nextLocked;
+      documentEditEpoch += 1;
+    }
+    stores.documentEditingLocked.set(nextLocked);
   };
   const unsubscribeDocumentEditingLock = canvasOperations.subscribe(syncDocumentEditingLock);
   const canEditDocument = (owner?: symbol): boolean =>
     owner === documentEditOwner || !stores.documentEditingLocked.get();
+  const captureDocumentEditPermit = (owner?: symbol): DocumentEditPermit | null =>
+    canEditDocument(owner) ? { epoch: documentEditEpoch, owner } : null;
+  const isDocumentEditPermitCurrent = (permit: DocumentEditPermit): boolean =>
+    permit.owner === documentEditOwner || (!stores.documentEditingLocked.get() && permit.epoch === documentEditEpoch);
 
   const ensureLayerCaches = (doc: CanvasDocumentContractV2): void => {
     for (const layer of doc.layers) {
@@ -1736,7 +1748,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const cropLayerToBbox = async (layerId: string): Promise<CropLayerResult> => {
-    if (!canEditDocument() || pipeline.isGestureActive()) {
+    const permit = captureDocumentEditPermit();
+    if (!permit || pipeline.isGestureActive()) {
       return { status: 'busy' };
     }
     endNudgeBurst();
@@ -1755,6 +1768,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
     try {
       const exported = await exportBakedLayerPixels(layerId, { includeDisabled: true });
+      if (!isDocumentEditPermitCurrent(permit)) {
+        return { status: 'busy' };
+      }
       if (exported.status !== 'ok') {
         switch (exported.status) {
           case 'missing':
@@ -1772,7 +1788,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (!liveDocument || !liveLayer) {
         return { status: 'missing' };
       }
-      if (pipeline.isGestureActive()) {
+      if (!isDocumentEditPermitCurrent(permit) || pipeline.isGestureActive()) {
         return { status: 'busy' };
       }
       if (liveLayer.isLocked) {
@@ -1848,6 +1864,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       };
       const afterPixels = { pixels: cropped, rect: cropRect };
       const preparedAfter = prepareGeneratedPaintCache(layerId, afterPixels.rect, afterPixels.pixels);
+      if (!isDocumentEditPermitCurrent(permit)) {
+        return { status: 'busy' };
+      }
       publishSnapshot(after, preparedAfter);
       history.push({
         bytes:
@@ -1866,7 +1885,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const copyLayerToRaster = async (layerId: string): Promise<string | null> => {
-    if (!canEditDocument()) {
+    const permit = captureDocumentEditPermit();
+    if (!permit) {
       return null;
     }
     if (pipeline.isGestureActive()) {
@@ -1879,10 +1899,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return null;
     }
     const baked = await exportBakedLayerPixels(layerId, { includeDisabled: true });
+    if (!isDocumentEditPermitCurrent(permit)) {
+      return null;
+    }
     if (baked.status !== 'ok') {
       return null;
     }
-    if (pipeline.isGestureActive() || !isLayerExportGuardCurrent(baked.guard) || baked.guard.layer !== sourceLayer) {
+    if (
+      !isDocumentEditPermitCurrent(permit) ||
+      pipeline.isGestureActive() ||
+      !isLayerExportGuardCurrent(baked.guard) ||
+      baked.guard.layer !== sourceLayer
+    ) {
       return null;
     }
     const liveDocument = mirror.getDocument();
@@ -1923,6 +1951,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       );
       installGeneratedPaintCache(prepared);
     };
+    if (!isDocumentEditPermitCurrent(permit)) {
+      return null;
+    }
     apply();
     history.push({
       bytes: baked.rect.width * baked.rect.height * 4 + 256,
@@ -3860,7 +3891,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     signal?: AbortSignal,
     owner?: symbol
   ): Promise<ReplaceSelectionFromImageResult> => {
-    if (!canEditDocument(owner)) {
+    const permit = captureDocumentEditPermit(owner);
+    if (!permit) {
       return { status: 'busy' };
     }
     if (signal?.aborted) {
@@ -3868,10 +3900,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     try {
       const blob = await imageResolver(image.imageName, signal);
+      if (!isDocumentEditPermitCurrent(permit)) {
+        return { status: 'busy' };
+      }
       if (signal?.aborted) {
         return { status: 'aborted' };
       }
       const bitmap = await backend.createImageBitmap(blob);
+      if (!isDocumentEditPermitCurrent(permit)) {
+        bitmap.close();
+        return { status: 'busy' };
+      }
       if (signal?.aborted) {
         bitmap.close();
         return { status: 'aborted' };
@@ -3902,7 +3941,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
         return { status: 'unsupported' };
       }
-      if (pipeline.isGestureActive()) {
+      if (!isDocumentEditPermitCurrent(permit) || pipeline.isGestureActive()) {
         return { status: 'busy' };
       }
       if (!isLayerExportGuardCurrent(guard)) {
@@ -3912,6 +3951,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         return { status: 'aborted' };
       }
 
+      if (!isDocumentEditPermitCurrent(permit)) {
+        return { status: 'busy' };
+      }
       selection.replaceMask({ rect: { ...rect }, surface: pixels });
       return { status: 'selected' };
     } catch (error) {
@@ -4018,7 +4060,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     options: CommitRasterFilterOptions,
     owner?: symbol
   ): Promise<CommitRasterFilterResult> => {
-    if (!canEditDocument(owner)) {
+    const permit = captureDocumentEditPermit(owner);
+    if (!permit) {
       return { status: 'busy' };
     }
     if (options.signal?.aborted) {
@@ -4026,10 +4069,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     try {
       const blob = await imageResolver(options.image.imageName, options.signal);
+      if (!isDocumentEditPermitCurrent(permit)) {
+        return { status: 'busy' };
+      }
       if (options.signal?.aborted) {
         return { status: 'aborted' };
       }
       const bitmap = await backend.createImageBitmap(blob);
+      if (!isDocumentEditPermitCurrent(permit)) {
+        bitmap.close();
+        return { status: 'busy' };
+      }
       if (options.signal?.aborted) {
         bitmap.close();
         return { status: 'aborted' };
@@ -4057,7 +4107,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
         return { status: 'unsupported' };
       }
-      if (pipeline.isGestureActive()) {
+      if (!isDocumentEditPermitCurrent(permit) || pipeline.isGestureActive()) {
         return { status: 'busy' };
       }
       if (!isLayerExportGuardCurrent(options.guard)) {
@@ -4067,6 +4117,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         return { status: 'aborted' };
       }
 
+      if (!isDocumentEditPermitCurrent(permit)) {
+        return { status: 'busy' };
+      }
       endNudgeBurst();
       const image = structuredClone(options.image);
       const rect = { ...options.rect };
@@ -4229,7 +4282,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     options: CommitGeneratedImageOptions,
     owner?: symbol
   ): Promise<CommitGeneratedImageResult> => {
-    if (!canEditDocument(owner)) {
+    const permit = captureDocumentEditPermit(owner);
+    if (!permit) {
       return { status: 'busy' };
     }
     if (options.signal?.aborted) {
@@ -4242,6 +4296,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           liveLayer: Extract<CanvasLayerContract, { type: 'raster' | 'control' }>;
         }
       | { result: CommitGeneratedImageResult } => {
+      if (!isDocumentEditPermitCurrent(permit)) {
+        return { result: { status: 'busy' } };
+      }
       const document = mirror.getDocument();
       const liveLayer = document?.layers.find((candidate) => candidate.id === options.guard.layerId);
       if (!document || !liveLayer) {
@@ -4264,11 +4321,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
     try {
       const blob = await imageResolver(options.image.imageName, options.signal);
+      if (!isDocumentEditPermitCurrent(permit)) {
+        return { status: 'busy' };
+      }
       if (options.signal?.aborted) {
         return { status: 'aborted' };
       }
 
       const bitmap = await backend.createImageBitmap(blob);
+      if (!isDocumentEditPermitCurrent(permit)) {
+        bitmap.close();
+        return { status: 'busy' };
+      }
       if (options.signal?.aborted) {
         bitmap.close();
         return { status: 'aborted' };
@@ -4462,7 +4526,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     upperLayerId: string,
     operation: BooleanRasterOperation
   ): Promise<BooleanRasterResult> => {
-    if (!canEditDocument() || pipeline.isGestureActive()) {
+    const permit = captureDocumentEditPermit();
+    if (!permit || pipeline.isGestureActive()) {
       return 'busy';
     }
     endNudgeBurst();
@@ -4490,6 +4555,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       exportBakedLayerPixels(upper.id),
       exportBakedLayerPixels(below.id),
     ]);
+    if (!isDocumentEditPermitCurrent(permit)) {
+      return 'busy';
+    }
     if (upperPixels.status !== 'ok' || belowPixels.status !== 'ok') {
       if (upperPixels.status === 'not-ready' || belowPixels.status === 'not-ready') {
         return 'not-ready';
@@ -4504,7 +4572,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       }
       return 'empty';
     }
-    if (pipeline.isGestureActive()) {
+    if (!isDocumentEditPermitCurrent(permit) || pipeline.isGestureActive()) {
       return 'busy';
     }
     if (
@@ -4595,6 +4663,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       installGeneratedPaintCache(prepared);
     };
 
+    if (!isDocumentEditPermitCurrent(permit)) {
+      return 'busy';
+    }
     apply();
     history.push({
       bytes: resultRect.width * resultRect.height * 4 + 256,
@@ -4631,7 +4702,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const extractMaskedArea = async (maskLayerId: string): Promise<ExtractMaskedAreaResult> => {
-    if (!canEditDocument() || pipeline.isGestureActive()) {
+    const permit = captureDocumentEditPermit();
+    if (!permit || pipeline.isGestureActive()) {
       return { status: 'busy' };
     }
     endNudgeBurst();
@@ -4668,6 +4740,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       exportBakedLayerPixels(maskLayerId, { includeDisabled: true }),
       Promise.all(contributors.map((layer) => rasterizeLayerPixels(layer.id))),
     ]);
+    if (!isDocumentEditPermitCurrent(permit)) {
+      return { status: 'busy' };
+    }
     if (maskPixels.status !== 'ok') {
       return { status: maskPixels.status === 'not-ready' ? 'not-ready' : 'empty' };
     }
@@ -4676,7 +4751,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         status: contributorPixels.some((pixels) => pixels.status === 'not-ready') ? 'not-ready' : 'empty',
       };
     }
-    if (pipeline.isGestureActive()) {
+    if (!isDocumentEditPermitCurrent(permit) || pipeline.isGestureActive()) {
       return { status: 'busy' };
     }
     if (maskPixels.guard.layer !== maskLayer || !isLayerExportGuardCurrent(maskPixels.guard)) {
@@ -4770,6 +4845,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       installGeneratedPaintCache(prepared);
     };
 
+    if (!isDocumentEditPermitCurrent(permit)) {
+      return { status: 'busy' };
+    }
     apply();
     history.push({
       bytes: resultRect.width * resultRect.height * 4 + 256,
@@ -6097,6 +6175,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const clearHistory = (): void => {
+    if (!canEditDocument()) {
+      return;
+    }
     // `history.clear` notifies subscribers, so `syncHistoryStores` refreshes
     // canUndo/canRedo — the header buttons disable in lockstep.
     endNudgeBurst();

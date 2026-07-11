@@ -154,6 +154,7 @@ export const LayerGroupSection = ({
                   <LayerListItem
                     key={layer.id}
                     dispatch={dispatch}
+                    editingLocked={editingLocked}
                     engine={engine}
                     index={globalIndexById.get(layer.id) ?? 0}
                     isSelected={layer.id === selectedLayerId}

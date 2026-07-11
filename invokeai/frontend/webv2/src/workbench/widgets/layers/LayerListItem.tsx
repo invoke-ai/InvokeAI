@@ -27,12 +27,21 @@ const layerBadgeKey = (layer: CanvasLayerContract): string => {
 
 interface LayerListItemProps {
   dispatch: Dispatch<WorkbenchAction>;
+  editingLocked: boolean;
   engine: CanvasEngine | null;
   index: number;
   isSelected: boolean;
   layer: CanvasLayerContract;
   layers: readonly CanvasLayerContract[];
 }
+
+export const getLayerListItemInteractionState = (editingLocked: boolean) => ({
+  canRename: !editingLocked,
+  canSelect: true,
+  canToggleLock: !editingLocked,
+  canToggleVisibility: !editingLocked,
+  sortableDisabled: editingLocked,
+});
 
 /**
  * One layer row: thumbnail, name (double-click to rename), type badge,
@@ -42,9 +51,21 @@ interface LayerListItemProps {
  * constraint so clicks, double-click rename, and the row buttons still work;
  * the selected layer's opacity (and mask fill swatch) lives in the panel header.
  */
-export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, layers }: LayerListItemProps) => {
+export const LayerListItem = ({
+  dispatch,
+  editingLocked,
+  engine,
+  index,
+  isSelected,
+  layer,
+  layers,
+}: LayerListItemProps) => {
   const { t } = useTranslation();
-  const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: layer.id });
+  const interaction = getLayerListItemInteractionState(editingLocked);
+  const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+    disabled: interaction.sortableDisabled,
+    id: layer.id,
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(layer.name);
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasLayerContextMenuTarget | null>(null);
@@ -61,10 +82,10 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
   );
 
   const handleSelect = useCallback(() => {
-    if (!isSelected) {
+    if (interaction.canSelect && !isSelected) {
       dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
     }
-  }, [dispatch, isSelected, layer.id]);
+  }, [dispatch, interaction.canSelect, isSelected, layer.id]);
 
   const patchBase = useCallback(
     (label: string, forward: Partial<CanvasLayerContract>, inverse: Partial<CanvasLayerContract>) => {
@@ -137,7 +158,7 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
   return (
     <Box ref={setNodeRef} style={dndStyle}>
       <Row
-        {...listeners}
+        {...(interaction.sortableDisabled ? {} : listeners)}
         active={isSelected ? 'muted' : undefined}
         cursor={isDragging ? 'grabbing' : 'default'}
         display="flex"
@@ -153,6 +174,7 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
               <Input
                 autoFocus
                 aria-label={t('widgets.layers.actions.rename')}
+                disabled={!interaction.canRename}
                 size="2xs"
                 value={draftName}
                 onBlur={commitName}
@@ -161,7 +183,13 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
                 onPointerDown={stopPropagation}
               />
             ) : (
-              <Text fontSize="2xs" fontWeight="700" truncate onDoubleClick={startEditing}>
+              <Text
+                aria-disabled={!interaction.canRename}
+                fontSize="2xs"
+                fontWeight="700"
+                truncate
+                onDoubleClick={interaction.canRename ? startEditing : undefined}
+              >
                 {layer.name}
               </Text>
             )}
@@ -172,6 +200,8 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
           <Box flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
             <ToggleDot
               checked={layer.isEnabled}
+              cursor={interaction.canToggleVisibility ? 'pointer' : 'not-allowed'}
+              disabled={!interaction.canToggleVisibility}
               label={t('widgets.layers.actions.toggleVisibility')}
               onCheckedChange={handleToggleVisible}
             />
@@ -179,6 +209,7 @@ export const LayerListItem = ({ dispatch, engine, index, isSelected, layer, laye
           <IconButton
             aria-label={t('widgets.layers.actions.toggleLock')}
             color={layer.isLocked ? 'fg' : 'fg.subtle'}
+            disabled={!interaction.canToggleLock}
             size="2xs"
             variant="ghost"
             onClick={handleToggleLock}

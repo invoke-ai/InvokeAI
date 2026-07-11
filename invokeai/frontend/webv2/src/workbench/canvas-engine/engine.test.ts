@@ -1405,6 +1405,49 @@ describe('createCanvasEngine', () => {
     engine.dispose();
   });
 
+  it('cropLayerToBbox aborts when an operation starts during its deferred export', async () => {
+    const pending = createDeferred<Blob>();
+    const document = { ...makeDoc(), layers: [rasterLayer('operation'), rasterLayer('a')] };
+    const { projectId, store } = createReducerBackedStore(document);
+    const bitmapStore = createSpyBitmapStore();
+    const resolver = vi.fn((imageName: string) => (imageName === 'a' ? pending.promise : Promise.resolve(new Blob())));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore,
+      imageResolver: resolver,
+      projectId,
+      store,
+    });
+    const operationExport = await engine.exportLayerPixels('operation');
+    if (operationExport.status !== 'ok') {
+      throw new Error('expected an operation guard');
+    }
+    (store.dispatch as Mock).mockClear();
+    bitmapStore.markLayerDirty.mockClear();
+
+    const crop = engine.cropLayerToBbox('a');
+    await vi.waitFor(() => expect(resolver).toHaveBeenCalledWith('a', expect.any(AbortSignal)));
+    const cleanupPreview = vi.fn();
+    engine.canvasOperations.start({
+      cleanupPreview,
+      guard: operationExport.guard,
+      identity: { kind: 'filter', layerId: 'operation', projectId },
+    });
+    pending.resolve(new Blob());
+
+    await expect(crop).resolves.toEqual({ status: 'busy' });
+    expect(engine.getDocument()).toEqual(document);
+    expect(store.dispatch).not.toHaveBeenCalled();
+    expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(cleanupPreview).not.toHaveBeenCalled();
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({
+      identity: { kind: 'filter', layerId: 'operation' },
+      status: 'active',
+    });
+    engine.dispose();
+  });
+
   it('cropLayerToBbox reports busy during an open gesture', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
@@ -6754,6 +6797,29 @@ describe('commitRasterFilterResult', () => {
     harness.engine.dispose();
   });
 
+  it('does not publish when an operation starts during durable-image decode', async () => {
+    const harness = await createPendingGuardHarness();
+    const cleanupPreview = vi.fn();
+    harness.engine.canvasOperations.start({
+      cleanupPreview,
+      guard: harness.guard,
+      identity: { kind: 'select-object', layerId: harness.layer.id, projectId: 'p1' },
+    });
+
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'busy' });
+    expect(harness.engine.getDocument()).toEqual(harness.document);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(cleanupPreview).not.toHaveBeenCalled();
+    expect(harness.engine.canvasOperations.getSnapshot()).toMatchObject({
+      identity: { kind: 'select-object' },
+      status: 'active',
+    });
+    harness.engine.dispose();
+  });
+
   it('returns missing without mutation when the source is deleted', async () => {
     const harness = await createPendingGuardHarness();
     harness.setDocument({ ...harness.document, layers: [] });
@@ -7731,6 +7797,48 @@ describe('commitGeneratedImageResult', () => {
     harness.decoded.resolve(new Blob());
     await expect(harness.pending).resolves.toEqual({ status: 'busy' });
     expect(harness.store.dispatch).not.toHaveBeenCalled();
+    harness.engine.dispose();
+  });
+
+  it('does not publish when an operation starts during generated-image decode', async () => {
+    const harness = await createPendingGuardHarness();
+    const cleanupPreview = vi.fn();
+    harness.engine.canvasOperations.start({
+      cleanupPreview,
+      guard: harness.exported.guard,
+      identity: { kind: 'filter', layerId: harness.source.id, projectId: 'p1' },
+    });
+
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'busy' });
+    expect(harness.engine.getDocument()).toEqual(harness.document);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(cleanupPreview).not.toHaveBeenCalled();
+    expect(harness.engine.canvasOperations.getSnapshot()).toMatchObject({
+      identity: { kind: 'filter' },
+      status: 'active',
+    });
+    harness.engine.dispose();
+  });
+
+  it('does not publish when an operation starts and ends during generated-image decode', async () => {
+    const harness = await createPendingGuardHarness();
+    const operation = harness.engine.canvasOperations.start({
+      cleanupPreview: vi.fn(),
+      guard: harness.exported.guard,
+      identity: { kind: 'filter', layerId: harness.source.id, projectId: 'p1' },
+    });
+    operation?.cancel();
+
+    harness.decoded.resolve(new Blob());
+
+    await expect(harness.pending).resolves.toEqual({ status: 'busy' });
+    expect(harness.engine.getDocument()).toEqual(harness.document);
+    expect(harness.store.dispatch).not.toHaveBeenCalled();
+    expect(harness.engine.stores.canUndo.get()).toBe(false);
+    expect(harness.engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
     harness.engine.dispose();
   });
 
@@ -9378,6 +9486,42 @@ describe('guarded filter previews', () => {
       engine.dispose();
     }
   );
+
+  it('does not clear history while document editing is locked', async () => {
+    const layer = guardableLayer('L');
+    const document = { ...emptyDoc(), layers: [layer] };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    expect((await engine.exportLayerPixels(layer.id)).status).toBe('ok');
+    engine.commitStructural(
+      'Rename',
+      { id: layer.id, patch: { name: 'Renamed' }, type: 'updateCanvasLayer' },
+      { id: layer.id, patch: { name: layer.name }, type: 'updateCanvasLayer' }
+    );
+    const guard = engine.captureLayerExportGuard(layer.id);
+    if (!guard) {
+      throw new Error('expected an operation guard');
+    }
+    const operation = engine.canvasOperations.start({
+      cleanupPreview: vi.fn(),
+      guard,
+      identity: { kind: 'filter', layerId: layer.id, projectId },
+    });
+
+    engine.clearHistory();
+
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({ identity: { kind: 'filter' }, status: 'active' });
+    operation?.cancel();
+    engine.clearHistory();
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.dispose();
+  });
 
   it('invalidates the owned filter session when its guarded source changes', async () => {
     const layer = guardableLayer('L');

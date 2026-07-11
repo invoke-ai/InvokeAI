@@ -276,7 +276,7 @@ const CanvasHeaderActionsInner = ({
         </Portal>
       </Menu.Root>
 
-      <CanvasSettingsMenu engine={engine} />
+      <CanvasSettingsMenu editingLocked={editingLocked} engine={engine} />
 
       <ConfirmDialog
         body={t('widgets.canvas.controls.newCanvasConfirm')}
@@ -299,7 +299,7 @@ const HeaderDivider = () => <Box bg="border.subtle" flexShrink={0} h="4" mx="1" 
  * actions (matching legacy `CanvasSettingsPopover`). `closeOnSelect={false}` keeps
  * it open while toggling. Settings persist per-project and never enter undo history.
  */
-const CanvasSettingsMenu = ({ engine }: { engine: CanvasEngine }) => {
+const CanvasSettingsMenu = ({ editingLocked, engine }: { editingLocked: boolean; engine: CanvasEngine }) => {
   const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const settings = useActiveProjectSelector(selectCanvasSettings, canvasSettingsEqual);
@@ -355,7 +355,7 @@ const CanvasSettingsMenu = ({ engine }: { engine: CanvasEngine }) => {
                     <Icon as={BugIcon} boxSize="3.5" color="fg.subtle" />
                     <Menu.ItemText fontSize="xs">{t('widgets.canvas.settings.logDebugInfo')}</Menu.ItemText>
                   </Menu.Item>
-                  <Menu.Item value="debug-clear-history" onClick={() => engine.clearHistory()}>
+                  <Menu.Item disabled={editingLocked} value="debug-clear-history" onClick={() => engine.clearHistory()}>
                     <Icon as={Trash2Icon} boxSize="3.5" color="fg.subtle" />
                     <Menu.ItemText fontSize="xs">{t('widgets.canvas.settings.clearHistory')}</Menu.ItemText>
                   </Menu.Item>
