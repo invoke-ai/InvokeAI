@@ -8,7 +8,13 @@ import {
   migrateCanvasStateToV2,
   placementToTransform,
 } from './canvasMigration';
-import { createInpaintMaskLayer, nextInpaintMaskName } from './widgets/layers/layerOps';
+import {
+  createControlLayer,
+  createEmptyPaintLayer,
+  createInpaintMaskLayer,
+  createRegionalGuidanceLayer,
+  nextInpaintMaskName,
+} from './widgets/layers/layerOps';
 
 describe('placementToTransform', () => {
   it('maps a placement rect to a scale-based transform relative to the source image size', () => {
@@ -183,6 +189,64 @@ describe('migrateCanvasStateToV2', () => {
       model: 'z-control',
       weight: 0.75,
     });
+  });
+
+  it.each([
+    ['missing discriminant and base fields', { id: 'broken' }],
+    ['raster with invalid source', { ...createEmptyPaintLayer('Raster', 'raster'), source: null }],
+    ['control with invalid adapter', { ...createControlLayer('Control', 'control'), adapter: null }],
+    [
+      'regional guidance with invalid mask',
+      { ...createRegionalGuidanceLayer('Region', 0, 'region'), mask: { bitmap: null, fill: null } },
+    ],
+    ['inpaint mask with invalid mask', { ...createInpaintMaskLayer('Mask', 'mask'), mask: null }],
+  ])('discards a snapshot containing a malformed layer: %s', (_label, malformedLayer) => {
+    const state = createEmptyCanvasStateV2();
+    const migrated = migrateCanvasStateToV2({
+      ...state,
+      snapshots: [
+        {
+          createdAt: 'now',
+          document: { ...state.document, layers: [malformedLayer] },
+          id: 'malformed',
+          name: 'Malformed',
+        },
+      ],
+    });
+
+    expect(migrated.snapshots).toEqual([]);
+    expect(migrated.document.layers).toEqual([]);
+  });
+
+  it('round-trips valid snapshots containing every layer type', () => {
+    const state = createEmptyCanvasStateV2();
+    const layers = [
+      createEmptyPaintLayer('Raster', 'raster'),
+      createControlLayer('Control', 'control'),
+      createRegionalGuidanceLayer('Region', 0, 'region'),
+      createInpaintMaskLayer('Mask', 'mask'),
+    ];
+    const snapshot = {
+      createdAt: 'now',
+      document: { ...state.document, layers, selectedLayerId: 'control' },
+      id: 'valid-layers',
+      name: 'Valid layers',
+    };
+
+    const migrated = migrateCanvasStateToV2({ ...state, snapshots: [snapshot] });
+
+    expect(migrated.snapshots).toEqual([snapshot]);
+  });
+
+  it('filters malformed live layers without discarding valid live layers', () => {
+    const state = createEmptyCanvasStateV2();
+    const valid = createEmptyPaintLayer('Valid', 'valid');
+    const migrated = migrateCanvasStateToV2({
+      ...state,
+      document: { ...state.document, layers: [{ id: 'broken' }, valid] },
+    });
+
+    expect(migrated.document.layers).toEqual([valid]);
   });
 
   it('maps a v1 raster layer to a v2 raster layer positioned by transform', () => {

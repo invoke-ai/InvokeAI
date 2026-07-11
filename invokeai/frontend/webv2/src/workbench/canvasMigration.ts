@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * Canvas v1 -> v2 document migration.
  *
@@ -31,6 +33,183 @@ const createMigrationId = (prefix: string): string =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+const zFiniteNumber = z.number().finite();
+const zCoordinate = z.object({ x: zFiniteNumber, y: zFiniteNumber });
+const zImageRef = z.object({
+  contentHash: z.string().optional(),
+  height: zFiniteNumber.nonnegative(),
+  imageName: z.string(),
+  width: zFiniteNumber.nonnegative(),
+});
+const zPaintSource = z.object({
+  bitmap: zImageRef.nullable(),
+  offset: zCoordinate.optional(),
+  type: z.literal('paint'),
+});
+const zLayerSource = z.discriminatedUnion('type', [
+  zPaintSource,
+  z.object({ image: zImageRef, type: z.literal('image') }),
+  z.object({
+    align: z.enum(['left', 'center', 'right']),
+    color: z.string(),
+    content: z.string(),
+    fontFamily: z.string(),
+    fontSize: zFiniteNumber,
+    fontWeight: zFiniteNumber,
+    lineHeight: zFiniteNumber,
+    type: z.literal('text'),
+  }),
+  z.object({
+    fill: z.string().nullable(),
+    height: zFiniteNumber,
+    kind: z.enum(['rect', 'ellipse', 'polygon']),
+    points: z.array(zCoordinate).optional(),
+    stroke: z.string().nullable(),
+    strokeWidth: zFiniteNumber,
+    type: z.literal('shape'),
+    width: zFiniteNumber,
+  }),
+  z.object({
+    angle: zFiniteNumber,
+    height: zFiniteNumber.positive().optional(),
+    kind: z.enum(['linear', 'radial']),
+    stops: z.array(z.object({ color: z.string(), offset: zFiniteNumber })),
+    type: z.literal('gradient'),
+    width: zFiniteNumber.positive().optional(),
+  }),
+]);
+const zTransform = z.object({
+  rotation: zFiniteNumber,
+  scaleX: zFiniteNumber,
+  scaleY: zFiniteNumber,
+  x: zFiniteNumber,
+  y: zFiniteNumber,
+});
+const zFilter = z.object({ settings: z.record(z.string(), z.unknown()), type: z.string() });
+const zCurve = z.array(z.tuple([zFiniteNumber, zFiniteNumber]));
+const zAdjustments = z.object({
+  brightness: zFiniteNumber,
+  contrast: zFiniteNumber,
+  curves: z.object({ b: zCurve, g: zCurve, r: zCurve }).optional(),
+  saturation: zFiniteNumber,
+});
+const zControlAdapter = z
+  .object({
+    beginEndStepPct: z.tuple([zFiniteNumber, zFiniteNumber]),
+    controlMode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).nullable(),
+    kind: z.enum(['controlnet', 't2i_adapter', 'control_lora', 'z_image_control']),
+    model: z.string().nullable(),
+    weight: zFiniteNumber,
+  })
+  .refine(({ beginEndStepPct }) => {
+    const [begin, end] = beginEndStepPct;
+    return begin >= 0 && end <= 1 && begin < end;
+  })
+  .refine(({ kind, weight }) => weight >= (kind === 'z_image_control' ? 0 : -1) && weight <= 2);
+const zMask = z.object({
+  bitmap: zImageRef.nullable(),
+  fill: z.object({
+    color: z.string(),
+    style: z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']),
+  }),
+  offset: zCoordinate.optional(),
+});
+const zGeneratedImage = z.object({
+  height: zFiniteNumber.nonnegative(),
+  imageName: z.string(),
+  imageUrl: z.string(),
+  queuedAt: z.string(),
+  sourceQueueItemId: z.string(),
+  thumbnailUrl: z.string(),
+  width: zFiniteNumber.nonnegative(),
+});
+const zModelIdentifier = z.object({ base: z.string(), key: z.string(), name: z.string(), type: z.string() });
+const zReferenceImage = z.object({
+  config: z.discriminatedUnion('type', [
+    z.object({
+      beginEndStepPct: z.tuple([zFiniteNumber, zFiniteNumber]),
+      clipVisionModel: z.enum(['ViT-H', 'ViT-G', 'ViT-L']),
+      image: zGeneratedImage.nullable(),
+      method: z.enum(['full', 'style', 'composition', 'style_strong', 'style_precise']),
+      model: zModelIdentifier.nullable(),
+      type: z.literal('ip_adapter'),
+      weight: zFiniteNumber,
+    }),
+    z.object({
+      image: zGeneratedImage.nullable(),
+      imageInfluence: z.enum(['lowest', 'low', 'medium', 'high', 'highest']),
+      model: zModelIdentifier.nullable(),
+      type: z.literal('flux_redux'),
+    }),
+    z.object({
+      image: zGeneratedImage.nullable(),
+      model: zModelIdentifier.nullable(),
+      type: z.literal('flux_kontext_reference_image'),
+    }),
+    z.object({ image: zGeneratedImage.nullable(), type: z.literal('flux2_reference_image') }),
+    z.object({ image: zGeneratedImage.nullable(), type: z.literal('qwen_image_reference_image') }),
+    z.object({ image: zGeneratedImage.nullable(), type: z.literal('external_reference_image') }),
+  ]),
+  id: z.string(),
+  isEnabled: z.boolean(),
+});
+const zLayerBase = z.object({
+  blendMode: z.enum([
+    'normal',
+    'multiply',
+    'screen',
+    'overlay',
+    'darken',
+    'lighten',
+    'color-dodge',
+    'color-burn',
+    'hard-light',
+    'soft-light',
+    'difference',
+    'exclusion',
+    'hue',
+    'saturation',
+    'color',
+    'luminosity',
+  ]),
+  id: z.string(),
+  isEnabled: z.boolean(),
+  isLocked: z.boolean(),
+  name: z.string(),
+  opacity: zFiniteNumber.min(0).max(1),
+  transform: zTransform,
+});
+const zCanvasLayer = z.discriminatedUnion('type', [
+  zLayerBase.extend({
+    adjustments: zAdjustments.optional(),
+    filter: zFilter.optional(),
+    isTransparencyLocked: z.boolean().optional(),
+    source: zLayerSource,
+    type: z.literal('raster'),
+  }),
+  zLayerBase.extend({
+    adapter: zControlAdapter,
+    filter: zFilter.optional(),
+    source: zLayerSource,
+    type: z.literal('control'),
+    withTransparencyEffect: z.boolean(),
+  }),
+  zLayerBase.extend({
+    autoNegative: z.boolean(),
+    mask: zMask,
+    negativePrompt: z.string().nullable(),
+    positivePrompt: z.string().nullable(),
+    referenceImages: z.array(zReferenceImage),
+    type: z.literal('regional_guidance'),
+  }),
+  zLayerBase.extend({
+    denoiseLimit: zFiniteNumber.optional(),
+    mask: zMask,
+    noiseLevel: zFiniteNumber.optional(),
+    type: z.literal('inpaint_mask'),
+  }),
+]);
 
 const asNumber = (value: unknown, fallback: number): number => (typeof value === 'number' ? value : fallback);
 
@@ -237,32 +416,54 @@ const migrateStagingAreaToV2 = (rawCanvas: Record<string, unknown>): CanvasStagi
 const isCanvasStateV2 = (canvas: unknown): canvas is Record<string, unknown> & { version: 2 } =>
   isRecord(canvas) && canvas.version === 2;
 
+const normalizeCanvasLayer = (value: unknown): CanvasDocumentContractV2['layers'][number] | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  let candidate: Record<string, unknown> = value;
+  if (value.type === 'control') {
+    candidate = {
+      ...value,
+      adapter: normalizeControlAdapter(value.adapter),
+      withTransparencyEffect: value.withTransparencyEffect === undefined ? true : value.withTransparencyEffect,
+    };
+  } else if (value.type === 'regional_guidance') {
+    candidate = {
+      ...value,
+      autoNegative: value.autoNegative === undefined ? false : value.autoNegative,
+      negativePrompt: value.negativePrompt === undefined ? null : value.negativePrompt,
+      positivePrompt: value.positivePrompt === undefined ? null : value.positivePrompt,
+      referenceImages: value.referenceImages === undefined ? [] : value.referenceImages,
+    };
+  }
+  const parsed = zCanvasLayer.safeParse(candidate);
+  return parsed.success ? (candidate as unknown as CanvasDocumentContractV2['layers'][number]) : null;
+};
+
 export const normalizeCanvasDocumentControlAdapters = (
   document: CanvasDocumentContractV2
 ): CanvasDocumentContractV2 => ({
   ...document,
-  layers: document.layers.map((layer) => {
-    if (!isRecord(layer) || layer.type !== 'control') {
-      return layer;
-    }
-    const adapter = normalizeControlAdapter(layer.adapter);
-    return adapter === layer.adapter ? layer : ({ ...layer, adapter } as CanvasDocumentContractV2['layers'][number]);
+  layers: document.layers.flatMap((layer) => {
+    const normalized = normalizeCanvasLayer(layer);
+    return normalized ? [normalized] : [];
   }),
 });
 
 const normalizeCanvasDocumentV2 = (value: unknown, requireValidLayers: boolean): CanvasDocumentContractV2 | null => {
   const rawDocument = isRecord(value) ? value : {};
-  if (
-    requireValidLayers &&
-    (!Array.isArray(rawDocument.layers) ||
-      !rawDocument.layers.every((layer) => isRecord(layer) && typeof layer.id === 'string'))
-  ) {
+  const rawLayers = Array.isArray(rawDocument.layers) ? rawDocument.layers : [];
+  const layers = rawLayers.flatMap((layer) => {
+    const normalized = normalizeCanvasLayer(layer);
+    return normalized ? [normalized] : [];
+  });
+  if (requireValidLayers && (!Array.isArray(rawDocument.layers) || layers.length !== rawLayers.length)) {
     return null;
   }
   const width = asPositiveNumber(rawDocument.width, DEFAULT_CANVAS_DOCUMENT_WIDTH);
   const height = asPositiveNumber(rawDocument.height, DEFAULT_CANVAS_DOCUMENT_HEIGHT);
   const bbox = isRecord(rawDocument.bbox) ? rawDocument.bbox : {};
-  return normalizeCanvasDocumentControlAdapters({
+  return {
     background:
       rawDocument.background === 'transparent' || isRecord(rawDocument.background)
         ? (rawDocument.background as CanvasDocumentContractV2['background'])
@@ -274,11 +475,11 @@ const normalizeCanvasDocumentV2 = (value: unknown, requireValidLayers: boolean):
       y: asNumber(bbox.y, 0),
     },
     height,
-    layers: Array.isArray(rawDocument.layers) ? (rawDocument.layers as CanvasDocumentContractV2['layers']) : [],
+    layers,
     selectedLayerId: typeof rawDocument.selectedLayerId === 'string' ? rawDocument.selectedLayerId : null,
     version: 2,
     width,
-  });
+  };
 };
 
 const normalizeCanvasSnapshot = (value: unknown): CanvasStateContractV2['snapshots'][number] | null => {
