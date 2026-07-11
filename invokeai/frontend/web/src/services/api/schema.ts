@@ -38592,6 +38592,8 @@ export interface operations {
                 has_been_opened?: boolean | null;
                 /** @description Filter by public/shared status */
                 is_public?: boolean | null;
+                /** @description Filter by whether workflows are callable by call_saved_workflow */
+                callable?: boolean | null;
             };
             header?: never;
             path?: never;
