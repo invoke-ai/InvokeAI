@@ -49,7 +49,9 @@ dependencies = [
   # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
   # >=2.10 so the rocm extra can use torch 2.10.0+rocm7.1, while macOS stays on 2.7.x — newer macOS torch
   # wheels exercise MPS on CI runners (no usable Metal GPU) and fail with MPS OOM.
-  "torch>=2.7.0,<3.0; sys_platform != 'darwin'",
+  # Capped <2.12: torch 2.12.x+rocm7.1 breaks generation (#9328), and legacy (pre-6.14) launcher
+  # installs resolve this range live against the pytorch wheel indexes rather than using uv.lock.
+  "torch>=2.7.0,<2.12; sys_platform != 'darwin'",
   "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
