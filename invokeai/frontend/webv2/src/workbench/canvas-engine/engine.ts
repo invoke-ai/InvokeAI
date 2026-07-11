@@ -2763,11 +2763,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     scheduler.invalidate({ overlay: true });
   };
 
-  const invalidateSelectObjectCommit = (): void => {
+  const revokeSelectObjectCommit = (): void => {
     selectObjectCommitToken += 1;
     const owner = selectObjectCommitOwner;
     selectObjectCommitOwner = null;
     owner?.controller.abort();
+  };
+
+  const invalidateSelectObjectCommit = (): void => {
+    revokeSelectObjectCommit();
     syncSelectObjectStore();
   };
 
@@ -2847,21 +2851,30 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
   };
 
-  const clearOwnedSelectObjectSession = (): void => {
-    pipeline.replaceTemporaryRestoreTool('sam', 'view');
-    invalidateSelectObjectCommit();
-    canvasOperations.cancel();
+  const clearOwnedSelectObjectSession = (expectedOwner?: SelectObjectCommitOwner): boolean => {
+    if (expectedOwner && !isSelectObjectCommitOwnerCurrent(expectedOwner)) {
+      return false;
+    }
     const session = selectObjectSession;
+    if (expectedOwner && session !== expectedOwner.session) {
+      return false;
+    }
+    pipeline.replaceTemporaryRestoreTool('sam', 'view');
     selectObjectSession = null;
     selectObjectUnsubscribe?.();
     selectObjectUnsubscribe = null;
-    session?.dispose();
-    clearSamPreview();
     selectObjectGuard = null;
     selectObjectSourceRect = null;
     selectObjectPointLabel = 'include';
-    stores.samSession.set(null);
+    revokeSelectObjectCommit();
+    clearSamPreview();
+    canvasOperations.cancel();
+    session?.dispose();
+    if (selectObjectSession === null) {
+      stores.samSession.set(null);
+    }
     scheduler.invalidate({ overlay: true });
+    return true;
   };
 
   const startSelectObject = (layerId: string): StartSelectObjectSessionResult => {
@@ -3027,11 +3040,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return result;
     }
     if (result.status === 'selected') {
-      if (!finishSelectObjectCommit(owner)) {
+      if (!clearOwnedSelectObjectSession(owner)) {
         return result;
       }
-      clearOwnedSelectObjectSession();
-      if (activeToolId === 'sam') {
+      if (selectObjectSession === null && activeToolId === 'sam') {
         setTool('view');
       }
     } else {
@@ -3103,11 +3115,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return result;
     }
     if (result.status === 'committed') {
-      if (!finishSelectObjectCommit(owner)) {
+      if (!clearOwnedSelectObjectSession(owner)) {
         return result;
       }
-      clearOwnedSelectObjectSession();
-      if (activeToolId === 'sam') {
+      if (selectObjectSession === null && activeToolId === 'sam') {
         setTool('view');
       }
     } else {
@@ -3141,7 +3152,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const cancelSelectObjectSession = (): void => {
     clearOwnedSelectObjectSession();
-    if (activeToolId === 'sam') {
+    if (selectObjectSession === null && activeToolId === 'sam') {
       setTool('view');
     }
   };

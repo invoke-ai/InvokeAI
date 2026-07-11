@@ -12247,6 +12247,56 @@ describe('Select Object canvas engine integration', () => {
     engine.dispose();
   });
 
+  it.each(['apply', 'save'] as const)(
+    'preserves a replacement started by the SAM subscriber when old %s succeeds',
+    async (kind) => {
+      const document = samDocument([samLayer('first'), samLayer('second', 30)]);
+      const reactive = createReducerBackedStore(document);
+      const { backend } = createOpaqueSamBackend();
+      const engine = createCanvasEngine({
+        backend,
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId: reactive.projectId,
+        selectObjectDeps: {
+          runGraph: () => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }),
+          uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+        },
+        store: reactive.store,
+      });
+      await engine.exportLayerPixels('first');
+      await engine.exportLayerPixels('second');
+      engine.startSelectObject('first');
+      engine.updateSelectObjectSession({
+        input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
+      });
+      await engine.processSelectObjectSession();
+      let sawCommitting = false;
+      let replaced = false;
+      const unsubscribe = engine.stores.samSession.subscribe(() => {
+        const snapshot = engine.stores.samSession.get();
+        if (snapshot?.status === 'committing') {
+          sawCommitting = true;
+        } else if (sawCommitting && !replaced) {
+          replaced = true;
+          expect(engine.startSelectObject('second')).toBe('started');
+        }
+      });
+
+      const result =
+        kind === 'apply'
+          ? await engine.applySelectObjectSession()
+          : await engine.saveSelectObjectSession('inpaint_mask', () => Promise.resolve());
+
+      expect(result.status).toBe(kind === 'apply' ? 'selected' : 'committed');
+      expect(replaced).toBe(true);
+      expect(engine.stores.samSession.get()).toMatchObject({ error: null, layerId: 'second' });
+      expect(engine.stores.activeTool.get()).toBe('sam');
+      unsubscribe();
+      engine.dispose();
+    }
+  );
+
   it('keeps the session and exact preview retryable when durability fails', async () => {
     const h = await createCommittingSamHarness();
     const previewInput = h.engine.stores.samSession.get()?.input;
