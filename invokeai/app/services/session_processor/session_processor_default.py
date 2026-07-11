@@ -528,16 +528,18 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._invoker.services.logger.error(error_traceback)
 
         if queue_item is not None:
-            # Update the queue item with the completed session & fail it
-            queue_item = self._invoker.services.session_queue.set_queue_item_session(
-                queue_item.item_id, queue_item.session
-            )
-            queue_item = self._invoker.services.session_queue.fail_queue_item(
-                item_id=queue_item.item_id,
-                error_type=error_type,
-                error_message=error_message,
-                error_traceback=error_traceback,
-            )
+            try:
+                queue_item = self._invoker.services.session_queue.set_queue_item_session(
+                    queue_item.item_id, queue_item.session
+                )
+                queue_item = self._invoker.services.session_queue.fail_queue_item(
+                    item_id=queue_item.item_id,
+                    error_type=error_type,
+                    error_message=error_message,
+                    error_traceback=error_traceback,
+                )
+            except SessionQueueItemNotFoundError:
+                self._invoker.services.logger.warning(f"Could not mark queue item {queue_item.item_id} as failed because it no longer exists in the database.")
 
         for callback in self._on_non_fatal_processor_error_callbacks:
             callback(
