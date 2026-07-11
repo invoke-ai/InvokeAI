@@ -207,6 +207,35 @@ describe('createSelectObjectSession', () => {
     }
   );
 
+  it('starts an immediate same-input retry after invalidation when old work ignores abort', async () => {
+    const older = deferred<{ imageName: string; origin: string }>();
+    const newer = deferred<{ imageName: string; origin: string }>();
+    const harness = createHarness({
+      runGraph: vi
+        .fn()
+        .mockImplementationOnce(() => older.promise)
+        .mockImplementationOnce(() => newer.promise),
+    });
+    const oldPending = harness.session.process();
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
+
+    harness.controller.invalidateSource('p1', layer.id);
+    const newPending = harness.session.process();
+
+    expect(newPending).not.toBe(oldPending);
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledTimes(2));
+    expect(harness.deps.exportLayer).toHaveBeenCalledTimes(2);
+    older.resolve({ imageName: 'old.png', origin: 'old' });
+    await expect(oldPending).resolves.toBe('stale');
+    expect(harness.session.process()).toBe(newPending);
+
+    newer.resolve({ imageName: 'new.png', origin: 'new' });
+    await expect(newPending).resolves.toBe('published');
+    expect(harness.session.getSnapshot().preview?.image.imageName).toBe('new.png');
+    await expect(harness.session.process()).resolves.toBe('deduped');
+    expect(harness.deps.runGraph).toHaveBeenCalledTimes(2);
+  });
+
   it('deduplicates an identical stable input hash after publication', async () => {
     const harness = createHarness();
 

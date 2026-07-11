@@ -146,6 +146,11 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   };
 
   const clearSource = (): void => {
+    requestToken += 1;
+    sourceController?.abort();
+    sourceController = null;
+    pendingHash = null;
+    pendingProcess = null;
     source = null;
     operation = null;
     operationGuard = null;
@@ -166,8 +171,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       return;
     }
     if (!startingOperation && operation && deps.controller.getSnapshot().status === 'idle') {
-      sourceController?.abort();
-      sourceController = null;
       clearSource();
     }
   });
