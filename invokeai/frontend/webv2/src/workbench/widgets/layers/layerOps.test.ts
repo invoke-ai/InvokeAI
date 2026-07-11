@@ -302,7 +302,7 @@ describe('nextInpaintMaskName', () => {
 describe('createControlLayer', () => {
   it('centralizes legacy defaults for every adapter kind', () => {
     expect(CONTROL_ADAPTER_DEFAULTS).toEqual({
-      control_lora: { beginEndStepPct: [0, 0.75], controlMode: null, kind: 'control_lora', model: null, weight: 0.75 },
+      control_lora: { beginEndStepPct: [0, 1], controlMode: null, kind: 'control_lora', model: null, weight: 0.75 },
       controlnet: {
         beginEndStepPct: [0, 0.75],
         controlMode: 'balanced',
@@ -310,7 +310,7 @@ describe('createControlLayer', () => {
         model: null,
         weight: 0.75,
       },
-      t2i_adapter: { beginEndStepPct: [0, 0.75], controlMode: null, kind: 't2i_adapter', model: null, weight: 0.75 },
+      t2i_adapter: { beginEndStepPct: [0, 1], controlMode: null, kind: 't2i_adapter', model: null, weight: 1 },
     });
   });
 

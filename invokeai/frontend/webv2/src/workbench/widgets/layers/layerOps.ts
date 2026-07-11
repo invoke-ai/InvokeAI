@@ -294,7 +294,7 @@ export const CONTROL_ADAPTER_DEFAULTS: Readonly<
   Record<CanvasControlAdapterContract['kind'], CanvasControlAdapterContract>
 > = {
   control_lora: {
-    beginEndStepPct: [0, 0.75],
+    beginEndStepPct: [0, 1],
     controlMode: null,
     kind: 'control_lora',
     model: null,
@@ -308,11 +308,11 @@ export const CONTROL_ADAPTER_DEFAULTS: Readonly<
     weight: 0.75,
   },
   t2i_adapter: {
-    beginEndStepPct: [0, 0.75],
+    beginEndStepPct: [0, 1],
     controlMode: null,
     kind: 't2i_adapter',
     model: null,
-    weight: 0.75,
+    weight: 1,
   },
 };
 

@@ -33,7 +33,6 @@ export type FilterParamSpec =
       sliderMin?: number;
       sliderMax?: number;
       coerceMin?: number;
-      dynamicBounds?: 'adjust_value';
     }
   | { kind: 'boolean'; key: string; default: boolean }
   | {
@@ -164,7 +163,7 @@ export const CONTROL_FILTERS: readonly FilterDefinition[] = [
           { labelKey: 'widgets.layers.control.filterOptions.channel.cr', value: 'Cr (YCbCr)' },
         ],
       },
-      { default: 1, dynamicBounds: 'adjust_value', key: 'value', kind: 'number', max: 255, min: 0, step: 0.0025 },
+      { default: 1, key: 'value', kind: 'number', max: 255, min: 0, sliderMax: 2, step: 0.0025 },
       { default: false, key: 'scale_values', kind: 'boolean' },
     ],
     type: 'adjust_image',
@@ -237,16 +236,15 @@ export interface FilterNumberBounds {
   step: number;
 }
 
-/** Resolves legacy slider/input ranges, including adjust_image's mode-dependent value maximum. */
+/** Resolves independently declared legacy slider and numeric-input ranges. */
 export const getFilterNumberBounds = (
   param: Extract<FilterParamSpec, { kind: 'number' }>,
-  settings: Record<string, unknown>
+  _settings: Record<string, unknown>
 ): FilterNumberBounds => {
-  const dynamicMax = param.dynamicBounds === 'adjust_value' && settings.scale_values !== true ? 2 : param.max;
   return {
-    inputMax: dynamicMax,
+    inputMax: param.max,
     inputMin: param.min,
-    sliderMax: param.dynamicBounds === 'adjust_value' ? dynamicMax : (param.sliderMax ?? dynamicMax),
+    sliderMax: param.sliderMax ?? param.max,
     sliderMin: param.sliderMin ?? param.min,
     step: param.step,
   };
@@ -369,7 +367,7 @@ export const buildFilterGraph = (
       : {
           ...node,
           channel,
-          offset: Math.round(255 * ((value as number) - 1)),
+          offset: Math.round(255 * (Math.min(value as number, 2) - 1)),
           scale_values: undefined,
           type: 'img_channel_offset',
           value: undefined,

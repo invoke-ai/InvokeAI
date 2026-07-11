@@ -114,13 +114,14 @@ describe('getFilterNumberBounds', () => {
     expect(getFilterNumberBounds(param, settings)).toEqual(expected);
   });
 
-  it('changes adjust value bounds with scale_values', () => {
+  it('keeps independent legacy adjust slider and numeric bounds in both modes', () => {
     const param = getFilterDefinition('adjust_image')?.params.find((candidate) => candidate.key === 'value');
     if (param?.kind !== 'number') {
       throw new Error('Missing adjust_image.value');
     }
-    expect(getFilterNumberBounds(param, { scale_values: false })).toMatchObject({ inputMax: 2, sliderMax: 2 });
-    expect(getFilterNumberBounds(param, { scale_values: true })).toMatchObject({ inputMax: 255, sliderMax: 255 });
+    const expected = { inputMax: 255, inputMin: 0, sliderMax: 2, sliderMin: 0, step: 0.0025 };
+    expect(getFilterNumberBounds(param, { scale_values: false })).toEqual(expected);
+    expect(getFilterNumberBounds(param, { scale_values: true })).toEqual(expected);
   });
 });
 
