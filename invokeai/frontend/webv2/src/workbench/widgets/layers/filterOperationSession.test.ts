@@ -45,6 +45,7 @@ const deferred = <T>() => {
 };
 
 const createDeps = (overrides: Partial<FilterOperationSessionDeps> = {}): FilterOperationSessionDeps => ({
+  canCommit: vi.fn(() => true),
   clearPreview: vi.fn(),
   commit: vi.fn(() => Promise.resolve({ layerId: layer.id, status: 'committed' as const })),
   controller: createCanvasOperationController({ isGuardCurrent: () => true }),

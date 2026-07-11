@@ -9247,10 +9247,12 @@ describe('guarded filter previews', () => {
     expect(engine.stores.samSession.get()).not.toBeNull();
     expect(engine.stores.activeTool.get()).toBe('view');
 
-    engine.setInteractionLocked(false);
-    expect(engine.stores.activeTool.get()).toBe('sam');
     engine.cancelSelectObjectSession();
     expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    expect(engine.stores.samSession.get()).toBeNull();
+
+    engine.setInteractionLocked(false);
+    expect(engine.stores.activeTool.get()).toBe('view');
     engine.dispose();
   });
 
@@ -9490,6 +9492,45 @@ describe('guarded filter previews', () => {
     });
     return { document, engine, source };
   };
+
+  it('blocks Filter actions called directly after an external lock and still allows Cancel', async () => {
+    const { document, engine } = await createFilterFlowHarness('raster');
+    const makeDurable = vi.fn(() => Promise.resolve());
+
+    engine.setInteractionLocked(true);
+
+    await expect(engine.processFilterOperation()).resolves.toBe('blocked');
+    await expect(engine.commitFilterOperation('apply', makeDurable)).resolves.toBe('blocked');
+    expect(makeDurable).not.toHaveBeenCalled();
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.stores.filterSession.get()?.preview).not.toBeNull();
+
+    engine.cancelFilterOperation();
+    expect(engine.stores.filterSession.get()).toBeNull();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    engine.setInteractionLocked(false);
+    expect(engine.stores.filterSession.get()).toBeNull();
+    engine.dispose();
+  });
+
+  it('blocks Filter mutation when an external lock begins during durability', async () => {
+    const { document, engine } = await createFilterFlowHarness('raster');
+    const durable = createDeferred<void>();
+    const pending = engine.commitFilterOperation('apply', () => durable.promise);
+    await vi.waitFor(() => expect(engine.stores.filterSession.get()?.status).toBe('committing'));
+
+    engine.setInteractionLocked(true);
+    durable.resolve();
+
+    await expect(pending).resolves.toBe('blocked');
+    expect(engine.getDocument()).toEqual(document);
+    expect(engine.stores.filterSession.get()).toMatchObject({
+      preview: { imageName: 'filtered.png' },
+      status: 'ready',
+    });
+    engine.cancelFilterOperation();
+    engine.dispose();
+  });
 
   it.each([
     {
@@ -12677,6 +12718,63 @@ describe('Select Object canvas engine integration', () => {
     expect(h.engine.getDocument()).toEqual(h.document);
     expect(h.engine.stores.hasSelection.get()).toBe(true);
     expect(h.engine.stores.samSession.get()).toBeNull();
+    h.engine.dispose();
+  });
+
+  it('blocks Select Object actions called directly after an external lock and still allows Cancel', async () => {
+    const h = await createCommittingSamHarness();
+    const makeDurable = vi.fn(() => Promise.resolve());
+
+    h.engine.setInteractionLocked(true);
+
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('stale');
+    await expect(h.engine.applySelectObjectSession()).resolves.toEqual({ status: 'locked' });
+    await expect(h.engine.saveSelectObjectSession('raster', makeDurable)).resolves.toEqual({ status: 'locked' });
+    expect(makeDurable).not.toHaveBeenCalled();
+    expect(h.engine.getDocument()).toEqual(h.document);
+    expect(h.engine.stores.samSession.get()?.hasPreview).toBe(true);
+
+    h.engine.cancelSelectObjectSession();
+    expect(h.engine.stores.samSession.get()).toBeNull();
+    expect(h.engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    h.engine.setInteractionLocked(false);
+    expect(h.engine.stores.activeTool.get()).toBe('view');
+    h.engine.dispose();
+  });
+
+  it('blocks Select Object save mutation when an external lock begins during durability', async () => {
+    const h = await createCommittingSamHarness();
+    const durable = createDeferred<void>();
+    const pending = h.engine.saveSelectObjectSession('raster', () => durable.promise);
+    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('committing'));
+
+    h.engine.setInteractionLocked(true);
+    durable.resolve();
+
+    await expect(pending).resolves.toEqual({ status: 'locked' });
+    expect(h.engine.getDocument()).toEqual(h.document);
+    expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: true, status: 'ready' });
+    h.engine.cancelSelectObjectSession();
+    h.engine.dispose();
+  });
+
+  it('blocks Select Object apply mutation when an external lock begins during final decode', async () => {
+    const finalDecode = createDeferred<Blob>();
+    let resolutions = 0;
+    const h = await createCommittingSamHarness(() => {
+      resolutions += 1;
+      return resolutions === 1 ? Promise.resolve(new Blob()) : finalDecode.promise;
+    });
+    const pending = h.engine.applySelectObjectSession();
+    await vi.waitFor(() => expect(resolutions).toBe(2));
+
+    h.engine.setInteractionLocked(true);
+    finalDecode.resolve(new Blob());
+
+    await expect(pending).resolves.not.toEqual({ status: 'selected' });
+    expect(h.engine.getDocument()).toEqual(h.document);
+    expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: true, status: 'ready' });
+    h.engine.cancelSelectObjectSession();
     h.engine.dispose();
   });
 

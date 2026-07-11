@@ -378,6 +378,8 @@ export type StartSelectObjectSessionResult =
   | 'unsupported'
   | 'not-ready';
 export type StartFilterOperationResult = 'started' | 'missing' | 'disabled' | 'locked' | 'unsupported' | 'not-ready';
+export type CanvasOperationActionResult = 'completed' | 'blocked' | 'stale';
+export type FilterCommitOperationResult = 'committed' | 'blocked' | 'stale';
 
 export type SelectObjectSaveTarget = 'raster' | 'control' | MaskImageResultTarget;
 export type SaveSelectObjectSessionResult = CommitGeneratedImageResult | CommitMaskImageResult;
@@ -424,12 +426,12 @@ export interface CanvasEngine {
   /** Starts one engine-owned guarded filter operation for a raster or control layer. */
   startFilterOperation(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
   updateFilterOperation(draft: LayerFilterSettings): void;
-  processFilterOperation(): Promise<void>;
+  processFilterOperation(): Promise<CanvasOperationActionResult>;
   resetFilterOperation(settings: Record<string, unknown>): void;
   commitFilterOperation(
     target: FilterCommitTarget,
     makeImageDurable: (imageName: string) => Promise<void>
-  ): Promise<void>;
+  ): Promise<FilterCommitOperationResult>;
   cancelFilterOperation(): void;
   updateSelectObjectSession(changes: SelectObjectSessionUpdate): void;
   processSelectObjectSession(): Promise<SelectObjectSessionProcessResult>;
@@ -3070,6 +3072,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const processSelectObjectSession = (): Promise<SelectObjectSessionProcessResult> => {
+    if (interactionLocked) {
+      return Promise.resolve('stale');
+    }
     invalidateSelectObjectCommit();
     return selectObjectSession?.process() ?? Promise.resolve('stale');
   };
@@ -3090,6 +3095,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const applySelectObjectSession = async (): Promise<ReplaceSelectionFromImageResult> => {
+    if (interactionLocked) {
+      return { status: 'locked' };
+    }
     const session = selectObjectSession;
     const preview = getCurrentSelectObjectPreview();
     if (!session || !preview) {
@@ -3102,6 +3110,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!isSelectObjectCommitOwnerCurrent(owner)) {
       invalidateSelectObjectCommit();
       return { status: 'stale' };
+    }
+    if (interactionLocked) {
+      invalidateSelectObjectCommit();
+      return { status: 'locked' };
     }
     const result = await replaceSelectionFromImage(
       preview.guard,
@@ -3135,6 +3147,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     target: SelectObjectSaveTarget,
     makeImageDurable: (imageName: string) => Promise<void>
   ): Promise<SaveSelectObjectSessionResult> => {
+    if (interactionLocked) {
+      return { status: 'locked' };
+    }
     const session = selectObjectSession;
     const preview = getCurrentSelectObjectPreview();
     if (!session || !preview) {
@@ -3148,6 +3163,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       invalidateSelectObjectCommit();
       return { status: 'stale' };
     }
+    if (interactionLocked) {
+      invalidateSelectObjectCommit();
+      return { status: 'locked' };
+    }
     try {
       await makeImageDurable(preview.image.imageName);
     } catch (error) {
@@ -3158,7 +3177,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return { message, status: 'failed' };
     }
     if (!isSelectObjectCommitOwnerCurrent(owner)) {
-      return { status: 'stale' };
+      return interactionLocked ? { status: 'locked' } : { status: 'stale' };
+    }
+    if (interactionLocked) {
+      invalidateSelectObjectCommit();
+      return { status: 'locked' };
     }
     let result: SaveSelectObjectSessionResult;
     try {
@@ -3301,9 +3324,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     const queueDeps = opts.filterDeps;
     filterSession = createFilterOperationSession({
       deps: {
+        canCommit: () => !interactionLocked,
         clearPreview: () => clearFilterPreview(layer.id),
-        commit: ({ draft, guard, image, rect, signal, target }) =>
-          commitRasterFilterResult(
+        commit: ({ draft, guard, image, rect, signal, target }) => {
+          if (interactionLocked) {
+            return Promise.resolve({ status: 'locked' });
+          }
+          return commitRasterFilterResult(
             {
               filter: draft,
               guard,
@@ -3314,7 +3341,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
               target,
             },
             documentEditOwner
-          ),
+          );
+        },
         controller: canvasOperations,
         exportPixels: () => rasterizeLayerPixels(layer.id, { applyAdjustments: true, includeDisabled: true }),
         isGuardCurrent: isLayerExportGuardCurrent,
@@ -3360,24 +3388,38 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const updateFilterOperation = (draft: LayerFilterSettings): void => filterSession?.updateDraft(draft);
-  const processFilterOperation = (): Promise<void> => filterSession?.process() ?? Promise.resolve();
+  const processFilterOperation = async (): Promise<CanvasOperationActionResult> => {
+    if (interactionLocked) {
+      return 'blocked';
+    }
+    const session = filterSession;
+    if (!session) {
+      return 'stale';
+    }
+    await session.process();
+    return 'completed';
+  };
   const resetFilterOperation = (settings: Record<string, unknown>): void => filterSession?.reset(settings);
   const commitFilterOperation = async (
     target: FilterCommitTarget,
     makeImageDurable: (imageName: string) => Promise<void>
-  ): Promise<void> => {
+  ): Promise<FilterCommitOperationResult> => {
+    if (interactionLocked) {
+      return 'blocked';
+    }
     const session = filterSession;
     if (!session) {
-      return;
+      return 'stale';
     }
     filterMakeDurable = makeImageDurable;
-    await session.commit(target);
+    const result = await session.commit(target);
     if (canvasOperations.getSnapshot().status === 'idle' && filterSession === session) {
       filterSession = null;
       filterUnsubscribe?.();
       filterUnsubscribe = null;
       stores.filterSession.set(null);
     }
+    return result;
   };
 
   const cancelFilterOperation = (): void => clearOwnedFilterSession();
@@ -3410,6 +3452,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     interactionLocked = locked;
     if (locked) {
+      invalidateSelectObjectCommit();
+      filterSession?.blockCommit();
       pipeline.cancelActiveGesture();
       setTool('view', { temporary: true });
     } else if (canvasOperations.getSnapshot().status === 'active' && selectObjectSession) {

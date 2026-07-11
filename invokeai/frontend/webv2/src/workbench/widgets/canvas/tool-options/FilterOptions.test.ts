@@ -3,7 +3,7 @@ import type { FilterOperationSessionState } from '@workbench/widgets/layers/filt
 
 import { describe, expect, it } from 'vitest';
 
-import { getFilterActionEligibility } from './FilterOptions';
+import { getFilterActionEligibility, getFilterSaveTargetEligibility } from './FilterOptions';
 
 const state = (patch: Partial<FilterOperationSessionState> = {}): FilterOperationSessionState => ({
   draft: { settings: {}, type: 'canny_edge_detection' },
@@ -37,7 +37,9 @@ describe('getFilterActionEligibility', () => {
       rect: { height: 10, width: 10, x: 0, y: 0 },
       width: 10,
     } as NonNullable<FilterOperationSessionState['preview']>;
-    expect(getFilterActionEligibility(state({ preview }))).toMatchObject({ canApply: true, canSave: true });
+    const eligibility = getFilterActionEligibility(state({ preview }));
+    expect(eligibility).toMatchObject({ canApply: true, canSave: true });
+    expect(getFilterSaveTargetEligibility(eligibility)).toEqual({ control: true, raster: true });
   });
 
   it.each(['processing', 'committing'] as const)('disables ordinary actions while %s', (status) => {
@@ -52,7 +54,8 @@ describe('getFilterActionEligibility', () => {
   });
 
   it('disables mutating actions under an external interaction lock but preserves Cancel', () => {
-    expect(getFilterActionEligibility(state(), true)).toEqual({
+    const eligibility = getFilterActionEligibility(state(), true);
+    expect(eligibility).toEqual({
       canApply: false,
       canCancel: true,
       canEdit: false,
@@ -60,6 +63,7 @@ describe('getFilterActionEligibility', () => {
       canReset: false,
       canSave: false,
     });
+    expect(getFilterSaveTargetEligibility(eligibility)).toEqual({ control: false, raster: false });
   });
 
   it('disables Process for Spandrel until a compatible model is selected', () => {

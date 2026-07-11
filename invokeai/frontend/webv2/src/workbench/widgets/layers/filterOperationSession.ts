@@ -51,6 +51,7 @@ export interface FilterOperationSessionDeps {
   clearPreview(): void;
   isGuardCurrent(guard: LayerExportGuard): boolean;
   makeDurable(imageName: string): Promise<void>;
+  canCommit(): boolean;
   commit(options: {
     draft: LayerFilterSettings;
     guard: LayerExportGuard;
@@ -68,7 +69,8 @@ export interface FilterOperationSession {
   updateDraft(draft: LayerFilterSettings): void;
   process(): Promise<void>;
   reset(settings: Record<string, unknown>): void;
-  commit(target: FilterCommitTarget): Promise<void>;
+  commit(target: FilterCommitTarget): Promise<'committed' | 'blocked' | 'stale'>;
+  blockCommit(): void;
   cancel(): void;
   dispose(): void;
 }
@@ -204,10 +206,13 @@ export const createFilterOperationSession = (
     commitController = null;
   };
 
-  const commit = async (target: FilterCommitTarget): Promise<void> => {
+  const commit = async (target: FilterCommitTarget): Promise<'committed' | 'blocked' | 'stale'> => {
     const preview = state.preview;
     if (disposed || !preview || state.status === 'processing' || state.status === 'committing') {
-      return;
+      return 'stale';
+    }
+    if (!deps.canCommit()) {
+      return 'blocked';
     }
     cancelCommit();
     const token = commitToken;
@@ -215,9 +220,19 @@ export const createFilterOperationSession = (
     commitController = controller;
     publish({ ...state, error: null, status: 'committing' });
     try {
+      if (!deps.canCommit()) {
+        publish({ ...state, error: null, status: 'ready' });
+        return 'blocked';
+      }
       await deps.makeDurable(preview.imageName);
+      if (!deps.canCommit()) {
+        if (!disposed && token === commitToken) {
+          publish({ ...state, error: null, status: 'ready' });
+        }
+        return 'blocked';
+      }
       if (disposed || token !== commitToken || controller.signal.aborted || !deps.isGuardCurrent(guard)) {
-        return;
+        return 'stale';
       }
       const result = await deps.commit({
         draft: structuredClone(state.draft),
@@ -229,22 +244,24 @@ export const createFilterOperationSession = (
         target,
       });
       if (disposed || token !== commitToken || controller.signal.aborted) {
-        return;
+        return 'stale';
       }
       if (result.status === 'committed') {
         operation.cancel();
         publish({ ...state, error: null, preview: null, status: 'ready' });
-        return;
+        return 'committed';
       }
       publish({
         ...state,
         error: result.status === 'failed' ? result.message : `Filter commit is ${result.status}.`,
         status: 'error',
       });
+      return result.status === 'locked' ? 'blocked' : 'stale';
     } catch (error) {
       if (!disposed && token === commitToken && !controller.signal.aborted) {
         publish({ ...state, error: message(error), status: 'error' });
       }
+      return 'stale';
     } finally {
       if (token === commitToken) {
         commitController = null;
@@ -262,6 +279,12 @@ export const createFilterOperationSession = (
   };
 
   return {
+    blockCommit: () => {
+      if (commitController) {
+        cancelCommit();
+        publish({ ...state, error: null, status: 'ready' });
+      }
+    },
     cancel,
     commit,
     dispose: () => {

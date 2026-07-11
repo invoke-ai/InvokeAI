@@ -22,6 +22,7 @@ import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useState } fro
 import { useTranslation } from 'react-i18next';
 
 import { gridSizeForModelBase } from './bboxGrid';
+import { CanvasBottomControls } from './CanvasBottomControls';
 import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
 import {
   CANVAS_SETTINGS,
@@ -35,8 +36,6 @@ import { useCanvasOperation } from './engineStoreHooks';
 import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
-import { CanvasOperationBar } from './tool-options/CanvasOperationBar';
-import { ToolOptionsBar } from './tool-options/ToolOptionsBar';
 import { ToolStrip } from './ToolStrip';
 import { useCanvasEngine } from './useCanvasEngine';
 
@@ -442,12 +441,13 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
             onToggleVisibility={() => dispatch({ type: 'toggleCanvasStagingVisibility' })}
           />
         ) : null}
-        {engine && operation?.status === 'active' && interactionCapabilities.isOperationChromeVisible ? (
-          <CanvasOperationBar engine={engine} isExternalInteractionLocked={isInteractionLocked} operation={operation} />
-        ) : null}
-        {engine && interactionCapabilities.isRegularToolOptionsVisible ? (
-          <ToolOptionsBar documentHeight={document.height} documentWidth={document.width} engine={engine} />
-        ) : null}
+        <CanvasBottomControls
+          documentHeight={document.height}
+          documentWidth={document.width}
+          engine={engine}
+          isExternalInteractionLocked={isInteractionLocked}
+          operation={operation}
+        />
       </Stack>
     </Box>
   );

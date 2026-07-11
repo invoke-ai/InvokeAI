@@ -25,6 +25,13 @@ export interface FilterActionEligibility {
   canSave: boolean;
 }
 
+export const getFilterSaveTargetEligibility = (
+  eligibility: Pick<FilterActionEligibility, 'canSave'>
+): Record<'raster' | 'control', boolean> => ({
+  control: eligibility.canSave,
+  raster: eligibility.canSave,
+});
+
 export const getFilterActionEligibility = (
   session: FilterOperationSessionState,
   isExternalInteractionLocked = false
@@ -83,6 +90,7 @@ export const FilterOptions = ({
     return null;
   }
   const eligibility = getFilterActionEligibility(session, isExternalInteractionLocked);
+  const saveTargetEligibility = getFilterSaveTargetEligibility(eligibility);
 
   return (
     <HStack align="center" gap="2" maxW="calc(100vw - 2rem)" overflowX="auto">
@@ -112,10 +120,10 @@ export const FilterOptions = ({
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="11rem" py="1">
-              <Menu.Item value="raster" onClick={saveRaster}>
+              <Menu.Item disabled={!saveTargetEligibility.raster} value="raster" onClick={saveRaster}>
                 <Menu.ItemText>{t('widgets.layers.selectObject.saveAs_raster')}</Menu.ItemText>
               </Menu.Item>
-              <Menu.Item value="control" onClick={saveControl}>
+              <Menu.Item disabled={!saveTargetEligibility.control} value="control" onClick={saveControl}>
                 <Menu.ItemText>{t('widgets.layers.selectObject.saveAs_control')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
