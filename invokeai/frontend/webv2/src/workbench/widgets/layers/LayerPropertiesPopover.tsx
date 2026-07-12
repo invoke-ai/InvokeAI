@@ -15,6 +15,7 @@ import { AdjustmentsPopover } from './AdjustmentsPopover';
 import { ControlLayerSettings } from './ControlLayerSettings';
 import { InpaintMaskSettings } from './InpaintMaskSettings';
 import { applyStructural } from './layerOps';
+import { closeLayerPropertiesForOperation, isLayerPropertiesOpen } from './layerPropertiesOperation';
 import { clearLayerPropertiesRequest, useLayerPropertiesRequest } from './layerPropertiesRequestStore';
 import { RasterLayerFilterSection } from './RasterLayerFilterSection';
 import { RegionalGuidanceSettings } from './RegionalGuidanceSettings';
@@ -37,11 +38,10 @@ interface LayerPropertiesPopoverProps {
  * stacked in the panel header for the *selected* layer; moving them into a per-row
  * popover keeps the header slim and each layer's config next to the layer.
  *
- * Content is mounted ONLY while open (`lazyMount` + `unmountOnExit`, the codebase
- * convention) — unmount-on-close is what fires `ControlLayerSettings`' filter-preview
- * ref-callback teardown, so a previewed filter can never outlive a closed popover
- * (Task 38 lesson). The type-specific settings are additionally `key`ed on
- * `layer.id` (Task 39 lesson: the cleanup relies on a fresh instance per layer).
+ * Content is mounted only while open (`lazyMount` + `unmountOnExit`). Starting a
+ * canvas operation explicitly clears both trigger and request ownership before
+ * the operation panel takes over. Type-specific settings are keyed by layer so
+ * switching targets always mounts a fresh settings instance.
  */
 export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropertiesPopoverProps) => {
   const { t } = useTranslation();
@@ -49,7 +49,7 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
   const request = useLayerPropertiesRequest(layer.id);
   const documentRevision = useActiveProjectSelector((project) => project.canvas.documentRevision);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
-  const isOpen = triggerOpen || request !== null;
+  const isOpen = isLayerPropertiesOpen({ requestToken: request?.token ?? null, triggerOpen });
 
   const handleOpenChange = useCallback(
     (details: { open: boolean }) => {
@@ -60,6 +60,13 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
     },
     [request]
   );
+  const handleOperationStarted = useCallback(() => {
+    const closed = closeLayerPropertiesForOperation({ requestToken: request?.token ?? null, triggerOpen });
+    setTriggerOpen(closed.triggerOpen);
+    if (closed.requestTokenToClear !== null) {
+      clearLayerPropertiesRequest(closed.requestTokenToClear);
+    }
+  }, [request?.token, triggerOpen]);
 
   return (
     <Popover.Root
@@ -92,6 +99,7 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
                   documentRevision={documentRevision}
                   engine={engine}
                   layer={layer}
+                  onOperationStarted={handleOperationStarted}
                 />
               </Stack>
             </Popover.Body>
@@ -108,11 +116,13 @@ const LayerTypeSettings = ({
   documentRevision,
   engine,
   layer,
+  onOperationStarted,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
   documentRevision: number;
   engine: CanvasEngine | null;
   layer: CanvasLayerContract;
+  onOperationStarted(): void;
 }) => {
   switch (layer.type) {
     case 'inpaint_mask':
@@ -120,7 +130,9 @@ const LayerTypeSettings = ({
     case 'regional_guidance':
       return <RegionalGuidanceSettings key={layer.id} engine={engine} layer={layer} />;
     case 'control':
-      return <ControlLayerSettings key={layer.id} engine={engine} layer={layer} />;
+      return (
+        <ControlLayerSettings key={layer.id} engine={engine} layer={layer} onOperationStarted={onOperationStarted} />
+      );
     case 'raster':
       return (
         <RasterLayerSettings
@@ -128,6 +140,7 @@ const LayerTypeSettings = ({
           dispatch={dispatch}
           engine={engine}
           layer={layer}
+          onOperationStarted={onOperationStarted}
         />
       );
   }
@@ -138,10 +151,12 @@ const RasterLayerSettings = ({
   dispatch,
   engine,
   layer,
+  onOperationStarted,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
   engine: CanvasEngine | null;
   layer: Extract<CanvasLayerContract, { type: 'raster' }>;
+  onOperationStarted(): void;
 }) => {
   const { t } = useTranslation();
   const isLocked = layer.isTransparencyLocked === true;
@@ -182,7 +197,7 @@ const RasterLayerSettings = ({
         {t('widgets.layers.adjustments.title')}
       </Text>
       <AdjustmentsPopover engine={engine} layer={layer} />
-      <RasterLayerFilterSection engine={engine} layer={layer} />
+      <RasterLayerFilterSection engine={engine} layer={layer} onOperationStarted={onOperationStarted} />
     </Stack>
   );
 };

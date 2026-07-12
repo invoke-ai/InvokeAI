@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 import { getCompatibleControlModels } from './controlModelOptions';
 import { applyStructural, applyStructuralPreview, CONTROL_ADAPTER_DEFAULTS, CONTROL_WEIGHT_BOUNDS } from './layerOps';
+import { runLayerFilterOperation } from './layerPropertiesOperation';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
 
@@ -53,6 +54,7 @@ const useSelectedMainModel = () => {
 interface ControlLayerSettingsProps {
   engine: CanvasEngine | null;
   layer: CanvasControlLayerContract;
+  onOperationStarted(): void;
 }
 
 /**
@@ -63,7 +65,7 @@ interface ControlLayerSettingsProps {
  * undo stack (`updateCanvasLayerConfig`); the filter preview runs on the utility
  * queue and never mutates the document until "Apply".
  */
-export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProps) => {
+export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
@@ -138,11 +140,11 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         const selected = models.find((candidate) => candidate.key === model);
         const recommendation = resolveDefaultFilterForModel(selected);
         if (recommendation && !layer.filter) {
-          engine?.startFilterOperation(layer.id, recommendation);
+          runLayerFilterOperation(() => engine?.startFilterOperation(layer.id, recommendation), onOperationStarted);
         }
       }
     },
-    [adapter.model, commitAdapter, engine, layer.filter, layer.id, models, t]
+    [adapter.model, commitAdapter, engine, layer.filter, layer.id, models, onOperationStarted, t]
   );
 
   const handleControlModeChange = useCallback(
@@ -323,7 +325,10 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
           zImageControlIndex: Math.max(0, zImageControlIndex),
         })
       : null;
-  const startFilter = useCallback(() => engine?.startFilterOperation(layer.id), [engine, layer.id]);
+  const startFilter = useCallback(
+    () => runLayerFilterOperation(() => engine?.startFilterOperation(layer.id), onOperationStarted),
+    [engine, layer.id, onOperationStarted]
+  );
 
   return (
     <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md">
