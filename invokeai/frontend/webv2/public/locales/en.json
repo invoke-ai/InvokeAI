@@ -1327,6 +1327,7 @@
       },
       "selectObject": {
         "autoProcess": "Auto Process",
+        "autoProcessCompact": "Auto",
         "bboxActive": "Bounding box active",
         "bboxInactive": "No bounding box",
         "errorDecode": "The object preview could not be decoded.",
@@ -1346,6 +1347,7 @@
         "includeCount": "Include · {{count}}",
         "invert": "Invert",
         "isolatedPreview": "Isolated Preview",
+        "isolatedPreviewCompact": "Isolate",
         "model": "Model",
         "modelHuge": "SAM Huge",
         "modelSam2Large": "SAM 2 Large",
@@ -1362,6 +1364,8 @@
         "saveAs_inpaint_mask": "Inpaint mask",
         "saveAs_raster": "Raster layer",
         "saveAs_regional_guidance": "Regional guidance",
+        "sourceDimensions": "{{width}} × {{height}}",
+        "sourceDimensionsLabel": "Generation area: {{width}} × {{height}}",
         "statusCommitting": "Applying object result…",
         "statusError": "Select Object needs attention.",
         "statusPreparingComposite": "Preparing canvas composite…",
@@ -1370,6 +1374,7 @@
         "statusRenderingPreview": "Rendering object preview…",
         "statusScheduled": "Waiting to process object…",
         "statusUploading": "Uploading canvas composite…",
+        "technicalDetails": "Technical details",
         "title": "Select Object",
         "visual": "Visual",
         "visualGuidance": "Click to add · drag to move · Shift flips type"

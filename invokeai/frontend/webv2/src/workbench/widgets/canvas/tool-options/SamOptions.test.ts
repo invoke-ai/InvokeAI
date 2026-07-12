@@ -3,21 +3,28 @@ import type { ComponentProps } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createInstance } from 'i18next';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { I18nextProvider } from 'react-i18next';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   getSamPanelViewModel,
   getSamActionEligibility,
+  getSamActionHandlers,
   getSamErrorTranslationKey,
   getSamStatusTranslationKey,
+  SAM_COMPACT_BUTTON_LAYOUT,
   SAM_COMPACT_CONTROL_LAYOUT,
   SAM_COMPACT_FOOTER_LAYOUT,
+  SAM_COMPACT_GROUP_LAYOUT,
   SAM_MODEL_SELECT_LAYOUT,
   SamPromptBody,
   SamModeToggle,
+  SamOptionsPanel,
   SamProcessFeedback,
+  SamSwitch,
   SamVisualBody,
 } from './SamOptions';
 
@@ -25,9 +32,18 @@ const englishCatalogModules = import.meta.glob('../../../../../public/locales/en
   eager: true,
   import: 'default',
 });
-const en = Object.values(englishCatalogModules)[0] as {
+const enCatalog = Object.values(englishCatalogModules)[0] as {
+  common: Record<string, string>;
   widgets: { layers: { selectObject: Record<string, string> } };
 };
+const en = enCatalog;
+const testI18n = createInstance();
+await testI18n.init({
+  initImmediate: false,
+  lng: 'en',
+  resources: { en: { translation: enCatalog } },
+  showSupportNotice: false,
+});
 
 const snapshot = (overrides: Partial<SamSessionSnapshot> = {}): SamSessionSnapshot => ({
   applyPolygonRefinement: false,
@@ -130,23 +146,30 @@ describe('getSamPanelViewModel', () => {
           },
           sourceRect: { height: 768, width: 1024, x: 64, y: 32 },
         }),
-        (width, height) => `Área de generación ${width} por ${height}`
+        (width, height) => `Área de generación ${width} por ${height}`,
+        (width, height) => `Generation area ${width} by ${height}`
       )
     ).toEqual({
       bboxActive: true,
       excludeCount: 1,
       includeCount: 2,
+      sourceLabel: 'Generation area 1024 by 768',
       sourceSummary: 'Área de generación 1024 por 768',
     });
   });
 
   it('returns zero visual counts for prompt mode', () => {
     expect(
-      getSamPanelViewModel(snapshot({ input: { prompt: 'cat', type: 'prompt' } }), (w, h) => `${w} × ${h}`)
+      getSamPanelViewModel(
+        snapshot({ input: { prompt: 'cat', type: 'prompt' } }),
+        (w, h) => `${w} × ${h}`,
+        (w, h) => `Generation area ${w} × ${h}`
+      )
     ).toEqual({
       bboxActive: false,
       excludeCount: 0,
       includeCount: 0,
+      sourceLabel: 'Generation area 20 × 20',
       sourceSummary: '20 × 20',
     });
   });
@@ -154,9 +177,30 @@ describe('getSamPanelViewModel', () => {
 
 describe('SamModeToggle', () => {
   it('uses compact controls and wraps only when the card runs out of inline space', () => {
-    expect(SAM_COMPACT_CONTROL_LAYOUT).toEqual({ h: '8', minH: '8', size: 'sm' });
-    expect(SAM_COMPACT_FOOTER_LAYOUT).toMatchObject({ flexWrap: 'wrap', gap: '2' });
+    expect(SAM_COMPACT_CONTROL_LAYOUT).toEqual({ h: '8', minH: '8', size: 'xs' });
+    expect(SAM_COMPACT_BUTTON_LAYOUT).toEqual({ h: '8', minH: '8', px: '2', size: 'xs' });
+    expect(SAM_COMPACT_FOOTER_LAYOUT).toMatchObject({ flexWrap: 'wrap', gap: '1' });
+    expect(SAM_COMPACT_GROUP_LAYOUT).toEqual({ maxW: 'full', minW: '0' });
     expect(SAM_MODEL_SELECT_LAYOUT).toEqual({ flex: '0 1 11rem', maxW: 'full', minW: '0', w: '11rem' });
+  });
+
+  it('renders compact switch copy with the full localized accessible name', () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamSwitch, {
+          accessibleLabel: 'Auto Process',
+          checked: false,
+          disabled: false,
+          label: 'Auto',
+          onChange: () => undefined,
+        })
+      )
+    );
+
+    expect(markup).toContain('>Auto<');
+    expect(markup).toContain('aria-label="Auto Process"');
   });
 
   it('uses ordinary pressed buttons without incomplete tab relationships', () => {
@@ -229,6 +273,7 @@ describe('SamProcessFeedback', () => {
           errorText: null,
           isBusy: true,
           statusText: 'Rendering object preview…',
+          technicalDetailsLabel: 'Technical details',
         })
       )
     );
@@ -246,6 +291,7 @@ describe('SamProcessFeedback', () => {
         errorText: null,
         isBusy: false,
         statusText: 'Ready',
+        technicalDetailsLabel: 'Technical details',
       })
     );
 
@@ -254,12 +300,17 @@ describe('SamProcessFeedback', () => {
 
   it('server-renders a known localized error as the assertive primary message', () => {
     const markup = renderToStaticMarkup(
-      createElement(SamProcessFeedback, {
-        error: { code: 'decode' },
-        errorText: 'The object preview could not be decoded.',
-        isBusy: false,
-        statusText: 'Select Object needs attention.',
-      })
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamProcessFeedback, {
+          error: { code: 'decode' },
+          errorText: 'The object preview could not be decoded.',
+          isBusy: false,
+          statusText: 'Select Object needs attention.',
+          technicalDetailsLabel: 'Technical details',
+        })
+      )
     );
 
     expect(markup).toContain('role="alert"');
@@ -269,15 +320,23 @@ describe('SamProcessFeedback', () => {
 
   it('server-renders unknown diagnostics only after a localized primary message', () => {
     const markup = renderToStaticMarkup(
-      createElement(SamProcessFeedback, {
-        error: { code: 'unknown', detail: 'GPU worker disconnected' },
-        errorText: 'Select Object could not finish.',
-        isBusy: false,
-        statusText: 'Select Object needs attention.',
-      })
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamProcessFeedback, {
+          error: { code: 'unknown', detail: 'GPU worker disconnected' },
+          errorText: 'Select Object could not finish.',
+          isBusy: false,
+          statusText: 'Select Object needs attention.',
+          technicalDetailsLabel: 'Technical details',
+        })
+      )
     );
 
-    expect(markup).toContain('title="GPU worker disconnected"');
+    expect(markup).not.toContain('title=');
+    expect(markup).toContain('aria-label="Technical details"');
+    expect(markup).toContain('tabindex="0"');
+    expect(markup).toContain('data-scope="tooltip"');
     expect(markup).not.toContain('>GPU worker disconnected<');
     expect(markup).toContain('role="alert"');
   });
@@ -285,15 +344,22 @@ describe('SamProcessFeedback', () => {
   it('server-renders a localized queue error before its backend exception type', () => {
     const errorText = en.widgets.layers.selectObject.errorQueue;
     const markup = renderToStaticMarkup(
-      createElement(SamProcessFeedback, {
-        error: { code: 'queue', detail: 'AttributeError' },
-        errorText,
-        isBusy: false,
-        statusText: 'Select Object needs attention.',
-      })
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamProcessFeedback, {
+          error: { code: 'queue', detail: 'AttributeError' },
+          errorText,
+          isBusy: false,
+          statusText: 'Select Object needs attention.',
+          technicalDetailsLabel: 'Technical details',
+        })
+      )
     );
 
-    expect(markup).toContain('title="AttributeError"');
+    expect(markup).not.toContain('title=');
+    expect(markup).toContain('aria-label="Technical details"');
+    expect(markup).toContain('data-scope="tooltip"');
     expect(markup).not.toContain('>AttributeError<');
     expect(markup).toContain('role="alert"');
   });
@@ -303,6 +369,11 @@ describe('compact SAM inputs', () => {
   it('uses compact model-row copy without the removed stacked section heading', () => {
     expect(en.widgets.layers.selectObject.model).toBe('Model');
     expect(en.widgets.layers.selectObject.refine).toBe('Refine');
+    expect(en.widgets.layers.selectObject.autoProcessCompact).toBe('Auto');
+    expect(en.widgets.layers.selectObject.isolatedPreviewCompact).toBe('Isolate');
+    expect(en.widgets.layers.selectObject.technicalDetails).toBe('Technical details');
+    expect(en.widgets.layers.selectObject.sourceDimensions).toBe('{{width}} × {{height}}');
+    expect(en.widgets.layers.selectObject.sourceDimensionsLabel).toContain('{{width}}');
     expect(en.widgets.layers.selectObject).not.toHaveProperty('modelAndRefinement');
     expect(en.widgets.layers.selectObject).not.toHaveProperty('sourceSummary');
   });
@@ -318,6 +389,8 @@ describe('compact SAM inputs', () => {
 
     expect(markup).toContain('<input');
     expect(markup).toContain('aria-label=');
+    expect(markup).toContain('aria-describedby="sam-prompt-guidance"');
+    expect(markup).toContain('id="sam-prompt-guidance"');
     expect(markup).toContain('placeholder=');
     expect(markup).not.toContain('<textarea');
   });
@@ -342,15 +415,87 @@ describe('compact SAM inputs', () => {
           session: session as SamSessionSnapshot & {
             input: Extract<SamSessionSnapshot['input'], { type: 'visual' }>;
           },
-          viewModel: getSamPanelViewModel(session, (width, height) => `${width} × ${height}`),
+          viewModel: getSamPanelViewModel(
+            session,
+            (width, height) => `${width} × ${height}`,
+            (width, height) => `Generation area ${width} × ${height}`
+          ),
         })
       )
     );
 
     expect(markup).toContain('role="group"');
     expect(markup).toContain('aria-pressed="true"');
-    expect(markup).toContain('title=');
+    expect(markup).not.toContain('title=');
+    expect(markup).toContain('aria-describedby="sam-visual-guidance"');
+    expect(markup).toContain('id="sam-visual-guidance"');
     expect(markup).not.toContain('>widgets.layers.selectObject.pointType<');
-    expect(markup).not.toContain('widgets.layers.selectObject.visualGuidance</');
+  });
+});
+
+describe('getSamActionHandlers', () => {
+  it('wires every compact footer action and save target to the engine', () => {
+    const engine = {
+      applySelectObjectSession: vi.fn(),
+      cancelSelectObjectSession: vi.fn(),
+      processSelectObjectSession: vi.fn(),
+      resetSelectObjectSession: vi.fn(),
+      saveSelectObjectSession: vi.fn(),
+    };
+    const actions = getSamActionHandlers(engine as never);
+
+    actions.process();
+    actions.apply();
+    actions.reset();
+    actions.save('control');
+    actions.cancel();
+
+    expect(engine.processSelectObjectSession).toHaveBeenCalledOnce();
+    expect(engine.applySelectObjectSession).toHaveBeenCalledOnce();
+    expect(engine.resetSelectObjectSession).toHaveBeenCalledOnce();
+    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('control', expect.any(Function));
+    expect(engine.cancelSelectObjectSession).toHaveBeenCalledOnce();
+  });
+});
+
+describe('SamOptionsPanel', () => {
+  it('server-renders the compact ready state in semantic order with one footer action row', () => {
+    const engine = {
+      applySelectObjectSession: vi.fn(),
+      cancelSelectObjectSession: vi.fn(),
+      processSelectObjectSession: vi.fn(),
+      resetSelectObjectSession: vi.fn(),
+      saveSelectObjectSession: vi.fn(),
+      updateSelectObjectSession: vi.fn(),
+    };
+    const markup = renderToStaticMarkup(
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(
+          I18nextProvider,
+          { i18n: testI18n },
+          createElement(SamOptionsPanel, {
+            engine: engine as never,
+            session: snapshot({
+              hasPreview: true,
+              input: { bbox: null, excludePoints: [], includePoints: [{ x: 4, y: 5 }], type: 'visual' },
+              sourceRect: { height: 768, width: 1024, x: 0, y: 0 },
+            }),
+          })
+        )
+      )
+    );
+
+    expect(markup.indexOf('data-slot="header"')).toBeLessThan(markup.indexOf('data-slot="body"'));
+    expect(markup.indexOf('data-slot="body"')).toBeLessThan(markup.indexOf('data-slot="footer"'));
+    expect(markup).not.toContain('data-slot="feedback"');
+    expect(markup).toContain('>Auto<');
+    expect(markup).toContain('>Isolate<');
+    expect(markup).toContain('aria-label="Generation area: 1024 × 768"');
+    expect(markup.indexOf('>Process<')).toBeLessThan(markup.indexOf('>Apply<'));
+    expect(markup.indexOf('>Apply<')).toBeLessThan(markup.indexOf('>Reset<'));
+    expect(markup.indexOf('>Reset<')).toBeLessThan(markup.indexOf('Save As'));
+    expect(markup.indexOf('Save As')).toBeLessThan(markup.indexOf('>Cancel<'));
   });
 });

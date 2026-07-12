@@ -27,8 +27,8 @@ export const CANVAS_SELECT_OBJECT_PANEL_LAYOUT = {
 } satisfies BoxProps;
 
 export const CANVAS_SELECT_OBJECT_SLOT_LAYOUT = {
-  px: '4',
-  py: '3',
+  px: '3',
+  py: '2',
 } satisfies BoxProps;
 
 export const CANVAS_OPERATION_FOOTER_LAYOUT = {

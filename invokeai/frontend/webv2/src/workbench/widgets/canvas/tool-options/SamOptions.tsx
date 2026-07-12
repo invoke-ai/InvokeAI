@@ -9,6 +9,7 @@ import {
   Flex,
   Group,
   Heading,
+  IconButton,
   Input,
   Menu,
   NativeSelect,
@@ -17,12 +18,13 @@ import {
   Stack,
   Switch,
   Text,
+  VisuallyHidden,
 } from '@chakra-ui/react';
-import { Button, MenuContent } from '@workbench/components/ui';
+import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
 import { makeImageDurable } from '@workbench/gallery/api';
 import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
 import { useSamSession } from '@workbench/widgets/canvas/engineStoreHooks';
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, InfoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { ToolOptionsComponentProps } from './ToolOptionsBar';
@@ -42,12 +44,25 @@ export interface SamPanelViewModel {
   bboxActive: boolean;
   excludeCount: number;
   includeCount: number;
+  sourceLabel: string;
   sourceSummary: string;
 }
 
-export const SAM_COMPACT_CONTROL_LAYOUT = { h: '8', minH: '8', size: 'sm' } as const;
-export const SAM_COMPACT_FOOTER_LAYOUT = { flexWrap: 'wrap', gap: '2' } satisfies FlexProps;
+export const SAM_COMPACT_CONTROL_LAYOUT = { h: '8', minH: '8', size: 'xs' } as const;
+export const SAM_COMPACT_BUTTON_LAYOUT = { ...SAM_COMPACT_CONTROL_LAYOUT, px: '2' } as const;
+export const SAM_COMPACT_FOOTER_LAYOUT = { flexWrap: 'wrap', gap: '1' } satisfies FlexProps;
+export const SAM_COMPACT_GROUP_LAYOUT = { maxW: 'full', minW: '0' } as const;
 export const SAM_MODEL_SELECT_LAYOUT = { flex: '0 1 11rem', maxW: 'full', minW: '0', w: '11rem' } as const;
+
+const SAM_SEGMENT_BUTTON_LAYOUT = {
+  ...SAM_COMPACT_BUTTON_LAYOUT,
+  flex: '1 1 0',
+  minW: '0',
+  overflow: 'hidden',
+} as const;
+
+const SAM_PROMPT_GUIDANCE_ID = 'sam-prompt-guidance';
+const SAM_VISUAL_GUIDANCE_ID = 'sam-visual-guidance';
 
 const SAM_STATUS_TRANSLATION_KEYS: Record<SamSessionSnapshot['status'], string> = {
   committing: 'widgets.layers.selectObject.statusCommitting',
@@ -83,11 +98,13 @@ export const getSamErrorTranslationKey = (code: SamSessionErrorCode): string => 
 
 export const getSamPanelViewModel = (
   session: SamSessionSnapshot,
-  formatSourceSummary: (width: number, height: number) => string
+  formatSourceSummary: (width: number, height: number) => string,
+  formatSourceLabel: (width: number, height: number) => string
 ): SamPanelViewModel => ({
   bboxActive: session.input.type === 'visual' && session.input.bbox !== null,
   excludeCount: session.input.type === 'visual' ? session.input.excludePoints.length : 0,
   includeCount: session.input.type === 'visual' ? session.input.includePoints.length : 0,
+  sourceLabel: formatSourceLabel(session.sourceRect.width, session.sourceRect.height),
   sourceSummary: formatSourceSummary(session.sourceRect.width, session.sourceRect.height),
 });
 
@@ -96,23 +113,33 @@ export const SamProcessFeedback = ({
   errorText,
   isBusy,
   statusText,
+  technicalDetailsLabel,
 }: {
   error: SamSessionError | null;
   errorText: string | null;
   isBusy: boolean;
   statusText: string;
+  technicalDetailsLabel: string;
 }) => {
   const detail = error?.detail?.trim();
   if (error && errorText) {
     return (
-      <span
-        aria-live="assertive"
-        role="alert"
-        style={{ WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, display: '-webkit-box', overflow: 'hidden' }}
-        title={detail && detail !== errorText ? detail : undefined}
-      >
-        {errorText}
-      </span>
+      <Flex align="center" gap="1" minW="0">
+        <span
+          aria-live="assertive"
+          role="alert"
+          style={{ WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, display: '-webkit-box', overflow: 'hidden' }}
+        >
+          {errorText}
+        </span>
+        {detail && detail !== errorText ? (
+          <Tooltip content={detail}>
+            <IconButton aria-label={technicalDetailsLabel} flexShrink="0" size="xs" tabIndex={0} variant="ghost">
+              <InfoIcon />
+            </IconButton>
+          </Tooltip>
+        ) : null}
+      </Flex>
     );
   }
   if (isBusy) {
@@ -125,6 +152,14 @@ export const SamProcessFeedback = ({
   }
   return null;
 };
+
+export const getSamActionHandlers = (engine: ToolOptionsComponentProps['engine']) => ({
+  apply: () => void engine.applySelectObjectSession(),
+  cancel: () => engine.cancelSelectObjectSession(),
+  process: () => void engine.processSelectObjectSession(),
+  reset: () => engine.resetSelectObjectSession(),
+  save: (target: SelectObjectSaveTarget) => void engine.saveSelectObjectSession(target, makeImageDurable),
+});
 
 export const getSamActionEligibility = (
   session: SamSessionSnapshot,
@@ -147,29 +182,36 @@ export const getSamActionEligibility = (
   };
 };
 
-const SamSwitch = ({
+export const SamSwitch = ({
+  accessibleLabel,
   checked,
   disabled,
   label,
   onChange,
 }: {
+  accessibleLabel: string;
   checked: boolean;
   disabled?: boolean;
   label: string;
   onChange(checked: boolean): void;
 }) => (
-  <Switch.Root
-    checked={checked}
-    disabled={disabled}
-    {...SAM_COMPACT_CONTROL_LAYOUT}
-    onCheckedChange={({ checked: next }) => onChange(next)}
-  >
-    <Switch.HiddenInput />
-    <Switch.Control>
-      <Switch.Thumb />
-    </Switch.Control>
-    <Switch.Label fontSize="xs">{label}</Switch.Label>
-  </Switch.Root>
+  <Tooltip content={accessibleLabel}>
+    <Switch.Root
+      checked={checked}
+      disabled={disabled}
+      minW="0"
+      {...SAM_COMPACT_CONTROL_LAYOUT}
+      onCheckedChange={({ checked: next }) => onChange(next)}
+    >
+      <Switch.HiddenInput aria-label={accessibleLabel} />
+      <Switch.Control flexShrink="0">
+        <Switch.Thumb />
+      </Switch.Control>
+      <Switch.Label fontSize="xs" whiteSpace="nowrap">
+        {label}
+      </Switch.Label>
+    </Switch.Root>
+  </Tooltip>
 );
 
 export const SamModeToggle = ({
@@ -189,11 +231,11 @@ export const SamModeToggle = ({
   promptLabel: string;
   visualLabel: string;
 }) => (
-  <Group aria-label={groupLabel} attached role="group">
+  <Group aria-label={groupLabel} attached flex="1 1 10rem" role="group" {...SAM_COMPACT_GROUP_LAYOUT}>
     <Button
       aria-pressed={mode === 'visual'}
       disabled={disabled}
-      {...SAM_COMPACT_CONTROL_LAYOUT}
+      {...SAM_SEGMENT_BUTTON_LAYOUT}
       variant={mode === 'visual' ? 'solid' : 'ghost'}
       onClick={onVisual}
     >
@@ -202,7 +244,7 @@ export const SamModeToggle = ({
     <Button
       aria-pressed={mode === 'prompt'}
       disabled={disabled}
-      {...SAM_COMPACT_CONTROL_LAYOUT}
+      {...SAM_SEGMENT_BUTTON_LAYOUT}
       variant={mode === 'prompt' ? 'solid' : 'ghost'}
       onClick={onPrompt}
     >
@@ -228,37 +270,38 @@ export const SamVisualBody = ({
   return (
     <Flex
       align="center"
+      aria-describedby={SAM_VISUAL_GUIDANCE_ID}
       aria-label={t('widgets.layers.selectObject.pointType')}
       flexWrap="wrap"
       gap="2"
       role="group"
-      title={t('widgets.layers.selectObject.visualGuidance')}
     >
-      <Group attached>
+      <VisuallyHidden id={SAM_VISUAL_GUIDANCE_ID}>{t('widgets.layers.selectObject.visualGuidance')}</VisuallyHidden>
+      <Group attached flex="1 1 10rem" {...SAM_COMPACT_GROUP_LAYOUT}>
         <Button
           aria-pressed={session.pointLabel === 'include'}
           disabled={disabled}
-          {...SAM_COMPACT_CONTROL_LAYOUT}
+          {...SAM_SEGMENT_BUTTON_LAYOUT}
           variant={session.pointLabel === 'include' ? 'solid' : 'outline'}
           onClick={onInclude}
         >
-          <Text as="span" fontVariantNumeric="tabular-nums">
+          <Text as="span" fontVariantNumeric="tabular-nums" overflow="hidden" textOverflow="ellipsis">
             {t('widgets.layers.selectObject.includeCount', { count: viewModel.includeCount })}
           </Text>
         </Button>
         <Button
           aria-pressed={session.pointLabel === 'exclude'}
           disabled={disabled}
-          {...SAM_COMPACT_CONTROL_LAYOUT}
+          {...SAM_SEGMENT_BUTTON_LAYOUT}
           variant={session.pointLabel === 'exclude' ? 'solid' : 'outline'}
           onClick={onExclude}
         >
-          <Text as="span" fontVariantNumeric="tabular-nums">
+          <Text as="span" fontVariantNumeric="tabular-nums" overflow="hidden" textOverflow="ellipsis">
             {t('widgets.layers.selectObject.excludeCount', { count: viewModel.excludeCount })}
           </Text>
         </Button>
       </Group>
-      <Text color={viewModel.bboxActive ? 'fg' : 'fg.muted'} fontSize="xs" fontWeight="medium">
+      <Text color={viewModel.bboxActive ? 'fg' : 'fg.muted'} flex="0 1 auto" fontSize="xs" fontWeight="medium" minW="0">
         {viewModel.bboxActive
           ? t('widgets.layers.selectObject.bboxActive')
           : t('widgets.layers.selectObject.bboxInactive')}
@@ -278,47 +321,56 @@ export const SamPromptBody = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <Input
-      aria-label={t('widgets.layers.selectObject.prompt')}
-      autoComplete="off"
-      disabled={disabled}
-      placeholder={t('widgets.layers.selectObject.promptGuidance')}
-      value={prompt}
-      {...SAM_COMPACT_CONTROL_LAYOUT}
-      onChange={onChange}
-    />
+    <>
+      <Input
+        aria-describedby={SAM_PROMPT_GUIDANCE_ID}
+        aria-label={t('widgets.layers.selectObject.prompt')}
+        autoComplete="off"
+        disabled={disabled}
+        minW="0"
+        placeholder={t('widgets.layers.selectObject.promptGuidance')}
+        value={prompt}
+        {...SAM_COMPACT_CONTROL_LAYOUT}
+        onChange={onChange}
+      />
+      <VisuallyHidden id={SAM_PROMPT_GUIDANCE_ID}>{t('widgets.layers.selectObject.promptGuidance')}</VisuallyHidden>
+    </>
   );
 };
 
 const SamSaveItem = ({
   disabled,
-  engine,
+  onSave,
   target,
-}: ToolOptionsComponentProps & { disabled: boolean; target: SelectObjectSaveTarget }) => {
+}: {
+  disabled: boolean;
+  onSave(target: SelectObjectSaveTarget): void;
+  target: SelectObjectSaveTarget;
+}) => {
   const { t } = useTranslation();
   return (
-    <Menu.Item
-      disabled={disabled}
-      value={target}
-      onClick={() => void engine.saveSelectObjectSession(target, makeImageDurable)}
-    >
+    <Menu.Item disabled={disabled} value={target} onClick={() => onSave(target)}>
       <Menu.ItemText>{t(`widgets.layers.selectObject.saveAs_${target}`)}</Menu.ItemText>
     </Menu.Item>
   );
 };
 
-export const SamOptions = ({
+export const SamOptionsPanel = ({
   engine,
+  session,
   isExternalInteractionLocked = false,
-}: ToolOptionsComponentProps & { isExternalInteractionLocked?: boolean }) => {
+}: ToolOptionsComponentProps & {
+  isExternalInteractionLocked?: boolean;
+  session: SamSessionSnapshot;
+}) => {
   const { t } = useTranslation();
-  const session = useSamSession(engine);
-  if (!session) {
-    return null;
-  }
-
   const eligibility = getSamActionEligibility(session, isExternalInteractionLocked);
-  const viewModel = getSamPanelViewModel(session, (width, height) => `${width} × ${height}`);
+  const viewModel = getSamPanelViewModel(
+    session,
+    (width, height) => t('widgets.layers.selectObject.sourceDimensions', { height, width }),
+    (width, height) => t('widgets.layers.selectObject.sourceDimensionsLabel', { height, width })
+  );
+  const actions = getSamActionHandlers(engine);
   const isProcessing =
     session.status === 'preparing-composite' ||
     session.status === 'uploading' ||
@@ -330,34 +382,42 @@ export const SamOptions = ({
   return (
     <CanvasOperationPanel.Root aria-labelledby="sam-operation-title" operation="select-object">
       <CanvasOperationPanel.Header>
-        <Flex align="center" flexWrap="wrap" gap="3" justify="space-between">
-          <Flex align="baseline" gap="2" minW="0">
-            <Heading fontSize="md" id="sam-operation-title">
+        <Flex align="center" flexWrap="wrap" gap="2" justify="space-between">
+          <Flex align="baseline" gap="1" minW="0">
+            <Heading fontSize="sm" id="sam-operation-title" whiteSpace="nowrap">
               {t('widgets.layers.selectObject.title')}
             </Heading>
-            <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums" whiteSpace="nowrap">
+            <Text
+              aria-label={viewModel.sourceLabel}
+              color="fg.muted"
+              fontSize="xs"
+              fontVariantNumeric="tabular-nums"
+              whiteSpace="nowrap"
+            >
               {viewModel.sourceSummary}
             </Text>
           </Flex>
-          <Flex align="center" flexWrap="wrap" gap="3">
+          <Flex align="center" flexWrap="wrap" gap="2" minW="0">
             <SamSwitch
+              accessibleLabel={t('widgets.layers.selectObject.autoProcess')}
               checked={session.autoProcess}
               disabled={!eligibility.canEditInputs}
-              label={t('widgets.layers.selectObject.autoProcess')}
+              label={t('widgets.layers.selectObject.autoProcessCompact')}
               onChange={(value) => setBoolean('autoProcess', value)}
             />
             <SamSwitch
+              accessibleLabel={t('widgets.layers.selectObject.isolatedPreview')}
               checked={session.isolatedPreview}
               disabled={!eligibility.canEditInputs}
-              label={t('widgets.layers.selectObject.isolatedPreview')}
+              label={t('widgets.layers.selectObject.isolatedPreviewCompact')}
               onChange={(value) => setBoolean('isolatedPreview', value)}
             />
           </Flex>
         </Flex>
       </CanvasOperationPanel.Header>
       <CanvasOperationPanel.Body>
-        <Stack gap="3">
-          <Flex align="center" gap="2" justify="space-between">
+        <Stack gap="2">
+          <Flex align="center" flexWrap="wrap" gap="1" justify="space-between" minW="0">
             <SamModeToggle
               disabled={!eligibility.canEditInputs}
               groupLabel={t('widgets.layers.selectObject.mode')}
@@ -372,6 +432,7 @@ export const SamOptions = ({
               }
             />
             <SamSwitch
+              accessibleLabel={t('widgets.layers.selectObject.invert')}
               checked={session.invert}
               disabled={!eligibility.canEditInputs}
               label={t('widgets.layers.selectObject.invert')}
@@ -395,7 +456,7 @@ export const SamOptions = ({
               }
             />
           )}
-          <Flex align="center" flexWrap="wrap" gap="2">
+          <Flex align="center" flexWrap="wrap" gap="1" minW="0">
             <Text asChild fontSize="xs" fontWeight="semibold">
               <label htmlFor="sam-model">{t('widgets.layers.selectObject.model')}</label>
             </Text>
@@ -416,6 +477,7 @@ export const SamOptions = ({
               <NativeSelect.Indicator />
             </NativeSelect.Root>
             <SamSwitch
+              accessibleLabel={t('widgets.layers.selectObject.refine')}
               checked={session.applyPolygonRefinement}
               disabled={isProcessing || !eligibility.canEditInputs}
               label={t('widgets.layers.selectObject.refine')}
@@ -431,6 +493,7 @@ export const SamOptions = ({
             errorText={session.error ? t(getSamErrorTranslationKey(session.error.code)) : null}
             isBusy={!session.error}
             statusText={t(getSamStatusTranslationKey(session.status))}
+            technicalDetailsLabel={t('widgets.layers.selectObject.technicalDetails')}
           />
         </CanvasOperationPanel.Feedback>
       ) : null}
@@ -438,30 +501,25 @@ export const SamOptions = ({
         <Button
           disabled={!eligibility.canProcess}
           loading={isProcessing}
-          {...SAM_COMPACT_CONTROL_LAYOUT}
-          onClick={() => void engine.processSelectObjectSession()}
+          {...SAM_COMPACT_BUTTON_LAYOUT}
+          onClick={actions.process}
         >
           {t('widgets.layers.selectObject.process')}
         </Button>
         <Button
           colorPalette="accent"
           disabled={!eligibility.canApply}
-          {...SAM_COMPACT_CONTROL_LAYOUT}
-          onClick={() => void engine.applySelectObjectSession()}
+          {...SAM_COMPACT_BUTTON_LAYOUT}
+          onClick={actions.apply}
         >
           {t('common.apply')}
         </Button>
-        <Button
-          disabled={!eligibility.canReset}
-          variant="ghost"
-          {...SAM_COMPACT_CONTROL_LAYOUT}
-          onClick={() => engine.resetSelectObjectSession()}
-        >
+        <Button disabled={!eligibility.canReset} variant="ghost" {...SAM_COMPACT_BUTTON_LAYOUT} onClick={actions.reset}>
           {t('widgets.layers.selectObject.reset')}
         </Button>
         <Menu.Root>
           <Menu.Trigger asChild>
-            <Button disabled={!eligibility.canSave} variant="outline" {...SAM_COMPACT_CONTROL_LAYOUT}>
+            <Button disabled={!eligibility.canSave} variant="outline" {...SAM_COMPACT_BUTTON_LAYOUT}>
               {t('widgets.layers.selectObject.saveAs')} <ChevronDownIcon size={14} />
             </Button>
           </Menu.Trigger>
@@ -469,7 +527,7 @@ export const SamOptions = ({
             <Menu.Positioner>
               <MenuContent minW="11rem" py="1">
                 {SAVE_TARGETS.map((target) => (
-                  <SamSaveItem key={target} disabled={!eligibility.canSave} engine={engine} target={target} />
+                  <SamSaveItem key={target} disabled={!eligibility.canSave} target={target} onSave={actions.save} />
                 ))}
               </MenuContent>
             </Menu.Positioner>
@@ -478,12 +536,25 @@ export const SamOptions = ({
         <Button
           disabled={!eligibility.canCancel}
           variant="ghost"
-          {...SAM_COMPACT_CONTROL_LAYOUT}
-          onClick={() => engine.cancelSelectObjectSession()}
+          {...SAM_COMPACT_BUTTON_LAYOUT}
+          onClick={actions.cancel}
         >
           {t('common.cancel')}
         </Button>
       </CanvasOperationPanel.Footer>
     </CanvasOperationPanel.Root>
+  );
+};
+
+export const SamOptions = ({
+  engine,
+  isExternalInteractionLocked = false,
+}: ToolOptionsComponentProps & { isExternalInteractionLocked?: boolean }) => {
+  const session = useSamSession(engine);
+  if (!session) {
+    return null;
+  }
+  return (
+    <SamOptionsPanel engine={engine} isExternalInteractionLocked={isExternalInteractionLocked} session={session} />
   );
 };

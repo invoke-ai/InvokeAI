@@ -68,7 +68,7 @@ describe('CanvasOperationPanel', () => {
       w: '26.25rem',
     });
     expect(CANVAS_OPERATION_PANEL_LAYOUT.w).toBe('30rem');
-    expect(CANVAS_SELECT_OBJECT_SLOT_LAYOUT).toMatchObject({ px: '4', py: '3' });
+    expect(CANVAS_SELECT_OBJECT_SLOT_LAYOUT).toMatchObject({ px: '3', py: '2' });
   });
 
   it('keeps vertical overflow on the body while fixed sections retain their order', () => {
