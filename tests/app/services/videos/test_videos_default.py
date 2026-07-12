@@ -58,7 +58,7 @@ class TestDeleteVideosOnBoardContract:
             _make_record(video_name="good.mp4", video_subfolder="general"),
             _make_record(video_name="bad.mp4", video_subfolder="general"),
         ]
-        invoker.services.video_files.delete.side_effect = [None, Exception("disk error")]
+        invoker.services.video_files.stage_delete.side_effect = [object(), Exception("disk error")]
 
         deleted = video_service.delete_videos_on_board("board-1")
 
@@ -75,7 +75,7 @@ class TestDeleteVideosOnBoardContract:
         invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
         invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = ["v.mp4"]
         invoker.services.video_records.get.return_value = _make_record(video_name="v.mp4")
-        invoker.services.video_files.delete.side_effect = Exception("permission denied")
+        invoker.services.video_files.stage_delete.side_effect = Exception("permission denied")
 
         # Should not raise
         deleted = video_service.delete_videos_on_board("board-1")
@@ -94,12 +94,26 @@ class TestDeleteVideosOnBoardContract:
             _make_record(video_name="a.mp4"),
             _make_record(video_name="b.mp4"),
         ]
-        invoker.services.video_files.delete.return_value = None
+        invoker.services.video_files.stage_delete.side_effect = [object(), object()]
 
         deleted = video_service.delete_videos_on_board("board-1")
 
         invoker.services.video_records.delete_many.assert_called_once_with(["a.mp4", "b.mp4"])
         assert deleted == ["a.mp4", "b.mp4"]
+
+
+class TestDeleteAtomicity:
+    def test_single_delete_rolls_files_back_when_record_delete_fails(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.video_records.get.return_value = _make_record()
+        invoker.services.video_records.delete.side_effect = RuntimeError("database unavailable")
+
+        with pytest.raises(RuntimeError, match="database unavailable"):
+            video_service.delete("abc.mp4")
+
+        invoker.services.video_files.stage_delete.assert_called_once_with("abc.mp4", video_subfolder="")
+        invoker.services.video_files.rollback_delete.assert_called_once()
+        invoker.services.video_files.commit_delete.assert_not_called()
 
 
 class TestCreateRollback:

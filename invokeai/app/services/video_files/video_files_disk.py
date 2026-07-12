@@ -1,5 +1,7 @@
 import json
 import shutil
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
 
@@ -13,6 +15,12 @@ from invokeai.app.services.video_files.video_files_common import (
 from invokeai.app.util.thumbnails import make_thumbnail
 from invokeai.app.util.video_thumbnails import extract_video_frame, get_video_thumbnail_name
 from invokeai.backend.util.logging import InvokeAILogger
+
+
+@dataclass
+class _StagedDelete:
+    directory: Path
+    files: list[tuple[Path, Path]]
 
 
 class DiskVideoFileStorage(VideoFileStorageBase):
@@ -101,19 +109,46 @@ class DiskVideoFileStorage(VideoFileStorageBase):
             raise VideoFileSaveException from e
 
     def delete(self, video_name: str, video_subfolder: str = "") -> None:
+        token = self.stage_delete(video_name, video_subfolder)
+        self.commit_delete(token)
+
+    def stage_delete(self, video_name: str, video_subfolder: str = "") -> _StagedDelete:
+        staging_dir = Path(tempfile.mkdtemp(prefix=".delete_", dir=self.__output_folder))
+        candidates = [
+            self.get_path(video_name, video_subfolder=video_subfolder),
+            self.get_path(video_name, thumbnail=True, video_subfolder=video_subfolder),
+            self.__get_sidecar_path(video_name, video_subfolder=video_subfolder),
+        ]
+        staged: list[tuple[Path, Path]] = []
         try:
-            video_path = self.get_path(video_name, video_subfolder=video_subfolder)
-            if video_path.exists():
-                video_path.unlink()
+            for index, source in enumerate(candidates):
+                if source.exists():
+                    destination = staging_dir / str(index)
+                    source.replace(destination)
+                    staged.append((source, destination))
+            return _StagedDelete(directory=staging_dir, files=staged)
+        except Exception as e:
+            for source, destination in reversed(staged):
+                if destination.exists():
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    destination.replace(source)
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise VideoFileDeleteException from e
 
-            thumbnail_name = get_video_thumbnail_name(video_name)
-            thumbnail_path = self.get_path(thumbnail_name, thumbnail=True, video_subfolder=video_subfolder)
-            if thumbnail_path.exists():
-                thumbnail_path.unlink()
+    def commit_delete(self, token: object) -> None:
+        if not isinstance(token, _StagedDelete):
+            raise VideoFileDeleteException("Invalid staged-delete token")
+        shutil.rmtree(token.directory)
 
-            sidecar_path = self.__get_sidecar_path(video_name, video_subfolder=video_subfolder)
-            if sidecar_path.exists():
-                sidecar_path.unlink()
+    def rollback_delete(self, token: object) -> None:
+        if not isinstance(token, _StagedDelete):
+            raise VideoFileDeleteException("Invalid staged-delete token")
+        try:
+            for source, destination in reversed(token.files):
+                if destination.exists():
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    destination.replace(source)
+            shutil.rmtree(token.directory, ignore_errors=True)
         except Exception as e:
             raise VideoFileDeleteException from e
 

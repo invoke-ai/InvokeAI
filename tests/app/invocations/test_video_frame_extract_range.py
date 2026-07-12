@@ -40,6 +40,11 @@ def _lazy_frames(n: int, pulled: list[int]) -> Iterator[np.ndarray]:
         yield np.full((4, 4, 3), i % 255, dtype=np.uint8)
 
 
+def _fail_after(n: int) -> Iterator[np.ndarray]:
+    yield from _lazy_frames(n, [0])
+    raise RuntimeError("decoder advanced past requested range")
+
+
 class TestWriteFrameRangeStreams:
     def test_encoding_begins_without_materializing_the_iterator(self) -> None:
         pulled = [0]
@@ -55,9 +60,11 @@ class TestWriteFrameRangeStreams:
         writer = RecordingWriter().watch(pulled)
         written = _write_frame_range(_lazy_frames(1000, pulled), writer, start=5, end=9)
         assert written == 5
-        # Frames 0..9 pass through, frame 10 triggers the break — the remaining 989
-        # frames are never decoded.
-        assert pulled[0] == 11
+        assert pulled[0] == 10
+
+    def test_does_not_pull_the_frame_after_end(self) -> None:
+        writer = RecordingWriter()
+        assert _write_frame_range(_fail_after(10), writer, start=5, end=9) == 5
 
     def test_range_to_final_frame_consumes_input_exactly_once(self) -> None:
         pulled = [0]

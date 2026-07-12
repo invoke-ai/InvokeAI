@@ -105,3 +105,26 @@ def test_save_failure_cleanup_covers_subfolders(
         )
 
     assert _all_files(tmp_path / "videos") == []
+
+
+def test_staged_delete_can_be_rolled_back(storage: DiskVideoFileStorage, tmp_path: Path):
+    source = _make_source(tmp_path)
+    storage.save(source_path=source, video_name=VIDEO_NAME, metadata='{"seed": 1}')
+    video_path = storage.get_path(VIDEO_NAME)
+
+    token = storage.stage_delete(VIDEO_NAME)
+    assert not video_path.exists()
+
+    storage.rollback_delete(token)
+    assert video_path.exists()
+    assert storage.get_workflow(VIDEO_NAME) is None
+
+
+def test_staged_delete_can_be_committed(storage: DiskVideoFileStorage, tmp_path: Path):
+    source = _make_source(tmp_path)
+    storage.save(source_path=source, video_name=VIDEO_NAME, metadata='{"seed": 1}')
+
+    token = storage.stage_delete(VIDEO_NAME)
+    storage.commit_delete(token)
+
+    assert _all_files(tmp_path / "videos") == []

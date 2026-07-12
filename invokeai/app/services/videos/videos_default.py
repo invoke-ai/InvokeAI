@@ -286,18 +286,32 @@ class VideoService(VideoServiceABC):
             raise e
 
     def delete(self, video_name: str) -> None:
+        token: object | None = None
+        record_deleted = False
         try:
             record = self.__invoker.services.video_records.get(video_name)
-            self.__invoker.services.video_files.delete(video_name, video_subfolder=record.video_subfolder)
+            token = self.__invoker.services.video_files.stage_delete(video_name, video_subfolder=record.video_subfolder)
             self.__invoker.services.video_records.delete(video_name)
+            record_deleted = True
+            try:
+                self.__invoker.services.video_files.commit_delete(token)
+            except Exception as cleanup_error:
+                self.__invoker.services.logger.error(f"Failed to purge staged video files: {cleanup_error}")
             self._on_deleted(video_name)
         except VideoRecordDeleteException:
+            if token is not None:
+                self.__invoker.services.video_files.rollback_delete(token)
             self.__invoker.services.logger.error("Failed to delete video record")
             raise
         except VideoFileDeleteException:
             self.__invoker.services.logger.error("Failed to delete video file")
             raise
         except Exception as e:
+            if token is not None and not record_deleted:
+                try:
+                    self.__invoker.services.video_files.rollback_delete(token)
+                except Exception as rollback_error:
+                    self.__invoker.services.logger.error(f"Failed to restore video files: {rollback_error}")
             self.__invoker.services.logger.error("Problem deleting video record and file")
             raise e
 
@@ -315,16 +329,27 @@ class VideoService(VideoServiceABC):
             # caller, so any preserved records cascade to "uncategorized" via the
             # board_videos FK.
             deleted_video_names: list[str] = []
+            staged_deletes: list[tuple[str, object]] = []
             for video_name in video_names:
                 try:
                     record = self.__invoker.services.video_records.get(video_name)
-                    self.__invoker.services.video_files.delete(video_name, video_subfolder=record.video_subfolder)
+                    token = self.__invoker.services.video_files.stage_delete(
+                        video_name, video_subfolder=record.video_subfolder
+                    )
+                    staged_deletes.append((video_name, token))
                     deleted_video_names.append(video_name)
                 except Exception as e:
                     self.__invoker.services.logger.error(
                         f"Failed to delete video file {video_name}; keeping record: {str(e)}"
                     )
-            self.__invoker.services.video_records.delete_many(deleted_video_names)
+            try:
+                self.__invoker.services.video_records.delete_many(deleted_video_names)
+            except Exception:
+                for _, token in staged_deletes:
+                    self.__invoker.services.video_files.rollback_delete(token)
+                raise
+            for _, token in staged_deletes:
+                self.__invoker.services.video_files.commit_delete(token)
             for video_name in deleted_video_names:
                 self._on_deleted(video_name)
             return deleted_video_names

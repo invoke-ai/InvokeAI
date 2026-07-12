@@ -8,6 +8,7 @@ to a usable middle section before chaining it to another shot.
 """
 
 import tempfile
+from itertools import islice
 from pathlib import Path
 from typing import Callable, Iterator, Optional, Protocol
 
@@ -55,13 +56,11 @@ def _write_frame_range(
     number of frames written.
     """
     written = 0
-    for idx, frame in enumerate(frames):
+    for idx, frame in enumerate(islice(frames, end + 1)):
         if is_canceled is not None and is_canceled():
             raise CanceledException
         if idx < start:
             continue
-        if idx > end:
-            break
         writer.append_data(np.ascontiguousarray(frame))
         written += 1
     return written

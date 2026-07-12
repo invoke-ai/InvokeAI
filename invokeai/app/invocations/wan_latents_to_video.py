@@ -12,8 +12,9 @@ The VAE expands the temporal dim by 4× during decode minus the initial offset:
 
 import tempfile
 from pathlib import Path
+from typing import Callable, Protocol
 
-import imageio.v3 as iio
+import imageio.v2 as iio2
 import numpy as np
 import torch
 from diffusers.models.autoencoders import AutoencoderKLWan
@@ -30,8 +31,20 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import VideoOutput
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.util.devices import TorchDevice
+
+
+class _FrameWriter(Protocol):
+    def append_data(self, frame: np.ndarray) -> None: ...
+
+
+def _write_video_frames(writer: _FrameWriter, frames: np.ndarray, is_canceled: Callable[[], bool]) -> None:
+    for frame in frames:
+        if is_canceled():
+            raise CanceledException
+        writer.append_data(np.ascontiguousarray(frame))
 
 
 @invocation(
@@ -99,17 +112,18 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         TorchDevice.empty_cache()
 
+        if context.util.is_canceled():
+            raise CanceledException
+
         # Convert to a list of numpy uint8 frames [H, W, C].
         decoded = rearrange(decoded, "c t h w -> t h w c")
         # [-1, 1] -> [0, 255]
         frames = (127.5 * (decoded.cpu().float() + 1.0)).round().clamp(0, 255).byte().numpy()
-        frames_list = [np.ascontiguousarray(frames[i]) for i in range(frames.shape[0])]
-
-        if not frames_list:
+        if frames.shape[0] == 0:
             raise ValueError("Wan VAE decode produced zero frames.")
 
-        height, width = frames_list[0].shape[:2]
-        num_frames = len(frames_list)
+        height, width = frames[0].shape[:2]
+        num_frames = frames.shape[0]
         duration = num_frames / float(self.fps)
 
         # Encode to a temporary MP4 via imageio's FFMPEG plugin (backed by the
@@ -124,13 +138,11 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"Encoding MP4: {num_frames} frames @ {self.fps} fps ({duration:.2f}s) at {width}x{height} via libx264"
             )
             context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {self.fps} fps)")
-            iio.imwrite(
-                tmp_path,
-                frames_list,
-                plugin="FFMPEG",
-                codec="libx264",
-                fps=self.fps,
-            )
+            writer = iio2.get_writer(str(tmp_path), format="FFMPEG", mode="I", codec="libx264", fps=self.fps)
+            try:
+                _write_video_frames(writer, frames, context.util.is_canceled)
+            finally:
+                writer.close()
             encoded_bytes = tmp_path.stat().st_size
             context.logger.info(f"MP4 encode complete: {encoded_bytes / 1024:.1f} KB")
             video_dto = context.videos.save(

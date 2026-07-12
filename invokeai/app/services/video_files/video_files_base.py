@@ -33,6 +33,21 @@ class VideoFileStorageBase(ABC):
         pass
 
     @abstractmethod
+    def stage_delete(self, video_name: str, video_subfolder: str = "") -> object:
+        """Moves a video's files out of service and returns a rollback token."""
+        pass
+
+    @abstractmethod
+    def commit_delete(self, token: object) -> None:
+        """Permanently removes files represented by a staged-delete token."""
+        pass
+
+    @abstractmethod
+    def rollback_delete(self, token: object) -> None:
+        """Restores files represented by a staged-delete token."""
+        pass
+
+    @abstractmethod
     def get_workflow(self, video_name: str, video_subfolder: str = "") -> Optional[str]:
         """Gets the workflow JSON sidecar of a video, if any."""
         pass

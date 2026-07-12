@@ -15,6 +15,8 @@ interface UseRangeBasedImageFetchingReturn {
   onRangeChanged: (range: ListRange) => void;
 }
 
+export const getVideoPrefetchOptions = () => ({ subscribe: false }) as const;
+
 const getUncachedNames = (imageNames: string[], cachedImageNames: string[], ranges: ListRange[]): string[] => {
   const uncachedNamesSet = new Set<string>();
   const cachedImageNamesSet = new Set(cachedImageNames);
@@ -67,7 +69,7 @@ export const useRangeBasedImageFetching = ({
       const cachedVideoNames = videosApi.util.selectCachedArgsForQuery(state, 'getVideoDTO');
       const uncachedVideoNames = getUncachedNames(allNames, cachedVideoNames, ranges).filter((n) => isVideoName(n));
       for (const videoName of uncachedVideoNames) {
-        store.dispatch(videosApi.endpoints.getVideoDTO.initiate(videoName));
+        store.dispatch(videosApi.endpoints.getVideoDTO.initiate(videoName, getVideoPrefetchOptions()));
       }
 
       setPendingRanges([]);

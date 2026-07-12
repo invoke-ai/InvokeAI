@@ -184,8 +184,8 @@ def iter_video_frames(
             if kind == "frame":
                 if not isinstance(value, np.ndarray):
                     raise ValueError(f"Decoder returned an invalid frame for {video_path}")
-                deadline = time.monotonic() + timeout
                 yield value
+                deadline = time.monotonic() + timeout
                 continue
             return_code = proc.wait(timeout=1)
             if return_code != 0:
