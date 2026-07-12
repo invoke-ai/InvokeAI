@@ -41,7 +41,7 @@ export const DEFAULT_UTILITY_RECONCILE_RETRY_POLICY = { delayMs: 100, maxAttempt
 
 /** Thrown when a utility graph fails, is canceled, times out, or is aborted. */
 export class UtilityQueueError extends Error {
-  readonly reason: 'failed' | 'canceled' | 'timeout' | 'aborted' | 'no-output' | 'enqueue' | 'reconcile';
+  readonly reason: 'failed' | 'canceled' | 'timeout' | 'aborted' | 'no-output' | 'enqueue' | 'reconcile' | 'setup';
 
   constructor(reason: UtilityQueueError['reason'], message: string, cause?: unknown) {
     super(message, cause === undefined ? undefined : { cause });
@@ -210,8 +210,14 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
   const reconcileDelayMs = Number.isFinite(reconcileRetryPolicy.delayMs)
     ? Math.max(0, reconcileRetryPolicy.delayMs)
     : DEFAULT_UTILITY_RECONCILE_RETRY_POLICY.delayMs;
-  const utilityId = (options.createId ?? (() => crypto.randomUUID()))();
-  const origin = buildUtilityQueueItemOrigin(utilityId);
+  let origin: string;
+  try {
+    const utilityId = (options.createId ?? (() => crypto.randomUUID()))();
+    origin = buildUtilityQueueItemOrigin(utilityId);
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    return Promise.reject(new UtilityQueueError('setup', `Failed to initialize utility graph run: ${detail}`, cause));
+  }
 
   return new Promise<UtilityGraphResult>((resolve, reject) => {
     let settled = false;
@@ -256,14 +262,29 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         clearTimeout(timer);
         timer = null;
       }
-      cancelReconciliationRetry?.();
+      const cancelRetry = cancelReconciliationRetry;
       cancelReconciliationRetry = null;
+      if (cancelRetry) {
+        try {
+          cancelRetry();
+        } catch {
+          // Cleanup is best-effort and must not interrupt settlement.
+        }
+      }
       for (const detach of detachers) {
-        detach();
+        try {
+          detach();
+        } catch {
+          // Continue detaching the remaining listeners.
+        }
       }
       detachers.length = 0;
       if (signal) {
-        signal.removeEventListener('abort', onAbort);
+        try {
+          signal.removeEventListener('abort', onAbort);
+        } catch {
+          // Cleanup must not interrupt settlement.
+        }
       }
     };
 
@@ -303,10 +324,22 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       reconciliationInFlight = true;
       const reconciliationItemIds = [...enqueueResult.itemIds];
       const scheduleNextReconciliation = (): void => {
-        cancelReconciliationRetry = scheduleReconcileRetry(() => {
-          cancelReconciliationRetry = null;
-          reconcileCompletion();
-        }, reconcileDelayMs);
+        try {
+          const cancelRetry = scheduleReconcileRetry(() => {
+            cancelReconciliationRetry = null;
+            reconcileCompletion();
+          }, reconcileDelayMs);
+          cancelReconciliationRetry = typeof cancelRetry === 'function' ? cancelRetry : null;
+        } catch (cause) {
+          const detail = cause instanceof Error ? cause.message : String(cause);
+          settleReject(
+            new UtilityQueueError(
+              'reconcile',
+              `Failed to schedule utility graph output reconciliation: ${detail}`,
+              cause
+            )
+          );
+        }
       };
       void Promise.resolve()
         .then(() => reconcileCompletedOutput(reconciliationItemIds, outputNodeId))
@@ -333,7 +366,21 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
             }
             return;
           }
-          if (classifyReconcileError(cause) === 'fail' || reconciliationAttempts >= reconcileMaxAttempts) {
+          let classification: ReturnType<UtilityReconcileErrorClassifier>;
+          try {
+            classification = classifyReconcileError(cause);
+          } catch (classifierCause) {
+            const detail = classifierCause instanceof Error ? classifierCause.message : String(classifierCause);
+            settleReject(
+              new UtilityQueueError(
+                'reconcile',
+                `Failed to classify utility reconciliation error: ${detail}`,
+                classifierCause
+              )
+            );
+            return;
+          }
+          if (classification === 'fail' || reconciliationAttempts >= reconcileMaxAttempts) {
             const detail = cause instanceof Error ? cause.message : String(cause);
             settleReject(
               new UtilityQueueError(
@@ -357,47 +404,59 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     }
 
     // Attach listeners BEFORE enqueue so a very fast completion is not missed.
-    detachers.push(
-      hub.on('invocation_complete', (event: InvocationCompleteEvent) => {
-        if (event.origin !== origin) {
-          return;
-        }
-        // Only take the target node's output (or, when unspecified, any image).
-        if (outputNodeId && event.invocation_source_id !== outputNodeId) {
-          return;
-        }
-        const output = extractImageOutput(event.result);
-        if (output) {
-          capturedOutput = output;
-          if (completionReceived) {
-            settleResolve(output);
+    try {
+      detachers.push(
+        hub.on('invocation_complete', (event: InvocationCompleteEvent) => {
+          if (event.origin !== origin) {
+            return;
           }
-        }
-      })
-    );
+          // Only take the target node's output (or, when unspecified, any image).
+          if (outputNodeId && event.invocation_source_id !== outputNodeId) {
+            return;
+          }
+          const output = extractImageOutput(event.result);
+          if (output) {
+            capturedOutput = output;
+            if (completionReceived) {
+              settleResolve(output);
+            }
+          }
+        })
+      );
 
-    detachers.push(
-      hub.on('queue_item_status_changed', (event: QueueItemStatusChangedEvent) => {
-        if (event.origin !== origin) {
+      detachers.push(
+        hub.on('queue_item_status_changed', (event: QueueItemStatusChangedEvent) => {
+          if (event.origin !== origin) {
+            return;
+          }
+          if (event.status === 'completed') {
+            completionReceived = true;
+            reconcileCompletion();
+          } else if (event.status === 'failed') {
+            settleReject(new UtilityQueueError('failed', event.error_message ?? 'The utility graph failed.'));
+          } else if (event.status === 'canceled') {
+            settleReject(new UtilityQueueError('canceled', 'The utility graph was canceled.'));
+          }
+        })
+      );
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      settleReject(new UtilityQueueError('setup', `Failed to attach utility graph listeners: ${detail}`, cause));
+      return;
+    }
+
+    try {
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
           return;
         }
-        if (event.status === 'completed') {
-          completionReceived = true;
-          reconcileCompletion();
-        } else if (event.status === 'failed') {
-          settleReject(new UtilityQueueError('failed', event.error_message ?? 'The utility graph failed.'));
-        } else if (event.status === 'canceled') {
-          settleReject(new UtilityQueueError('canceled', 'The utility graph was canceled.'));
-        }
-      })
-    );
-
-    if (signal) {
-      if (signal.aborted) {
-        onAbort();
-        return;
+        signal.addEventListener('abort', onAbort);
       }
-      signal.addEventListener('abort', onAbort);
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      settleReject(new UtilityQueueError('setup', `Failed to attach utility graph abort listener: ${detail}`, cause));
+      return;
     }
 
     if (timeoutMs > 0) {
@@ -412,7 +471,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
 
     // Enqueue last. A synchronous listener callback could already have fired by
     // the time this resolves; `settled` guards against a late enqueue result.
-    enqueue({ graph, origin })
+    void Promise.resolve()
+      .then(() => enqueue({ graph, origin }))
       .then((result) => {
         enqueueResult = result;
         cancelAcceptedItems();
@@ -424,7 +484,11 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       })
       .catch((error: unknown) => {
         settleReject(
-          new UtilityQueueError('enqueue', error instanceof Error ? error.message : 'Failed to enqueue utility graph.')
+          new UtilityQueueError(
+            'enqueue',
+            error instanceof Error ? error.message : 'Failed to enqueue utility graph.',
+            error
+          )
         );
       });
   });

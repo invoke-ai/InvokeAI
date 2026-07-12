@@ -762,6 +762,167 @@ describe('runUtilityGraph — timeout + cancellation', () => {
 });
 
 describe('runUtilityGraph — enqueue failures', () => {
+  it('contains a synchronous enqueue throw and cleans listeners with timeout disabled', async () => {
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const cause = new Error('synchronous enqueue failure');
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => {
+        throw cause;
+      },
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      timeoutMs: 0,
+    });
+
+    await expect(promise).rejects.toMatchObject({ cause, message: cause.message, reason: 'enqueue' });
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('contains a synchronous reconciliation scheduler throw and fully settles with timeout disabled', async () => {
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const cause = new Error('scheduler unavailable');
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      reconcileCompletedOutput: () => Promise.resolve(null),
+      scheduleReconcileRetry: () => {
+        throw cause;
+      },
+      timeoutMs: 0,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+
+    await expect(promise).rejects.toMatchObject({
+      cause,
+      message: 'Failed to schedule utility graph output reconciliation: scheduler unavailable',
+      reason: 'reconcile',
+    });
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('contains a throwing reconciliation retry cancellation seam during socket success', async () => {
+    const fake = createFakeHub();
+    const cancelRetry = vi.fn(() => {
+      throw new Error('cancel retry failed');
+    });
+    const scheduleReconcileRetry = vi.fn(() => cancelRetry);
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      reconcileCompletedOutput: () => Promise.resolve(null),
+      scheduleReconcileRetry,
+      timeoutMs: 0,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await vi.waitFor(() => expect(scheduleReconcileRetry).toHaveBeenCalledOnce());
+
+    expect(() => fake.emit('invocation_complete', completeEvent())).not.toThrow();
+    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
+    expect(cancelRetry).toHaveBeenCalledOnce();
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
+  it('contains a synchronous id-source throw as a setup error', async () => {
+    const cause = new Error('id source failed');
+    const promise = runUtilityGraph({
+      createId: () => {
+        throw cause;
+      },
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: createFakeHub().hub,
+      timeoutMs: 0,
+    });
+
+    await expect(promise).rejects.toMatchObject({ cause, reason: 'setup' });
+  });
+
+  it('cleans a partially attached listener when the second socket subscription throws', async () => {
+    const fake = createFakeHub();
+    const cause = new Error('subscription failed');
+    let calls = 0;
+    const hub: Pick<SocketHub, 'on'> = {
+      on: (event, handler) => {
+        calls += 1;
+        if (calls === 2) {
+          throw cause;
+        }
+        return fake.hub.on(event, handler);
+      },
+    };
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub,
+      timeoutMs: 0,
+    });
+
+    await expect(promise).rejects.toMatchObject({ cause, reason: 'setup' });
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
+  it('contains a synchronous injected reconciliation classifier throw', async () => {
+    const fake = createFakeHub();
+    const cause = new Error('classifier failed');
+    const promise = runUtilityGraph({
+      classifyReconcileError: () => {
+        throw cause;
+      },
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      reconcileCompletedOutput: () => Promise.reject(new TypeError('network failed')),
+      timeoutMs: 0,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+
+    await expect(promise).rejects.toMatchObject({ cause, reason: 'reconcile' });
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
+  it('cleans listeners when abort-signal subscription throws synchronously', async () => {
+    const fake = createFakeHub();
+    const cause = new Error('abort subscription failed');
+    const signal = {
+      aborted: false,
+      addEventListener: () => {
+        throw cause;
+      },
+      removeEventListener: vi.fn(),
+    } as unknown as AbortSignal;
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      signal,
+      timeoutMs: 0,
+    });
+
+    await expect(promise).rejects.toMatchObject({ cause, reason: 'setup' });
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
   it('rejects enqueue when the backend accepts zero items', async () => {
     const fake = createFakeHub();
     const promise = runUtilityGraph({
