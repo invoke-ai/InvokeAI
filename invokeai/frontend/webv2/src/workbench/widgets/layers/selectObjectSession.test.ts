@@ -35,6 +35,12 @@ const replacementGuard: CanvasCompositeExportGuard = {
   documentFingerprint: 'document:4',
   participants: [{ cacheVersion: 4, layer, layerId: layer.id }],
 };
+const cloneGuard = (source: CanvasCompositeExportGuard = guard): CanvasCompositeExportGuard => ({
+  ...source,
+  bbox: { ...source.bbox },
+  candidates: source.candidates.map((candidate) => ({ ...candidate })),
+  participants: source.participants.map((participant) => ({ ...participant })),
+});
 const lifecycleGuard: SelectObjectLifecycleGuard = {
   bbox: guard.bbox,
   documentGeneration: guard.documentGeneration,
@@ -344,6 +350,72 @@ describe('createSelectObjectSession', () => {
     expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
     expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
+  });
+
+  it('rebinds a prepared source across fresh structurally equal guards without another export or upload', async () => {
+    let currentGuard = cloneGuard();
+    const harness = createHarness({
+      captureGuard: () => currentGuard,
+      exportComposite: vi.fn(() => Promise.resolve({ blob, guard: currentGuard, rect, status: 'ok' as const })),
+      isGuardCurrent: (candidate) =>
+        candidate.documentFingerprint === currentGuard.documentFingerprint &&
+        candidate.documentGeneration === currentGuard.documentGeneration,
+    });
+    harness.session.update({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: -4, y: 8 }], type: 'visual' },
+    });
+
+    await expect(harness.session.process()).resolves.toBe('published');
+    for (const update of [
+      { input: { bbox: null, excludePoints: [], includePoints: [{ x: -3, y: 9 }], type: 'visual' as const } },
+      { invert: true },
+      { applyPolygonRefinement: true },
+    ]) {
+      currentGuard = cloneGuard();
+      harness.session.update(update);
+      await expect(harness.session.process()).resolves.toBe('published');
+      expect(harness.session.getSnapshot().sourceGuard).toBe(currentGuard);
+    }
+
+    expect(harness.deps.exportComposite).toHaveBeenCalledOnce();
+    expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce();
+    expect(harness.deps.runGraph).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    ['bbox', { ...cloneGuard(), bbox: { ...guard.bbox, x: guard.bbox.x + 1 }, documentFingerprint: 'bbox:4' }],
+    [
+      'cache participant',
+      {
+        ...cloneGuard(replacementGuard),
+        documentFingerprint: 'cache:4',
+      },
+    ],
+    [
+      'document generation',
+      {
+        ...cloneGuard(),
+        documentFingerprint: 'document:5',
+        documentGeneration: guard.documentGeneration + 1,
+      },
+    ],
+  ] as const)('does not reuse the prepared source after a changed %s guard', async (_label, nextGuard) => {
+    let currentGuard: CanvasCompositeExportGuard = guard;
+    const harness = createHarness({
+      captureGuard: () => currentGuard,
+      exportComposite: vi.fn(() =>
+        Promise.resolve({ blob, guard: currentGuard, rect: currentGuard.bbox, status: 'ok' as const })
+      ),
+      isGuardCurrent: (candidate) => candidate === currentGuard,
+    });
+    await expect(harness.session.process()).resolves.toBe('published');
+
+    currentGuard = nextGuard;
+    harness.session.update({ input: { prompt: 'dog', type: 'prompt' } });
+    await expect(harness.session.process()).resolves.toBe('published');
+
+    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
+    expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
   });
 
   it.each(['layer', 'project', 'document'] as const)(

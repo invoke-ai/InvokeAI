@@ -944,6 +944,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   let selectObjectSession: SelectObjectSession<RasterSurface> | null = null;
   let selectObjectUnsubscribe: (() => void) | null = null;
   let selectObjectControllerUnsubscribe: (() => void) | null = null;
+  let selectObjectLifecycleGuard: SelectObjectLifecycleGuard | null = null;
   let selectObjectGuard: CanvasCompositeExportGuard | null = null;
   let selectObjectSourceRect: Rect | null = null;
   let selectObjectPointLabel: SamPointLabel = 'include';
@@ -3262,6 +3263,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     selectObjectUnsubscribe = null;
     selectObjectControllerUnsubscribe?.();
     selectObjectControllerUnsubscribe = null;
+    selectObjectLifecycleGuard = null;
     selectObjectGuard = null;
     selectObjectSourceRect = null;
     selectObjectPointLabel = 'include';
@@ -3291,6 +3293,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
     clearOwnedFilterSession();
     clearOwnedSelectObjectSession();
+    selectObjectLifecycleGuard = lifecycleGuard;
     selectObjectGuard = null;
     selectObjectSourceRect = { ...lifecycleGuard.bbox };
     const operation = canvasOperations.start({
@@ -3299,6 +3302,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       identity: { kind: 'select-object', projectId },
     });
     if (!operation) {
+      selectObjectLifecycleGuard = null;
       selectObjectGuard = null;
       selectObjectSourceRect = null;
       return 'not-ready';
@@ -3568,11 +3572,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return 'blocked';
     }
     const session = selectObjectSession;
-    const guard = selectObjectGuard;
-    if (!session || !guard) {
+    const lifecycleGuard = selectObjectLifecycleGuard;
+    const operation = canvasOperations.getSnapshot();
+    if (
+      !session ||
+      !lifecycleGuard ||
+      !isSelectObjectLifecycleGuardCurrent(lifecycleGuard) ||
+      operation.status !== 'active' ||
+      operation.identity.kind !== 'select-object' ||
+      operation.identity.projectId !== projectId
+    ) {
       return 'stale';
     }
     invalidateSelectObjectCommit();
+    selectObjectGuard = null;
     selectObjectPointLabel = 'include';
     session.reset();
     session.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });

@@ -79,6 +79,10 @@ describe('getSamActionEligibility', () => {
       canCancel: true,
       canReset: true,
     });
+    expect(getSamActionEligibility(snapshot({ error: { code: 'not-ready' }, status: 'error' }))).toMatchObject({
+      canReset: true,
+    });
+    expect(getSamActionEligibility(snapshot({ status: 'ready' }))).toMatchObject({ canReset: true });
   });
 
   it('disables every mutating control while committing and keeps Cancel available', () => {

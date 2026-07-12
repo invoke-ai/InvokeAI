@@ -12921,6 +12921,92 @@ describe('Select Object canvas engine integration', () => {
     h.engine.dispose();
   });
 
+  it('resets edited inputs and point mode immediately after launch without requiring a preview guard', async () => {
+    const h = await createSamHarness();
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: {
+        bbox: { height: 10, width: 10, x: 1, y: 2 },
+        excludePoints: [{ x: 4, y: 5 }],
+        includePoints: [{ x: 2, y: 3 }],
+        type: 'visual',
+      },
+      invert: true,
+      pointLabel: 'exclude',
+    });
+
+    expect(h.engine.resetSelectObjectSession()).toBe('updated');
+
+    expect(h.engine.stores.samSession.get()).toMatchObject({
+      error: null,
+      hasPreview: false,
+      input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
+      invert: false,
+      pointLabel: 'include',
+      status: 'ready',
+    });
+    expect(h.engine.canvasOperations.getSnapshot()).toMatchObject({ status: 'active' });
+    h.engine.dispose();
+  });
+
+  it('resets after a first not-ready Process while preserving lifecycle ownership', async () => {
+    const bbox = { height: 100, width: 100, x: 0, y: 0 };
+    const reactive = createReactiveStore(samDocument());
+    const engine = createCanvasEngine({
+      backend: withSamPreviewBitmapDimensions(createTestStubRasterBackend()),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      selectObjectDeps: {
+        runGraph: () => Promise.resolve({ height: 100, imageName: 'mask.png', origin: 'test', width: 100 }),
+        uploadIntermediate: () => Promise.resolve({ height: 100, imageName: 'source.png', width: 100 }),
+      },
+      store: reactive.store,
+    });
+    expect(engine.startSelectObject()).toBe('started');
+    engine.updateSelectObjectSession({ input: { prompt: 'cat', type: 'prompt' }, invert: true });
+    await expect(engine.processSelectObjectSession()).resolves.toBe('error');
+    expect(engine.stores.samSession.get()).toMatchObject({ error: { code: 'not-ready' }, status: 'error' });
+
+    expect(engine.resetSelectObjectSession()).toBe('updated');
+
+    expect(engine.stores.samSession.get()).toMatchObject({
+      error: null,
+      hasPreview: false,
+      input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
+      invert: false,
+      pointLabel: 'include',
+      status: 'ready',
+    });
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({ status: 'active' });
+    expect(engine.getDocument()?.bbox).toEqual(bbox);
+    engine.dispose();
+  });
+
+  it('reuses one uploaded composite across fresh engine guards for point, invert, and refinement changes', async () => {
+    const uploadIntermediate = vi.fn(() => Promise.resolve({ height: 100, imageName: 'source.png', width: 100 }));
+    const runGraph = vi.fn(() => Promise.resolve({ height: 100, imageName: 'mask.png', origin: 'test', width: 100 }));
+    const h = await createSamHarness({ runGraph, uploadIntermediate });
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 2, y: 2 }], type: 'visual' },
+    });
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+
+    h.engine.updateSelectObjectSession({
+      input: { bbox: null, excludePoints: [], includePoints: [{ x: 3, y: 3 }], type: 'visual' },
+    });
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+    h.engine.updateSelectObjectSession({ invert: true });
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+    h.engine.updateSelectObjectSession({ applyPolygonRefinement: true });
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+
+    expect(uploadIntermediate).toHaveBeenCalledOnce();
+    expect(runGraph).toHaveBeenCalledTimes(4);
+    h.engine.dispose();
+  });
+
   it('starts from every visible participant without changing the selected layer', async () => {
     const h = await createSamHarness({ layers: [samLayer('first'), samLayer('second', 30)] });
 

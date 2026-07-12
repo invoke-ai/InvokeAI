@@ -220,10 +220,32 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
   };
 
-  const isSameGuard = (left: CanvasCompositeExportGuard, right: CanvasCompositeExportGuard): boolean =>
-    left.projectId === right.projectId &&
-    left.documentFingerprint === right.documentFingerprint &&
-    left.documentGeneration === right.documentGeneration;
+  const isSameGuard = (left: CanvasCompositeExportGuard, right: CanvasCompositeExportGuard): boolean => {
+    const sameParticipants = (
+      leftParticipants: CanvasCompositeExportGuard['candidates'],
+      rightParticipants: CanvasCompositeExportGuard['candidates']
+    ): boolean =>
+      leftParticipants.length === rightParticipants.length &&
+      leftParticipants.every((participant, index) => {
+        const other = rightParticipants[index];
+        return (
+          participant.layerId === other?.layerId &&
+          participant.layer === other.layer &&
+          participant.cacheVersion === other.cacheVersion
+        );
+      });
+    return (
+      left.projectId === right.projectId &&
+      left.documentGeneration === right.documentGeneration &&
+      left.documentFingerprint === right.documentFingerprint &&
+      left.bbox.x === right.bbox.x &&
+      left.bbox.y === right.bbox.y &&
+      left.bbox.width === right.bbox.width &&
+      left.bbox.height === right.bbox.height &&
+      sameParticipants(left.candidates, right.candidates) &&
+      sameParticipants(left.participants, right.participants)
+    );
+  };
 
   unsubscribeController = deps.controller.subscribe(() => {
     if (!disposed && deps.controller.getSnapshot().status === 'idle') {
@@ -254,7 +276,8 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     signal: AbortSignal,
     token: number
   ): Promise<SelectObjectPreparedSource> => {
-    if (source?.guard === guard && isGuardCurrent(guard)) {
+    if (source && isSameGuard(source.guard, guard) && isGuardCurrent(source.guard) && isGuardCurrent(guard)) {
+      source = { ...source, guard };
       return source;
     }
     source = null;
