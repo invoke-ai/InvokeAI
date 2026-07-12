@@ -56,6 +56,7 @@ import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
 import { addPBRFilterListener } from './middleware/listenerMiddleware/listeners/addPBRFilterListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
+import { addVideoUploadedListeners } from './middleware/listenerMiddleware/listeners/videoUploaded';
 
 const listenerMiddleware = createListenerMiddleware();
 
@@ -257,6 +258,7 @@ export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
 // To avoid circular dependencies, all listener middleware listeners are added here in the main store setup file.
 const startAppListening = listenerMiddleware.startListening as AppStartListening;
 addImageUploadedFulfilledListener(startAppListening);
+addVideoUploadedListeners(startAppListening);
 
 // Image deleted
 addDeleteBoardAndImagesFulfilledListener(startAppListening);

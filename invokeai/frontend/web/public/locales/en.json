@@ -13,7 +13,8 @@
         "toggleRightPanel": "Toggle Right Panel (G)",
         "toggleLeftPanel": "Toggle Left Panel (T)",
         "uploadImage": "Upload Image",
-        "uploadImages": "Upload Images"
+        "uploadImages": "Upload Images",
+        "uploadMedia": "Upload Media"
     },
     "auth": {
         "login": {
@@ -1974,6 +1975,7 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "videoUploaded": "Video Uploaded",
         "videoUploadFailed": "Video Upload Failed",
         "importFailed": "Import Failed",
         "importSuccessful": "Import Successful",
@@ -2026,10 +2028,11 @@
         "setNodeField": "Set as node field",
         "somethingWentWrong": "Something Went Wrong",
         "uploadFailed": "Upload failed",
-        "imagesWillBeAddedTo": "Uploaded images will be added to board {{boardName}}'s assets.",
+        "itemsWillBeAddedTo": "Uploaded items will be added to board {{boardName}}'s assets.",
         "uploadFailedInvalidUploadDesc_withCount_one": "Must be maximum of 1 PNG, JPEG or WEBP image.",
         "uploadFailedInvalidUploadDesc_withCount_other": "Must be maximum of {{count}} PNG, JPEG or WEBP images.",
         "uploadFailedInvalidUploadDesc": "Must be PNG, JPEG or WEBP images.",
+        "uploadFailedInvalidMediaUploadDesc": "Must be PNG, JPEG or WEBP images, or MP4 videos.",
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",
         "workflowDeleted": "Workflow Deleted",

@@ -15,9 +15,10 @@ export const GalleryUploadButton = memo(() => {
         size="sm"
         alignSelf="stretch"
         variant="link"
-        aria-label={t('accessibility.uploadImages')}
-        tooltip={t('accessibility.uploadImages')}
+        aria-label={t('accessibility.uploadMedia')}
+        tooltip={t('accessibility.uploadMedia')}
         icon={<PiUploadBold />}
+        isLoading={uploadApi.isUploading}
         {...uploadApi.getUploadButtonProps()}
       />
       <input {...uploadApi.getUploadInputProps()} />

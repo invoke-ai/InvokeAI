@@ -322,6 +322,15 @@ export const uploadVideo = (arg: UploadVideoArg): Promise<VideoDTO> => {
   return req.unwrap();
 };
 
+/**
+ * Uploads a batch of videos and resolves with the DTOs that succeeded.
+ *
+ * Rejections are NOT re-thrown, mirroring `uploadImages`: per-file failure feedback
+ * (an error toast naming the failed file) is handled by the `uploadVideo.matchRejected`
+ * listener in `videoUploaded.ts`, which fires for every rejected mutation regardless of
+ * how the caller aggregates the promises. Callers should treat the resolved array as
+ * "what actually made it" and must not assume it matches the request 1:1.
+ */
 export const uploadVideos = async (args: UploadVideoArg[]): Promise<VideoDTO[]> => {
   const { dispatch } = getStore();
   const results = await Promise.allSettled(

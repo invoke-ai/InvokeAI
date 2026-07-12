@@ -46,7 +46,9 @@ export const FullscreenDropzone = memo(() => {
       const parseResult = z.array(zUploadFile).safeParse(files);
 
       if (!parseResult.success) {
-        const description = t('toast.uploadFailedInvalidUploadDesc');
+        // The fullscreen surface accepts videos too, so its invalid-upload message must
+        // mention MP4 (unlike image-only upload fields, which keep the image-only text).
+        const description = t('toast.uploadFailedInvalidMediaUploadDesc');
 
         toast({
           id: 'UPLOAD_FAILED',
@@ -177,7 +179,7 @@ const DropLabel = memo(() => {
   return (
     <Flex flexDir="column" gap={4} color="base.100" alignItems="center">
       <Heading size="lg">{t('gallery.dropToUpload')}</Heading>
-      <Heading size="md">{t('toast.imagesWillBeAddedTo', { boardName })}</Heading>
+      <Heading size="md">{t('toast.itemsWillBeAddedTo', { boardName })}</Heading>
     </Flex>
   );
 });
