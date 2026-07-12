@@ -26,9 +26,9 @@ export const CANVAS_SELECT_OBJECT_PANEL_LAYOUT = {
   w: '26.25rem',
 } satisfies BoxProps;
 
-export const CANVAS_SELECT_OBJECT_SLOT_LAYOUT = {
-  px: '3',
-  py: '2',
+export const CANVAS_OPERATION_SLOT_LAYOUT = {
+  px: '4',
+  py: '3',
 } satisfies BoxProps;
 
 export const CANVAS_OPERATION_FOOTER_LAYOUT = {
@@ -77,7 +77,7 @@ const Header = (props: BoxProps) => {
       as="header"
       borderBottomWidth={operation === 'select-object' ? undefined : '1px'}
       data-slot="header"
-      {...CANVAS_SELECT_OBJECT_SLOT_LAYOUT}
+      {...CANVAS_OPERATION_SLOT_LAYOUT}
       {...CANVAS_OPERATION_FIXED_SECTION_LAYOUT}
       {...props}
     />
@@ -90,7 +90,7 @@ const Body = (props: BoxProps) => {
     <Box
       data-scroll-container="body"
       data-slot="body"
-      {...CANVAS_SELECT_OBJECT_SLOT_LAYOUT}
+      {...CANVAS_OPERATION_SLOT_LAYOUT}
       {...CANVAS_OPERATION_BODY_LAYOUT}
       flex={operation === 'select-object' ? '0 1 auto' : CANVAS_OPERATION_BODY_LAYOUT.flex}
       {...props}
@@ -119,7 +119,7 @@ const Footer = (props: FlexProps) => (
     borderTopWidth="1px"
     data-slot="footer"
     gap="2"
-    {...CANVAS_SELECT_OBJECT_SLOT_LAYOUT}
+    {...CANVAS_OPERATION_SLOT_LAYOUT}
     {...CANVAS_OPERATION_FOOTER_LAYOUT}
     {...CANVAS_OPERATION_FIXED_SECTION_LAYOUT}
     {...props}

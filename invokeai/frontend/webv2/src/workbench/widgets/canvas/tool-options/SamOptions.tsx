@@ -52,6 +52,8 @@ export const SAM_COMPACT_CONTROL_LAYOUT = { h: '8', minH: '8', size: 'xs' } as c
 export const SAM_COMPACT_BUTTON_LAYOUT = { ...SAM_COMPACT_CONTROL_LAYOUT, px: '2' } as const;
 export const SAM_COMPACT_FOOTER_LAYOUT = { flexWrap: 'wrap', gap: '1' } satisfies FlexProps;
 export const SAM_COMPACT_GROUP_LAYOUT = { maxW: 'full', minW: '0' } as const;
+export const SAM_COMPACT_SLOT_LAYOUT = { px: '3', py: '2' } as const;
+export const SAM_COMPACT_SWITCH_LAYOUT = { flex: '0 1 auto', maxW: 'full', minW: '0' } as const;
 export const SAM_MODEL_SELECT_LAYOUT = { flex: '0 1 11rem', maxW: 'full', minW: '0', w: '11rem' } as const;
 
 const SAM_SEGMENT_BUTTON_LAYOUT = {
@@ -60,6 +62,8 @@ const SAM_SEGMENT_BUTTON_LAYOUT = {
   minW: '0',
   overflow: 'hidden',
 } as const;
+
+export const SAM_VISUAL_BUTTON_LAYOUT = { ...SAM_SEGMENT_BUTTON_LAYOUT, fontSize: '2xs', px: '1' } as const;
 
 const SAM_PROMPT_GUIDANCE_ID = 'sam-prompt-guidance';
 const SAM_VISUAL_GUIDANCE_ID = 'sam-visual-guidance';
@@ -199,15 +203,15 @@ export const SamSwitch = ({
     <Switch.Root
       checked={checked}
       disabled={disabled}
-      minW="0"
       {...SAM_COMPACT_CONTROL_LAYOUT}
+      {...SAM_COMPACT_SWITCH_LAYOUT}
       onCheckedChange={({ checked: next }) => onChange(next)}
     >
       <Switch.HiddenInput aria-label={accessibleLabel} />
       <Switch.Control flexShrink="0">
         <Switch.Thumb />
       </Switch.Control>
-      <Switch.Label fontSize="xs" whiteSpace="nowrap">
+      <Switch.Label fontSize="xs" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
         {label}
       </Switch.Label>
     </Switch.Root>
@@ -281,7 +285,7 @@ export const SamVisualBody = ({
         <Button
           aria-pressed={session.pointLabel === 'include'}
           disabled={disabled}
-          {...SAM_SEGMENT_BUTTON_LAYOUT}
+          {...SAM_VISUAL_BUTTON_LAYOUT}
           variant={session.pointLabel === 'include' ? 'solid' : 'outline'}
           onClick={onInclude}
         >
@@ -292,7 +296,7 @@ export const SamVisualBody = ({
         <Button
           aria-pressed={session.pointLabel === 'exclude'}
           disabled={disabled}
-          {...SAM_SEGMENT_BUTTON_LAYOUT}
+          {...SAM_VISUAL_BUTTON_LAYOUT}
           variant={session.pointLabel === 'exclude' ? 'solid' : 'outline'}
           onClick={onExclude}
         >
@@ -301,7 +305,15 @@ export const SamVisualBody = ({
           </Text>
         </Button>
       </Group>
-      <Text color={viewModel.bboxActive ? 'fg' : 'fg.muted'} flex="0 1 auto" fontSize="xs" fontWeight="medium" minW="0">
+      <Text
+        color={viewModel.bboxActive ? 'fg' : 'fg.muted'}
+        flex="0 1 auto"
+        fontSize="xs"
+        fontWeight="medium"
+        maxW="full"
+        minW="0"
+        overflowWrap="anywhere"
+      >
         {viewModel.bboxActive
           ? t('widgets.layers.selectObject.bboxActive')
           : t('widgets.layers.selectObject.bboxInactive')}
@@ -381,10 +393,10 @@ export const SamOptionsPanel = ({
 
   return (
     <CanvasOperationPanel.Root aria-labelledby="sam-operation-title" operation="select-object">
-      <CanvasOperationPanel.Header>
-        <Flex align="center" flexWrap="wrap" gap="2" justify="space-between">
-          <Flex align="baseline" gap="1" minW="0">
-            <Heading fontSize="sm" id="sam-operation-title" whiteSpace="nowrap">
+      <CanvasOperationPanel.Header {...SAM_COMPACT_SLOT_LAYOUT}>
+        <Flex align="center" flexWrap="wrap" gap="2" justify="space-between" maxW="full" minW="0">
+          <Flex align="baseline" flex="0 1 auto" flexWrap="wrap" gap="1" maxW="full" minW="0">
+            <Heading fontSize="sm" id="sam-operation-title" maxW="full" whiteSpace="nowrap">
               {t('widgets.layers.selectObject.title')}
             </Heading>
             <Text
@@ -392,12 +404,14 @@ export const SamOptionsPanel = ({
               color="fg.muted"
               fontSize="xs"
               fontVariantNumeric="tabular-nums"
+              maxW="full"
+              minW="0"
               whiteSpace="nowrap"
             >
               {viewModel.sourceSummary}
             </Text>
           </Flex>
-          <Flex align="center" flexWrap="wrap" gap="2" minW="0">
+          <Flex align="center" flex="0 1 auto" flexWrap="wrap" gap="2" maxW="full" minW="0">
             <SamSwitch
               accessibleLabel={t('widgets.layers.selectObject.autoProcess')}
               checked={session.autoProcess}
@@ -415,7 +429,7 @@ export const SamOptionsPanel = ({
           </Flex>
         </Flex>
       </CanvasOperationPanel.Header>
-      <CanvasOperationPanel.Body>
+      <CanvasOperationPanel.Body {...SAM_COMPACT_SLOT_LAYOUT}>
         <Stack gap="2">
           <Flex align="center" flexWrap="wrap" gap="1" justify="space-between" minW="0">
             <SamModeToggle
@@ -487,7 +501,11 @@ export const SamOptionsPanel = ({
         </Stack>
       </CanvasOperationPanel.Body>
       {session.error || isProcessing || session.status === 'scheduled' || session.status === 'committing' ? (
-        <CanvasOperationPanel.Feedback color={session.error ? 'fg.error' : 'fg.muted'} fontSize="xs">
+        <CanvasOperationPanel.Feedback
+          {...SAM_COMPACT_SLOT_LAYOUT}
+          color={session.error ? 'fg.error' : 'fg.muted'}
+          fontSize="xs"
+        >
           <SamProcessFeedback
             error={session.error}
             errorText={session.error ? t(getSamErrorTranslationKey(session.error.code)) : null}
@@ -497,7 +515,7 @@ export const SamOptionsPanel = ({
           />
         </CanvasOperationPanel.Feedback>
       ) : null}
-      <CanvasOperationPanel.Footer {...SAM_COMPACT_FOOTER_LAYOUT}>
+      <CanvasOperationPanel.Footer {...SAM_COMPACT_FOOTER_LAYOUT} {...SAM_COMPACT_SLOT_LAYOUT}>
         <Button
           disabled={!eligibility.canProcess}
           loading={isProcessing}
@@ -506,6 +524,9 @@ export const SamOptionsPanel = ({
         >
           {t('widgets.layers.selectObject.process')}
         </Button>
+        <Button disabled={!eligibility.canReset} variant="ghost" {...SAM_COMPACT_BUTTON_LAYOUT} onClick={actions.reset}>
+          {t('widgets.layers.selectObject.reset')}
+        </Button>
         <Button
           colorPalette="accent"
           disabled={!eligibility.canApply}
@@ -513,9 +534,6 @@ export const SamOptionsPanel = ({
           onClick={actions.apply}
         >
           {t('common.apply')}
-        </Button>
-        <Button disabled={!eligibility.canReset} variant="ghost" {...SAM_COMPACT_BUTTON_LAYOUT} onClick={actions.reset}>
-          {t('widgets.layers.selectObject.reset')}
         </Button>
         <Menu.Root>
           <Menu.Trigger asChild>

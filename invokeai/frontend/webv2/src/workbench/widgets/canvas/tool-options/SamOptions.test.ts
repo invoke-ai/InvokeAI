@@ -19,7 +19,10 @@ import {
   SAM_COMPACT_CONTROL_LAYOUT,
   SAM_COMPACT_FOOTER_LAYOUT,
   SAM_COMPACT_GROUP_LAYOUT,
+  SAM_COMPACT_SLOT_LAYOUT,
+  SAM_COMPACT_SWITCH_LAYOUT,
   SAM_MODEL_SELECT_LAYOUT,
+  SAM_VISUAL_BUTTON_LAYOUT,
   SamPromptBody,
   SamModeToggle,
   SamOptionsPanel,
@@ -181,6 +184,9 @@ describe('SamModeToggle', () => {
     expect(SAM_COMPACT_BUTTON_LAYOUT).toEqual({ h: '8', minH: '8', px: '2', size: 'xs' });
     expect(SAM_COMPACT_FOOTER_LAYOUT).toMatchObject({ flexWrap: 'wrap', gap: '1' });
     expect(SAM_COMPACT_GROUP_LAYOUT).toEqual({ maxW: 'full', minW: '0' });
+    expect(SAM_COMPACT_SLOT_LAYOUT).toEqual({ px: '3', py: '2' });
+    expect(SAM_COMPACT_SWITCH_LAYOUT).toEqual({ flex: '0 1 auto', maxW: 'full', minW: '0' });
+    expect(SAM_VISUAL_BUTTON_LAYOUT).toMatchObject({ fontSize: '2xs', px: '1' });
     expect(SAM_MODEL_SELECT_LAYOUT).toEqual({ flex: '0 1 11rem', maxW: 'full', minW: '0', w: '11rem' });
   });
 
@@ -374,6 +380,8 @@ describe('compact SAM inputs', () => {
     expect(en.widgets.layers.selectObject.technicalDetails).toBe('Technical details');
     expect(en.widgets.layers.selectObject.sourceDimensions).toBe('{{width}} × {{height}}');
     expect(en.widgets.layers.selectObject.sourceDimensionsLabel).toContain('{{width}}');
+    expect(en.widgets.layers.selectObject.includeCount).toBe('Include {{count}}');
+    expect(en.widgets.layers.selectObject.excludeCount).toBe('Exclude {{count}}');
     expect(en.widgets.layers.selectObject).not.toHaveProperty('modelAndRefinement');
     expect(en.widgets.layers.selectObject).not.toHaveProperty('sourceSummary');
   });
@@ -445,14 +453,20 @@ describe('getSamActionHandlers', () => {
     const actions = getSamActionHandlers(engine as never);
 
     actions.process();
-    actions.apply();
     actions.reset();
+    actions.apply();
     actions.save('control');
     actions.cancel();
 
     expect(engine.processSelectObjectSession).toHaveBeenCalledOnce();
-    expect(engine.applySelectObjectSession).toHaveBeenCalledOnce();
     expect(engine.resetSelectObjectSession).toHaveBeenCalledOnce();
+    expect(engine.applySelectObjectSession).toHaveBeenCalledOnce();
+    expect(engine.processSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
+      engine.resetSelectObjectSession.mock.invocationCallOrder[0] as number
+    );
+    expect(engine.resetSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
+      engine.applySelectObjectSession.mock.invocationCallOrder[0] as number
+    );
     expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('control', expect.any(Function));
     expect(engine.cancelSelectObjectSession).toHaveBeenCalledOnce();
   });
@@ -493,9 +507,9 @@ describe('SamOptionsPanel', () => {
     expect(markup).toContain('>Auto<');
     expect(markup).toContain('>Isolate<');
     expect(markup).toContain('aria-label="Generation area: 1024 × 768"');
-    expect(markup.indexOf('>Process<')).toBeLessThan(markup.indexOf('>Apply<'));
-    expect(markup.indexOf('>Apply<')).toBeLessThan(markup.indexOf('>Reset<'));
-    expect(markup.indexOf('>Reset<')).toBeLessThan(markup.indexOf('Save As'));
+    expect(markup.indexOf('>Process<')).toBeLessThan(markup.indexOf('>Reset<'));
+    expect(markup.indexOf('>Reset<')).toBeLessThan(markup.indexOf('>Apply<'));
+    expect(markup.indexOf('>Apply<')).toBeLessThan(markup.indexOf('Save As'));
     expect(markup.indexOf('Save As')).toBeLessThan(markup.indexOf('>Cancel<'));
   });
 });
