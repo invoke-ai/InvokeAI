@@ -1,5 +1,7 @@
 import { parseify } from 'common/util/serialize';
+import { getSavedWorkflowDynamicFields } from 'features/nodes/components/flow/nodes/Invocation/callSavedWorkflowFormUtils';
 import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
+import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from 'features/nodes/store/nodesSlice';
 import type { Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import {
@@ -9,6 +11,7 @@ import {
   isModelFieldType,
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
+import { getInvocationNodeInputTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import {
   buildNodeFieldElement,
@@ -22,6 +25,7 @@ import {
   getUpdatedFieldName,
   updateNode,
 } from 'features/nodes/util/node/nodeUpdate';
+import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { t } from 'i18next';
 import type { JsonObject } from 'type-fest';
 
@@ -39,11 +43,86 @@ type ValidateWorkflowArgs = {
   checkImageAccess: (name: string) => Promise<boolean>;
   checkBoardAccess: (id: string) => Promise<boolean>;
   checkModelAccess: (key: string) => Promise<boolean>;
+  getWorkflow?: (workflowId: string) => Promise<NonNullable<Parameters<typeof getSavedWorkflowDynamicFields>[0]>>;
 };
 
 type ValidateWorkflowResult = {
   workflow: WorkflowV3;
   warnings: WorkflowWarning[];
+};
+
+const refreshCallSavedWorkflowDynamicInputs = async ({
+  workflow,
+  templates,
+  getWorkflow,
+  warnings,
+}: {
+  workflow: WorkflowV3;
+  templates: Templates;
+  getWorkflow: ValidateWorkflowArgs['getWorkflow'];
+  warnings: WorkflowWarning[];
+}) => {
+  if (!getWorkflow) {
+    return;
+  }
+
+  for (const node of workflow.nodes) {
+    if (!isWorkflowInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
+      continue;
+    }
+
+    const workflowId = node.data.inputs.workflow_id?.value;
+    if (typeof workflowId !== 'string' || !workflowId) {
+      continue;
+    }
+
+    try {
+      const savedWorkflow = await getWorkflow(workflowId);
+      const fields = getSavedWorkflowDynamicFields(savedWorkflow, templates);
+      const nextFieldNames = new Set(fields.map((field) => field.fieldName));
+
+      for (const fieldName of Object.keys(node.data.inputs)) {
+        if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX) && !nextFieldNames.has(fieldName)) {
+          delete node.data.inputs[fieldName];
+          delete node.data.dynamicInputTemplates[fieldName];
+        }
+      }
+
+      for (const { fieldName, fieldTemplate, label, description, initialValue } of fields) {
+        const existingTemplate = node.data.dynamicInputTemplates[fieldName];
+        node.data.dynamicInputTemplates[fieldName] = fieldTemplate;
+        const existing = node.data.inputs[fieldName];
+        if (existing) {
+          if (
+            existingTemplate?.type.name !== fieldTemplate.type.name ||
+            existingTemplate?.type.cardinality !== fieldTemplate.type.cardinality ||
+            existingTemplate?.type.batch !== fieldTemplate.type.batch
+          ) {
+            const instance = buildFieldInputInstance(fieldName, fieldTemplate);
+            instance.label = label;
+            instance.description = description;
+            instance.value = initialValue;
+            node.data.inputs[fieldName] = instance;
+            continue;
+          }
+          existing.label = label;
+          existing.description = description;
+          continue;
+        }
+
+        const instance = buildFieldInputInstance(fieldName, fieldTemplate);
+        instance.label = label;
+        instance.description = description;
+        instance.value = initialValue;
+        node.data.inputs[fieldName] = instance;
+      }
+    } catch {
+      warnings.push({
+        message: t('toast.problemRetrievingWorkflow'),
+        data: { workflowId },
+      });
+    }
+  }
 };
 
 /**
@@ -56,7 +135,7 @@ type ValidateWorkflowResult = {
  * @throws {z.ZodError} If there is a validation error.
  */
 export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<ValidateWorkflowResult> => {
-  const { workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess } = args;
+  const { workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess, getWorkflow } = args;
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
 
@@ -64,6 +143,8 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
   const { nodes, edges } = _workflow;
   const warnings: WorkflowWarning[] = [];
   const validEdges: WorkflowV3['edges'] = [];
+
+  await refreshCallSavedWorkflowDynamicInputs({ workflow: _workflow, templates, getWorkflow, warnings });
 
   for (const edge of edges) {
     // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
@@ -121,7 +202,13 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       );
     }
 
-    if (targetNode && targetTemplate && edge.type === 'default' && !(edge.targetHandle in targetTemplate.inputs)) {
+    if (
+      targetNode &&
+      isWorkflowInvocationNode(targetNode) &&
+      targetTemplate &&
+      edge.type === 'default' &&
+      !getInvocationNodeInputTemplate(targetNode.data, targetTemplate, edge.targetHandle)
+    ) {
       // The edge's target/input node field does not exist
       issues.push(
         t('nodes.targetNodeFieldDoesNotExist', {
@@ -193,7 +280,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
     }
 
     for (const input of Object.values(node.data.inputs)) {
-      const fieldTemplate = template.inputs[input.name];
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, template, input.name);
 
       if (!fieldTemplate) {
         const message = t('nodes.missingFieldTemplate');
@@ -275,14 +362,14 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
 
     for (const { nodeId, fieldName } of reverseExposedFields) {
       const node = nodes.find(({ id }) => id === nodeId);
-      if (!node) {
+      if (!node || !isWorkflowInvocationNode(node)) {
         continue;
       }
       const nodeTemplate = templates[node.data.type];
       if (!nodeTemplate) {
         continue;
       }
-      const fieldTemplate = nodeTemplate.inputs[fieldName];
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
       if (!fieldTemplate) {
         continue;
       }

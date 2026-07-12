@@ -122,6 +122,18 @@ def test_calc_session_count(batch_data_collection, batch_graph):
     assert calc_session_count(batch=b) == 8
 
 
+def test_calc_session_count_does_not_materialize_cartesian_product(
+    batch_data_collection, batch_graph, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(
+        "invokeai.app.services.session_queue.session_queue_common.product",
+        lambda *args: pytest.fail("calc_session_count must not enumerate the cartesian product"),
+    )
+    batch = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
+
+    assert calc_session_count(batch=batch) == 8
+
+
 def test_prepare_values_to_insert(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
     values = prepare_values_to_insert(queue_id="default", batch=b, priority=0, max_new_queue_items=1000)
