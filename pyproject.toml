@@ -249,6 +249,8 @@ exclude = [
   "invokeai/backend/image_util/normal_bae/",     # External code
   "invokeai/backend/image_util/pidi/",           # External code
   "invokeai/backend/image_util/imwatermark/",    # External code
+  "invokeai/backend/image_util/triposplat/model.py",      # External code (vendored TripoSplat)
+  "invokeai/backend/image_util/triposplat/triposplat.py", # External code (vendored TripoSplat)
 ]
 
 [tool.ruff.lint]

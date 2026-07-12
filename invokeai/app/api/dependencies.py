@@ -6,6 +6,7 @@ from logging import Logger
 import torch
 
 from invokeai.app.services.app_settings import AppSettingsService
+from invokeai.app.services.asset_files.asset_files_disk import DiskAssetFileStorage
 from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
@@ -108,6 +109,7 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
+        asset_files = DiskAssetFileStorage(output_folder / "assets")
 
         model_images_folder = config.models_path
         style_presets_folder = config.style_presets_path
@@ -192,6 +194,7 @@ class ApiDependencies:
         users = UserService(db=db)
 
         services = InvocationServices(
+            asset_files=asset_files,
             board_image_records=board_image_records,
             board_images=board_images,
             board_records=board_records,

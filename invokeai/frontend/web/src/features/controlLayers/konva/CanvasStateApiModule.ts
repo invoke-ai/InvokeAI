@@ -351,6 +351,25 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   /**
+   * Run a graph and return the raw output of a node. Use this for non-image outputs (e.g. the 3D asset
+   * output from the image_to_3d node).
+   *
+   * @param arg.graph The graph to execute.
+   * @param arg.outputNodeId The id of the node whose output will be retrieved.
+   * @param arg.options Optional RunGraphOptions (prepend, signal, timeout, destination).
+   * @returns A promise that resolves to the raw invocation output of the specified node.
+   */
+  runGraphAndReturnOutput = async (arg: {
+    graph: Graph;
+    outputNodeId: string;
+    options?: RunGraphOptions;
+  }): Promise<S['GraphExecutionState']['results'][string]> => {
+    const dependencies = buildRunGraphDependencies(this.store.dispatch, this.manager.socket);
+    const { output } = await runGraph({ dependencies, ...arg });
+    return output;
+  };
+
+  /**
    * Helper function to extract ImageDTO from graph execution result.
    * Expects the result to be an ImageOutput.
    */

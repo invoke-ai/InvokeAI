@@ -25,3 +25,10 @@ class LocalUrlService(UrlServiceBase):
 
     def get_workflow_thumbnail_url(self, workflow_id: str) -> str:
         return f"{self._base_url}/workflows/i/{workflow_id}/thumbnail"
+
+    def get_asset_url(self, asset_name: str) -> str:
+        import os
+
+        asset_basename = os.path.basename(asset_name)
+        # This path is determined by the route in invokeai/app/api/routers/assets.py
+        return f"{self._base_url}/assets/i/{asset_basename}"

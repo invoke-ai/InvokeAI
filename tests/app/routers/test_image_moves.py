@@ -48,6 +48,7 @@ def mock_services() -> InvocationServices:
     db = create_mock_sqlite_database(configuration, logger)
     image_moves = MagicMock()
     return InvocationServices(
+        asset_files=None,  # type: ignore
         board_image_records=SqliteBoardImageRecordStorage(db=db),
         board_images=None,  # type: ignore
         board_records=SqliteBoardRecordStorage(db=db),

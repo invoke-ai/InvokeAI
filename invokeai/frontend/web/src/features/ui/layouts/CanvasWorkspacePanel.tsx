@@ -14,6 +14,7 @@ import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
+import { CanvasSplatOverlay } from 'features/controlLayers/components/SplatOverlay/CanvasSplatOverlay';
 import { StagingAreaContextProvider } from 'features/controlLayers/components/StagingArea/context';
 import { CanvasTextOverlay } from 'features/controlLayers/components/Text/CanvasTextOverlay';
 import { PinnedFillColorPickerOverlay } from 'features/controlLayers/components/Tool/PinnedFillColorPickerOverlay';
@@ -83,6 +84,7 @@ export const CanvasWorkspacePanel = memo(() => {
               <InvokeCanvasComponent />
               <CanvasManagerProviderGate>
                 <CanvasTextOverlay />
+                <CanvasSplatOverlay />
                 <Flex
                   position="absolute"
                   flexDir="column"

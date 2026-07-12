@@ -13,6 +13,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     AnimaConditioningField,
+    Asset3DField,
     BoundingBoxField,
     CogView4ConditioningField,
     ColorField,
@@ -251,6 +252,17 @@ class ImageOutput(BaseInvocationOutput):
             width=image_dto.width,
             height=image_dto.height,
         )
+
+
+@invocation_output("asset_3d_output")
+class Asset3DOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single 3D asset"""
+
+    asset: Asset3DField = OutputField(description="The output 3D asset")
+
+    @classmethod
+    def build(cls, asset_name: str) -> "Asset3DOutput":
+        return cls(asset=Asset3DField(asset_name=asset_name))
 
 
 @invocation_output("image_collection_output")

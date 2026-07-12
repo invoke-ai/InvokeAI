@@ -17,6 +17,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.api.routers import (
     app_info,
+    assets,
     auth,
     board_images,
     boards,
@@ -179,6 +180,7 @@ app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
+app.include_router(assets.assets_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
 app.include_router(virtual_boards.virtual_boards_router, prefix="/api")
