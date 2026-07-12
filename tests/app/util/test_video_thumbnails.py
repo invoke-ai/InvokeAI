@@ -15,13 +15,15 @@ synthetic MP4 so the subprocess plumbing is actually validated end to end.
 import sys
 import time
 from pathlib import Path
+from threading import Event
 
 import imageio.v3 as iio
 import numpy as np
 import pytest
 
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.util import video_thumbnails
-from invokeai.app.util.video_thumbnails import decoder_frame_count, extract_video_frame, probe_video
+from invokeai.app.util.video_thumbnails import decoder_frame_count, extract_video_frame, iter_video_frames, probe_video
 
 FRAMES = 12
 FPS = 8.0
@@ -102,3 +104,48 @@ class TestHungDecoderIsBounded:
         started = time.monotonic()
         assert decoder_frame_count(target, timeout=self.TIMEOUT) is None
         assert time.monotonic() - started < self.MAX_ELAPSED
+
+
+class TestStreamedDecoderIsBounded:
+    def test_streams_real_frames_through_worker(self, synthetic_mp4: Path) -> None:
+        frames = list(iter_video_frames(synthetic_mp4))
+        assert len(frames) == FRAMES
+        assert frames[0].shape == (32, 48, 3)
+
+    def test_times_out_when_worker_stops_producing_frames(self, hanging_worker, tmp_path: Path) -> None:
+        target = tmp_path / "malicious.mp4"
+        target.write_bytes(b"pretend this hangs the decoder")
+        started = time.monotonic()
+        with pytest.raises(TimeoutError, match="Timed out decoding"):
+            next(iter_video_frames(target, timeout=0.2))
+        assert time.monotonic() - started < 5
+
+    def test_cancellation_terminates_blocked_decoder(self, hanging_worker, tmp_path: Path) -> None:
+        target = tmp_path / "malicious.mp4"
+        target.write_bytes(b"pretend this hangs the decoder")
+        canceled = Event()
+        canceled.set()
+        with pytest.raises(CanceledException):
+            next(iter_video_frames(target, timeout=5, is_canceled=canceled.is_set))
+
+
+def test_timeout_kills_worker_descendants(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    child_pid_path = tmp_path / "child.pid"
+
+    def _descendant_command(*args: str) -> list[str]:
+        script = (
+            "import pathlib, subprocess, sys, time; "
+            "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(600)']); "
+            "pathlib.Path(sys.argv[1]).write_text(str(child.pid)); "
+            "time.sleep(600)"
+        )
+        return [sys.executable, "-c", script, str(child_pid_path)]
+
+    monkeypatch.setattr(video_thumbnails, "_worker_command", _descendant_command)
+    assert video_thumbnails._run_worker(["probe", "unused"], timeout=0.5) is None
+    child_pid = int(child_pid_path.read_text())
+
+    deadline = time.monotonic() + 5
+    while video_thumbnails._is_process_running(child_pid) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not video_thumbnails._is_process_running(child_pid)

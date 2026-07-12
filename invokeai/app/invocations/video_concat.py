@@ -15,10 +15,9 @@ admits files whose decoded frames would run to tens of gigabytes).
 import tempfile
 from collections import deque
 from pathlib import Path
-from typing import Iterable, Iterator, Literal, Optional
+from typing import Callable, Iterable, Iterator, Literal, Optional
 
 import imageio.v2 as iio2
-import imageio.v3 as iio
 import numpy as np
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
@@ -29,40 +28,39 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.primitives import VideoOutput
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.video_thumbnails import probe_video
+from invokeai.app.util.video_thumbnails import iter_video_frames, probe_video
 
 TransitionMode = Literal["cut", "crossfade", "fade_through_black"]
+MAX_TRANSITION_MEMORY_BYTES = 512 * 1024 * 1024
+_BLEND_WORKING_FRAMES = 13
 
 
-def _crossfade(a_tail: list[np.ndarray], b_head: list[np.ndarray]) -> list[np.ndarray]:
-    """Linear A→B cross-dissolve. Consumes N frames from each side, returns N blended frames."""
+def _crossfade(a_tail: list[np.ndarray], b_head: list[np.ndarray]) -> Iterator[np.ndarray]:
+    """Yields a linear A to B cross-dissolve without retaining the blended frames."""
     n = len(a_tail)
-    out: list[np.ndarray] = []
     for i in range(n):
         alpha = (i + 1) / (n + 1)
         blended = a_tail[i].astype(np.float32) * (1.0 - alpha) + b_head[i].astype(np.float32) * alpha
-        out.append(np.clip(blended, 0, 255).astype(np.uint8))
-    return out
+        yield np.clip(blended, 0, 255).astype(np.uint8)
 
 
-def _fade_through_black(a_tail: list[np.ndarray], b_head: list[np.ndarray]) -> list[np.ndarray]:
+def _fade_through_black(a_tail: list[np.ndarray], b_head: list[np.ndarray]) -> Iterator[np.ndarray]:
     """A fades to black, then black fades to B. Consumes N/2 frames from each side and returns N output frames.
 
     Asymmetric framing: the first ``len(a_tail)`` output frames are the trailing A frames scaled
     toward zero brightness; the next ``len(b_head)`` are the leading B frames scaled up from zero.
     """
-    out: list[np.ndarray] = []
     n_a = len(a_tail)
     for i, fa in enumerate(a_tail):
         # 1.0 at i=0 (fully visible) → near 0 at i=n_a-1 (essentially black).
         alpha = 1.0 - (i + 1) / (n_a + 1)
-        out.append(np.clip(fa.astype(np.float32) * alpha, 0, 255).astype(np.uint8))
+        yield np.clip(fa.astype(np.float32) * alpha, 0, 255).astype(np.uint8)
     n_b = len(b_head)
     for j, fb in enumerate(b_head):
         alpha = (j + 1) / (n_b + 1)
-        out.append(np.clip(fb.astype(np.float32) * alpha, 0, 255).astype(np.uint8))
-    return out
+        yield np.clip(fb.astype(np.float32) * alpha, 0, 255).astype(np.uint8)
 
 
 @invocation(
@@ -129,6 +127,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"{sorted(widths)}. Re-render at a single resolution before concatenating."
             )
         width, height, _, first_fps = probes[0]
+        self._validate_transition_memory(width, height)
         output_fps = float(self.fps) if self.fps is not None else (first_fps or 16.0)
 
         context.util.signal_progress(f"Joining {len(self.videos)} clip(s) ({self.transition}) @ {output_fps:.2f} fps")
@@ -142,8 +141,8 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             writer = iio2.get_writer(str(tmp_path), format="FFMPEG", mode="I", fps=output_fps, codec="libx264")
             num_frames = 0
             try:
-                clip_iters = [iio.imiter(p, plugin="FFMPEG") for p in paths]
-                for frame in self._iter_joined_frames(clip_iters):
+                clip_iters = [iter_video_frames(p, is_canceled=context.util.is_canceled) for p in paths]
+                for frame in self._iter_joined_frames(clip_iters, is_canceled=context.util.is_canceled):
                     writer.append_data(frame)
                     num_frames += 1
             finally:
@@ -172,7 +171,29 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             except Exception:
                 pass
 
-    def _iter_joined_frames(self, clips: list[Iterable[np.ndarray]]) -> Iterator[np.ndarray]:
+    def _estimate_transition_memory(self, width: int, height: int) -> int:
+        if self.transition == "cut" or self.transition_frames == 0:
+            return 0
+        buffered_frames = self.transition_frames * (2 if self.transition == "crossfade" else 1)
+        frame_bytes = width * height * 3
+        return frame_bytes * (buffered_frames + _BLEND_WORKING_FRAMES)
+
+    def _validate_transition_memory(self, width: int, height: int) -> None:
+        estimated_bytes = self._estimate_transition_memory(width, height)
+        if estimated_bytes > MAX_TRANSITION_MEMORY_BYTES:
+            estimated_mib = estimated_bytes / (1024 * 1024)
+            limit_mib = MAX_TRANSITION_MEMORY_BYTES / (1024 * 1024)
+            raise ValueError(
+                f"The requested transition needs an estimated {estimated_mib:.0f} MiB, "
+                f"which exceeds the {limit_mib:.0f} MiB transition memory budget. "
+                "Lower transition_frames or use lower-resolution clips."
+            )
+
+    def _iter_joined_frames(
+        self,
+        clips: list[Iterable[np.ndarray]],
+        is_canceled: Optional[Callable[[], bool]] = None,
+    ) -> Iterator[np.ndarray]:
         """Yields the joined output frames, pulling lazily from each clip's frame iterator.
 
         A frame is emitted as soon as it can no longer participate in a transition, so at
@@ -211,6 +232,8 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             tail_buf: deque[np.ndarray] = deque()
             n_frames = 0
             for frame in clip:
+                if is_canceled is not None and is_canceled():
+                    raise CanceledException
                 frame = np.ascontiguousarray(frame)
                 n_frames += 1
                 # The clip's first head_want frames are consumed into the boundary blend

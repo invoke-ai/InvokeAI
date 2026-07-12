@@ -25,7 +25,8 @@ import numpy as np
 import pytest
 
 from invokeai.app.invocations.fields import VideoField
-from invokeai.app.invocations.video_concat import VideoConcatInvocation
+from invokeai.app.invocations.video_concat import MAX_TRANSITION_MEMORY_BYTES, VideoConcatInvocation, _crossfade
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 
 
 def _invocation(transition: str, transition_frames: int) -> VideoConcatInvocation:
@@ -163,3 +164,27 @@ class TestStreamingJoin:
         v = _invocation("crossfade", 8)
         with pytest.raises(ValueError, match="transitions need"):
             list(v._iter_joined_frames([iter(_clip(200, 4)), iter(_clip(100, 20))]))
+
+    def test_crossfade_yields_without_materializing_all_blends(self) -> None:
+        a = _clip(200, 8)
+        b = _clip(100, 8)
+        blended = _crossfade(a, b)
+        assert isinstance(blended, Iterator)
+        assert next(blended).shape == (4, 4, 3)
+
+
+class TestResourceBounds:
+    def test_rejects_transition_window_over_memory_budget(self) -> None:
+        v = _invocation("crossfade", 240)
+        with pytest.raises(ValueError, match="memory budget"):
+            v._validate_transition_memory(width=8192, height=8192)
+
+    def test_accepts_small_transition_window(self) -> None:
+        v = _invocation("crossfade", 8)
+        assert v._estimate_transition_memory(width=512, height=512) < MAX_TRANSITION_MEMORY_BYTES
+        v._validate_transition_memory(width=512, height=512)
+
+    def test_cancellation_stops_join(self) -> None:
+        v = _invocation("cut", 0)
+        with pytest.raises(CanceledException):
+            next(v._iter_joined_frames([iter(_clip(200, 10)), iter(_clip(100, 10))], is_canceled=lambda: True))

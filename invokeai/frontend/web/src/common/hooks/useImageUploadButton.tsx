@@ -2,10 +2,11 @@ import type { ButtonProps, IconButtonProps, SystemStyleObject } from '@invoke-ai
 import { Button, IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
+import { trackAsyncTask } from 'common/util/trackAsyncTask';
 import { getUploadDropzoneAccept, partitionUploadFiles } from 'common/util/uploadMediaAccept';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import type { FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
@@ -76,7 +77,13 @@ export const useImageUploadButton = ({
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [uploadImage, imageRequest] = useUploadImageMutation();
   const [uploadVideo, videoRequest] = useUploadVideoMutation();
+  const [isBatchUploading, setIsBatchUploading] = useState(false);
+  const pendingBatchUploads = useRef(0);
   const { t } = useTranslation();
+  const onBatchLoadingChanged = useCallback((isLoading: boolean) => {
+    pendingBatchUploads.current += isLoading ? 1 : -1;
+    setIsBatchUploading(pendingBatchUploads.current > 0);
+  }, []);
 
   const onDropAccepted = useCallback(
     async (files: File[]) => {
@@ -130,41 +137,42 @@ export const useImageUploadButton = ({
           }
         } else {
           onUploadStarted?.(files);
+          await trackAsyncTask(async () => {
+            let imageDTOs: ImageDTO[] = [];
+            if (imageFiles.length > 0) {
+              imageDTOs = await uploadImages(
+                imageFiles.map((file, i) => ({
+                  file,
+                  image_category: 'user',
+                  is_intermediate: false,
+                  board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+                  silent: false,
+                  isFirstUploadOfBatch: i === 0,
+                }))
+              );
+            }
 
-          let imageDTOs: ImageDTO[] = [];
-          if (imageFiles.length > 0) {
-            imageDTOs = await uploadImages(
-              imageFiles.map((file, i) => ({
-                file,
-                image_category: 'user',
-                is_intermediate: false,
-                board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-                silent: false,
-                isFirstUploadOfBatch: i === 0,
-              }))
-            );
-          }
+            let videoDTOs: VideoDTO[] = [];
+            if (videoFiles.length > 0) {
+              videoDTOs = await uploadVideos(
+                videoFiles.map((file, i) => ({
+                  file,
+                  video_category: 'user',
+                  is_intermediate: false,
+                  board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+                  silent: false,
+                  isFirstUploadOfBatch: i === 0,
+                }))
+              );
+            }
 
-          let videoDTOs: VideoDTO[] = [];
-          if (videoFiles.length > 0) {
-            videoDTOs = await uploadVideos(
-              videoFiles.map((file, i) => ({
-                file,
-                video_category: 'user',
-                is_intermediate: false,
-                board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-                silent: false,
-                isFirstUploadOfBatch: i === 0,
-              }))
-            );
-          }
-
-          if (imageDTOs.length > 0) {
-            (onUpload as ((dtos: ImageDTO[]) => void) | undefined)?.(imageDTOs);
-          }
-          if (videoDTOs.length > 0) {
-            (onUploadVideo as ((dtos: VideoDTO[]) => void) | undefined)?.(videoDTOs);
-          }
+            if (imageDTOs.length > 0) {
+              (onUpload as ((dtos: ImageDTO[]) => void) | undefined)?.(imageDTOs);
+            }
+            if (videoDTOs.length > 0) {
+              (onUploadVideo as ((dtos: VideoDTO[]) => void) | undefined)?.(videoDTOs);
+            }
+          }, onBatchLoadingChanged);
         }
       } catch (error) {
         onError?.(error);
@@ -193,6 +201,7 @@ export const useImageUploadButton = ({
       onUpload,
       onUploadVideo,
       onError,
+      onBatchLoadingChanged,
       t,
     ]
   );
@@ -235,7 +244,7 @@ export const useImageUploadButton = ({
 
   // Uploads run through separate image and video mutations; loading state must cover both
   // or an in-flight MP4 upload would show idle controls and allow double submission.
-  const isUploading = imageRequest.isLoading || videoRequest.isLoading;
+  const isUploading = imageRequest.isLoading || videoRequest.isLoading || isBatchUploading;
 
   return { getUploadButtonProps, getUploadInputProps, openUploader, isUploading };
 };

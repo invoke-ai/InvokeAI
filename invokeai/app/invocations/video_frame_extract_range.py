@@ -9,10 +9,9 @@ to a usable middle section before chaining it to another shot.
 
 import tempfile
 from pathlib import Path
-from typing import Iterator, Protocol
+from typing import Callable, Iterator, Optional, Protocol
 
 import imageio.v2 as iio2
-import imageio.v3 as iio
 import numpy as np
 
 from invokeai.app.invocations.baseinvocation import (
@@ -31,15 +30,22 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.primitives import VideoOutput
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.video_thumbnails import decoder_frame_count, probe_video
+from invokeai.app.util.video_thumbnails import decoder_frame_count, iter_video_frames, probe_video
 
 
 class _FrameWriter(Protocol):
     def append_data(self, frame: np.ndarray) -> None: ...
 
 
-def _write_frame_range(frames: Iterator[np.ndarray], writer: _FrameWriter, start: int, end: int) -> int:
+def _write_frame_range(
+    frames: Iterator[np.ndarray],
+    writer: _FrameWriter,
+    start: int,
+    end: int,
+    is_canceled: Optional[Callable[[], bool]] = None,
+) -> int:
     """Streams frames[start..end] (inclusive) from a lazy decoder into the writer.
 
     Frames are appended one at a time as they stream past — the full range is never
@@ -50,6 +56,8 @@ def _write_frame_range(frames: Iterator[np.ndarray], writer: _FrameWriter, start
     """
     written = 0
     for idx, frame in enumerate(frames):
+        if is_canceled is not None and is_canceled():
+            raise CanceledException
         if idx < start:
             continue
         if idx > end:
@@ -164,7 +172,13 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Frames stream straight from the decoder into the encoder; see _write_frame_range.
             writer = iio2.get_writer(str(tmp_path), format="FFMPEG", mode="I", fps=output_fps, codec="libx264")
             try:
-                num_frames = _write_frame_range(iio.imiter(video_path, plugin="FFMPEG"), writer, start, end)
+                num_frames = _write_frame_range(
+                    iter_video_frames(video_path, is_canceled=context.util.is_canceled),
+                    writer,
+                    start,
+                    end,
+                    is_canceled=context.util.is_canceled,
+                )
             finally:
                 writer.close()
 

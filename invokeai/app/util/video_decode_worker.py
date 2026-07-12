@@ -16,15 +16,19 @@ Commands:
     probe <video_path>                     -> {"width", "height", "duration", "fps"}
     frame <video_path> <index> <out_path>  -> {"ok": true}; the frame is written to out_path as PNG
     count <video_path>                     -> {"count": <int or null>}
+    stream <video_path>                    -> consecutive numpy arrays on stdout
 """
 
+import io
 import json
 import math
+import struct
 import sys
 from pathlib import Path
 from typing import Optional
 
 import imageio.v3 as iio
+import numpy as np
 from PIL import Image
 
 
@@ -138,10 +142,23 @@ def _count(video_path: Path) -> Optional[int]:
         return None
 
 
+def _stream(video_path: Path) -> None:
+    """Writes decoded frames as length-prefixed, non-pickled numpy records."""
+    for frame in iio.imiter(video_path, plugin="FFMPEG"):
+        record = io.BytesIO()
+        np.save(record, np.ascontiguousarray(frame), allow_pickle=False)
+        payload = record.getvalue()
+        sys.stdout.buffer.write(struct.pack(">Q", len(payload)))
+        sys.stdout.buffer.write(payload)
+        sys.stdout.buffer.flush()
+
+
 def main(argv: list[str]) -> int:
     try:
         command = argv[1]
-        if command == "probe":
+        if command == "stream":
+            _stream(Path(argv[2]))
+        elif command == "probe":
             width, height, duration, fps = _probe(Path(argv[2]))
             print(json.dumps({"width": width, "height": height, "duration": duration, "fps": fps}))
         elif command == "frame":

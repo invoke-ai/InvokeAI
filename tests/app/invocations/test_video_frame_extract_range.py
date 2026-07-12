@@ -10,8 +10,10 @@ stops decoding as soon as the range is written.
 from typing import Iterator
 
 import numpy as np
+import pytest
 
 from invokeai.app.invocations.video_frame_extract_range import _write_frame_range
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 
 
 class RecordingWriter:
@@ -64,3 +66,11 @@ class TestWriteFrameRangeStreams:
         assert written == 24
         assert pulled[0] == 24
         assert [int(f[0, 0, 0]) for f in writer.frames] == list(range(24))
+
+    def test_cancellation_stops_before_writing_more_frames(self) -> None:
+        pulled = [0]
+        writer = RecordingWriter()
+        with pytest.raises(CanceledException):
+            _write_frame_range(_lazy_frames(24, pulled), writer, start=0, end=23, is_canceled=lambda: pulled[0] >= 2)
+        assert len(writer.frames) == 1
+        assert pulled[0] == 2
