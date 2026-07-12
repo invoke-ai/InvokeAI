@@ -30,7 +30,7 @@ import type { SocketHub } from '@workbench/backend/socketHub';
 import type { BackendGraphContract } from '@workbench/types';
 
 import { buildUtilityQueueItemOrigin } from '@workbench/backend/events';
-import { cancelQueueItems, enqueueUtilityGraph } from '@workbench/generation/api';
+import { cancelQueueItems, enqueueUtilityGraph, getQueueItem } from '@workbench/generation/api';
 
 /** The default time a utility graph may run before it is abandoned. */
 export const DEFAULT_UTILITY_QUEUE_TIMEOUT_MS = 120_000;
@@ -55,6 +55,14 @@ export type UtilityEnqueue = (request: {
 /** The cancellation seam: best-effort cancels accepted backend item ids. */
 export type UtilityCancel = (itemIds: number[]) => Promise<void>;
 
+type UtilityImageOutput = { height: number; imageName: string; width: number };
+
+/** Deterministically reads a completed queue item's target output. */
+export type UtilityCompletedOutputReconciler = (
+  itemIds: number[],
+  outputNodeId?: string
+) => Promise<UtilityImageOutput | null>;
+
 /** Dependencies for {@link runUtilityGraph} (all injectable for tests). */
 export interface RunUtilityGraphOptions {
   /** The graph to enqueue and await. */
@@ -76,6 +84,8 @@ export interface RunUtilityGraphOptions {
   signal?: AbortSignal;
   /** Injectable id source (defaults to `crypto.randomUUID`). */
   createId?: () => string;
+  /** Injectable completed-item reconciliation seam. */
+  reconcileCompletedOutput?: UtilityCompletedOutputReconciler;
 }
 
 /** The resolved result of a utility graph: its single output image. */
@@ -88,22 +98,40 @@ export interface UtilityGraphResult {
 }
 
 /** Extracts the current backend ImageOutput fields from a completion payload. */
-const extractImageOutput = (
-  result: InvocationCompleteEvent['result'] | undefined
-): { height: number; imageName: string; width: number } | null => {
+const extractImageOutput = (result: InvocationCompleteEvent['result'] | undefined): UtilityImageOutput | null => {
   const output = result as { height?: unknown; image?: { image_name?: unknown }; width?: unknown } | undefined;
   if (
     typeof output?.image?.image_name !== 'string' ||
     typeof output.width !== 'number' ||
     !Number.isFinite(output.width) ||
+    !Number.isInteger(output.width) ||
     output.width <= 0 ||
     typeof output.height !== 'number' ||
     !Number.isFinite(output.height) ||
+    !Number.isInteger(output.height) ||
     output.height <= 0
   ) {
     return null;
   }
   return { height: output.height, imageName: output.image.image_name, width: output.width };
+};
+
+const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler = async (itemIds, outputNodeId) => {
+  for (const itemId of itemIds) {
+    const item = await getQueueItem(itemId);
+    const results = item.session?.results ?? {};
+    const preparedSourceMapping = item.session?.prepared_source_mapping ?? {};
+    for (const [preparedNodeId, result] of Object.entries(results)) {
+      if (outputNodeId && (preparedSourceMapping[preparedNodeId] ?? preparedNodeId) !== outputNodeId) {
+        continue;
+      }
+      const output = extractImageOutput(result as InvocationCompleteEvent['result']);
+      if (output) {
+        return output;
+      }
+    }
+  }
+  return null;
 };
 
 /**
@@ -116,6 +144,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
   const enqueue = options.enqueue ?? enqueueUtilityGraph;
   const cancel = options.cancel ?? cancelQueueItems;
   const timeoutMs = options.timeoutMs ?? DEFAULT_UTILITY_QUEUE_TIMEOUT_MS;
+  const reconcileCompletedOutput = options.reconcileCompletedOutput ?? reconcileUtilityCompletedOutput;
   const utilityId = (options.createId ?? (() => crypto.randomUUID()))();
   const origin = buildUtilityQueueItemOrigin(utilityId);
 
@@ -125,6 +154,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     let cancellationRequested = false;
     let cancellationStarted = false;
     let enqueueResult: { itemIds: number[]; enqueued: number } | null = null;
+    let completionReceived = false;
+    let reconciliationStarted = false;
     const detachers: Array<() => void> = [];
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -185,6 +216,35 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       reject(error);
     };
 
+    const reconcileCompletion = (): void => {
+      if (settled || !completionReceived || reconciliationStarted || enqueueResult === null) {
+        return;
+      }
+      if (capturedOutput) {
+        settleResolve(capturedOutput);
+        return;
+      }
+      reconciliationStarted = true;
+      void reconcileCompletedOutput([...enqueueResult.itemIds], outputNodeId)
+        .then((output) => {
+          if (settled) {
+            return;
+          }
+          if (capturedOutput) {
+            settleResolve(capturedOutput);
+          } else if (output) {
+            settleResolve(output);
+          } else {
+            settleReject(new UtilityQueueError('no-output', 'The utility graph produced no output image.'));
+          }
+        })
+        .catch(() => {
+          if (!settled) {
+            settleReject(new UtilityQueueError('no-output', 'The utility graph output could not be reconciled.'));
+          }
+        });
+    };
+
     function onAbort(): void {
       if (settled) {
         return;
@@ -206,6 +266,9 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         const output = extractImageOutput(event.result);
         if (output) {
           capturedOutput = output;
+          if (completionReceived) {
+            settleResolve(output);
+          }
         }
       })
     );
@@ -216,11 +279,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
           return;
         }
         if (event.status === 'completed') {
-          if (capturedOutput) {
-            settleResolve(capturedOutput);
-          } else {
-            settleReject(new UtilityQueueError('no-output', 'The utility graph produced no output image.'));
-          }
+          completionReceived = true;
+          reconcileCompletion();
         } else if (event.status === 'failed') {
           settleReject(new UtilityQueueError('failed', event.error_message ?? 'The utility graph failed.'));
         } else if (event.status === 'canceled') {
@@ -255,6 +315,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         cancelAcceptedItems();
         if (!settled && result.enqueued === 0) {
           settleReject(new UtilityQueueError('enqueue', 'The backend queue did not accept the utility graph.'));
+        } else {
+          reconcileCompletion();
         }
       })
       .catch((error: unknown) => {

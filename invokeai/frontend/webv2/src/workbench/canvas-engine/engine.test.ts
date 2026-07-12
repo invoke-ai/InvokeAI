@@ -23,7 +23,7 @@ import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbe
 import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import type { BitmapStore } from './document/bitmapStore';
-import type { CanvasEngine, EngineStore } from './engine';
+import type { CanvasEngine, CanvasEngineOptions, EngineStore } from './engine';
 import type { StrokeCommittedEvent } from './tools/tool';
 
 import { createBitmapStore } from './document/bitmapStore';
@@ -12632,10 +12632,11 @@ describe('Select Object canvas engine integration', () => {
   const createSamHarness = async (
     options: {
       backend?: StubRasterBackend;
+      bbox?: CanvasDocumentContractV2['bbox'];
       imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
       layers?: CanvasLayerContract[];
-      runGraph?: () => Promise<{ imageName: string; origin: string }>;
-      uploadIntermediate?: (blob: Blob, signal?: AbortSignal) => Promise<{ imageName: string }>;
+      runGraph?: NonNullable<CanvasEngineOptions['selectObjectDeps']>['runGraph'];
+      uploadIntermediate?: NonNullable<CanvasEngineOptions['selectObjectDeps']>['uploadIntermediate'];
     } = {}
   ) => {
     const raf = createControllableRaf();
@@ -12650,15 +12651,25 @@ describe('Select Object canvas engine integration', () => {
     vi.stubGlobal('removeEventListener', (type: string, listener: (event: Event) => void) => {
       windowListeners.get(type)?.delete(listener);
     });
-    const reactive = createReactiveStore(samDocument(options.layers));
+    const bbox = options.bbox ?? { height: 100, width: 100, x: 0, y: 0 };
+    const reactive = createReactiveStore({ ...samDocument(options.layers), bbox });
     const engine = createCanvasEngine({
-      backend: options.backend ?? createTestStubRasterBackend(),
+      backend: options.backend ?? {
+        ...createTestStubRasterBackend(),
+        createImageBitmap: () =>
+          Promise.resolve({ close: () => undefined, height: bbox.height, width: bbox.width } as unknown as ImageBitmap),
+      },
       bitmapStore: createSpyBitmapStore(),
       imageResolver: options.imageResolver ?? (() => Promise.resolve(new Blob())),
       projectId: 'p1',
       selectObjectDeps: {
-        runGraph: options.runGraph ?? (() => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' })),
-        uploadIntermediate: options.uploadIntermediate ?? (() => Promise.resolve({ imageName: 'sam-source.png' })),
+        runGraph:
+          options.runGraph ??
+          (() =>
+            Promise.resolve({ height: bbox.height, imageName: 'sam-mask.png', origin: 'test', width: bbox.width })),
+        uploadIntermediate:
+          options.uploadIntermediate ??
+          (() => Promise.resolve({ height: bbox.height, imageName: 'sam-source.png', width: bbox.width })),
       },
       store: reactive.store,
     });
@@ -12684,13 +12695,19 @@ describe('Select Object canvas engine integration', () => {
     const document = { ...samDocument([samLayer('source', -5)]), bbox };
     const reactive = createReducerBackedStore(document);
     const engine = createCanvasEngine({
-      backend,
+      backend: {
+        ...backend,
+        createImageBitmap: () =>
+          Promise.resolve({ close: () => undefined, height: bbox.height, width: bbox.width } as unknown as ImageBitmap),
+      },
       bitmapStore: createSpyBitmapStore(),
       imageResolver,
       projectId: reactive.projectId,
       selectObjectDeps: {
-        runGraph: () => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }),
-        uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+        runGraph: () =>
+          Promise.resolve({ height: bbox.height, imageName: 'sam-mask.png', origin: 'test', width: bbox.width }),
+        uploadIntermediate: () =>
+          Promise.resolve({ height: bbox.height, imageName: 'sam-source.png', width: bbox.width }),
       },
       store: reactive.store,
     });
@@ -12755,6 +12772,113 @@ describe('Select Object canvas engine integration', () => {
 
     expect(h.store.dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'setCanvasSelectedLayer' }));
     expect(h.engine.getDocument()?.selectedLayerId).toBe('first');
+    h.engine.dispose();
+  });
+
+  it('runs transformed multilayer bbox composite through upload, local visual graph, metadata, and decoded rect', async () => {
+    const bbox = { height: 30, width: 40, x: -11, y: 7 };
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const backend: StubRasterBackend = {
+      ...base,
+      createImageBitmap: () =>
+        Promise.resolve({ close: () => undefined, height: bbox.height, width: bbox.width } as unknown as ImageBitmap),
+      createSurface: (width, height) => {
+        const surface = base.createSurface(width, height);
+        surfaces.push(surface);
+        return surface;
+      },
+    };
+    const uploadIntermediate = vi.fn(async (source: Blob) => {
+      expect(await source.text()).toBe('stub-surface-40x30');
+      return { height: 30, imageName: 'composite.png', width: 40 };
+    });
+    const runGraph = vi.fn<NonNullable<CanvasEngineOptions['selectObjectDeps']>['runGraph']>((options) => {
+      expect(options.graph.nodes['sam-segment']).toMatchObject({
+        bounding_boxes: [{ x_max: 25, x_min: 5, y_max: 20, y_min: 5 }],
+        point_lists: [{ points: [{ label: 1, x: 10, y: 10 }] }],
+      });
+      return Promise.resolve({ height: 30, imageName: 'mask.png', origin: 'test', width: 40 });
+    });
+    const imageResolver = vi.fn(() => Promise.resolve(new Blob(['mask'])));
+    const lower = { ...samLayer('lower', -6), transform: { rotation: 0, scaleX: 1.5, scaleY: 1, x: -6, y: 9 } };
+    const upper = { ...samLayer('upper', 4), transform: { rotation: 15, scaleX: 1, scaleY: 0.75, x: 4, y: 11 } };
+    const h = await createSamHarness({
+      backend,
+      bbox,
+      imageResolver,
+      layers: [upper, lower],
+      runGraph,
+      uploadIntermediate,
+    });
+    expect(h.engine.startSelectObject()).toBe('started');
+    h.engine.updateSelectObjectSession({
+      input: {
+        bbox: { height: 15, width: 20, x: -6, y: 12 },
+        excludePoints: [],
+        includePoints: [{ x: -1, y: 17 }],
+        type: 'visual',
+      },
+    });
+
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+    h.raf.flush();
+
+    expect(uploadIntermediate).toHaveBeenCalledOnce();
+    expect(runGraph).toHaveBeenCalledOnce();
+    expect(imageResolver).toHaveBeenCalledWith('mask.png', expect.any(AbortSignal));
+    expect(surfaces.some((surface) => surface.width === 40 && surface.height === 30)).toBe(true);
+    expect(h.overlay.surface.callLog).toContainEqual({
+      args: [expect.anything(), -11, 7, 40, 30],
+      op: 'drawImage',
+    });
+    h.engine.dispose();
+  });
+
+  it('builds the prompt path and reports a decoded preview', async () => {
+    const runGraph = vi.fn<NonNullable<CanvasEngineOptions['selectObjectDeps']>['runGraph']>((options) => {
+      expect(options.graph.nodes['sam-detect']).toMatchObject({ prompt: 'red car', type: 'grounding_dino' });
+      return Promise.resolve({ height: 100, imageName: 'prompt-mask.png', origin: 'test', width: 100 });
+    });
+    const h = await createSamHarness({ runGraph });
+    h.engine.startSelectObject();
+    h.engine.updateSelectObjectSession({ input: { prompt: '  red car  ', type: 'prompt' } });
+
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
+
+    expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: true, status: 'ready' });
+    h.engine.dispose();
+  });
+
+  it('rejects SAM metadata dimensions that do not match the decoded preview rect', async () => {
+    const h = await createSamHarness({
+      runGraph: () => Promise.resolve({ height: 99, imageName: 'bad-mask.png', origin: 'test', width: 100 }),
+    });
+    h.engine.startSelectObject();
+    h.engine.updateSelectObjectSession({ input: { prompt: 'cat', type: 'prompt' } });
+
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
+
+    expect(h.engine.stores.samSession.get()).toMatchObject({
+      error: 'SAM output dimensions 100x99 do not match 100x100.',
+      hasPreview: false,
+      status: 'error',
+    });
+    h.engine.dispose();
+  });
+
+  it('reports preview decode failures without publishing a stale surface', async () => {
+    const h = await createSamHarness({ imageResolver: () => Promise.reject(new Error('preview decode failed')) });
+    h.engine.startSelectObject();
+    h.engine.updateSelectObjectSession({ input: { prompt: 'cat', type: 'prompt' } });
+
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
+
+    expect(h.engine.stores.samSession.get()).toMatchObject({
+      error: 'preview decode failed',
+      hasPreview: false,
+      status: 'error',
+    });
     h.engine.dispose();
   });
 
@@ -12847,7 +12971,7 @@ describe('Select Object canvas engine integration', () => {
   });
 
   it('interrupts Select Object processing on an external lock without losing inputs or operation', async () => {
-    const graph = createDeferred<{ imageName: string; origin: string }>();
+    const graph = createDeferred<{ height: number; imageName: string; origin: string; width: number }>();
     const runGraph = vi.fn(() => graph.promise);
     const h = await createSamHarness({ runGraph });
     expect(h.engine.startSelectObject()).toBe('started');
@@ -12857,7 +12981,7 @@ describe('Select Object canvas engine integration', () => {
     await vi.waitFor(() => expect(runGraph).toHaveBeenCalledOnce());
 
     h.engine.setInteractionLocked(true);
-    graph.resolve({ imageName: 'late.png', origin: 'test' });
+    graph.resolve({ height: 100, imageName: 'late.png', origin: 'test', width: 100 });
 
     await expect(pending).resolves.toBe('stale');
     expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: false, input, invert: true, status: 'ready' });
@@ -13038,8 +13162,8 @@ describe('Select Object canvas engine integration', () => {
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: reactive.projectId,
       selectObjectDeps: {
-        runGraph: () => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }),
-        uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+        runGraph: () => Promise.resolve({ height: 100, imageName: 'sam-mask.png', origin: 'test', width: 100 }),
+        uploadIntermediate: () => Promise.resolve({ height: 100, imageName: 'sam-source.png', width: 100 }),
       },
       store: reactive.store,
     });
@@ -13074,8 +13198,8 @@ describe('Select Object canvas engine integration', () => {
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: reactive.projectId,
       selectObjectDeps: {
-        runGraph: () => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }),
-        uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+        runGraph: () => Promise.resolve({ height: 100, imageName: 'sam-mask.png', origin: 'test', width: 100 }),
+        uploadIntermediate: () => Promise.resolve({ height: 100, imageName: 'sam-source.png', width: 100 }),
       },
       store: reactive.store,
     });
@@ -13113,8 +13237,8 @@ describe('Select Object canvas engine integration', () => {
         imageResolver: () => Promise.resolve(new Blob()),
         projectId: reactive.projectId,
         selectObjectDeps: {
-          runGraph: () => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }),
-          uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+          runGraph: () => Promise.resolve({ height: 100, imageName: 'sam-mask.png', origin: 'test', width: 100 }),
+          uploadIntermediate: () => Promise.resolve({ height: 100, imageName: 'sam-source.png', width: 100 }),
         },
         store: reactive.store,
       });
@@ -13219,8 +13343,8 @@ describe('Select Object canvas engine integration', () => {
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: reducer.projectId,
       selectObjectDeps: {
-        runGraph: () => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }),
-        uploadIntermediate: () => Promise.resolve({ imageName: 'sam-source.png' }),
+        runGraph: () => Promise.resolve({ height: 100, imageName: 'sam-mask.png', origin: 'test', width: 100 }),
+        uploadIntermediate: () => Promise.resolve({ height: 100, imageName: 'sam-source.png', width: 100 }),
       },
       store: reducer.store,
     });
@@ -13302,7 +13426,9 @@ describe('Select Object canvas engine integration', () => {
   });
 
   it('processes a sole bbox near-edge point after canonicalizing it to the last bbox pixel', async () => {
-    const runGraph = vi.fn(() => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }));
+    const runGraph = vi.fn(() =>
+      Promise.resolve({ height: 100, imageName: 'sam-mask.png', origin: 'test', width: 100 })
+    );
     const h = await createSamHarness({ runGraph });
     h.engine.startSelectObject();
 
@@ -13380,8 +13506,10 @@ describe('Select Object canvas engine integration', () => {
 
   it('does not omit a stale outside cache when its new source may enter the bbox', async () => {
     const nextImage = createDeferred<Blob>();
-    const uploadIntermediate = vi.fn(() => Promise.resolve({ imageName: 'sam-source.png' }));
-    const runGraph = vi.fn(() => Promise.resolve({ imageName: 'sam-mask.png', origin: 'test' }));
+    const uploadIntermediate = vi.fn(() => Promise.resolve({ height: 100, imageName: 'sam-source.png', width: 100 }));
+    const runGraph = vi.fn(() =>
+      Promise.resolve({ height: 100, imageName: 'sam-mask.png', origin: 'test', width: 100 })
+    );
     const outside = {
       ...samLayer('moving-source'),
       source: {
@@ -13414,7 +13542,7 @@ describe('Select Object canvas engine integration', () => {
     });
 
     const firstProcess = h.engine.processSelectObjectSession();
-    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('processing'));
+    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('preparing-composite'));
     expect(runGraph).not.toHaveBeenCalled();
     expect(uploadIntermediate).not.toHaveBeenCalled();
     nextImage.resolve(new Blob(['inside']));
@@ -13503,7 +13631,7 @@ describe('Select Object canvas engine integration', () => {
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
     const pending = h.engine.processSelectObjectSession();
-    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('processing'));
+    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('rendering-preview'));
     image.resolve(new Blob());
     await vi.waitFor(() => expect(backend.createImageBitmap).toHaveBeenCalledOnce());
 
@@ -13633,7 +13761,12 @@ describe('Select Object canvas engine integration', () => {
       mask: { bitmap: { height: 10, imageName: 'mask.png', width: 10 }, fill: { color: '#fff', style: 'solid' } },
       type: 'inpaint_mask',
     };
-    const h = await createSamHarness({ backend, layers: [mask, control, raster] });
+    const h = await createSamHarness({
+      backend,
+      layers: [mask, control, raster],
+      runGraph: () => Promise.resolve({ height: 70, imageName: 'sam-mask.png', origin: 'test', width: 80 }),
+      uploadIntermediate: () => Promise.resolve({ height: 70, imageName: 'sam-source.png', width: 80 }),
+    });
     h.setDocument({ ...h.engine.getDocument()!, bbox: { height: 70, width: 80, x: 10, y: 15 } });
     const rasterExport = await h.engine.exportLayerPixels('raster');
     const controlExport = await h.engine.exportLayerPixels('control');
@@ -13693,7 +13826,7 @@ describe('Select Object canvas engine integration', () => {
   });
 
   it('owns only the latest session and suppresses in-flight work from the replaced session', async () => {
-    const output = createDeferred<{ imageName: string; origin: string }>();
+    const output = createDeferred<{ height: number; imageName: string; origin: string; width: number }>();
     const layers = [samLayer('first'), samLayer('second', 30)];
     const h = await createSamHarness({ layers, runGraph: () => output.promise });
     h.engine.startSelectObject();
@@ -13701,12 +13834,12 @@ describe('Select Object canvas engine integration', () => {
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 5, y: 5 }], type: 'visual' },
     });
     const pending = h.engine.processSelectObjectSession();
-    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('processing'));
+    await vi.waitFor(() => expect(h.engine.stores.samSession.get()?.status).toBe('processing-sam'));
 
     h.setDocument({ ...h.engine.getDocument()!, selectedLayerId: 'second' });
     expect(h.engine.startSelectObject()).toBe('started');
     expect(h.engine.stores.samSession.get()).not.toBeNull();
-    output.resolve({ imageName: 'late.png', origin: 'late' });
+    output.resolve({ height: 100, imageName: 'late.png', origin: 'late', width: 100 });
 
     await expect(pending).resolves.toBe('stale');
     expect(h.engine.stores.samSession.get()).toMatchObject({ hasPreview: false });

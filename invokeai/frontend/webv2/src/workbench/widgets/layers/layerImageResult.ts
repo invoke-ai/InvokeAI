@@ -4,7 +4,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
 import type { CanvasImageRef } from '@workbench/types';
 
-import { buildSamGraph, documentToExportLocalSamInput } from '@workbench/generation/canvas/samGraph';
+import { buildSamGraph, documentToExportLocalSamInput, isSamInputValid } from '@workbench/generation/canvas/samGraph';
 
 export interface SelectObjectReadyResult {
   status: 'ready';
@@ -16,14 +16,14 @@ export interface SelectObjectReadyResult {
 export type SelectObjectRunResult =
   | SelectObjectReadyResult
   | { status: 'aborted' | 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' }
+  | { status: 'invalid-input' }
+  | { status: 'dimension-mismatch'; message: string }
   | { status: 'failed'; message: string };
 
 export interface SelectObjectRunnerDeps {
   exportComposite(): Promise<ExportCanvasCompositeBlobResult>;
-  uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
-  runGraph(
-    options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>
-  ): Promise<Pick<UtilityGraphResult, 'imageName' | 'origin'>>;
+  uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
+  runGraph(options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>): Promise<UtilityGraphResult>;
 }
 
 const isAbortError = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError';
@@ -32,7 +32,9 @@ const errorMessage = (error: unknown): string => (error instanceof Error ? error
 export interface SelectObjectPreparedSource {
   guard: CanvasCompositeExportGuard;
   imageName: string;
+  height: number;
   rect: Rect;
+  width: number;
 }
 
 export type PrepareSelectObjectSourceResult =
@@ -41,7 +43,8 @@ export type PrepareSelectObjectSourceResult =
 
 export const prepareSelectObjectSource = async (
   deps: Pick<SelectObjectRunnerDeps, 'exportComposite' | 'uploadIntermediate'>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onPhase?: (phase: 'uploading') => void
 ): Promise<PrepareSelectObjectSourceResult> => {
   if (signal?.aborted) {
     return { status: 'aborted' };
@@ -54,12 +57,25 @@ export const prepareSelectObjectSource = async (
     if (exported.status !== 'ok') {
       return exported;
     }
+    onPhase?.('uploading');
     const uploaded = await deps.uploadIntermediate(exported.blob, signal);
     if (signal?.aborted) {
       return { status: 'aborted' };
     }
+    if (!hasExactDimensions(uploaded, exported.rect)) {
+      return {
+        message: `Uploaded Select Object source dimensions ${String(uploaded.width)}x${String(uploaded.height)} do not match ${exported.rect.width}x${exported.rect.height}.`,
+        status: 'dimension-mismatch',
+      };
+    }
     return {
-      source: { guard: exported.guard, imageName: uploaded.imageName, rect: exported.rect },
+      source: {
+        guard: exported.guard,
+        height: uploaded.height,
+        imageName: uploaded.imageName,
+        rect: exported.rect,
+        width: uploaded.width,
+      },
       status: 'ready',
     };
   } catch (error) {
@@ -78,7 +94,21 @@ export interface ProcessSelectObjectSourceOptions {
   applyPolygonRefinement: boolean;
   signal?: AbortSignal;
   runGraph: SelectObjectRunnerDeps['runGraph'];
+  onPhase?: (phase: 'processing-sam') => void;
 }
+
+const hasExactDimensions = (
+  value: { height: number; width: number },
+  expected: { height: number; width: number }
+): boolean =>
+  Number.isFinite(value.width) &&
+  Number.isInteger(value.width) &&
+  value.width > 0 &&
+  Number.isFinite(value.height) &&
+  Number.isInteger(value.height) &&
+  value.height > 0 &&
+  value.width === expected.width &&
+  value.height === expected.height;
 
 export const processSelectObjectSource = async (
   options: ProcessSelectObjectSourceOptions
@@ -87,13 +117,24 @@ export const processSelectObjectSource = async (
     return { status: 'aborted' };
   }
   try {
+    if (!hasExactDimensions(options.source, options.source.rect)) {
+      return {
+        message: `Uploaded Select Object source dimensions ${String(options.source.width)}x${String(options.source.height)} do not match ${options.source.rect.width}x${options.source.rect.height}.`,
+        status: 'dimension-mismatch',
+      };
+    }
+    const input = documentToExportLocalSamInput(options.input, options.source.rect);
+    if (!isSamInputValid(input)) {
+      return { status: 'invalid-input' };
+    }
     const built = buildSamGraph({
       applyPolygonRefinement: options.applyPolygonRefinement,
       imageName: options.source.imageName,
-      input: documentToExportLocalSamInput(options.input, options.source.rect),
+      input,
       invert: options.invert,
       model: options.model,
     });
+    options.onPhase?.('processing-sam');
     const output = await options.runGraph({
       graph: built.graph,
       outputNodeId: built.outputNodeId,
@@ -102,12 +143,18 @@ export const processSelectObjectSource = async (
     if (options.signal?.aborted) {
       return { status: 'aborted' };
     }
+    if (!hasExactDimensions(output, options.source.rect)) {
+      return {
+        message: `SAM output dimensions ${String(output.width)}x${String(output.height)} do not match ${options.source.rect.width}x${options.source.rect.height}.`,
+        status: 'dimension-mismatch',
+      };
+    }
     return {
       guard: options.source.guard,
       image: {
-        height: options.source.rect.height,
+        height: output.height,
         imageName: output.imageName,
-        width: options.source.rect.width,
+        width: output.width,
       },
       rect: options.source.rect,
       status: 'ready',

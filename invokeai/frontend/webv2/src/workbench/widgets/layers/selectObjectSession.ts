@@ -14,7 +14,14 @@ import type { SelectObjectPreparedSource, SelectObjectReadyResult } from './laye
 
 import { prepareSelectObjectSource, processSelectObjectSource } from './layerImageResult';
 
-export type SelectObjectSessionStatus = 'ready' | 'scheduled' | 'processing' | 'error';
+export type SelectObjectSessionStatus =
+  | 'ready'
+  | 'scheduled'
+  | 'preparing-composite'
+  | 'uploading'
+  | 'processing-sam'
+  | 'rendering-preview'
+  | 'error';
 
 export interface SelectObjectSessionPreview<T> {
   data: T;
@@ -44,10 +51,8 @@ export interface SelectObjectSessionDeps<T> {
   captureGuard(): CanvasCompositeExportGuard | null;
   controller: CanvasOperationController;
   exportComposite(): Promise<ExportCanvasCompositeBlobResult>;
-  uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
-  runGraph(
-    options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>
-  ): Promise<Pick<UtilityGraphResult, 'imageName' | 'origin'>>;
+  uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
+  runGraph(options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>): Promise<UtilityGraphResult>;
   decodePreview(result: SelectObjectReadyResult, signal: AbortSignal): Promise<T>;
   publishPreview(preview: SelectObjectSessionPreview<T>): undefined;
   cleanupPreview(): void;
@@ -109,7 +114,7 @@ const stableInputHash = <T>(state: SelectObjectSessionState<T>): string => {
 };
 
 const resultError = (result: Exclude<Awaited<ReturnType<typeof prepareSelectObjectSource>>, { status: 'ready' }>) =>
-  result.status === 'failed' ? result.message : `Select Object source is ${result.status}.`;
+  'message' in result ? result.message : `Select Object source is ${result.status}.`;
 
 export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionOptions<T>): SelectObjectSession<T> => {
   const { deps, projectId } = options;
@@ -120,6 +125,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   let requestToken = 0;
   let lastPublishedHash: string | null = null;
   let pendingHash: string | null = null;
+  let pendingPhase: SelectObjectSessionStatus | null = null;
   let pendingProcess: Promise<SelectObjectSessionProcessResult> | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let startingOperation = false;
@@ -149,9 +155,17 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
   };
 
+  const publishPhase = (token: number, status: SelectObjectSessionStatus): void => {
+    if (!disposed && token === requestToken) {
+      pendingPhase = status;
+      publishState({ ...state, error: null, status });
+    }
+  };
+
   const clearSource = (): void => {
     requestToken += 1;
     pendingHash = null;
+    pendingPhase = null;
     pendingProcess = null;
     source = null;
     operation = null;
@@ -209,13 +223,14 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
   const ensureSource = async (
     guard: CanvasCompositeExportGuard,
-    signal: AbortSignal
+    signal: AbortSignal,
+    token: number
   ): Promise<SelectObjectPreparedSource> => {
     if (source?.guard === guard && isGuardCurrent(guard)) {
       return source;
     }
     source = null;
-    const prepared = await prepareSelectObjectSource(deps, signal);
+    const prepared = await prepareSelectObjectSource(deps, signal, (phase) => publishPhase(token, phase));
     if (prepared.status !== 'ready') {
       throw new Error(resultError(prepared));
     }
@@ -253,10 +268,11 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
         operationGuard = guard;
       }
 
-      publishState({ ...state, sourceGuard: guard, status: 'processing' });
+      pendingPhase = 'preparing-composite';
+      publishState({ ...state, sourceGuard: guard, status: 'preparing-composite' });
       const result = await operation.run(
         async (signal) => {
-          const preparedSource = await ensureSource(guard, signal);
+          const preparedSource = await ensureSource(guard, signal, token);
           if (signal.aborted || token !== requestToken) {
             throw new DOMException('Select Object source preparation was aborted.', 'AbortError');
           }
@@ -266,6 +282,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
             invert: requestState.invert,
             model: requestState.model,
             runGraph: deps.runGraph,
+            onPhase: (phase) => publishPhase(token, phase),
             signal,
             source: preparedSource,
           });
@@ -273,10 +290,9 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
             if (processed.status === 'aborted') {
               throw new DOMException('Select Object processing was aborted.', 'AbortError');
             }
-            throw new Error(
-              processed.status === 'failed' ? processed.message : `Select Object is ${processed.status}.`
-            );
+            throw new Error('message' in processed ? processed.message : `Select Object is ${processed.status}.`);
           }
+          publishPhase(token, 'rendering-preview');
           const data = await deps.decodePreview(processed, signal);
           if (signal.aborted) {
             throw new DOMException('Select Object preview decode was aborted.', 'AbortError');
@@ -355,7 +371,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
     const hash = stableInputHash(state);
     if (hash === pendingHash && pendingProcess) {
-      publishState({ ...state, error: null, status: 'processing' });
+      publishState({ ...state, error: null, status: pendingPhase ?? 'preparing-composite' });
       return pendingProcess;
     }
     if (
@@ -378,11 +394,11 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       return Promise.resolve('error');
     }
     pendingHash = hash;
-    publishState({ ...state, error: null, status: 'processing' });
     const requestState = state;
     const promise = runRequest(token, hash, requestState, guard).finally(() => {
       if (token === requestToken) {
         pendingHash = null;
+        pendingPhase = null;
         pendingProcess = null;
       }
     });
@@ -394,6 +410,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     clearTimer();
     requestToken += 1;
     pendingHash = null;
+    pendingPhase = null;
     pendingProcess = null;
     operation?.cancel();
     operation = null;
@@ -405,6 +422,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   const invalidateProcessingState = (): void => {
     requestToken += 1;
     pendingHash = null;
+    pendingPhase = null;
     pendingProcess = null;
     lastPublishedHash = null;
     operation?.reset();
@@ -429,6 +447,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       clearTimer();
       requestToken += 1;
       pendingHash = null;
+      pendingPhase = null;
       pendingProcess = null;
       lastPublishedHash = null;
       unsubscribeController?.();
@@ -446,11 +465,12 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     getSnapshot: () => state,
     interruptProcessing: () => {
       clearTimer();
-      if (disposed || (state.status !== 'processing' && state.status !== 'scheduled')) {
+      if (disposed || state.status === 'ready' || state.status === 'error') {
         return;
       }
       requestToken += 1;
       pendingHash = null;
+      pendingPhase = null;
       pendingProcess = null;
       lastPublishedHash = null;
       operation?.interruptProcessing();

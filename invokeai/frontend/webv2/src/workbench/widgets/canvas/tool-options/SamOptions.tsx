@@ -27,7 +27,11 @@ export const getSamActionEligibility = (
   session: SamSessionSnapshot,
   isExternalInteractionLocked = false
 ): SamActionEligibility => {
-  const isProcessing = session.status === 'processing';
+  const isProcessing =
+    session.status === 'preparing-composite' ||
+    session.status === 'uploading' ||
+    session.status === 'processing-sam' ||
+    session.status === 'rendering-preview';
   const isCommitting = session.status === 'committing';
   const actionsBlocked = isCommitting || isExternalInteractionLocked;
   const hasReadyPreview = session.hasPreview && !isProcessing && !actionsBlocked;
@@ -127,7 +131,11 @@ export const SamOptions = ({
   }
 
   const eligibility = getSamActionEligibility(session, isExternalInteractionLocked);
-  const isProcessing = session.status === 'processing';
+  const isProcessing =
+    session.status === 'preparing-composite' ||
+    session.status === 'uploading' ||
+    session.status === 'processing-sam' ||
+    session.status === 'rendering-preview';
 
   return (
     <HStack align="center" gap="2" maxW="calc(100vw - 2rem)" overflowX="auto">
@@ -248,6 +256,9 @@ export const SamOptions = ({
       <Button disabled={!eligibility.canCancel} size="xs" variant="ghost" onClick={cancel}>
         {t('common.cancel')}
       </Button>
+      <Text fontSize="2xs" role="status">
+        {session.status.replaceAll('-', ' ')}
+      </Text>
       {session.error ? (
         <Text color="fg.error" fontSize="2xs" role="alert">
           {session.error}

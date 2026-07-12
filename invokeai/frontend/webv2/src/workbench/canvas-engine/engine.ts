@@ -357,12 +357,12 @@ export interface CanvasEngineOptions {
   imageResolver: ImageResolver;
   /** Injectable Select Object queue/upload seams; production defaults use the utility queue. */
   selectObjectDeps?: {
-    uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
+    uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
     runGraph(options: {
       graph: Parameters<typeof runUtilityGraph>[0]['graph'];
       outputNodeId?: string;
       signal?: AbortSignal;
-    }): Promise<Pick<UtilityGraphResult, 'imageName' | 'origin'>>;
+    }): Promise<UtilityGraphResult>;
   };
   /** Injectable filter queue/upload seams; production defaults use intermediate canvas images and the utility queue. */
   filterDeps?: {
@@ -3162,7 +3162,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       const ctx = surface.ctx;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, surface.width, surface.height);
-      ctx.drawImage(bitmap, 0, 0, surface.width, surface.height);
+      ctx.drawImage(bitmap, 0, 0);
       ctx.globalCompositeOperation = 'source-in';
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(0, 0, surface.width, surface.height);
@@ -3257,7 +3257,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           if (signal?.aborted) {
             throw new DOMException('Select Object upload was aborted.', 'AbortError');
           }
-          return { imageName: uploaded.imageName };
+          return uploaded;
         },
       },
       projectId,
@@ -3321,8 +3321,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     const preview = state?.preview;
     if (
       !state ||
-      state.status === 'processing' ||
-      state.status === 'scheduled' ||
+      (state.status !== 'ready' && state.status !== 'error') ||
       !preview ||
       preview.guard !== selectObjectGuard
     ) {

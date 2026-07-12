@@ -68,8 +68,10 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
     isGuardCurrent: (candidate) => candidate === currentGuard,
     publishPreview: vi.fn((): undefined => undefined),
     cleanupPreview: vi.fn(),
-    runGraph: vi.fn(() => Promise.resolve({ imageName: 'result.png', origin: 'webv2:util:test' })),
-    uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'input.png' })),
+    runGraph: vi.fn(() =>
+      Promise.resolve({ height: 12, imageName: 'result.png', origin: 'webv2:util:test', width: 16 })
+    ),
+    uploadIntermediate: vi.fn(() => Promise.resolve({ height: 12, imageName: 'input.png', width: 16 })),
     ...overrides,
   };
   const session = createSelectObjectSession({ deps, projectId: 'p1' });
@@ -108,6 +110,40 @@ describe('createSelectObjectSession', () => {
       sourceGuard: null,
       status: 'ready',
     });
+  });
+
+  it('reports phases from the composite, upload, SAM, render, and ready boundaries', async () => {
+    const harness = createHarness();
+    const phases: string[] = [];
+    harness.session.subscribe(() => phases.push(harness.session.getSnapshot().status));
+
+    await expect(harness.session.process()).resolves.toBe('published');
+
+    expect(phases).toEqual(['preparing-composite', 'uploading', 'processing-sam', 'rendering-preview', 'ready']);
+  });
+
+  it('does not publish a stale request phase after a replacement retry starts', async () => {
+    const oldUpload = deferred<{ height: number; imageName: string; width: number }>();
+    const harness = createHarness({
+      uploadIntermediate: vi
+        .fn()
+        .mockImplementationOnce(() => oldUpload.promise)
+        .mockResolvedValueOnce({ height: 12, imageName: 'new-source.png', width: 16 }),
+    });
+    const phases: string[] = [];
+    harness.session.subscribe(() => phases.push(harness.session.getSnapshot().status));
+    const oldPending = harness.session.process();
+    await vi.waitFor(() => expect(harness.session.getSnapshot().status).toBe('uploading'));
+
+    harness.controller.invalidateSource('p1', layer.id);
+    const newPending = harness.session.process();
+    await expect(newPending).resolves.toBe('published');
+    const readyIndex = phases.lastIndexOf('ready');
+    oldUpload.resolve({ height: 12, imageName: 'old-source.png', width: 16 });
+    await expect(oldPending).resolves.toBe('stale');
+
+    expect(phases.slice(readyIndex + 1)).toEqual([]);
+    expect(harness.session.getSnapshot()).toMatchObject({ status: 'ready' });
   });
 
   it('contains subscriber exceptions so healthy subscribers and processing continue', async () => {
@@ -154,6 +190,22 @@ describe('createSelectObjectSession', () => {
     await expect(harness.session.process()).resolves.toBe('error');
 
     expect(harness.session.getSnapshot()).toEqual(expect.objectContaining({ error: 'graph failed', status: 'error' }));
+  });
+
+  it('retries the same input after a dimension mismatch and publishes the corrected output', async () => {
+    const runGraph = vi
+      .fn()
+      .mockResolvedValueOnce({ height: 12, imageName: 'bad.png', origin: 'test', width: 15 })
+      .mockResolvedValueOnce({ height: 12, imageName: 'good.png', origin: 'test', width: 16 });
+    const harness = createHarness({ runGraph });
+
+    await expect(harness.session.process()).resolves.toBe('error');
+    expect(harness.session.getSnapshot()).toMatchObject({ preview: null, status: 'error' });
+    await expect(harness.session.process()).resolves.toBe('published');
+
+    expect(runGraph).toHaveBeenCalledTimes(2);
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'ready' });
+    expect(harness.session.getSnapshot().preview?.image.imageName).toBe('good.png');
   });
 
   it('reports routing failures without discarding the preview and Reset clears the error', async () => {
@@ -227,8 +279,8 @@ describe('createSelectObjectSession', () => {
   );
 
   it('starts an immediate same-input retry after invalidation when old work ignores abort', async () => {
-    const older = deferred<{ imageName: string; origin: string }>();
-    const newer = deferred<{ imageName: string; origin: string }>();
+    const older = deferred<{ height: number; imageName: string; origin: string; width: number }>();
+    const newer = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const harness = createHarness({
       runGraph: vi
         .fn()
@@ -244,11 +296,11 @@ describe('createSelectObjectSession', () => {
     expect(newPending).not.toBe(oldPending);
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledTimes(2));
     expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
-    older.resolve({ imageName: 'old.png', origin: 'old' });
+    older.resolve({ height: 12, imageName: 'old.png', origin: 'old', width: 16 });
     await expect(oldPending).resolves.toBe('stale');
     expect(harness.session.process()).toBe(newPending);
 
-    newer.resolve({ imageName: 'new.png', origin: 'new' });
+    newer.resolve({ height: 12, imageName: 'new.png', origin: 'new', width: 16 });
     await expect(newPending).resolves.toBe('published');
     expect(harness.session.getSnapshot().preview?.image.imageName).toBe('new.png');
     await expect(harness.session.process()).resolves.toBe('deduped');
@@ -281,12 +333,12 @@ describe('createSelectObjectSession', () => {
   });
 
   it('starts an immediate same-input retry when invalidation aborts an upload that ignores its signal', async () => {
-    const oldUpload = deferred<{ imageName: string }>();
+    const oldUpload = deferred<{ height: number; imageName: string; width: number }>();
     const harness = createHarness({
       uploadIntermediate: vi
         .fn()
         .mockImplementationOnce(() => oldUpload.promise)
-        .mockImplementationOnce(() => Promise.resolve({ imageName: 'new-input.png' })),
+        .mockImplementationOnce(() => Promise.resolve({ height: 12, imageName: 'new-input.png', width: 16 })),
     });
     const oldPending = harness.session.process();
     await vi.waitFor(() => expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce());
@@ -299,7 +351,7 @@ describe('createSelectObjectSession', () => {
     expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
-    oldUpload.resolve({ imageName: 'old-input.png' });
+    oldUpload.resolve({ height: 12, imageName: 'old-input.png', width: 16 });
     await expect(oldPending).resolves.toBe('stale');
     expect(harness.session.getSnapshot().preview?.sourceImageName).toBe('new-input.png');
     await expect(harness.session.process()).resolves.toBe('deduped');
@@ -335,7 +387,7 @@ describe('createSelectObjectSession', () => {
 
   it('transitions an identical scheduled auto-run back to processing when work is already in flight', async () => {
     vi.useFakeTimers();
-    const graph = deferred<{ imageName: string; origin: string }>();
+    const graph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const harness = createHarness({ runGraph: vi.fn(() => graph.promise) });
     const pending = harness.session.process();
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
@@ -344,10 +396,10 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot().status).toBe('scheduled');
     await vi.advanceTimersByTimeAsync(1_000);
 
-    expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'processing' });
+    expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'processing-sam' });
     expect(vi.getTimerCount()).toBe(0);
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
-    graph.resolve({ imageName: 'result.png', origin: 'test' });
+    graph.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 });
     await expect(pending).resolves.toBe('published');
   });
 
@@ -384,7 +436,7 @@ describe('createSelectObjectSession', () => {
 
   it('immediately stales a delayed auto-run when input changes before the replacement debounce', async () => {
     vi.useFakeTimers();
-    const oldGraph = deferred<{ imageName: string; origin: string }>();
+    const oldGraph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const harness = createHarness({ runGraph: vi.fn(() => oldGraph.promise) });
     harness.session.update({ autoProcess: true });
     await vi.advanceTimersByTimeAsync(1_000);
@@ -392,7 +444,7 @@ describe('createSelectObjectSession', () => {
 
     harness.session.update({ input: { prompt: 'dog', type: 'prompt' } });
     expect(harness.session.getSnapshot()).toMatchObject({ preview: null, status: 'scheduled' });
-    oldGraph.resolve({ imageName: 'old.png', origin: 'old' });
+    oldGraph.resolve({ height: 12, imageName: 'old.png', origin: 'old', width: 16 });
     await vi.advanceTimersByTimeAsync(999);
 
     expect(harness.deps.publishPreview).not.toHaveBeenCalled();
@@ -406,7 +458,7 @@ describe('createSelectObjectSession', () => {
     ['refinement', { applyPolygonRefinement: true }],
   ] as const)('immediately aborts in-flight work and clears preview for a %s update', async (_label, update) => {
     const signals: AbortSignal[] = [];
-    const graph = deferred<{ imageName: string; origin: string }>();
+    const graph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const harness = createHarness({
       runGraph: vi.fn((options) => {
         if (options.signal) {
@@ -422,7 +474,7 @@ describe('createSelectObjectSession', () => {
 
     expect(signals[0]?.aborted).toBe(true);
     expect(harness.session.getSnapshot().preview).toBeNull();
-    graph.resolve({ imageName: 'stale.png', origin: 'stale' });
+    graph.resolve({ height: 12, imageName: 'stale.png', origin: 'stale', width: 16 });
     await expect(pending).resolves.toBe('stale');
     expect(harness.deps.publishPreview).not.toHaveBeenCalled();
   });
@@ -445,7 +497,7 @@ describe('createSelectObjectSession', () => {
   });
 
   it('changes isolation during processing without aborting or rerunning the request', async () => {
-    const graph = deferred<{ imageName: string; origin: string }>();
+    const graph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const signals: AbortSignal[] = [];
     const harness = createHarness({
       runGraph: vi.fn((options) => {
@@ -459,7 +511,7 @@ describe('createSelectObjectSession', () => {
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
 
     harness.session.update({ isolatedPreview: false });
-    graph.resolve({ imageName: 'result.png', origin: 'test' });
+    graph.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 });
 
     await expect(pending).resolves.toBe('published');
     expect(signals[0]?.aborted).toBe(false);
@@ -498,8 +550,8 @@ describe('createSelectObjectSession', () => {
   });
 
   it('publishes only the latest request when graph completions arrive out of order', async () => {
-    const older = deferred<{ imageName: string; origin: string }>();
-    const newer = deferred<{ imageName: string; origin: string }>();
+    const older = deferred<{ height: number; imageName: string; origin: string; width: number }>();
+    const newer = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const harness = createHarness({
       runGraph: vi
         .fn()
@@ -512,9 +564,9 @@ describe('createSelectObjectSession', () => {
     const newPending = harness.session.process();
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledTimes(2));
 
-    newer.resolve({ imageName: 'new.png', origin: 'new' });
+    newer.resolve({ height: 12, imageName: 'new.png', origin: 'new', width: 16 });
     await expect(newPending).resolves.toBe('published');
-    older.resolve({ imageName: 'old.png', origin: 'old' });
+    older.resolve({ height: 12, imageName: 'old.png', origin: 'old', width: 16 });
     await expect(oldPending).resolves.toBe('stale');
 
     expect(harness.deps.publishPreview).toHaveBeenCalledOnce();
@@ -537,11 +589,11 @@ describe('createSelectObjectSession', () => {
         runGraph:
           boundary === 'queue'
             ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['runGraph']>)
-            : vi.fn(() => Promise.resolve({ imageName: 'result.png', origin: 'test' })),
+            : vi.fn(() => Promise.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 })),
         uploadIntermediate:
           boundary === 'upload'
             ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['uploadIntermediate']>)
-            : vi.fn(() => Promise.resolve({ imageName: 'input.png' })),
+            : vi.fn(() => Promise.resolve({ height: 12, imageName: 'input.png', width: 16 })),
       });
       const pending = harness.session.process();
       await vi.waitFor(() => {
@@ -560,9 +612,9 @@ describe('createSelectObjectSession', () => {
       if (boundary === 'export') {
         wait.resolve({ blob, guard, rect, status: 'ok' });
       } else if (boundary === 'upload') {
-        wait.resolve({ imageName: 'input.png' });
+        wait.resolve({ height: 12, imageName: 'input.png', width: 16 });
       } else if (boundary === 'queue') {
-        wait.resolve({ imageName: 'result.png', origin: 'test' });
+        wait.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 });
       } else {
         wait.resolve('decoded');
       }
@@ -593,11 +645,11 @@ describe('createSelectObjectSession', () => {
         runGraph:
           boundary === 'queue'
             ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['runGraph']>)
-            : vi.fn(() => Promise.resolve({ imageName: 'result.png', origin: 'test' })),
+            : vi.fn(() => Promise.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 })),
         uploadIntermediate:
           boundary === 'upload'
             ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['uploadIntermediate']>)
-            : vi.fn(() => Promise.resolve({ imageName: 'input.png' })),
+            : vi.fn(() => Promise.resolve({ height: 12, imageName: 'input.png', width: 16 })),
       });
       harness.session.update({ input: { prompt: 'keep me', type: 'prompt' }, invert: true });
       const pending = harness.session.process();
@@ -617,9 +669,9 @@ describe('createSelectObjectSession', () => {
       if (boundary === 'export') {
         wait.resolve({ blob, guard, rect, status: 'ok' });
       } else if (boundary === 'upload') {
-        wait.resolve({ imageName: 'input.png' });
+        wait.resolve({ height: 12, imageName: 'input.png', width: 16 });
       } else if (boundary === 'queue') {
-        wait.resolve({ imageName: 'result.png', origin: 'test' });
+        wait.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 });
       } else {
         wait.resolve('decoded');
       }
@@ -652,14 +704,14 @@ describe('createSelectObjectSession', () => {
 
   it('reset cancels work and scheduling, clears preview/cache, and restores defaults', async () => {
     vi.useFakeTimers();
-    const graph = deferred<{ imageName: string; origin: string }>();
+    const graph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const harness = createHarness({ runGraph: vi.fn(() => graph.promise) });
     harness.session.update({ autoProcess: true, invert: true, model: 'segment-anything-huge' });
     const pending = harness.session.process();
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
 
     harness.session.reset();
-    graph.resolve({ imageName: 'late.png', origin: 'test' });
+    graph.resolve({ height: 12, imageName: 'late.png', origin: 'test', width: 16 });
 
     await expect(pending).resolves.toBe('stale');
     expect(harness.session.getSnapshot()).toEqual({
@@ -713,7 +765,7 @@ describe('createSelectObjectSession', () => {
   });
 
   it('dispose aborts in-flight processing and suppresses its completion', async () => {
-    const graph = deferred<{ imageName: string; origin: string }>();
+    const graph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const signals: AbortSignal[] = [];
     const harness = createHarness({
       runGraph: vi.fn((options) => {
@@ -729,7 +781,7 @@ describe('createSelectObjectSession', () => {
     harness.session.dispose();
 
     expect(signals[0]?.aborted).toBe(true);
-    graph.resolve({ imageName: 'late.png', origin: 'late' });
+    graph.resolve({ height: 12, imageName: 'late.png', origin: 'late', width: 16 });
     await expect(pending).resolves.toBe('stale');
     expect(harness.deps.publishPreview).not.toHaveBeenCalled();
     expect(harness.unsubscribe).toHaveBeenCalledOnce();

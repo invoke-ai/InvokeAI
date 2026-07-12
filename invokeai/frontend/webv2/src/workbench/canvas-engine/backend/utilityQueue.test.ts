@@ -151,9 +151,85 @@ describe('runUtilityGraph — await + settle', () => {
       enqueue: okEnqueue,
       graph: { edges: [], id: 'g', nodes: {} },
       hub: fake.hub,
+      reconcileCompletedOutput: () => Promise.resolve(null),
     });
     fake.emit('queue_item_status_changed', statusEvent('completed'));
     await expect(promise).rejects.toMatchObject({ name: 'UtilityQueueError', reason: 'no-output' });
+  });
+
+  it('reconciles the target output when completed status arrives before invocation_complete', async () => {
+    const fake = createFakeHub();
+    const reconcileCompletedOutput = vi.fn(() =>
+      Promise.resolve({ height: 48, imageName: 'reconciled.png', width: 64 })
+    );
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      outputNodeId: 'control_filter',
+      reconcileCompletedOutput,
+    });
+
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+
+    await expect(promise).resolves.toEqual({
+      height: 48,
+      imageName: 'reconciled.png',
+      origin: ORIGIN,
+      width: 64,
+    });
+    expect(reconcileCompletedOutput).toHaveBeenCalledExactlyOnceWith([1], 'control_filter');
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
+  it('rejects no-output after deterministic completed-item reconciliation finds no target output', async () => {
+    const fake = createFakeHub();
+    const reconcileCompletedOutput = vi.fn(() => Promise.resolve(null));
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      outputNodeId: 'control_filter',
+      reconcileCompletedOutput,
+    });
+
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+
+    await expect(promise).rejects.toMatchObject({ reason: 'no-output' });
+    expect(reconcileCompletedOutput).toHaveBeenCalledOnce();
+  });
+
+  it('aborts and fully cleans up while completed-output reconciliation is pending', async () => {
+    const fake = createFakeHub();
+    const reconciliation = createDeferred<{ height: number; imageName: string; width: number } | null>();
+    const controller = new AbortController();
+    const cancel = vi.fn(() => Promise.resolve());
+    const promise = runUtilityGraph({
+      cancel,
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      outputNodeId: 'control_filter',
+      reconcileCompletedOutput: () => reconciliation.promise,
+      signal: controller.signal,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ reason: 'aborted' });
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledExactlyOnceWith([1]));
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    reconciliation.resolve({ height: 48, imageName: 'late.png', width: 64 });
+    await Promise.resolve();
+    expect(fake.detachCount).toBe(2);
   });
 
   it('rejects with the failure reason + message on a failed item', async () => {

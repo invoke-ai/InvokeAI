@@ -34,7 +34,7 @@ describe('getSamActionEligibility', () => {
 
   it('permits Apply and Save only for a current ready preview', () => {
     expect(getSamActionEligibility(snapshot({ hasPreview: true }))).toMatchObject({ canApply: true, canSave: true });
-    expect(getSamActionEligibility(snapshot({ hasPreview: true, status: 'processing' }))).toMatchObject({
+    expect(getSamActionEligibility(snapshot({ hasPreview: true, status: 'processing-sam' }))).toMatchObject({
       canApply: false,
       canProcess: false,
       canSave: false,
@@ -52,7 +52,7 @@ describe('getSamActionEligibility', () => {
   });
 
   it('keeps Cancel available while processing and Reset available for every active session', () => {
-    expect(getSamActionEligibility(snapshot({ status: 'processing' }))).toMatchObject({
+    expect(getSamActionEligibility(snapshot({ status: 'processing-sam' }))).toMatchObject({
       canCancel: true,
       canReset: true,
     });
