@@ -13,6 +13,7 @@ const state = (patch: Partial<FilterOperationSessionState> = {}): FilterOperatio
   error: null,
   initialFilter: null,
   layerId: 'layer-1',
+  layerName: 'Portrait',
   layerType: 'raster',
   preview: null,
   status: 'ready',
@@ -110,15 +111,16 @@ describe('getFilterActionEligibility', () => {
 });
 
 describe('FilterPanelHeading', () => {
-  it('identifies the filter target from the available snapshot fields', () => {
+  it('identifies the filter target by its captured user-facing name and type', () => {
     const markup = renderToStaticMarkup(
       <ChakraProvider value={system}>
-        <FilterPanelHeading layerId="layer-1" layerType="raster" title="Filter" />
+        <FilterPanelHeading layerName="Portrait" layerTypeLabel="Raster layer" title="Filter" />
       </ChakraProvider>
     );
 
     expect(markup).toContain('Filter');
     expect(markup).toContain('Raster layer');
-    expect(markup).toContain('layer-1');
+    expect(markup).toContain('Portrait');
+    expect(markup).not.toContain('layer-1');
   });
 });

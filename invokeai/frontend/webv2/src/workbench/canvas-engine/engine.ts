@@ -3639,6 +3639,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       guard,
       initialDraft: draft,
       initialFilter,
+      layerName: layer.name,
       layerType: layer.type,
     });
     if (!filterSession) {

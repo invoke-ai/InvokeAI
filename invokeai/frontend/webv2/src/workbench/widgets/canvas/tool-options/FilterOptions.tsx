@@ -53,14 +53,12 @@ export const getFilterActionEligibility = (
 };
 
 export const FilterPanelHeading = ({
-  layerId,
-  layerType,
-  targetSummary,
+  layerName,
+  layerTypeLabel,
   title,
 }: {
-  layerId: string;
-  layerType: FilterOperationSessionState['layerType'];
-  targetSummary?: string;
+  layerName: string;
+  layerTypeLabel: string;
   title: string;
 }) => (
   <Box>
@@ -68,7 +66,7 @@ export const FilterPanelHeading = ({
       {title}
     </Heading>
     <Text color="fg.muted" fontSize="xs">
-      {targetSummary ?? (layerType === 'raster' ? 'Raster layer' : 'Control layer')} · {layerId}
+      {layerName} · {layerTypeLabel}
     </Text>
   </Box>
 );
@@ -132,9 +130,8 @@ export const FilterOptions = ({
     <CanvasOperationPanel.Root aria-labelledby="filter-operation-title" operation="filter">
       <CanvasOperationPanel.Header>
         <FilterPanelHeading
-          layerId={session.layerId}
-          layerType={session.layerType}
-          targetSummary={t(`widgets.layers.selectObject.saveAs_${session.layerType}`)}
+          layerName={session.layerName}
+          layerTypeLabel={t(`widgets.layers.selectObject.saveAs_${session.layerType}`)}
           title={t('widgets.layers.rasterFilter.title')}
         />
       </CanvasOperationPanel.Header>
@@ -145,6 +142,7 @@ export const FilterOptions = ({
             filterType={session.draft.type}
             focusFilter={false}
             settings={session.draft.settings}
+            variant="operation"
             onFilterTypeChange={setType}
             onSettingsChange={setSettings}
           />

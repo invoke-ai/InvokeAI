@@ -2,7 +2,7 @@
 import type { WidgetViewProps } from '@workbench/types';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 
-import { Box, Stack } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
 import {
   createLayerId,
@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 
 import { gridSizeForModelBase } from './bboxGrid';
 import { CanvasBottomControls } from './CanvasBottomControls';
+import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
 import {
   CANVAS_SETTINGS,
@@ -417,38 +418,42 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
        * staging UI". The wrapper is click-through so the canvas stays
        * interactive around the bars; each bar re-enables pointer events.
        */}
-      <Stack align="center" bottom="2" gap="2" left="2" pointerEvents="none" position="absolute" right="2" zIndex="3">
+      <CanvasBottomOverlay.Root>
         {hasStagingSlots || isCanvasGenerationInFlight ? (
-          <StagingBar
-            antialiasProgressImages={antialiasProgressImages}
-            areThumbnailsVisible={stagingArea.areThumbnailsVisible}
-            autoSwitchMode={stagingArea.autoSwitchMode}
-            hasMultipleSlots={hasMultipleStagingSlots}
-            isGenerating={isCanvasGenerationInFlight}
-            isVisible={stagingArea.isVisible}
-            selectedCandidate={selectedCandidate}
-            selectedImageIndex={stagingArea.selectedImageIndex}
-            selectedSlot={selectedSlot}
-            slots={stagingSlots}
-            onAccept={() => dispatch({ type: 'acceptStagedImage' })}
-            onCancelQueueItem={(queueItemId) => dispatch({ queueItemId, type: 'cancelQueueItem' })}
-            onCycle={(direction) => dispatch({ direction, type: 'cycleStagedImage' })}
-            onDiscardAll={() => dispatch({ type: 'discardAllStagedImages' })}
-            onDiscardSelected={() => dispatch({ type: 'discardSelectedStagedImage' })}
-            onSelectImage={(imageIndex) => dispatch({ imageIndex, type: 'setStagedImageIndex' })}
-            onSetAutoSwitch={(mode) => dispatch({ mode, type: 'setCanvasStagingAutoSwitch' })}
-            onToggleThumbnails={() => dispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' })}
-            onToggleVisibility={() => dispatch({ type: 'toggleCanvasStagingVisibility' })}
-          />
+          <CanvasBottomOverlay.Staging>
+            <StagingBar
+              antialiasProgressImages={antialiasProgressImages}
+              areThumbnailsVisible={stagingArea.areThumbnailsVisible}
+              autoSwitchMode={stagingArea.autoSwitchMode}
+              hasMultipleSlots={hasMultipleStagingSlots}
+              isGenerating={isCanvasGenerationInFlight}
+              isVisible={stagingArea.isVisible}
+              selectedCandidate={selectedCandidate}
+              selectedImageIndex={stagingArea.selectedImageIndex}
+              selectedSlot={selectedSlot}
+              slots={stagingSlots}
+              onAccept={() => dispatch({ type: 'acceptStagedImage' })}
+              onCancelQueueItem={(queueItemId) => dispatch({ queueItemId, type: 'cancelQueueItem' })}
+              onCycle={(direction) => dispatch({ direction, type: 'cycleStagedImage' })}
+              onDiscardAll={() => dispatch({ type: 'discardAllStagedImages' })}
+              onDiscardSelected={() => dispatch({ type: 'discardSelectedStagedImage' })}
+              onSelectImage={(imageIndex) => dispatch({ imageIndex, type: 'setStagedImageIndex' })}
+              onSetAutoSwitch={(mode) => dispatch({ mode, type: 'setCanvasStagingAutoSwitch' })}
+              onToggleThumbnails={() => dispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' })}
+              onToggleVisibility={() => dispatch({ type: 'toggleCanvasStagingVisibility' })}
+            />
+          </CanvasBottomOverlay.Staging>
         ) : null}
-        <CanvasBottomControls
-          documentHeight={document.height}
-          documentWidth={document.width}
-          engine={engine}
-          isExternalInteractionLocked={isInteractionLocked}
-          operation={operation}
-        />
-      </Stack>
+        <CanvasBottomOverlay.Controls>
+          <CanvasBottomControls
+            documentHeight={document.height}
+            documentWidth={document.width}
+            engine={engine}
+            isExternalInteractionLocked={isInteractionLocked}
+            operation={operation}
+          />
+        </CanvasBottomOverlay.Controls>
+      </CanvasBottomOverlay.Root>
     </Box>
   );
 };

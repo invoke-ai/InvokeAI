@@ -60,13 +60,20 @@ const createDeps = (overrides: Partial<FilterOperationSessionDeps> = {}): Filter
 describe('createFilterOperationSession', () => {
   it('starts with a cloned persisted settings snapshot and an independent local draft', () => {
     const deps = createDeps();
-    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' });
+    const session = createFilterOperationSession({
+      deps,
+      guard,
+      initialFilter: layer.filter!,
+      layerName: 'Portrait',
+      layerType: 'raster',
+    });
 
     expect(session).not.toBeNull();
     expect(session!.getSnapshot()).toMatchObject({
       draft: { settings: { radius: 2 }, type: 'canny_edge_detection' },
       initialFilter: { settings: { radius: 2 }, type: 'canny_edge_detection' },
       layerId: layer.id,
+      layerName: 'Portrait',
       layerType: 'raster',
       status: 'ready',
     });
@@ -74,6 +81,7 @@ describe('createFilterOperationSession', () => {
     session!.updateDraft({ settings: { radius: 9 }, type: 'content_shuffle' });
     expect(session!.getSnapshot().draft).toEqual({ settings: { radius: 9 }, type: 'content_shuffle' });
     expect(session!.getSnapshot().initialFilter).toEqual(layer.filter);
+    expect(session!.getSnapshot().layerName).toBe('Portrait');
   });
 
   it('publishes only the newest guarded process result', async () => {

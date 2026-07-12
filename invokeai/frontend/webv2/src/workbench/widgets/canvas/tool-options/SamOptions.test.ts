@@ -1,5 +1,8 @@
 import type { SamSessionSnapshot } from '@workbench/canvas-engine/engineStores';
+import type { ComponentProps } from 'react';
 
+import { ChakraProvider } from '@chakra-ui/react';
+import { system } from '@theme/system';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -9,6 +12,8 @@ import {
   getSamActionEligibility,
   getSamErrorTranslationKey,
   getSamStatusTranslationKey,
+  SAM_AUTO_FIT_COLUMNS,
+  SamModeToggle,
   SamProcessFeedback,
 } from './SamOptions';
 
@@ -102,7 +107,7 @@ describe('getSamActionEligibility', () => {
 });
 
 describe('getSamPanelViewModel', () => {
-  it('derives visual counts, bbox state, and generation-area source summary', () => {
+  it('derives visual counts, bbox state, and a localized generation-area source summary', () => {
     expect(
       getSamPanelViewModel(
         snapshot({
@@ -116,23 +121,55 @@ describe('getSamPanelViewModel', () => {
             type: 'visual',
           },
           sourceRect: { height: 768, width: 1024, x: 64, y: 32 },
-        })
+        }),
+        (width, height) => `Área de generación ${width} por ${height}`
       )
     ).toEqual({
       bboxActive: true,
       excludeCount: 1,
       includeCount: 2,
-      sourceSummary: '1024 × 768 generation area',
+      sourceSummary: 'Área de generación 1024 por 768',
     });
   });
 
   it('returns zero visual counts for prompt mode', () => {
-    expect(getSamPanelViewModel(snapshot({ input: { prompt: 'cat', type: 'prompt' } }))).toEqual({
+    expect(
+      getSamPanelViewModel(snapshot({ input: { prompt: 'cat', type: 'prompt' } }), (w, h) => `${w} × ${h}`)
+    ).toEqual({
       bboxActive: false,
       excludeCount: 0,
       includeCount: 0,
-      sourceSummary: '20 × 20 generation area',
+      sourceSummary: '20 × 20',
     });
+  });
+});
+
+describe('SamModeToggle', () => {
+  it('uses available inline width instead of viewport breakpoints', () => {
+    expect(SAM_AUTO_FIT_COLUMNS).toBe('repeat(auto-fit, minmax(min(100%, 11rem), 1fr))');
+  });
+
+  it('uses ordinary pressed buttons without incomplete tab relationships', () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamModeToggle, {
+          disabled: false,
+          mode: 'visual',
+          onPrompt: () => undefined,
+          onVisual: () => undefined,
+          promptLabel: 'Prompt',
+          visualLabel: 'Visual',
+        })
+      )
+    );
+
+    expect(markup).toContain('aria-label="Selection mode"');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain('aria-pressed="false"');
+    expect(markup).not.toContain('role="tab"');
+    expect(markup).not.toContain('aria-controls');
   });
 });
 

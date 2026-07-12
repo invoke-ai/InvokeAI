@@ -27,9 +27,17 @@ interface LayerFilterControlsProps {
   settings: Record<string, unknown>;
   disabled: boolean;
   focusFilter: boolean;
+  variant?: LayerFilterControlsVariant;
   onFilterTypeChange(value: string): void;
   onSettingsChange(value: Record<string, unknown>): void;
 }
+
+type LayerFilterControlsVariant = 'operation' | 'property';
+
+export const getLayerFilterControlPolicy = (variant: LayerFilterControlsVariant) =>
+  variant === 'operation'
+    ? ({ controlMinH: '10', controlSize: 'md', modelSize: 'md' } as const)
+    : ({ controlMinH: undefined, controlSize: 'xs', modelSize: 'xs' } as const);
 
 export const LayerFilterControls = ({
   disabled,
@@ -38,6 +46,7 @@ export const LayerFilterControls = ({
   onFilterTypeChange,
   onSettingsChange,
   settings,
+  variant = 'property',
 }: LayerFilterControlsProps) => {
   const { t } = useTranslation();
   const definition = getFilterDefinition(filterType);
@@ -52,7 +61,11 @@ export const LayerFilterControls = ({
     [t]
   );
   const filterValue = useMemo(() => [filterType], [filterType]);
-  const filterTriggerProps = useMemo(() => ({ autoFocus: focusFilter }), [focusFilter]);
+  const policy = getLayerFilterControlPolicy(variant);
+  const filterTriggerProps = useMemo(
+    () => ({ autoFocus: focusFilter, minH: policy.controlMinH }),
+    [focusFilter, policy.controlMinH]
+  );
 
   const handleFilterTypeChange = useCallback(
     ({ value }: SelectValueChangeDetails) => {
@@ -76,7 +89,7 @@ export const LayerFilterControls = ({
           collection={filterCollection}
           disabled={disabled}
           positioning={SELECT_POSITIONING}
-          size="xs"
+          size={policy.controlSize}
           triggerProps={filterTriggerProps}
           value={filterValue}
           valueText={t(`widgets.layers.control.filters.${filterType}`, filterType)}
@@ -88,6 +101,7 @@ export const LayerFilterControls = ({
           key={param.key}
           disabled={disabled}
           param={param}
+          policy={policy}
           settings={settings}
           value={settings[param.key]}
           onChange={handleSettingChange}
@@ -100,12 +114,13 @@ export const LayerFilterControls = ({
 interface FilterParamFieldProps {
   disabled: boolean;
   param: FilterParamSpec;
+  policy: ReturnType<typeof getLayerFilterControlPolicy>;
   settings: Record<string, unknown>;
   value: unknown;
   onChange: (key: string, value: unknown) => void;
 }
 
-const FilterParamField = ({ disabled, param, settings, value, onChange }: FilterParamFieldProps) => {
+const FilterParamField = ({ disabled, param, policy, settings, value, onChange }: FilterParamFieldProps) => {
   const { t } = useTranslation();
   const label = t(`widgets.layers.control.filterParams.${param.key}`, param.key);
   const labelAria = useMemo(() => [label], [label]);
@@ -171,6 +186,7 @@ const FilterParamField = ({ disabled, param, settings, value, onChange }: Filter
     ? t(enumCurrentOption.labelKey, enumCurrentOption.value)
     : String(enumCurrent);
   const enumValue = useMemo(() => [String(enumCurrent)], [enumCurrent]);
+  const enumTriggerProps = useMemo(() => ({ minH: policy.controlMinH }), [policy.controlMinH]);
   const numberCurrent = typeof value === 'number' && Number.isFinite(value) ? value : param.default;
   const numberBounds = param.kind === 'number' ? getFilterNumberBounds(param, settings) : null;
   const sliderCurrent = numberBounds
@@ -184,7 +200,8 @@ const FilterParamField = ({ disabled, param, settings, value, onChange }: Filter
         checked={typeof value === 'boolean' ? value : param.default}
         colorPalette="accent"
         disabled={disabled}
-        size="xs"
+        minH={policy.controlMinH}
+        size={policy.controlSize === 'md' ? 'sm' : 'xs'}
         onCheckedChange={handleBoolean}
       >
         <Switch.HiddenInput />
@@ -206,7 +223,8 @@ const FilterParamField = ({ disabled, param, settings, value, onChange }: Filter
           collection={enumCollection}
           disabled={disabled}
           positioning={SELECT_POSITIONING}
-          size="xs"
+          size={policy.controlSize}
+          triggerProps={enumTriggerProps}
           value={enumValue}
           valueText={enumCurrentLabel}
           onValueChange={handleEnum}
@@ -224,7 +242,7 @@ const FilterParamField = ({ disabled, param, settings, value, onChange }: Filter
           invalid={!model}
           modelTypes={SPANDREL_MODEL_TYPES}
           placeholder={label}
-          size="xs"
+          size={policy.modelSize}
           value={model && typeof model.key === 'string' ? model.key : null}
           onChange={handleModel}
         />
@@ -237,7 +255,8 @@ const FilterParamField = ({ disabled, param, settings, value, onChange }: Filter
       <Field label={label}>
         <Input
           disabled={disabled}
-          size="xs"
+          minH={policy.controlMinH}
+          size={policy.controlSize}
           value={typeof value === 'string' ? value : param.default}
           onChange={handleString}
         />
@@ -257,6 +276,7 @@ const FilterParamField = ({ disabled, param, settings, value, onChange }: Filter
           disabled={disabled}
           flex="1"
           max={numberBounds.sliderMax}
+          minH={policy.controlMinH}
           min={numberBounds.sliderMin}
           size="sm"
           step={numberBounds.step}
@@ -268,7 +288,8 @@ const FilterParamField = ({ disabled, param, settings, value, onChange }: Filter
           disabled={disabled}
           max={numberBounds.inputMax}
           min={numberBounds.inputMin}
-          size="xs"
+          minH={policy.controlMinH}
+          size={policy.controlSize}
           step={numberBounds.step}
           value={String(numberCurrent)}
           w="20"

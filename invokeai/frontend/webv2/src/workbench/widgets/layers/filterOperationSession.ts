@@ -32,6 +32,7 @@ export interface FilterOperationSessionState {
   error: string | null;
   initialFilter: LayerFilterSettings | null;
   layerId: string;
+  layerName: string;
   layerType: 'raster' | 'control';
   preview: FilterOperationPreview | null;
   status: 'ready' | 'processing' | 'committing' | 'error';
@@ -82,6 +83,7 @@ export interface CreateFilterOperationSessionOptions {
   guard: LayerExportGuard;
   initialFilter: LayerFilterSettings | null;
   initialDraft?: LayerFilterSettings;
+  layerName?: string;
   layerType: 'raster' | 'control';
 }
 
@@ -108,6 +110,7 @@ export const createFilterOperationSession = (
     error: null,
     initialFilter,
     layerId: guard.layerId,
+    layerName: options.layerName ?? guard.layer.name,
     layerType,
     preview: null,
     status: 'ready',

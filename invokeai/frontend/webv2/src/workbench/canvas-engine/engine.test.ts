@@ -9321,6 +9321,7 @@ describe('guarded filter previews', () => {
       draft: layer.filter,
       initialFilter: layer.filter,
       layerId: 'L',
+      layerName: layer.name,
       layerType: 'raster',
       status: 'ready',
     });

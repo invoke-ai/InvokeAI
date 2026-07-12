@@ -4,19 +4,7 @@ import type { SamSessionError, SamSessionErrorCode, SamSessionSnapshot } from '@
 import type { SamModel } from '@workbench/generation/canvas/samGraph';
 import type { ChangeEvent } from 'react';
 
-import {
-  Box,
-  Grid,
-  Heading,
-  HStack,
-  Menu,
-  NativeSelect,
-  Portal,
-  Stack,
-  Switch,
-  Text,
-  Textarea,
-} from '@chakra-ui/react';
+import { Box, Flex, Grid, Heading, Menu, NativeSelect, Portal, Stack, Switch, Text, Textarea } from '@chakra-ui/react';
 import { Button, Field, MenuContent } from '@workbench/components/ui';
 import { makeImageDurable } from '@workbench/gallery/api';
 import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
@@ -43,6 +31,8 @@ export interface SamPanelViewModel {
   includeCount: number;
   sourceSummary: string;
 }
+
+export const SAM_AUTO_FIT_COLUMNS = 'repeat(auto-fit, minmax(min(100%, 11rem), 1fr))';
 
 const SAM_STATUS_TRANSLATION_KEYS: Record<SamSessionSnapshot['status'], string> = {
   committing: 'widgets.layers.selectObject.statusCommitting',
@@ -76,11 +66,14 @@ export const getSamStatusTranslationKey = (status: SamSessionSnapshot['status'])
 
 export const getSamErrorTranslationKey = (code: SamSessionErrorCode): string => SAM_ERROR_TRANSLATION_KEYS[code];
 
-export const getSamPanelViewModel = (session: SamSessionSnapshot): SamPanelViewModel => ({
+export const getSamPanelViewModel = (
+  session: SamSessionSnapshot,
+  formatSourceSummary: (width: number, height: number) => string
+): SamPanelViewModel => ({
   bboxActive: session.input.type === 'visual' && session.input.bbox !== null,
   excludeCount: session.input.type === 'visual' ? session.input.excludePoints.length : 0,
   includeCount: session.input.type === 'visual' ? session.input.includePoints.length : 0,
-  sourceSummary: `${session.sourceRect.width} × ${session.sourceRect.height} generation area`,
+  sourceSummary: formatSourceSummary(session.sourceRect.width, session.sourceRect.height),
 });
 
 export const SamProcessFeedback = ({
@@ -156,6 +149,47 @@ const SamSwitch = ({
   </Switch.Root>
 );
 
+export const SamModeToggle = ({
+  disabled,
+  groupLabel = 'Selection mode',
+  mode,
+  onPrompt,
+  onVisual,
+  promptLabel,
+  visualLabel,
+}: {
+  disabled: boolean;
+  groupLabel?: string;
+  mode: SamSessionSnapshot['input']['type'];
+  onPrompt(): void;
+  onVisual(): void;
+  promptLabel: string;
+  visualLabel: string;
+}) => (
+  <Flex aria-label={groupLabel} flexWrap="wrap" gap="1" role="group">
+    <Button
+      aria-pressed={mode === 'visual'}
+      disabled={disabled}
+      flex="1 1 8rem"
+      minH="10"
+      variant={mode === 'visual' ? 'solid' : 'ghost'}
+      onClick={onVisual}
+    >
+      {visualLabel}
+    </Button>
+    <Button
+      aria-pressed={mode === 'prompt'}
+      disabled={disabled}
+      flex="1 1 8rem"
+      minH="10"
+      variant={mode === 'prompt' ? 'solid' : 'ghost'}
+      onClick={onPrompt}
+    >
+      {promptLabel}
+    </Button>
+  </Flex>
+);
+
 const SamVisualBody = ({
   disabled,
   session,
@@ -171,12 +205,12 @@ const SamVisualBody = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <Stack aria-labelledby="sam-visual-tab" gap="3" id="sam-visual-panel" role="tabpanel">
+    <Stack gap="3">
       <Box>
         <Text fontSize="xs" fontWeight="semibold" mb="2">
           {t('widgets.layers.selectObject.pointType')}
         </Text>
-        <Grid gap="2" templateColumns={{ base: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }}>
+        <Grid gap="2" templateColumns={SAM_AUTO_FIT_COLUMNS}>
           <Button
             aria-pressed={session.pointLabel === 'include'}
             disabled={disabled}
@@ -184,9 +218,8 @@ const SamVisualBody = ({
             variant={session.pointLabel === 'include' ? 'solid' : 'outline'}
             onClick={onInclude}
           >
-            {t('widgets.layers.selectObject.include')}{' '}
             <Text as="span" fontVariantNumeric="tabular-nums">
-              {viewModel.includeCount}
+              {t('widgets.layers.selectObject.includeCount', { count: viewModel.includeCount })}
             </Text>
           </Button>
           <Button
@@ -196,9 +229,8 @@ const SamVisualBody = ({
             variant={session.pointLabel === 'exclude' ? 'solid' : 'outline'}
             onClick={onExclude}
           >
-            {t('widgets.layers.selectObject.exclude')}{' '}
             <Text as="span" fontVariantNumeric="tabular-nums">
-              {viewModel.excludeCount}
+              {t('widgets.layers.selectObject.excludeCount', { count: viewModel.excludeCount })}
             </Text>
           </Button>
         </Grid>
@@ -226,7 +258,7 @@ const SamPromptBody = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <Stack aria-labelledby="sam-prompt-tab" gap="2" id="sam-prompt-panel" role="tabpanel">
+    <Stack gap="2">
       <Field label={t('widgets.layers.selectObject.prompt')}>
         <Textarea
           aria-label={t('widgets.layers.selectObject.prompt')}
@@ -273,7 +305,9 @@ export const SamOptions = ({
   }
 
   const eligibility = getSamActionEligibility(session, isExternalInteractionLocked);
-  const viewModel = getSamPanelViewModel(session);
+  const viewModel = getSamPanelViewModel(session, (width, height) =>
+    t('widgets.layers.selectObject.sourceSummary', { height, width })
+  );
   const isProcessing =
     session.status === 'preparing-composite' ||
     session.status === 'uploading' ||
@@ -294,7 +328,7 @@ export const SamOptions = ({
               {viewModel.sourceSummary}
             </Text>
           </Box>
-          <Grid gap="2" templateColumns={{ base: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }}>
+          <Grid gap="2" templateColumns={SAM_AUTO_FIT_COLUMNS}>
             <SamSwitch
               checked={session.autoProcess}
               disabled={!eligibility.canEditInputs}
@@ -313,38 +347,19 @@ export const SamOptions = ({
       <CanvasOperationPanel.Body>
         <Stack gap="4">
           <Stack gap="2">
-            <HStack gap="1" role="tablist">
-              <Button
-                aria-controls="sam-visual-panel"
-                aria-selected={session.input.type === 'visual'}
-                disabled={!eligibility.canEditInputs}
-                flex="1"
-                id="sam-visual-tab"
-                minH="10"
-                role="tab"
-                variant={session.input.type === 'visual' ? 'solid' : 'ghost'}
-                onClick={() =>
-                  engine.updateSelectObjectSession({
-                    input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
-                  })
-                }
-              >
-                {t('widgets.layers.selectObject.visual')}
-              </Button>
-              <Button
-                aria-controls="sam-prompt-panel"
-                aria-selected={session.input.type === 'prompt'}
-                disabled={!eligibility.canEditInputs}
-                flex="1"
-                id="sam-prompt-tab"
-                minH="10"
-                role="tab"
-                variant={session.input.type === 'prompt' ? 'solid' : 'ghost'}
-                onClick={() => engine.updateSelectObjectSession({ input: { prompt: '', type: 'prompt' } })}
-              >
-                {t('widgets.layers.selectObject.promptMode')}
-              </Button>
-            </HStack>
+            <SamModeToggle
+              disabled={!eligibility.canEditInputs}
+              groupLabel={t('widgets.layers.selectObject.mode')}
+              mode={session.input.type}
+              promptLabel={t('widgets.layers.selectObject.promptMode')}
+              visualLabel={t('widgets.layers.selectObject.visual')}
+              onPrompt={() => engine.updateSelectObjectSession({ input: { prompt: '', type: 'prompt' } })}
+              onVisual={() =>
+                engine.updateSelectObjectSession({
+                  input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
+                })
+              }
+            />
             <SamSwitch
               checked={session.invert}
               disabled={!eligibility.canEditInputs}

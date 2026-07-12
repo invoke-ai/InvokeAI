@@ -3,7 +3,13 @@ import { system } from '@theme/system';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { CanvasOperationPanel } from './CanvasOperationPanel';
+import {
+  CANVAS_OPERATION_BODY_LAYOUT,
+  CANVAS_OPERATION_FIXED_SECTION_LAYOUT,
+  CANVAS_OPERATION_FOOTER_LAYOUT,
+  CANVAS_OPERATION_PANEL_LAYOUT,
+  CanvasOperationPanel,
+} from './CanvasOperationPanel';
 
 describe('CanvasOperationPanel', () => {
   it('renders the operation panel slots as semantic regions in stable order', () => {
@@ -36,17 +42,41 @@ describe('CanvasOperationPanel', () => {
     expect(markup.indexOf('Process')).toBeLessThan(markup.indexOf('Cancel'));
   });
 
-  it('keeps responsive width on the canvas container and scroll policy on the body only', () => {
+  it('uses a widget-sized flex policy with a 30rem ideal width', () => {
+    expect(CANVAS_OPERATION_PANEL_LAYOUT).toEqual({
+      flex: '0 1 30rem',
+      maxH: 'full',
+      maxW: 'full',
+      minH: '0',
+      minW: '0',
+      overflow: 'hidden',
+      w: '30rem',
+    });
+    expect(CANVAS_OPERATION_FOOTER_LAYOUT).toMatchObject({ flexWrap: 'wrap', minW: '0' });
+  });
+
+  it('keeps vertical overflow on the body while fixed sections retain their order', () => {
+    expect(CANVAS_OPERATION_BODY_LAYOUT).toEqual({
+      flex: '1',
+      minH: '0',
+      overflowX: 'hidden',
+      overflowY: 'auto',
+    });
+    expect(CANVAS_OPERATION_FIXED_SECTION_LAYOUT).toEqual({ flexShrink: '0' });
     const markup = renderToStaticMarkup(
       <ChakraProvider value={system}>
         <CanvasOperationPanel.Root aria-label="Filter" operation="filter">
+          <CanvasOperationPanel.Header>Filter</CanvasOperationPanel.Header>
           <CanvasOperationPanel.Body>Parameters</CanvasOperationPanel.Body>
+          <CanvasOperationPanel.Feedback>Ready</CanvasOperationPanel.Feedback>
+          <CanvasOperationPanel.Footer>Process</CanvasOperationPanel.Footer>
         </CanvasOperationPanel.Root>
       </ChakraProvider>
     );
 
-    expect(markup).toContain('data-operation-panel-width="responsive"');
-    expect(markup).toContain('data-operation-panel-max-width="container"');
-    expect(markup).toContain('data-scroll-container="body"');
+    const body = markup.indexOf('data-slot="body"');
+    const feedback = markup.indexOf('data-slot="feedback"');
+    expect(body).toBeGreaterThan(-1);
+    expect(body).toBeLessThan(feedback);
   });
 });
