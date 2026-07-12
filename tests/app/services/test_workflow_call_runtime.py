@@ -47,6 +47,18 @@ def test_run_queue_item_tolerates_parent_deleted_while_child_runs(monkeypatch) -
     workflow_call_tests.test_run_queue_item_tolerates_parent_deleted_while_child_runs(monkeypatch)
 
 
+def test_run_queue_item_tolerates_parent_deleted_before_completed_parent_mutation(monkeypatch) -> None:
+    workflow_call_tests.test_run_queue_item_tolerates_parent_deleted_before_completed_parent_mutation(monkeypatch)
+
+
+def test_run_queue_item_tolerates_parent_deleted_before_failed_parent_mutation(monkeypatch) -> None:
+    workflow_call_tests.test_run_queue_item_tolerates_parent_deleted_before_failed_parent_mutation(monkeypatch)
+
+
+def test_run_queue_item_tolerates_parent_deleted_before_canceled_parent_mutation(monkeypatch) -> None:
+    workflow_call_tests.test_run_queue_item_tolerates_parent_deleted_before_canceled_parent_mutation(monkeypatch)
+
+
 def test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(monkeypatch) -> None:
     workflow_call_tests.test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(monkeypatch)
 

@@ -888,6 +888,14 @@ class _DummySessionQueue:
         self.deleted_item_ids: list[int] = []
         self.pending_count = 0
         self.fail_enqueue_after: int | None = None
+        # Item ids whose mutation methods raise SessionQueueItemNotFoundError, simulating the row
+        # being deleted after a successful get_queue_item lookup. Like the SQLite implementation's
+        # mutations, which re-read the row and raise when it has disappeared.
+        self.not_found_item_ids: set[int] = set()
+
+    def _raise_if_not_found(self, item_id: int) -> None:
+        if item_id in self.not_found_item_ids:
+            raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
 
     def add_queue_item(self, queue_item):
         self.items[queue_item.item_id] = queue_item
@@ -920,30 +928,42 @@ class _DummySessionQueue:
         return queue_item
 
     def set_queue_item_session(self, item_id: int, session):
+        self._raise_if_not_found(item_id)
         queue_item = self._ensure_queue_item(item_id, session)
         queue_item.session = session
         self.session_updates.append((item_id, session))
         return queue_item
 
     def suspend_queue_item(self, item_id: int):
+        self._raise_if_not_found(item_id)
         queue_item = self._ensure_queue_item(item_id, None)
         queue_item.status = "waiting"
         self.waiting_item_ids.append(item_id)
         return queue_item
 
     def resume_queue_item(self, item_id: int):
+        self._raise_if_not_found(item_id)
         queue_item = self._ensure_queue_item(item_id, None)
         queue_item.status = "pending"
         self.resumed_item_ids.append(item_id)
         return queue_item
 
     def complete_queue_item(self, item_id: int):
+        self._raise_if_not_found(item_id)
         queue_item = self._ensure_queue_item(item_id, None)
         queue_item.status = "completed"
         self.completed_item_ids.append(item_id)
         return queue_item
 
+    def cancel_queue_item(self, item_id: int):
+        self._raise_if_not_found(item_id)
+        queue_item = self._ensure_queue_item(item_id, None)
+        queue_item.status = "canceled"
+        self.canceled_item_ids.append(item_id)
+        return queue_item
+
     def fail_queue_item(self, item_id: int, error_type: str, error_message: str, error_traceback: str):
+        self._raise_if_not_found(item_id)
         queue_item = self._ensure_queue_item(item_id, None)
         queue_item.status = "failed"
         queue_item.error_type = error_type
@@ -1569,6 +1589,92 @@ def test_run_queue_item_tolerates_parent_deleted_while_child_runs(monkeypatch: p
         assert session_queue.canceled_item_ids == []
         assert session_queue.failed_item_ids == []
         assert events.errors == []
+
+
+def _setup_suspended_workflow_call_parent(monkeypatch: pytest.MonkeyPatch):
+    """Runs a workflow-call parent to its suspension point: parent (item 1) is waiting, child (item 100) is pending."""
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    lifecycle = WorkflowCallQueueLifecycle(runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+    session_queue.add_queue_item(queue_item)
+    lifecycle.run_queue_item(queue_item)
+    assert session_queue.waiting_item_ids == [1]
+    assert session_queue.enqueued_child_item_ids == [100]
+    return session_queue, runner, lifecycle, events
+
+
+def test_run_queue_item_tolerates_parent_deleted_before_completed_parent_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue, runner, lifecycle, _events = _setup_suspended_workflow_call_parent(monkeypatch)
+
+    # The parent is deleted after the child's completion handler has looked it up: get_queue_item
+    # still succeeds, but the parent mutations (set_queue_item_session et al.) raise.
+    session_queue.not_found_item_ids.add(1)
+
+    child_queue_item = session_queue.dequeue()
+    assert child_queue_item is not None
+    lifecycle.run_queue_item(child_queue_item)
+
+    assert 100 in session_queue.completed_item_ids
+    assert 1 not in session_queue.completed_item_ids
+    assert session_queue.resumed_item_ids == []
+
+
+def test_run_queue_item_tolerates_parent_deleted_before_failed_parent_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue, runner, lifecycle, _events = _setup_suspended_workflow_call_parent(monkeypatch)
+
+    session_queue.not_found_item_ids.add(1)
+
+    child_queue_item = session_queue.dequeue()
+    assert child_queue_item is not None
+
+    def run_to_failed(item) -> None:
+        item.status = "failed"
+        item.error_message = "child failed"
+
+    monkeypatch.setattr(runner, "run", run_to_failed)
+    lifecycle.run_queue_item(child_queue_item)
+
+    assert 1 not in session_queue.failed_item_ids
+
+
+def test_run_queue_item_tolerates_parent_deleted_before_canceled_parent_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue, runner, lifecycle, _events = _setup_suspended_workflow_call_parent(monkeypatch)
+
+    session_queue.not_found_item_ids.add(1)
+
+    child_queue_item = session_queue.dequeue()
+    assert child_queue_item is not None
+
+    def run_to_canceled(item) -> None:
+        item.status = "canceled"
+
+    monkeypatch.setattr(runner, "run", run_to_canceled)
+    lifecycle.run_queue_item(child_queue_item)
+
+    assert session_queue.canceled_item_ids == []
 
 
 def test_workflow_call_coordinator_cleans_up_enqueued_children_when_boundary_setup_fails(

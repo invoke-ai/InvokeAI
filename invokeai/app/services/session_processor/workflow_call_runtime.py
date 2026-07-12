@@ -280,9 +280,15 @@ class WorkflowCallQueueLifecycle:
             return
         if getattr(updated_queue_item, "parent_item_id", None) is None:
             return
-        if updated_queue_item.status == "completed":
-            self._resume_parent_from_completed_child(updated_queue_item)
-        elif updated_queue_item.status == "failed":
-            self._fail_parent_from_failed_child(updated_queue_item)
-        elif updated_queue_item.status == "canceled":
-            self._cancel_parent_from_canceled_child(updated_queue_item)
+        try:
+            if updated_queue_item.status == "completed":
+                self._resume_parent_from_completed_child(updated_queue_item)
+            elif updated_queue_item.status == "failed":
+                self._fail_parent_from_failed_child(updated_queue_item)
+            elif updated_queue_item.status == "canceled":
+                self._cancel_parent_from_canceled_child(updated_queue_item)
+        except SessionQueueItemNotFoundError:
+            # An item in the parent chain was deleted after we looked it up but before we mutated it
+            # (the queue mutations re-read the row and raise when it has disappeared). The chain is
+            # being torn down; there is nothing left to update.
+            return
