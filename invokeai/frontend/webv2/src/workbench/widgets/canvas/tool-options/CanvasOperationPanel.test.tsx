@@ -8,6 +8,8 @@ import {
   CANVAS_OPERATION_FIXED_SECTION_LAYOUT,
   CANVAS_OPERATION_FOOTER_LAYOUT,
   CANVAS_OPERATION_PANEL_LAYOUT,
+  CANVAS_SELECT_OBJECT_PANEL_LAYOUT,
+  CANVAS_SELECT_OBJECT_SLOT_LAYOUT,
   CanvasOperationPanel,
 } from './CanvasOperationPanel';
 
@@ -53,6 +55,20 @@ describe('CanvasOperationPanel', () => {
       w: '30rem',
     });
     expect(CANVAS_OPERATION_FOOTER_LAYOUT).toMatchObject({ flexWrap: 'wrap', minW: '0' });
+  });
+
+  it('gives Select Object a compact 26.25rem variant without changing Filter', () => {
+    expect(CANVAS_SELECT_OBJECT_PANEL_LAYOUT).toEqual({
+      flex: '0 1 26.25rem',
+      maxH: 'full',
+      maxW: 'full',
+      minH: '0',
+      minW: '0',
+      overflow: 'hidden',
+      w: '26.25rem',
+    });
+    expect(CANVAS_OPERATION_PANEL_LAYOUT.w).toBe('30rem');
+    expect(CANVAS_SELECT_OBJECT_SLOT_LAYOUT).toMatchObject({ px: '4', py: '3' });
   });
 
   it('keeps vertical overflow on the body while fixed sections retain their order', () => {

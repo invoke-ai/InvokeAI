@@ -12,9 +12,13 @@ import {
   getSamActionEligibility,
   getSamErrorTranslationKey,
   getSamStatusTranslationKey,
-  SAM_AUTO_FIT_COLUMNS,
+  SAM_COMPACT_CONTROL_LAYOUT,
+  SAM_COMPACT_FOOTER_LAYOUT,
+  SAM_MODEL_SELECT_LAYOUT,
+  SamPromptBody,
   SamModeToggle,
   SamProcessFeedback,
+  SamVisualBody,
 } from './SamOptions';
 
 const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
@@ -149,8 +153,10 @@ describe('getSamPanelViewModel', () => {
 });
 
 describe('SamModeToggle', () => {
-  it('uses available inline width instead of viewport breakpoints', () => {
-    expect(SAM_AUTO_FIT_COLUMNS).toBe('repeat(auto-fit, minmax(min(100%, 11rem), 1fr))');
+  it('uses compact controls and wraps only when the card runs out of inline space', () => {
+    expect(SAM_COMPACT_CONTROL_LAYOUT).toEqual({ h: '8', minH: '8', size: 'sm' });
+    expect(SAM_COMPACT_FOOTER_LAYOUT).toMatchObject({ flexWrap: 'wrap', gap: '2' });
+    expect(SAM_MODEL_SELECT_LAYOUT).toEqual({ flex: '0 1 11rem', maxW: 'full', minW: '0', w: '11rem' });
   });
 
   it('uses ordinary pressed buttons without incomplete tab relationships', () => {
@@ -215,11 +221,16 @@ describe('SamProcessFeedback', () => {
 
   it('server-renders a localized phase with polite status semantics', () => {
     const markup = renderToStaticMarkup(
-      createElement(SamProcessFeedback, {
-        error: null,
-        errorText: null,
-        statusText: 'Rendering object preview…',
-      })
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamProcessFeedback, {
+          error: null,
+          errorText: null,
+          isBusy: true,
+          statusText: 'Rendering object preview…',
+        })
+      )
     );
 
     expect(markup).toContain('role="status"');
@@ -228,11 +239,25 @@ describe('SamProcessFeedback', () => {
     expect(markup).not.toContain('role="alert"');
   });
 
+  it('renders nothing when ready without an error', () => {
+    const markup = renderToStaticMarkup(
+      createElement(SamProcessFeedback, {
+        error: null,
+        errorText: null,
+        isBusy: false,
+        statusText: 'Ready',
+      })
+    );
+
+    expect(markup).toBe('');
+  });
+
   it('server-renders a known localized error as the assertive primary message', () => {
     const markup = renderToStaticMarkup(
       createElement(SamProcessFeedback, {
         error: { code: 'decode' },
         errorText: 'The object preview could not be decoded.',
+        isBusy: false,
         statusText: 'Select Object needs attention.',
       })
     );
@@ -247,11 +272,13 @@ describe('SamProcessFeedback', () => {
       createElement(SamProcessFeedback, {
         error: { code: 'unknown', detail: 'GPU worker disconnected' },
         errorText: 'Select Object could not finish.',
+        isBusy: false,
         statusText: 'Select Object needs attention.',
       })
     );
 
-    expect(markup.indexOf('Select Object could not finish.')).toBeLessThan(markup.indexOf('GPU worker disconnected'));
+    expect(markup).toContain('title="GPU worker disconnected"');
+    expect(markup).not.toContain('>GPU worker disconnected<');
     expect(markup).toContain('role="alert"');
   });
 
@@ -261,11 +288,69 @@ describe('SamProcessFeedback', () => {
       createElement(SamProcessFeedback, {
         error: { code: 'queue', detail: 'AttributeError' },
         errorText,
+        isBusy: false,
         statusText: 'Select Object needs attention.',
       })
     );
 
-    expect(markup.indexOf(errorText)).toBeLessThan(markup.indexOf('AttributeError'));
+    expect(markup).toContain('title="AttributeError"');
+    expect(markup).not.toContain('>AttributeError<');
     expect(markup).toContain('role="alert"');
+  });
+});
+
+describe('compact SAM inputs', () => {
+  it('uses compact model-row copy without the removed stacked section heading', () => {
+    expect(en.widgets.layers.selectObject.model).toBe('Model');
+    expect(en.widgets.layers.selectObject.refine).toBe('Refine');
+    expect(en.widgets.layers.selectObject).not.toHaveProperty('modelAndRefinement');
+    expect(en.widgets.layers.selectObject).not.toHaveProperty('sourceSummary');
+  });
+
+  it('server-renders Prompt as a one-line accessible input', () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamPromptBody, { disabled: false, prompt: 'cat', onChange: () => undefined })
+      )
+    );
+
+    expect(markup).toContain('<input');
+    expect(markup).toContain('aria-label=');
+    expect(markup).toContain('placeholder=');
+    expect(markup).not.toContain('<textarea');
+  });
+
+  it('server-renders the visual controls as one labeled row without permanent guidance', () => {
+    const session = snapshot({
+      input: {
+        bbox: { height: 8, width: 12, x: 1, y: 2 },
+        excludePoints: [{ x: 3, y: 4 }],
+        includePoints: [{ x: 1, y: 2 }],
+        type: 'visual',
+      },
+    });
+    const markup = renderToStaticMarkup(
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamVisualBody, {
+          disabled: false,
+          onExclude: () => undefined,
+          onInclude: () => undefined,
+          session: session as SamSessionSnapshot & {
+            input: Extract<SamSessionSnapshot['input'], { type: 'visual' }>;
+          },
+          viewModel: getSamPanelViewModel(session, (width, height) => `${width} × ${height}`),
+        })
+      )
+    );
+
+    expect(markup).toContain('role="group"');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain('title=');
+    expect(markup).not.toContain('>widgets.layers.selectObject.pointType<');
+    expect(markup).not.toContain('widgets.layers.selectObject.visualGuidance</');
   });
 });
