@@ -1,17 +1,18 @@
 ---
 title: Writing Tests
-lastUpdated: 2026-06-19
+lastUpdated: 2026-07-13
 ---
 
 ## Frontend Tests
 
 We use `vitest` to run the frontend tests. (See [vite.config.ts](https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/vite.config.mts) for the default `vitest` options.)
 
-Frontend tests live alongside the code they exercise in the [`invokeai/frontend/web/src/`](https://github.com/invoke-ai/InvokeAI/tree/main/invokeai/frontend/web/src) tree. Test files typically use the `*.test.ts` or `*.test.tsx` naming pattern.
-
 Below are some common frontend test commands:
 
 ```bash
+# From the repository root, run the frontend test suite once using the Makefile shortcut.
+make frontend-test
+
 # From the repository root, run the full frontend test suite in watch mode.
 pnpm --dir invokeai/frontend/web test
 
@@ -45,6 +46,9 @@ As a rule of thumb, tests should be marked as 'slow' if there is a chance that t
 Below are some common test commands:
 
 ```bash
+# Run the fast tests from the repository root using the Makefile shortcut.
+make test
+
 # Run the fast tests. (This implicitly uses the configured default option: `-m "not slow"`.)
 pytest tests/
 
@@ -63,9 +67,7 @@ pytest tests -m ""
 
 ### Test Organization
 
-All backend tests are in the [`tests/`](https://github.com/invoke-ai/InvokeAI/tree/main/tests) directory. This directory mirrors the organization of the `invokeai/` directory. For example, tests for `invokeai/model_management/model_manager.py` would be found in `tests/model_management/test_model_manager.py`.
-
-Some legacy tests still live outside this idealized structure, so use the example above as the preferred pattern for new tests rather than a guarantee about every existing file.
+Most backend tests live in the [`tests/`](https://github.com/invoke-ai/InvokeAI/tree/main/tests) directory. When adding a new backend test, prefer keeping it near the corresponding module area so related code and tests stay easy to find together.
 
 ### Tests that depend on models
 
