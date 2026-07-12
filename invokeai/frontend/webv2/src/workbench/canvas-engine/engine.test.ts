@@ -12872,7 +12872,7 @@ describe('Select Object canvas engine integration', () => {
     await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
 
     expect(h.engine.stores.samSession.get()).toMatchObject({
-      error: 'SAM output dimensions 100x99 do not match 100x100.',
+      error: { code: 'output-dimension', detail: 'SAM output dimensions 100x99 do not match 100x100.' },
       hasPreview: false,
       status: 'error',
     });
@@ -12887,7 +12887,7 @@ describe('Select Object canvas engine integration', () => {
     await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
 
     expect(h.engine.stores.samSession.get()).toMatchObject({
-      error: 'preview decode failed',
+      error: { code: 'decode', detail: 'preview decode failed' },
       hasPreview: false,
       status: 'error',
     });
@@ -12925,7 +12925,10 @@ describe('Select Object canvas engine integration', () => {
     expect(close).toHaveBeenCalledOnce();
     expect(previewSurfaceAllocations).not.toHaveBeenCalled();
     expect(h.engine.stores.samSession.get()).toMatchObject({
-      error: `Decoded Select Object preview dimensions ${String(decoded.width)}x${decoded.height} do not match SAM output 100x100 and preview rect 100x100.`,
+      error: {
+        code: 'output-dimension',
+        detail: `Decoded Select Object preview dimensions ${String(decoded.width)}x${decoded.height} do not match SAM output 100x100 and preview rect 100x100.`,
+      },
       hasPreview: false,
       status: 'error',
     });
@@ -13333,7 +13336,10 @@ describe('Select Object canvas engine integration', () => {
       h.engine.saveSelectObjectSession('raster', () => Promise.reject(new Error('promotion failed')))
     ).resolves.toEqual({ message: 'promotion failed', status: 'failed' });
 
-    expect(h.engine.stores.samSession.get()).toMatchObject({ error: 'promotion failed', hasPreview: true });
+    expect(h.engine.stores.samSession.get()).toMatchObject({
+      error: { code: 'unknown', detail: 'promotion failed' },
+      hasPreview: true,
+    });
     expect(h.engine.stores.samSession.get()?.input).toEqual(previewInput);
     expect(h.engine.getDocument()).toEqual(h.document);
     await expect(h.engine.saveSelectObjectSession('raster', () => Promise.resolve())).resolves.toMatchObject({
@@ -13354,7 +13360,10 @@ describe('Select Object canvas engine integration', () => {
       status: 'failed',
     });
 
-    expect(h.engine.stores.samSession.get()).toMatchObject({ error: 'commit rejected', hasPreview: true });
+    expect(h.engine.stores.samSession.get()).toMatchObject({
+      error: { code: 'unknown', detail: 'commit rejected' },
+      hasPreview: true,
+    });
     expect(h.engine.stores.samSession.get()?.input).toEqual(previewInput);
     expect(h.engine.getDocument()).toEqual(h.document);
     h.engine.dispose();
@@ -13548,7 +13557,7 @@ describe('Select Object canvas engine integration', () => {
 
     await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
     expect(h.engine.stores.samSession.get()).toMatchObject({
-      error: 'Select Object source is empty.',
+      error: { code: 'empty' },
       status: 'error',
     });
     h.engine.dispose();
@@ -13627,7 +13636,7 @@ describe('Select Object canvas engine integration', () => {
     });
 
     await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
-    expect(h.engine.stores.samSession.get()?.error).toBe('Select Object source is empty.');
+    expect(h.engine.stores.samSession.get()?.error).toEqual({ code: 'empty' });
     expect(imageResolver).not.toHaveBeenCalled();
     h.engine.dispose();
   });

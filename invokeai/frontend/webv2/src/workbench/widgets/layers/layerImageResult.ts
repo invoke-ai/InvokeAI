@@ -1,9 +1,11 @@
 import type { RunUtilityGraphOptions, UtilityGraphResult } from '@workbench/canvas-engine/backend/utilityQueue';
 import type { CanvasCompositeExportGuard, ExportCanvasCompositeBlobResult } from '@workbench/canvas-engine/engine';
+import type { SamSessionErrorCode } from '@workbench/canvas-engine/engineStores';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
 import type { CanvasImageRef } from '@workbench/types';
 
+import { UtilityQueueError } from '@workbench/canvas-engine/backend/utilityQueue';
 import { buildSamGraph, documentToExportLocalSamInput, isSamInputValid } from '@workbench/generation/canvas/samGraph';
 
 export interface SelectObjectReadyResult {
@@ -18,7 +20,7 @@ export type SelectObjectRunResult =
   | { status: 'aborted' | 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' }
   | { status: 'invalid-input' }
   | { status: 'dimension-mismatch'; message: string }
-  | { status: 'failed'; message: string };
+  | { status: 'failed'; message: string; code: SamSessionErrorCode };
 
 export interface SelectObjectRunnerDeps {
   exportComposite(): Promise<ExportCanvasCompositeBlobResult>;
@@ -49,14 +51,23 @@ export const prepareSelectObjectSource = async (
   if (signal?.aborted) {
     return { status: 'aborted' };
   }
+  let exported: ExportCanvasCompositeBlobResult;
   try {
-    const exported = await deps.exportComposite();
+    exported = await deps.exportComposite();
     if (signal?.aborted) {
       return { status: 'aborted' };
     }
     if (exported.status !== 'ok') {
       return exported;
     }
+  } catch (error) {
+    if (signal?.aborted || isAbortError(error)) {
+      return { status: 'aborted' };
+    }
+    return { code: 'unknown', message: errorMessage(error), status: 'failed' };
+  }
+
+  try {
     onPhase?.('uploading');
     const uploaded = await deps.uploadIntermediate(exported.blob, signal);
     if (signal?.aborted) {
@@ -82,7 +93,7 @@ export const prepareSelectObjectSource = async (
     if (signal?.aborted || isAbortError(error)) {
       return { status: 'aborted' };
     }
-    return { message: errorMessage(error), status: 'failed' };
+    return { code: 'upload', message: errorMessage(error), status: 'failed' };
   }
 };
 
@@ -163,6 +174,14 @@ export const processSelectObjectSource = async (
     if (options.signal?.aborted || isAbortError(error)) {
       return { status: 'aborted' };
     }
-    return { message: errorMessage(error), status: 'failed' };
+    const code: SamSessionErrorCode =
+      error instanceof UtilityQueueError
+        ? error.reason === 'no-output'
+          ? 'no-output'
+          : error.reason === 'reconcile'
+            ? 'reconcile'
+            : 'queue'
+        : 'queue';
+    return { code, message: errorMessage(error), status: 'failed' };
   }
 };

@@ -30,6 +30,7 @@ import type { SocketHub } from '@workbench/backend/socketHub';
 import type { BackendGraphContract } from '@workbench/types';
 
 import { buildUtilityQueueItemOrigin } from '@workbench/backend/events';
+import { ApiError } from '@workbench/backend/http';
 import { cancelQueueItems, enqueueUtilityGraph, getQueueItem } from '@workbench/generation/api';
 
 /** The default time a utility graph may run before it is abandoned. */
@@ -74,6 +75,20 @@ export interface UtilityReconcileRetryPolicy {
 /** Returns a cancellation function for one scheduled reconciliation retry. */
 export type UtilityReconcileRetryScheduler = (callback: () => void, delayMs: number) => () => void;
 
+export type UtilityReconcileErrorClassifier = (cause: unknown) => 'retry' | 'fail';
+
+export const classifyUtilityReconcileError: UtilityReconcileErrorClassifier = (cause) => {
+  if (cause instanceof TypeError) {
+    return 'retry';
+  }
+  if (cause instanceof ApiError) {
+    return cause.status === 408 || cause.status === 429 || (cause.status >= 500 && cause.status <= 599)
+      ? 'retry'
+      : 'fail';
+  }
+  return 'fail';
+};
+
 const scheduleUtilityReconcileRetry: UtilityReconcileRetryScheduler = (callback, delayMs) => {
   const timer = setTimeout(callback, delayMs);
   return () => clearTimeout(timer);
@@ -106,6 +121,8 @@ export interface RunUtilityGraphOptions {
   reconcileRetryPolicy?: UtilityReconcileRetryPolicy;
   /** Injectable reconciliation retry timer seam. */
   scheduleReconcileRetry?: UtilityReconcileRetryScheduler;
+  /** Injectable reconciliation failure classifier. */
+  classifyReconcileError?: UtilityReconcileErrorClassifier;
 }
 
 /** The resolved result of a utility graph: its single output image. */
@@ -186,6 +203,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
   const reconcileCompletedOutput = options.reconcileCompletedOutput ?? reconcileUtilityCompletedOutput;
   const reconcileRetryPolicy = options.reconcileRetryPolicy ?? DEFAULT_UTILITY_RECONCILE_RETRY_POLICY;
   const scheduleReconcileRetry = options.scheduleReconcileRetry ?? scheduleUtilityReconcileRetry;
+  const classifyReconcileError = options.classifyReconcileError ?? classifyUtilityReconcileError;
   const reconcileMaxAttempts = Number.isFinite(reconcileRetryPolicy.maxAttempts)
     ? Math.max(1, Math.floor(reconcileRetryPolicy.maxAttempts))
     : DEFAULT_UTILITY_RECONCILE_RETRY_POLICY.maxAttempts;
@@ -283,7 +301,15 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       }
       reconciliationAttempts += 1;
       reconciliationInFlight = true;
-      void reconcileCompletedOutput([...enqueueResult.itemIds], outputNodeId)
+      const reconciliationItemIds = [...enqueueResult.itemIds];
+      const scheduleNextReconciliation = (): void => {
+        cancelReconciliationRetry = scheduleReconcileRetry(() => {
+          cancelReconciliationRetry = null;
+          reconcileCompletion();
+        }, reconcileDelayMs);
+      };
+      void Promise.resolve()
+        .then(() => reconcileCompletedOutput(reconciliationItemIds, outputNodeId))
         .then((output) => {
           reconciliationInFlight = false;
           if (settled) {
@@ -293,8 +319,10 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
             settleResolve(capturedOutput);
           } else if (output) {
             settleResolve(output);
-          } else {
+          } else if (reconciliationAttempts >= reconcileMaxAttempts) {
             settleReject(new UtilityQueueError('no-output', 'The utility graph produced no output image.'));
+          } else {
+            scheduleNextReconciliation();
           }
         })
         .catch((cause: unknown) => {
@@ -305,7 +333,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
             }
             return;
           }
-          if (reconciliationAttempts >= reconcileMaxAttempts) {
+          if (classifyReconcileError(cause) === 'fail' || reconciliationAttempts >= reconcileMaxAttempts) {
             const detail = cause instanceof Error ? cause.message : String(cause);
             settleReject(
               new UtilityQueueError(
@@ -316,10 +344,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
             );
             return;
           }
-          cancelReconciliationRetry = scheduleReconcileRetry(() => {
-            cancelReconciliationRetry = null;
-            reconcileCompletion();
-          }, reconcileDelayMs);
+          scheduleNextReconciliation();
         });
     };
 

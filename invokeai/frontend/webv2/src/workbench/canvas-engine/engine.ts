@@ -3170,8 +3170,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         bitmap.width === result.rect.width &&
         bitmap.height === result.rect.height;
       if (!dimensionsAreValid) {
-        throw new Error(
-          `Decoded Select Object preview dimensions ${String(bitmap.width)}x${String(bitmap.height)} do not match SAM output ${result.image.width}x${result.image.height} and preview rect ${result.rect.width}x${result.rect.height}.`
+        throw Object.assign(
+          new Error(
+            `Decoded Select Object preview dimensions ${String(bitmap.width)}x${String(bitmap.height)} do not match SAM output ${result.image.width}x${result.image.height} and preview rect ${result.rect.width}x${result.rect.height}.`
+          ),
+          { samErrorCode: 'output-dimension' as const }
         );
       }
       const surface = backend.createSurface(result.rect.width, result.rect.height);
@@ -3389,7 +3392,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         return result;
       }
       owner.session.reportError(
-        result.status === 'failed' ? result.message : `Select Object apply is ${result.status}.`
+        result.status === 'locked'
+          ? { code: 'locked' }
+          : {
+              code: 'unknown',
+              detail: result.status === 'failed' ? result.message : `Select Object apply is ${result.status}.`,
+            }
       );
     }
     return result;
@@ -3424,7 +3432,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (finishSelectObjectCommit(owner)) {
-        owner.session.reportError(message);
+        owner.session.reportError({ code: 'unknown', detail: message });
       }
       return { message, status: 'failed' };
     }
@@ -3462,7 +3470,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (finishSelectObjectCommit(owner)) {
-        owner.session.reportError(message);
+        owner.session.reportError({ code: 'unknown', detail: message });
       }
       return { message, status: 'failed' };
     }
@@ -3481,7 +3489,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         return result;
       }
       owner.session.reportError(
-        result.status === 'failed' ? result.message : `Select Object save is ${result.status}.`
+        result.status === 'locked'
+          ? { code: 'locked' }
+          : {
+              code: 'unknown',
+              detail: result.status === 'failed' ? result.message : `Select Object save is ${result.status}.`,
+            }
       );
     }
     return result;

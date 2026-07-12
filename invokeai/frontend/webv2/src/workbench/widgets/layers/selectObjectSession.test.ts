@@ -1,6 +1,8 @@
 import type { CanvasCompositeExportGuard } from '@workbench/canvas-engine/engine';
+import type { SamSessionError } from '@workbench/canvas-engine/engineStores';
 import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
+import { UtilityQueueError } from '@workbench/canvas-engine/backend/utilityQueue';
 import { createCanvasOperationController } from '@workbench/canvas-engine/canvasOperationController';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -165,7 +167,7 @@ describe('createSelectObjectSession', () => {
 
   it('never publishes error status without an error and returns to ready when update clears it', async () => {
     const harness = createHarness();
-    const snapshots: Array<{ error: string | null; status: string }> = [];
+    const snapshots: Array<{ error: SamSessionError | null; status: string }> = [];
     harness.session.subscribe(() => {
       const { error, status } = harness.session.getSnapshot();
       snapshots.push({ error, status });
@@ -174,7 +176,7 @@ describe('createSelectObjectSession', () => {
 
     await expect(harness.session.process()).resolves.toBe('invalid');
     expect(harness.session.getSnapshot()).toMatchObject({
-      error: 'A Segment Anything input is required.',
+      error: { code: 'invalid' },
       status: 'error',
     });
 
@@ -189,7 +191,9 @@ describe('createSelectObjectSession', () => {
 
     await expect(harness.session.process()).resolves.toBe('error');
 
-    expect(harness.session.getSnapshot()).toEqual(expect.objectContaining({ error: 'graph failed', status: 'error' }));
+    expect(harness.session.getSnapshot()).toEqual(
+      expect.objectContaining({ error: { code: 'queue', detail: 'graph failed' }, status: 'error' })
+    );
   });
 
   it('retries the same input after a dimension mismatch and publishes the corrected output', async () => {
@@ -215,9 +219,77 @@ describe('createSelectObjectSession', () => {
 
     harness.session.reportError('commit failed');
 
-    expect(harness.session.getSnapshot()).toMatchObject({ error: 'commit failed', preview, status: 'error' });
+    expect(harness.session.getSnapshot()).toMatchObject({
+      error: { code: 'unknown', detail: 'commit failed' },
+      preview,
+      status: 'error',
+    });
     harness.session.reset();
     expect(harness.session.getSnapshot()).toMatchObject({ error: null, preview: null, status: 'ready' });
+  });
+
+  it.each([
+    ['no-output', new UtilityQueueError('no-output', 'No output image.')],
+    ['reconcile', new UtilityQueueError('reconcile', 'Queue lookup failed.')],
+    ['queue', new UtilityQueueError('failed', 'SAM backend failed.')],
+  ] as const)('maps utility queue failures to %s session errors', async (code, cause) => {
+    const harness = createHarness({ runGraph: vi.fn(() => Promise.reject(cause)) });
+
+    await expect(harness.session.process()).resolves.toBe('error');
+
+    expect(harness.session.getSnapshot()).toMatchObject({ error: { code, detail: cause.message }, status: 'error' });
+  });
+
+  it('maps upload failures to a typed upload error', async () => {
+    const harness = createHarness({
+      uploadIntermediate: vi.fn(() => Promise.reject(new Error('upload service unavailable'))),
+    });
+
+    await expect(harness.session.process()).resolves.toBe('error');
+
+    expect(harness.session.getSnapshot()).toMatchObject({
+      error: { code: 'upload', detail: 'upload service unavailable' },
+      status: 'error',
+    });
+  });
+
+  it('maps empty and not-ready sources to typed errors', async () => {
+    const empty = createHarness({ exportComposite: vi.fn(() => Promise.resolve({ status: 'empty' as const })) });
+    await expect(empty.session.process()).resolves.toBe('error');
+    expect(empty.session.getSnapshot().error).toEqual({ code: 'empty' });
+
+    const notReady = createHarness();
+    notReady.setCurrentGuard(null);
+    await expect(notReady.session.process()).resolves.toBe('error');
+    expect(notReady.session.getSnapshot().error).toEqual({ code: 'not-ready' });
+  });
+
+  it('maps output dimensions and decode failures to typed errors', async () => {
+    const uploadDimensions = createHarness({
+      uploadIntermediate: vi.fn(() => Promise.resolve({ height: 12, imageName: 'bad-source.png', width: 15 })),
+    });
+    await expect(uploadDimensions.session.process()).resolves.toBe('error');
+    expect(uploadDimensions.session.getSnapshot().error).toMatchObject({ code: 'output-dimension' });
+
+    const dimensions = createHarness({
+      runGraph: vi.fn(() => Promise.resolve({ height: 12, imageName: 'bad.png', origin: 'test', width: 15 })),
+    });
+    await expect(dimensions.session.process()).resolves.toBe('error');
+    expect(dimensions.session.getSnapshot().error).toMatchObject({ code: 'output-dimension' });
+
+    const decode = createHarness({ decodePreview: vi.fn(() => Promise.reject(new Error('corrupt PNG'))) });
+    await expect(decode.session.process()).resolves.toBe('error');
+    expect(decode.session.getSnapshot().error).toEqual({ code: 'decode', detail: 'corrupt PNG' });
+  });
+
+  it('accepts typed locked errors while preserving string compatibility as unknown diagnostics', () => {
+    const harness = createHarness();
+
+    harness.session.reportError({ code: 'locked' });
+    expect(harness.session.getSnapshot().error).toEqual({ code: 'locked' });
+
+    harness.session.reportError('legacy failure detail');
+    expect(harness.session.getSnapshot().error).toEqual({ code: 'unknown', detail: 'legacy failure detail' });
   });
 
   it('clears a failed process error when controller source invalidation returns the session to ready', async () => {

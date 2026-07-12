@@ -5,6 +5,7 @@ import type {
   CanvasOperationSession,
 } from '@workbench/canvas-engine/canvasOperationController';
 import type { CanvasCompositeExportGuard, ExportCanvasCompositeBlobResult } from '@workbench/canvas-engine/engine';
+import type { SamSessionError, SamSessionErrorCode } from '@workbench/canvas-engine/engineStores';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
 
@@ -42,7 +43,7 @@ export interface SelectObjectSessionState<T> {
   autoProcess: boolean;
   isolatedPreview: boolean;
   status: SelectObjectSessionStatus;
-  error: string | null;
+  error: SamSessionError | null;
   preview: SelectObjectSessionPreview<T> | null;
   sourceGuard: CanvasCompositeExportGuard | null;
 }
@@ -79,7 +80,7 @@ export interface SelectObjectSession<T> {
   ): void;
   process(): Promise<SelectObjectSessionProcessResult>;
   interruptProcessing(): void;
-  reportError(message: string): void;
+  reportError(error: SamSessionError | string): void;
   reset(): void;
   cancel(): void;
   dispose(): void;
@@ -113,8 +114,50 @@ const stableInputHash = <T>(state: SelectObjectSessionState<T>): string => {
   return JSON.stringify([input, state.model, state.invert, state.applyPolygonRefinement]);
 };
 
-const resultError = (result: Exclude<Awaited<ReturnType<typeof prepareSelectObjectSource>>, { status: 'ready' }>) =>
-  'message' in result ? result.message : `Select Object source is ${result.status}.`;
+const errorDetail = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
+
+const withDetail = (code: SamSessionErrorCode, detail?: string): SamSessionError =>
+  detail ? { code, detail } : { code };
+
+const getPreparedSourceError = (
+  result: Exclude<Awaited<ReturnType<typeof prepareSelectObjectSource>>, { status: 'ready' }>
+): SamSessionError => {
+  if (result.status === 'failed') {
+    return withDetail(result.code, result.message);
+  }
+  if (result.status === 'empty') {
+    return { code: 'empty' };
+  }
+  if (result.status === 'dimension-mismatch') {
+    return withDetail('output-dimension', result.message);
+  }
+  return { code: 'not-ready' };
+};
+
+const getProcessedSourceError = (
+  result: Exclude<Awaited<ReturnType<typeof processSelectObjectSource>>, { status: 'ready' | 'aborted' }>
+): SamSessionError => {
+  if (result.status === 'invalid-input') {
+    return { code: 'invalid' };
+  }
+  if (result.status === 'dimension-mismatch') {
+    return withDetail('output-dimension', result.message);
+  }
+  if (result.status === 'failed') {
+    return withDetail(result.code, result.message);
+  }
+  return { code: 'unknown' };
+};
+
+class SamSessionFailure extends Error {
+  readonly error: SamSessionError;
+
+  constructor(error: SamSessionError) {
+    super(error.detail ?? error.code);
+    this.name = 'SamSessionFailure';
+    this.error = error;
+  }
+}
 
 export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionOptions<T>): SelectObjectSession<T> => {
   const { deps, projectId } = options;
@@ -232,7 +275,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     source = null;
     const prepared = await prepareSelectObjectSource(deps, signal, (phase) => publishPhase(token, phase));
     if (prepared.status !== 'ready') {
-      throw new Error(resultError(prepared));
+      throw new SamSessionFailure(getPreparedSourceError(prepared));
     }
     if (signal.aborted || !isGuardCurrent(guard) || !isSameGuard(prepared.source.guard, guard)) {
       throw new DOMException('Select Object source became stale.', 'AbortError');
@@ -247,6 +290,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     requestState: SelectObjectSessionState<T>,
     guard: CanvasCompositeExportGuard
   ): Promise<SelectObjectSessionProcessResult> => {
+    let requestError: SamSessionError | null = null;
     try {
       if (operationGuard !== guard || !operation) {
         startingOperation = true;
@@ -272,41 +316,63 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       publishState({ ...state, sourceGuard: guard, status: 'preparing-composite' });
       const result = await operation.run(
         async (signal) => {
-          const preparedSource = await ensureSource(guard, signal, token);
-          if (signal.aborted || token !== requestToken) {
-            throw new DOMException('Select Object source preparation was aborted.', 'AbortError');
-          }
-          const processed = await processSelectObjectSource({
-            applyPolygonRefinement: requestState.applyPolygonRefinement,
-            input: requestState.input,
-            invert: requestState.invert,
-            model: requestState.model,
-            runGraph: deps.runGraph,
-            onPhase: (phase) => publishPhase(token, phase),
-            signal,
-            source: preparedSource,
-          });
-          if (processed.status !== 'ready') {
-            if (processed.status === 'aborted') {
-              throw new DOMException('Select Object processing was aborted.', 'AbortError');
+          try {
+            const preparedSource = await ensureSource(guard, signal, token);
+            if (signal.aborted || token !== requestToken) {
+              throw new DOMException('Select Object source preparation was aborted.', 'AbortError');
             }
-            throw new Error('message' in processed ? processed.message : `Select Object is ${processed.status}.`);
+            const processed = await processSelectObjectSource({
+              applyPolygonRefinement: requestState.applyPolygonRefinement,
+              input: requestState.input,
+              invert: requestState.invert,
+              model: requestState.model,
+              runGraph: deps.runGraph,
+              onPhase: (phase) => publishPhase(token, phase),
+              signal,
+              source: preparedSource,
+            });
+            if (processed.status !== 'ready') {
+              if (processed.status === 'aborted') {
+                throw new DOMException('Select Object processing was aborted.', 'AbortError');
+              }
+              throw new SamSessionFailure(getProcessedSourceError(processed));
+            }
+            publishPhase(token, 'rendering-preview');
+            let data: T;
+            try {
+              data = await deps.decodePreview(processed, signal);
+            } catch (cause) {
+              if (signal.aborted || (cause instanceof Error && cause.name === 'AbortError')) {
+                throw cause;
+              }
+              const code =
+                cause &&
+                typeof cause === 'object' &&
+                'samErrorCode' in cause &&
+                cause.samErrorCode === 'output-dimension'
+                  ? 'output-dimension'
+                  : 'decode';
+              throw new SamSessionFailure(withDetail(code, errorDetail(cause)));
+            }
+            if (signal.aborted) {
+              throw new DOMException('Select Object preview decode was aborted.', 'AbortError');
+            }
+            return {
+              data,
+              guard: processed.guard,
+              image: processed.image,
+              inputHash: hash,
+              previewId: token,
+              isolated: requestState.isolatedPreview,
+              rect: processed.rect,
+              sourceImageName: preparedSource.imageName,
+            } satisfies SelectObjectSessionPreview<T>;
+          } catch (cause) {
+            if (cause instanceof SamSessionFailure) {
+              requestError = cause.error;
+            }
+            throw cause;
           }
-          publishPhase(token, 'rendering-preview');
-          const data = await deps.decodePreview(processed, signal);
-          if (signal.aborted) {
-            throw new DOMException('Select Object preview decode was aborted.', 'AbortError');
-          }
-          return {
-            data,
-            guard: processed.guard,
-            image: processed.image,
-            inputHash: hash,
-            previewId: token,
-            isolated: requestState.isolatedPreview,
-            rect: processed.rect,
-            sourceImageName: preparedSource.imageName,
-          } satisfies SelectObjectSessionPreview<T>;
         },
         (preview) => {
           const publishedPreview =
@@ -330,7 +396,14 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
         const controllerState = deps.controller.getSnapshot();
         publishState({
           ...state,
-          error: controllerState.status === 'active' ? controllerState.error : 'Select Object processing failed.',
+          error:
+            requestError ??
+            withDetail(
+              'unknown',
+              controllerState.status === 'active'
+                ? (controllerState.error ?? undefined)
+                : 'Select Object processing failed.'
+            ),
           status: 'error',
         });
       } else if (result === 'stale' && !isGuardCurrent(guard)) {
@@ -341,7 +414,11 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       if (token !== requestToken || (cause instanceof Error && cause.name === 'AbortError')) {
         return 'stale';
       }
-      publishState({ ...state, error: cause instanceof Error ? cause.message : String(cause), status: 'error' });
+      publishState({
+        ...state,
+        error: cause instanceof SamSessionFailure ? cause.error : withDetail('unknown', errorDetail(cause)),
+        status: 'error',
+      });
       return 'error';
     }
   };
@@ -352,7 +429,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       return Promise.resolve('stale');
     }
     if (!isSamDocumentInputValid(state.input)) {
-      publishState({ ...state, error: 'A Segment Anything input is required.', status: 'error' });
+      publishState({ ...state, error: { code: 'invalid' }, status: 'error' });
       return Promise.resolve('invalid');
     }
     if (state.sourceGuard && !isGuardCurrent(state.sourceGuard)) {
@@ -390,7 +467,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     const token = requestToken;
     const guard = operationGuard && isGuardCurrent(operationGuard) ? operationGuard : deps.captureGuard();
     if (!guard || !isGuardCurrent(guard)) {
-      publishState({ ...state, error: 'Select Object source is not ready.', status: 'error' });
+      publishState({ ...state, error: { code: 'not-ready' }, status: 'error' });
       return Promise.resolve('error');
     }
     pendingHash = hash;
@@ -477,9 +554,13 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       publishState({ ...state, error: null, preview: null, status: 'ready' });
     },
     process,
-    reportError: (message) => {
+    reportError: (error) => {
       if (!disposed) {
-        publishState({ ...state, error: message, status: 'error' });
+        publishState({
+          ...state,
+          error: typeof error === 'string' ? withDetail('unknown', error) : error,
+          status: 'error',
+        });
       }
     },
     reset: () => {

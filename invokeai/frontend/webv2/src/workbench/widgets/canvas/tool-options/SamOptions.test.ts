@@ -4,7 +4,12 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { getSamActionEligibility, getSamStatusTranslationKey, SamProcessFeedback } from './SamOptions';
+import {
+  getSamActionEligibility,
+  getSamErrorTranslationKey,
+  getSamStatusTranslationKey,
+  SamProcessFeedback,
+} from './SamOptions';
 
 const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
   eager: true,
@@ -54,7 +59,9 @@ describe('getSamActionEligibility', () => {
       canSave: false,
     });
     expect(
-      getSamActionEligibility(snapshot({ error: 'commit failed', hasPreview: true, status: 'error' }))
+      getSamActionEligibility(
+        snapshot({ error: { code: 'unknown', detail: 'commit failed' }, hasPreview: true, status: 'error' })
+      )
     ).toMatchObject({
       canApply: true,
       canSave: true,
@@ -110,10 +117,30 @@ describe('SamProcessFeedback', () => {
     expect(copy).not.toContain(status);
   });
 
-  it('server-renders polite status and assertive error feedback visibly', () => {
+  it.each([
+    'invalid',
+    'not-ready',
+    'empty',
+    'upload',
+    'queue',
+    'no-output',
+    'reconcile',
+    'output-dimension',
+    'decode',
+    'locked',
+    'unknown',
+  ] as const)('maps %s errors to localized primary copy', (code) => {
+    const key = getSamErrorTranslationKey(code).split('.').at(-1);
+    const copy = key ? en.widgets.layers.selectObject[key] : undefined;
+    expect(copy).toBeTypeOf('string');
+    expect(copy).not.toBe(code);
+  });
+
+  it('server-renders a localized phase with polite status semantics', () => {
     const markup = renderToStaticMarkup(
       createElement(SamProcessFeedback, {
-        error: 'The mask could not be decoded.',
+        error: null,
+        errorText: null,
         statusText: 'Rendering object preview…',
       })
     );
@@ -121,8 +148,33 @@ describe('SamProcessFeedback', () => {
     expect(markup).toContain('role="status"');
     expect(markup).toContain('aria-live="polite"');
     expect(markup).toContain('Rendering object preview…');
+    expect(markup).not.toContain('role="alert"');
+  });
+
+  it('server-renders a known localized error as the assertive primary message', () => {
+    const markup = renderToStaticMarkup(
+      createElement(SamProcessFeedback, {
+        error: { code: 'decode' },
+        errorText: 'The object preview could not be decoded.',
+        statusText: 'Select Object needs attention.',
+      })
+    );
+
     expect(markup).toContain('role="alert"');
     expect(markup).toContain('aria-live="assertive"');
-    expect(markup).toContain('The mask could not be decoded.');
+    expect(markup).toContain('The object preview could not be decoded.');
+  });
+
+  it('server-renders unknown diagnostics only after a localized primary message', () => {
+    const markup = renderToStaticMarkup(
+      createElement(SamProcessFeedback, {
+        error: { code: 'unknown', detail: 'GPU worker disconnected' },
+        errorText: 'Select Object could not finish.',
+        statusText: 'Select Object needs attention.',
+      })
+    );
+
+    expect(markup.indexOf('Select Object could not finish.')).toBeLessThan(markup.indexOf('GPU worker disconnected'));
+    expect(markup).toContain('role="alert"');
   });
 });

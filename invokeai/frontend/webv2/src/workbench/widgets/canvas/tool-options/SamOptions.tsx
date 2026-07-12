@@ -1,5 +1,5 @@
 import type { SelectObjectSaveTarget } from '@workbench/canvas-engine/engine';
-import type { SamSessionSnapshot } from '@workbench/canvas-engine/engineStores';
+import type { SamSessionError, SamSessionErrorCode, SamSessionSnapshot } from '@workbench/canvas-engine/engineStores';
 import type { SamModel } from '@workbench/generation/canvas/samGraph';
 import type { ChangeEvent } from 'react';
 
@@ -37,18 +37,47 @@ const SAM_STATUS_TRANSLATION_KEYS: Record<SamSessionSnapshot['status'], string> 
 export const getSamStatusTranslationKey = (status: SamSessionSnapshot['status']): string =>
   SAM_STATUS_TRANSLATION_KEYS[status];
 
-export const SamProcessFeedback = ({ error, statusText }: { error: string | null; statusText: string }) => (
-  <>
-    <span aria-live="polite" role="status">
-      {statusText}
-    </span>
-    {error ? (
-      <span aria-live="assertive" role="alert">
-        {error}
+const SAM_ERROR_TRANSLATION_KEYS: Record<SamSessionErrorCode, string> = {
+  decode: 'widgets.layers.selectObject.errorDecode',
+  empty: 'widgets.layers.selectObject.errorEmpty',
+  invalid: 'widgets.layers.selectObject.errorInvalid',
+  locked: 'widgets.layers.selectObject.errorLocked',
+  'no-output': 'widgets.layers.selectObject.errorNoOutput',
+  'not-ready': 'widgets.layers.selectObject.errorNotReady',
+  'output-dimension': 'widgets.layers.selectObject.errorOutputDimension',
+  queue: 'widgets.layers.selectObject.errorQueue',
+  reconcile: 'widgets.layers.selectObject.errorReconcile',
+  unknown: 'widgets.layers.selectObject.errorUnknown',
+  upload: 'widgets.layers.selectObject.errorUpload',
+};
+
+export const getSamErrorTranslationKey = (code: SamSessionErrorCode): string => SAM_ERROR_TRANSLATION_KEYS[code];
+
+export const SamProcessFeedback = ({
+  error,
+  errorText,
+  statusText,
+}: {
+  error: SamSessionError | null;
+  errorText: string | null;
+  statusText: string;
+}) => {
+  const detail = error?.detail?.trim();
+  const showDetail = Boolean(detail && detail !== errorText);
+  return (
+    <>
+      <span aria-live="polite" role="status">
+        {statusText}
       </span>
-    ) : null}
-  </>
-);
+      {error && errorText ? (
+        <span aria-live="assertive" role="alert">
+          <span>{errorText}</span>
+          {showDetail ? <span>{detail}</span> : null}
+        </span>
+      ) : null}
+    </>
+  );
+};
 
 export const getSamActionEligibility = (
   session: SamSessionSnapshot,
@@ -283,7 +312,11 @@ export const SamOptions = ({
       <Button disabled={!eligibility.canCancel} size="xs" variant="ghost" onClick={cancel}>
         {t('common.cancel')}
       </Button>
-      <SamProcessFeedback error={session.error} statusText={t(getSamStatusTranslationKey(session.status))} />
+      <SamProcessFeedback
+        error={session.error}
+        errorText={session.error ? t(getSamErrorTranslationKey(session.error.code)) : null}
+        statusText={t(getSamStatusTranslationKey(session.status))}
+      />
     </HStack>
   );
 };

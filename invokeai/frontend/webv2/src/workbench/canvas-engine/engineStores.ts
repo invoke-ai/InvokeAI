@@ -227,6 +227,24 @@ export interface TextEditSession {
 
 export type SamPointLabel = 'include' | 'exclude';
 
+export type SamSessionErrorCode =
+  | 'invalid'
+  | 'not-ready'
+  | 'empty'
+  | 'upload'
+  | 'queue'
+  | 'no-output'
+  | 'reconcile'
+  | 'output-dimension'
+  | 'decode'
+  | 'locked'
+  | 'unknown';
+
+export interface SamSessionError {
+  code: SamSessionErrorCode;
+  detail?: string;
+}
+
 export interface SamVisualInput {
   type: 'visual';
   includePoints: Vec2[];
@@ -257,7 +275,7 @@ export interface SamSessionSnapshot {
     | 'rendering-preview'
     | 'committing'
     | 'error';
-  error: string | null;
+  error: SamSessionError | null;
   hasPreview: boolean;
 }
 
