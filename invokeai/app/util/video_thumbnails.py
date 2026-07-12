@@ -1,18 +1,31 @@
-"""Video frame/probe helpers used by the video file store.
+"""Video frame/probe helpers used by the video file store, upload router, and video nodes.
 
-The primary backend is imageio's FFMPEG plugin (the same one ``wan_l2v`` uses
-to *encode* output MP4s — so reading our own output is guaranteed to work).
-We fall back to ``cv2.VideoCapture`` only if imageio fails; cv2 wheels have
-historically hung on certain codec/container combinations, so we never rely
-on it as the primary path.
+Decoding runs in a short-lived child process (``video_decode_worker.py``) with a hard
+timeout. Files reaching these helpers are user uploads, and both decode backends can
+hang indefinitely on crafted or malformed containers (cv2 wheels historically, ffmpeg in
+degenerate cases). An in-process hang would tie up the FastAPI request worker that
+called us — repeated crafted uploads could exhaust the worker pool — and a hung thread
+cannot be killed from Python, so process isolation is the only reliable bound.
+``subprocess.run`` kills the child when the timeout expires, so a hostile file costs at
+most ``timeout`` seconds and cannot leak a stuck process.
 """
 
+import json
 import os
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-import imageio.v3 as iio
 from PIL import Image
+
+# Generous — a healthy decode of a single frame or of container metadata takes well
+# under a second even for large files. The timeout exists to bound adversarial or hung
+# decodes, not to police slow ones.
+VIDEO_DECODE_TIMEOUT_SECONDS = 30.0
+
+_WORKER_PATH = Path(__file__).parent / "video_decode_worker.py"
 
 
 def get_video_thumbnail_name(video_name: str) -> str:
@@ -20,81 +33,83 @@ def get_video_thumbnail_name(video_name: str) -> str:
     return os.path.splitext(video_name)[0] + ".webp"
 
 
-def extract_video_frame(video_path: Path, frame_index: int = 0) -> Optional[Image.Image]:
-    """Extracts a single frame from a video file as a PIL Image. Returns None on failure.
+def _worker_command(*args: str) -> list[str]:
+    """Command line for one decode-worker invocation (patchable in tests).
 
-    Tries imageio's FFMPEG plugin first since it's the same encoder we use for
-    output, then falls back to cv2 (with a controlled context that can't hang
-    silently — at worst it raises and we return None).
+    The worker is run by file path rather than ``-m`` so the child process doesn't
+    import the invokeai package (and transitively torch) just to decode a frame.
     """
+    return [sys.executable, str(_WORKER_PATH), *args]
+
+
+def _run_worker(args: list[str], timeout: float) -> Optional[dict[str, Any]]:
+    """Runs the decode worker; returns its parsed JSON output, or None on failure or timeout."""
     try:
-        # iio.imread with index=N seeks to that frame directly. Returns RGB HxWxC uint8.
-        frame = iio.imread(video_path, plugin="FFMPEG", index=frame_index)
-        return Image.fromarray(frame)
+        proc = subprocess.run(_worker_command(*args), capture_output=True, text=True, timeout=timeout)
     except Exception:
-        pass
-
-    # Fallback: cv2.VideoCapture. Only used if imageio couldn't decode the file
-    # — uploaded videos with unusual codecs may need this path.
+        # TimeoutExpired (child already killed by subprocess.run) or a spawn failure.
+        return None
+    if proc.returncode != 0:
+        return None
     try:
-        import cv2  # local import so the imageio-only path doesn't pay the cv2 import cost
+        result = json.loads(proc.stdout)
+    except ValueError:
+        return None
+    return result if isinstance(result, dict) else None
 
-        capture = cv2.VideoCapture(str(video_path))
-        if not capture.isOpened():
-            capture.release()
+
+def extract_video_frame(
+    video_path: Path, frame_index: int = 0, timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS
+) -> Optional[Image.Image]:
+    """Extracts a single frame from a video file as a PIL Image. Returns None on failure or timeout."""
+    fd, tmp_name = tempfile.mkstemp(prefix="invokeai_frame_", suffix=".png")
+    os.close(fd)
+    try:
+        result = _run_worker(["frame", str(video_path), str(frame_index), tmp_name], timeout)
+        if result is None:
             return None
-        try:
-            if frame_index > 0:
-                capture.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
-            ok, frame_bgr = capture.read()
-            if not ok or frame_bgr is None:
-                return None
-            frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-            return Image.fromarray(frame_rgb)
-        finally:
-            capture.release()
+        with Image.open(tmp_name) as image:
+            image.load()
+        return image
     except Exception:
         return None
+    finally:
+        Path(tmp_name).unlink(missing_ok=True)
 
 
-def probe_video(video_path: Path) -> tuple[int, int, float, Optional[float]]:
+def probe_video(
+    video_path: Path, timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS
+) -> tuple[int, int, float, Optional[float]]:
     """Returns (width, height, duration_seconds, fps_or_none) for a video file.
 
-    Tries imageio's FFMPEG plugin first; falls back to cv2.VideoCapture. Raises
-    FileNotFoundError if neither backend can read the file.
+    Raises FileNotFoundError if the file cannot be read — including when the decode
+    times out, since a file we cannot probe within the bound is treated as unreadable.
     """
+    result = _run_worker(["probe", str(video_path)], timeout)
+    if result is None:
+        raise FileNotFoundError(f"Unable to open video at {video_path}")
     try:
-        meta = iio.immeta(video_path, plugin="FFMPEG")
-        fps_raw = meta.get("fps")
-        duration = float(meta.get("duration", 0.0)) if meta.get("duration") is not None else 0.0
-        size = meta.get("size")
-        if size is None:
-            # Fall through to cv2 — imageio didn't give us dimensions.
-            raise ValueError("imageio probe missing 'size'")
-        width, height = int(size[0]), int(size[1])
-        fps: Optional[float] = float(fps_raw) if fps_raw and fps_raw > 0 else None
-        return width, height, duration, fps
-    except Exception:
-        pass
-
-    try:
-        import cv2
-
-        capture = cv2.VideoCapture(str(video_path))
-        if not capture.isOpened():
-            capture.release()
-            raise FileNotFoundError(f"Unable to open video at {video_path}")
-        try:
-            width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-            fps_raw = capture.get(cv2.CAP_PROP_FPS)
-            fps_v2: Optional[float] = float(fps_raw) if fps_raw and fps_raw > 0 else None
-            duration = (frame_count / fps_v2) if (fps_v2 and frame_count > 0) else 0.0
-        finally:
-            capture.release()
-        return width, height, duration, fps_v2
-    except FileNotFoundError:
-        raise
-    except Exception as e:
+        width = int(result["width"])
+        height = int(result["height"])
+        duration = float(result["duration"])
+        fps_raw = result.get("fps")
+        fps: Optional[float] = float(fps_raw) if fps_raw else None
+    except (KeyError, TypeError, ValueError) as e:
         raise FileNotFoundError(f"Unable to open video at {video_path}") from e
+    return width, height, duration, fps
+
+
+def decoder_frame_count(video_path: Path, timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS) -> Optional[int]:
+    """Returns the exact decoded frame count, or None if it cannot be determined in time.
+
+    Preferred over a ``duration * fps`` estimate, which can overshoot by one on VFR
+    uploads or containers with imprecise metadata; callers fall back to that estimate
+    when this returns None.
+    """
+    result = _run_worker(["count", str(video_path)], timeout)
+    if result is None:
+        return None
+    count = result.get("count")
+    if isinstance(count, bool) or not isinstance(count, (int, float)):
+        return None
+    return int(count) if count > 0 else None
