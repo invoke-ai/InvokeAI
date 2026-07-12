@@ -254,4 +254,18 @@ describe('SamProcessFeedback', () => {
     expect(markup.indexOf('Select Object could not finish.')).toBeLessThan(markup.indexOf('GPU worker disconnected'));
     expect(markup).toContain('role="alert"');
   });
+
+  it('server-renders a localized queue error before its backend exception type', () => {
+    const errorText = en.widgets.layers.selectObject.errorQueue;
+    const markup = renderToStaticMarkup(
+      createElement(SamProcessFeedback, {
+        error: { code: 'queue', detail: 'AttributeError' },
+        errorText,
+        statusText: 'Select Object needs attention.',
+      })
+    );
+
+    expect(markup.indexOf(errorText)).toBeLessThan(markup.indexOf('AttributeError'));
+    expect(markup).toContain('role="alert"');
+  });
 });

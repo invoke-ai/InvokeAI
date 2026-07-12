@@ -263,6 +263,19 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot()).toMatchObject({ error: { code, detail: cause.message }, status: 'error' });
   });
 
+  it('preserves a backend exception type as queue diagnostics', async () => {
+    const harness = createHarness({
+      runGraph: vi.fn(() => Promise.reject(new UtilityQueueError('failed', 'AttributeError'))),
+    });
+
+    await expect(harness.session.process()).resolves.toBe('error');
+
+    expect(harness.session.getSnapshot()).toMatchObject({
+      error: { code: 'queue', detail: 'AttributeError' },
+      status: 'error',
+    });
+  });
+
   it('maps upload failures to a typed upload error', async () => {
     const harness = createHarness({
       uploadIntermediate: vi.fn(() => Promise.reject(new Error('upload service unavailable'))),

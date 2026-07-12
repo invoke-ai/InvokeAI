@@ -452,7 +452,9 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
             completionReceived = true;
             reconcileCompletion();
           } else if (event.status === 'failed') {
-            settleReject(new UtilityQueueError('failed', event.error_message ?? 'The utility graph failed.'));
+            const errorMessage = typeof event.error_message === 'string' ? event.error_message.trim() : '';
+            const errorType = typeof event.error_type === 'string' ? event.error_type.trim() : '';
+            settleReject(new UtilityQueueError('failed', errorMessage || errorType || 'The utility graph failed.'));
           } else if (event.status === 'canceled') {
             settleReject(new UtilityQueueError('canceled', 'The utility graph was canceled.'));
           }

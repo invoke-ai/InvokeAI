@@ -575,6 +575,71 @@ describe('runUtilityGraph — await + settle', () => {
     await expect(promise).rejects.toMatchObject({ message: 'boom', reason: 'failed' });
   });
 
+  it.each(['', '   '])('uses a trimmed backend error type when the message is %j', async (error_message) => {
+    const fake = createFakeHub();
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+    });
+
+    fake.emit(
+      'queue_item_status_changed',
+      statusEvent('failed', { error_message, error_traceback: 'giant traceback', error_type: '  AttributeError  ' })
+    );
+
+    await expect(promise).rejects.toMatchObject({ message: 'AttributeError', reason: 'failed' });
+  });
+
+  it('prefers and trims a nonempty backend message over its error type', async () => {
+    const fake = createFakeHub();
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+    });
+
+    fake.emit(
+      'queue_item_status_changed',
+      statusEvent('failed', { error_message: '  useful detail  ', error_type: 'AttributeError' })
+    );
+
+    await expect(promise).rejects.toMatchObject({ message: 'useful detail', reason: 'failed' });
+  });
+
+  it('uses the generic backend-failed fallback when message and type are missing', async () => {
+    const fake = createFakeHub();
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+    });
+
+    fake.emit('queue_item_status_changed', statusEvent('failed'));
+
+    await expect(promise).rejects.toMatchObject({ message: 'The utility graph failed.', reason: 'failed' });
+  });
+
+  it('ignores malformed non-string backend failure fields', async () => {
+    const fake = createFakeHub();
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+    });
+
+    fake.emit(
+      'queue_item_status_changed',
+      statusEvent('failed', { error_message: 42, error_type: { name: 'AttributeError' } } as never)
+    );
+
+    await expect(promise).rejects.toMatchObject({ message: 'The utility graph failed.', reason: 'failed' });
+  });
+
   it('rejects canceled on a canceled item', async () => {
     const fake = createFakeHub();
     const promise = runUtilityGraph({

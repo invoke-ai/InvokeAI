@@ -19,8 +19,9 @@ export interface QueueItemEventBase {
 
 export interface QueueItemStatusChangedEvent extends QueueItemEventBase {
   status: BackendQueueItemStatus;
-  error_type: string | null;
+  error_type?: string | null;
   error_message: string | null;
+  error_traceback?: string | null;
   created_at: string;
   updated_at: string;
   started_at: string | null;
