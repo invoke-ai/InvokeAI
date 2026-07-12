@@ -9,7 +9,6 @@ import {
   CANVAS_OPERATION_FOOTER_LAYOUT,
   CANVAS_OPERATION_PANEL_LAYOUT,
   CANVAS_OPERATION_SLOT_LAYOUT,
-  CANVAS_SELECT_OBJECT_PANEL_LAYOUT,
   CanvasOperationPanel,
 } from './CanvasOperationPanel';
 
@@ -17,9 +16,9 @@ describe('CanvasOperationPanel', () => {
   it('renders the operation panel slots as semantic regions in stable order', () => {
     const markup = renderToStaticMarkup(
       <ChakraProvider value={system}>
-        <CanvasOperationPanel.Root aria-labelledby="operation-title" operation="select-object">
+        <CanvasOperationPanel.Root aria-labelledby="operation-title">
           <CanvasOperationPanel.Header>
-            <h2 id="operation-title">Select Object</h2>
+            <h2 id="operation-title">Filter</h2>
           </CanvasOperationPanel.Header>
           <CanvasOperationPanel.Body>Inputs</CanvasOperationPanel.Body>
           <CanvasOperationPanel.Feedback>Status</CanvasOperationPanel.Feedback>
@@ -33,7 +32,7 @@ describe('CanvasOperationPanel', () => {
 
     expect(markup).toContain('role="region"');
     expect(markup).toContain('aria-labelledby="operation-title"');
-    expect(markup).toContain('data-operation="select-object"');
+    expect(markup).toContain('data-operation="filter"');
     expect(markup).toContain('data-slot="header"');
     expect(markup).toContain('data-slot="body"');
     expect(markup).toContain('data-slot="feedback"');
@@ -55,19 +54,6 @@ describe('CanvasOperationPanel', () => {
       w: '30rem',
     });
     expect(CANVAS_OPERATION_FOOTER_LAYOUT).toMatchObject({ flexWrap: 'wrap', minW: '0' });
-  });
-
-  it('gives Select Object a compact 26.25rem variant without changing Filter', () => {
-    expect(CANVAS_SELECT_OBJECT_PANEL_LAYOUT).toEqual({
-      flex: '0 1 26.25rem',
-      maxH: 'full',
-      maxW: 'full',
-      minH: '0',
-      minW: '0',
-      overflow: 'hidden',
-      w: '26.25rem',
-    });
-    expect(CANVAS_OPERATION_PANEL_LAYOUT.w).toBe('30rem');
     expect(CANVAS_OPERATION_SLOT_LAYOUT).toEqual({ px: '4', py: '3' });
   });
 
@@ -81,7 +67,7 @@ describe('CanvasOperationPanel', () => {
     expect(CANVAS_OPERATION_FIXED_SECTION_LAYOUT).toEqual({ flexShrink: '0' });
     const markup = renderToStaticMarkup(
       <ChakraProvider value={system}>
-        <CanvasOperationPanel.Root aria-label="Filter" operation="filter">
+        <CanvasOperationPanel.Root aria-label="Filter">
           <CanvasOperationPanel.Header>Filter</CanvasOperationPanel.Header>
           <CanvasOperationPanel.Body>Parameters</CanvasOperationPanel.Body>
           <CanvasOperationPanel.Feedback>Ready</CanvasOperationPanel.Feedback>

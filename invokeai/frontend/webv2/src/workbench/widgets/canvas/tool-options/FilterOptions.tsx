@@ -127,7 +127,7 @@ export const FilterOptions = ({
   };
 
   return (
-    <CanvasOperationPanel.Root aria-labelledby="filter-operation-title" operation="filter">
+    <CanvasOperationPanel.Root aria-labelledby="filter-operation-title">
       <CanvasOperationPanel.Header>
         <FilterPanelHeading
           layerName={session.layerName}

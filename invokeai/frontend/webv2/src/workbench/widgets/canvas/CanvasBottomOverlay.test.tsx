@@ -42,7 +42,7 @@ describe('CanvasBottomOverlay', () => {
         <CanvasBottomOverlay.Root data-layout="overlay">
           <CanvasBottomOverlay.Staging data-layout="staging">Staging</CanvasBottomOverlay.Staging>
           <CanvasBottomOverlay.Controls data-layout="controls">
-            <CanvasOperationPanel.Root aria-label="Filter" operation="filter">
+            <CanvasOperationPanel.Root aria-label="Filter">
               <CanvasOperationPanel.Header>Header</CanvasOperationPanel.Header>
               <CanvasOperationPanel.Body>{'Large body '.repeat(500)}</CanvasOperationPanel.Body>
               <CanvasOperationPanel.Feedback>Ready</CanvasOperationPanel.Feedback>

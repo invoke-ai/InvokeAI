@@ -15,20 +15,11 @@ import {
   getSamActionHandlers,
   getSamErrorTranslationKey,
   getSamStatusTranslationKey,
-  SAM_COMPACT_BUTTON_LAYOUT,
-  SAM_COMPACT_CONTROL_LAYOUT,
-  SAM_COMPACT_FOOTER_LAYOUT,
-  SAM_COMPACT_GROUP_LAYOUT,
-  SAM_COMPACT_SLOT_LAYOUT,
-  SAM_COMPACT_SWITCH_LAYOUT,
-  SAM_MODEL_SELECT_LAYOUT,
-  SAM_VISUAL_BUTTON_LAYOUT,
   SamPromptBody,
   SamModeToggle,
-  SamOptionsPanel,
-  SamProcessFeedback,
-  SamSwitch,
-  SamVisualBody,
+  SamOptionsBar,
+  SamStatusSlot,
+  SamVisualInput,
 } from './SamOptions';
 
 const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
@@ -179,36 +170,6 @@ describe('getSamPanelViewModel', () => {
 });
 
 describe('SamModeToggle', () => {
-  it('uses compact controls and wraps only when the card runs out of inline space', () => {
-    expect(SAM_COMPACT_CONTROL_LAYOUT).toEqual({ h: '8', minH: '8', size: 'xs' });
-    expect(SAM_COMPACT_BUTTON_LAYOUT).toEqual({ h: '8', minH: '8', px: '2', size: 'xs' });
-    expect(SAM_COMPACT_FOOTER_LAYOUT).toMatchObject({ flexWrap: 'wrap', gap: '1' });
-    expect(SAM_COMPACT_GROUP_LAYOUT).toEqual({ maxW: 'full', minW: '0' });
-    expect(SAM_COMPACT_SLOT_LAYOUT).toEqual({ px: '3', py: '2' });
-    expect(SAM_COMPACT_SWITCH_LAYOUT).toEqual({ flex: '0 1 auto', maxW: 'full', minW: '0' });
-    expect(SAM_VISUAL_BUTTON_LAYOUT).toMatchObject({ fontSize: '2xs', px: '1' });
-    expect(SAM_MODEL_SELECT_LAYOUT).toEqual({ flex: '0 1 11rem', maxW: 'full', minW: '0', w: '11rem' });
-  });
-
-  it('renders compact switch copy with the full localized accessible name', () => {
-    const markup = renderToStaticMarkup(
-      createElement(
-        ChakraProvider,
-        { value: system } as ComponentProps<typeof ChakraProvider>,
-        createElement(SamSwitch, {
-          accessibleLabel: 'Auto Process',
-          checked: false,
-          disabled: false,
-          label: 'Auto',
-          onChange: () => undefined,
-        })
-      )
-    );
-
-    expect(markup).toContain('>Auto<');
-    expect(markup).toContain('aria-label="Auto Process"');
-  });
-
   it('uses ordinary pressed buttons without incomplete tab relationships', () => {
     const markup = renderToStaticMarkup(
       createElement(
@@ -233,7 +194,7 @@ describe('SamModeToggle', () => {
   });
 });
 
-describe('SamProcessFeedback', () => {
+describe('SamStatusSlot', () => {
   it.each([
     'ready',
     'scheduled',
@@ -274,7 +235,7 @@ describe('SamProcessFeedback', () => {
       createElement(
         ChakraProvider,
         { value: system } as ComponentProps<typeof ChakraProvider>,
-        createElement(SamProcessFeedback, {
+        createElement(SamStatusSlot, {
           error: null,
           errorText: null,
           isBusy: true,
@@ -290,18 +251,25 @@ describe('SamProcessFeedback', () => {
     expect(markup).not.toContain('role="alert"');
   });
 
-  it('renders nothing when ready without an error', () => {
+  it('reserves an empty polite live region when ready without an error', () => {
     const markup = renderToStaticMarkup(
-      createElement(SamProcessFeedback, {
-        error: null,
-        errorText: null,
-        isBusy: false,
-        statusText: 'Ready',
-        technicalDetailsLabel: 'Technical details',
-      })
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(SamStatusSlot, {
+          error: null,
+          errorText: null,
+          isBusy: false,
+          statusText: 'Ready',
+          technicalDetailsLabel: 'Technical details',
+        })
+      )
     );
 
-    expect(markup).toBe('');
+    expect(markup).toContain('role="status"');
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).not.toContain('Ready');
+    expect(markup).not.toContain('role="alert"');
   });
 
   it('server-renders a known localized error as the assertive primary message', () => {
@@ -309,7 +277,7 @@ describe('SamProcessFeedback', () => {
       createElement(
         ChakraProvider,
         { value: system } as ComponentProps<typeof ChakraProvider>,
-        createElement(SamProcessFeedback, {
+        createElement(SamStatusSlot, {
           error: { code: 'decode' },
           errorText: 'The object preview could not be decoded.',
           isBusy: false,
@@ -329,7 +297,7 @@ describe('SamProcessFeedback', () => {
       createElement(
         ChakraProvider,
         { value: system } as ComponentProps<typeof ChakraProvider>,
-        createElement(SamProcessFeedback, {
+        createElement(SamStatusSlot, {
           error: { code: 'unknown', detail: 'GPU worker disconnected' },
           errorText: 'Select Object could not finish.',
           isBusy: false,
@@ -353,7 +321,7 @@ describe('SamProcessFeedback', () => {
       createElement(
         ChakraProvider,
         { value: system } as ComponentProps<typeof ChakraProvider>,
-        createElement(SamProcessFeedback, {
+        createElement(SamStatusSlot, {
           error: { code: 'queue', detail: 'AttributeError' },
           errorText,
           isBusy: false,
@@ -371,19 +339,21 @@ describe('SamProcessFeedback', () => {
   });
 });
 
-describe('compact SAM inputs', () => {
-  it('uses compact model-row copy without the removed stacked section heading', () => {
+describe('single-row SAM inputs', () => {
+  it('uses bar-scale copy including the settings popover and bbox indicator labels', () => {
     expect(en.widgets.layers.selectObject.model).toBe('Model');
     expect(en.widgets.layers.selectObject.refine).toBe('Refine');
-    expect(en.widgets.layers.selectObject.autoProcessCompact).toBe('Auto');
-    expect(en.widgets.layers.selectObject.isolatedPreviewCompact).toBe('Isolate');
+    expect(en.widgets.layers.selectObject.autoProcess).toBe('Auto Process');
+    expect(en.widgets.layers.selectObject.isolatedPreview).toBe('Isolated Preview');
+    expect(en.widgets.layers.selectObject.settings).toBe('Select Object settings');
+    expect(en.widgets.layers.selectObject.bbox).toBe('BBox');
     expect(en.widgets.layers.selectObject.technicalDetails).toBe('Technical details');
     expect(en.widgets.layers.selectObject.sourceDimensions).toBe('{{width}} × {{height}}');
     expect(en.widgets.layers.selectObject.sourceDimensionsLabel).toContain('{{width}}');
     expect(en.widgets.layers.selectObject.includeCount).toBe('Include {{count}}');
     expect(en.widgets.layers.selectObject.excludeCount).toBe('Exclude {{count}}');
-    expect(en.widgets.layers.selectObject).not.toHaveProperty('modelAndRefinement');
-    expect(en.widgets.layers.selectObject).not.toHaveProperty('sourceSummary');
+    expect(en.widgets.layers.selectObject).not.toHaveProperty('autoProcessCompact');
+    expect(en.widgets.layers.selectObject).not.toHaveProperty('isolatedPreviewCompact');
   });
 
   it('server-renders Prompt as a one-line accessible input', () => {
@@ -403,7 +373,7 @@ describe('compact SAM inputs', () => {
     expect(markup).not.toContain('<textarea');
   });
 
-  it('server-renders the visual controls as one labeled row without permanent guidance', () => {
+  it('server-renders the visual controls as one labeled group without permanent guidance', () => {
     const session = snapshot({
       input: {
         bbox: { height: 8, width: 12, x: 1, y: 2 },
@@ -416,19 +386,21 @@ describe('compact SAM inputs', () => {
       createElement(
         ChakraProvider,
         { value: system } as ComponentProps<typeof ChakraProvider>,
-        createElement(SamVisualBody, {
-          disabled: false,
-          onExclude: () => undefined,
-          onInclude: () => undefined,
-          session: session as SamSessionSnapshot & {
-            input: Extract<SamSessionSnapshot['input'], { type: 'visual' }>;
-          },
-          viewModel: getSamPanelViewModel(
-            session,
-            (width, height) => `${width} × ${height}`,
-            (width, height) => `Generation area ${width} × ${height}`
-          ),
-        })
+        createElement(
+          I18nextProvider,
+          { i18n: testI18n },
+          createElement(SamVisualInput, {
+            disabled: false,
+            onExclude: () => undefined,
+            onInclude: () => undefined,
+            pointLabel: session.pointLabel,
+            viewModel: getSamPanelViewModel(
+              session,
+              (width, height) => `${width} × ${height}`,
+              (width, height) => `Generation area ${width} × ${height}`
+            ),
+          })
+        )
       )
     );
 
@@ -437,12 +409,15 @@ describe('compact SAM inputs', () => {
     expect(markup).not.toContain('title=');
     expect(markup).toContain('aria-describedby="sam-visual-guidance"');
     expect(markup).toContain('id="sam-visual-guidance"');
+    expect(markup).toContain('Include 1');
+    expect(markup).toContain('Exclude 1');
+    expect(markup).toContain('Bounding box active');
     expect(markup).not.toContain('>widgets.layers.selectObject.pointType<');
   });
 });
 
 describe('getSamActionHandlers', () => {
-  it('wires every compact footer action and save target to the engine', () => {
+  it('wires every bar action and save target to the engine', () => {
     const engine = {
       applySelectObjectSession: vi.fn(),
       cancelSelectObjectSession: vi.fn(),
@@ -472,8 +447,8 @@ describe('getSamActionHandlers', () => {
   });
 });
 
-describe('SamOptionsPanel', () => {
-  it('server-renders the compact ready state in semantic order with one footer action row', () => {
+describe('SamOptionsBar', () => {
+  it('server-renders one row of controls in stable order without panel slots', () => {
     const engine = {
       applySelectObjectSession: vi.fn(),
       cancelSelectObjectSession: vi.fn(),
@@ -489,7 +464,7 @@ describe('SamOptionsPanel', () => {
         createElement(
           I18nextProvider,
           { i18n: testI18n },
-          createElement(SamOptionsPanel, {
+          createElement(SamOptionsBar, {
             engine: engine as never,
             session: snapshot({
               hasPreview: true,
@@ -501,15 +476,20 @@ describe('SamOptionsPanel', () => {
       )
     );
 
-    expect(markup.indexOf('data-slot="header"')).toBeLessThan(markup.indexOf('data-slot="body"'));
-    expect(markup.indexOf('data-slot="body"')).toBeLessThan(markup.indexOf('data-slot="footer"'));
-    expect(markup).not.toContain('data-slot="feedback"');
-    expect(markup).toContain('>Auto<');
-    expect(markup).toContain('>Isolate<');
-    expect(markup).toContain('aria-label="Generation area: 1024 × 768"');
+    expect(markup).not.toContain('data-slot="header"');
+    expect(markup).not.toContain('data-slot="body"');
+    expect(markup).not.toContain('data-slot="footer"');
+    expect(markup).not.toContain('data-operation=');
+    expect(markup).toContain('Generation area: 1024 × 768');
+    expect(markup).toContain('aria-label="Select Object settings"');
+    expect(markup).toContain('aria-label="Save As"');
+    expect(markup.indexOf('>Visual<')).toBeLessThan(markup.indexOf('Include 1'));
+    expect(markup.indexOf('Include 1')).toBeLessThan(markup.indexOf('>Invert<'));
+    expect(markup.indexOf('>Invert<')).toBeLessThan(markup.indexOf('aria-label="Select Object settings"'));
+    expect(markup.indexOf('aria-label="Select Object settings"')).toBeLessThan(markup.indexOf('>Process<'));
     expect(markup.indexOf('>Process<')).toBeLessThan(markup.indexOf('>Reset<'));
     expect(markup.indexOf('>Reset<')).toBeLessThan(markup.indexOf('>Apply<'));
-    expect(markup.indexOf('>Apply<')).toBeLessThan(markup.indexOf('Save As'));
-    expect(markup.indexOf('Save As')).toBeLessThan(markup.indexOf('>Cancel<'));
+    expect(markup.indexOf('>Apply<')).toBeLessThan(markup.indexOf('aria-label="Save As"'));
+    expect(markup.indexOf('aria-label="Save As"')).toBeLessThan(markup.indexOf('>Cancel<'));
   });
 });
