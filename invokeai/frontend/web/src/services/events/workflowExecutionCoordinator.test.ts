@@ -138,6 +138,13 @@ const buildInvocationErrorEvent = (overrides: Partial<S['InvocationErrorEvent']>
     ...overrides,
   }) as S['InvocationErrorEvent'];
 
+const buildQueueClearedEvent = (overrides: Partial<S['QueueClearedEvent']> = {}): S['QueueClearedEvent'] =>
+  ({
+    queue_id: 'default',
+    user_id: null,
+    ...overrides,
+  }) as S['QueueClearedEvent'];
+
 const buildQueueItem = (status: S['SessionQueueItem']['status']): S['SessionQueueItem'] =>
   ({
     item_id: 1,
@@ -165,7 +172,7 @@ const buildQueueItem = (status: S['SessionQueueItem']['status']): S['SessionQueu
     },
   }) as unknown as S['SessionQueueItem'];
 
-const createCoordinatorHarness = () => {
+const createCoordinatorHarness = (currentUserId: string | null = 'user-1') => {
   const completedInvocationKeysByItemId = new Map<number, Set<string>>();
   const nodeExecutionStates: Record<string, NodeExecutionState | undefined> = {};
   const onInvocationComplete = vi.fn();
@@ -177,6 +184,7 @@ const createCoordinatorHarness = () => {
     clearCanvasWorkflowIntegrationProcessing,
     completedInvocationKeysByItemId,
     getAllNodeExecutionStates: () => nodeExecutionStates,
+    getCurrentUserId: () => currentUserId,
     getNodeExecutionState: (nodeId) => nodeExecutionStates[nodeId],
     logReconciliationError,
     onInvocationComplete,
@@ -333,10 +341,51 @@ describe(createWorkflowExecutionCoordinator.name, () => {
     coordinator.onQueueItemStatusChanged(
       buildQueueStatusEvent({ item_id: 2, status: 'completed', origin: 'workflows' })
     );
-    coordinator.onQueueCleared();
+    expect(coordinator.onQueueCleared(buildQueueClearedEvent({ user_id: null }))).toBe(true);
 
     expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 1 }))).toBe(false);
     expect(queueItemRequests.get(2)?.abort).toHaveBeenCalled();
+  });
+
+  it('applies a queue clear scoped to the current user', () => {
+    const { coordinator, queueItemRequests } = createCoordinatorHarness('user-1');
+
+    coordinator.onQueueItemStatusChanged(buildQueueStatusEvent({ item_id: 1, status: 'in_progress', origin: null }));
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 1 }))).toBe(true);
+    coordinator.onQueueItemStatusChanged(
+      buildQueueStatusEvent({ item_id: 2, status: 'completed', origin: 'workflows' })
+    );
+
+    expect(coordinator.onQueueCleared(buildQueueClearedEvent({ user_id: 'user-1' }))).toBe(true);
+
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 1 }))).toBe(false);
+    expect(queueItemRequests.get(2)?.abort).toHaveBeenCalled();
+  });
+
+  it("does not disturb this user's items when another user's scoped clear is broadcast", async () => {
+    // In multiuser mode a user-scoped clear only deletes that user's rows, but the queue_cleared
+    // event is broadcast to every queue subscriber (sanitized to user_id="redacted" for
+    // non-owner, non-admin recipients). This client's items were not touched: its in-flight
+    // reconciliation must complete and its in-progress item must keep accepting events.
+    const { coordinator, nodeExecutionStates, queueItemRequests } = createCoordinatorHarness('user-b');
+
+    coordinator.onQueueItemStatusChanged(
+      buildQueueStatusEvent({ item_id: 1, status: 'completed', origin: 'workflows' })
+    );
+    coordinator.onQueueItemStatusChanged(buildQueueStatusEvent({ item_id: 2, status: 'in_progress', origin: null }));
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 2 }))).toBe(true);
+
+    expect(coordinator.onQueueCleared(buildQueueClearedEvent({ user_id: 'redacted' }))).toBe(false);
+
+    expect(queueItemRequests.get(1)?.abort).not.toHaveBeenCalled();
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 2 }))).toBe(true);
+
+    queueItemRequests.get(1)?.resolve(buildQueueItem('completed'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(nodeExecutionStates['node-1']?.status).toBe(zNodeStatus.enum.COMPLETED);
+    expect(nodeExecutionStates['node-1']?.outputs).toHaveLength(1);
   });
 
   it('still clears canvas workflow integration processing on late invocation errors', () => {

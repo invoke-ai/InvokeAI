@@ -59604,9 +59604,22 @@
             "description": "The ID of the queue",
             "title": "Queue Id",
             "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The ID of the user whose queue items were cleared, or None if all users' items were cleared",
+            "title": "User Id"
           }
         },
-        "required": ["timestamp", "queue_id"],
+        "required": ["timestamp", "queue_id", "user_id"],
         "title": "QueueClearedEvent",
         "type": "object"
       },

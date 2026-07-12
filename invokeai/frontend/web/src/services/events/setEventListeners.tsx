@@ -4,6 +4,7 @@ import { socketConnected } from 'app/store/middleware/listenerMiddleware/listene
 import type { AppStore } from 'app/store/store';
 import { parseify } from 'common/util/serialize';
 import { isNil, round } from 'es-toolkit/compat';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
@@ -71,6 +72,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     clearCanvasWorkflowIntegrationProcessing: () => dispatch(canvasWorkflowIntegrationProcessingCompleted()),
     completedInvocationKeysByItemId,
     getAllNodeExecutionStates: () => $nodeExecutionStates.get(),
+    getCurrentUserId: () => selectCurrentUser(getState())?.user_id ?? null,
     getNodeExecutionState: (nodeId) => $nodeExecutionStates.get()[nodeId],
     logReconciliationError: (error, itemId) => {
       log.debug({ error: parseify(error) }, `Unable to reconcile workflow queue item ${itemId}`);
@@ -540,9 +542,13 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Queue cleared');
     // Clearing the queue deletes the in-progress item without emitting a per-item terminal status
     // event, so the progress bar must be reset here — and the coordinator must mark its tracked
-    // items terminal so a trailing invocation_progress event cannot repopulate the bar.
-    workflowExecutionCoordinator.onQueueCleared();
-    $lastProgressEvent.set(null);
+    // items terminal so a trailing invocation_progress event cannot repopulate the bar. The
+    // coordinator reports whether the clear applied to this client's items: a user-scoped clear
+    // by another user (multiuser mode) leaves them untouched, and only the queue tags below need
+    // refreshing.
+    if (workflowExecutionCoordinator.onQueueCleared(data)) {
+      $lastProgressEvent.set(null);
+    }
     dispatch(
       queueApi.util.invalidateTags([
         'SessionQueueStatus',

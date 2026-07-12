@@ -25206,6 +25206,12 @@ export type components = {
              * @description The ID of the queue
              */
             queue_id: string;
+            /**
+             * User Id
+             * @description The ID of the user whose queue items were cleared, or None if all users' items were cleared
+             * @default null
+             */
+            user_id: string | null;
         };
         /**
          * QueueItemStatusChangedEvent

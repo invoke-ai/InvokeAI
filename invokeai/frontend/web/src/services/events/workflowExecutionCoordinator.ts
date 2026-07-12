@@ -32,6 +32,7 @@ type WorkflowExecutionCoordinatorDeps = {
   clearCanvasWorkflowIntegrationProcessing: () => void;
   completedInvocationKeysByItemId: Map<number, Set<string>>;
   getAllNodeExecutionStates: () => Record<string, NodeExecutionState | undefined>;
+  getCurrentUserId: () => string | null;
   getNodeExecutionState: (nodeId: string) => NodeExecutionState | undefined;
   logReconciliationError: (error: unknown, itemId: number) => void;
   onInvocationComplete: (data: S['InvocationCompleteEvent']) => void;
@@ -75,7 +76,16 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
     pendingWorkflowReconciliationRequests.clear();
   };
 
-  const onQueueCleared = () => {
+  const onQueueCleared = (data: S['QueueClearedEvent']): boolean => {
+    // A user-scoped clear (multiuser mode) deletes only that user's queue items, but the event is
+    // broadcast to every queue subscriber (sanitized to user_id="redacted" for non-owner,
+    // non-admin recipients). Another user's clear leaves this client's items untouched, so it must
+    // not mark them canceled or abort their pending reconciliations. An unscoped clear
+    // (user_id=null — an admin or single-user clear) deletes everything and always applies.
+    const clearedUserId = data.user_id ?? null;
+    if (clearedUserId !== null && clearedUserId !== deps.getCurrentUserId()) {
+      return false;
+    }
     // Clearing the queue deletes its items without emitting per-item terminal status events, so the
     // tracked items must be marked terminal here for trailing invocation events to be rejected.
     cancelPendingWorkflowReconciliations();
@@ -86,6 +96,7 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
       }
       workflowExecutionStates.set(itemId, { ...state, queueStatus: 'canceled' });
     }
+    return true;
   };
 
   const reconcileWorkflowQueueItemResults = (itemId: number, status: TerminalQueueStatus) => {
