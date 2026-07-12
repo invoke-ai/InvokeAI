@@ -133,25 +133,17 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.shared')}
                 </Badge>
               )}
-              {listItemState.showUnsupportedBadge && (
-                <Tooltip
-                  label={
-                    listItemState.unsupportedMessageKey
-                      ? t(listItemState.unsupportedMessageKey)
-                      : t('workflows.savedWorkflowUnsupportedDescription')
-                  }
+              {listItemState.showCallableBadge && (
+                <Badge
+                  color="invokeBlue.400"
+                  borderColor="invokeBlue.700"
+                  borderWidth={1}
+                  bg="transparent"
+                  flexShrink={0}
+                  variant="subtle"
                 >
-                  <Badge
-                    color="warning.300"
-                    borderColor="warning.600"
-                    borderWidth={1}
-                    bg="transparent"
-                    flexShrink={0}
-                    variant="subtle"
-                  >
-                    {t('nodes.savedWorkflowUnsupported')}
-                  </Badge>
-                </Tooltip>
+                  {t('workflows.callable')}
+                </Badge>
               )}
               {listItemState.showDefaultIcon && (
                 <Image
@@ -170,13 +162,6 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
           <Text variant="subtext" fontSize="xs" noOfLines={3}>
             {workflow.description}
           </Text>
-          {listItemState.showUnsupportedBadge && (
-            <Text variant="subtext" fontSize="xs" noOfLines={2} color="warning.300">
-              {listItemState.unsupportedMessageKey
-                ? t(listItemState.unsupportedMessageKey)
-                : t('workflows.savedWorkflowUnsupportedDescription')}
-            </Text>
-          )}
           {tags.length > 0 && (
             <Text fontSize="xs" noOfLines={1}>
               <Text as="span" color="base.400">
