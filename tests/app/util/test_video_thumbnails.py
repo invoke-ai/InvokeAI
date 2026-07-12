@@ -113,9 +113,12 @@ class TestStreamedDecoderIsBounded:
         assert frames[0].shape == (32, 48, 3)
 
     def test_consumer_time_does_not_count_as_decoder_inactivity(self, synthetic_mp4: Path) -> None:
-        frames = iter_video_frames(synthetic_mp4, timeout=0.2)
+        frames = iter_video_frames(synthetic_mp4, timeout=2.0)
         next(frames)
-        time.sleep(0.4)
+        # Sleep longer than the inactivity timeout. This time belongs to the consumer and
+        # must not expire the decoder, while the two-second window avoids treating normal
+        # process/FFmpeg scheduling latency on macOS CI as a decoder hang.
+        time.sleep(2.2)
         assert next(frames).shape == (32, 48, 3)
 
     def test_times_out_when_worker_stops_producing_frames(self, hanging_worker, tmp_path: Path) -> None:
