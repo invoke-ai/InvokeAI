@@ -1,5 +1,13 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsUncommittedCanvasTextSessionActive } from 'features/controlLayers/hooks/useIsUncommittedCanvasTextSessionActive';
+import {
+  canonicalizeHotkeyString,
+  formatHotkeyStringForPlatform,
+  getHotkeyStringAliases,
+  type HotkeyKeyboardLayoutMap,
+  IS_MAC_OS,
+} from 'features/system/components/HotkeysModal/hotkeyStrings';
+import { useKeyboardLayoutMap } from 'features/system/components/HotkeysModal/useKeyboardLayoutMap';
 import { selectCustomHotkeys } from 'features/system/store/hotkeysSlice';
 import { useMemo } from 'react';
 import { type HotkeyCallback, type Options, useHotkeys } from 'react-hotkeys-hook';
@@ -8,16 +16,7 @@ import { assert } from 'tsafe';
 
 type HotkeyCategory = 'app' | 'canvas' | 'viewer' | 'gallery' | 'workflows';
 
-// Centralized platform detection - computed once
-export const IS_MAC_OS =
-  typeof navigator !== 'undefined' &&
-  (
-    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ??
-    navigator.platform ??
-    ''
-  )
-    .toLowerCase()
-    .includes('mac');
+export { IS_MAC_OS } from 'features/system/components/HotkeysModal/hotkeyStrings';
 
 export type Hotkey = {
   id: string;
@@ -36,17 +35,15 @@ type HotkeysData = Record<HotkeyCategory, HotkeyCategoryData>;
 type HotkeyTranslator = (key: string) => string;
 type CustomHotkeys = Record<string, string[]>;
 
-const formatKeysForPlatform = (keys: string[]): string[][] => {
-  return keys.map((k) => {
-    if (IS_MAC_OS) {
-      return k.split('+').map((i) => i.replaceAll('mod', 'cmd').replaceAll('alt', 'option'));
-    } else {
-      return k.split('+').map((i) => i.replaceAll('mod', 'ctrl'));
-    }
-  });
+const formatKeysForPlatform = (keys: string[], keyboardLayoutMap?: HotkeyKeyboardLayoutMap | null): string[][] => {
+  return keys.map((key) => formatHotkeyStringForPlatform(key, IS_MAC_OS, keyboardLayoutMap));
 };
 
-export const buildHotkeysData = (t: HotkeyTranslator, customHotkeys: CustomHotkeys): HotkeysData => {
+export const buildHotkeysData = (
+  t: HotkeyTranslator,
+  customHotkeys: CustomHotkeys,
+  keyboardLayoutMap?: HotkeyKeyboardLayoutMap | null
+): HotkeysData => {
   const data: HotkeysData = {
     app: {
       title: t('hotkeys.app.title'),
@@ -72,15 +69,16 @@ export const buildHotkeysData = (t: HotkeyTranslator, customHotkeys: CustomHotke
 
   const addHotkey = (category: HotkeyCategory, id: string, keys: string[], isEnabled: boolean = true) => {
     const hotkeyId = `${category}.${id}`;
-    const effectiveKeys = customHotkeys[hotkeyId] ?? keys;
+    const defaultHotkeys = keys.map((key) => canonicalizeHotkeyString(key, IS_MAC_OS));
+    const effectiveKeys = customHotkeys[hotkeyId] ?? defaultHotkeys;
     data[category].hotkeys[id] = {
       id,
       category,
       title: t(`hotkeys.${category}.${id}.title`),
       desc: t(`hotkeys.${category}.${id}.desc`),
       hotkeys: effectiveKeys,
-      defaultHotkeys: keys,
-      platformKeys: formatKeysForPlatform(effectiveKeys),
+      defaultHotkeys,
+      platformKeys: formatKeysForPlatform(effectiveKeys, keyboardLayoutMap),
       isEnabled,
     };
   };
@@ -111,8 +109,8 @@ export const buildHotkeysData = (t: HotkeyTranslator, customHotkeys: CustomHotke
   // Canvas
   addHotkey('canvas', 'selectBrushTool', ['b']);
   addHotkey('canvas', 'selectBboxTool', ['c']);
-  addHotkey('canvas', 'decrementToolWidth', ['[']);
-  addHotkey('canvas', 'incrementToolWidth', [']']);
+  addHotkey('canvas', 'decrementToolWidth', ['bracketleft']);
+  addHotkey('canvas', 'incrementToolWidth', ['bracketright']);
   addHotkey('canvas', 'selectEraserTool', ['e']);
   addHotkey('canvas', 'selectMoveTool', ['v']);
   addHotkey('canvas', 'selectRectTool', ['u']);
@@ -139,8 +137,8 @@ export const buildHotkeysData = (t: HotkeyTranslator, customHotkeys: CustomHotke
   addHotkey('canvas', 'invertMask', ['shift+v']);
   addHotkey('canvas', 'undo', ['mod+z']);
   addHotkey('canvas', 'redo', ['mod+shift+z', 'mod+y']);
-  addHotkey('canvas', 'nextEntity', ['alt+]']);
-  addHotkey('canvas', 'prevEntity', ['alt+[']);
+  addHotkey('canvas', 'nextEntity', ['alt+bracketright']);
+  addHotkey('canvas', 'prevEntity', ['alt+bracketleft']);
   addHotkey('canvas', 'applyFilter', ['enter']);
   addHotkey('canvas', 'cancelFilter', ['esc']);
   addHotkey('canvas', 'applyTransform', ['enter']);
@@ -185,7 +183,7 @@ export const buildHotkeysData = (t: HotkeyTranslator, customHotkeys: CustomHotke
   addHotkey('gallery', 'galleryNavDownAlt', ['alt+down']);
   addHotkey('gallery', 'galleryNavLeftAlt', ['alt+left']);
   addHotkey('gallery', 'deleteSelection', ['delete', 'backspace']);
-  addHotkey('gallery', 'starImage', ['.']);
+  addHotkey('gallery', 'starImage', ['period']);
 
   return data;
 };
@@ -193,8 +191,12 @@ export const buildHotkeysData = (t: HotkeyTranslator, customHotkeys: CustomHotke
 export const useHotkeyData = (): HotkeysData => {
   const { t } = useTranslation();
   const customHotkeys = useAppSelector(selectCustomHotkeys);
+  const keyboardLayoutMap = useKeyboardLayoutMap();
 
-  const hotkeysData = useMemo<HotkeysData>(() => buildHotkeysData((key) => t(key), customHotkeys), [customHotkeys, t]);
+  const hotkeysData = useMemo<HotkeysData>(
+    () => buildHotkeysData((key) => t(key), customHotkeys, keyboardLayoutMap),
+    [customHotkeys, keyboardLayoutMap, t]
+  );
 
   return hotkeysData;
 };
@@ -212,7 +214,11 @@ export const useHotkeyConflictMap = (): Map<string, HotkeyConflictInfo> => {
     for (const [category, categoryData] of Object.entries(hotkeysData)) {
       for (const [id, hotkeyData] of Object.entries(categoryData.hotkeys)) {
         for (const hotkeyString of hotkeyData.hotkeys) {
-          map.set(hotkeyString, { category, id, title: hotkeyData.title, fullId: `${category}.${id}` });
+          for (const hotkeyStringAlias of getHotkeyStringAliases(hotkeyString, IS_MAC_OS)) {
+            if (!map.has(hotkeyStringAlias)) {
+              map.set(hotkeyStringAlias, { category, id, title: hotkeyData.title, fullId: `${category}.${id}` });
+            }
+          }
         }
       }
     }
