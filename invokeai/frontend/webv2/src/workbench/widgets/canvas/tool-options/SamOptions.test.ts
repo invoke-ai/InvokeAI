@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import {
+  getSamPanelViewModel,
   getSamActionEligibility,
   getSamErrorTranslationKey,
   getSamStatusTranslationKey,
@@ -96,6 +97,41 @@ describe('getSamActionEligibility', () => {
       canProcess: false,
       canReset: false,
       canSave: false,
+    });
+  });
+});
+
+describe('getSamPanelViewModel', () => {
+  it('derives visual counts, bbox state, and generation-area source summary', () => {
+    expect(
+      getSamPanelViewModel(
+        snapshot({
+          input: {
+            bbox: { height: 8, width: 12, x: 1, y: 2 },
+            excludePoints: [{ x: 3, y: 4 }],
+            includePoints: [
+              { x: 1, y: 2 },
+              { x: 2, y: 3 },
+            ],
+            type: 'visual',
+          },
+          sourceRect: { height: 768, width: 1024, x: 64, y: 32 },
+        })
+      )
+    ).toEqual({
+      bboxActive: true,
+      excludeCount: 1,
+      includeCount: 2,
+      sourceSummary: '1024 × 768 generation area',
+    });
+  });
+
+  it('returns zero visual counts for prompt mode', () => {
+    expect(getSamPanelViewModel(snapshot({ input: { prompt: 'cat', type: 'prompt' } }))).toEqual({
+      bboxActive: false,
+      excludeCount: 0,
+      includeCount: 0,
+      sourceSummary: '20 × 20 generation area',
     });
   });
 });

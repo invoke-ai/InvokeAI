@@ -1319,12 +1319,16 @@
         "preview": "Preview",
         "replace": "Replace",
         "running": "Running filter…",
+        "statusCommitting": "Applying filter…",
+        "statusError": "Filter needs attention.",
         "stale": "The layer changed while filtering. Preview it again.",
         "title": "Filter",
         "unsupported": "This layer content cannot be filtered."
       },
       "selectObject": {
         "autoProcess": "Auto Process",
+        "bboxActive": "Bounding box active",
+        "bboxInactive": "No bounding box",
         "errorDecode": "The object preview could not be decoded.",
         "errorEmpty": "The canvas area has no visible content to select.",
         "errorInvalid": "Add an object prompt, point, or bounding box before processing.",
@@ -1341,9 +1345,13 @@
         "invert": "Invert",
         "isolatedPreview": "Isolated Preview",
         "model": "Segment Anything model",
+        "modelAndRefinement": "Model and refinement",
         "modelHuge": "SAM Huge",
         "modelSam2Large": "SAM 2 Large",
         "prompt": "Object prompt",
+        "promptGuidance": "Describe the object you want to select.",
+        "promptMode": "Prompt",
+        "pointType": "Point type",
         "process": "Process",
         "refine": "Refine mask edges",
         "reset": "Reset",
@@ -1360,7 +1368,9 @@
         "statusRenderingPreview": "Rendering object preview…",
         "statusScheduled": "Waiting to process object…",
         "statusUploading": "Uploading canvas composite…",
-        "visual": "Visual"
+        "title": "Select Object",
+        "visual": "Visual",
+        "visualGuidance": "Click to add · drag to move · Shift flips type"
       },
       "runWorkflow": {
         "aborted": "Workflow run was canceled.",

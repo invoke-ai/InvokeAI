@@ -1,9 +1,12 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/engine';
 import type { FilterOperationSessionState } from '@workbench/widgets/layers/filterOperationSession';
 
+import { ChakraProvider } from '@chakra-ui/react';
+import { system } from '@theme/system';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { getFilterActionEligibility, getFilterSaveTargetEligibility } from './FilterOptions';
+import { FilterPanelHeading, getFilterActionEligibility, getFilterSaveTargetEligibility } from './FilterOptions';
 
 const state = (patch: Partial<FilterOperationSessionState> = {}): FilterOperationSessionState => ({
   draft: { settings: {}, type: 'canny_edge_detection' },
@@ -103,5 +106,19 @@ describe('getFilterActionEligibility', () => {
         })
       )
     ).toMatchObject({ canProcess: false });
+  });
+});
+
+describe('FilterPanelHeading', () => {
+  it('identifies the filter target from the available snapshot fields', () => {
+    const markup = renderToStaticMarkup(
+      <ChakraProvider value={system}>
+        <FilterPanelHeading layerId="layer-1" layerType="raster" title="Filter" />
+      </ChakraProvider>
+    );
+
+    expect(markup).toContain('Filter');
+    expect(markup).toContain('Raster layer');
+    expect(markup).toContain('layer-1');
   });
 });
