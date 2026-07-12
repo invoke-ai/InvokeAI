@@ -183,3 +183,86 @@ def test_model_manager_gemini_starter_model_applies_reference_and_resolution_ove
         "16:9",
         "21:9",
     ]
+
+
+def _make_stats_services(ram_caches: dict) -> Any:
+    class _Load:
+        pass
+
+    load = _Load()
+    load.ram_caches = ram_caches
+
+    class _ModelManager:
+        pass
+
+    mm = _ModelManager()
+    mm.load = load
+    services = type("Services", (), {})()
+    services.model_manager = mm
+    return services
+
+
+def test_get_stats_aggregates_per_device_caches(monkeypatch: Any, client: TestClient) -> None:
+    """In multi-GPU mode there is one cache per device; the stats endpoint must not report only
+    the API thread's default cache."""
+    from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+
+    class _Cache:
+        def __init__(self, stats: CacheStats | None) -> None:
+            self.stats = stats
+
+    stats_0 = CacheStats(hits=3, misses=1, in_cache=2, cleared=1, cache_size=100, high_watermark=80)
+    stats_0.loaded_model_sizes = {"m1": 50}
+    stats_1 = CacheStats(hits=5, misses=2, in_cache=1, cleared=0, cache_size=200, high_watermark=120)
+    stats_1.loaded_model_sizes = {"m2": 70}
+
+    services = _make_stats_services({"cuda:0": _Cache(stats_0), "cuda:1": _Cache(stats_1)})
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.get("/api/v2/models/stats")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["hits"] == 8
+    assert payload["misses"] == 3
+    assert payload["in_cache"] == 3
+    assert payload["cleared"] == 1
+    assert payload["cache_size"] == 300
+    assert payload["high_watermark"] == 200
+    assert payload["loaded_model_sizes"] == {"m1": 50, "m2": 70}
+
+
+def test_get_stats_counts_duplicate_cache_objects_once(monkeypatch: Any, client: TestClient) -> None:
+    """ram_caches can map several device keys to the same cache object (the default cache is
+    always included under its own device key); its stats must not be double-counted."""
+    from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+
+    class _Cache:
+        def __init__(self, stats: CacheStats | None) -> None:
+            self.stats = stats
+
+    shared = _Cache(CacheStats(hits=4, misses=2, in_cache=1, cache_size=100, high_watermark=60))
+    services = _make_stats_services({"cuda:0": shared, "cpu": shared})
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.get("/api/v2/models/stats")
+
+    assert response.status_code == 200
+    assert response.json()["hits"] == 4
+
+
+def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClient) -> None:
+    class _Cache:
+        def __init__(self) -> None:
+            self.stats = None
+
+    services = _make_stats_services({"cuda:0": _Cache(), "cuda:1": _Cache()})
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.get("/api/v2/models/stats")
+
+    assert response.status_code == 200
+    assert response.json() is None

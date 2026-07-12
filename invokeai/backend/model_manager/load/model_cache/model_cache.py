@@ -1148,6 +1148,12 @@ class ModelCache:
             self._delete_cache_entry(entry)
             dropped.append(entry)
 
+        # Also forget this model's canonical shared CPU weights. A locked (stale-marked) entry keeps
+        # its shared-store reference alive until unlock; without this, another device's rebuild of
+        # the same key would acquire() that old canonical and silently adopt the pre-change weights.
+        if self._shared_cpu_weights is not None:
+            self._shared_cpu_weights.invalidate(model_key)
+
         if dropped:
             if self.stats:
                 self.stats.cleared = len(dropped)

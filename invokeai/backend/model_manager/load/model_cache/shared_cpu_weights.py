@@ -106,19 +106,45 @@ class SharedCpuWeightsStore:
             entry = self._entries.get(key)
             return entry.shell if entry is not None else None
 
-    def release(self, key: str) -> None:
+    def release(self, key: str, state_dict: dict[str, torch.Tensor] | None = None) -> None:
         """Release one reference to `key`'s canonical state dict, freeing it when the count hits 0.
 
         A `release()` for a key that is not present is a no-op (e.g. a cached model that never
         acquired shared weights, or a double eviction guard).
+
+        When `state_dict` is given, the release only applies if it is the *same object* as the
+        current canonical. This protects against a holder of an `invalidate()`d entry releasing
+        after a new canonical has been registered under the same key: without the identity check,
+        that stale release would decrement the new entry's refcount and could free weights still
+        aliased by live cached models.
         """
         with self._lock:
             entry = self._entries.get(key)
             if entry is None:
                 return
+            if state_dict is not None and entry.state_dict is not state_dict:
+                return
             entry.refcount -= 1
             if entry.refcount <= 0:
                 del self._entries[key]
+
+    def invalidate(self, model_key: str) -> int:
+        """Forget the canonical entries (and shells) for `model_key` and all of its submodels, so no
+        future `acquire()`/`peek()` can adopt them. Returns the number of entries forgotten.
+
+        Used when a load-affecting model setting changes: the canonical weights were built under the
+        old settings and must not be re-adopted by any device's next load, even while a locked (in
+        use, marked-stale) cache entry still aliases them. The forgotten tensors stay alive through
+        the cached models that hold them and are garbage-collected as those are evicted; their later
+        `release()` calls become identity-mismatched no-ops (see `release()`). Until then,
+        `total_bytes_in_use()` no longer counts the retired weights.
+        """
+        prefix = f"{model_key}:"
+        with self._lock:
+            doomed = [key for key in self._entries if key == model_key or key.startswith(prefix)]
+            for key in doomed:
+                del self._entries[key]
+            return len(doomed)
 
     # -- Introspection / accounting (also used by tests) ----------------------------------------
 

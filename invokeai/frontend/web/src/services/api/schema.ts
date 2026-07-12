@@ -826,7 +826,9 @@ export type paths = {
         };
         /**
          * Get model manager RAM cache performance statistics.
-         * @description Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded.
+         * @description Return performance statistics on the model manager's RAM cache. In multi-GPU mode there is
+         *     one cache per generation device; their statistics are aggregated. Will return null if no models
+         *     have been loaded.
          */
         get: operations["get_stats"];
         put?: never;
@@ -16797,7 +16799,7 @@ export type components = {
             max_queue_size?: number;
             /**
              * Session Queue Mode
-             * @description Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.
+             * @description Session queue mode. Use 'FIFO' for strict first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In round-robin mode, priority orders each user's own jobs, but the user rotation takes precedence: one user's high-priority job does not preempt another user's turn. In single-user mode, jobs are served in submission order either way — except that on multi-GPU systems the default 'round_robin' allows same-priority jobs to be reordered slightly so a freed GPU prefers jobs whose models it already has loaded. Set 'FIFO' to disable that reordering and enforce strict submission order.
              * @default round_robin
              * @enum {string}
              */

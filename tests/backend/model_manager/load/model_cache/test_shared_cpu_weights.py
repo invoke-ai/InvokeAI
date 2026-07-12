@@ -104,3 +104,38 @@ def test_concurrent_acquire_release_is_consistent():
     # Every acquire was paired with a release, so only the pre-registration reference remains.
     assert store.refcount("k") == 1
     assert store.total_bytes_in_use() == 420
+
+
+def test_invalidate_forgets_key_and_submodels():
+    store = SharedCpuWeightsStore()
+    store.acquire("k", _state_dict())
+    store.acquire("k:unet", _state_dict())
+    store.acquire("other", _state_dict())
+
+    assert store.invalidate("k") == 2
+    assert "k" not in store
+    assert "k:unet" not in store
+    assert store.peek("k") is None
+    # Unrelated key untouched.
+    assert store.refcount("other") == 1
+
+
+def test_release_with_identity_mismatch_is_noop():
+    """A holder of an invalidated canonical must not decrement a NEW canonical registered under
+    the same key after the invalidation — that would free weights still aliased by live models."""
+    store = SharedCpuWeightsStore()
+    old = _state_dict()
+    store.acquire("k", old)
+    store.invalidate("k")
+
+    new = _state_dict()
+    store.acquire("k", new)
+    assert store.refcount("k") == 1
+
+    # The stale holder releases with its (retired) dict: no-op.
+    store.release("k", old)
+    assert store.refcount("k") == 1
+
+    # The legitimate holder releases with the current dict: frees the entry.
+    store.release("k", new)
+    assert "k" not in store

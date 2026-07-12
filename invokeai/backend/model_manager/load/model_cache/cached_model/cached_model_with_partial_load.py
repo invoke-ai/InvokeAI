@@ -29,6 +29,9 @@ class CachedModelWithPartialLoad:
         # under `cache_key`; `release_shared_weights()` must be called exactly once on eviction.
         self._shared_store: SharedCpuWeightsStore | None = None
         self._shared_key: str | None = None
+        # Assigned for real at the end of __init__; initialized here so the acquire-failure path
+        # below can call release_shared_weights(), which reads it, before that assignment runs.
+        self._cpu_state_dict: dict[str, torch.Tensor] | None = None
 
         model_state_dict = model.state_dict()
         # A CPU read-only copy of the model's state dict. Used for faster model unloads from VRAM, and to speed up LoRA
@@ -72,7 +75,7 @@ class CachedModelWithPartialLoad:
                 self.release_shared_weights()
                 raise
 
-        self._cpu_state_dict: dict[str, torch.Tensor] | None = cpu_state_dict
+        self._cpu_state_dict = cpu_state_dict
 
     def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
         """Find all modules that support autocasting."""
@@ -173,7 +176,7 @@ class CachedModelWithPartialLoad:
         held this key releases it.
         """
         if self._shared_store is not None and self._shared_key is not None:
-            self._shared_store.release(self._shared_key)
+            self._shared_store.release(self._shared_key, self._cpu_state_dict)
             self._shared_store = None
             self._shared_key = None
 

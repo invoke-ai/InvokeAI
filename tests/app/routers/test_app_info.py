@@ -229,6 +229,9 @@ def test_update_runtime_config_persists_generation_devices(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient
 ) -> None:
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    # The route verifies the requested devices exist before persisting; simulate a 2-GPU box.
+    monkeypatch.setattr(app_info.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(app_info.torch.cuda, "device_count", lambda: 2)
 
     response = client.patch("/api/v1/app/runtime_config", json={"generation_devices": ["cuda:0", "cuda:1"]})
 
@@ -265,6 +268,45 @@ def test_update_runtime_config_rejects_null_generation_devices(
     response = client.patch("/api/v1/app/runtime_config", json={"generation_devices": None})
 
     assert response.status_code == 422
+
+
+def test_update_runtime_config_rejects_empty_generation_devices(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """An empty list is rejected by InvokeAIAppConfig validation at startup; the route must reject
+    it up front with a 422 (not a 500) and without touching the config."""
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    devices_before = get_config().generation_devices
+
+    response = client.patch("/api/v1/app/runtime_config", json={"generation_devices": []})
+
+    assert response.status_code == 422
+    assert get_config().generation_devices == devices_before
+
+
+def test_update_runtime_config_rejects_unavailable_generation_device(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """A syntactically valid but nonexistent device (e.g. 'cuda:99' on a 2-GPU box) must be
+    rejected with a 422 before anything is persisted — otherwise the config file fails on the
+    next startup."""
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr(app_info.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(app_info.torch.cuda, "device_count", lambda: 2)
+    devices_before = get_config().generation_devices
+
+    response = client.patch("/api/v1/app/runtime_config", json={"generation_devices": ["cuda:99"]})
+
+    assert response.status_code == 422
+    assert "cuda:99" in response.json()["detail"]
+    assert get_config().generation_devices == devices_before
+
+    # No CUDA at all: any cuda device is rejected.
+    monkeypatch.setattr(app_info.torch.cuda, "is_available", lambda: False)
+    response = client.patch("/api/v1/app/runtime_config", json={"generation_devices": ["cuda:0"]})
+
+    assert response.status_code == 422
+    assert get_config().generation_devices == devices_before
 
 
 def test_get_generation_device_options_lists_devices(

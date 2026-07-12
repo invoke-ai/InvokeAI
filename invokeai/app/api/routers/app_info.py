@@ -28,6 +28,7 @@ from invokeai.app.services.invocation_cache.invocation_cache_common import Invoc
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
 
@@ -155,6 +156,10 @@ class UpdateAppGenerationSettingsRequest(BaseModel):
     ) -> Union[Literal["auto"], list[str], None]:
         if v is None or v == "auto":
             return v
+        # Mirror the InvokeAIAppConfig validator: an empty list would be rejected there anyway,
+        # but catching it here turns an eventual 500 into a request-validation 422.
+        if len(v) == 0:
+            raise ValueError("generation_devices cannot be an empty list. Use 'auto' or a list of devices.")
         for device in v:
             if not _GENERATION_DEVICE_PATTERN.match(device):
                 raise ValueError(
@@ -213,6 +218,14 @@ async def update_runtime_config(
     _: AdminUserOrDefault,
     changes: UpdateAppGenerationSettingsRequest = Body(description="Writable runtime configuration changes"),
 ) -> InvokeAIAppConfigWithSetFields:
+    # The request model validates the *shape* of generation_devices; also verify the devices exist
+    # on this machine before persisting, so we can't write a config that fails on the next startup
+    # (e.g. 'cuda:99' on a 2-GPU box). Same resolution the startup path uses.
+    if changes.generation_devices is not None:
+        try:
+            TorchDevice.get_generation_devices(changes.generation_devices)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
     with _EXTERNAL_PROVIDER_CONFIG_LOCK:
         config = get_config()
         update_dict = changes.model_dump(exclude_unset=True)

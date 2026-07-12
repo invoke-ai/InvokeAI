@@ -116,7 +116,7 @@ These options set the paths of various directories and files used by InvokeAI. A
 
 #### Multi-GPU Generation
 
-On a machine with more than one GPU, InvokeAI can run several generation sessions at the same time — one per GPU — instead of processing the queue one job at a time. Jobs are distributed fairly across users, so a single user's large batch cannot monopolize every GPU while others wait.
+On a machine with more than one GPU, InvokeAI can run several generation sessions at the same time — one per GPU — instead of processing the queue one job at a time. In multi-user deployments with the default `session_queue_mode: round_robin`, jobs are distributed fairly across users, so a single user's large batch cannot monopolize every GPU while others wait.
 
 This is controlled by the `generation_devices` setting:
 
@@ -129,9 +129,8 @@ generation_devices: auto # default value
 | `auto`                          | Use every available CUDA GPU, running one generation session per GPU concurrently. This is the default.             |
 | `[cuda:0,cuda:1]`         | Use the specific devices listed, one session per device. Useful for reserving a GPU for other work.                 |
 | `[cuda:0]`                | Use a single specific device. Generation runs serially, as it did before multi-GPU support.                                 |
-| `[]`                      | Use the first detected device. Generation runs serially, as it did before multi-GPU support.                                |
 
-Each entry in the list must be one of `cpu`, `cuda`, `mps`, or `cuda:N`, where `N` is a zero-based device number (`cuda:0` is the first GPU, `cuda:1` the second, and so on).
+Each entry in the list must be one of `cpu`, `cuda`, `mps`, or `cuda:N`, where `N` is a zero-based device number (`cuda:0` is the first GPU, `cuda:1` the second, and so on). The list may not be empty — use `auto` (or a single-device list) instead.
 
 ```yaml
 # Use the first and third GPUs, leaving the second free for other tasks
@@ -141,7 +140,8 @@ generation_devices: [cuda:0, cuda:2]
 Notes:
 
 - On a system without a CUDA GPU, `auto` resolves to the single best available device (`mps` on Apple Silicon, otherwise `cpu`), so generation runs serially.
-- Each active GPU gets its own model cache, and model weights are duplicated in system RAM for every device. Running many GPUs in parallel therefore increases RAM usage — ensure you have ample system memory before enabling a large device list.
+- Each active GPU gets its own model cache, but the CPU (system RAM) copy of each model's weights is shared between the caches, so a model loaded on several GPUs is held in RAM only once. Running many GPUs in parallel can still increase RAM usage (different GPUs may hold different models), so ensure you have ample system memory before enabling a large device list.
+- When a GPU finishes a job, it prefers queued jobs whose models it already has loaded (among the same user's equal-priority jobs) to avoid slow model reloads. Set `session_queue_mode: FIFO` to disable this reordering and enforce strict submission order.
 - Duplicate entries are ignored; `[cuda:0, cuda:0]` is treated as `[cuda:0]`.
 - You can restrict which physical GPUs InvokeAI sees with the `CUDA_VISIBLE_DEVICES` environment variable. When set, `auto` only enumerates the visible subset, and `cuda:N` indices refer to positions within that subset.
 

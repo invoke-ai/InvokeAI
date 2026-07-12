@@ -93,7 +93,7 @@ class CachedModelOnlyFullLoad:
         held this key releases it.
         """
         if self._shared_store is not None and self._shared_key is not None:
-            self._shared_store.release(self._shared_key)
+            self._shared_store.release(self._shared_key, self._cpu_state_dict)
             self._shared_store = None
             self._shared_key = None
 
