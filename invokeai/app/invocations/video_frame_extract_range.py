@@ -9,7 +9,9 @@ to a usable middle section before chaining it to another shot.
 
 import tempfile
 from pathlib import Path
+from typing import Iterator, Protocol
 
+import imageio.v2 as iio2
 import imageio.v3 as iio
 import numpy as np
 
@@ -29,9 +31,32 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.primitives import VideoOutput
-from invokeai.app.invocations.video_frame_extract import _decoder_frame_count
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.video_thumbnails import probe_video
+from invokeai.app.util.video_thumbnails import decoder_frame_count, probe_video
+
+
+class _FrameWriter(Protocol):
+    def append_data(self, frame: np.ndarray) -> None: ...
+
+
+def _write_frame_range(frames: Iterator[np.ndarray], writer: _FrameWriter, start: int, end: int) -> int:
+    """Streams frames[start..end] (inclusive) from a lazy decoder into the writer.
+
+    Frames are appended one at a time as they stream past — the full range is never
+    materialized in RAM. The upload cap admits files whose decoded frames would run to
+    tens of gigabytes, so peak memory here must stay one-frame-sized regardless of the
+    requested range. Decoding stops as soon as ``end`` has been written. Returns the
+    number of frames written.
+    """
+    written = 0
+    for idx, frame in enumerate(frames):
+        if idx < start:
+            continue
+        if idx > end:
+            break
+        writer.append_data(np.ascontiguousarray(frame))
+        written += 1
+    return written
 
 
 @invocation_output("extract_video_range_output")
@@ -99,7 +124,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         video_path = context.videos.get_path(self.video.video_name)
         width, height, duration, source_fps = probe_video(video_path)
 
-        n_frames = _decoder_frame_count(video_path)
+        n_frames = decoder_frame_count(video_path)
         if n_frames is None:
             if not source_fps or duration <= 0:
                 raise ValueError(
@@ -129,42 +154,30 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         else:
             output_fps = 16.0
 
-        context.util.signal_progress(f"Decoding frames {start}-{end} of {n_frames}")
-        # imageio's iter_index isn't exposed by iio.imiter, so we enumerate and skip.
-        # The downstream slice is contiguous; bailing early after `end` keeps us from
-        # decoding the rest of the file unnecessarily for short ranges of long videos.
-        frames: list[np.ndarray] = []
-        for idx, frame in enumerate(iio.imiter(video_path, plugin="FFMPEG")):
-            if idx < start:
-                continue
-            if idx > end:
-                break
-            frames.append(np.ascontiguousarray(frame))
-
-        if not frames:
-            raise ValueError(
-                f"Decoded zero frames for range {start}-{end} of {self.video.video_name} "
-                f"(probed {n_frames} frames). The container's metadata may be inaccurate."
-            )
-
-        num_frames = len(frames)
-        out_duration = num_frames / output_fps
-        context.logger.info(
-            f"Encoding trimmed MP4: {num_frames} frames @ {output_fps:.2f} fps "
-            f"({out_duration:.2f}s) at {width}x{height}"
-        )
-        context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {output_fps:.2f} fps)")
+        context.util.signal_progress(f"Transcoding frames {start}-{end} of {n_frames} @ {output_fps:.2f} fps")
 
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".mp4", delete=False)
         tmp.close()
         tmp_path = Path(tmp.name)
         try:
-            iio.imwrite(
-                tmp_path,
-                frames,
-                plugin="FFMPEG",
-                codec="libx264",
-                fps=output_fps,
+            # imageio's iter_index isn't exposed by iio.imiter, so we enumerate and skip.
+            # Frames stream straight from the decoder into the encoder; see _write_frame_range.
+            writer = iio2.get_writer(str(tmp_path), format="FFMPEG", mode="I", fps=output_fps, codec="libx264")
+            try:
+                num_frames = _write_frame_range(iio.imiter(video_path, plugin="FFMPEG"), writer, start, end)
+            finally:
+                writer.close()
+
+            if num_frames == 0:
+                raise ValueError(
+                    f"Decoded zero frames for range {start}-{end} of {self.video.video_name} "
+                    f"(probed {n_frames} frames). The container's metadata may be inaccurate."
+                )
+
+            out_duration = num_frames / output_fps
+            context.logger.info(
+                f"Encoded trimmed MP4: {num_frames} frames @ {output_fps:.2f} fps "
+                f"({out_duration:.2f}s) at {width}x{height}"
             )
             video_dto = context.videos.save(
                 source_path=tmp_path,

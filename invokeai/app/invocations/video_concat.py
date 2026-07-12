@@ -6,15 +6,18 @@ options hide the seam between independently-denoised clips.
 
 Implementation uses imageio (FFMPEG plugin) for both decode and encode, matching
 ``wan_latents_to_video`` and ``video_thumbnails`` — so we can read our own
-output without surprises. All decoded frames live in RAM at once; this is fine
-for the short clips the I2V chain produces (a few hundred frames at 832x480),
-but be aware before piping in long uploads.
+output without surprises. Frames stream from the decoders into the encoder one
+at a time, buffering only the transition windows, so peak memory stays
+O(transition_frames) even when the inputs are long uploads (the upload cap
+admits files whose decoded frames would run to tens of gigabytes).
 """
 
 import tempfile
+from collections import deque
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Iterable, Iterator, Literal, Optional
 
+import imageio.v2 as iio2
 import imageio.v3 as iio
 import numpy as np
 
@@ -128,60 +131,31 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         width, height, _, first_fps = probes[0]
         output_fps = float(self.fps) if self.fps is not None else (first_fps or 16.0)
 
-        context.util.signal_progress(f"Decoding {len(self.videos)} clip(s)")
-        clip_frames: list[list[np.ndarray]] = []
-        for idx, p in enumerate(paths):
-            # iio.imiter is a generator — collecting to a list keeps things simple and the
-            # downstream blending math straightforward. Memory cost is fine for I2V-length
-            # clips; if this ever needs to handle hour-long uploads, switch to streaming.
-            frames = [np.ascontiguousarray(f) for f in iio.imiter(p, plugin="FFMPEG")]
-            if not frames:
-                raise ValueError(f"Input video {idx} ({self.videos[idx].video_name}) decoded to zero frames.")
-            clip_frames.append(frames)
-
-        # Validate transition windows fit within the surrounding clips.
-        if self.transition != "cut" and self.transition_frames > 0:
-            tf = self.transition_frames
-            # For fade_through_black, split tf asymmetrically so an odd tf still emits exactly
-            # tf frames (per the docstring contract). tail_half is consumed from the previous
-            # clip's tail (the fade-out), head_half from the next clip's head (the fade-in).
-            tail_half = tf // 2
-            head_half = tf - tail_half
-            for i, frames in enumerate(clip_frames):
-                # Each non-edge clip uses transition_frames from both its head and tail.
-                head_need = 0 if i == 0 else (tf if self.transition == "crossfade" else head_half)
-                tail_need = 0 if i == len(clip_frames) - 1 else (tf if self.transition == "crossfade" else tail_half)
-                if head_need + tail_need > len(frames):
-                    raise ValueError(
-                        f"Clip {i} has {len(frames)} frames but the requested transitions need "
-                        f"{head_need} from its head + {tail_need} from its tail. Lower "
-                        f"transition_frames or use longer clips."
-                    )
-
-        context.util.signal_progress(f"Joining clips ({self.transition})")
-        output_frames = self._assemble(clip_frames)
-
-        if not output_frames:
-            raise ValueError("Concatenation produced zero output frames.")
-
-        num_frames = len(output_frames)
-        duration = num_frames / output_fps
-        context.logger.info(
-            f"Encoding concatenated MP4: {num_frames} frames @ {output_fps:.2f} fps "
-            f"({duration:.2f}s) at {width}x{height}"
-        )
-        context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {output_fps:.2f} fps)")
+        context.util.signal_progress(f"Joining {len(self.videos)} clip(s) ({self.transition}) @ {output_fps:.2f} fps")
 
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_concat_", suffix=".mp4", delete=False)
         tmp.close()
         tmp_path = Path(tmp.name)
         try:
-            iio.imwrite(
-                tmp_path,
-                output_frames,
-                plugin="FFMPEG",
-                codec="libx264",
-                fps=output_fps,
+            # Frames stream from the decoders straight into the encoder; only the
+            # transition windows are buffered. See _iter_joined_frames.
+            writer = iio2.get_writer(str(tmp_path), format="FFMPEG", mode="I", fps=output_fps, codec="libx264")
+            num_frames = 0
+            try:
+                clip_iters = [iio.imiter(p, plugin="FFMPEG") for p in paths]
+                for frame in self._iter_joined_frames(clip_iters):
+                    writer.append_data(frame)
+                    num_frames += 1
+            finally:
+                writer.close()
+
+            if num_frames == 0:
+                raise ValueError("Concatenation produced zero output frames.")
+
+            duration = num_frames / output_fps
+            context.logger.info(
+                f"Encoded concatenated MP4: {num_frames} frames @ {output_fps:.2f} fps "
+                f"({duration:.2f}s) at {width}x{height}"
             )
             video_dto = context.videos.save(
                 source_path=tmp_path,
@@ -198,40 +172,65 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             except Exception:
                 pass
 
-    def _assemble(self, clip_frames: list[list[np.ndarray]]) -> list[np.ndarray]:
-        if self.transition == "cut" or self.transition_frames == 0:
-            return [f for frames in clip_frames for f in frames]
+    def _iter_joined_frames(self, clips: list[Iterable[np.ndarray]]) -> Iterator[np.ndarray]:
+        """Yields the joined output frames, pulling lazily from each clip's frame iterator.
 
-        tf = self.transition_frames
-        if self.transition == "crossfade":
-            # Reduction layout: keep clip[i] minus tf from its tail (except the last clip),
-            # then insert tf blended frames at each boundary.
-            output: list[np.ndarray] = []
-            for i, frames in enumerate(clip_frames):
-                head_trim = 0 if i == 0 else tf
-                tail_trim = 0 if i == len(clip_frames) - 1 else tf
-                output.extend(frames[head_trim : len(frames) - tail_trim])
-                if i < len(clip_frames) - 1:
-                    a_tail = frames[len(frames) - tail_trim :]
-                    b_head = clip_frames[i + 1][:tf]
-                    output.extend(_crossfade(a_tail, b_head))
-            return output
+        A frame is emitted as soon as it can no longer participate in a transition, so at
+        most one transition window (the previous clip's tail plus the current clip's head,
+        each bounded by ``transition_frames``) is buffered at a time — never a whole clip.
 
-        # fade_through_black: each boundary emits exactly `tf` frames. To preserve that
-        # contract for odd tf, the fade-out (consumed from clip[i] tail) gets tf // 2 frames
-        # and the fade-in (consumed from clip[i+1] head) gets the remainder. Even tf is
-        # symmetric as before.
-        tail_half = tf // 2
-        head_half = tf - tail_half
-        if tail_half == 0 and head_half == 0:
-            return [f for frames in clip_frames for f in frames]
-        output_ftb: list[np.ndarray] = []
-        for i, frames in enumerate(clip_frames):
-            head_trim = 0 if i == 0 else head_half
-            tail_trim = 0 if i == len(clip_frames) - 1 else tail_half
-            output_ftb.extend(frames[head_trim : len(frames) - tail_trim])
-            if i < len(clip_frames) - 1:
-                a_tail = frames[len(frames) - tail_trim :] if tail_trim else []
-                b_head = clip_frames[i + 1][:head_half] if head_half else []
-                output_ftb.extend(_fade_through_black(a_tail, b_head))
-        return output_ftb
+        Transition layout matches the class docstring:
+
+        * ``crossfade`` consumes ``tf`` frames from both sides of each boundary and emits
+          ``tf`` blended frames in their place.
+        * ``fade_through_black`` splits ``tf`` asymmetrically (``tf // 2`` from the previous
+          clip's tail, the remainder from the next clip's head) so an odd ``tf`` still emits
+          exactly ``tf`` frames per boundary.
+
+        Raises ValueError if a clip decodes to zero frames or is too short to supply its
+        transition windows. Because frames stream straight into the encoder, that error can
+        surface mid-encode; the caller discards the partial output file.
+        """
+        if self.transition == "crossfade" and self.transition_frames > 0:
+            tail_need = head_need = self.transition_frames
+            blend = _crossfade
+        elif self.transition == "fade_through_black" and self.transition_frames > 0:
+            tail_need = self.transition_frames // 2
+            head_need = self.transition_frames - tail_need
+            blend = _fade_through_black
+        else:
+            # "cut", or a zero-length transition: plain concatenation.
+            tail_need = head_need = 0
+            blend = None
+
+        a_tail: list[np.ndarray] = []
+        for i, clip in enumerate(clips):
+            head_want = 0 if i == 0 else head_need
+            tail_keep = 0 if i == len(clips) - 1 else tail_need
+            b_head: list[np.ndarray] = []
+            tail_buf: deque[np.ndarray] = deque()
+            n_frames = 0
+            for frame in clip:
+                frame = np.ascontiguousarray(frame)
+                n_frames += 1
+                # The clip's first head_want frames are consumed into the boundary blend
+                # with the previous clip's tail rather than emitted directly.
+                if len(b_head) < head_want:
+                    b_head.append(frame)
+                    if len(b_head) == head_want and blend is not None:
+                        yield from blend(a_tail, b_head)
+                    continue
+                # Hold back the last tail_keep frames seen so far; anything older is
+                # guaranteed not to be part of the next boundary and can be emitted.
+                tail_buf.append(frame)
+                if len(tail_buf) > tail_keep:
+                    yield tail_buf.popleft()
+            if n_frames == 0:
+                raise ValueError(f"Input video {i} ({self.videos[i].video_name}) decoded to zero frames.")
+            if n_frames < head_want + tail_keep:
+                raise ValueError(
+                    f"Clip {i} has {n_frames} frames but the requested transitions need "
+                    f"{head_want} from its head + {tail_keep} from its tail. Lower "
+                    f"transition_frames or use longer clips."
+                )
+            a_tail = list(tail_buf)
