@@ -1,4 +1,4 @@
-import type { CanvasCompositeExportGuard } from '@workbench/canvas-engine/engine';
+import type { CanvasCompositeExportGuard, SelectObjectLifecycleGuard } from '@workbench/canvas-engine/engine';
 import type { SamSessionError } from '@workbench/canvas-engine/engineStores';
 import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
@@ -35,6 +35,12 @@ const replacementGuard: CanvasCompositeExportGuard = {
   documentFingerprint: 'document:4',
   participants: [{ cacheVersion: 4, layer, layerId: layer.id }],
 };
+const lifecycleGuard: SelectObjectLifecycleGuard = {
+  bbox: guard.bbox,
+  documentGeneration: guard.documentGeneration,
+  kind: 'select-object-lifecycle',
+  projectId: guard.projectId,
+};
 const rect = { height: 12, width: 16, x: -5, y: 7 };
 const blob = new Blob(['source'], { type: 'image/png' });
 
@@ -50,7 +56,9 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
   let currentGuard: CanvasCompositeExportGuard | null = guard;
   let controllerSubscriber: (() => void) | null = null;
   const unsubscribe = vi.fn();
-  const baseController = createCanvasOperationController({ isGuardCurrent: (candidate) => candidate === currentGuard });
+  const baseController = createCanvasOperationController({
+    isGuardCurrent: (candidate) => candidate === lifecycleGuard,
+  });
   const controller = {
     ...baseController,
     subscribe: vi.fn((listener: () => void) => {
@@ -76,7 +84,15 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
     uploadIntermediate: vi.fn(() => Promise.resolve({ height: 12, imageName: 'input.png', width: 16 })),
     ...overrides,
   };
-  const session = createSelectObjectSession({ deps, projectId: 'p1' });
+  const operation = controller.start({
+    cleanupPreview: deps.cleanupPreview,
+    guard: lifecycleGuard,
+    identity: { kind: 'select-object', projectId: 'p1' },
+  });
+  if (!operation) {
+    throw new Error('expected Select Object operation');
+  }
+  const session = createSelectObjectSession({ deps, operation });
   session.update({ input: { prompt: 'cat', type: 'prompt' } });
   return {
     controller,
@@ -137,7 +153,8 @@ describe('createSelectObjectSession', () => {
     const oldPending = harness.session.process();
     await vi.waitFor(() => expect(harness.session.getSnapshot().status).toBe('uploading'));
 
-    harness.controller.invalidateSource('p1', layer.id);
+    harness.setCurrentGuard(replacementGuard);
+    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
     const newPending = harness.session.process();
     await expect(newPending).resolves.toBe('published');
     const readyIndex = phases.lastIndexOf('ready');
@@ -292,13 +309,14 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot().error).toEqual({ code: 'unknown', detail: 'legacy failure detail' });
   });
 
-  it('clears a failed process error when controller source invalidation returns the session to ready', async () => {
+  it('does not close or clear a failed process on cache-only source invalidation', async () => {
     const harness = createHarness({ runGraph: vi.fn(() => Promise.reject(new Error('graph failed'))) });
     await expect(harness.session.process()).resolves.toBe('error');
 
     harness.controller.invalidateSource('p1', layer.id);
 
-    expect(harness.session.getSnapshot()).toMatchObject({ error: null, status: 'ready' });
+    expect(harness.session.getSnapshot()).toMatchObject({ error: { code: 'queue' }, status: 'error' });
+    expect(harness.controller.getSnapshot()).toMatchObject({ status: 'active' });
   });
 
   it('reuses an uploaded export only while its exact guard remains current', async () => {
@@ -328,16 +346,14 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
   });
 
-  it.each(['source', 'layer', 'project', 'document'] as const)(
+  it.each(['layer', 'project', 'document'] as const)(
     'invalidates the cached export and preview on %s invalidation',
     async (kind) => {
       const harness = createHarness();
       await harness.session.process();
       vi.mocked(harness.deps.cleanupPreview).mockClear();
 
-      if (kind === 'source') {
-        harness.controller.invalidateSource('p1', layer.id);
-      } else if (kind === 'layer') {
+      if (kind === 'layer') {
         harness.controller.invalidateLayer('p1', layer.id);
       } else if (kind === 'project') {
         harness.controller.invalidateProject('p1');
@@ -362,7 +378,8 @@ describe('createSelectObjectSession', () => {
     const oldPending = harness.session.process();
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
 
-    harness.controller.invalidateSource('p1', layer.id);
+    harness.setCurrentGuard(replacementGuard);
+    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
     const newPending = harness.session.process();
 
     expect(newPending).not.toBe(oldPending);
@@ -385,12 +402,13 @@ describe('createSelectObjectSession', () => {
       exportComposite: vi
         .fn()
         .mockImplementationOnce(() => oldExport.promise)
-        .mockImplementationOnce(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
+        .mockImplementationOnce(() => Promise.resolve({ blob, guard: replacementGuard, rect, status: 'ok' as const })),
     });
     const oldPending = harness.session.process();
     await vi.waitFor(() => expect(harness.deps.exportComposite).toHaveBeenCalledOnce());
 
-    harness.controller.invalidateSource('p1', layer.id);
+    harness.setCurrentGuard(replacementGuard);
+    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
     const newPending = harness.session.process();
 
     expect(newPending).not.toBe(oldPending);
@@ -415,7 +433,8 @@ describe('createSelectObjectSession', () => {
     const oldPending = harness.session.process();
     await vi.waitFor(() => expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce());
 
-    harness.controller.invalidateSource('p1', layer.id);
+    harness.setCurrentGuard(replacementGuard);
+    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
     const newPending = harness.session.process();
 
     expect(newPending).not.toBe(oldPending);
@@ -756,7 +775,7 @@ describe('createSelectObjectSession', () => {
         preview: null,
         status: 'ready',
       });
-      expect(harness.deps.controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
+      expect(harness.controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
     }
   );
 

@@ -2,11 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   closeLayerPropertiesForOperation,
+  getLayerPropertiesOwnershipKey,
   isLayerPropertiesOpen,
   runLayerFilterOperation,
 } from './layerPropertiesOperation';
 
 describe('closeLayerPropertiesForOperation', () => {
+  it('uses separate ownership across editing-lock transitions so trigger state cannot reopen after cancel', () => {
+    expect(getLayerPropertiesOwnershipKey(false)).not.toBe(getLayerPropertiesOwnershipKey(true));
+  });
+
   it.each([
     { requestToken: null, triggerOpen: true },
     { requestToken: 42, triggerOpen: false },

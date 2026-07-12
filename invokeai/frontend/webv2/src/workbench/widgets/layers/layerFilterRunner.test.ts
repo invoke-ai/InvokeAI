@@ -1,7 +1,7 @@
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it } from 'vitest';
 
-import { resolveFilterOutputRect, runLayerFilter } from './layerFilterRunner';
+import { LayerFilterOutputDimensionError, resolveFilterOutputRect, runLayerFilter } from './layerFilterRunner';
 
 describe('resolveFilterOutputRect', () => {
   const source = { height: 60, width: 80, x: 12, y: 24 };
@@ -45,18 +45,43 @@ describe('resolveFilterOutputRect', () => {
     ).toBe(expectedX);
   });
 
-  it('retains the source rect for dimension-preserving filters', () => {
-    expect(
+  it('rejects wrong metadata dimensions for dimension-preserving filters', () => {
+    expect(() =>
       resolveFilterOutputRect({
         filterType: 'canny_edge_detection',
         output: { height: 999, width: 999 },
         source,
       })
+    ).toThrow(LayerFilterOutputDimensionError);
+  });
+
+  it('retains the source rect for exact dimension-preserving output', () => {
+    expect(
+      resolveFilterOutputRect({ filterType: 'canny_edge_detection', output: { height: 60, width: 80 }, source })
     ).toEqual(source);
   });
 });
 
 describe('runLayerFilter', () => {
+  it('returns an actionable typed error for wrong dimension-preserving output metadata', async () => {
+    const surface = createTestStubRasterBackend().createSurface(80, 60);
+
+    await expect(
+      runLayerFilter({
+        deps: {
+          encodeSurface: () => Promise.resolve(new Blob()),
+          runFilterGraph: () => Promise.resolve({ height: 60, imageName: 'wrong', width: 79 }),
+          uploadIntermediate: () => Promise.resolve({ imageName: 'input' }),
+        },
+        filterType: 'canny_edge_detection',
+        input: { rect: { height: 60, width: 80, x: 12, y: 24 }, surface },
+      })
+    ).rejects.toMatchObject({
+      code: 'output-dimension',
+      message: 'Canny Edge Detection output dimensions 79x60 do not match source dimensions 80x60.',
+    });
+  });
+
   it('encodes, uploads, builds, and runs a filter in order', async () => {
     const surface = createTestStubRasterBackend().createSurface(80, 60);
     const blob = new Blob(['pixels'], { type: 'image/png' });

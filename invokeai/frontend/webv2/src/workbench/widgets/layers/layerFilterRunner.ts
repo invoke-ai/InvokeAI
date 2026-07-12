@@ -27,6 +27,23 @@ export interface RunLayerFilterOptions {
   };
 }
 
+const filterName = (filterType: string): string =>
+  filterType
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+export class LayerFilterOutputDimensionError extends Error {
+  readonly code = 'output-dimension' as const;
+
+  constructor(filterType: string, output: { width: number; height: number }, source: Rect) {
+    super(
+      `${filterName(filterType)} output dimensions ${String(output.width)}x${String(output.height)} do not match source dimensions ${source.width}x${source.height}.`
+    );
+    this.name = 'LayerFilterOutputDimensionError';
+  }
+}
+
 export const resolveFilterOutputRect = (options: {
   filterType: string;
   output: { width: number; height: number };
@@ -49,6 +66,9 @@ export const resolveFilterOutputRect = (options: {
   }
   if (options.filterType === 'spandrel_filter') {
     return { ...options.output, x: options.source.x, y: options.source.y };
+  }
+  if (options.output.width !== options.source.width || options.output.height !== options.source.height) {
+    throw new LayerFilterOutputDimensionError(options.filterType, options.output, options.source);
   }
   return { ...options.source };
 };

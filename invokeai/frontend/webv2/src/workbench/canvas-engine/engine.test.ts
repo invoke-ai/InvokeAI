@@ -9205,11 +9205,94 @@ describe('guarded filter previews', () => {
     source: { fill: '#fff', height: 10, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
   });
 
+  const filterBitmapBackend = (width = 10, height = 10): StubRasterBackend => ({
+    ...createTestStubRasterBackend(),
+    createImageBitmap: () => Promise.resolve({ close: () => undefined, height, width } as unknown as ImageBitmap),
+  });
+
+  it.each(['apply', 'raster'] as const)(
+    'rejects a decoded dimension mismatch for canny %s without scaling, then retries successfully',
+    async (target) => {
+      const source = guardableLayer('dimension-source');
+      const document = { ...emptyDoc(), layers: [source], selectedLayerId: source.id };
+      const { projectId, store } = createReducerBackedStore(document);
+      const base = createTestStubRasterBackend();
+      const decodedDimensions = [
+        { height: 10, width: 9 },
+        { height: 10, width: 10 },
+        { height: 9, width: 10 },
+        { height: 10, width: 10 },
+      ];
+      const decodedBitmaps: ImageBitmap[] = [];
+      const surfaces: StubRasterSurface[] = [];
+      const backend: StubRasterBackend = {
+        ...base,
+        createImageBitmap: () => {
+          const dimensions = decodedDimensions.shift();
+          if (!dimensions) {
+            throw new Error('unexpected filter decode');
+          }
+          const bitmap = { ...dimensions, close: vi.fn(), decodedFilter: true } as unknown as ImageBitmap;
+          decodedBitmaps.push(bitmap);
+          return Promise.resolve(bitmap);
+        },
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      };
+      const engine = createCanvasEngine({
+        backend,
+        bitmapStore: createSpyBitmapStore(),
+        filterDeps: {
+          runGraph: () =>
+            Promise.resolve({ height: 10, imageName: 'canny.png', origin: 'test', output: {}, width: 10 }),
+          uploadIntermediate: () => Promise.resolve({ imageName: 'input.png' }),
+        },
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      expect((await engine.exportLayerPixels(source.id)).status).toBe('ok');
+      expect(engine.startFilterOperation(source.id)).toBe('started');
+
+      await expect(engine.processFilterOperation()).resolves.toBe('stale');
+      expect(engine.stores.filterSession.get()).toMatchObject({
+        error: 'Canny Edge Detection output dimensions 9x10 do not match source dimensions 10x10.',
+        preview: null,
+        status: 'error',
+      });
+      expect(engine.getDocument()).toEqual(document);
+
+      await expect(engine.processFilterOperation()).resolves.toBe('completed');
+      await expect(engine.commitFilterOperation(target, () => Promise.resolve())).resolves.toBe('stale');
+      expect(engine.stores.filterSession.get()).toMatchObject({
+        error: 'Canny Edge Detection output dimensions 10x9 do not match source dimensions 10x10.',
+        preview: { imageName: 'canny.png' },
+        status: 'error',
+      });
+      expect(engine.getDocument()).toEqual(document);
+
+      await expect(engine.commitFilterOperation(target, () => Promise.resolve())).resolves.toBe('committed');
+
+      const bitmapDraws = surfaces.flatMap((surface) =>
+        surface.callLog.filter(
+          (entry) => entry.op === 'drawImage' && decodedBitmaps.includes(entry.args[0] as ImageBitmap)
+        )
+      );
+      expect(bitmapDraws.length).toBeGreaterThan(0);
+      expect(bitmapDraws.every((entry) => entry.args.length === 3)).toBe(true);
+      expect(engine.getDocument()?.layers).toHaveLength(target === 'apply' ? 1 : 2);
+      engine.dispose();
+    }
+  );
+
   it('interaction lock blocks Filter and Select Object launches without creating sessions', async () => {
     const layer = guardableLayer('locked-launch');
     const { store } = createReactiveStore({ ...emptyDoc(), layers: [layer] });
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: filterBitmapBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
@@ -9230,7 +9313,7 @@ describe('guarded filter previews', () => {
     const layer = guardableLayer('active-before-lock');
     const { store } = createReactiveStore({ ...emptyDoc(), layers: [layer] });
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: filterBitmapBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
@@ -9303,7 +9386,7 @@ describe('guarded filter previews', () => {
     const document = { ...emptyDoc(), layers: [layer] };
     const { store } = createReactiveStore(document);
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: filterBitmapBackend(),
       filterDeps: {
         runGraph: vi.fn(() =>
           Promise.resolve({ height: 10, imageName: 'filtered', origin: 'canvas', output: {}, width: 10 })
@@ -9472,7 +9555,7 @@ describe('guarded filter previews', () => {
     const document = { ...emptyDoc(), layers: [source], selectedLayerId: source.id };
     const { projectId, store } = createReducerBackedStore(document);
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: filterBitmapBackend(),
       bitmapStore: createSpyBitmapStore(),
       filterDeps: {
         runGraph: vi.fn(() =>
@@ -9548,7 +9631,7 @@ describe('guarded filter previews', () => {
     const graph = createDeferred<{ height: number; imageName: string; origin: string; output: {}; width: number }>();
     const runGraph = vi.fn(() => graph.promise);
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: filterBitmapBackend(),
       bitmapStore: createSpyBitmapStore(),
       filterDeps: {
         runGraph,
@@ -9607,7 +9690,7 @@ describe('guarded filter previews', () => {
       const document = { ...emptyDoc(), layers: [source], selectedLayerId: source.id };
       const { projectId, store } = createReducerBackedStore(document);
       const engine = createCanvasEngine({
-        backend: createTestStubRasterBackend(),
+        backend: filterBitmapBackend(output.width, output.height),
         bitmapStore: createSpyBitmapStore(),
         filterDeps: {
           runGraph: vi.fn(() =>
@@ -9743,7 +9826,7 @@ describe('guarded filter previews', () => {
     const uploadSignals: AbortSignal[] = [];
     let uploadCount = 0;
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: filterBitmapBackend(),
       bitmapStore: createSpyBitmapStore(),
       filterDeps: {
         runGraph: () =>
@@ -12700,6 +12783,66 @@ describe('Select Object canvas engine integration', () => {
     return { ...reactive, engine, fireKey, overlay, raf, screen };
   };
 
+  it('keeps Select Object visible and inputs intact when first Process rasterizes a missing candidate, then retries', async () => {
+    const bbox = { height: 100, width: 100, x: 0, y: 0 };
+    const reactive = createReactiveStore(samDocument());
+    const runGraph = vi.fn(() =>
+      Promise.resolve({ height: bbox.height, imageName: 'sam-mask.png', origin: 'test', width: bbox.width })
+    );
+    const engine = createCanvasEngine({
+      backend: {
+        ...createTestStubRasterBackend(),
+        createImageBitmap: () =>
+          Promise.resolve({ close: () => undefined, height: bbox.height, width: bbox.width } as unknown as ImageBitmap),
+      },
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      selectObjectDeps: {
+        runGraph,
+        uploadIntermediate: () =>
+          Promise.resolve({ height: bbox.height, imageName: 'sam-source.png', width: bbox.width }),
+      },
+      store: reactive.store,
+    });
+    const input = { prompt: 'keep this', type: 'prompt' as const };
+    expect(engine.startSelectObject()).toBe('started');
+    engine.updateSelectObjectSession({ input, invert: true });
+
+    await expect(engine.processSelectObjectSession()).resolves.toBe('error');
+
+    expect(runGraph).not.toHaveBeenCalled();
+    expect(engine.canvasOperations.getSnapshot()).toMatchObject({ phase: 'error', status: 'active' });
+    expect(engine.stores.samSession.get()).toMatchObject({ hasPreview: false, input, invert: true });
+
+    await expect(engine.processSelectObjectSession()).resolves.toBe('published');
+    expect(runGraph).toHaveBeenCalledOnce();
+    expect(engine.stores.samSession.get()).toMatchObject({ hasPreview: true, input, invert: true, status: 'ready' });
+    engine.dispose();
+  });
+
+  it.each(['bbox', 'document', 'project'] as const)(
+    'fully clears Select Object session, store, operation, and tool on %s invalidation',
+    async (kind) => {
+      const h = await createSamHarness();
+      expect(h.engine.startSelectObject()).toBe('started');
+      const document = h.engine.getDocument()!;
+
+      if (kind === 'bbox') {
+        h.setDocument({ ...document, bbox: { ...document.bbox, x: document.bbox.x + 1 } });
+      } else if (kind === 'document') {
+        h.setDocument({ ...document }, 1);
+      } else {
+        h.setActiveProjectId('p2');
+      }
+
+      expect(h.engine.stores.samSession.get()).toBeNull();
+      expect(h.engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+      expect(h.engine.stores.activeTool.get()).toBe('view');
+      h.engine.dispose();
+    }
+  );
+
   const createCommittingSamHarness = async (
     imageResolver: (imageName: string, signal?: AbortSignal) => Promise<Blob> = () => Promise.resolve(new Blob()),
     backend: StubRasterBackend = createTestStubRasterBackend(),
@@ -13607,12 +13750,11 @@ describe('Select Object canvas engine integration', () => {
     expect(uploadIntermediate).not.toHaveBeenCalled();
     nextImage.resolve(new Blob(['inside']));
     await expect(firstProcess).resolves.not.toBe('published');
-    expect(h.engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
-
-    expect(h.engine.startSelectObject()).toBe('started');
-    h.engine.updateSelectObjectSession({
+    expect(h.engine.canvasOperations.getSnapshot()).toMatchObject({ phase: 'error', status: 'active' });
+    expect(h.engine.stores.samSession.get()).toMatchObject({
       input: { bbox: null, excludePoints: [], includePoints: [{ x: 2, y: 2 }], type: 'visual' },
     });
+
     await expect(h.engine.processSelectObjectSession()).resolves.toBe('published');
     expect(uploadIntermediate).toHaveBeenCalledOnce();
     expect(runGraph).toHaveBeenCalledOnce();

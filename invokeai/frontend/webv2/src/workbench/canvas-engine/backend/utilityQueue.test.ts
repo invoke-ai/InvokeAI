@@ -762,6 +762,55 @@ describe('runUtilityGraph — timeout + cancellation', () => {
 });
 
 describe('runUtilityGraph — enqueue failures', () => {
+  it.each([
+    { enqueued: 1, itemIds: [], label: 'accepted count without ids', canceled: [] },
+    { enqueued: 1, itemIds: [Number.NaN], label: 'non-finite id', canceled: [] },
+    { enqueued: 1, itemIds: [0], label: 'non-positive id', canceled: [] },
+    { enqueued: Number.NaN, itemIds: [11], label: 'non-finite accepted count', canceled: [11] },
+    { enqueued: 1.5, itemIds: [11], label: 'fractional accepted count', canceled: [11] },
+    { enqueued: -1, itemIds: [11], label: 'negative accepted count', canceled: [11] },
+    { enqueued: 2, itemIds: [11, 11], label: 'duplicate ids', canceled: [11] },
+    { enqueued: 2, itemIds: [11], label: 'count mismatch', canceled: [11] },
+  ])('immediately rejects $label and fully cleans up', async ({ canceled, enqueued, itemIds }) => {
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
+    const promise = runUtilityGraph({
+      cancel,
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued, itemIds }),
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+    });
+
+    await expect(promise).rejects.toMatchObject({ reason: 'enqueue' });
+    await Promise.resolve();
+
+    expect(cancel).toHaveBeenCalledTimes(canceled.length > 0 ? 1 : 0);
+    if (canceled.length > 0) {
+      expect(cancel).toHaveBeenCalledWith(canceled);
+    }
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('accepts a valid multi-item enqueue response', async () => {
+    const fake = createFakeHub();
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 2, itemIds: [11, 12] }),
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+    });
+    await Promise.resolve();
+
+    fake.emit('invocation_complete', completeEvent());
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+
+    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
+  });
+
   it('contains a synchronous enqueue throw and cleans listeners with timeout disabled', async () => {
     vi.useFakeTimers();
     const fake = createFakeHub();

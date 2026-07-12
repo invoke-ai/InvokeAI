@@ -1,6 +1,7 @@
 import type { BoxProps, FlexProps, StackProps } from '@chakra-ui/react';
 
 import { Box, Flex, Stack } from '@chakra-ui/react';
+import { forwardRef } from 'react';
 
 export const BOTTOM_OVERLAY_LAYOUT = {
   bottom: '2',
@@ -24,7 +25,7 @@ export const BOTTOM_OVERLAY_STACK_LAYOUT = {
 
 export const BOTTOM_CONTROLS_SLOT_LAYOUT = {
   align: 'center',
-  flex: '1',
+  flex: '0 1 auto',
   justify: 'center',
   minH: '0',
   minW: '0',
@@ -32,13 +33,14 @@ export const BOTTOM_CONTROLS_SLOT_LAYOUT = {
   w: 'full',
 } satisfies FlexProps;
 
-const Root = ({ children }: BoxProps) => (
-  <Box {...BOTTOM_OVERLAY_LAYOUT}>
+const Root = forwardRef<HTMLDivElement, BoxProps>(({ children, ...props }, ref) => (
+  <Box ref={ref} {...BOTTOM_OVERLAY_LAYOUT} {...props}>
     <Stack {...BOTTOM_OVERLAY_STACK_LAYOUT} gap="2">
       {children}
     </Stack>
   </Box>
-);
+));
+Root.displayName = 'CanvasBottomOverlay.Root';
 
 const Staging = (props: BoxProps) => <Box flexShrink="0" {...props} />;
 

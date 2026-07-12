@@ -61,6 +61,25 @@ export type UtilityCancel = (itemIds: number[]) => Promise<void>;
 
 type UtilityImageOutput = { height: number; imageName: string; width: number };
 
+const inspectUtilityEnqueueResult = (result: unknown) => {
+  const response = result as { itemIds?: unknown; enqueued?: unknown } | null;
+  const rawItemIds = Array.isArray(response?.itemIds) ? response.itemIds : [];
+  const itemIds = [
+    ...new Set(
+      rawItemIds.filter(
+        (id): id is number => typeof id === 'number' && Number.isFinite(id) && Number.isInteger(id) && id > 0
+      )
+    ),
+  ];
+  const enqueued = response?.enqueued;
+  const valid =
+    Number.isInteger(enqueued) &&
+    (enqueued as number) > 0 &&
+    itemIds.length === rawItemIds.length &&
+    itemIds.length === enqueued;
+  return { itemIds, result: valid ? { enqueued: enqueued as number, itemIds } : null };
+};
+
 /** Deterministically reads a completed queue item's target output. */
 export type UtilityCompletedOutputReconciler = (
   itemIds: number[],
@@ -474,11 +493,20 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     void Promise.resolve()
       .then(() => enqueue({ graph, origin }))
       .then((result) => {
-        enqueueResult = result;
+        const inspected = inspectUtilityEnqueueResult(result);
+        const validResult = inspected.result;
+        if (!validResult) {
+          const knownItemIds = inspected.itemIds;
+          enqueueResult = { enqueued: knownItemIds.length, itemIds: knownItemIds };
+          requestBackendCancellation();
+          settleReject(
+            new UtilityQueueError('enqueue', 'The backend returned an inconsistent utility enqueue response.')
+          );
+          return;
+        }
+        enqueueResult = validResult;
         cancelAcceptedItems();
-        if (!settled && result.enqueued === 0) {
-          settleReject(new UtilityQueueError('enqueue', 'The backend queue did not accept the utility graph.'));
-        } else {
+        if (!settled) {
           reconcileCompletion();
         }
       })

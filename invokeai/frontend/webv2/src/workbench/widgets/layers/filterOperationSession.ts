@@ -49,7 +49,12 @@ export interface FilterOperationSessionDeps {
     settings: Record<string, unknown>;
     signal: AbortSignal;
   }): Promise<LayerFilterResult>;
-  publishPreview(imageName: string, rect: Rect, guard: LayerExportGuard): Promise<'shown' | 'missing' | 'stale'>;
+  publishPreview(
+    imageName: string,
+    rect: Rect,
+    guard: LayerExportGuard,
+    filterType: string
+  ): Promise<'shown' | 'missing' | 'stale'>;
   clearPreview(): void;
   isGuardCurrent(guard: LayerExportGuard): boolean;
   makeDurable(imageName: string): Promise<void>;
@@ -173,7 +178,7 @@ export const createFilterOperationSession = (
           throw new DOMException('The filter request was superseded.', 'AbortError');
         }
         const rect = { height: filtered.height, width: filtered.width, ...filtered.origin };
-        const shown = await deps.publishPreview(filtered.imageName, rect, guard);
+        const shown = await deps.publishPreview(filtered.imageName, rect, guard, requestDraft.type);
         if (signal.aborted || !deps.isGuardCurrent(guard)) {
           throw new DOMException('The filter request was superseded.', 'AbortError');
         }
@@ -249,13 +254,13 @@ export const createFilterOperationSession = (
         signal: controller.signal,
         target,
       });
-      if (disposed || token !== commitToken || controller.signal.aborted) {
-        return 'stale';
-      }
       if (result.status === 'committed') {
         operation.cancel();
         publish({ ...state, error: null, preview: null, status: 'ready' });
         return 'committed';
+      }
+      if (disposed || token !== commitToken || controller.signal.aborted) {
+        return 'stale';
       }
       publish({
         ...state,

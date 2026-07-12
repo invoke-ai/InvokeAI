@@ -5,6 +5,9 @@ interface LayerPropertiesOpenOwnership {
   triggerOpen: boolean;
 }
 
+export const getLayerPropertiesOwnershipKey = (editingLocked: boolean): 'editable' | 'locked' =>
+  editingLocked ? 'locked' : 'editable';
+
 export const isLayerPropertiesOpen = ({ requestToken, triggerOpen }: LayerPropertiesOpenOwnership): boolean =>
   triggerOpen || requestToken !== null;
 

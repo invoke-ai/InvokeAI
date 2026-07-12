@@ -101,7 +101,12 @@ describe('createFilterOperationSession', () => {
     await first;
 
     expect(deps.publishPreview).toHaveBeenCalledOnce();
-    expect(deps.publishPreview).toHaveBeenCalledWith('newer', { height: 10, width: 10, x: 3, y: 4 }, guard);
+    expect(deps.publishPreview).toHaveBeenCalledWith(
+      'newer',
+      { height: 10, width: 10, x: 3, y: 4 },
+      guard,
+      'canny_edge_detection'
+    );
     expect(session.getSnapshot().preview?.imageName).toBe('newer');
   });
 

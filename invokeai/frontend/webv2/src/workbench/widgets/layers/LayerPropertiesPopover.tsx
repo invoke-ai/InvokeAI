@@ -3,7 +3,7 @@ import type { CanvasLayerContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
 
-import { Popover, Portal, Stack, Switch, Text } from '@chakra-ui/react';
+import { Box, Popover, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -11,11 +11,17 @@ import { SlidersHorizontalIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { LayerPropertiesRequest } from './layerPropertiesRequestStore';
+
 import { AdjustmentsPopover } from './AdjustmentsPopover';
 import { ControlLayerSettings } from './ControlLayerSettings';
 import { InpaintMaskSettings } from './InpaintMaskSettings';
 import { applyStructural } from './layerOps';
-import { closeLayerPropertiesForOperation, isLayerPropertiesOpen } from './layerPropertiesOperation';
+import {
+  closeLayerPropertiesForOperation,
+  getLayerPropertiesOwnershipKey,
+  isLayerPropertiesOpen,
+} from './layerPropertiesOperation';
 import { clearLayerPropertiesRequest, useLayerPropertiesRequest } from './layerPropertiesRequestStore';
 import { RasterLayerFilterSection } from './RasterLayerFilterSection';
 import { RegionalGuidanceSettings } from './RegionalGuidanceSettings';
@@ -43,13 +49,38 @@ interface LayerPropertiesPopoverProps {
  * the operation panel takes over. Type-specific settings are keyed by layer so
  * switching targets always mounts a fresh settings instance.
  */
-export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropertiesPopoverProps) => {
+export const LayerPropertiesPopover = (props: LayerPropertiesPopoverProps) => {
+  const editingLocked = useCanvasDocumentEditingLocked(props.engine);
+  const request = useLayerPropertiesRequest(props.layer.id);
+  return (
+    <LayerPropertiesPopoverOwnership
+      key={`${props.layer.id}:${getLayerPropertiesOwnershipKey(editingLocked)}`}
+      {...props}
+      editingLocked={editingLocked}
+      request={request}
+    />
+  );
+};
+
+const LayerPropertiesPopoverOwnership = ({
+  dispatch,
+  editingLocked,
+  engine,
+  layer,
+  request,
+}: LayerPropertiesPopoverProps & { editingLocked: boolean; request: LayerPropertiesRequest | null }) => {
   const { t } = useTranslation();
   const [triggerOpen, setTriggerOpen] = useState(false);
-  const request = useLayerPropertiesRequest(layer.id);
   const documentRevision = useActiveProjectSelector((project) => project.canvas.documentRevision);
-  const editingLocked = useCanvasDocumentEditingLocked(engine);
-  const isOpen = isLayerPropertiesOpen({ requestToken: request?.token ?? null, triggerOpen });
+  const isOpen = !editingLocked && isLayerPropertiesOpen({ requestToken: request?.token ?? null, triggerOpen });
+  const consumeLockedRequestRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node && editingLocked && request) {
+        clearLayerPropertiesRequest(request.token);
+      }
+    },
+    [editingLocked, request]
+  );
 
   const handleOpenChange = useCallback(
     (details: { open: boolean }) => {
@@ -69,44 +100,47 @@ export const LayerPropertiesPopover = ({ dispatch, engine, layer }: LayerPropert
   }, [request?.token, triggerOpen]);
 
   return (
-    <Popover.Root
-      lazyMount
-      open={isOpen}
-      positioning={POPOVER_POSITIONING}
-      unmountOnExit
-      onOpenChange={handleOpenChange}
-    >
-      <Popover.Trigger asChild>
-        <IconButton
-          aria-label={t('widgets.layers.properties')}
-          color="fg.subtle"
-          disabled={editingLocked}
-          size="2xs"
-          variant="ghost"
-          onClick={stopPropagation}
-          onPointerDown={stopPropagation}
-        >
-          <SlidersHorizontalIcon />
-        </IconButton>
-      </Popover.Trigger>
-      <Portal>
-        <Popover.Positioner>
-          <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="20rem">
-            <Popover.Body p="2.5">
-              <Stack gap="2" inert={editingLocked}>
-                <LayerTypeSettings
-                  dispatch={dispatch}
-                  documentRevision={documentRevision}
-                  engine={engine}
-                  layer={layer}
-                  onOperationStarted={handleOperationStarted}
-                />
-              </Stack>
-            </Popover.Body>
-          </Popover.Content>
-        </Popover.Positioner>
-      </Portal>
-    </Popover.Root>
+    <>
+      {editingLocked && request ? <Box ref={consumeLockedRequestRef} display="none" /> : null}
+      <Popover.Root
+        lazyMount
+        open={isOpen}
+        positioning={POPOVER_POSITIONING}
+        unmountOnExit
+        onOpenChange={handleOpenChange}
+      >
+        <Popover.Trigger asChild>
+          <IconButton
+            aria-label={t('widgets.layers.properties')}
+            color="fg.subtle"
+            disabled={editingLocked}
+            size="2xs"
+            variant="ghost"
+            onClick={stopPropagation}
+            onPointerDown={stopPropagation}
+          >
+            <SlidersHorizontalIcon />
+          </IconButton>
+        </Popover.Trigger>
+        <Portal>
+          <Popover.Positioner>
+            <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="20rem">
+              <Popover.Body p="2.5">
+                <Stack gap="2" inert={editingLocked}>
+                  <LayerTypeSettings
+                    dispatch={dispatch}
+                    documentRevision={documentRevision}
+                    engine={engine}
+                    layer={layer}
+                    onOperationStarted={handleOperationStarted}
+                  />
+                </Stack>
+              </Popover.Body>
+            </Popover.Content>
+          </Popover.Positioner>
+        </Portal>
+      </Popover.Root>
+    </>
   );
 };
 

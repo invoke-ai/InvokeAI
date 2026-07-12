@@ -1,10 +1,10 @@
-import type { CanvasCompositeExportGuard, LayerExportGuard } from './engine';
+import type { LayerExportGuard, SelectObjectLifecycleGuard } from './engine';
 
 export type CanvasOperationIdentity =
   | { kind: 'select-object'; projectId: string }
   | { kind: 'filter'; projectId: string; layerId: string };
 
-export type CanvasOperationGuard = CanvasCompositeExportGuard | LayerExportGuard;
+export type CanvasOperationGuard = LayerExportGuard | SelectObjectLifecycleGuard;
 
 export type CanvasOperationState =
   | { status: 'idle' }
@@ -37,7 +37,7 @@ export interface CanvasOperationSession {
 export type StartCanvasOperationOptions =
   | {
       identity: Extract<CanvasOperationIdentity, { kind: 'select-object' }>;
-      guard: CanvasCompositeExportGuard;
+      guard: SelectObjectLifecycleGuard;
       cleanupPreview(): void;
     }
   | {
@@ -220,7 +220,10 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
       options.identity.kind === 'filter' &&
       'layerId' in options.guard &&
       options.identity.layerId === options.guard.layerId;
-    const compositeIdentityMatches = options.identity.kind === 'select-object' && 'participants' in options.guard;
+    const compositeIdentityMatches =
+      options.identity.kind === 'select-object' &&
+      'kind' in options.guard &&
+      options.guard.kind === 'select-object-lifecycle';
     if (
       disposed ||
       options.identity.projectId !== options.guard.projectId ||
@@ -262,10 +265,7 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
   const invalidateTarget = (projectId: string, layerId?: string): void => {
     if (
       active?.identity.projectId === projectId &&
-      (layerId === undefined ||
-        (active.identity.kind === 'select-object'
-          ? 'candidates' in active.guard && active.guard.candidates.some((candidate) => candidate.layerId === layerId)
-          : active.identity.layerId === layerId))
+      (layerId === undefined || (active.identity.kind === 'select-object' ? true : active.identity.layerId === layerId))
     ) {
       close(active);
     }
@@ -298,7 +298,15 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     },
     invalidateLayer: (projectId, layerId) => invalidateTarget(projectId, layerId),
     invalidateProject: (projectId) => invalidateTarget(projectId),
-    invalidateSource: (projectId, layerId) => invalidateTarget(projectId, layerId),
+    invalidateSource: (projectId, layerId) => {
+      if (
+        active?.identity.kind === 'filter' &&
+        active.identity.projectId === projectId &&
+        active.identity.layerId === layerId
+      ) {
+        close(active);
+      }
+    },
     reset: () => {
       if (active) {
         interruptProcessing(active);

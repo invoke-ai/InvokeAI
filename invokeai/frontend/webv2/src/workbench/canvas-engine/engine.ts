@@ -121,7 +121,7 @@ import {
   getFilterDefinition,
 } from '@workbench/generation/canvas/filterGraphs';
 import { createFilterOperationSession } from '@workbench/widgets/layers/filterOperationSession';
-import { runLayerFilter } from '@workbench/widgets/layers/layerFilterRunner';
+import { LayerFilterOutputDimensionError, runLayerFilter } from '@workbench/widgets/layers/layerFilterRunner';
 import {
   createInpaintMaskFromImage,
   createControlLayer,
@@ -174,6 +174,7 @@ export type StagedPreviewInput =
 export interface FilterPreviewInput {
   imageName: string;
   rect: Rect;
+  filterType?: string;
 }
 
 /**
@@ -208,6 +209,7 @@ export interface CommitRasterFilterOptions {
   mode: 'replace' | 'copy';
   filter?: LayerFilterSettings;
   target?: FilterCommitTarget;
+  requireExactImageDimensions?: boolean;
   signal?: AbortSignal;
 }
 
@@ -280,6 +282,14 @@ export interface CanvasCompositeExportGuard {
     readonly cacheVersion: number;
   }[];
   readonly participants: readonly CanvasCompositeExportGuard['candidates'][number][];
+}
+
+/** Stable Select Object chrome lifetime, independent of mutable raster-cache versions. */
+export interface SelectObjectLifecycleGuard {
+  readonly kind: 'select-object-lifecycle';
+  readonly projectId: string;
+  readonly bbox: Rect;
+  readonly documentGeneration: number;
 }
 
 export type ExportCanvasCompositeBlobResult =
@@ -933,6 +943,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   let selectObjectSession: SelectObjectSession<RasterSurface> | null = null;
   let selectObjectUnsubscribe: (() => void) | null = null;
+  let selectObjectControllerUnsubscribe: (() => void) | null = null;
   let selectObjectGuard: CanvasCompositeExportGuard | null = null;
   let selectObjectSourceRect: Rect | null = null;
   let selectObjectPointLabel: SamPointLabel = 'include';
@@ -1710,6 +1721,34 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     );
   };
 
+  const captureSelectObjectLifecycleGuard = (): SelectObjectLifecycleGuard | null => {
+    const document = mirror.getDocument();
+    if (!document || document.bbox.width <= 0 || document.bbox.height <= 0) {
+      return null;
+    }
+    return {
+      bbox: { ...document.bbox },
+      documentGeneration: rasterDocumentGeneration,
+      kind: 'select-object-lifecycle',
+      projectId,
+    };
+  };
+
+  const isSelectObjectLifecycleGuardCurrent = (guard: SelectObjectLifecycleGuard): boolean => {
+    const document = mirror.getDocument();
+    return (
+      !disposed &&
+      guard.projectId === projectId &&
+      store.getState().activeProjectId === projectId &&
+      guard.documentGeneration === rasterDocumentGeneration &&
+      document !== null &&
+      document.bbox.x === guard.bbox.x &&
+      document.bbox.y === guard.bbox.y &&
+      document.bbox.width === guard.bbox.width &&
+      document.bbox.height === guard.bbox.height
+    );
+  };
+
   const exportCanvasCompositeBlob = async (): Promise<ExportCanvasCompositeBlobResult> => {
     const guard = captureCanvasCompositeExportGuard();
     if (!guard || !isCanvasCompositeExportGuardCurrent(guard)) {
@@ -1772,8 +1811,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   canvasOperations = createCanvasOperationController({
-    isGuardCurrent: (guard) =>
-      'participants' in guard ? isCanvasCompositeExportGuardCurrent(guard) : isLayerExportGuardCurrent(guard),
+    isGuardCurrent: (guard) => {
+      if ('kind' in guard) {
+        return isSelectObjectLifecycleGuardCurrent(guard);
+      }
+      return isLayerExportGuardCurrent(guard);
+    },
   });
   const documentEditOwner = Symbol('canvas-operation-document-edit-owner');
   type DocumentEditPermit = { epoch: number; owner?: symbol };
@@ -2396,6 +2439,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     try {
       const decoded = await decodeStagedPreview({ imageName: input.imageName });
+      if (input.filterType && (decoded.width !== input.rect.width || decoded.height !== input.rect.height)) {
+        throw new LayerFilterOutputDimensionError(
+          input.filterType,
+          { height: decoded.height, width: decoded.width },
+          input.rect
+        );
+      }
       const beforePublish = validate();
       if (beforePublish !== 'shown') {
         dropGuardedRequest();
@@ -2409,9 +2459,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       filterPreviews.set(layerId, { guard, rect: { ...input.rect }, surface: decoded.surface });
       scheduler.invalidate({ layers: [layerId] });
       return 'shown';
-    } catch {
+    } catch (error) {
       // Transient decode failure leaves any prior preview untouched.
       dropGuardedRequest();
+      if (error instanceof LayerFilterOutputDimensionError) {
+        throw error;
+      }
       return 'stale';
     }
   };
@@ -3207,6 +3260,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     selectObjectSession = null;
     selectObjectUnsubscribe?.();
     selectObjectUnsubscribe = null;
+    selectObjectControllerUnsubscribe?.();
+    selectObjectControllerUnsubscribe = null;
     selectObjectGuard = null;
     selectObjectSourceRect = null;
     selectObjectPointLabel = 'include';
@@ -3229,18 +3284,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!doc) {
       return 'missing';
     }
-    const guard = captureCanvasCompositeExportGuard();
-    if (!guard) {
+    const lifecycleGuard = captureSelectObjectLifecycleGuard();
+    if (!lifecycleGuard) {
       return 'not-ready';
     }
 
     clearOwnedFilterSession();
     clearOwnedSelectObjectSession();
-    selectObjectGuard = guard;
-    selectObjectSourceRect = { ...guard.bbox };
+    selectObjectGuard = null;
+    selectObjectSourceRect = { ...lifecycleGuard.bbox };
     const operation = canvasOperations.start({
       cleanupPreview: clearSamPreview,
-      guard,
+      guard: lifecycleGuard,
       identity: { kind: 'select-object', projectId },
     });
     if (!operation) {
@@ -3251,14 +3306,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     const queueDeps = opts.selectObjectDeps;
     selectObjectSession = createSelectObjectSession({
       deps: {
-        captureGuard: () =>
-          selectObjectGuard && isCanvasCompositeExportGuardCurrent(selectObjectGuard) ? selectObjectGuard : null,
+        captureGuard: captureCanvasCompositeExportGuard,
         cleanupPreview: clearSamPreview,
         controller: canvasOperations,
         decodePreview: decodeSelectObjectPreview,
         exportComposite: exportCanvasCompositeBlob,
         isGuardCurrent: isCanvasCompositeExportGuardCurrent,
         publishPreview: (preview) => {
+          selectObjectGuard = preview.guard;
           const isolationChanged = samPreview?.isolated !== preview.isolated;
           samPreview = preview;
           scheduler.invalidate(preview.isolated || isolationChanged ? { all: true } : { overlay: true });
@@ -3279,7 +3334,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           return uploaded;
         },
       },
-      projectId,
+      operation,
     });
     const installedSession = selectObjectSession;
     selectObjectUnsubscribe = installedSession.subscribe(() => {
@@ -3291,6 +3346,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         invalidateSelectObjectCommit();
       }
       syncSelectObjectStore();
+    });
+    selectObjectControllerUnsubscribe = canvasOperations.subscribe(() => {
+      if (selectObjectSession === installedSession && canvasOperations.getSnapshot().status === 'idle') {
+        clearOwnedSelectObjectSession();
+        if (selectObjectSession === null && activeToolId === 'sam') {
+          setTool('view');
+        }
+      }
     });
     selectObjectSession.update({
       input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
@@ -3513,11 +3576,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     selectObjectPointLabel = 'include';
     session.reset();
     session.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });
-    canvasOperations.start({
-      cleanupPreview: clearSamPreview,
-      guard,
-      identity: { kind: 'select-object', projectId },
-    });
     syncSelectObjectStore();
     return 'updated';
   };
@@ -3606,6 +3664,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
               image,
               mode: target === 'apply' ? 'replace' : 'copy',
               rect,
+              requireExactImageDimensions: true,
               signal,
               target,
             },
@@ -3616,8 +3675,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         exportPixels: () => rasterizeLayerPixels(layer.id, { applyAdjustments: true, includeDisabled: true }),
         isGuardCurrent: isLayerExportGuardCurrent,
         makeDurable: (imageName) => filterMakeDurable(imageName),
-        publishPreview: (imageName, rect, previewGuard) =>
-          setGuardedFilterPreview(layer.id, { imageName, rect }, previewGuard),
+        publishPreview: (imageName, rect, previewGuard, filterType) =>
+          setGuardedFilterPreview(layer.id, { filterType, imageName, rect }, previewGuard),
         runFilter: (options) =>
           runLayerFilter({
             ...options,
@@ -4471,10 +4530,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         bitmap.close();
         return { status: 'aborted' };
       }
+      if (
+        options.requireExactImageDimensions &&
+        (bitmap.width !== options.image.width || bitmap.height !== options.image.height)
+      ) {
+        const error = new LayerFilterOutputDimensionError(
+          options.filter?.type ?? 'decoded_filter',
+          { height: bitmap.height, width: bitmap.width },
+          { height: options.image.height, width: options.image.width, x: options.rect.x, y: options.rect.y }
+        );
+        bitmap.close();
+        return { message: error.message, status: 'failed' };
+      }
       const pixels = backend.createSurface(options.image.width, options.image.height);
       try {
         pixels.ctx.clearRect(0, 0, options.image.width, options.image.height);
-        pixels.ctx.drawImage(bitmap, 0, 0, options.image.width, options.image.height);
+        pixels.ctx.drawImage(bitmap, 0, 0);
       } finally {
         bitmap.close();
       }

@@ -3,6 +3,10 @@ import type { CanvasOperationState } from '@workbench/canvas-engine/canvasOperat
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { ReactNode } from 'react';
 
+import { Box } from '@chakra-ui/react';
+import { clearLayerPropertiesRequest } from '@workbench/widgets/layers/layerPropertiesRequestStore';
+import { useCallback } from 'react';
+
 import { CanvasOperationBar } from './tool-options/CanvasOperationBar';
 import { ToolOptionsBar } from './tool-options/ToolOptionsBar';
 
@@ -16,6 +20,8 @@ export const resolveBottomControlSlots = ({
   operation: operationKind !== null,
   regular: operationKind === null && !isExternalInteractionLocked,
 });
+
+export const clearLayerPropertiesForOperationPresentation = (): void => clearLayerPropertiesRequest();
 
 export const CanvasBottomControlsPresentation = ({
   isExternalInteractionLocked,
@@ -49,6 +55,11 @@ export const CanvasBottomControls = ({
   operation: CanvasOperationState | null;
 }) => {
   const operationKind = operation?.status === 'active' ? operation.identity.kind : null;
+  const consumeLayerPropertiesRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      clearLayerPropertiesForOperationPresentation();
+    }
+  }, []);
   if (!engine) {
     return null;
   }
@@ -57,7 +68,9 @@ export const CanvasBottomControls = ({
   );
   const renderOperation = (locked: boolean): ReactNode =>
     operation?.status === 'active' ? (
-      <CanvasOperationBar engine={engine} isExternalInteractionLocked={locked} operation={operation} />
+      <Box ref={consumeLayerPropertiesRef} display="contents">
+        <CanvasOperationBar engine={engine} isExternalInteractionLocked={locked} operation={operation} />
+      </Box>
     ) : null;
   return (
     <CanvasBottomControlsPresentation

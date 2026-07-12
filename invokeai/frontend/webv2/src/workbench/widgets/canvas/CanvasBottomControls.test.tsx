@@ -1,14 +1,30 @@
 import type { ReactNode } from 'react';
 
+import {
+  getLayerPropertiesRequest,
+  requestLayerProperties,
+} from '@workbench/widgets/layers/layerPropertiesRequestStore';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CanvasBottomControlsPresentation, resolveBottomControlSlots } from './CanvasBottomControls';
+import {
+  CanvasBottomControlsPresentation,
+  clearLayerPropertiesForOperationPresentation,
+  resolveBottomControlSlots,
+} from './CanvasBottomControls';
 
 const REGULAR_CONTENT = <span>regular</span>;
 const renderOperation = vi.fn((locked: boolean): ReactNode => <span data-locked={locked}>operation</span>);
 
 describe('canvas bottom controls', () => {
+  it('consumes any programmatic layer-properties request at the operation presentation boundary', () => {
+    requestLayerProperties('other-layer', 'filter');
+
+    clearLayerPropertiesForOperationPresentation();
+
+    expect(getLayerPropertiesRequest()).toBeNull();
+  });
+
   it.each([
     { externalLock: false, operationKind: null, expected: { operation: false, regular: true }, scenario: 'idle' },
     { externalLock: true, operationKind: null, expected: { operation: false, regular: false }, scenario: 'staging' },

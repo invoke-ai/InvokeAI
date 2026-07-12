@@ -61,8 +61,8 @@ export interface SelectObjectSessionDeps<T> {
 }
 
 export interface CreateSelectObjectSessionOptions<T> {
-  projectId: string;
   deps: SelectObjectSessionDeps<T>;
+  operation: CanvasOperationSession;
 }
 
 export type SelectObjectSessionProcessResult = CanvasOperationRunResult | 'blocked' | 'deduped' | 'invalid';
@@ -160,18 +160,15 @@ class SamSessionFailure extends Error {
 }
 
 export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionOptions<T>): SelectObjectSession<T> => {
-  const { deps, projectId } = options;
+  const { deps, operation } = options;
   let state = defaultState<T>();
   let source: SelectObjectPreparedSource | null = null;
-  let operation: CanvasOperationSession | null = null;
-  let operationGuard: CanvasCompositeExportGuard | null = null;
   let requestToken = 0;
   let lastPublishedHash: string | null = null;
   let pendingHash: string | null = null;
   let pendingPhase: SelectObjectSessionStatus | null = null;
   let pendingProcess: Promise<SelectObjectSessionProcessResult> | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let startingOperation = false;
   let disposed = false;
   let unsubscribeController: (() => void) | null = null;
   const listeners = new Set<() => void>();
@@ -211,8 +208,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     pendingPhase = null;
     pendingProcess = null;
     source = null;
-    operation = null;
-    operationGuard = null;
     lastPublishedHash = null;
     publishState({ ...state, preview: null, sourceGuard: null, status: 'ready' });
   };
@@ -231,20 +226,10 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     left.documentGeneration === right.documentGeneration;
 
   unsubscribeController = deps.controller.subscribe(() => {
-    if (disposed) {
-      return;
-    }
-    if (!startingOperation && operation && deps.controller.getSnapshot().status === 'idle') {
+    if (!disposed && deps.controller.getSnapshot().status === 'idle') {
       clearSource();
     }
   });
-
-  const cleanupPreview = (): void => {
-    deps.cleanupPreview();
-    if (state.preview) {
-      publishState({ ...state, preview: null });
-    }
-  };
 
   const schedule = (): void => {
     clearTimer();
@@ -292,26 +277,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   ): Promise<SelectObjectSessionProcessResult> => {
     let requestError: SamSessionError | null = null;
     try {
-      if (operationGuard !== guard || !operation) {
-        startingOperation = true;
-        let nextOperation: CanvasOperationSession | null = null;
-        try {
-          nextOperation = deps.controller.start({
-            cleanupPreview,
-            guard,
-            identity: { kind: 'select-object', projectId },
-          });
-        } finally {
-          startingOperation = false;
-        }
-        if (!nextOperation) {
-          clearSource();
-          return 'stale';
-        }
-        operation = nextOperation;
-        operationGuard = guard;
-      }
-
       pendingPhase = 'preparing-composite';
       publishState({ ...state, sourceGuard: guard, status: 'preparing-composite' });
       const result = await operation.run(
@@ -337,6 +302,9 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
               }
               throw new SamSessionFailure(getProcessedSourceError(processed));
             }
+            if (!isGuardCurrent(guard) || !isSameGuard(processed.guard, guard)) {
+              throw new DOMException('Select Object composite became stale.', 'AbortError');
+            }
             publishPhase(token, 'rendering-preview');
             let data: T;
             try {
@@ -354,7 +322,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
                   : 'decode';
               throw new SamSessionFailure(withDetail(code, errorDetail(cause)));
             }
-            if (signal.aborted) {
+            if (signal.aborted || !isGuardCurrent(guard)) {
               throw new DOMException('Select Object preview decode was aborted.', 'AbortError');
             }
             return {
@@ -375,6 +343,9 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
           }
         },
         (preview) => {
+          if (!isGuardCurrent(preview.guard)) {
+            throw new DOMException('Select Object preview became stale.', 'AbortError');
+          }
           const publishedPreview =
             preview.isolated === state.isolatedPreview ? preview : { ...preview, isolated: state.isolatedPreview };
           deps.publishPreview(publishedPreview);
@@ -392,18 +363,14 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       if (token !== requestToken) {
         return 'stale';
       }
+      if (result === 'error' && requestError === null && !isGuardCurrent(guard)) {
+        clearSource();
+        return 'stale';
+      }
       if (result === 'error') {
-        const controllerState = deps.controller.getSnapshot();
         publishState({
           ...state,
-          error:
-            requestError ??
-            withDetail(
-              'unknown',
-              controllerState.status === 'active'
-                ? (controllerState.error ?? undefined)
-                : 'Select Object processing failed.'
-            ),
+          error: requestError ?? withDetail('unknown', 'Select Object processing failed.'),
           status: 'error',
         });
       } else if (result === 'stale' && !isGuardCurrent(guard)) {
@@ -434,13 +401,8 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
     if (state.sourceGuard && !isGuardCurrent(state.sourceGuard)) {
       requestToken += 1;
-      operation?.cancel();
-      if (!operation && state.preview) {
-        cleanupPreview();
-      }
+      operation.interruptProcessing();
       source = null;
-      operation = null;
-      operationGuard = null;
       pendingHash = null;
       pendingProcess = null;
       lastPublishedHash = null;
@@ -456,7 +418,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       state.preview !== null &&
       state.sourceGuard === state.preview.guard &&
       source?.guard === state.preview.guard &&
-      operationGuard === state.preview.guard &&
       isGuardCurrent(state.preview.guard)
     ) {
       publishState({ ...state, error: null, status: 'ready' });
@@ -465,7 +426,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
 
     requestToken += 1;
     const token = requestToken;
-    const guard = operationGuard && isGuardCurrent(operationGuard) ? operationGuard : deps.captureGuard();
+    const guard = deps.captureGuard();
     if (!guard || !isGuardCurrent(guard)) {
       publishState({ ...state, error: { code: 'not-ready' }, status: 'error' });
       return Promise.resolve('error');
@@ -489,9 +450,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     pendingHash = null;
     pendingPhase = null;
     pendingProcess = null;
-    operation?.cancel();
-    operation = null;
-    operationGuard = null;
+    operation.cancel();
     source = null;
     lastPublishedHash = null;
   };
@@ -502,10 +461,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     pendingPhase = null;
     pendingProcess = null;
     lastPublishedHash = null;
-    operation?.reset();
-    if (!operation && state.preview) {
-      cleanupPreview();
-    }
+    operation.reset();
   };
 
   return {
@@ -529,12 +485,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       lastPublishedHash = null;
       unsubscribeController?.();
       unsubscribeController = null;
-      operation?.cancel();
-      if (!operation && state.preview) {
-        cleanupPreview();
-      }
-      operation = null;
-      operationGuard = null;
+      operation.cancel();
       source = null;
       publishState({ ...state, error: null, preview: null, sourceGuard: null, status: 'ready' });
       listeners.clear();
@@ -550,7 +501,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       pendingPhase = null;
       pendingProcess = null;
       lastPublishedHash = null;
-      operation?.interruptProcessing();
+      operation.interruptProcessing();
       publishState({ ...state, error: null, preview: null, status: 'ready' });
     },
     process,
@@ -567,7 +518,14 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       if (disposed) {
         return;
       }
-      cancelCurrent();
+      clearTimer();
+      requestToken += 1;
+      pendingHash = null;
+      pendingPhase = null;
+      pendingProcess = null;
+      operation.reset();
+      source = null;
+      lastPublishedHash = null;
       publishState(defaultState<T>());
     },
     subscribe: (listener) => {

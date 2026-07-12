@@ -20,7 +20,7 @@ describe('CanvasBottomOverlay', () => {
   it('allocates only the canvas widget inset and allows the stack to shrink', () => {
     expect(BOTTOM_OVERLAY_LAYOUT).toMatchObject({ bottom: '2', minH: '0', overflow: 'hidden', top: '2' });
     expect(BOTTOM_OVERLAY_STACK_LAYOUT).toMatchObject({ h: 'full', minH: '0', overflow: 'hidden' });
-    expect(BOTTOM_CONTROLS_SLOT_LAYOUT).toMatchObject({ flex: '1', minH: '0', overflow: 'hidden' });
+    expect(BOTTOM_CONTROLS_SLOT_LAYOUT).toMatchObject({ flex: '0 1 auto', minH: '0', overflow: 'hidden' });
   });
 
   it('server-renders staging above controls inside the bounded layout', () => {
@@ -53,15 +53,29 @@ describe('CanvasBottomOverlay', () => {
       </ChakraProvider>
     );
 
+    expect(markup).toContain('data-layout="overlay"');
     expect(markup.indexOf('data-layout="overlay"')).toBeLessThan(markup.indexOf('data-layout="staging"'));
     expect(markup.indexOf('data-layout="staging"')).toBeLessThan(markup.indexOf('data-layout="controls"'));
     expect(markup.indexOf('data-slot="header"')).toBeLessThan(markup.indexOf('data-slot="body"'));
     expect(markup.indexOf('data-slot="body"')).toBeLessThan(markup.indexOf('data-slot="feedback"'));
     expect(markup.indexOf('data-slot="feedback"')).toBeLessThan(markup.indexOf('data-slot="footer"'));
     expect(BOTTOM_OVERLAY_LAYOUT).toMatchObject({ bottom: '2', overflow: 'hidden', top: '2' });
-    expect(BOTTOM_CONTROLS_SLOT_LAYOUT).toMatchObject({ flex: '1', minH: '0', overflow: 'hidden' });
+    expect(BOTTOM_OVERLAY_STACK_LAYOUT).toMatchObject({ justifyContent: 'flex-end' });
+    expect(BOTTOM_CONTROLS_SLOT_LAYOUT).toMatchObject({ flex: '0 1 auto', minH: '0', overflow: 'hidden' });
     expect(CANVAS_OPERATION_PANEL_LAYOUT).toMatchObject({ maxH: 'full', minH: '0', overflow: 'hidden' });
     expect(CANVAS_OPERATION_BODY_LAYOUT).toMatchObject({ minH: '0', overflowY: 'auto' });
     expect(CANVAS_OPERATION_FIXED_SECTION_LAYOUT).toEqual({ flexShrink: '0' });
+  });
+
+  it('forwards root props and ref-compatible attributes', () => {
+    const markup = renderToStaticMarkup(
+      <ChakraProvider value={system}>
+        <CanvasBottomOverlay.Root aria-label="Bottom chrome" data-forwarded="yes" id="bottom-overlay" />
+      </ChakraProvider>
+    );
+
+    expect(markup).toContain('aria-label="Bottom chrome"');
+    expect(markup).toContain('data-forwarded="yes"');
+    expect(markup).toContain('id="bottom-overlay"');
   });
 });
