@@ -71,6 +71,7 @@ const statusEvent = (
   created_at: '',
   destination: null,
   error_message: null,
+  error_traceback: null,
   error_type: null,
   item_id: 1,
   origin: ORIGIN,

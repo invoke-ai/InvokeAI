@@ -56,6 +56,7 @@ const createStatusEvent = (overrides: Partial<QueueItemStatusChangedEvent>): Que
   created_at: '2026-06-10T00:00:00Z',
   destination: 'gallery',
   error_message: null,
+  error_traceback: null,
   error_type: null,
   item_id: 1,
   origin: null,
