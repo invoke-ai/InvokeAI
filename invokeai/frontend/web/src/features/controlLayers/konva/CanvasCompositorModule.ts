@@ -425,6 +425,36 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         isVectorLayerEntityIdentifier(belowEntityIdentifier) &&
         isVectorLayerEntityIdentifier(aboveEntityIdentifier)
       ) {
+        const belowAdapter = this.manager.getAdapter(belowEntityIdentifier);
+        const aboveAdapter = this.manager.getAdapter(aboveEntityIdentifier);
+        if (!belowAdapter || !aboveAdapter) {
+          this.log.error({ belowEntityIdentifier, aboveEntityIdentifier }, 'Failed to get vector layer adapters');
+          toast({
+            id: 'MERGE_LAYERS_TOAST',
+            title: t('controlLayers.mergeVisibleError'),
+            status: 'error',
+            withCount: false,
+          });
+          return null;
+        }
+        if (
+          belowAdapter.state.paths.length > 0 &&
+          aboveAdapter.state.paths.length > 0 &&
+          belowAdapter.state.opacity !== aboveAdapter.state.opacity
+        ) {
+          this.log.warn(
+            { belowEntityIdentifier, aboveEntityIdentifier },
+            'Cannot merge vector layers with different opacity'
+          );
+          toast({
+            id: 'MERGE_LAYERS_TOAST',
+            title: t('controlLayers.mergeVisibleError'),
+            status: 'error',
+            withCount: false,
+          });
+          return null;
+        }
+
         const editSession = this.manager.tool.tools.path.$editSession.get();
         if (
           editSession &&

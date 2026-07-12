@@ -3,6 +3,7 @@ import { CanvasEntityMenuItemsArrange } from 'features/controlLayers/components/
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsMergeDown } from 'features/controlLayers/components/common/CanvasEntityMenuItemsMergeDown';
+import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import { VectorLayerMenuItemsEdit } from 'features/controlLayers/components/VectorLayer/VectorLayerMenuItemsEdit';
 import { VectorLayerMenuItemsTraceAll } from 'features/controlLayers/components/VectorLayer/VectorLayerMenuItemsTraceAll';
 import { memo } from 'react';
@@ -12,6 +13,7 @@ export const VectorLayerMenuItems = memo(() => {
     <>
       <VectorLayerMenuItemsEdit />
       <VectorLayerMenuItemsTraceAll />
+      <CanvasEntityMenuItemsTransform />
       <CanvasEntityMenuItemsMergeDown />
       <IconMenuItemGroup>
         <CanvasEntityMenuItemsArrange />

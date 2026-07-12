@@ -59,11 +59,9 @@ export class CanvasEntityAdapterVectorLayer extends CanvasEntityAdapterBase<
 
   private syncPaths = async () => {
     this.$isEmpty.set(this.state.paths.length === 0);
-    const didRender = await this.renderer.render();
-    if (didRender) {
-      this.transformer.requestRectCalculation();
-      this.transformer.syncInteractionState();
-    }
+    await this.renderer.render();
+    this.transformer.requestRectCalculation();
+    this.transformer.syncInteractionState();
   };
 
   getHashableState = (): JsonObject => {

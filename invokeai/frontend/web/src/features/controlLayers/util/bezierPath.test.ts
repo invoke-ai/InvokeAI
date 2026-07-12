@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluateBezierSegment,
   findNearestBezierPathSegment,
+  getBezierPathHitSamplesPerSegment,
+  getBezierPointPullHandleType,
   setBezierPointHandle,
   setBezierPointType,
   splitBezierSegmentAt,
@@ -62,6 +64,29 @@ describe('bezierPath utilities', () => {
     expect(hit?.distance).toBeCloseTo(2, 1);
     expect(hit?.point.x).toBeCloseTo(4, 1);
     expect(hit?.point.y).toBeCloseTo(0, 1);
+  });
+
+  it('keeps curved path hit testing accurate at high zoom', () => {
+    const from = {
+      anchor: { x: 0, y: 0 },
+      inHandle: null,
+      outHandle: { x: 0, y: 1000 },
+    };
+    const to = {
+      anchor: { x: 1000, y: 0 },
+      inHandle: { x: 1000, y: 1000 },
+      outHandle: null,
+    };
+    const stageScale = 20;
+    const pointOnCurve = evaluateBezierSegment(from, to, 0.51);
+    const hit = findNearestBezierPathSegment(
+      [from, to],
+      false,
+      pointOnCurve,
+      getBezierPathHitSamplesPerSegment(stageScale)
+    );
+
+    expect(hit?.distance).toBeLessThan(10 / stageScale);
   });
 
   it('moves corner handles independently', () => {
@@ -131,5 +156,34 @@ describe('bezierPath utilities', () => {
     setBezierPointType(point, 'symmetric', 'outHandle');
 
     expect(point.type).toBe('symmetric');
+  });
+
+  it('chooses outgoing handle when pulling from the first point of an open path', () => {
+    expect(
+      getBezierPointPullHandleType([{ anchor: { x: 0, y: 0 } }, { anchor: { x: 10, y: 0 } }], false, 0, {
+        x: -10,
+        y: 0,
+      })
+    ).toBe('outHandle');
+  });
+
+  it('chooses incoming handle when pulling from the last point of an open path', () => {
+    expect(
+      getBezierPointPullHandleType([{ anchor: { x: 0, y: 0 } }, { anchor: { x: 10, y: 0 } }], false, 1, { x: 20, y: 0 })
+    ).toBe('inHandle');
+  });
+
+  it('chooses the handle on the dragged side for a middle point', () => {
+    const points = [{ anchor: { x: 0, y: 0 } }, { anchor: { x: 10, y: 0 } }, { anchor: { x: 20, y: 0 } }];
+
+    expect(getBezierPointPullHandleType(points, false, 1, { x: 0, y: 0 })).toBe('inHandle');
+    expect(getBezierPointPullHandleType(points, false, 1, { x: 20, y: 0 })).toBe('outHandle');
+  });
+
+  it('chooses the handle on the dragged side for a closed path point', () => {
+    const points = [{ anchor: { x: 0, y: 0 } }, { anchor: { x: 10, y: 0 } }, { anchor: { x: 0, y: 10 } }];
+
+    expect(getBezierPointPullHandleType(points, true, 0, { x: 0, y: 10 })).toBe('inHandle');
+    expect(getBezierPointPullHandleType(points, true, 0, { x: 10, y: 0 })).toBe('outHandle');
   });
 });

@@ -127,6 +127,29 @@ const translateBezierPathToLayer = (path: CanvasBezierPathState, offset: Coordin
   })),
 });
 
+type TransformMatrix = [number, number, number, number, number, number];
+
+// Konva's objectGroup matrix maps path-local coordinates into canvas coordinates; paths store coordinates relative to
+// the entity position.
+const transformCoordinate = (coordinate: Coordinate, matrix: TransformMatrix, position: Coordinate): Coordinate => ({
+  x: matrix[0] * coordinate.x + matrix[2] * coordinate.y + matrix[4] - position.x,
+  y: matrix[1] * coordinate.x + matrix[3] * coordinate.y + matrix[5] - position.y,
+});
+
+const transformBezierPath = (
+  path: CanvasBezierPathState,
+  matrix: TransformMatrix,
+  position: Coordinate
+): CanvasBezierPathState => ({
+  ...path,
+  points: path.points.map((point) => ({
+    ...point,
+    anchor: transformCoordinate(point.anchor, matrix, position),
+    inHandle: point.inHandle ? transformCoordinate(point.inHandle, matrix, position) : null,
+    outHandle: point.outHandle ? transformCoordinate(point.outHandle, matrix, position) : null,
+  })),
+});
+
 const slice = createSlice({
   name: 'canvas',
   initialState: getInitialCanvasState(),
@@ -539,7 +562,9 @@ const slice = createSlice({
     },
     vectorLayerPathsReplaced: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ paths: CanvasBezierPathState[] }, 'vector_layer'>>
+      action: PayloadAction<
+        EntityIdentifierPayload<{ paths: CanvasBezierPathState[]; undoGroup?: string }, 'vector_layer'>
+      >
     ) => {
       const { entityIdentifier, paths } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -548,6 +573,18 @@ const slice = createSlice({
       }
 
       entity.paths = paths.map((path) => ({ ...path }));
+    },
+    vectorLayerTransformed: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ matrix: TransformMatrix }, 'vector_layer'>>
+    ) => {
+      const { entityIdentifier, matrix } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity || entity.type !== 'vector_layer') {
+        return;
+      }
+
+      entity.paths = entity.paths.map((path) => transformBezierPath(path, matrix, entity.position));
     },
     vectorLayersMergedDown: (
       state,
@@ -567,11 +604,18 @@ const slice = createSlice({
         return;
       }
 
+      if (belowEntity.paths.length > 0 && aboveEntity.paths.length > 0 && belowEntity.opacity !== aboveEntity.opacity) {
+        return;
+      }
+
       const offset = {
         x: aboveEntity.position.x - belowEntity.position.x,
         y: aboveEntity.position.y - belowEntity.position.y,
       };
 
+      if (belowEntity.paths.length === 0) {
+        belowEntity.opacity = aboveEntity.opacity;
+      }
       belowEntity.paths.push(...aboveEntity.paths.map((path) => translateBezierPathToLayer(path, offset)));
       state.vectorLayers.entities = state.vectorLayers.entities.filter((layer) => layer.id !== aboveEntity.id);
       state.selectedEntityIdentifier = belowEntityIdentifier;
@@ -2122,6 +2166,7 @@ export const {
   vectorLayerAdded,
   vectorPathAdded,
   vectorLayerPathsReplaced,
+  vectorLayerTransformed,
   vectorLayersMergedDown,
   controlLayerConvertedToRasterLayer,
   controlLayerConvertedToInpaintMask,
@@ -2193,6 +2238,12 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
     // Throttle rapid actions of the same type
     filter = actionsThrottlingFilter(action);
     return filter;
+  },
+  groupBy: (action) => {
+    if (vectorLayerPathsReplaced.match(action)) {
+      return action.payload.undoGroup ?? null;
+    }
+    return null;
   },
   // This is pretty spammy, leave commented out unless you need it
   // debug: import.meta.env.MODE === 'development',

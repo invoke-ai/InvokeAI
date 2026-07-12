@@ -10,6 +10,8 @@ type BezierPathSegmentHit = {
   distance: number;
 };
 
+const DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT = 24;
+
 const formatCoordinate = (coordinate: Coordinate) => `${coordinate.x} ${coordinate.y}`;
 const getDistance = (a: Coordinate, b: Coordinate) => Math.hypot(a.x - b.x, a.y - b.y);
 const lerpCoordinate = (a: Coordinate, b: Coordinate, t: number): Coordinate => ({
@@ -99,6 +101,60 @@ export const setBezierPointHandle = (
 ) => {
   point[handleType] = normalizeHandle(point.anchor, handle);
   syncOppositeHandleForPointType(point, handleType);
+};
+
+export const getBezierPointPullHandleType = (
+  points: Pick<CanvasBezierPointState, 'anchor'>[],
+  isClosed: boolean,
+  pointIndex: number,
+  pointer: Coordinate
+): 'inHandle' | 'outHandle' => {
+  const point = points[pointIndex];
+  if (!point) {
+    return 'outHandle';
+  }
+
+  if (!isClosed) {
+    if (pointIndex === 0) {
+      return 'outHandle';
+    }
+    if (pointIndex === points.length - 1) {
+      return 'inHandle';
+    }
+  }
+
+  const previousPoint = isClosed ? points.at(pointIndex - 1) : points[pointIndex - 1];
+  const nextPoint = isClosed ? points[(pointIndex + 1) % points.length] : points[pointIndex + 1];
+  if (!previousPoint) {
+    return 'outHandle';
+  }
+  if (!nextPoint) {
+    return 'inHandle';
+  }
+
+  const dragVector = {
+    x: pointer.x - point.anchor.x,
+    y: pointer.y - point.anchor.y,
+  };
+  const dragLength = Math.hypot(dragVector.x, dragVector.y);
+  if (dragLength === 0) {
+    return 'outHandle';
+  }
+
+  const getDirectionScore = (target: Coordinate) => {
+    const direction = {
+      x: target.x - point.anchor.x,
+      y: target.y - point.anchor.y,
+    };
+    const directionLength = Math.hypot(direction.x, direction.y);
+    if (directionLength === 0) {
+      return -Infinity;
+    }
+
+    return (dragVector.x * direction.x + dragVector.y * direction.y) / directionLength;
+  };
+
+  return getDirectionScore(previousPoint.anchor) > getDirectionScore(nextPoint.anchor) ? 'inHandle' : 'outHandle';
 };
 
 const getSegmentData = (from: RenderableBezierPoint, to: RenderableBezierPoint): string => {
@@ -210,7 +266,7 @@ export const findNearestBezierPathSegment = (
   points: RenderableBezierPoint[],
   isClosed: boolean,
   point: Coordinate,
-  samplesPerSegment = 24
+  samplesPerSegment = DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT
 ): BezierPathSegmentHit | null => {
   if (points.length < 2) {
     return null;
@@ -263,10 +319,15 @@ export const findNearestBezierPathSegment = (
   return nearestHit;
 };
 
+export const getBezierPathHitSamplesPerSegment = (stageScale: number): number => {
+  const normalizedScale = Math.max(1, stageScale);
+  return Math.ceil(DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT * Math.sqrt(normalizedScale));
+};
+
 export const approximateBezierPath = (
   points: RenderableBezierPoint[],
   isClosed: boolean,
-  samplesPerSegment = 24
+  samplesPerSegment = DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT
 ): Coordinate[] => {
   const firstPoint = points[0];
   if (!firstPoint) {

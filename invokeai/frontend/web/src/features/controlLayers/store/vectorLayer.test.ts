@@ -17,6 +17,7 @@ import {
   vectorLayerAdded,
   vectorLayerPathsReplaced,
   vectorLayersMergedDown,
+  vectorLayerTransformed,
   vectorPathAdded,
 } from './canvasSlice';
 import { buildSelectHasObjects, selectAllEntities, selectCanvasMetadata } from './selectors';
@@ -54,16 +55,17 @@ describe('vector layer integration', () => {
 
   it('adds a vector layer with empty paths and selects it', () => {
     const state = reducer(getInitialCanvasState(), vectorLayerAdded({ isSelected: true }));
+    const layer = state.vectorLayers.entities[0];
 
     expect(state.vectorLayers.entities).toHaveLength(1);
-    expect(state.vectorLayers.entities[0]).toMatchObject({
-      id: 'vector_layer-1',
+    expect(layer).toMatchObject({
       type: 'vector_layer',
       paths: [],
       opacity: 1,
       position: { x: 0, y: 0 },
     });
-    expect(state.selectedEntityIdentifier).toEqual({ id: 'vector_layer-1', type: 'vector_layer' });
+    expect(layer?.id).toMatch(/^vector_layer/);
+    expect(state.selectedEntityIdentifier).toEqual({ id: layer?.id, type: 'vector_layer' });
   });
 
   it('adds a bezier path to an existing vector layer', () => {
@@ -192,7 +194,7 @@ describe('vector layer integration', () => {
     expect(result.vectorLayers.entities[0]?.id).toBe('vector-layer-below');
     expect(result.vectorLayers.entities[0]?.paths).toHaveLength(2);
     expect(result.vectorLayers.entities[0]?.paths[1]).toEqual({
-      id: 'bezier_path-1',
+      id: expect.stringMatching(/^bezier_path/),
       name: 'Above Path',
       isClosed: false,
       points: [
@@ -211,6 +213,142 @@ describe('vector layer integration', () => {
       ],
     });
     expect(result.selectedEntityIdentifier).toEqual({ id: 'vector-layer-below', type: 'vector_layer' });
+  });
+
+  it('rejects merging non-empty vector layers with different opacity', () => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(
+      getVectorLayerState('vector-layer-below', {
+        opacity: 1,
+        paths: [
+          {
+            id: 'bezier-path-below',
+            name: null,
+            isClosed: false,
+            points: [
+              { anchor: { x: 0, y: 0 }, inHandle: null, outHandle: null, type: 'corner' },
+              { anchor: { x: 10, y: 0 }, inHandle: null, outHandle: null, type: 'corner' },
+            ],
+          },
+        ],
+      }),
+      getVectorLayerState('vector-layer-above', {
+        opacity: 0.5,
+        paths: [
+          {
+            id: 'bezier-path-above',
+            name: null,
+            isClosed: false,
+            points: [
+              { anchor: { x: 0, y: 10 }, inHandle: null, outHandle: null, type: 'corner' },
+              { anchor: { x: 10, y: 10 }, inHandle: null, outHandle: null, type: 'corner' },
+            ],
+          },
+        ],
+      })
+    );
+
+    const result = reducer(
+      state,
+      vectorLayersMergedDown({
+        belowEntityIdentifier: { id: 'vector-layer-below', type: 'vector_layer' },
+        aboveEntityIdentifier: { id: 'vector-layer-above', type: 'vector_layer' },
+      })
+    );
+
+    expect(result.vectorLayers.entities).toEqual(state.vectorLayers.entities);
+  });
+
+  it('adopts the upper opacity when merging into an empty vector layer', () => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(
+      getVectorLayerState('vector-layer-below', { opacity: 1 }),
+      getVectorLayerState('vector-layer-above', {
+        opacity: 0.5,
+        paths: [
+          {
+            id: 'bezier-path-above',
+            name: null,
+            isClosed: false,
+            points: [
+              { anchor: { x: 0, y: 0 }, inHandle: null, outHandle: null, type: 'corner' },
+              { anchor: { x: 10, y: 0 }, inHandle: null, outHandle: null, type: 'corner' },
+            ],
+          },
+        ],
+      })
+    );
+
+    const result = reducer(
+      state,
+      vectorLayersMergedDown({
+        belowEntityIdentifier: { id: 'vector-layer-below', type: 'vector_layer' },
+        aboveEntityIdentifier: { id: 'vector-layer-above', type: 'vector_layer' },
+      })
+    );
+
+    expect(result.vectorLayers.entities).toHaveLength(1);
+    expect(result.vectorLayers.entities[0]?.opacity).toBe(0.5);
+  });
+
+  it('applies a transform matrix to all paths on a vector layer', () => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(
+      getVectorLayerState('vector-layer-a', {
+        position: { x: 10, y: 20 },
+        paths: [
+          {
+            id: 'bezier-path-a',
+            name: 'Path A',
+            isClosed: false,
+            points: [
+              {
+                anchor: { x: 1, y: 2 },
+                inHandle: { x: 0, y: 1 },
+                outHandle: { x: 3, y: 4 },
+                type: 'smooth',
+              },
+              {
+                anchor: { x: 5, y: 6 },
+                inHandle: null,
+                outHandle: null,
+                type: 'corner',
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    const result = reducer(
+      state,
+      vectorLayerTransformed({
+        entityIdentifier: { id: 'vector-layer-a', type: 'vector_layer' },
+        matrix: [2, 0.5, -1, 3, 14, 26],
+      })
+    );
+
+    expect(result.vectorLayers.entities[0]?.paths).toEqual([
+      {
+        id: 'bezier-path-a',
+        name: 'Path A',
+        isClosed: false,
+        points: [
+          {
+            anchor: { x: 4, y: 12.5 },
+            inHandle: { x: 3, y: 9 },
+            outHandle: { x: 6, y: 19.5 },
+            type: 'smooth',
+          },
+          {
+            anchor: { x: 8, y: 26.5 },
+            inHandle: null,
+            outHandle: null,
+            type: 'corner',
+          },
+        ],
+      },
+    ]);
   });
 
   it('duplicates a vector layer and rekeys its paths', () => {
@@ -242,14 +380,18 @@ describe('vector layer integration', () => {
 
     expect(result.vectorLayers.entities).toHaveLength(2);
     expect(result.vectorLayers.entities[1]).toMatchObject({
-      id: 'vector_layer-1',
       name: 'Spline Layer (Copy)',
       type: 'vector_layer',
     });
+    expect(result.vectorLayers.entities[1]?.id).toMatch(/^vector_layer/);
+    expect(result.vectorLayers.entities[1]?.id).not.toBe('vector-layer-a');
     expect(result.vectorLayers.entities[1]?.paths).toHaveLength(1);
-    expect(result.vectorLayers.entities[1]?.paths[0]?.id).toBe('bezier_path-2');
+    expect(result.vectorLayers.entities[1]?.paths[0]?.id).toMatch(/^bezier_path/);
     expect(result.vectorLayers.entities[1]?.paths[0]?.id).not.toBe('bezier-path-a');
-    expect(result.selectedEntityIdentifier).toEqual({ id: 'vector_layer-1', type: 'vector_layer' });
+    expect(result.selectedEntityIdentifier).toEqual({
+      id: result.vectorLayers.entities[1]?.id,
+      type: 'vector_layer',
+    });
   });
 
   it('resets vector layer paths and position', () => {

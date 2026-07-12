@@ -10,6 +10,8 @@ import {
   anchorsToBezierPoints,
   buildBezierPathData,
   findNearestBezierPathSegment,
+  getBezierPathHitSamplesPerSegment,
+  getBezierPointPullHandleType,
   setBezierPointHandle,
   setBezierPointType,
   splitBezierSegmentAt,
@@ -22,6 +24,8 @@ import type { Logger } from 'roarr';
 type CanvasPathToolModuleConfig = {
   ANCHOR_RADIUS_PX: number;
   ANCHOR_STROKE_WIDTH_PX: number;
+  START_POINT_HOVER_RADIUS_DELTA_PX: number;
+  PATH_CLOSE_RADIUS_PX: number;
   HANDLE_RADIUS_PX: number;
   HANDLE_STROKE_WIDTH_PX: number;
   HANDLE_LINE_WIDTH_PX: number;
@@ -44,10 +48,11 @@ type PathHandleType = 'inHandle' | 'outHandle';
 
 type CanvasPathEditDragTarget =
   | { pathId: string; pointIndex: number; type: 'anchor' }
-  | { pathId: string; pointIndex: number; type: 'pullHandles' }
+  | { pathId: string; pointIndex: number; type: 'pullHandles'; handleType: PathHandleType | null }
   | { pathId: string; pointIndex: number; type: PathHandleType };
 
 type CanvasPathEditSession = {
+  id: string;
   entityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
   snapshotPaths: CanvasBezierPathState[];
   activePathId: string | null;
@@ -59,6 +64,8 @@ type CanvasPathEditSession = {
 const DEFAULT_CONFIG: CanvasPathToolModuleConfig = {
   ANCHOR_RADIUS_PX: 4,
   ANCHOR_STROKE_WIDTH_PX: 2,
+  START_POINT_HOVER_RADIUS_DELTA_PX: 2,
+  PATH_CLOSE_RADIUS_PX: 10,
   HANDLE_RADIUS_PX: 3.5,
   HANDLE_STROKE_WIDTH_PX: 1.5,
   HANDLE_LINE_WIDTH_PX: 1,
@@ -203,6 +210,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
     this.resetCreateState();
     this.$editSession.set({
+      id: getPrefixedId('path_edit_session'),
       entityIdentifier,
       snapshotPaths: deepClone(adapter.state.paths),
       activePathId: adapter.state.paths[0]?.id ?? null,
@@ -238,6 +246,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.manager.stateApi.replaceVectorPaths({
       entityIdentifier: session.entityIdentifier,
       paths: nextPaths,
+      undoGroup: session.id,
     });
     this.render();
   };
@@ -296,6 +305,10 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       return;
     }
 
+    this.commitCreateSession(false);
+  };
+
+  private commitCreateSession = (isClosed: boolean) => {
     const activeEntity = this.getCreateEntityAdapter();
 
     if (!activeEntity || this.points.length < 2) {
@@ -308,7 +321,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       entityIdentifier: activeEntity.entityIdentifier,
       path: getBezierPathState(getPrefixedId('bezier_path'), {
         points: anchorsToBezierPoints(this.points),
-        isClosed: false,
+        isClosed,
       }),
     });
 
@@ -338,6 +351,11 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     }
 
     const point = this.getEntityRelativePoint(cursorPos.relative, selectedEntity.state.position);
+    if (this.getIsClosingCreatePath(point)) {
+      this.commitCreateSession(true);
+      return;
+    }
+
     const pathPoint = this.getPathPoint(point, e.evt.shiftKey);
 
     this.activeEntityIdentifier = { id: selectedEntity.state.id, type: 'vector_layer' };
@@ -360,7 +378,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     }
 
     const point = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
-    this.previewPoint = this.getPathPoint(point, e.evt.shiftKey);
+    this.previewPoint = this.getIsClosingCreatePath(point) ? point : this.getPathPoint(point, e.evt.shiftKey);
     this.render();
   };
 
@@ -437,6 +455,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.manager.stateApi.replaceVectorPaths({
       entityIdentifier: session.entityIdentifier,
       paths: deepClone(session.snapshotPaths),
+      undoGroup: session.id,
     });
     this.$editSession.set(null);
     this.render();
@@ -473,6 +492,19 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     };
   };
 
+  private getPathCloseRadius = (): number => {
+    return this.manager.stage.unscale(this.config.PATH_CLOSE_RADIUS_PX);
+  };
+
+  private getIsClosingCreatePath = (point: Coordinate): boolean => {
+    const startPoint = this.points[0];
+    if (!startPoint || this.points.length < 3) {
+      return false;
+    }
+
+    return getDistance(point, startPoint) <= this.getPathCloseRadius();
+  };
+
   private syncCreatePreview = () => {
     const activeEntity = this.getCreateEntityAdapter();
     if (!activeEntity || this.points.length === 0) {
@@ -481,11 +513,17 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     }
 
     const entityPosition = activeEntity.state.position;
-    const previewAnchors = this.previewPoint ? [...this.points, this.previewPoint] : [...this.points];
+    const isClosingPath = this.previewPoint ? this.getIsClosingCreatePath(this.previewPoint) : false;
+    const previewAnchors = isClosingPath
+      ? [...this.points]
+      : this.previewPoint
+        ? [...this.points, this.previewPoint]
+        : [...this.points];
     const previewPoints = previewAnchors.map((point) => addCoords(point, entityPosition));
-    const data = buildBezierPathData(anchorsToBezierPoints(previewPoints), false);
+    const data = buildBezierPathData(anchorsToBezierPoints(previewPoints), isClosingPath);
     const anchorRadius = this.manager.stage.unscale(this.config.ANCHOR_RADIUS_PX);
     const anchorStrokeWidth = this.manager.stage.unscale(this.config.ANCHOR_STROKE_WIDTH_PX);
+    const startPointHoverRadiusDelta = this.manager.stage.unscale(this.config.START_POINT_HOVER_RADIUS_DELTA_PX);
 
     this.konva.previewPath.setAttrs({
       data,
@@ -494,12 +532,17 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     });
 
     this.konva.previewAnchorsGroup.destroyChildren();
-    for (const point of this.points.map((anchor) => addCoords(anchor, entityPosition))) {
+    for (let pointIndex = 0; pointIndex < this.points.length; pointIndex += 1) {
+      const point = this.points[pointIndex];
+      if (!point) {
+        continue;
+      }
+      const stagePoint = addCoords(point, entityPosition);
       this.konva.previewAnchorsGroup.add(
         new Konva.Circle({
-          x: point.x,
-          y: point.y,
-          radius: anchorRadius,
+          x: stagePoint.x,
+          y: stagePoint.y,
+          radius: anchorRadius + (pointIndex === 0 && isClosingPath ? startPointHoverRadiusDelta : 0),
           fill: this.config.PREVIEW_POINT_FILL,
           stroke: this.config.PREVIEW_POINT_STROKE,
           strokeWidth: anchorStrokeWidth,
@@ -645,6 +688,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     const anchorHitRadius = this.manager.stage.unscale(this.config.ANCHOR_RADIUS_PX + 4);
     const handleHitRadius = this.manager.stage.unscale(this.config.HANDLE_RADIUS_PX + 4);
     const pathHitTolerance = this.manager.stage.unscale(this.config.PATH_HIT_TOLERANCE_PX);
+    const pathHitSamplesPerSegment = getBezierPathHitSamplesPerSegment(this.manager.stage.getScale());
     const activePath =
       activeEntity.state.paths.find((path) => path.id === session.activePathId) ?? activeEntity.state.paths[0] ?? null;
 
@@ -674,7 +718,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
     const anchorHit = this.findAnchorHit(activeEntity.state.paths, point, anchorHitRadius);
     if (anchorHit) {
-      if (e.evt.ctrlKey) {
+      if (e.evt.ctrlKey || e.evt.metaKey) {
         this.deletePoint(anchorHit.pathId, anchorHit.pointIndex);
         return;
       }
@@ -687,24 +731,37 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         session.activePointIndex === anchorHit.pointIndex &&
         !clickedPoint?.inHandle &&
         !clickedPoint?.outHandle;
+      const dragTarget: CanvasPathEditDragTarget = shouldPullHandles
+        ? {
+            pathId: anchorHit.pathId,
+            pointIndex: anchorHit.pointIndex,
+            type: 'pullHandles',
+            handleType: null,
+          }
+        : {
+            pathId: anchorHit.pathId,
+            pointIndex: anchorHit.pointIndex,
+            type: 'anchor',
+          };
 
       this.$editSession.set({
         ...session,
         activePathId: anchorHit.pathId,
         activePointIndex: anchorHit.pointIndex,
         activeHandle: null,
-        dragTarget: {
-          pathId: anchorHit.pathId,
-          pointIndex: anchorHit.pointIndex,
-          type: shouldPullHandles ? 'pullHandles' : 'anchor',
-        },
+        dragTarget,
       });
       this.render();
       return;
     }
 
     if (e.evt.shiftKey && activePath) {
-      const segmentHit = findNearestBezierPathSegment(activePath.points, activePath.isClosed, point);
+      const segmentHit = findNearestBezierPathSegment(
+        activePath.points,
+        activePath.isClosed,
+        point,
+        pathHitSamplesPerSegment
+      );
       if (segmentHit && segmentHit.distance <= pathHitTolerance) {
         const insertedPointIndex = this.insertPoint(activePath.id, segmentHit.segmentIndex, segmentHit.t);
         if (insertedPointIndex !== null) {
@@ -725,7 +782,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       }
     }
 
-    const pathHit = this.findPathHit(activeEntity.state.paths, point, pathHitTolerance);
+    const pathHit = this.findPathHit(activeEntity.state.paths, point, pathHitTolerance, pathHitSamplesPerSegment);
     if (pathHit) {
       this.$editSession.set({
         ...session,
@@ -763,6 +820,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     if (!path || !bezierPoint) {
       return;
     }
+    let nextSession: CanvasPathEditSession | null = null;
 
     if (session.dragTarget.type === 'anchor') {
       const dx = point.x - bezierPoint.anchor.x;
@@ -775,7 +833,20 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         bezierPoint.outHandle = { x: bezierPoint.outHandle.x + dx, y: bezierPoint.outHandle.y + dy };
       }
     } else if (session.dragTarget.type === 'pullHandles') {
-      setBezierPointHandle(bezierPoint, 'outHandle', point);
+      const handleType =
+        session.dragTarget.handleType ??
+        getBezierPointPullHandleType(path.points, path.isClosed, session.dragTarget.pointIndex, point);
+      setBezierPointHandle(bezierPoint, handleType, point);
+      if (!session.dragTarget.handleType) {
+        nextSession = {
+          ...session,
+          activeHandle: handleType,
+          dragTarget: {
+            ...session.dragTarget,
+            handleType,
+          },
+        };
+      }
     } else {
       setBezierPointHandle(bezierPoint, session.dragTarget.type, point);
     }
@@ -783,7 +854,11 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.manager.stateApi.replaceVectorPaths({
       entityIdentifier: session.entityIdentifier,
       paths: nextPaths,
+      undoGroup: session.id,
     });
+    if (nextSession) {
+      this.$editSession.set(nextSession);
+    }
 
     if (evt.shiftKey && session.dragTarget.type === 'anchor') {
       this.render();
@@ -875,7 +950,8 @@ export class CanvasPathToolModule extends CanvasModuleBase {
   private findPathHit = (
     paths: CanvasBezierPathState[],
     point: Coordinate,
-    hitTolerance: number
+    hitTolerance: number,
+    samplesPerSegment: number
   ): { pathId: string } | null => {
     let bestHit: { pathId: string; distance: number; pathOrder: number } | null = null;
     for (let pathOrder = 0; pathOrder < paths.length; pathOrder += 1) {
@@ -884,7 +960,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         continue;
       }
 
-      const hit = findNearestBezierPathSegment(path.points, path.isClosed, point);
+      const hit = findNearestBezierPathSegment(path.points, path.isClosed, point, samplesPerSegment);
       if (!hit || hit.distance > hitTolerance) {
         continue;
       }
@@ -930,6 +1006,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.manager.stateApi.replaceVectorPaths({
       entityIdentifier: session.entityIdentifier,
       paths: nextPaths,
+      undoGroup: session.id,
     });
 
     const nextActivePointIndex = path.points.length === 0 ? null : Math.min(pointIndex, path.points.length - 1);
@@ -972,6 +1049,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.manager.stateApi.replaceVectorPaths({
       entityIdentifier: session.entityIdentifier,
       paths: nextPaths,
+      undoGroup: session.id,
     });
 
     return insertIndex;

@@ -33,6 +33,7 @@ import {
   vectorLayerAdded,
   vectorLayerPathsReplaced,
   vectorLayersMergedDown,
+  vectorLayerTransformed,
   vectorPathAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -231,8 +232,16 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   replaceVectorPaths = (arg: {
     entityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
     paths: CanvasBezierPathState[];
+    undoGroup?: string;
   }) => {
     this.store.dispatch(vectorLayerPathsReplaced(arg));
+  };
+
+  /**
+   * Applies a transform matrix to all bezier paths on a vector layer, preserving editable paths.
+   */
+  transformVectorLayer = (arg: Param0<typeof vectorLayerTransformed>) => {
+    this.store.dispatch(vectorLayerTransformed(arg));
   };
 
   /**

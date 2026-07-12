@@ -1170,11 +1170,13 @@ export function isTransformableEntityIdentifier(
 ): entityIdentifier is
   | CanvasEntityIdentifier<'raster_layer'>
   | CanvasEntityIdentifier<'control_layer'>
+  | CanvasEntityIdentifier<'vector_layer'>
   | CanvasEntityIdentifier<'inpaint_mask'>
   | CanvasEntityIdentifier<'regional_guidance'> {
   return (
     isRasterLayerEntityIdentifier(entityIdentifier) ||
     isControlLayerEntityIdentifier(entityIdentifier) ||
+    isVectorLayerEntityIdentifier(entityIdentifier) ||
     isInpaintMaskEntityIdentifier(entityIdentifier) ||
     isRegionalGuidanceEntityIdentifier(entityIdentifier)
   );
