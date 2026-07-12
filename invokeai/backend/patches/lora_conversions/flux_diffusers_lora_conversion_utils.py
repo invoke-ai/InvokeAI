@@ -54,7 +54,10 @@ def is_state_dict_likely_in_flux_diffusers_format(state_dict: dict[str | int, to
 
     # --- Flux2 Klein diffusers key patterns (fused QKV+MLP, ff.linear_in) ---
     # These use Flux2Transformer2DModel naming which differs from Flux.1.
-    for prefix in ["transformer.", "base_model.model."]:
+    # An empty prefix is supported because some trainers (e.g. PEFT-style LoRAs from
+    # Modelscope/MuseAI Klein 9B finetunes) save keys at the top level without any
+    # `transformer.` or `base_model.model.` wrapper.
+    for prefix in ["transformer.", "base_model.model.", ""]:
         has_single = any(
             k.startswith(f"{prefix}single_transformer_blocks.") and "to_qkv_mlp_proj" in k for k in state_dict
         )

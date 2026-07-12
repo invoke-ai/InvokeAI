@@ -13,7 +13,7 @@ from transformers import (
     CLIPTextModel,
     CLIPTokenizer,
     T5EncoderModel,
-    T5TokenizerFast,
+    T5Tokenizer,
 )
 
 from invokeai.app.services.config.config_default import get_config
@@ -54,6 +54,10 @@ from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMin
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Base, VAE_Checkpoint_Flux2_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.flux2_state_dict_utils import (
+    convert_flux2_bfl_to_diffusers,
+    convert_flux2_vae_bfl_to_diffusers,
+)
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -177,7 +181,7 @@ class Flux2VAELoader(ModelLoader):
             for k in sd.keys()
         )
         if is_bfl_format:
-            sd = self._convert_flux2_vae_bfl_to_diffusers(sd)
+            sd = convert_flux2_vae_bfl_to_diffusers(sd)
 
         # FLUX.2 VAE configuration (32 latent channels).
         # The standard FLUX.2 VAE uses block_out_channels=(128,256,512,512) for both
@@ -236,171 +240,6 @@ class Flux2VAELoader(ModelLoader):
         model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
         return model
 
-    def _convert_flux2_vae_bfl_to_diffusers(self, sd: dict) -> dict:
-        """Convert FLUX.2 VAE BFL format state dict to diffusers format.
-
-        Key differences:
-        - encoder.down.X.block.Y -> encoder.down_blocks.X.resnets.Y
-        - encoder.down.X.downsample.conv -> encoder.down_blocks.X.downsamplers.0.conv
-        - encoder.mid.block_1/2 -> encoder.mid_block.resnets.0/1
-        - encoder.mid.attn_1.q/k/v -> encoder.mid_block.attentions.0.to_q/k/v
-        - encoder.norm_out -> encoder.conv_norm_out
-        - encoder.quant_conv -> quant_conv (top-level)
-        - decoder.up.X -> decoder.up_blocks.(num_blocks-1-X) (reversed order!)
-        - decoder.post_quant_conv -> post_quant_conv (top-level)
-        - *.nin_shortcut -> *.conv_shortcut
-        """
-        import re
-
-        converted = {}
-        num_up_blocks = 4  # Standard VAE has 4 up blocks
-
-        for old_key, tensor in sd.items():
-            new_key = old_key
-
-            # Encoder down blocks: encoder.down.X.block.Y -> encoder.down_blocks.X.resnets.Y
-            match = re.match(r"encoder\.down\.(\d+)\.block\.(\d+)\.(.*)", old_key)
-            if match:
-                block_idx, resnet_idx, rest = match.groups()
-                rest = rest.replace("nin_shortcut", "conv_shortcut")
-                new_key = f"encoder.down_blocks.{block_idx}.resnets.{resnet_idx}.{rest}"
-                converted[new_key] = tensor
-                continue
-
-            # Encoder downsamplers: encoder.down.X.downsample.conv -> encoder.down_blocks.X.downsamplers.0.conv
-            match = re.match(r"encoder\.down\.(\d+)\.downsample\.conv\.(.*)", old_key)
-            if match:
-                block_idx, rest = match.groups()
-                new_key = f"encoder.down_blocks.{block_idx}.downsamplers.0.conv.{rest}"
-                converted[new_key] = tensor
-                continue
-
-            # Encoder mid block resnets: encoder.mid.block_1/2 -> encoder.mid_block.resnets.0/1
-            match = re.match(r"encoder\.mid\.block_(\d+)\.(.*)", old_key)
-            if match:
-                block_num, rest = match.groups()
-                resnet_idx = int(block_num) - 1  # block_1 -> resnets.0, block_2 -> resnets.1
-                new_key = f"encoder.mid_block.resnets.{resnet_idx}.{rest}"
-                converted[new_key] = tensor
-                continue
-
-            # Encoder mid block attention: encoder.mid.attn_1.* -> encoder.mid_block.attentions.0.*
-            match = re.match(r"encoder\.mid\.attn_1\.(.*)", old_key)
-            if match:
-                rest = match.group(1)
-                # Map attention keys
-                # BFL uses Conv2d (shape [out, in, 1, 1]), diffusers uses Linear (shape [out, in])
-                # Squeeze the extra dimensions for weight tensors
-                if rest.startswith("q."):
-                    new_key = f"encoder.mid_block.attentions.0.to_q.{rest[2:]}"
-                    if rest.endswith(".weight") and tensor.dim() == 4:
-                        tensor = tensor.squeeze(-1).squeeze(-1)
-                elif rest.startswith("k."):
-                    new_key = f"encoder.mid_block.attentions.0.to_k.{rest[2:]}"
-                    if rest.endswith(".weight") and tensor.dim() == 4:
-                        tensor = tensor.squeeze(-1).squeeze(-1)
-                elif rest.startswith("v."):
-                    new_key = f"encoder.mid_block.attentions.0.to_v.{rest[2:]}"
-                    if rest.endswith(".weight") and tensor.dim() == 4:
-                        tensor = tensor.squeeze(-1).squeeze(-1)
-                elif rest.startswith("proj_out."):
-                    new_key = f"encoder.mid_block.attentions.0.to_out.0.{rest[9:]}"
-                    if rest.endswith(".weight") and tensor.dim() == 4:
-                        tensor = tensor.squeeze(-1).squeeze(-1)
-                elif rest.startswith("norm."):
-                    new_key = f"encoder.mid_block.attentions.0.group_norm.{rest[5:]}"
-                else:
-                    new_key = f"encoder.mid_block.attentions.0.{rest}"
-                converted[new_key] = tensor
-                continue
-
-            # Encoder norm_out -> conv_norm_out
-            if old_key.startswith("encoder.norm_out."):
-                new_key = old_key.replace("encoder.norm_out.", "encoder.conv_norm_out.")
-                converted[new_key] = tensor
-                continue
-
-            # Encoder quant_conv -> quant_conv (move to top level)
-            if old_key.startswith("encoder.quant_conv."):
-                new_key = old_key.replace("encoder.quant_conv.", "quant_conv.")
-                converted[new_key] = tensor
-                continue
-
-            # Decoder up blocks (reversed order!): decoder.up.X -> decoder.up_blocks.(num_blocks-1-X)
-            match = re.match(r"decoder\.up\.(\d+)\.block\.(\d+)\.(.*)", old_key)
-            if match:
-                block_idx, resnet_idx, rest = match.groups()
-                # Reverse the block index
-                new_block_idx = num_up_blocks - 1 - int(block_idx)
-                rest = rest.replace("nin_shortcut", "conv_shortcut")
-                new_key = f"decoder.up_blocks.{new_block_idx}.resnets.{resnet_idx}.{rest}"
-                converted[new_key] = tensor
-                continue
-
-            # Decoder upsamplers (reversed order!)
-            match = re.match(r"decoder\.up\.(\d+)\.upsample\.conv\.(.*)", old_key)
-            if match:
-                block_idx, rest = match.groups()
-                new_block_idx = num_up_blocks - 1 - int(block_idx)
-                new_key = f"decoder.up_blocks.{new_block_idx}.upsamplers.0.conv.{rest}"
-                converted[new_key] = tensor
-                continue
-
-            # Decoder mid block resnets: decoder.mid.block_1/2 -> decoder.mid_block.resnets.0/1
-            match = re.match(r"decoder\.mid\.block_(\d+)\.(.*)", old_key)
-            if match:
-                block_num, rest = match.groups()
-                resnet_idx = int(block_num) - 1
-                new_key = f"decoder.mid_block.resnets.{resnet_idx}.{rest}"
-                converted[new_key] = tensor
-                continue
-
-            # Decoder mid block attention: decoder.mid.attn_1.* -> decoder.mid_block.attentions.0.*
-            match = re.match(r"decoder\.mid\.attn_1\.(.*)", old_key)
-            if match:
-                rest = match.group(1)
-                # BFL uses Conv2d (shape [out, in, 1, 1]), diffusers uses Linear (shape [out, in])
-                # Squeeze the extra dimensions for weight tensors
-                if rest.startswith("q."):
-                    new_key = f"decoder.mid_block.attentions.0.to_q.{rest[2:]}"
-                    if rest.endswith(".weight") and tensor.dim() == 4:
-                        tensor = tensor.squeeze(-1).squeeze(-1)
-                elif rest.startswith("k."):
-                    new_key = f"decoder.mid_block.attentions.0.to_k.{rest[2:]}"
-                    if rest.endswith(".weight") and tensor.dim() == 4:
-                        tensor = tensor.squeeze(-1).squeeze(-1)
-                elif rest.startswith("v."):
-                    new_key = f"decoder.mid_block.attentions.0.to_v.{rest[2:]}"
-                    if rest.endswith(".weight") and tensor.dim() == 4:
-                        tensor = tensor.squeeze(-1).squeeze(-1)
-                elif rest.startswith("proj_out."):
-                    new_key = f"decoder.mid_block.attentions.0.to_out.0.{rest[9:]}"
-                    if rest.endswith(".weight") and tensor.dim() == 4:
-                        tensor = tensor.squeeze(-1).squeeze(-1)
-                elif rest.startswith("norm."):
-                    new_key = f"decoder.mid_block.attentions.0.group_norm.{rest[5:]}"
-                else:
-                    new_key = f"decoder.mid_block.attentions.0.{rest}"
-                converted[new_key] = tensor
-                continue
-
-            # Decoder norm_out -> conv_norm_out
-            if old_key.startswith("decoder.norm_out."):
-                new_key = old_key.replace("decoder.norm_out.", "decoder.conv_norm_out.")
-                converted[new_key] = tensor
-                continue
-
-            # Decoder post_quant_conv -> post_quant_conv (move to top level)
-            if old_key.startswith("decoder.post_quant_conv."):
-                new_key = old_key.replace("decoder.post_quant_conv.", "post_quant_conv.")
-                converted[new_key] = tensor
-                continue
-
-            # Keep other keys as-is (like encoder.conv_in, decoder.conv_in, decoder.conv_out, bn.*)
-            converted[new_key] = tensor
-
-        return converted
-
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Diffusers)
 class CLIPDiffusersLoader(ModelLoader):
@@ -442,7 +281,7 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
             )
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5TokenizerFast.from_pretrained(
+                return T5Tokenizer.from_pretrained(
                     Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
                 )
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
@@ -470,8 +309,11 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False, assign=True)
         assert len(unexpected_keys) == 0
         assert set(missing_keys) == {"encoder.embed_tokens.weight"}
-        # Assert that the layers we expect to be shared are actually shared.
-        assert model.encoder.embed_tokens.weight is model.shared.weight
+        # Re-tie shared weights. In transformers 5.x, weight tying is implemented at the
+        # parameter level (via _tie_weights / tie_weights) rather than as a Python object
+        # alias.  load_state_dict(assign=True) replaces parameters in-place, which severs
+        # the parameter-level tie.  Calling tie_weights() re-establishes it.
+        model.tie_weights()
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder)
@@ -488,7 +330,7 @@ class T5EncoderCheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5TokenizerFast.from_pretrained(
+                return T5Tokenizer.from_pretrained(
                     Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
                 )
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
@@ -811,7 +653,7 @@ class Flux2CheckpointModel(ModelLoader):
             }
 
         # Convert BFL format state dict to diffusers format
-        converted_sd = self._convert_flux2_bfl_to_diffusers(sd)
+        converted_sd = convert_flux2_bfl_to_diffusers(sd)
 
         # Detect architecture from checkpoint keys
         double_block_indices = [
@@ -895,156 +737,6 @@ class Flux2CheckpointModel(ModelLoader):
         model.load_state_dict(converted_sd, assign=True)
 
         return model
-
-    def _convert_flux2_bfl_to_diffusers(self, sd: dict) -> dict:
-        """Convert FLUX.2 BFL format state dict to diffusers format.
-
-        Based on diffusers convert_flux2_to_diffusers.py key mappings.
-        """
-        converted = {}
-
-        # Basic key renames
-        key_renames = {
-            "img_in.weight": "x_embedder.weight",
-            "txt_in.weight": "context_embedder.weight",
-            "time_in.in_layer.weight": "time_guidance_embed.timestep_embedder.linear_1.weight",
-            "time_in.out_layer.weight": "time_guidance_embed.timestep_embedder.linear_2.weight",
-            "guidance_in.in_layer.weight": "time_guidance_embed.guidance_embedder.linear_1.weight",
-            "guidance_in.out_layer.weight": "time_guidance_embed.guidance_embedder.linear_2.weight",
-            "double_stream_modulation_img.lin.weight": "double_stream_modulation_img.linear.weight",
-            "double_stream_modulation_txt.lin.weight": "double_stream_modulation_txt.linear.weight",
-            "single_stream_modulation.lin.weight": "single_stream_modulation.linear.weight",
-            "final_layer.linear.weight": "proj_out.weight",
-            "final_layer.adaLN_modulation.1.weight": "norm_out.linear.weight",
-        }
-
-        for old_key, tensor in sd.items():
-            new_key = old_key
-
-            # Apply basic renames
-            if old_key in key_renames:
-                new_key = key_renames[old_key]
-                # Apply scale-shift swap for adaLN modulation weights
-                # BFL and diffusers use different parameter ordering for AdaLayerNorm
-                if old_key == "final_layer.adaLN_modulation.1.weight":
-                    tensor = self._swap_scale_shift(tensor)
-                converted[new_key] = tensor
-                continue
-
-            # Convert double_blocks.X.* to transformer_blocks.X.*
-            if old_key.startswith("double_blocks."):
-                new_key = self._convert_double_block_key(old_key, tensor, converted)
-                if new_key is None:
-                    continue  # Key was handled specially
-            # Convert single_blocks.X.* to single_transformer_blocks.X.*
-            elif old_key.startswith("single_blocks."):
-                new_key = self._convert_single_block_key(old_key, tensor, converted)
-                if new_key is None:
-                    continue  # Key was handled specially
-
-            if new_key != old_key or new_key not in converted:
-                converted[new_key] = tensor
-
-        return converted
-
-    def _convert_double_block_key(self, key: str, tensor: torch.Tensor, converted: dict) -> str | None:
-        """Convert double_blocks key to transformer_blocks format."""
-        parts = key.split(".")
-        block_idx = parts[1]
-        rest = ".".join(parts[2:])
-
-        prefix = f"transformer_blocks.{block_idx}"
-
-        # Attention QKV conversion - BFL uses fused qkv, diffusers uses separate
-        if "img_attn.qkv.weight" in rest:
-            # Split fused QKV into separate Q, K, V
-            # Defensive check: ensure tensor has at least 1 dimension and can be split into 3
-            if tensor.dim() < 1 or tensor.shape[0] % 3 != 0:
-                # Skip malformed tensors (might be metadata or corrupted)
-                return key
-            q, k, v = tensor.chunk(3, dim=0)
-            converted[f"{prefix}.attn.to_q.weight"] = q
-            converted[f"{prefix}.attn.to_k.weight"] = k
-            converted[f"{prefix}.attn.to_v.weight"] = v
-            return None
-        elif "txt_attn.qkv.weight" in rest:
-            # Defensive check
-            if tensor.dim() < 1 or tensor.shape[0] % 3 != 0:
-                return key
-            q, k, v = tensor.chunk(3, dim=0)
-            converted[f"{prefix}.attn.add_q_proj.weight"] = q
-            converted[f"{prefix}.attn.add_k_proj.weight"] = k
-            converted[f"{prefix}.attn.add_v_proj.weight"] = v
-            return None
-
-        # Attention output projection
-        if "img_attn.proj.weight" in rest:
-            return f"{prefix}.attn.to_out.0.weight"
-        elif "txt_attn.proj.weight" in rest:
-            return f"{prefix}.attn.to_add_out.weight"
-
-        # Attention norms
-        if "img_attn.norm.query_norm.scale" in rest or "img_attn.norm.query_norm.weight" in rest:
-            return f"{prefix}.attn.norm_q.weight"
-        elif "img_attn.norm.key_norm.scale" in rest or "img_attn.norm.key_norm.weight" in rest:
-            return f"{prefix}.attn.norm_k.weight"
-        elif "txt_attn.norm.query_norm.scale" in rest or "txt_attn.norm.query_norm.weight" in rest:
-            return f"{prefix}.attn.norm_added_q.weight"
-        elif "txt_attn.norm.key_norm.scale" in rest or "txt_attn.norm.key_norm.weight" in rest:
-            return f"{prefix}.attn.norm_added_k.weight"
-
-        # MLP layers
-        if "img_mlp.0.weight" in rest:
-            return f"{prefix}.ff.linear_in.weight"
-        elif "img_mlp.2.weight" in rest:
-            return f"{prefix}.ff.linear_out.weight"
-        elif "txt_mlp.0.weight" in rest:
-            return f"{prefix}.ff_context.linear_in.weight"
-        elif "txt_mlp.2.weight" in rest:
-            return f"{prefix}.ff_context.linear_out.weight"
-
-        return key
-
-    def _convert_single_block_key(self, key: str, tensor: torch.Tensor, converted: dict) -> str | None:
-        """Convert single_blocks key to single_transformer_blocks format."""
-        parts = key.split(".")
-        block_idx = parts[1]
-        rest = ".".join(parts[2:])
-
-        prefix = f"single_transformer_blocks.{block_idx}"
-
-        # linear1 is the fused QKV+MLP projection
-        if "linear1.weight" in rest:
-            return f"{prefix}.attn.to_qkv_mlp_proj.weight"
-        elif "linear2.weight" in rest:
-            return f"{prefix}.attn.to_out.weight"
-
-        # Norms
-        if "norm.query_norm.scale" in rest or "norm.query_norm.weight" in rest:
-            return f"{prefix}.attn.norm_q.weight"
-        elif "norm.key_norm.scale" in rest or "norm.key_norm.weight" in rest:
-            return f"{prefix}.attn.norm_k.weight"
-
-        return key
-
-    def _swap_scale_shift(self, weight: torch.Tensor) -> torch.Tensor:
-        """Swap scale and shift in AdaLayerNorm weights.
-
-        BFL and diffusers use different parameter ordering for AdaLayerNorm.
-        This function swaps the two halves of the weight tensor.
-
-        Args:
-            weight: Weight tensor of shape (out_features,) or (out_features, in_features)
-
-        Returns:
-            Weight tensor with scale and shift swapped.
-        """
-        # Defensive check: ensure tensor can be split
-        if weight.dim() < 1 or weight.shape[0] % 2 != 0:
-            return weight
-        # Split in half along the first dimension and swap
-        shift, scale = weight.chunk(2, dim=0)
-        return torch.cat([scale, shift], dim=0)
 
     def _dequantize_fp8_weights(self, sd: dict) -> dict:
         """Dequantize FP8 quantized weights in the state dict.
@@ -1161,7 +853,7 @@ class Flux2GGUFCheckpointModel(ModelLoader):
             }
 
         # Convert BFL format state dict to diffusers format
-        converted_sd = self._convert_flux2_bfl_to_diffusers(sd)
+        converted_sd = convert_flux2_bfl_to_diffusers(sd)
 
         # Detect architecture from checkpoint keys
         double_block_indices = [
@@ -1261,127 +953,6 @@ class Flux2GGUFCheckpointModel(ModelLoader):
 
         model.load_state_dict(converted_sd, assign=True)
         return model
-
-    def _convert_flux2_bfl_to_diffusers(self, sd: dict) -> dict:
-        """Convert FLUX.2 BFL format state dict to diffusers format."""
-        converted = {}
-
-        key_renames = {
-            "img_in.weight": "x_embedder.weight",
-            "txt_in.weight": "context_embedder.weight",
-            "time_in.in_layer.weight": "time_guidance_embed.timestep_embedder.linear_1.weight",
-            "time_in.out_layer.weight": "time_guidance_embed.timestep_embedder.linear_2.weight",
-            "guidance_in.in_layer.weight": "time_guidance_embed.guidance_embedder.linear_1.weight",
-            "guidance_in.out_layer.weight": "time_guidance_embed.guidance_embedder.linear_2.weight",
-            "double_stream_modulation_img.lin.weight": "double_stream_modulation_img.linear.weight",
-            "double_stream_modulation_txt.lin.weight": "double_stream_modulation_txt.linear.weight",
-            "single_stream_modulation.lin.weight": "single_stream_modulation.linear.weight",
-            "final_layer.linear.weight": "proj_out.weight",
-            "final_layer.adaLN_modulation.1.weight": "norm_out.linear.weight",
-        }
-
-        for old_key, tensor in sd.items():
-            new_key = old_key
-
-            if old_key in key_renames:
-                new_key = key_renames[old_key]
-                if old_key == "final_layer.adaLN_modulation.1.weight":
-                    tensor = self._swap_scale_shift(tensor)
-                converted[new_key] = tensor
-                continue
-
-            if old_key.startswith("double_blocks."):
-                new_key = self._convert_double_block_key(old_key, tensor, converted)
-                if new_key is None:
-                    continue
-            elif old_key.startswith("single_blocks."):
-                new_key = self._convert_single_block_key(old_key, tensor, converted)
-                if new_key is None:
-                    continue
-
-            if new_key != old_key or new_key not in converted:
-                converted[new_key] = tensor
-
-        return converted
-
-    def _convert_double_block_key(self, key: str, tensor, converted: dict) -> str | None:
-        parts = key.split(".")
-        block_idx = parts[1]
-        rest = ".".join(parts[2:])
-        prefix = f"transformer_blocks.{block_idx}"
-
-        if "img_attn.qkv.weight" in rest:
-            q, k, v = self._chunk_tensor(tensor, 3)
-            converted[f"{prefix}.attn.to_q.weight"] = q
-            converted[f"{prefix}.attn.to_k.weight"] = k
-            converted[f"{prefix}.attn.to_v.weight"] = v
-            return None
-        elif "txt_attn.qkv.weight" in rest:
-            q, k, v = self._chunk_tensor(tensor, 3)
-            converted[f"{prefix}.attn.add_q_proj.weight"] = q
-            converted[f"{prefix}.attn.add_k_proj.weight"] = k
-            converted[f"{prefix}.attn.add_v_proj.weight"] = v
-            return None
-
-        if "img_attn.proj.weight" in rest:
-            return f"{prefix}.attn.to_out.0.weight"
-        elif "txt_attn.proj.weight" in rest:
-            return f"{prefix}.attn.to_add_out.weight"
-
-        if "img_attn.norm.query_norm.scale" in rest or "img_attn.norm.query_norm.weight" in rest:
-            return f"{prefix}.attn.norm_q.weight"
-        elif "img_attn.norm.key_norm.scale" in rest or "img_attn.norm.key_norm.weight" in rest:
-            return f"{prefix}.attn.norm_k.weight"
-        elif "txt_attn.norm.query_norm.scale" in rest or "txt_attn.norm.query_norm.weight" in rest:
-            return f"{prefix}.attn.norm_added_q.weight"
-        elif "txt_attn.norm.key_norm.scale" in rest or "txt_attn.norm.key_norm.weight" in rest:
-            return f"{prefix}.attn.norm_added_k.weight"
-
-        if "img_mlp.0.weight" in rest:
-            return f"{prefix}.ff.linear_in.weight"
-        elif "img_mlp.2.weight" in rest:
-            return f"{prefix}.ff.linear_out.weight"
-        elif "txt_mlp.0.weight" in rest:
-            return f"{prefix}.ff_context.linear_in.weight"
-        elif "txt_mlp.2.weight" in rest:
-            return f"{prefix}.ff_context.linear_out.weight"
-
-        return key
-
-    def _convert_single_block_key(self, key: str, tensor, converted: dict) -> str | None:
-        parts = key.split(".")
-        block_idx = parts[1]
-        rest = ".".join(parts[2:])
-        prefix = f"single_transformer_blocks.{block_idx}"
-
-        if "linear1.weight" in rest:
-            return f"{prefix}.attn.to_qkv_mlp_proj.weight"
-        elif "linear2.weight" in rest:
-            return f"{prefix}.attn.to_out.weight"
-
-        if "norm.query_norm.scale" in rest or "norm.query_norm.weight" in rest:
-            return f"{prefix}.attn.norm_q.weight"
-        elif "norm.key_norm.scale" in rest or "norm.key_norm.weight" in rest:
-            return f"{prefix}.attn.norm_k.weight"
-
-        return key
-
-    def _chunk_tensor(self, tensor, chunks: int):
-        """Chunk a tensor, handling both regular tensors and GGUF quantized tensors."""
-        if hasattr(tensor, "get_dequantized_tensor"):
-            # GGUF quantized tensor - dequantize first, then chunk
-            # This loses quantization for the split weights, but is necessary
-            # because diffusers uses separate Q/K/V projections
-            tensor = tensor.get_dequantized_tensor()
-        return tensor.chunk(chunks, dim=0)
-
-    def _swap_scale_shift(self, weight) -> torch.Tensor:
-        """Swap scale and shift in AdaLayerNorm weights."""
-        if hasattr(weight, "get_dequantized_tensor"):
-            # For GGUF, dequantize first
-            weight = weight.get_dequantized_tensor()
-        shift, scale = weight.chunk(2, dim=0)
-        return torch.cat([scale, shift], dim=0)
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)

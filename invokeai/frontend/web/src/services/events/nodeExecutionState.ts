@@ -1,4 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
+import type { NodeExecutionStates } from 'features/nodes/store/types';
 import type { NodeExecutionState } from 'features/nodes/types/invocation';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { S } from 'services/api/types';
@@ -14,6 +15,32 @@ const getInitialNodeExecutionState = (nodeId: string): NodeExecutionState => ({
   outputs: [],
   error: null,
 });
+
+export const getResetNodeExecutionStatesOnQueueItemStarted = (
+  nodeExecutionStates: NodeExecutionStates,
+  itemId: number,
+  completedInvocationKeysByItemId: CompletedInvocationKeysByItemId
+): NodeExecutionStates | undefined => {
+  if (completedInvocationKeysByItemId.has(itemId)) {
+    return;
+  }
+
+  const next: NodeExecutionStates = {};
+  for (const [nodeId, nodeExecutionState] of Object.entries(nodeExecutionStates)) {
+    if (!nodeExecutionState) {
+      next[nodeId] = nodeExecutionState;
+      continue;
+    }
+    const clone = deepClone(nodeExecutionState);
+    clone.status = zNodeStatus.enum.PENDING;
+    clone.error = null;
+    clone.progress = null;
+    clone.progressImage = null;
+    clone.outputs = [];
+    next[nodeId] = clone;
+  }
+  return next;
+};
 
 export const getUpdatedNodeExecutionStateOnInvocationStarted = (
   nodeExecutionState: NodeExecutionState | undefined,
@@ -82,4 +109,43 @@ export const getUpdatedNodeExecutionStateOnInvocationError = (
   };
 
   return _nodeExecutionState;
+};
+
+export const getNodeExecutionStatesFromCompletedSession = (
+  session: S['SessionQueueItem']['session']
+): NodeExecutionState[] => {
+  const nodeExecutionStates: NodeExecutionState[] = [];
+
+  for (const [nodeId, preparedNodeIds] of Object.entries(session.source_prepared_mapping)) {
+    const outputs = preparedNodeIds.flatMap((preparedNodeId) => {
+      const result = session.results[preparedNodeId];
+      return result ? [result] : [];
+    });
+
+    if (outputs.length === 0) {
+      continue;
+    }
+
+    nodeExecutionStates.push({
+      ...getInitialNodeExecutionState(nodeId),
+      status: zNodeStatus.enum.COMPLETED,
+      outputs,
+    });
+  }
+
+  return nodeExecutionStates;
+};
+
+export const getCompletedInvocationIdsFromCompletedSession = (session: S['SessionQueueItem']['session']): string[] => {
+  const completedInvocationIds: string[] = [];
+
+  for (const preparedNodeIds of Object.values(session.source_prepared_mapping)) {
+    for (const preparedNodeId of preparedNodeIds) {
+      if (session.results[preparedNodeId]) {
+        completedInvocationIds.push(preparedNodeId);
+      }
+    }
+  }
+
+  return completedInvocationIds;
 };

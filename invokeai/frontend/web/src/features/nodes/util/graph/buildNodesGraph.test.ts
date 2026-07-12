@@ -1,9 +1,27 @@
 import { deepClone } from 'common/util/deepClone';
+import { callSavedWorkflowDynamicFieldsChanged, nodesSliceConfig } from 'features/nodes/store/nodesSlice';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
 import { add, buildEdge, buildNode, img_resize, sub, templates } from 'features/nodes/store/util/testUtils';
+import type { IntegerFieldInputTemplate } from 'features/nodes/types/field';
 import { describe, expect, it } from 'vitest';
 
 import { buildNodesGraph } from './buildNodesGraph';
+
+const callSavedWorkflowTemplate = templates.call_saved_workflow;
+const addTemplate = templates.add;
+
+if (!callSavedWorkflowTemplate || !addTemplate || !addTemplate.inputs.a) {
+  throw new Error('Expected saved workflow and add templates');
+}
+
+const addIntegerInputTemplate = addTemplate.inputs.a as IntegerFieldInputTemplate;
+
+const buildDynamicIntegerTemplate = (fieldName: string): IntegerFieldInputTemplate => ({
+  ...addIntegerInputTemplate,
+  name: fieldName,
+  title: 'Left Addend',
+  input: 'any',
+});
 
 const buildConnectorNode = (id: string) => ({
   id,
@@ -54,6 +72,139 @@ const buildState = (nodes: unknown[], edges: unknown[]) =>
   }) as unknown as Parameters<typeof buildNodesGraph>[0];
 
 describe('buildNodesGraph', () => {
+  it('serializes dynamic saved workflow inputs into workflow_inputs', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const node = buildNode(callSavedWorkflowTemplate);
+    state.nodes.push(node);
+
+    const nextState = nodesSliceConfig.slice.reducer(
+      state,
+      callSavedWorkflowDynamicFieldsChanged({
+        nodeId: node.id,
+        fields: [
+          {
+            fieldName: 'saved_workflow_input::node-1::a',
+            fieldTemplate: buildDynamicIntegerTemplate('saved_workflow_input::node-1::a'),
+            label: 'Left Addend',
+            description: 'The first number',
+            initialValue: 23,
+          },
+        ],
+        edgeIdsToRemove: [],
+      })
+    );
+
+    const rootState = {
+      nodes: {
+        past: [],
+        future: [],
+        present: nextState,
+      },
+      gallery: {
+        autoAddBoardId: 'none',
+      },
+    } as never;
+
+    const graph = buildNodesGraph(rootState, templates);
+
+    expect(graph.nodes[node.id]).toMatchObject({
+      workflow_id: '',
+      workflow_inputs: {
+        ['saved_workflow_input::node-1::a']: 23,
+      },
+    });
+  });
+
+  it('omits connected dynamic saved workflow literal values from workflow_inputs while preserving the edge', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const sourceNode = buildNode(add);
+    const callNode = buildNode(callSavedWorkflowTemplate);
+    state.nodes.push(sourceNode, callNode);
+
+    const nextState = deepClone(
+      nodesSliceConfig.slice.reducer(
+        state,
+        callSavedWorkflowDynamicFieldsChanged({
+          nodeId: callNode.id,
+          fields: [
+            {
+              fieldName: 'saved_workflow_input::node-1::a',
+              fieldTemplate: buildDynamicIntegerTemplate('saved_workflow_input::node-1::a'),
+              label: 'Left Addend',
+              description: 'The first number',
+              initialValue: 23,
+            },
+          ],
+          edgeIdsToRemove: [],
+        })
+      )
+    );
+
+    nextState.edges.push(buildEdge(sourceNode.id, 'value', callNode.id, 'saved_workflow_input::node-1::a'));
+
+    const rootState = {
+      nodes: {
+        past: [],
+        future: [],
+        present: nextState,
+      },
+      gallery: {
+        autoAddBoardId: 'none',
+      },
+    } as never;
+
+    const graph = buildNodesGraph(rootState, templates);
+
+    expect(graph.nodes[callNode.id]).toMatchObject({
+      workflow_id: '',
+      workflow_inputs: {},
+    });
+    expect(graph.edges).toContainEqual({
+      source: { node_id: sourceNode.id, field: 'value' },
+      destination: { node_id: callNode.id, field: 'saved_workflow_input::node-1::a' },
+    });
+  });
+
+  it('does not serialize stale hidden saved workflow input values without matching dynamic fields', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const node = buildNode(callSavedWorkflowTemplate);
+    node.data.inputs.workflow_inputs = {
+      name: 'workflow_inputs',
+      type: 'workflow_inputs',
+      value: {
+        ['saved_workflow_input::old-node::a']: 23,
+      },
+    } as never;
+    state.nodes.push(node);
+    const templatesWithWorkflowInputs = {
+      ...templates,
+      call_saved_workflow: {
+        ...callSavedWorkflowTemplate,
+        inputs: {
+          ...callSavedWorkflowTemplate.inputs,
+          workflow_inputs: buildDynamicIntegerTemplate('workflow_inputs'),
+        },
+      },
+    };
+
+    const rootState = {
+      nodes: {
+        past: [],
+        future: [],
+        present: state,
+      },
+      gallery: {
+        autoAddBoardId: 'none',
+      },
+    } as never;
+
+    const graph = buildNodesGraph(rootState, templatesWithWorkflowInputs);
+    const graphNode = graph.nodes[node.id] as { workflow_id: string; workflow_inputs: Record<string, unknown> };
+
+    expect(graphNode.workflow_id).toBe('');
+    expect(graphNode.workflow_inputs).toEqual({});
+  });
+
   it('flattens a single connector to one direct execution edge', () => {
     const source = buildNode(add);
     const target = buildNode(sub);

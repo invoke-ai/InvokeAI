@@ -316,28 +316,43 @@ def test_inference_autocast_from_cpu_to_device(device: str, layer_under_test: La
     # Move the original layer to the CPU.
     layer_to_device_via_state_dict(orig_layer, "cpu")
 
-    # Inference should fail with an input on the device.
-    with pytest.raises(RuntimeError):
-        _ = orig_layer(x)
+    is_nf4_layer = type(orig_layer).__name__ == "InvokeLinearNF4"
+    # Inference should fail with an input on the device. Do not probe raw NF4 here: with CPU-stored weights and a
+    # single-row CUDA input, some bitsandbytes versions hit an unsafe gemv_4bit path instead of raising safely.
+    if not is_nf4_layer:
+        with pytest.raises((RuntimeError, ValueError)):
+            _ = orig_layer(x)
 
     # Wrap the original layer.
     custom_layer = copy.deepcopy(orig_layer)
     custom_layer = wrap_single_custom_layer(custom_layer)
 
-    # Inference should still fail with autocasting disabled.
+    # Inference should still fail with autocasting disabled. See the raw NF4 note above.
     custom_layer.set_device_autocasting_enabled(False)
-    with pytest.raises(RuntimeError):
-        _ = custom_layer(x)
+    if not is_nf4_layer:
+        with pytest.raises((RuntimeError, ValueError)):
+            _ = custom_layer(x)
 
     # Run inference with the wrapped layer on the device.
     custom_layer.set_device_autocasting_enabled(True)
     custom_output = custom_layer(x)
     assert custom_output.device.type == device
 
-    assert torch.allclose(orig_output, custom_output)
+    if is_nf4_layer:
+        assert torch.allclose(orig_output, custom_output, atol=1e-5)
+    else:
+        assert torch.allclose(orig_output, custom_output)
 
 
 PatchUnderTest = tuple[list[tuple[BaseLayerPatch, float]], torch.Tensor]
+
+
+def _has_dora_patch(patches: list[tuple[BaseLayerPatch, float]]) -> bool:
+    return any(isinstance(patch, DoRALayer) for patch, _ in patches)
+
+
+def _is_bnb_quantized_linear(layer: torch.nn.Module) -> bool:
+    return type(layer).__name__ in {"InvokeLinear8bitLt", "InvokeLinearNF4"}
 
 
 @pytest.fixture(
@@ -574,6 +589,7 @@ def test_quantized_linear_sidecar_patches(
     patches, input = patch_under_test
 
     linear_layer, quantized_linear_layer = quantized_linear_layer_under_test
+    expect_dora_incompatible = _is_bnb_quantized_linear(quantized_linear_layer) and _has_dora_patch(patches)
 
     # Move everything to the device.
     layer_to_device_via_state_dict(linear_layer, device)
@@ -592,6 +608,11 @@ def test_quantized_linear_sidecar_patches(
 
     # Run inference with the original layer and the patched layer and assert they are equal.
     output_linear_patched = linear_layer_custom(input)
+    if expect_dora_incompatible:
+        with pytest.raises(RuntimeError, match="not compatible with DoRA patches"):
+            quantized_linear_layer_custom(input)
+        return
+
     output_quantized_patched = quantized_linear_layer_custom(input)
     assert torch.allclose(output_linear_patched, output_quantized_patched, rtol=0.2, atol=0.2)
 
@@ -608,6 +629,7 @@ def test_quantized_linear_sidecar_patches_with_autocast_from_cpu_to_device(
     patches, input = patch_under_test
 
     _, quantized_linear_layer = quantized_linear_layer_under_test
+    expect_dora_incompatible = _is_bnb_quantized_linear(quantized_linear_layer) and _has_dora_patch(patches)
 
     # Move everything to the device.
     layer_to_device_via_state_dict(quantized_linear_layer, device)
@@ -620,6 +642,11 @@ def test_quantized_linear_sidecar_patches_with_autocast_from_cpu_to_device(
         quantized_linear_layer_custom.add_patch(patch, weight)
 
     # Run inference with the custom layer on the device.
+    if expect_dora_incompatible:
+        with pytest.raises(RuntimeError, match="not compatible with DoRA patches"):
+            quantized_linear_layer_custom(input)
+        return
+
     expected_output = quantized_linear_layer_custom(input)
 
     # Move the custom layer to the CPU.
