@@ -8475,6 +8475,24 @@
               "title": "Is Public"
             },
             "description": "Filter by public/shared status"
+          },
+          {
+            "name": "callable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by whether workflows are callable by call_saved_workflow",
+              "title": "Callable"
+            },
+            "description": "Filter by whether workflows are callable by call_saved_workflow"
           }
         ],
         "responses": {
