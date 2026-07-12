@@ -44,6 +44,7 @@ dependencies = [
   "onnxruntime==1.19.2",
   "opencv-contrib-python",
   "imageio[ffmpeg]",                       # video encode (for Wan 2.2 T2V/I2V output)
+  "psutil",                                # video decode worker process-tree termination
   "safetensors",
   "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
