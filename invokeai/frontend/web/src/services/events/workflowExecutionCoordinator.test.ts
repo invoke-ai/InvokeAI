@@ -321,6 +321,24 @@ describe(createWorkflowExecutionCoordinator.name, () => {
     expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 1 }))).toBe(false);
   });
 
+  it('rejects trailing invocation progress after the queue is cleared', () => {
+    const { coordinator, queueItemRequests } = createCoordinatorHarness();
+
+    coordinator.onQueueItemStatusChanged(buildQueueStatusEvent({ item_id: 1, status: 'in_progress', origin: null }));
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 1 }))).toBe(true);
+
+    // Clearing the queue deletes items without emitting per-item terminal status events, so the
+    // coordinator is told directly. A workflow item with a pending reconciliation is also tracked
+    // to verify the reconciliation is aborted.
+    coordinator.onQueueItemStatusChanged(
+      buildQueueStatusEvent({ item_id: 2, status: 'completed', origin: 'workflows' })
+    );
+    coordinator.onQueueCleared();
+
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 1 }))).toBe(false);
+    expect(queueItemRequests.get(2)?.abort).toHaveBeenCalled();
+  });
+
   it('still clears canvas workflow integration processing on late invocation errors', () => {
     const { clearCanvasWorkflowIntegrationProcessing, coordinator } = createCoordinatorHarness();
 

@@ -539,7 +539,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
     // Clearing the queue deletes the in-progress item without emitting a per-item terminal status
-    // event, so the progress bar must be reset here.
+    // event, so the progress bar must be reset here — and the coordinator must mark its tracked
+    // items terminal so a trailing invocation_progress event cannot repopulate the bar.
+    workflowExecutionCoordinator.onQueueCleared();
     $lastProgressEvent.set(null);
     dispatch(
       queueApi.util.invalidateTags([

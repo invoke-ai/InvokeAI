@@ -15,6 +15,7 @@ import {
 } from 'services/events/nodeExecutionState';
 import {
   createWorkflowExecutionState,
+  isTerminalQueueStatus,
   transitionWorkflowExecutionState,
   type WorkflowExecutionState,
 } from 'services/events/workflowExecutionState';
@@ -72,6 +73,19 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
       req.unsubscribe?.();
     }
     pendingWorkflowReconciliationRequests.clear();
+  };
+
+  const onQueueCleared = () => {
+    // Clearing the queue deletes its items without emitting per-item terminal status events, so the
+    // tracked items must be marked terminal here for trailing invocation events to be rejected.
+    cancelPendingWorkflowReconciliations();
+    for (const itemId of [...workflowExecutionStates.keys()]) {
+      const state = workflowExecutionStates.get(itemId);
+      if (!state || isTerminalQueueStatus(state.queueStatus)) {
+        continue;
+      }
+      workflowExecutionStates.set(itemId, { ...state, queueStatus: 'canceled' });
+    }
   };
 
   const reconcileWorkflowQueueItemResults = (itemId: number, status: TerminalQueueStatus) => {
@@ -248,6 +262,7 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
     onInvocationError,
     onInvocationProgress,
     onInvocationStarted,
+    onQueueCleared,
     onQueueItemStatusChanged,
   };
 };
