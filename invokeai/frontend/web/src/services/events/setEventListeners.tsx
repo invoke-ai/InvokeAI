@@ -538,6 +538,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
+    // Clearing the queue deletes the in-progress item without emitting a per-item terminal status
+    // event, so the progress bar must be reset here.
+    $lastProgressEvent.set(null);
     dispatch(
       queueApi.util.invalidateTags([
         'SessionQueueStatus',

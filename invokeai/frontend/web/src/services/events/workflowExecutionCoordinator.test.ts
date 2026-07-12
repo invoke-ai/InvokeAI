@@ -71,6 +71,28 @@ const buildInvocationStartedEvent = (
     ...overrides,
   }) as S['InvocationStartedEvent'];
 
+const buildInvocationProgressEvent = (
+  overrides: Partial<S['InvocationProgressEvent']> = {}
+): S['InvocationProgressEvent'] =>
+  ({
+    queue_id: 'default',
+    item_id: 1,
+    batch_id: 'batch-1',
+    origin: null,
+    destination: null,
+    user_id: 'user-1',
+    session_id: 'session-1',
+    invocation_source_id: 'node-1',
+    invocation: {
+      id: 'prepared-node-1',
+      type: 'test_node',
+    },
+    message: 'denoising',
+    percentage: 0.5,
+    image: null,
+    ...overrides,
+  }) as S['InvocationProgressEvent'];
+
 const buildInvocationCompleteEvent = (
   overrides: Partial<S['InvocationCompleteEvent']> = {}
 ): S['InvocationCompleteEvent'] =>
@@ -284,6 +306,19 @@ describe(createWorkflowExecutionCoordinator.name, () => {
     ).toBe(false);
 
     expect(queueItemRequests.size).toBe(1);
+  });
+
+  it('rejects trailing invocation progress after a queue item is canceled', () => {
+    const { coordinator } = createCoordinatorHarness();
+
+    coordinator.onQueueItemStatusChanged(buildQueueStatusEvent({ item_id: 1, status: 'in_progress', origin: null }));
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 1 }))).toBe(true);
+
+    coordinator.onQueueItemStatusChanged(buildQueueStatusEvent({ item_id: 1, status: 'canceled', origin: null }));
+
+    // A denoise step callback may race the cancelation and emit progress after the terminal status
+    // event. It must not be applied - it would repopulate the progress bar after it was cleared.
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 1 }))).toBe(false);
   });
 
   it('still clears canvas workflow integration processing on late invocation errors', () => {

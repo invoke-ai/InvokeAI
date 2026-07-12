@@ -59,7 +59,10 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
     req?.abort?.();
     req?.unsubscribe?.();
     pendingWorkflowReconciliationRequests.delete(itemId);
-    workflowExecutionStates.delete(itemId);
+    // The workflow execution state entry is intentionally kept. A canceled queue item can emit a
+    // few trailing invocation events (e.g. a denoise step callback racing the cancelation), and the
+    // retained terminal state is what rejects them. Item ids are never reused, and the LRU cache
+    // bounds memory.
     clearCompletedInvocationKeysForQueueItem(deps.completedInvocationKeysByItemId, itemId);
   };
 
