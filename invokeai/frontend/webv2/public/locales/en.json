@@ -1341,6 +1341,14 @@
         "saveAs_inpaint_mask": "Inpaint mask",
         "saveAs_raster": "Raster layer",
         "saveAs_regional_guidance": "Regional guidance",
+        "statusCommitting": "Applying object result…",
+        "statusError": "Select Object needs attention.",
+        "statusPreparingComposite": "Preparing canvas composite…",
+        "statusProcessingSam": "Finding object…",
+        "statusReady": "Ready",
+        "statusRenderingPreview": "Rendering object preview…",
+        "statusScheduled": "Waiting to process object…",
+        "statusUploading": "Uploading canvas composite…",
         "visual": "Visual"
       },
       "runWorkflow": {

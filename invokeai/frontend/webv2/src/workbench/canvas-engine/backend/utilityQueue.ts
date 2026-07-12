@@ -35,12 +35,15 @@ import { cancelQueueItems, enqueueUtilityGraph, getQueueItem } from '@workbench/
 /** The default time a utility graph may run before it is abandoned. */
 export const DEFAULT_UTILITY_QUEUE_TIMEOUT_MS = 120_000;
 
+/** Bounded retries for transient completed-item reconciliation failures. */
+export const DEFAULT_UTILITY_RECONCILE_RETRY_POLICY = { delayMs: 100, maxAttempts: 3 } as const;
+
 /** Thrown when a utility graph fails, is canceled, times out, or is aborted. */
 export class UtilityQueueError extends Error {
-  readonly reason: 'failed' | 'canceled' | 'timeout' | 'aborted' | 'no-output' | 'enqueue';
+  readonly reason: 'failed' | 'canceled' | 'timeout' | 'aborted' | 'no-output' | 'enqueue' | 'reconcile';
 
-  constructor(reason: UtilityQueueError['reason'], message: string) {
-    super(message);
+  constructor(reason: UtilityQueueError['reason'], message: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
     this.name = 'UtilityQueueError';
     this.reason = reason;
   }
@@ -62,6 +65,19 @@ export type UtilityCompletedOutputReconciler = (
   itemIds: number[],
   outputNodeId?: string
 ) => Promise<UtilityImageOutput | null>;
+
+export interface UtilityReconcileRetryPolicy {
+  delayMs: number;
+  maxAttempts: number;
+}
+
+/** Returns a cancellation function for one scheduled reconciliation retry. */
+export type UtilityReconcileRetryScheduler = (callback: () => void, delayMs: number) => () => void;
+
+const scheduleUtilityReconcileRetry: UtilityReconcileRetryScheduler = (callback, delayMs) => {
+  const timer = setTimeout(callback, delayMs);
+  return () => clearTimeout(timer);
+};
 
 /** Dependencies for {@link runUtilityGraph} (all injectable for tests). */
 export interface RunUtilityGraphOptions {
@@ -86,6 +102,10 @@ export interface RunUtilityGraphOptions {
   createId?: () => string;
   /** Injectable completed-item reconciliation seam. */
   reconcileCompletedOutput?: UtilityCompletedOutputReconciler;
+  /** Bounded reconciliation retry policy. */
+  reconcileRetryPolicy?: UtilityReconcileRetryPolicy;
+  /** Injectable reconciliation retry timer seam. */
+  scheduleReconcileRetry?: UtilityReconcileRetryScheduler;
 }
 
 /** The resolved result of a utility graph: its single output image. */
@@ -116,9 +136,25 @@ const extractImageOutput = (result: InvocationCompleteEvent['result'] | undefine
   return { height: output.height, imageName: output.image.image_name, width: output.width };
 };
 
-const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler = async (itemIds, outputNodeId) => {
+export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler = async (itemIds, outputNodeId) => {
   for (const itemId of itemIds) {
     const item = await getQueueItem(itemId);
+    if (
+      !item ||
+      typeof item !== 'object' ||
+      item.item_id !== itemId ||
+      !item.session ||
+      typeof item.session !== 'object' ||
+      !item.session.results ||
+      typeof item.session.results !== 'object' ||
+      Array.isArray(item.session.results) ||
+      (item.session.prepared_source_mapping !== undefined &&
+        (typeof item.session.prepared_source_mapping !== 'object' ||
+          item.session.prepared_source_mapping === null ||
+          Array.isArray(item.session.prepared_source_mapping)))
+    ) {
+      throw new Error(`Queue item ${itemId} returned malformed reconciliation data.`);
+    }
     const results = item.session?.results ?? {};
     const preparedSourceMapping = item.session?.prepared_source_mapping ?? {};
     for (const [preparedNodeId, result] of Object.entries(results)) {
@@ -128,6 +164,9 @@ const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler = async 
       const output = extractImageOutput(result as InvocationCompleteEvent['result']);
       if (output) {
         return output;
+      }
+      if (outputNodeId) {
+        throw new Error(`Queue item ${itemId} returned malformed output for node ${outputNodeId}.`);
       }
     }
   }
@@ -145,6 +184,14 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
   const cancel = options.cancel ?? cancelQueueItems;
   const timeoutMs = options.timeoutMs ?? DEFAULT_UTILITY_QUEUE_TIMEOUT_MS;
   const reconcileCompletedOutput = options.reconcileCompletedOutput ?? reconcileUtilityCompletedOutput;
+  const reconcileRetryPolicy = options.reconcileRetryPolicy ?? DEFAULT_UTILITY_RECONCILE_RETRY_POLICY;
+  const scheduleReconcileRetry = options.scheduleReconcileRetry ?? scheduleUtilityReconcileRetry;
+  const reconcileMaxAttempts = Number.isFinite(reconcileRetryPolicy.maxAttempts)
+    ? Math.max(1, Math.floor(reconcileRetryPolicy.maxAttempts))
+    : DEFAULT_UTILITY_RECONCILE_RETRY_POLICY.maxAttempts;
+  const reconcileDelayMs = Number.isFinite(reconcileRetryPolicy.delayMs)
+    ? Math.max(0, reconcileRetryPolicy.delayMs)
+    : DEFAULT_UTILITY_RECONCILE_RETRY_POLICY.delayMs;
   const utilityId = (options.createId ?? (() => crypto.randomUUID()))();
   const origin = buildUtilityQueueItemOrigin(utilityId);
 
@@ -155,7 +202,9 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     let cancellationStarted = false;
     let enqueueResult: { itemIds: number[]; enqueued: number } | null = null;
     let completionReceived = false;
-    let reconciliationStarted = false;
+    let reconciliationAttempts = 0;
+    let reconciliationInFlight = false;
+    let cancelReconciliationRetry: (() => void) | null = null;
     const detachers: Array<() => void> = [];
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -189,6 +238,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         clearTimeout(timer);
         timer = null;
       }
+      cancelReconciliationRetry?.();
+      cancelReconciliationRetry = null;
       for (const detach of detachers) {
         detach();
       }
@@ -217,16 +268,24 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     };
 
     const reconcileCompletion = (): void => {
-      if (settled || !completionReceived || reconciliationStarted || enqueueResult === null) {
+      if (
+        settled ||
+        !completionReceived ||
+        reconciliationInFlight ||
+        cancelReconciliationRetry !== null ||
+        enqueueResult === null
+      ) {
         return;
       }
       if (capturedOutput) {
         settleResolve(capturedOutput);
         return;
       }
-      reconciliationStarted = true;
+      reconciliationAttempts += 1;
+      reconciliationInFlight = true;
       void reconcileCompletedOutput([...enqueueResult.itemIds], outputNodeId)
         .then((output) => {
+          reconciliationInFlight = false;
           if (settled) {
             return;
           }
@@ -238,10 +297,29 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
             settleReject(new UtilityQueueError('no-output', 'The utility graph produced no output image.'));
           }
         })
-        .catch(() => {
-          if (!settled) {
-            settleReject(new UtilityQueueError('no-output', 'The utility graph output could not be reconciled.'));
+        .catch((cause: unknown) => {
+          reconciliationInFlight = false;
+          if (settled || capturedOutput) {
+            if (capturedOutput) {
+              settleResolve(capturedOutput);
+            }
+            return;
           }
+          if (reconciliationAttempts >= reconcileMaxAttempts) {
+            const detail = cause instanceof Error ? cause.message : String(cause);
+            settleReject(
+              new UtilityQueueError(
+                'reconcile',
+                `Failed to reconcile utility graph output after ${reconciliationAttempts} attempts: ${detail}`,
+                cause
+              )
+            );
+            return;
+          }
+          cancelReconciliationRetry = scheduleReconcileRetry(() => {
+            cancelReconciliationRetry = null;
+            reconcileCompletion();
+          }, reconcileDelayMs);
         });
     };
 

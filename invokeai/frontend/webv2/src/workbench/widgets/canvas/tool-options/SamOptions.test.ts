@@ -1,8 +1,18 @@
 import type { SamSessionSnapshot } from '@workbench/canvas-engine/engineStores';
 
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { getSamActionEligibility } from './SamOptions';
+import { getSamActionEligibility, getSamStatusTranslationKey, SamProcessFeedback } from './SamOptions';
+
+const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
+  eager: true,
+  import: 'default',
+});
+const en = Object.values(englishCatalogModules)[0] as {
+  widgets: { layers: { selectObject: Record<string, string> } };
+};
 
 const snapshot = (overrides: Partial<SamSessionSnapshot> = {}): SamSessionSnapshot => ({
   applyPolygonRefinement: false,
@@ -80,5 +90,39 @@ describe('getSamActionEligibility', () => {
       canReset: false,
       canSave: false,
     });
+  });
+});
+
+describe('SamProcessFeedback', () => {
+  it.each([
+    'ready',
+    'scheduled',
+    'preparing-composite',
+    'uploading',
+    'processing-sam',
+    'rendering-preview',
+    'committing',
+    'error',
+  ] as const)('maps %s to localized user-facing copy without exposing the identifier', (status) => {
+    const key = getSamStatusTranslationKey(status).split('.').at(-1);
+    const copy = key ? en.widgets.layers.selectObject[key] : undefined;
+    expect(copy).toBeTypeOf('string');
+    expect(copy).not.toContain(status);
+  });
+
+  it('server-renders polite status and assertive error feedback visibly', () => {
+    const markup = renderToStaticMarkup(
+      createElement(SamProcessFeedback, {
+        error: 'The mask could not be decoded.',
+        statusText: 'Rendering object preview…',
+      })
+    );
+
+    expect(markup).toContain('role="status"');
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('Rendering object preview…');
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain('aria-live="assertive"');
+    expect(markup).toContain('The mask could not be decoded.');
   });
 });

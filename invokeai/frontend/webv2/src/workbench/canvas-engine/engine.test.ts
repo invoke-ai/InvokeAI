@@ -305,8 +305,8 @@ const createRecordingRasterBackend = (): RecordingRasterBackend => {
   };
 };
 
-const recordingBitmap = (id: string): ImageBitmap =>
-  ({ __recordingId: `bitmap-${id}`, close: vi.fn(), height: 10, width: 10 }) as unknown as ImageBitmap;
+const recordingBitmap = (id: string, width = 10, height = 10): ImageBitmap =>
+  ({ __recordingId: `bitmap-${id}`, close: vi.fn(), height, width }) as unknown as ImageBitmap;
 
 /** One-shot allocation/draw faults, armed after a deterministic number of successful calls. */
 const createStructuralFaultBackend = () => {
@@ -12629,6 +12629,18 @@ describe('Select Object canvas engine integration', () => {
     return { backend, surfaces };
   };
 
+  const withSamPreviewBitmapDimensions = (
+    backend: StubRasterBackend,
+    width = 100,
+    height = 100
+  ): StubRasterBackend => ({
+    ...backend,
+    createImageBitmap: async (source) => {
+      const bitmap = await backend.createImageBitmap(source);
+      return Object.assign(bitmap, { height, width });
+    },
+  });
+
   const createSamHarness = async (
     options: {
       backend?: StubRasterBackend;
@@ -12876,6 +12888,44 @@ describe('Select Object canvas engine integration', () => {
 
     expect(h.engine.stores.samSession.get()).toMatchObject({
       error: 'preview decode failed',
+      hasPreview: false,
+      status: 'error',
+    });
+    h.engine.dispose();
+  });
+
+  it.each([
+    { decoded: { height: 100, width: 99 }, label: 'smaller' },
+    { decoded: { height: 100, width: 101 }, label: 'larger' },
+    { decoded: { height: 100, width: Number.NaN }, label: 'non-finite' },
+    { decoded: { height: 100, width: 99.5 }, label: 'non-integer' },
+  ])('rejects a $label decoded bitmap before surface allocation and closes it', async ({ decoded }) => {
+    const close = vi.fn();
+    const base = createTestStubRasterBackend();
+    let didDecode = false;
+    const previewSurfaceAllocations = vi.fn();
+    const backend = {
+      ...base,
+      createImageBitmap: () => {
+        didDecode = true;
+        return Promise.resolve({ ...decoded, close } as unknown as ImageBitmap);
+      },
+      createSurface: (width: number, height: number) => {
+        if (didDecode) {
+          previewSurfaceAllocations(width, height);
+        }
+        return base.createSurface(width, height);
+      },
+    };
+    const h = await createSamHarness({ backend });
+    h.engine.startSelectObject();
+    h.engine.updateSelectObjectSession({ input: { prompt: 'cat', type: 'prompt' } });
+    await expect(h.engine.processSelectObjectSession()).resolves.toBe('error');
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(previewSurfaceAllocations).not.toHaveBeenCalled();
+    expect(h.engine.stores.samSession.get()).toMatchObject({
+      error: `Decoded Select Object preview dimensions ${String(decoded.width)}x${decoded.height} do not match SAM output 100x100 and preview rect 100x100.`,
       hasPreview: false,
       status: 'error',
     });
@@ -13157,7 +13207,7 @@ describe('Select Object canvas engine integration', () => {
     const document = samDocument([samLayer('first'), samLayer('second', 30)]);
     const reactive = createReducerBackedStore(document);
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: withSamPreviewBitmapDimensions(createTestStubRasterBackend()),
       bitmapStore: createSpyBitmapStore(),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: reactive.projectId,
@@ -13193,7 +13243,7 @@ describe('Select Object canvas engine integration', () => {
     const reactive = createReducerBackedStore(document);
     const { backend } = createOpaqueSamBackend();
     const engine = createCanvasEngine({
-      backend,
+      backend: withSamPreviewBitmapDimensions(backend),
       bitmapStore: createSpyBitmapStore(),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: reactive.projectId,
@@ -13232,7 +13282,7 @@ describe('Select Object canvas engine integration', () => {
       const reactive = createReducerBackedStore(document);
       const { backend } = createOpaqueSamBackend();
       const engine = createCanvasEngine({
-        backend,
+        backend: withSamPreviewBitmapDimensions(backend),
         bitmapStore: createSpyBitmapStore(),
         imageResolver: () => Promise.resolve(new Blob()),
         projectId: reactive.projectId,
@@ -13338,7 +13388,7 @@ describe('Select Object canvas engine integration', () => {
       }
     });
     engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: withSamPreviewBitmapDimensions(createTestStubRasterBackend()),
       bitmapStore: createSpyBitmapStore(),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: reducer.projectId,
@@ -13646,7 +13696,7 @@ describe('Select Object canvas engine integration', () => {
 
   it('isolates the same flattened bbox participants in the compositor while a preview is published', async () => {
     const backend = createRecordingRasterBackend();
-    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('sam-mask')));
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('sam-mask', 100, 100)));
     const h = await createSamHarness({ backend, layers: [samLayer('source'), samLayer('other', 30)] });
     h.engine.stores.checkerboard.set(false);
     h.engine.startSelectObject();
@@ -13670,7 +13720,7 @@ describe('Select Object canvas engine integration', () => {
 
   it('flattens transformed raster and control participants with display semantics while excluding masks', async () => {
     const backend = createRecordingRasterBackend();
-    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('decoded')));
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('decoded', 100, 100)));
     const raster: CanvasLayerContract = {
       ...samLayer('adjusted-raster'),
       adjustments: { brightness: 0.2, contrast: -0.1, saturation: 0.3 },
@@ -13733,7 +13783,7 @@ describe('Select Object canvas engine integration', () => {
       encoded.push(surface as StubRasterSurface);
       return Promise.resolve(new Blob(['composite'], { type: 'image/png' }));
     });
-    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('decoded')));
+    backend.createImageBitmap = vi.fn(() => Promise.resolve(recordingBitmap('decoded', 80, 70)));
     const raster: CanvasLayerContract = {
       ...samLayer('raster'),
       source: {

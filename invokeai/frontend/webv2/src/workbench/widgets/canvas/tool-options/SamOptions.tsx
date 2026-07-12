@@ -3,7 +3,7 @@ import type { SamSessionSnapshot } from '@workbench/canvas-engine/engineStores';
 import type { SamModel } from '@workbench/generation/canvas/samGraph';
 import type { ChangeEvent } from 'react';
 
-import { HStack, Input, Menu, NativeSelect, Portal, Switch, Text } from '@chakra-ui/react';
+import { HStack, Input, Menu, NativeSelect, Portal, Switch } from '@chakra-ui/react';
 import { Button, MenuContent } from '@workbench/components/ui';
 import { makeImageDurable } from '@workbench/gallery/api';
 import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
@@ -22,6 +22,33 @@ export interface SamActionEligibility {
   canReset: boolean;
   canSave: boolean;
 }
+
+const SAM_STATUS_TRANSLATION_KEYS: Record<SamSessionSnapshot['status'], string> = {
+  committing: 'widgets.layers.selectObject.statusCommitting',
+  error: 'widgets.layers.selectObject.statusError',
+  'preparing-composite': 'widgets.layers.selectObject.statusPreparingComposite',
+  'processing-sam': 'widgets.layers.selectObject.statusProcessingSam',
+  ready: 'widgets.layers.selectObject.statusReady',
+  'rendering-preview': 'widgets.layers.selectObject.statusRenderingPreview',
+  scheduled: 'widgets.layers.selectObject.statusScheduled',
+  uploading: 'widgets.layers.selectObject.statusUploading',
+};
+
+export const getSamStatusTranslationKey = (status: SamSessionSnapshot['status']): string =>
+  SAM_STATUS_TRANSLATION_KEYS[status];
+
+export const SamProcessFeedback = ({ error, statusText }: { error: string | null; statusText: string }) => (
+  <>
+    <span aria-live="polite" role="status">
+      {statusText}
+    </span>
+    {error ? (
+      <span aria-live="assertive" role="alert">
+        {error}
+      </span>
+    ) : null}
+  </>
+);
 
 export const getSamActionEligibility = (
   session: SamSessionSnapshot,
@@ -256,14 +283,7 @@ export const SamOptions = ({
       <Button disabled={!eligibility.canCancel} size="xs" variant="ghost" onClick={cancel}>
         {t('common.cancel')}
       </Button>
-      <Text fontSize="2xs" role="status">
-        {session.status.replaceAll('-', ' ')}
-      </Text>
-      {session.error ? (
-        <Text color="fg.error" fontSize="2xs" role="alert">
-          {session.error}
-        </Text>
-      ) : null}
+      <SamProcessFeedback error={session.error} statusText={t(getSamStatusTranslationKey(session.status))} />
     </HStack>
   );
 };

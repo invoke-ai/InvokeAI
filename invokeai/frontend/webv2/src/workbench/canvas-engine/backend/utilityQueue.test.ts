@@ -91,6 +91,34 @@ const createDeferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void
   return { promise, resolve };
 };
 
+const createReconcileScheduler = () => {
+  const pending: Array<{ callback: () => void; canceled: boolean }> = [];
+  const cancelers: ReturnType<typeof vi.fn>[] = [];
+  const schedule = vi.fn((callback: () => void, _delayMs: number) => {
+    const entry = { callback, canceled: false };
+    pending.push(entry);
+    const cancel = vi.fn(() => {
+      entry.canceled = true;
+    });
+    cancelers.push(cancel);
+    return cancel;
+  });
+  return {
+    cancelers,
+    pending,
+    runNext() {
+      const entry = pending.shift();
+      if (!entry) {
+        throw new Error('No reconciliation retry is scheduled.');
+      }
+      if (!entry.canceled) {
+        entry.callback();
+      }
+    },
+    schedule,
+  };
+};
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -230,6 +258,139 @@ describe('runUtilityGraph — await + settle', () => {
     reconciliation.resolve({ height: 48, imageName: 'late.png', width: 64 });
     await Promise.resolve();
     expect(fake.detachCount).toBe(2);
+  });
+
+  it('allows delayed socket output to win after a transient reconciliation failure', async () => {
+    const fake = createFakeHub();
+    const scheduler = createReconcileScheduler();
+    const reconcileCompletedOutput = vi.fn(() => Promise.reject(new Error('gateway unavailable')));
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      outputNodeId: 'control_filter',
+      reconcileCompletedOutput,
+      scheduleReconcileRetry: scheduler.schedule,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
+
+    fake.emit('invocation_complete', completeEvent());
+
+    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
+    expect(reconcileCompletedOutput).toHaveBeenCalledOnce();
+    expect(scheduler.cancelers[0]).toHaveBeenCalledOnce();
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+  });
+
+  it('retries bounded reconciliation failures and resolves from a later successful attempt', async () => {
+    const fake = createFakeHub();
+    const scheduler = createReconcileScheduler();
+    const reconcileCompletedOutput = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('first failure'))
+      .mockRejectedValueOnce(new Error('second failure'))
+      .mockResolvedValueOnce({ height: 48, imageName: 'reconciled.png', width: 64 });
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      outputNodeId: 'control_filter',
+      reconcileCompletedOutput,
+      reconcileRetryPolicy: { delayMs: 25, maxAttempts: 3 },
+      scheduleReconcileRetry: scheduler.schedule,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledTimes(1));
+    scheduler.runNext();
+    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledTimes(2));
+    scheduler.runNext();
+
+    await expect(promise).resolves.toMatchObject({ imageName: 'reconciled.png' });
+    expect(reconcileCompletedOutput).toHaveBeenCalledTimes(3);
+    expect(scheduler.schedule).toHaveBeenNthCalledWith(1, expect.any(Function), 25);
+  });
+
+  it('rejects with reconcile reason and preserves the final failure after bounded attempts are exhausted', async () => {
+    const fake = createFakeHub();
+    const scheduler = createReconcileScheduler();
+    const finalCause = new Error('authentication expired');
+    const reconcileCompletedOutput = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockRejectedValueOnce(finalCause);
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      reconcileCompletedOutput,
+      reconcileRetryPolicy: { delayMs: 10, maxAttempts: 2 },
+      scheduleReconcileRetry: scheduler.schedule,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
+    scheduler.runNext();
+
+    await expect(promise).rejects.toMatchObject({
+      cause: finalCause,
+      message: 'Failed to reconcile utility graph output after 2 attempts: authentication expired',
+      reason: 'reconcile',
+    });
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+  });
+
+  it('aborts during a scheduled reconciliation retry and cancels the retry timer', async () => {
+    const fake = createFakeHub();
+    const scheduler = createReconcileScheduler();
+    const controller = new AbortController();
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      reconcileCompletedOutput: () => Promise.reject(new Error('offline')),
+      scheduleReconcileRetry: scheduler.schedule,
+      signal: controller.signal,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
+
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ reason: 'aborted' });
+    expect(scheduler.cancelers[0]).toHaveBeenCalledOnce();
+    scheduler.runNext();
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+  });
+
+  it('cancels a scheduled reconciliation retry when terminal failure wins', async () => {
+    const fake = createFakeHub();
+    const scheduler = createReconcileScheduler();
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      reconcileCompletedOutput: () => Promise.reject(new Error('offline')),
+      scheduleReconcileRetry: scheduler.schedule,
+    });
+    await Promise.resolve();
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
+
+    fake.emit('queue_item_status_changed', statusEvent('failed', { error_message: 'backend failed' }));
+
+    await expect(promise).rejects.toMatchObject({ message: 'backend failed', reason: 'failed' });
+    expect(scheduler.cancelers[0]).toHaveBeenCalledOnce();
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
   });
 
   it('rejects with the failure reason + message on a failed item', async () => {

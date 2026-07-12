@@ -3158,6 +3158,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (signal.aborted) {
         throw new DOMException('Select Object preview decode was aborted.', 'AbortError');
       }
+      const dimensionsAreValid =
+        Number.isFinite(bitmap.width) &&
+        Number.isInteger(bitmap.width) &&
+        bitmap.width > 0 &&
+        Number.isFinite(bitmap.height) &&
+        Number.isInteger(bitmap.height) &&
+        bitmap.height > 0 &&
+        bitmap.width === result.image.width &&
+        bitmap.height === result.image.height &&
+        bitmap.width === result.rect.width &&
+        bitmap.height === result.rect.height;
+      if (!dimensionsAreValid) {
+        throw new Error(
+          `Decoded Select Object preview dimensions ${String(bitmap.width)}x${String(bitmap.height)} do not match SAM output ${result.image.width}x${result.image.height} and preview rect ${result.rect.width}x${result.rect.height}.`
+        );
+      }
       const surface = backend.createSurface(result.rect.width, result.rect.height);
       const ctx = surface.ctx;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
