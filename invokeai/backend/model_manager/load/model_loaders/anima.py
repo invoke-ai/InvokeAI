@@ -25,6 +25,35 @@ from invokeai.backend.util.logging import InvokeAILogger
 logger = InvokeAILogger.get_logger(__name__)
 
 
+def _strip_anima_bundle_prefix(sd: dict) -> dict:
+    """Strip the transformer-key prefix from an Anima single-file checkpoint.
+
+    Handles both packaging formats:
+      - Official format: keys prefixed with `net.` (e.g. `net.blocks.0...`)
+      - ComfyUI bundled format: transformer keys prefixed with `model.diffusion_model.`
+        alongside `first_stage_model.*` (VAE) and `cond_stage_model.*` (text encoder).
+
+    Only keys under the detected prefix are kept; unrelated keys from bundled
+    checkpoints (VAE, text encoder) are dropped. If no known prefix is present, the
+    state dict is returned unchanged.
+    """
+    prefix_to_strip = None
+    for prefix in ["model.diffusion_model.", "net."]:
+        if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
+            prefix_to_strip = prefix
+            break
+
+    if prefix_to_strip is None:
+        return sd
+
+    stripped_sd: dict = {}
+    for key, value in sd.items():
+        if isinstance(key, str) and key.startswith(prefix_to_strip):
+            stripped_sd[key[len(prefix_to_strip) :]] = value
+        # Skip non-transformer keys from bundled checkpoints (VAE, text encoder)
+    return stripped_sd
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class AnimaCheckpointModel(ModelLoader):
     """Class to load Anima transformer models from single-file checkpoints.
@@ -68,23 +97,8 @@ class AnimaCheckpointModel(ModelLoader):
         # Load the state dict from safetensors
         sd = load_file(model_path)
 
-        # Handle different checkpoint packaging formats:
-        # - Official format: keys prefixed with `net.` (e.g. `net.blocks.0...`)
-        # - ComfyUI bundled format: transformer keys prefixed with `model.diffusion_model.`
-        #   alongside `first_stage_model.*` (VAE) and `cond_stage_model.*` (text encoder)
-        prefix_to_strip = None
-        for prefix in ["model.diffusion_model.", "net."]:
-            if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
-                prefix_to_strip = prefix
-                break
-
-        if prefix_to_strip:
-            stripped_sd = {}
-            for key, value in sd.items():
-                if isinstance(key, str) and key.startswith(prefix_to_strip):
-                    stripped_sd[key[len(prefix_to_strip) :]] = value
-                # Skip non-transformer keys from bundled checkpoints (VAE, text encoder)
-            sd = stripped_sd
+        # Strip the transformer-key prefix (`net.` or bundled `model.diffusion_model.`).
+        sd = _strip_anima_bundle_prefix(sd)
 
         # Create an empty AnimaTransformer with Anima's default architecture parameters
         with accelerate.init_empty_weights():

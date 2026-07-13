@@ -1943,6 +1943,7 @@
         "layerSavedToAssets": "Layer Saved to Assets",
         "loadedWithWarnings": "Workflow Loaded with Warnings",
         "modelAddedSimple": "Model Added to Queue",
+        "modelDefaultsLoaded": "Model Defaults Loaded",
         "modelImportCanceled": "Model Import Canceled",
         "outOfMemoryError": "Out of Memory Error",
         "outOfMemoryErrorDescLocal": "Follow our <LinkComponent>Low VRAM guide</LinkComponent> to reduce OOMs.",
@@ -2493,7 +2494,7 @@
         "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
-        "savedWorkflowUnsupportedDescription": "This workflow cannot currently be used by Call Saved Workflow.",
+        "callable": "Callable",
         "savedWorkflowCompatibility": {
             "missingWorkflowReturn": "The workflow must contain a Workflow Return node.",
             "multipleWorkflowReturn": "The workflow may contain only one Workflow Return node.",

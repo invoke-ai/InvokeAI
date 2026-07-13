@@ -8469,6 +8469,24 @@
               "title": "Is Public"
             },
             "description": "Filter by public/shared status"
+          },
+          {
+            "name": "callable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by whether workflows are callable by call_saved_workflow",
+              "title": "Callable"
+            },
+            "description": "Filter by whether workflows are callable by call_saved_workflow"
           }
         ],
         "responses": {
@@ -10893,7 +10911,7 @@
         "tags": ["image", "latents", "vae", "i2l", "anima"],
         "title": "Image to Latents - Anima",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -11212,7 +11230,7 @@
         "tags": ["latents", "image", "vae", "l2i", "anima"],
         "title": "Latents to Image - Anima",
         "type": "object",
-        "version": "1.0.2",
+        "version": "1.0.3",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -60039,9 +60057,22 @@
             "description": "The ID of the queue",
             "title": "Queue Id",
             "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The ID of the user whose queue items were cleared, or None if all users' items were cleared",
+            "title": "User Id"
           }
         },
-        "required": ["timestamp", "queue_id"],
+        "required": ["timestamp", "queue_id", "user_id"],
         "title": "QueueClearedEvent",
         "type": "object"
       },

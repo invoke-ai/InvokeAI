@@ -25422,6 +25422,12 @@ export type components = {
              * @description The ID of the queue
              */
             queue_id: string;
+            /**
+             * User Id
+             * @description The ID of the user whose queue items were cleared, or None if all users' items were cleared
+             * @default null
+             */
+            user_id: string | null;
         };
         /**
          * QueueItemStatusChangedEvent
@@ -38617,6 +38623,8 @@ export interface operations {
                 has_been_opened?: boolean | null;
                 /** @description Filter by public/shared status */
                 is_public?: boolean | null;
+                /** @description Filter by whether workflows are callable by call_saved_workflow */
+                callable?: boolean | null;
             };
             header?: never;
             path?: never;
