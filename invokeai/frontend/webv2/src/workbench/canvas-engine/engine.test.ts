@@ -2157,6 +2157,8 @@ const createControlPaintHarness = (overrides: ControlPaintHarnessOverrides) => {
   };
 };
 
+const createControlSelectionHarness = createControlPaintHarness;
+
 /** A minimal in-memory bitmap store: records dirty-marks, never touches the network. */
 const createSpyBitmapStore = (): BitmapStore & {
   markLayerDirty: Mock<(layerId: string) => void>;
@@ -12380,6 +12382,228 @@ describe('engine selection: fill / erase', () => {
     });
     return { bitmapStore, engine };
   };
+
+  it('fills an empty selected paint control without adding a raster layer', () => {
+    const h = createControlSelectionHarness({ source: { bitmap: null, type: 'paint' } });
+    h.engine.selectAll();
+    h.engine.fillSelection();
+    expect(h.engine.getDocument()!.layers).toHaveLength(1);
+    expect(h.engine.getDocument()!.layers[0]).toMatchObject({ id: 'control', type: 'control' });
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.dispose();
+  });
+
+  it('erases an existing selected paint control without adding a raster layer', async () => {
+    const h = createControlSelectionHarness({
+      source: { bitmap: { height: 10, imageName: 'paint-bitmap', width: 10 }, type: 'paint' },
+    });
+    await h.publishInitialCache();
+    h.engine.selectAll();
+    h.engine.eraseSelection();
+    expect(h.engine.getDocument()!.layers).toHaveLength(1);
+    expect(h.engine.getDocument()!.layers[0]).toMatchObject({ id: 'control', type: 'control' });
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.dispose();
+  });
+
+  it.each(['fill', 'erase'] as const)('materializes an image control and %ss it as one undo step', async (kind) => {
+    const h = createControlSelectionHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 },
+    });
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.getDocument()!.layers[0]);
+    h.engine.selectAll();
+    if (kind === 'fill') {
+      h.engine.fillSelection();
+    } else {
+      h.engine.eraseSelection();
+    }
+    const after = structuredClone(h.engine.getDocument()!.layers[0]);
+    expect(after).toMatchObject({ id: 'control', source: { type: 'paint' }, type: 'control' });
+    h.engine.undo();
+    expect(h.engine.getDocument()!.layers[0]).toEqual(before);
+    h.engine.redo();
+    expect(h.engine.getDocument()!.layers[0]).toEqual(after);
+    h.engine.dispose();
+  });
+
+  it('does not materialize an image control when Erase has no overlapping pixels', async () => {
+    const h = createControlSelectionHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 50, y: 50 },
+    });
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.getDocument());
+    h.engine.setTool('lasso');
+    h.overlay.fire('pointerdown', pointerAt(0, 0));
+    h.overlay.fire('pointermove', pointerAt(10, 0));
+    h.overlay.fire('pointermove', pointerAt(10, 10));
+    h.overlay.fire('pointermove', pointerAt(0, 10));
+    h.overlay.fire('pointerup', pointerAt(0, 0, { buttons: 0 }));
+    h.engine.eraseSelection();
+    expect(h.engine.getDocument()).toEqual(before);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    h.engine.dispose();
+  });
+
+  it.each([
+    ['locked', { isLocked: true }],
+    ['disabled', { isEnabled: false }],
+  ] as const)('selection editing leaves a %s control unchanged', (_scenario, patch) => {
+    const h = createControlSelectionHarness({ source: { bitmap: null, type: 'paint' }, ...patch });
+    const before = structuredClone(h.engine.getDocument());
+    h.engine.selectAll();
+    h.engine.fillSelection();
+    expect(h.engine.getDocument()).toEqual(before);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    h.engine.dispose();
+  });
+
+  it('selection editing leaves a not-ready image control unchanged', () => {
+    const h = createControlSelectionHarness({
+      source: { image: { height: 10, imageName: 'pending-image', width: 10 }, type: 'image' },
+    });
+    const before = structuredClone(h.engine.getDocument());
+    h.engine.selectAll();
+    h.engine.fillSelection();
+    expect(h.engine.getDocument()).toEqual(before);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    h.engine.dispose();
+  });
+
+  it('rolls back a direct control selection edit when masked compositing fails', async () => {
+    const h = createControlSelectionHarness({
+      source: { bitmap: { height: 10, imageName: 'paint-bitmap', width: 10 }, type: 'paint' },
+    });
+    await h.publishInitialCache();
+    const beforeDocument = structuredClone(h.engine.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'control');
+    const originalCtx = beforeCache.surface.ctx;
+    let capturedBefore: ImageData | null = null;
+    const failingCtx = new Proxy(originalCtx, {
+      get(target, property, receiver) {
+        const value = Reflect.get(target, property, receiver);
+        if (property === 'getImageData' && typeof value === 'function') {
+          return (...args: unknown[]) => {
+            const result = Reflect.apply(value, target, args) as ImageData;
+            capturedBefore = result;
+            return result;
+          };
+        }
+        if (property === 'drawImage' && typeof value === 'function') {
+          return (...args: unknown[]) => {
+            Reflect.apply(value, target, args);
+            throw new Error('selection compositing failed');
+          };
+        }
+        return value;
+      },
+    });
+    Object.defineProperty(beforeCache.surface, 'ctx', { configurable: true, value: failingCtx });
+    h.engine.setTool('lasso');
+    h.overlay.fire('pointerdown', pointerAt(0, 0));
+    h.overlay.fire('pointermove', pointerAt(5, 0));
+    h.overlay.fire('pointermove', pointerAt(5, 5));
+    h.overlay.fire('pointermove', pointerAt(0, 5));
+    h.overlay.fire('pointerup', pointerAt(0, 0, { buttons: 0 }));
+
+    expect(() => h.engine.fillSelection()).toThrow('selection compositing failed');
+
+    expect(h.engine.getDocument()).toEqual(beforeDocument);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(
+      (beforeCache.surface as StubRasterSurface).callLog.filter((entry) => entry.op === 'putImageData').at(-1)?.args[0]
+    ).toBe(capturedBefore);
+
+    Object.defineProperty(beforeCache.surface, 'ctx', { configurable: true, value: originalCtx });
+    h.engine.fillSelection();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.dispose();
+  });
+
+  it('rolls back a materialized control selection edit when masked compositing fails', async () => {
+    const h = createControlSelectionHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 },
+    });
+    await h.publishInitialCache();
+    const beforeDocument = structuredClone(h.engine.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'control');
+    const createSurface = h.backend.createSurface.bind(h.backend);
+    vi.spyOn(h.backend, 'createSurface').mockImplementation((width, height) => {
+      const surface = createSurface(width, height);
+      const originalCtx = surface.ctx;
+      const failingCtx = new Proxy(originalCtx, {
+        get(target, property, receiver) {
+          const value = Reflect.get(target, property, receiver);
+          if (property !== 'drawImage' || typeof value !== 'function') {
+            return value;
+          }
+          return (...args: unknown[]) => {
+            const result = Reflect.apply(value, target, args);
+            if (target.globalCompositeOperation === 'destination-out') {
+              throw new Error('selection compositing failed');
+            }
+            return result;
+          };
+        },
+      });
+      Object.defineProperty(surface, 'ctx', { configurable: true, value: failingCtx });
+      return surface;
+    });
+    h.engine.selectAll();
+
+    expect(() => h.engine.eraseSelection()).toThrow('selection compositing failed');
+
+    expect(h.engine.getDocument()).toEqual(beforeDocument);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+
+    vi.mocked(h.backend.createSurface).mockRestore();
+    h.engine.eraseSelection();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.dispose();
+  });
+
+  it('preserves transaction-owned rollback when a materialized control selection commit fails', async () => {
+    const h = createControlSelectionHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 },
+    });
+    await h.publishInitialCache();
+    const beforeDocument = structuredClone(h.engine.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'control');
+    h.engine.selectAll();
+    historyPreparationFaults.layerSnapshot = true;
+
+    expect(() => h.engine.fillSelection()).toThrow('layer snapshot preparation failed');
+
+    expect(h.engine.getDocument()).toEqual(beforeDocument);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+    h.engine.dispose();
+  });
 
   it('fillSelection on the selected paint layer records one undoable edit + persists', () => {
     const { bitmapStore, engine } = makeEngine(paintDoc());

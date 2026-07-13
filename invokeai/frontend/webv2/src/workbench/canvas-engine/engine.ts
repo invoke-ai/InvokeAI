@@ -316,6 +316,10 @@ interface RasterizationJob {
 
 export type LayerThumbnailRequestResult = 'ready' | 'stale' | 'error' | 'missing' | 'unsupported';
 
+type SelectionPixelTarget =
+  | { kind: 'raster'; layerId: string; transparencyLocked: boolean }
+  | { kind: 'control'; transaction: ControlPixelEditTransaction; transparencyLocked: false };
+
 /** Structural equality for JSON-safe canvas contracts (including synthetic mask paint sources). */
 const isDeeplyEqual = (left: unknown, right: unknown): boolean => {
   if (Object.is(left, right)) {
@@ -6475,19 +6479,25 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
   };
 
-  /** Resolves the selected paint layer eligible for a masked fill/erase, or `null`. */
-  const selectionPaintTarget = (): { layerId: string; transparencyLocked: boolean } | null => {
+  /** Resolves the selected pixel-edit target for a masked fill/erase, or `null`. */
+  const selectionPixelTarget = (): SelectionPixelTarget | null => {
     const doc = mirror.getDocument();
     if (!doc || !doc.selectedLayerId) {
       return null;
     }
     const layer = doc.layers.find((candidate) => candidate.id === doc.selectedLayerId);
-    // Paint layers only (image-source layers are a no-op this phase — rasterize
-    // comes with the next task); locked/hidden targets are refused.
-    if (!layer || layer.type !== 'raster' || layer.source.type !== 'paint' || layer.isLocked || !layer.isEnabled) {
-      return null;
+    if (layer?.type === 'raster' && layer.source.type === 'paint' && !layer.isLocked && layer.isEnabled) {
+      return {
+        kind: 'raster',
+        layerId: layer.id,
+        transparencyLocked: layer.isTransparencyLocked === true,
+      };
     }
-    return { layerId: layer.id, transparencyLocked: layer.isTransparencyLocked === true };
+    if (layer?.type === 'control') {
+      const transaction = beginControlPixelEdit(layer.id);
+      return transaction ? { kind: 'control', transaction, transparencyLocked: false } : null;
+    }
+    return null;
   };
 
   /**
@@ -6514,77 +6524,187 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!doc || !placedMask || !bounds) {
       return;
     }
-    const target = selectionPaintTarget();
+    const selRect = roundOut(bounds);
+    const selectedLayer = doc.layers.find((candidate) => candidate.id === doc.selectedLayerId);
+    if (
+      kind === 'erase' &&
+      selectedLayer?.type === 'control' &&
+      !intersect(selRect, roundOut(getSourceBounds(selectedLayer, doc)))
+    ) {
+      return;
+    }
+    const target = selectionPixelTarget();
     if (!target) {
       return;
     }
+    const cancelControlEdit = (): void => {
+      if (target.kind === 'control') {
+        target.transaction.cancel();
+      }
+    };
     // Transparency lock (mirrors the brush/eraser tool policy, paintTool.ts): an
     // ERASE is refused outright (it would delete locked alpha), and a FILL is
     // constrained to existing pixels via `source-atop` — colour lands only on
     // already-opaque areas, never into transparent space.
     if (kind === 'erase' && target.transparencyLocked) {
+      cancelControlEdit();
       return;
     }
-    const selRect = roundOut(bounds);
-    let rect: Rect | null;
-    let entry: ReturnType<LayerCacheStore['getOrCreateRect']>;
-    if (kind === 'fill' && !target.transparencyLocked) {
-      // Grow the cache to the selection bounds so a fill in empty space appears.
-      rect = selRect;
-      entry = layerCache.growToRect(target.layerId, selRect);
-    } else {
-      // Erase, OR a transparency-locked fill: both only affect EXISTING pixels, so
-      // clamp to the current content extent (never grow into empty space).
-      const existing = layerCache.get(target.layerId);
-      if (!existing || isEmpty(existing.rect)) {
+    const layerId = target.kind === 'control' ? target.transaction.layerId : target.layerId;
+    let before: ImageData | null = null;
+    let editOrigin: { x: number; y: number } | null = null;
+    let editRect: Rect | null = null;
+    let editSurface: RasterSurface | null = null;
+    let controlCommitStarted = false;
+    let controlGrowthSnapshot:
+      | {
+          hasPublishedPixels: boolean;
+          lastUsed: number;
+          pixels: ImageData | null;
+          rect: Rect;
+          stale: boolean;
+          surface: RasterSurface;
+          version: number;
+        }
+      | null
+      | undefined;
+    try {
+      if (target.kind === 'control' && kind === 'fill') {
+        const existing = layerCache.get(layerId);
+        const needsGrowth =
+          !existing ||
+          isEmpty(existing.rect) ||
+          selRect.x < existing.rect.x ||
+          selRect.y < existing.rect.y ||
+          selRect.x + selRect.width > existing.rect.x + existing.rect.width ||
+          selRect.y + selRect.height > existing.rect.y + existing.rect.height;
+        if (needsGrowth) {
+          controlGrowthSnapshot = existing
+            ? {
+                hasPublishedPixels: existing.hasPublishedPixels,
+                lastUsed: existing.lastUsed,
+                pixels: isEmpty(existing.rect)
+                  ? null
+                  : existing.surface.ctx.getImageData(0, 0, existing.rect.width, existing.rect.height),
+                rect: { ...existing.rect },
+                stale: existing.stale,
+                surface: existing.surface,
+                version: existing.version,
+              }
+            : null;
+        }
+      }
+
+      let rect: Rect | null;
+      let entry: ReturnType<LayerCacheStore['getOrCreateRect']>;
+      if (kind === 'fill' && !target.transparencyLocked) {
+        // Grow the cache to the selection bounds so a fill in empty space appears.
+        rect = selRect;
+        entry = layerCache.growToRect(layerId, selRect);
+      } else {
+        // Erase, OR a transparency-locked fill: both only affect EXISTING pixels, so
+        // clamp to the current content extent (never grow into empty space).
+        const existing = layerCache.get(layerId);
+        if (!existing || isEmpty(existing.rect)) {
+          cancelControlEdit();
+          return;
+        }
+        rect = intersect(selRect, existing.rect);
+        entry = existing;
+      }
+      if (!rect || isEmpty(rect)) {
+        cancelControlEdit();
         return;
       }
-      rect = intersect(selRect, existing.rect);
-      entry = existing;
-    }
-    if (!rect || isEmpty(rect)) {
-      return;
-    }
-    endNudgeBurst();
-    const surface = entry.surface;
-    const origin = { x: entry.rect.x, y: entry.rect.y };
-    const before = surface.ctx.getImageData(rect.x - origin.x, rect.y - origin.y, rect.width, rect.height);
-    if (kind === 'fill') {
-      fillMaskedRegion({
-        backend,
-        color: stores.brushOptions.get().color,
-        // Transparency lock: colour only on existing pixels (never fill holes).
-        composite: target.transparencyLocked ? 'source-atop' : 'source-over',
-        mask: placedMask.surface,
-        maskOrigin: placedMask.rect,
-        rect,
-        target: surface,
-        targetOrigin: origin,
-      });
-    } else {
-      eraseMaskedRegion({
-        backend,
-        mask: placedMask.surface,
-        maskOrigin: placedMask.rect,
-        rect,
-        target: surface,
-        targetOrigin: origin,
-      });
-    }
-    const after = surface.ctx.getImageData(rect.x - origin.x, rect.y - origin.y, rect.width, rect.height);
-    notifyLayerPainted(target.layerId);
-    bitmapStore.markLayerDirty(target.layerId);
-    if (!history.isApplying()) {
-      history.push(
-        createImagePatchEntry({
-          after,
-          apply: applyImagePatch,
-          before,
-          label: kind === 'fill' ? 'Fill selection' : 'Erase selection',
-          layerId: target.layerId,
+      endNudgeBurst();
+      const surface = entry.surface;
+      const origin = { x: entry.rect.x, y: entry.rect.y };
+      before = surface.ctx.getImageData(rect.x - origin.x, rect.y - origin.y, rect.width, rect.height);
+      editOrigin = origin;
+      editRect = rect;
+      editSurface = surface;
+      if (kind === 'fill') {
+        fillMaskedRegion({
+          backend,
+          color: stores.brushOptions.get().color,
+          // Transparency lock: colour only on existing pixels (never fill holes).
+          composite: target.transparencyLocked ? 'source-atop' : 'source-over',
+          mask: placedMask.surface,
+          maskOrigin: placedMask.rect,
           rect,
-        })
-      );
+          target: surface,
+          targetOrigin: origin,
+        });
+      } else {
+        eraseMaskedRegion({
+          backend,
+          mask: placedMask.surface,
+          maskOrigin: placedMask.rect,
+          rect,
+          target: surface,
+          targetOrigin: origin,
+        });
+      }
+      const after = surface.ctx.getImageData(rect.x - origin.x, rect.y - origin.y, rect.width, rect.height);
+      const label = kind === 'fill' ? 'Fill selection' : 'Erase selection';
+      if (target.kind === 'control') {
+        controlCommitStarted = true;
+        target.transaction.commitPatch(label, { after, before, rect });
+      } else {
+        notifyLayerPainted(target.layerId);
+        bitmapStore.markLayerDirty(target.layerId);
+        if (!history.isApplying()) {
+          history.push(
+            createImagePatchEntry({
+              after,
+              apply: applyImagePatch,
+              before,
+              label,
+              layerId: target.layerId,
+              rect,
+            })
+          );
+        }
+      }
+    } catch (error) {
+      if (target.kind !== 'control') {
+        throw error;
+      }
+      if (controlCommitStarted) {
+        // The transaction owns commit-time rollback and closes itself before
+        // rethrowing; restoring its preview here would overwrite that rollback.
+        throw error;
+      }
+      try {
+        if (controlGrowthSnapshot !== undefined) {
+          if (controlGrowthSnapshot === null) {
+            layerCache.delete(layerId);
+          } else {
+            const current = layerCache.get(layerId);
+            if (current) {
+              controlGrowthSnapshot.surface.resize(controlGrowthSnapshot.rect.width, controlGrowthSnapshot.rect.height);
+              if (controlGrowthSnapshot.pixels) {
+                controlGrowthSnapshot.surface.ctx.putImageData(controlGrowthSnapshot.pixels, 0, 0);
+              }
+              current.hasPublishedPixels = controlGrowthSnapshot.hasPublishedPixels;
+              current.lastUsed = controlGrowthSnapshot.lastUsed;
+              current.rect = { ...controlGrowthSnapshot.rect };
+              current.stale = controlGrowthSnapshot.stale;
+              current.surface = controlGrowthSnapshot.surface;
+              current.version = controlGrowthSnapshot.version;
+            }
+          }
+          adjustedSurfaceCache.delete(layerId);
+          scheduler.invalidate({ layers: [layerId] });
+        } else if (before && editOrigin && editRect && editSurface) {
+          editSurface.ctx.putImageData(before, editRect.x - editOrigin.x, editRect.y - editOrigin.y);
+          adjustedSurfaceCache.delete(layerId);
+          scheduler.invalidate({ layers: [layerId] });
+        }
+      } finally {
+        target.transaction.cancel();
+      }
+      throw error;
     }
   };
 

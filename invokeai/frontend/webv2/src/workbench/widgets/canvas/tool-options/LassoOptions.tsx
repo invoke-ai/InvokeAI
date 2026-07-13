@@ -2,6 +2,7 @@ import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { SelectionOp } from '@workbench/canvas-engine/types';
 
 import { HStack, Text } from '@chakra-ui/react';
+import { isLayerPixelEditEligible } from '@workbench/canvas-engine/editing/controlPixelEdit';
 import { Button } from '@workbench/components/ui';
 import { useCanvasHasSelection, useLassoOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -50,7 +51,7 @@ export const LassoOptions = ({ engine }: ToolOptionsComponentProps) => {
     const layer = document.selectedLayerId
       ? document.layers.find((entry) => entry.id === document.selectedLayerId)
       : undefined;
-    return !!layer && layer.type === 'raster' && layer.source.type === 'paint' && !layer.isLocked && layer.isEnabled;
+    return isLayerPixelEditEligible(layer);
   });
 
   const onFill = useCallback(() => engine.fillSelection(), [engine]);
