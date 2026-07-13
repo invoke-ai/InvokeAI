@@ -7,8 +7,13 @@ const invokeLogoSVG = 'assets/images/invoke-favicon.svg';
 const invokeAlertLogoSVG = 'assets/images/invoke-alert-favicon.svg';
 
 const queryOptions = {
+  // The busy favicon/title reflect the user's own activity. In multiuser mode the global
+  // counts include other users' generations, so prefer the per-user counts.
   selectFromResult: (res) => ({
-    queueSize: res.data ? res.data.queue.pending + res.data.queue.in_progress : 0,
+    queueSize: res.data
+      ? (res.data.queue.user_pending ?? res.data.queue.pending) +
+        (res.data.queue.user_in_progress ?? res.data.queue.in_progress)
+      : 0,
   }),
 } satisfies Parameters<typeof useGetQueueStatusQuery>[1];
 

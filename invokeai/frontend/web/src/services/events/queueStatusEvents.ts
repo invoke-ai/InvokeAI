@@ -41,12 +41,28 @@ const recordQueueItemStatusChangedEvent = (event: QueueItemStatusChangedEvent): 
   latestObservedQueueStatus = event.queue_status;
 };
 
+/**
+ * Queue status embedded in socket events is built without a requesting user, so its
+ * user_pending/user_in_progress are always null. When replacing a cached/fetched status with an
+ * event's status, retain the previous per-user counts - for a non-owner recipient (e.g. an admin
+ * observing another user's event) they are still accurate, and for the owner the tag invalidation
+ * that accompanies every status change refetches fresh per-user counts immediately.
+ */
+const withRetainedUserCounts = (
+  next: S['SessionQueueStatus'],
+  previous: S['SessionQueueStatus']
+): S['SessionQueueStatus'] => ({
+  ...next,
+  user_pending: next.user_pending ?? previous.user_pending,
+  user_in_progress: next.user_in_progress ?? previous.user_in_progress,
+});
+
 export const getQueueStatusWithObservedEvents = (queueStatus: QueueStatusResponse): QueueStatusResponse => {
   const currentItemId = queueStatus.queue.item_id;
   if (latestObservedQueueStatus && currentItemId !== null && observedTerminalItemIds.has(currentItemId)) {
     return {
       ...queueStatus,
-      queue: latestObservedQueueStatus,
+      queue: withRetainedUserCounts(latestObservedQueueStatus, queueStatus.queue),
     };
   }
 
@@ -60,7 +76,7 @@ export const getUpdatedQueueStatusOnQueueItemStatusChanged = (
   recordQueueItemStatusChangedEvent(event);
   return {
     ...queueStatus,
-    queue: event.queue_status,
+    queue: withRetainedUserCounts(event.queue_status, queueStatus.queue),
   };
 };
 

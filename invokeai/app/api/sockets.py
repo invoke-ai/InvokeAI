@@ -497,7 +497,22 @@ class SocketIO:
             logger.error(f"Error handling queue event {event[0]}: {e}", exc_info=True)
 
     async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase | DownloadEventBase]) -> None:
-        await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"))
+        event_name, event_data = event
+
+        # Model load events only drive personal UI (the loading-models spinner that puts the
+        # progress bar into indeterminate mode), so they are routed to the user whose action
+        # triggered the load. Broadcasting them made every user's progress bar animate whenever
+        # any user's generation loaded a model. In single-user mode the owner is "system" and
+        # every socket is in user:system, preserving the old behavior.
+        if isinstance(event_data, (ModelLoadStartedEvent, ModelLoadCompleteEvent)):
+            await self._sio.emit(
+                event=event_name, data=event_data.model_dump(mode="json"), room=f"user:{event_data.user_id}"
+            )
+            return
+
+        # Model install / download events remain broadcast to all connected sockets - they feed
+        # the model manager UI, which is not per-user.
+        await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"))
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, event_data = event

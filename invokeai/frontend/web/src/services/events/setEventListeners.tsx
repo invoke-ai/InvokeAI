@@ -522,7 +522,13 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
 
-    if (status === 'completed' || status === 'failed' || status === 'canceled') {
+    // Admins receive full events for all users' queue items. Personal UI side effects (the
+    // failure toast and the progress indicator) must only follow the current user's own items.
+    // In single-user mode there is no current user and every event is the user's own.
+    const currentUser = getState().auth.user;
+    const isOwnItem = !currentUser || data.user_id === currentUser.user_id;
+
+    if (isOwnItem && (status === 'completed' || status === 'failed' || status === 'canceled')) {
       if (status === 'failed' && error_type) {
         toast({
           id: `INVOCATION_ERROR_${error_type}`,

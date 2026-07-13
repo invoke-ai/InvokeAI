@@ -1143,6 +1143,7 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_id: str,
         user_id: Optional[str] = None,
         acting_user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
             # Aggregate counts are always global (across all users). This lets a non-admin's
@@ -1190,11 +1191,13 @@ class SqliteSessionQueue(SessionQueueBase):
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
         # stale identifiers in the result. The aggregate counts stay global; only the current
         # item's identifiers are gated. acting_user_id (event path) takes precedence over
-        # user_id (API path) when deciding the redaction owner; either being None means an
-        # admin/global caller who may see the current item.
+        # user_id (API path) when deciding the redaction owner; either being None means a
+        # global caller who may see the current item. is_admin disables redaction outright so
+        # admin callers can pass their user_id (for the per-user counts) without losing
+        # visibility of other users' current item.
         owner_user_id = user_id if acting_user_id is None else acting_user_id
         show_current_item = current_item is not None and (
-            owner_user_id is None or current_item.user_id == owner_user_id
+            is_admin or owner_user_id is None or current_item.user_id == owner_user_id
         )
 
         return SessionQueueStatus(

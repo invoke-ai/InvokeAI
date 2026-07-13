@@ -107,3 +107,63 @@ async def test_error_event_is_emitted_once_to_owner_and_admin_rooms() -> None:
         data=event.model_dump(mode="json"),
         room=["user:owner-1", "admin"],
     )
+
+
+def _make_model_config():
+    from invokeai.backend.model_manager.configs.factory import AnyModelConfigValidator
+
+    return AnyModelConfigValidator.validate_python(
+        {
+            "key": "model-key-1",
+            "hash": "hash-1",
+            "path": "/models/some-model",
+            "name": "some-model",
+            "base": "sd-1",
+            "type": "vae",
+            "format": "diffusers",
+            "source": "/models/some-model",
+            "source_type": "path",
+            "file_size": 1024,
+        }
+    )
+
+
+@pytest.mark.anyio
+async def test_model_load_events_are_emitted_only_to_triggering_user() -> None:
+    from invokeai.app.services.events.events_common import ModelLoadCompleteEvent, ModelLoadStartedEvent
+
+    socketio = SocketIO(FastAPI())
+    socketio._sio.emit = AsyncMock()
+
+    config = _make_model_config()
+    started = ModelLoadStartedEvent.build(config, user_id="owner-1")
+    complete = ModelLoadCompleteEvent.build(config, user_id="owner-1")
+
+    await socketio._handle_model_event(("model_load_started", started))
+    await socketio._handle_model_event(("model_load_complete", complete))
+
+    socketio._sio.emit.assert_any_await(
+        event="model_load_started", data=started.model_dump(mode="json"), room="user:owner-1"
+    )
+    socketio._sio.emit.assert_any_await(
+        event="model_load_complete", data=complete.model_dump(mode="json"), room="user:owner-1"
+    )
+    assert socketio._sio.emit.await_count == 2
+
+
+@pytest.mark.anyio
+async def test_model_install_events_remain_broadcast() -> None:
+    from invokeai.app.services.events.events_common import ModelInstallStartedEvent
+
+    socketio = SocketIO(FastAPI())
+    socketio._sio.emit = AsyncMock()
+
+    from types import SimpleNamespace
+
+    event = SimpleNamespace(model_dump=lambda mode="json": {"id": 1})
+    # Not a load event, so it takes the broadcast path (no room argument).
+    assert not isinstance(event, ModelInstallStartedEvent)
+
+    await socketio._handle_model_event(("model_install_started", event))
+
+    socketio._sio.emit.assert_awaited_once_with(event="model_install_started", data={"id": 1})

@@ -1440,14 +1440,16 @@ class TestQueueStatusScoping:
         assert queue_status["user_pending"] == 2
         assert queue_status["user_in_progress"] == 0
 
-        # Admin caller sees the same global total. Admins query with user_id=None, so no
-        # per-user counts are computed (the badge falls back to the global total for admins).
+        # Admin caller sees the same global total plus their own per-user counts (zero here -
+        # the admin owns no items), so personal UI like the progress bar can distinguish the
+        # admin's own activity from other users'.
         r = client.get("/api/v1/queue/default/status", headers=_auth(admin_tok))
         assert r.status_code == 200
         queue_status = r.json()["queue"]
         assert queue_status["pending"] == 3
         assert queue_status["total"] == 3
-        assert queue_status["user_pending"] is None
+        assert queue_status["user_pending"] == 0
+        assert queue_status["user_in_progress"] == 0
 
 
 # ===========================================================================

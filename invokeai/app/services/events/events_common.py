@@ -510,10 +510,13 @@ class ModelLoadStartedEvent(ModelEventBase):
 
     config: AnyModelConfig = Field(description="The model's config")
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
+    user_id: str = Field(default="system", description="The ID of the user whose action triggered the load")
 
     @classmethod
-    def build(cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> "ModelLoadStartedEvent":
-        return cls(config=config, submodel_type=submodel_type)
+    def build(
+        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None, user_id: str = "system"
+    ) -> "ModelLoadStartedEvent":
+        return cls(config=config, submodel_type=submodel_type, user_id=user_id)
 
 
 @payload_schema.register
@@ -524,10 +527,13 @@ class ModelLoadCompleteEvent(ModelEventBase):
 
     config: AnyModelConfig = Field(description="The model's config")
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
+    user_id: str = Field(default="system", description="The ID of the user whose action triggered the load")
 
     @classmethod
-    def build(cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> "ModelLoadCompleteEvent":
-        return cls(config=config, submodel_type=submodel_type)
+    def build(
+        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None, user_id: str = "system"
+    ) -> "ModelLoadCompleteEvent":
+        return cls(config=config, submodel_type=submodel_type, user_id=user_id)
 
 
 @payload_schema.register

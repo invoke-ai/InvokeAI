@@ -100,7 +100,9 @@ const InvokeIconButtonIcon = memo(() => {
       if (!data) {
         return { isProcessing: false };
       }
-      return { isProcessing: data.queue.in_progress > 0 };
+      // The spinner reflects the user's own activity. In multiuser mode the global
+      // in_progress count includes other users' generations, so prefer the per-user count.
+      return { isProcessing: (data.queue.user_in_progress ?? data.queue.in_progress) > 0 };
     },
   });
 

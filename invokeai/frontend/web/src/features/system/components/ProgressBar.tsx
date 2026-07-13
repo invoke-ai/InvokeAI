@@ -12,6 +12,9 @@ const ProgressBar = (props: ProgressProps) => {
   const isConnected = useStore($isConnected);
   const lastProgressEvent = useStore($lastProgressEvent);
   const loadingModelsCount = useStore($loadingModelsCount);
+  // The progress bar reflects the user's own activity. In multiuser mode the global
+  // in_progress count includes other users' generations, so prefer the per-user count.
+  const inProgressCount = queueStatus?.queue.user_in_progress ?? queueStatus?.queue.in_progress;
   const value = useMemo(() => {
     if (!lastProgressEvent) {
       return 0;
@@ -28,7 +31,7 @@ const ProgressBar = (props: ProgressProps) => {
       return true;
     }
 
-    if (!queueStatus?.queue.in_progress) {
+    if (!inProgressCount) {
       return false;
     }
 
@@ -45,7 +48,7 @@ const ProgressBar = (props: ProgressProps) => {
     }
 
     return false;
-  }, [isConnected, lastProgressEvent, queueStatus?.queue.in_progress, loadingModelsCount]);
+  }, [isConnected, lastProgressEvent, inProgressCount, loadingModelsCount]);
 
   return (
     <Progress
