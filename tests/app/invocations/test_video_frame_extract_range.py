@@ -7,12 +7,15 @@ gigabytes. ``_write_frame_range`` now streams each frame straight into the encod
 stops decoding as soon as the range is written.
 """
 
+from pathlib import Path
 from typing import Iterator
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-from invokeai.app.invocations.video_frame_extract_range import _write_frame_range
+from invokeai.app.invocations.fields import VideoField
+from invokeai.app.invocations.video_frame_extract_range import ExtractVideoRangeInvocation, _write_frame_range
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 
 
@@ -81,3 +84,30 @@ class TestWriteFrameRangeStreams:
             _write_frame_range(_lazy_frames(24, pulled), writer, start=0, end=23, is_canceled=lambda: pulled[0] >= 2)
         assert len(writer.frames) == 1
         assert pulled[0] == 2
+
+
+@pytest.mark.parametrize("written,should_raise", [(5, False), (3, True)])
+def test_invocation_only_saves_complete_requested_range(written: int, should_raise: bool) -> None:
+    invocation = ExtractVideoRangeInvocation(video=VideoField(video_name="input.mp4"), start_frame=0, end_frame=4)
+    context = MagicMock()
+    context.videos.get_path.return_value = Path("input.mp4")
+    context.util.is_canceled.return_value = False
+    base_output = MagicMock(
+        video=VideoField(video_name="output.mp4"), width=32, height=32, num_frames=5, fps=8.0, duration=0.625
+    )
+
+    with (
+        patch("invokeai.app.invocations.video_frame_extract_range.probe_video", return_value=(32, 32, 0.625, 8.0)),
+        patch("invokeai.app.invocations.video_frame_extract_range.decoder_frame_count", return_value=5),
+        patch("invokeai.app.invocations.video_frame_extract_range.iio2.get_writer", return_value=MagicMock()),
+        patch("invokeai.app.invocations.video_frame_extract_range._write_frame_range", return_value=written),
+        patch("invokeai.app.invocations.video_frame_extract_range.VideoOutput.build", return_value=base_output),
+    ):
+        if should_raise:
+            with pytest.raises(ValueError, match="Decoded only 3 of 5 requested frames"):
+                invocation.invoke(context)
+            context.videos.save.assert_not_called()
+        else:
+            output = invocation.invoke(context)
+            assert output.end_frame == 4
+            context.videos.save.assert_called_once()

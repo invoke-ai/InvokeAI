@@ -101,6 +101,19 @@ class TestDeleteVideosOnBoardContract:
         invoker.services.video_records.delete_many.assert_called_once_with(["a.mp4", "b.mp4"])
         assert deleted == ["a.mp4", "b.mp4"]
 
+    def test_staging_cleanup_failure_is_deferred_after_records_are_deleted(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = ["v.mp4"]
+        invoker.services.video_records.get.return_value = _make_record(video_name="v.mp4")
+        invoker.services.video_files.stage_delete.return_value = object()
+        invoker.services.video_files.commit_delete.side_effect = OSError("staging directory busy")
+
+        deleted = video_service.delete_videos_on_board("board-1")
+
+        assert deleted == ["v.mp4"]
+        invoker.services.video_records.delete_many.assert_called_once_with(["v.mp4"])
+        invoker.services.logger.error.assert_called()
+
 
 class TestDeleteAtomicity:
     def test_single_delete_rolls_files_back_when_record_delete_fails(self, video_service: VideoService):

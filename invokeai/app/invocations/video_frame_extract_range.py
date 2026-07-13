@@ -181,9 +181,11 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             finally:
                 writer.close()
 
-            if num_frames == 0:
+            expected_frames = end - start + 1
+            if num_frames != expected_frames:
                 raise ValueError(
-                    f"Decoded zero frames for range {start}-{end} of {self.video.video_name} "
+                    f"Decoded only {num_frames} of {expected_frames} requested frames for range {start}-{end} "
+                    f"of {self.video.video_name} "
                     f"(probed {n_frames} frames). The container's metadata may be inaccurate."
                 )
 

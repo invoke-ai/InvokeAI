@@ -575,10 +575,11 @@ class VideoOutput(BaseInvocationOutput):
     duration: float = OutputField(description="The duration of the video in seconds")
 
     @classmethod
-    def build(cls, video_dto: VideoDTO) -> "VideoOutput":
+    def build(cls, video_dto: VideoDTO, num_frames: Optional[int] = None) -> "VideoOutput":
         # Frame count isn't stored on the DTO; derive it from duration * fps when fps is known.
         fps = video_dto.fps or 0.0
-        num_frames = int(round(video_dto.duration * fps)) if fps > 0 else 0
+        if num_frames is None:
+            num_frames = int(round(video_dto.duration * fps)) if fps > 0 else 0
         return cls(
             video=VideoField(video_name=video_dto.video_name),
             width=video_dto.width,
@@ -606,8 +607,11 @@ class VideoInvocation(BaseInvocation):
     # `from __future__ import annotations` left wan_l2v with a stringified annotation
     # and crashed the output-class registry on startup (commit cac366229a).
     def invoke(self, context: InvocationContext) -> VideoOutput:
+        from invokeai.app.util.video_thumbnails import decoder_frame_count
+
         video_dto = context.videos.get_dto(self.video.video_name)
-        return VideoOutput.build(video_dto=video_dto)
+        num_frames = decoder_frame_count(context.videos.get_path(self.video.video_name))
+        return VideoOutput.build(video_dto=video_dto, num_frames=num_frames)
 
 
 @invocation_output("conditioning_collection_output")

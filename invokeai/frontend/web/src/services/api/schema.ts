@@ -1499,9 +1499,7 @@ export type paths = {
          * Get Video Full
          * @description Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.
          *
-         *     Like the image equivalent, this endpoint is intentionally unauthenticated because browsers
-         *     load videos via <video src> tags which cannot send Bearer tokens. Video names are UUIDs,
-         *     providing security through unguessability.
+         *     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
          */
         get: operations["get_video_full"];
         put?: never;
@@ -1512,9 +1510,7 @@ export type paths = {
          * Get Video Full
          * @description Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.
          *
-         *     Like the image equivalent, this endpoint is intentionally unauthenticated because browsers
-         *     load videos via <video src> tags which cannot send Bearer tokens. Video names are UUIDs,
-         *     providing security through unguessability.
+         *     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
          */
         head: operations["get_video_full_head"];
         patch?: never;
@@ -1529,7 +1525,7 @@ export type paths = {
         };
         /**
          * Get Video Thumbnail
-         * @description Returns the first-frame WebP thumbnail of a video. Unauthenticated; UUIDs provide unguessability.
+         * @description Returns the first-frame WebP thumbnail of an authorized video.
          */
         get: operations["get_video_thumbnail"];
         put?: never;
@@ -39739,7 +39735,9 @@ export interface operations {
                 /** @description The name of video file to get */
                 video_name: string;
             };
-            cookie?: never;
+            cookie?: {
+                invokeai_media_token?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -39787,7 +39785,9 @@ export interface operations {
                 /** @description The name of video file to get */
                 video_name: string;
             };
-            cookie?: never;
+            cookie?: {
+                invokeai_media_token?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -39826,7 +39826,9 @@ export interface operations {
                 /** @description The name of thumbnail file to get */
                 video_name: string;
             };
-            cookie?: never;
+            cookie?: {
+                invokeai_media_token?: string | null;
+            };
         };
         requestBody?: never;
         responses: {

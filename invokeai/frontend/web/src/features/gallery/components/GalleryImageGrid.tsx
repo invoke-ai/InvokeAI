@@ -1,8 +1,8 @@
-import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, forwardRef, Grid, GridItem, IconButton, Spinner, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
-import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
+import { getVideoPrefetchOptions, useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
@@ -19,6 +19,7 @@ import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import type {
   GridComponents,
   GridComputeItemKey,
@@ -60,6 +61,11 @@ type GridContext = {
  */
 const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string }) => {
   const isVideo = isVideoName(imageName);
+  const store = useAppStore();
+  const { t } = useTranslation();
+  const retryVideo = useCallback(() => {
+    store.dispatch(videosApi.endpoints.getVideoDTO.initiate(imageName, getVideoPrefetchOptions()));
+  }, [imageName, store]);
 
   // Always call both hooks (React rules of hooks) — the irrelevant one is just a no-op subscription.
   const imageState = imagesApi.endpoints.getImageDTO.useQueryState(isVideo ? '' : imageName);
@@ -72,6 +78,21 @@ const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string 
   });
 
   if (isVideo) {
+    if (videoState.isError) {
+      return (
+        <Flex
+          data-item-id={imageName}
+          w="full"
+          h="full"
+          bg="base.850"
+          borderRadius="base"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <IconButton onClick={retryVideo} aria-label={t('queue.retryItem')} icon={<PiArrowCounterClockwiseBold />} />
+        </Flex>
+      );
+    }
     const videoDTO = videoState.currentData;
     if (!videoDTO) {
       return <GalleryImagePlaceholder data-item-id={imageName} />;

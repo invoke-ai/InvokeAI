@@ -349,7 +349,10 @@ class VideoService(VideoServiceABC):
                     self.__invoker.services.video_files.rollback_delete(token)
                 raise
             for _, token in staged_deletes:
-                self.__invoker.services.video_files.commit_delete(token)
+                try:
+                    self.__invoker.services.video_files.commit_delete(token)
+                except Exception as cleanup_error:
+                    self.__invoker.services.logger.error(f"Failed to purge staged video files: {cleanup_error}")
             for video_name in deleted_video_names:
                 self._on_deleted(video_name)
             return deleted_video_names

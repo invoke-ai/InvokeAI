@@ -128,3 +128,32 @@ def test_staged_delete_can_be_committed(storage: DiskVideoFileStorage, tmp_path:
     storage.commit_delete(token)
 
     assert _all_files(tmp_path / "videos") == []
+
+
+def test_start_restores_staged_delete_when_record_still_exists(storage: DiskVideoFileStorage, tmp_path: Path):
+    source = _make_source(tmp_path)
+    storage.save(source_path=source, video_name=VIDEO_NAME, metadata='{"seed": 1}')
+    storage.stage_delete(VIDEO_NAME)
+    assert not storage.get_path(VIDEO_NAME).exists()
+    invoker = MagicMock()
+    invoker.services.video_records.get.return_value = MagicMock()
+
+    DiskVideoFileStorage(tmp_path / "videos").start(invoker)
+
+    assert storage.get_path(VIDEO_NAME).exists()
+    assert not list((tmp_path / "videos").glob(".delete_*"))
+
+
+def test_start_purges_staged_delete_when_record_is_gone(storage: DiskVideoFileStorage, tmp_path: Path):
+    from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
+
+    source = _make_source(tmp_path)
+    storage.save(source_path=source, video_name=VIDEO_NAME, metadata='{"seed": 1}')
+    storage.stage_delete(VIDEO_NAME)
+    invoker = MagicMock()
+    invoker.services.video_records.get.side_effect = VideoRecordNotFoundException
+
+    DiskVideoFileStorage(tmp_path / "videos").start(invoker)
+
+    assert _all_files(tmp_path / "videos") == []
+    assert not list((tmp_path / "videos").glob(".delete_*"))

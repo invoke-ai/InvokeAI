@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
-from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
+from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import _assert_board_read_access
 from invokeai.app.invocations.fields import MetadataField
@@ -49,6 +49,12 @@ RANGE_CHUNK_SIZE = 1024 * 1024
 # the goal is to prevent a single client from exhausting RAM, not to be a content policy.
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 MAX_UPLOAD_SIZE = 1024 * 1024 * 1024  # 1 GB
+
+
+def _get_video_cache_control() -> str:
+    if ApiDependencies.invoker.services.configuration.multiuser:
+        return "private, no-store"
+    return f"max-age={VIDEO_MAX_AGE}"
 
 
 def _assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
@@ -142,6 +148,34 @@ def _is_accepted_video_upload(file: UploadFile) -> bool:
     return False
 
 
+def _is_mp4_file(path: Path) -> bool:
+    try:
+        with open(path, "rb") as video_file:
+            search_limit = min(path.stat().st_size, 64 * 1024)
+            position = 0
+            while position + 8 <= search_limit:
+                video_file.seek(position)
+                header = video_file.read(8)
+                box_size = int.from_bytes(header[:4], byteorder="big")
+                box_type = header[4:8]
+                header_size = 8
+                if box_size == 1:
+                    extended_size = video_file.read(8)
+                    if len(extended_size) != 8:
+                        return False
+                    box_size = int.from_bytes(extended_size, byteorder="big")
+                    header_size = 16
+                if box_size < header_size:
+                    return False
+                if box_type == b"ftyp":
+                    major_brand = video_file.read(4)
+                    return len(major_brand) == 4 and major_brand != b"qt  "
+                position += box_size
+    except OSError:
+        return False
+    return False
+
+
 @videos_router.post(
     "/upload",
     operation_id="upload_video",
@@ -203,6 +237,9 @@ async def upload_video(
                 )
             tmp.write(chunk)
         tmp.close()
+
+        if not _is_mp4_file(tmp_path):
+            raise HTTPException(status_code=415, detail="Not an MP4 video file")
 
         try:
             width, height, duration, fps = probe_video(tmp_path)
@@ -397,16 +434,16 @@ def _parse_range_header(range_header: str, file_size: int) -> Optional[tuple[int
 )
 async def get_video_full(
     request: Request,
+    current_user: CurrentMediaUserOrDefault,
     video_name: str = PathParam(description="The name of video file to get"),
 ) -> Response:
     """Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.
 
-    Like the image equivalent, this endpoint is intentionally unauthenticated because browsers
-    load videos via <video src> tags which cannot send Bearer tokens. Video names are UUIDs,
-    providing security through unguessability.
+    Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
     """
+    _assert_video_read_access(video_name, current_user)
     try:
-        path_str = ApiDependencies.invoker.services.videos.get_path(video_name)
+        path_str = ApiDependencies.invoker.services.videos.get_path(video_name, thumbnail=False)
     except Exception:
         raise HTTPException(status_code=404)
 
@@ -419,7 +456,7 @@ async def get_video_full(
 
     common_headers = {
         "Accept-Ranges": "bytes",
-        "Cache-Control": f"max-age={VIDEO_MAX_AGE}",
+        "Cache-Control": _get_video_cache_control(),
         "Content-Disposition": f'inline; filename="{video_name}"',
     }
 
@@ -478,9 +515,11 @@ async def get_video_full(
     },
 )
 async def get_video_thumbnail(
+    current_user: CurrentMediaUserOrDefault,
     video_name: str = PathParam(description="The name of thumbnail file to get"),
 ) -> Response:
-    """Returns the first-frame WebP thumbnail of a video. Unauthenticated; UUIDs provide unguessability."""
+    """Returns the first-frame WebP thumbnail of an authorized video."""
+    _assert_video_read_access(video_name, current_user)
     try:
         path = ApiDependencies.invoker.services.videos.get_path(video_name, thumbnail=True)
     except Exception:
@@ -494,7 +533,7 @@ async def get_video_thumbnail(
     return FileResponse(
         path,
         media_type="image/webp",
-        headers={"Cache-Control": f"max-age={VIDEO_MAX_AGE}"},
+        headers={"Cache-Control": _get_video_cache_control()},
     )
 
 

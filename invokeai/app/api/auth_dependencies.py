@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from invokeai.app.api.dependencies import ApiDependencies
@@ -13,6 +13,18 @@ logger = logging.getLogger(__name__)
 
 # HTTP Bearer token security scheme
 security = HTTPBearer(auto_error=False)
+MEDIA_TOKEN_COOKIE = "invokeai_media_token"
+
+
+def _validate_token(token: str, invalid_detail: str) -> TokenData:
+    token_data = verify_token(token)
+    if token_data is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=invalid_detail)
+
+    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+    return token_data
 
 
 async def get_current_user(
@@ -116,6 +128,19 @@ async def get_current_user_or_default(
     return token_data
 
 
+async def get_current_media_user_or_default(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+    media_token: Annotated[str | None, Cookie(alias=MEDIA_TOKEN_COOKIE)] = None,
+) -> TokenData:
+    """Authenticate video media requests with a Bearer token or the path-scoped login cookie."""
+    if not ApiDependencies.invoker.services.configuration.multiuser:
+        return TokenData(user_id="system", email="system@system.invokeai", is_admin=True)
+    token = credentials.credentials if credentials is not None else media_token
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    return _validate_token(token, "Invalid or expired token")
+
+
 async def require_admin(
     current_user: Annotated[TokenData, Depends(get_current_user)],
 ) -> TokenData:
@@ -162,5 +187,6 @@ async def require_admin_or_default(
 # Type aliases for convenient use in route dependencies
 CurrentUser = Annotated[TokenData, Depends(get_current_user)]
 CurrentUserOrDefault = Annotated[TokenData, Depends(get_current_user_or_default)]
+CurrentMediaUserOrDefault = Annotated[TokenData, Depends(get_current_media_user_or_default)]
 AdminUser = Annotated[TokenData, Depends(require_admin)]
 AdminUserOrDefault = Annotated[TokenData, Depends(require_admin_or_default)]

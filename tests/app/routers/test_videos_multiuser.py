@@ -20,6 +20,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.videos import _is_mp4_file
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.users.users_common import UserCreateRequest
@@ -384,6 +385,102 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     assert not tmp_file.exists(), f"tmp file leaked after 415: {tmp_file}"
 
 
+def test_upload_video_rejects_non_mp4_container_with_spoofed_mime(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    mock_invoker.services.videos.create.side_effect = AssertionError("non-MP4 payload reached video creation")
+    with patch("invokeai.app.api.routers.videos.probe_video", return_value=(64, 64, 1.0, 8.0)):
+        response = client.post(
+            "/api/v1/videos/upload",
+            params={"video_category": "general", "is_intermediate": False},
+            files={"file": ("spoofed.mp4", b"\x1aE\xdf\xa3webm payload", "video/mp4")},
+            headers={"Authorization": f"Bearer {user1_token}"},
+        )
+
+    assert response.status_code == status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
+    mock_invoker.services.videos.create.assert_not_called()
+
+
+def test_mp4_validation_allows_boxes_before_file_type(tmp_path: Path) -> None:
+    path = tmp_path / "valid.mp4"
+    path.write_bytes(b"\x00\x00\x00\x08free" + b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 12)
+
+    assert _is_mp4_file(path)
+
+
+def test_mp4_validation_rejects_quicktime_brand(tmp_path: Path) -> None:
+    path = tmp_path / "quicktime.mp4"
+    path.write_bytes(b"\x00\x00\x00\x18ftypqt  " + b"\x00" * 12)
+
+    assert not _is_mp4_file(path)
+
+
+@pytest.mark.parametrize("suffix,thumbnail", [("full", False), ("thumbnail", True)])
+def test_video_media_requires_auth_in_multiuser_mode(
+    enable_multiuser_for_videos: Any,
+    client: TestClient,
+    mock_invoker: Invoker,
+    tmp_path: Path,
+    suffix: str,
+    thumbnail: bool,
+):
+    client.cookies.clear()
+    media_path = tmp_path / ("video.webp" if thumbnail else "video.mp4")
+    media_path.write_bytes(b"media")
+    mock_invoker.services.videos.get_path.return_value = str(media_path)
+
+    response = client.get(f"/api/v1/videos/i/private.mp4/{suffix}")
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    mock_invoker.services.videos.get_path.assert_not_called()
+
+
+@pytest.mark.parametrize("suffix,thumbnail", [("full", False), ("thumbnail", True)])
+def test_video_owner_can_load_media_with_login_cookie(
+    client: TestClient,
+    mock_invoker: Invoker,
+    user1_token: str,
+    tmp_path: Path,
+    suffix: str,
+    thumbnail: bool,
+):
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
+    media_path = tmp_path / ("video.webp" if thumbnail else "video.mp4")
+    media_path.write_bytes(b"media")
+    mock_invoker.services.videos.get_path.return_value = str(media_path)
+    client.cookies.clear()
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "user1@test.com", "password": "TestPass123", "remember_me": False},
+    )
+    assert login.status_code == status.HTTP_200_OK
+
+    response = client.get(f"/api/v1/videos/i/private.mp4/{suffix}")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.headers["cache-control"] == "private, no-store"
+    mock_invoker.services.videos.get_path.assert_called_once_with("private.mp4", thumbnail=thumbnail)
+
+
+def test_foreign_user_cannot_load_private_video_media(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+):
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = None
+
+    response = client.get(
+        "/api/v1/videos/i/private.mp4/full",
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    mock_invoker.services.videos.get_path.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # GET /videos/i/{video_name}/thumbnail must return 404 when the thumbnail file
 # is missing on disk (JPPhoto PR #9163 follow-up). Video saves are allowed
@@ -392,9 +489,9 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
 
 
 def test_get_video_thumbnail_missing_file_returns_404(
-    enable_multiuser_for_videos: Any,
     client: TestClient,
     mock_invoker: Invoker,
+    user1_token: str,
     tmp_path: Path,
 ):
     """If videos.get_path resolves successfully but the file doesn't exist, the route must
@@ -404,9 +501,15 @@ def test_get_video_thumbnail_missing_file_returns_404(
     """
     missing_path = tmp_path / "does_not_exist.webp"
     assert not missing_path.exists()
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
     mock_invoker.services.videos.get_path.return_value = str(missing_path)
 
-    response = client.get("/api/v1/videos/i/some_video.mp4/thumbnail")
+    response = client.get(
+        "/api/v1/videos/i/some_video.mp4/thumbnail",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
     assert response.status_code == status.HTTP_404_NOT_FOUND
     mock_invoker.services.videos.get_path.assert_called_once_with("some_video.mp4", thumbnail=True)
 

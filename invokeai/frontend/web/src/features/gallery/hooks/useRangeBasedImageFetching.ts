@@ -15,7 +15,10 @@ interface UseRangeBasedImageFetchingReturn {
   onRangeChanged: (range: ListRange) => void;
 }
 
-export const getVideoPrefetchOptions = () => ({ subscribe: false }) as const;
+export const getVideoPrefetchOptions = () => ({ subscribe: false, forceRefetch: true }) as const;
+
+export const hasCachedVideoDTO = (queryState: { data?: unknown; isError?: boolean }): boolean =>
+  queryState.data !== undefined;
 
 const getUncachedNames = (imageNames: string[], cachedImageNames: string[], ranges: ListRange[]): string[] => {
   const uncachedNamesSet = new Set<string>();
@@ -66,7 +69,9 @@ export const useRangeBasedImageFetching = ({
 
       // Videos — fetch one at a time (no batch endpoint yet). Each `initiate()` is a no-op for
       // already-cached entries, so this is safe to call repeatedly while scrolling.
-      const cachedVideoNames = videosApi.util.selectCachedArgsForQuery(state, 'getVideoDTO');
+      const cachedVideoNames = videosApi.util
+        .selectCachedArgsForQuery(state, 'getVideoDTO')
+        .filter((videoName) => hasCachedVideoDTO(videosApi.endpoints.getVideoDTO.select(videoName)(state)));
       const uncachedVideoNames = getUncachedNames(allNames, cachedVideoNames, ranges).filter((n) => isVideoName(n));
       for (const videoName of uncachedVideoNames) {
         store.dispatch(videosApi.endpoints.getVideoDTO.initiate(videoName, getVideoPrefetchOptions()));

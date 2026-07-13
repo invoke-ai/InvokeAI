@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -36,6 +37,7 @@ class DiskVideoFileStorage(VideoFileStorageBase):
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
+        self.__recover_staged_deletes()
 
     def save(
         self,
@@ -121,6 +123,10 @@ class DiskVideoFileStorage(VideoFileStorageBase):
         ]
         staged: list[tuple[Path, Path]] = []
         try:
+            with open(staging_dir / "manifest.json", "w", encoding="utf-8") as manifest:
+                manifest.write(json.dumps({"video_name": video_name, "video_subfolder": video_subfolder}))
+                manifest.flush()
+                os.fsync(manifest.fileno())
             for index, source in enumerate(candidates):
                 if source.exists():
                     destination = staging_dir / str(index)
@@ -231,3 +237,37 @@ class DiskVideoFileStorage(VideoFileStorageBase):
     def __validate_storage_folders(self) -> None:
         for folder in (self.__output_folder, self.__thumbnails_folder, self.__sidecars_folder):
             folder.mkdir(parents=True, exist_ok=True)
+
+    def __recover_staged_deletes(self) -> None:
+        logger = InvokeAILogger.get_logger()
+        for staging_dir in self.__output_folder.glob(".delete_*"):
+            manifest_path = staging_dir / "manifest.json"
+            if not manifest_path.is_file():
+                if not any(staging_dir.iterdir()):
+                    staging_dir.rmdir()
+                continue
+            try:
+                with open(manifest_path, encoding="utf-8") as manifest:
+                    data = json.load(manifest)
+                video_name = data["video_name"]
+                video_subfolder = data.get("video_subfolder", "")
+                candidates = [
+                    self.get_path(video_name, video_subfolder=video_subfolder),
+                    self.get_path(video_name, thumbnail=True, video_subfolder=video_subfolder),
+                    self.__get_sidecar_path(video_name, video_subfolder=video_subfolder),
+                ]
+                token = _StagedDelete(
+                    directory=staging_dir,
+                    files=[(source, staging_dir / str(index)) for index, source in enumerate(candidates)],
+                )
+                if self.__invoker.services.video_records.get(video_name) is None:
+                    self.commit_delete(token)
+                else:
+                    self.rollback_delete(token)
+            except Exception as error:
+                from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
+
+                if isinstance(error, VideoRecordNotFoundException):
+                    shutil.rmtree(staging_dir, ignore_errors=True)
+                else:
+                    logger.error(f"Failed to recover staged video deletion {staging_dir}: {error}")

@@ -9,7 +9,7 @@ from torch import Tensor
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
-from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
+from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy, BoardVisibility
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -306,6 +306,20 @@ class VideosInterface(InvocationContextInterface):
         super().__init__(services, data)
         self._util = util
 
+    def _assert_read_access(self, video_name: str) -> None:
+        user_id = self._data.queue_item.user_id
+        user = self._services.users.get(user_id)
+        if user is None:
+            raise PermissionError("Queue user is not authorized to access this video")
+        if user.is_admin or self._services.video_records.get_user_id(video_name) == user_id:
+            return
+        board_id = self._services.board_video_records.get_board_for_video(video_name)
+        if board_id is not None:
+            board = self._services.boards.get_dto(board_id)
+            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
+                return
+        raise PermissionError("Queue user is not authorized to access this video")
+
     def save(
         self,
         source_path: Path,
@@ -341,6 +355,16 @@ class VideosInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
+        if board_id_ is not None:
+            board = self._services.boards.get_dto(board_id_)
+            user = self._services.users.get(self._data.queue_item.user_id)
+            if user is None or (
+                not user.is_admin
+                and board.user_id != self._data.queue_item.user_id
+                and board.board_visibility != BoardVisibility.Public
+            ):
+                raise PermissionError("Queue user is not authorized to save videos to this board")
+
         workflow_ = None
         if self._data.queue_item.workflow:
             workflow_ = self._data.queue_item.workflow.model_dump_json()
@@ -369,10 +393,12 @@ class VideosInterface(InvocationContextInterface):
 
     def get_dto(self, video_name: str) -> VideoDTO:
         """Get a video DTO by name."""
+        self._assert_read_access(video_name)
         return self._services.videos.get_dto(video_name)
 
     def get_path(self, video_name: str, thumbnail: bool = False) -> Path:
         """Get the on-disk path to a video file or its WebP thumbnail."""
+        self._assert_read_access(video_name)
         return Path(self._services.videos.get_path(video_name, thumbnail=thumbnail))
 
 

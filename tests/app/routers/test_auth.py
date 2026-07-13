@@ -97,6 +97,9 @@ def test_login_success(monkeypatch: Any, mock_invoker: Invoker, client: TestClie
     assert "expires_in" in json_response
     assert json_response["user"]["email"] == "test@example.com"
     assert json_response["user"]["is_admin"] is False
+    assert response.cookies.get("invokeai_media_token") == json_response["token"]
+    assert "HttpOnly" in response.headers["set-cookie"]
+    assert "Path=/api/v1/videos" in response.headers["set-cookie"]
 
 
 def test_login_with_remember_me(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:

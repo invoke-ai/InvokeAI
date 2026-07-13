@@ -5,10 +5,10 @@ import string
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Body, HTTPException, Path, status
+from fastapi import APIRouter, Body, HTTPException, Path, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
 
-from invokeai.app.api.auth_dependencies import AdminUser, CurrentUser
+from invokeai.app.api.auth_dependencies import MEDIA_TOKEN_COOKIE, AdminUser, CurrentUser
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.auth.token_service import TokenData, create_access_token
 from invokeai.app.services.users.users_common import (
@@ -119,7 +119,9 @@ async def get_setup_status() -> SetupStatusResponse:
 
 @auth_router.post("/login", response_model=LoginResponse)
 async def login(
-    request: Annotated[LoginRequest, Body(description="Login credentials")],
+    login_request: Annotated[LoginRequest, Body(description="Login credentials")],
+    request: Request,
+    response: Response,
 ) -> LoginResponse:
     """Authenticate user and return access token.
 
@@ -143,7 +145,7 @@ async def login(
         )
 
     user_service = ApiDependencies.invoker.services.users
-    user = user_service.authenticate(request.email, request.password)
+    user = user_service.authenticate(login_request.email, login_request.password)
 
     if user is None:
         raise HTTPException(
@@ -156,14 +158,25 @@ async def login(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled")
 
     # Create token with appropriate expiration
-    expires_delta = timedelta(days=TOKEN_EXPIRATION_REMEMBER_ME if request.remember_me else TOKEN_EXPIRATION_NORMAL)
+    expires_delta = timedelta(
+        days=TOKEN_EXPIRATION_REMEMBER_ME if login_request.remember_me else TOKEN_EXPIRATION_NORMAL
+    )
     token_data = TokenData(
         user_id=user.user_id,
         email=user.email,
         is_admin=user.is_admin,
-        remember_me=request.remember_me,
+        remember_me=login_request.remember_me,
     )
     token = create_access_token(token_data, expires_delta)
+    response.set_cookie(
+        MEDIA_TOKEN_COOKIE,
+        token,
+        max_age=int(expires_delta.total_seconds()),
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/api/v1/videos",
+    )
 
     return LoginResponse(
         token=token,
@@ -175,6 +188,7 @@ async def login(
 @auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(
     current_user: CurrentUser,
+    response: Response,
 ) -> LogoutResponse:
     """Logout current user.
 
@@ -193,6 +207,7 @@ async def logout(
     """
     # TODO: Implement token invalidation when server-side session management is added
     # For now, this is a no-op since we use stateless JWT tokens
+    response.delete_cookie(MEDIA_TOKEN_COOKIE, path="/api/v1/videos")
     return LogoutResponse(success=True)
 
 
