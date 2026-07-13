@@ -23,7 +23,7 @@ const ParamKrea2RebalanceWeights = () => {
       <InformationalPopover feature="krea2RebalanceWeights">
         <FormLabel>{t('parameters.krea2RebalanceWeights')}</FormLabel>
       </InformationalPopover>
-      <Input value={weights} onChange={onChange} placeholder="1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0" />
+      <Input value={weights} onChange={onChange} placeholder={t('parameters.krea2RebalanceWeightsPlaceholder')} />
     </FormControl>
   );
 };

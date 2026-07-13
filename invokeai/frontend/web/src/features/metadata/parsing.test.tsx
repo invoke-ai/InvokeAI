@@ -81,6 +81,31 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
     });
   });
 
+  describe('Krea-2 scalar handlers', () => {
+    it.each([
+      [ImageMetadataHandlers.Krea2SeedVarianceEnabled, { krea2_seed_variance_enabled: true }],
+      [ImageMetadataHandlers.Krea2SeedVarianceStrength, { krea2_seed_variance_strength: 20 }],
+      [ImageMetadataHandlers.Krea2SeedVarianceRandomizePercent, { krea2_seed_variance_randomize_percent: 50 }],
+      [ImageMetadataHandlers.Krea2RebalanceEnabled, { krea2_rebalance_enabled: true }],
+      [ImageMetadataHandlers.Krea2RebalanceMultiplier, { krea2_rebalance_multiplier: 4 }],
+      [ImageMetadataHandlers.Krea2RebalanceWeights, { krea2_rebalance_weights: '1,1,1,1,1,1,1,1,1,1,1,1' }],
+    ])('rejects parsing %s for unrelated model bases', async (handler, metadata) => {
+      currentBase = 'krea-2';
+
+      await expect(
+        Promise.resolve().then(() => handler.parse({ ...metadata, model: { base: 'sdxl' } }, makeStore()))
+      ).rejects.toThrow();
+    });
+
+    it('preserves the disabled default for older Krea-2 metadata', async () => {
+      currentBase = 'krea-2';
+
+      const metadata = { model: { base: 'krea-2' } };
+      await expect(ImageMetadataHandlers.Krea2SeedVarianceEnabled.parse(metadata, makeStore())).resolves.toBe(false);
+      await expect(ImageMetadataHandlers.Krea2RebalanceEnabled.parse(metadata, makeStore())).resolves.toBe(false);
+    });
+  });
+
   describe('KleinQwen3EncoderModel', () => {
     it('parses metadata.qwen3_encoder when the current main model is FLUX.2 Klein', async () => {
       currentBase = 'flux2';
@@ -108,7 +133,7 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
     // The generic VAEModel handler must NOT also fire for FLUX.2 / Z-Image
     // images, otherwise the metadata viewer renders duplicate VAE rows next
     // to the dedicated KleinVAEModel / ZImageVAEModel handlers.
-    it.each(['flux2', 'z-image'])('rejects parsing when current base is %s', async (base) => {
+    it.each(['flux2', 'z-image', 'krea-2'])('rejects parsing when current base is %s', async (base) => {
       currentBase = base;
       nextResolved = fakeModel('vae', base);
       const store = makeStore();
