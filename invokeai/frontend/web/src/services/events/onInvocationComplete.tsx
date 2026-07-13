@@ -45,6 +45,15 @@ export const buildOnInvocationComplete = (
   dispatch: AppDispatch,
   completedInvocationKeysByItemId: Map<number, Set<string>>
 ) => {
+  // In multiuser mode, admins receive invocation events for all users' generations so the cache
+  // updates below keep their gallery fresh - but personal UI (board/image selection, the progress
+  // indicator) must only follow this user's own generations. In single-user mode there is no
+  // current user and every event is the user's own.
+  const isOwnEvent = (data: S['InvocationCompleteEvent']) => {
+    const currentUser = selectCurrentUser(getState());
+    return !currentUser || data.user_id === currentUser.user_id;
+  };
+
   const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
@@ -167,11 +176,7 @@ export const buildOnInvocationComplete = (
       return;
     }
 
-    // In multiuser mode, admins receive invocation events for all users' generations so the cache
-    // updates above keep their gallery fresh - but the selected board/image must only follow this
-    // user's own generations. In single-user mode there is no current user and no gating is needed.
-    const currentUser = selectCurrentUser(getState());
-    if (currentUser && data.user_id !== currentUser.user_id) {
+    if (!isOwnEvent(data)) {
       return;
     }
 
@@ -280,6 +285,9 @@ export const buildOnInvocationComplete = (
     // Add images to gallery (canvas workflow integration results go to staging area automatically)
     await addImagesToGallery(data);
 
-    $lastProgressEvent.set(null);
+    // Another user's completion must not clear this user's progress indicator.
+    if (isOwnEvent(data)) {
+      $lastProgressEvent.set(null);
+    }
   };
 };

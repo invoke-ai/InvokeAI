@@ -325,18 +325,25 @@ class SocketIO:
             if isinstance(event_data, InvocationEventBase) and hasattr(event_data, "user_id"):
                 user_room = f"user:{event_data.user_id}"
 
-                # Emit to the user's room
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
-
-                # Also emit to admin room so admins can see all events, but strip image preview data
-                # from InvocationProgressEvent to prevent admins from seeing other users' image content
                 if isinstance(event_data, InvocationProgressEvent):
-                    admin_event_data = event_data.model_copy(update={"image": None})
-                    await self._sio.emit(event=event_name, data=admin_event_data.model_dump(mode="json"), room="admin")
+                    # Progress events only drive personal UI (the global progress bar and progress
+                    # image previews) and are high-frequency. No admin UI consumes other users'
+                    # progress, so emit to the owner only. This also keeps other users' progress
+                    # from hijacking an admin's progress bar and image previews.
+                    await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+                    logger.debug(f"Emitted invocation progress event to user room {user_room}")
                 else:
-                    await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
-
-                logger.debug(f"Emitted private invocation event {event_name} to user room {user_room} and admin room")
+                    # started/complete/error also feed admins' gallery cache updates, so admins
+                    # receive them for all users. Emit to the union of owner + admin rooms in a
+                    # SINGLE call so an admin owner receives exactly one copy (see the
+                    # RecallParametersUpdatedEvent note below on python-socketio's recipient
+                    # dedup across a room list).
+                    await self._sio.emit(
+                        event=event_name, data=event_data.model_dump(mode="json"), room=[user_room, "admin"]
+                    )
+                    logger.debug(
+                        f"Emitted private invocation event {event_name} to user room {user_room} and admin room"
+                    )
 
             # QueueItemStatusChangedEvent: full to owner+admin, sanitized to everyone else in
             # the queue room so their queue list, badge, and item caches refresh.

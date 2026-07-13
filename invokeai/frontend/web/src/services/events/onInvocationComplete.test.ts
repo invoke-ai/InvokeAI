@@ -2,6 +2,7 @@ import { boardIdSelected, imageSelected } from 'features/gallery/store/gallerySl
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
+import { $lastProgressEvent } from 'services/events/stores';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildOnInvocationComplete } from './onInvocationComplete';
@@ -111,10 +112,11 @@ const dispatchedActionTypes = (dispatch: ReturnType<typeof vi.fn>) =>
 
 describe('buildOnInvocationComplete gallery auto-switch', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(getImageDTOSafe).mockResolvedValue(imageDTO);
   });
 
-  it("does not switch boards for another user's generation, but still updates gallery caches", async () => {
+  it("does not switch boards or clear the progress indicator for another user's generation, but still updates gallery caches", async () => {
     const { handler, dispatch } = buildHandler({ user_id: OTHER_USER_ID, is_admin: true });
 
     await handler(buildEvent());
@@ -122,16 +124,18 @@ describe('buildOnInvocationComplete gallery auto-switch', () => {
     const types = dispatchedActionTypes(dispatch);
     expect(types).not.toContain(boardIdSelected.type);
     expect(types).not.toContain(imageSelected.type);
+    expect($lastProgressEvent.set).not.toHaveBeenCalled();
     // Cache updates still happen so the admin's view of the other user's board stays fresh.
     expect(boardsApi.util.upsertQueryEntries).toHaveBeenCalled();
   });
 
-  it("switches boards for the current user's own generation", async () => {
+  it("switches boards and clears the progress indicator for the current user's own generation", async () => {
     const { handler, dispatch } = buildHandler({ user_id: OWNER_USER_ID, is_admin: false });
 
     await handler(buildEvent());
 
     expect(dispatchedActionTypes(dispatch)).toContain(boardIdSelected.type);
+    expect($lastProgressEvent.set).toHaveBeenCalledWith(null);
   });
 
   it('switches boards in single-user mode (no current user)', async () => {
@@ -140,5 +144,6 @@ describe('buildOnInvocationComplete gallery auto-switch', () => {
     await handler(buildEvent());
 
     expect(dispatchedActionTypes(dispatch)).toContain(boardIdSelected.type);
+    expect($lastProgressEvent.set).toHaveBeenCalledWith(null);
   });
 });
