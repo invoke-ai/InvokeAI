@@ -306,7 +306,10 @@ class SocketIO:
            per-session side effects.
 
         InvocationEventBase events stay private (owner + admins only). RecallParametersUpdatedEvent
-        is also private. QueueClearedEvent has no user identity and is broadcast to the queue room.
+        is also private. QueueClearedEvent is broadcast to the queue room when unscoped (an admin or
+        single-user clear that deleted every user's items); a user-scoped clear goes full to
+        owner + admins with a sanitized companion to the rest of the queue room, so other users
+        refresh their queue lists without treating the clear as their own.
 
         IMPORTANT: Check InvocationEventBase BEFORE QueueItemEventBase since InvocationEventBase
         inherits from QueueItemEventBase. The order of isinstance checks matters!
@@ -445,9 +448,37 @@ class SocketIO:
                     f"Emitted private queue_items_retried event to user rooms {event_data.user_ids} and admin room"
                 )
 
+            # QueueClearedEvent: an unscoped clear (user_id=None — admin or single-user mode)
+            # deleted every user's items, so everyone gets the full event. A user-scoped clear
+            # only deleted that user's rows: full event to owner+admin (single emit to a room
+            # list so a socket in both rooms receives it once), sanitized companion to the rest
+            # of the queue room so their queue lists and badge counts refetch without treating
+            # the clear as their own.
+            elif isinstance(event_data, QueueClearedEvent):
+                if event_data.user_id is None:
+                    await self._sio.emit(
+                        event=event_name, data=event_data.model_dump(mode="json"), room=event_data.queue_id
+                    )
+                    logger.debug(f"Emitted unscoped queue_cleared to all subscribers in queue {event_data.queue_id}")
+                else:
+                    user_room = f"user:{event_data.user_id}"
+                    await self._sio.emit(
+                        event=event_name, data=event_data.model_dump(mode="json"), room=[user_room, "admin"]
+                    )
+                    sanitized = event_data.model_copy(update={"user_id": "redacted"})
+                    await self._sio.emit(
+                        event=event_name,
+                        data=sanitized.model_dump(mode="json"),
+                        room=event_data.queue_id,
+                        skip_sid=self._owner_and_admin_sids(event_data.user_id),
+                    )
+                    logger.debug(
+                        f"Emitted queue_cleared: full to {user_room}+admin, sanitized to queue {event_data.queue_id}"
+                    )
+
             else:
-                # For remaining queue events (e.g. QueueClearedEvent) that do not
-                # carry user identity, emit to all subscribers in the queue room.
+                # For remaining queue events that do not carry user identity,
+                # emit to all subscribers in the queue room.
                 await self._sio.emit(
                     event=event_name, data=event_data.model_dump(mode="json"), room=event_data.queue_id
                 )

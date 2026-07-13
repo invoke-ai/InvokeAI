@@ -27,7 +27,7 @@ import {
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
 } from 'features/modelManagerV2/models';
-import type { BaseModelType } from 'features/nodes/types/common';
+import type { BaseModelType, ModelIdentifierField } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -271,6 +271,20 @@ const slice = createSlice({
         return;
       }
       state.animaQwen3EncoderModel = result.data;
+    },
+    animaLLLiteModelSelected: (state, action: PayloadAction<ModelIdentifierField | null>) => {
+      const result = zParamsState.shape.animaLLLiteModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaLLLiteModel = result.data;
+    },
+    animaLLLiteWeightChanged: (state, action: PayloadAction<number>) => {
+      const result = zParamsState.shape.animaLLLiteWeight.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaLLLiteWeight = result.data;
     },
     setAnimaScheduler: (
       state,
@@ -651,6 +665,7 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.krea2Qwen3VlEncoderModel = oldState.krea2Qwen3VlEncoderModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
+  newState.animaLLLiteModel = oldState.animaLLLiteModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
@@ -758,6 +773,8 @@ export const {
   paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
+  animaLLLiteModelSelected,
+  animaLLLiteWeightChanged,
   setAnimaScheduler,
 } = slice.actions;
 
@@ -833,6 +850,8 @@ export const selectKrea2Qwen3VlEncoderModel = createParamsSelector((params) => p
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
+export const selectAnimaLLLiteModel = createParamsSelector((params) => params.animaLLLiteModel);
+export const selectAnimaLLLiteWeight = createParamsSelector((params) => params.animaLLLiteWeight);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
