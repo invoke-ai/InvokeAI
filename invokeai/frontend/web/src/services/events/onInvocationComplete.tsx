@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import {
   selectAutoSwitch,
@@ -163,6 +164,14 @@ export const buildOnInvocationComplete = (
     const autoSwitch = selectAutoSwitch(getState());
 
     if (!autoSwitch) {
+      return;
+    }
+
+    // In multiuser mode, admins receive invocation events for all users' generations so the cache
+    // updates above keep their gallery fresh - but the selected board/image must only follow this
+    // user's own generations. In single-user mode there is no current user and no gating is needed.
+    const currentUser = selectCurrentUser(getState());
+    if (currentUser && data.user_id !== currentUser.user_id) {
       return;
     }
 
