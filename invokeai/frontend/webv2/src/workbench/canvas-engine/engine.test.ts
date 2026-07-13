@@ -7,6 +7,7 @@ import type {
 } from '@workbench/canvas-engine/render/raster.testStub';
 import type { ToolId } from '@workbench/canvas-engine/types';
 import type {
+  CanvasControlLayerContract,
   CanvasDocumentContractV2,
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
@@ -2040,18 +2041,99 @@ const paintDoc = (): CanvasDocumentContractV2 => ({
   width: 100,
 });
 
+type ControlPaintHarnessOverrides = Partial<Omit<CanvasControlLayerContract, 'source' | 'type'>> & {
+  source: CanvasControlLayerContract['source'];
+};
+
+const createControlPaintHarness = (overrides: ControlPaintHarnessOverrides) => {
+  const raf = createControllableRaf();
+  vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+  vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+  vi.stubGlobal('Path2D', class FakePath2D {});
+
+  const { source, ...layerOverrides } = overrides;
+  const layer: CanvasControlLayerContract = {
+    adapter: {
+      beginEndStepPct: [0.1, 0.9],
+      controlMode: 'more_control',
+      kind: 'controlnet',
+      model: 'control-model',
+      weight: 0.7,
+    },
+    blendMode: 'screen',
+    filter: { settings: { low: 10 }, type: 'canny' },
+    id: 'control',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Control',
+    opacity: 0.6,
+    source,
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect: true,
+    ...layerOverrides,
+  };
+  const document: CanvasDocumentContractV2 = {
+    background: 'transparent',
+    bbox: { height: 100, width: 100, x: 0, y: 0 },
+    height: 100,
+    layers: [layer],
+    selectedLayerId: layer.id,
+    version: 2,
+    width: 100,
+  };
+  const { projectId, store } = createReducerBackedStore(document);
+  const backend = createTestStubRasterBackend();
+  const bitmapStore = createSpyBitmapStore();
+  const engine = createCanvasEngine({
+    backend,
+    bitmapStore,
+    imageResolver: () => Promise.resolve(new Blob()),
+    projectId,
+    store,
+  });
+  const strokes: StrokeCommittedEvent[] = [];
+  engine.onStrokeCommitted((event) => strokes.push(event));
+  const overlay = createInputCanvas();
+  const screen = createInputCanvas();
+  engine.attach(screen.element, overlay.element);
+
+  return {
+    backend,
+    bitmapStore,
+    engine,
+    overlay,
+    publishInitialCache: async () => {
+      raf.flush();
+      await flushMicrotasks();
+      raf.flush();
+      await flushMicrotasks();
+    },
+    raf,
+    screen,
+    strokes,
+  };
+};
+
 /** A minimal in-memory bitmap store: records dirty-marks, never touches the network. */
 const createSpyBitmapStore = (): BitmapStore & {
   markLayerDirty: Mock<(layerId: string) => void>;
+  releaseSuspendedLayer: Mock<() => void>;
   reset: Mock<() => void>;
-} => ({
-  discardLayer: vi.fn(),
-  dispose: vi.fn(),
-  flushPendingUploads: vi.fn(() => Promise.resolve()),
-  isSelfEcho: () => false,
-  markLayerDirty: vi.fn<(layerId: string) => void>(),
-  reset: vi.fn<() => void>(),
-});
+  suspendLayer: Mock<(layerId: string) => () => void>;
+} => {
+  const releaseSuspendedLayer = vi.fn();
+  return {
+    discardLayer: vi.fn(),
+    dispose: vi.fn(),
+    flushPendingUploads: vi.fn(() => Promise.resolve()),
+    isSelfEcho: () => false,
+    markLayerDirty: vi.fn<(layerId: string) => void>(),
+    releaseSuspendedLayer,
+    reset: vi.fn<() => void>(),
+    suspendLayer: vi.fn(() => releaseSuspendedLayer),
+  };
+};
 
 /** A fake canvas that also lets a test fire pointer events at the engine's listeners. */
 const createInputCanvas = (
@@ -2110,6 +2192,141 @@ const putImageDataCalls = (surfaces: StubRasterSurface[]): { image: unknown; x: 
       .filter((entry) => entry.op === 'putImageData')
       .map((entry) => ({ image: entry.args[0], x: entry.args[1], y: entry.args[2] }))
   );
+
+describe('engine-owned control pixel editing', () => {
+  it('brushes an empty control in place and never creates a raster layer', () => {
+    const h = createControlPaintHarness({ source: { bitmap: null, type: 'paint' } });
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(40, 40));
+    h.overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+
+    expect(h.engine.getDocument()!.layers).toHaveLength(1);
+    expect(h.engine.getDocument()!.layers[0]).toMatchObject({ id: 'control', type: 'control' });
+    expect(h.strokes).toHaveLength(1);
+    expect(h.strokes[0]!.layerId).toBe('control');
+    expect(h.bitmapStore.markLayerDirty).toHaveBeenCalledWith('control');
+    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.dispose();
+  });
+
+  it('materializes an image control plus brush stroke as one reversible edit', async () => {
+    const h = createControlPaintHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 20 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 7, y: 11 },
+    });
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.getDocument()!.layers[0]);
+
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }));
+
+    const after = structuredClone(h.engine.getDocument()!.layers[0]);
+    expect(after).toMatchObject({
+      adapter: before && 'adapter' in before ? before.adapter : undefined,
+      filter: before && 'filter' in before ? before.filter : undefined,
+      id: 'control',
+      source: { type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    });
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledWith('control');
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.markLayerDirty.mock.invocationCallOrder[0]).toBeLessThan(
+      h.bitmapStore.releaseSuspendedLayer.mock.invocationCallOrder[0]!
+    );
+
+    h.engine.undo();
+    expect(h.engine.getDocument()!.layers[0]).toEqual(before);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.engine.stores.canRedo.get()).toBe(true);
+
+    h.engine.redo();
+    expect(h.engine.getDocument()!.layers[0]).toEqual(after);
+    h.engine.dispose();
+  });
+
+  it.each(['eraser', 'brush'] as const)(
+    'rolls back a prepared image control when a %s gesture is cancelled',
+    async (tool) => {
+      const h = createControlPaintHarness({
+        source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+      });
+      await h.publishInitialCache();
+      const before = structuredClone(h.engine.getDocument());
+      h.engine.setTool(tool);
+      h.overlay.fire('pointerdown', pointerAt(5, 5));
+      h.overlay.fire('pointercancel', pointerAt(5, 5, { buttons: 0 }));
+      expect(h.engine.getDocument()).toEqual(before);
+      expect(h.engine.stores.canUndo.get()).toBe(false);
+      expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(h.bitmapStore.suspendLayer).toHaveBeenCalledWith('control');
+      expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+      h.engine.dispose();
+    }
+  );
+
+  it.each([
+    ['locked', { isLocked: true }],
+    ['disabled', { isEnabled: false }],
+  ] as const)('does not mutate or auto-create over a %s control', (_scenario, patch) => {
+    const h = createControlPaintHarness({ source: { bitmap: null, type: 'paint' }, ...patch });
+    const before = structuredClone(h.engine.getDocument());
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointerup', pointerAt(20, 20, { buttons: 0 }));
+    expect(h.engine.getDocument()).toEqual(before);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.dispose();
+  });
+
+  it('normalizes a transformed empty control before its first brush stroke', () => {
+    const h = createControlPaintHarness({
+      source: { bitmap: null, type: 'paint' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 30, y: 40 },
+    });
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(35, 45));
+    h.overlay.fire('pointerup', pointerAt(35, 45, { buttons: 0 }));
+    expect(h.engine.getDocument()!.layers[0]).toMatchObject({
+      id: 'control',
+      source: { type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+    });
+    h.engine.undo();
+    expect(h.engine.getDocument()!.layers[0]).toMatchObject({
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 30, y: 40 },
+    });
+    h.engine.dispose();
+  });
+
+  it('does not edit or auto-create when an image control cache is not ready', () => {
+    const h = createControlPaintHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+    });
+    h.raf.flush();
+    const before = structuredClone(h.engine.getDocument());
+
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(5, 5));
+    h.overlay.fire('pointerup', pointerAt(5, 5, { buttons: 0 }));
+
+    expect(h.engine.getDocument()).toEqual(before);
+    expect(h.engine.getDocument()!.layers).toHaveLength(1);
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.discardLayer).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.engine.stores.canRedo.get()).toBe(false);
+    h.engine.dispose();
+  });
+});
 
 describe('engine-owned history: stroke → undo → redo', () => {
   const drawStroke = () => {

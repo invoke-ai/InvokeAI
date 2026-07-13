@@ -123,6 +123,11 @@ export interface BitmapStoreDeps {
 export interface BitmapStore {
   /** Marks a layer dirty and (re)arms its debounce timer. Called on each committed stroke. */
   markLayerDirty(layerId: string): void;
+  /**
+   * Temporarily prevents persistence from reading or dispatching `layerId` while
+   * preserving dirty work. Returns an idempotent release; leases may be nested.
+   */
+  suspendLayer(layerId: string): () => void;
   /** Cancels pending persistence and invalidates an in-flight result for one layer. */
   discardLayer(layerId: string): void;
   /** Flushes every dirty layer immediately and resolves once all in-flight uploads settle. */
@@ -212,7 +217,24 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
    * tombstones for the lifetime of the engine.
    */
   const layerGenerations = new Map<string, number>();
+  /** Active nested persistence-suspension lease count per layer. */
+  const suspensionCounts = new Map<string, number>();
+  /** Barriers waiting for a suspended dirty layer to resume or be reset/disposed. */
+  const suspensionWaiters = new Set<() => void>();
   let disposed = false;
+
+  const isSuspended = (layerId: string): boolean => (suspensionCounts.get(layerId) ?? 0) > 0;
+  const notifySuspensionWaiters = (): void => {
+    const waiters = [...suspensionWaiters];
+    suspensionWaiters.clear();
+    for (const resolve of waiters) {
+      resolve();
+    }
+  };
+  const waitForSuspensionChange = (): Promise<void> =>
+    new Promise((resolve) => {
+      suspensionWaiters.add(resolve);
+    });
 
   const clearTimer = (layerId: string): void => {
     const handle = debounceTimers.get(layerId);
@@ -446,10 +468,13 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     if (existing) {
       return existing;
     }
+    if (isSuspended(layerId)) {
+      return Promise.resolve();
+    }
     const op = flushLayer(layerId).finally(() => {
       inFlight.delete(layerId);
       // Re-dirtied during the flush (new stroke) or a failure re-queued it.
-      if (dirty.has(layerId) && !disposed) {
+      if (dirty.has(layerId) && !disposed && !isSuspended(layerId)) {
         scheduleFlush(layerId);
       } else {
         // Any invalidated operation for this id has now settled and there is no
@@ -467,7 +492,46 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     }
     dirty.add(layerId);
     dirtyReason.set(layerId, 'stroke');
-    scheduleFlush(layerId);
+    if (!isSuspended(layerId)) {
+      scheduleFlush(layerId);
+    }
+  };
+
+  const suspendLayer = (layerId: string): (() => void) => {
+    if (disposed) {
+      return () => undefined;
+    }
+    const count = suspensionCounts.get(layerId) ?? 0;
+    suspensionCounts.set(layerId, count + 1);
+    if (count === 0) {
+      const hadPendingWork = dirty.has(layerId) || debounceTimers.has(layerId) || inFlight.has(layerId);
+      clearTimer(layerId);
+      if (inFlight.has(layerId)) {
+        layerGenerations.set(layerId, (layerGenerations.get(layerId) ?? 0) + 1);
+      }
+      if (hadPendingWork) {
+        dirty.add(layerId);
+        dirtyReason.set(layerId, 'stroke');
+      }
+    }
+
+    let released = false;
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      const current = suspensionCounts.get(layerId) ?? 0;
+      if (current <= 1) {
+        suspensionCounts.delete(layerId);
+        if (dirty.has(layerId) && !disposed) {
+          scheduleFlush(layerId);
+        }
+      } else {
+        suspensionCounts.set(layerId, current - 1);
+      }
+      notifySuspensionWaiters();
+    };
   };
 
   const discardLayer = (layerId: string): void => {
@@ -499,13 +563,17 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     // forever.
     const failedThisBarrier = new Set<string>();
     for (let iteration = 0; iteration < MAX_BARRIER_ITERATIONS; iteration += 1) {
-      const toFlush = Array.from(dirty).filter((layerId) => !failedThisBarrier.has(layerId));
+      const toFlush = Array.from(dirty).filter((layerId) => !failedThisBarrier.has(layerId) && !isSuspended(layerId));
       for (const layerId of toFlush) {
         clearTimer(layerId);
         void runFlush(layerId);
       }
       const ops = [...inFlight.values()];
       if (ops.length === 0) {
+        if (Array.from(dirty).some((layerId) => isSuspended(layerId))) {
+          await waitForSuspensionChange();
+          continue;
+        }
         return;
       }
       await Promise.all(ops);
@@ -541,6 +609,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     debounceTimers.clear();
     dirty.clear();
     dirtyReason.clear();
+    suspensionCounts.clear();
+    notifySuspensionWaiters();
     // The self-echo map is per-(old)document; a reused layer id in the new
     // document must not inherit it. `hashToImage` is content-addressed and kept.
     lastApplied.clear();
@@ -554,11 +624,13 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     debounceTimers.clear();
     dirty.clear();
     dirtyReason.clear();
+    suspensionCounts.clear();
+    notifySuspensionWaiters();
     inFlight.clear();
     hashToImage.clear();
     lastApplied.clear();
     layerGenerations.clear();
   };
 
-  return { discardLayer, dispose, flushPendingUploads, isSelfEcho, markLayerDirty, reset };
+  return { discardLayer, dispose, flushPendingUploads, isSelfEcho, markLayerDirty, reset, suspendLayer };
 };

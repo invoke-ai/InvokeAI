@@ -1,7 +1,12 @@
 import type { StubRasterBackend, StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
-import type { StrokeCommittedEvent, Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
+import type {
+  ControlPixelEditTransaction,
+  StrokeCommittedEvent,
+  Tool,
+  ToolContext,
+} from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
+import type { CanvasControlLayerContract, CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
@@ -52,6 +57,32 @@ const inpaintMaskLayer = (id: string): CanvasLayerContract => ({
   type: 'inpaint_mask',
 });
 
+const controlPaintLayer = (id: string): CanvasControlLayerContract => ({
+  adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: { bitmap: null, type: 'paint' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'control',
+  withTransparencyEffect: true,
+});
+
+const controlImageLayer = (id: string): CanvasControlLayerContract => ({
+  ...controlPaintLayer(id),
+  source: { image: { height: 20, imageName: id, width: 20 }, type: 'image' },
+});
+
+const controlTransaction = (): ControlPixelEditTransaction => ({
+  cancel: vi.fn(),
+  commitPatch: vi.fn(),
+  commitStroke: vi.fn(),
+  layerId: 'control',
+});
+
 const makeDoc = (layers: CanvasLayerContract[], selectedLayerId: string | null): CanvasDocumentContractV2 => ({
   background: 'transparent',
   bbox: { height: 100, width: 100, x: 0, y: 0 },
@@ -80,6 +111,7 @@ const up = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerUp?.
 const cancel = (t: Tool, ctx: ToolContext): void => t.onPointerCancel?.(ctx);
 
 interface Harness {
+  beginControlPixelEdit: ReturnType<typeof vi.fn> | null;
   ctx: ToolContext;
   backend: StubRasterBackend;
   layers: LayerCacheStore;
@@ -89,7 +121,10 @@ interface Harness {
   createdIds: string[];
 }
 
-const createHarness = (doc: CanvasDocumentContractV2): Harness => {
+const createHarness = (
+  doc: CanvasDocumentContractV2,
+  transaction: ControlPixelEditTransaction | null | undefined = undefined
+): Harness => {
   const backend = createTestStubRasterBackend();
   const layers = createLayerCacheStore(backend);
   const stores = createEngineStores();
@@ -97,10 +132,12 @@ const createHarness = (doc: CanvasDocumentContractV2): Harness => {
   const strokes: StrokeCommittedEvent[] = [];
   const painted: string[] = [];
   const createdIds: string[] = [];
+  const beginControlPixelEdit = transaction === undefined ? null : vi.fn(() => transaction);
   let idCounter = 0;
 
   const ctx: ToolContext = {
     backend,
+    ...(beginControlPixelEdit ? { beginControlPixelEdit } : {}),
     commitStructural: vi.fn(),
     createLayerId: () => {
       const id = `new-layer-${(idCounter += 1)}`;
@@ -109,7 +146,10 @@ const createHarness = (doc: CanvasDocumentContractV2): Harness => {
     },
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
-    emitStrokeCommitted: (event) => strokes.push(event),
+    emitStrokeCommitted: (event) => {
+      painted.push(event.layerId);
+      strokes.push(event);
+    },
     getDocument: () => doc,
     invalidate: vi.fn(),
     layers,
@@ -121,7 +161,7 @@ const createHarness = (doc: CanvasDocumentContractV2): Harness => {
     viewport: null as never,
   };
 
-  return { backend, createdIds, ctx, dispatched, layers, painted, strokes };
+  return { backend, beginControlPixelEdit, createdIds, ctx, dispatched, layers, painted, strokes };
 };
 
 const cacheOps = (surface: StubRasterSurface): string[] => surface.callLog.map((entry) => entry.op);
@@ -217,6 +257,42 @@ describe('brush tool: cancel', () => {
 });
 
 describe('paint tool: target resolution', () => {
+  it('commits a selected control stroke through its transaction without adding a raster layer', () => {
+    const transaction = controlTransaction();
+    const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(10, 10));
+    move(brush, h.ctx, pointer(20, 20), [pointer(20, 20)]);
+    up(brush, h.ctx, pointer(20, 20, { buttons: 0 }));
+
+    expect(h.beginControlPixelEdit).toHaveBeenCalledWith('control');
+    expect(transaction.commitStroke).toHaveBeenCalledOnce();
+    expect(transaction.cancel).not.toHaveBeenCalled();
+    expect(h.dispatched).toHaveLength(0);
+  });
+
+  it.each(['pointercancel', 'deactivate'] as const)('rolls back control preparation on %s', (ending) => {
+    const transaction = controlTransaction();
+    const h = createHarness(makeDoc([controlImageLayer('control')], 'control'), transaction);
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    if (ending === 'pointercancel') {
+      cancel(brush, h.ctx);
+    } else {
+      brush.onDeactivate?.(h.ctx);
+    }
+    expect(transaction.cancel).toHaveBeenCalledOnce();
+    expect(transaction.commitStroke).not.toHaveBeenCalled();
+  });
+
+  it('does not fall through to raster auto-create when control preparation is rejected', () => {
+    const h = createHarness(makeDoc([controlImageLayer('control')], 'control'), null);
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    expect(h.dispatched).toHaveLength(0);
+  });
+
   it('auto-creates a paint layer (one dispatch) when the selection is not paintable', () => {
     const doc = makeDoc([imageLayer('img1')], 'img1');
     const h = createHarness(doc);

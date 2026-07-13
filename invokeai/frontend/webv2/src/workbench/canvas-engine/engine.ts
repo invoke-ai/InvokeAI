@@ -135,7 +135,13 @@ import {
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
 import { createSelectObjectSession } from '@workbench/widgets/layers/selectObjectSession';
 
-import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
+import type {
+  ControlPixelEditTransaction,
+  PixelEditPatch,
+  StrokeCommittedEvent,
+  Tool,
+  ToolContext,
+} from './tools/tool';
 
 import { uploadCanvasImage } from './backend/canvasImages';
 import { createCanvasOperationController, type CanvasOperationController } from './canvasOperationController';
@@ -151,9 +157,19 @@ import {
   isRenderableLayer,
   renderableSourceOf,
 } from './document/sources';
+import {
+  bakeControlPixelEditSurface,
+  buildMaterializedControlLayer,
+  decideControlPixelEdit,
+} from './editing/controlPixelEdit';
 import { createDocumentPatchEntry } from './history/documentPatch';
 import { createHistory, type History, type HistoryEntry } from './history/history';
 import { createImagePatchEntry, type ImagePatchApply } from './history/imagePatch';
+import {
+  createLayerSnapshotEntry,
+  type LayerPixelSnapshot,
+  type LayerPixelSnapshotApply,
+} from './history/layerSnapshot';
 import { createViewTool } from './tools/viewTool';
 
 /**
@@ -1046,6 +1062,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   // Engine-owned canvas history (paint pixel patches + structural patches).
   // Project-level undo deliberately no longer covers the canvas (Phase 0).
   const history: History = createHistory();
+  let openControlPixelEdit: { cancel: () => void; layerId: string } | null = null;
+  const cancelOpenControlPixelEdit = (): void => {
+    openControlPixelEdit?.cancel();
+  };
 
   // Nudge coalescing: a rapid burst of same-layer arrow nudges collapses into a
   // single history entry whose inverse restores the burst's ORIGINAL position.
@@ -1176,6 +1196,36 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     };
   };
 
+  const commitOrdinaryStroke = (event: StrokeCommittedEvent): void => {
+    // A fresh stroke ends any open nudge-coalescing burst.
+    endNudgeBurst();
+    notifyLayerPainted(event.layerId);
+    // Persistence first: mark the layer dirty so a debounced upload fires even
+    // when no external subscriber is attached.
+    bitmapStore.markLayerDirty(event.layerId);
+    // Record the edit on the engine-owned history. Guarded against re-entrancy:
+    // an undo/redo replay routes pixels through `applyImagePatch`, not a fresh
+    // stroke, so this never fires during apply — the guard is belt-and-braces.
+    if (!history.isApplying()) {
+      const label = event.tool === 'eraser' ? 'Eraser stroke' : 'Brush stroke';
+      history.push(
+        event.createdLayer
+          ? createComposedPaintEntry(event.createdLayer, event, label)
+          : createImagePatchEntry({
+              after: event.afterImageData,
+              apply: applyImagePatch,
+              before: event.beforeImageData,
+              label,
+              layerId: event.layerId,
+              rect: event.dirtyRect,
+            })
+      );
+    }
+    for (const listener of strokeListeners) {
+      listener(event);
+    }
+  };
+
   // ---- Selection (transient interaction state) + marching ants ------------
   //
   // The selection lives on the engine, never the reducer, and is not undoable
@@ -1241,6 +1291,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const toolContext: ToolContext = {
     applyTransform: () => applyTransform(),
     backend,
+    beginControlPixelEdit: (layerId) => beginControlPixelEdit(layerId),
     beginTransformSession: (layerId) => beginTransformSession(layerId),
     cancelTextEdit: () => cancelTextEdit(),
     cancelTransform: () => cancelTransform(),
@@ -1249,38 +1300,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     createLayerId,
     createPath2D: createPath2DImpl,
     dispatch: (action) => store.dispatch(action),
-    emitStrokeCommitted: (event) => {
-      // A fresh stroke ends any open nudge-coalescing burst.
-      endNudgeBurst();
-      // Persistence first: mark the layer dirty so a debounced upload fires even
-      // when no external subscriber is attached.
-      bitmapStore.markLayerDirty(event.layerId);
-      // Record the edit on the engine-owned history. Guarded against re-entrancy:
-      // an undo/redo replay routes pixels through `applyImagePatch`, not a fresh
-      // stroke, so this never fires during apply — the guard is belt-and-braces.
-      if (!history.isApplying()) {
-        const label = event.tool === 'eraser' ? 'Eraser stroke' : 'Brush stroke';
-        history.push(
-          event.createdLayer
-            ? // The gesture auto-created its paint layer: compose layer creation +
-              // stroke into ONE entry, so an undo removes the now-empty layer AND the
-              // stroke (skipping the pixel restore — the layer's cache is gone), and a
-              // redo re-adds the layer then re-applies the stroke pixels.
-              createComposedPaintEntry(event.createdLayer, event, label)
-            : createImagePatchEntry({
-                after: event.afterImageData,
-                apply: applyImagePatch,
-                before: event.beforeImageData,
-                label,
-                layerId: event.layerId,
-                rect: event.dirtyRect,
-              })
-        );
-      }
-      for (const listener of strokeListeners) {
-        listener(event);
-      }
-    },
+    emitStrokeCommitted: (event) => commitOrdinaryStroke(event),
     getDocument: () => mirror.getDocument(),
     getSelectionMask: () => selection.mask(),
     invalidate: (payload) => scheduler.invalidate(payload),
@@ -2446,6 +2466,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       scheduler.invalidate(stagedPreview && !stagedPreview.placement ? { all: true } : { overlay: true });
     },
     onDocumentReplaced: () => {
+      pipeline.cancelActiveGesture();
+      cancelOpenControlPixelEdit();
       canvasOperations.invalidateDocument(projectId);
       cancelSelectObjectSession();
       const previousImageNames = [...mirroredLayerImageNames.values()];
@@ -2461,7 +2483,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       // otherwise commit against the replaced document. Routing through the
       // pipeline clears `gestureActive` and runs the tool's `onPointerCancel`, so
       // the tool drops its own transient state.
-      pipeline.cancelActiveGesture();
       // Defensive: a non-bbox active tool won't have cleared a lingering preview.
       stores.bboxPreview.set(null);
       history.clear();
@@ -2525,6 +2546,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       scheduler.invalidate({ all: true });
     },
     onLayersChanged: (ids, sourceChangedIds) => {
+      if (openControlPixelEdit && ids.includes(openControlPixelEdit.layerId)) {
+        pipeline.cancelActiveGesture();
+        cancelOpenControlPixelEdit();
+      }
       const doc = mirror.getDocument();
       for (const id of sourceChangedIds) {
         canvasOperations.invalidateSource(projectId, id);
@@ -2647,6 +2672,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const unsubscribeProjectPreviewLifecycle = store.subscribe(() => {
     const activeProjectId = store.getState().activeProjectId;
     if (lastActiveProjectId === projectId && activeProjectId !== projectId) {
+      pipeline.cancelActiveGesture();
+      cancelOpenControlPixelEdit();
       canvasOperations.invalidateProject(projectId);
       cancelSelectObjectSession();
       rasterDocumentGeneration += 1;
@@ -3995,6 +4022,304 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   ): boolean => {
     const current = document?.layers.find((candidate) => candidate.id === expected.id);
     return current !== undefined && isDeeplyEqual(current, expected);
+  };
+
+  const applyControlLayerSnapshot: LayerPixelSnapshotApply = (snapshot) => {
+    const pixels = backend.createSurface(snapshot.rect.width, snapshot.rect.height);
+    if (snapshot.pixels) {
+      pixels.ctx.putImageData(snapshot.pixels, 0, 0);
+    }
+    const prepared = prepareGeneratedPaintCache(snapshot.layer.id, snapshot.rect, pixels);
+    dispatchPreparedMutation(
+      { layer: snapshot.layer, layerId: snapshot.layer.id, type: 'replaceCanvasLayer' },
+      () => documentHasLayerContract(getReducerDocument(), snapshot.layer),
+      () => documentHasLayerContract(mirror.getDocument(), snapshot.layer)
+    );
+    try {
+      bitmapStore.discardLayer(snapshot.layer.id);
+    } catch {
+      // Persistence bookkeeping is ancillary after reducer acceptance.
+    }
+    installGeneratedPaintCache(prepared, snapshot.layer.source.type === 'paint');
+  };
+
+  const beginControlPixelEdit = (layerId: string): ControlPixelEditTransaction | null => {
+    const document = mirror.getDocument();
+    const layer = document?.layers.find((candidate) => candidate.id === layerId);
+    if (
+      !canEditDocument() ||
+      !document ||
+      document.selectedLayerId !== layerId ||
+      !layer ||
+      layer.type !== 'control' ||
+      openControlPixelEdit ||
+      canvasOperations.getSnapshot().status !== 'idle' ||
+      stores.transformSession.get()
+    ) {
+      return null;
+    }
+
+    const contentRect = getSourceContentRect(layer, document);
+    const decision = decideControlPixelEdit({
+      hasSourceContent: !isEmpty(contentRect),
+      isCacheReady: isLayerCacheReadyForOp(layer, document),
+      layer,
+    });
+    if (decision.status === 'rejected') {
+      return null;
+    }
+
+    if (decision.status === 'direct') {
+      let closed = false;
+      let owner: { cancel: () => void; layerId: string };
+      const close = (): boolean => {
+        if (closed || openControlPixelEdit !== owner) {
+          return false;
+        }
+        closed = true;
+        openControlPixelEdit = null;
+        return true;
+      };
+      const commitPatch = (label: string, patch: PixelEditPatch): boolean => {
+        if (closed || openControlPixelEdit !== owner) {
+          return false;
+        }
+        const currentDocument = mirror.getDocument();
+        const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layerId);
+        if (
+          store.getState().activeProjectId !== projectId ||
+          !canEditDocument() ||
+          canvasOperations.getSnapshot().status !== 'idle' ||
+          currentDocument?.selectedLayerId !== layerId ||
+          currentLayer !== layer
+        ) {
+          close();
+          const entry = layerCache.get(layerId);
+          if (entry) {
+            entry.surface.ctx.putImageData(patch.before, patch.rect.x - entry.rect.x, patch.rect.y - entry.rect.y);
+            adjustedSurfaceCache.delete(layerId);
+            scheduler.invalidate({ layers: [layerId] });
+          }
+          return false;
+        }
+        close();
+        endNudgeBurst();
+        notifyLayerPainted(layerId);
+        bitmapStore.markLayerDirty(layerId);
+        if (!history.isApplying()) {
+          history.push(
+            createImagePatchEntry({
+              after: patch.after,
+              apply: applyImagePatch,
+              before: patch.before,
+              label,
+              layerId,
+              rect: patch.rect,
+            })
+          );
+        }
+        return true;
+      };
+      const transaction: ControlPixelEditTransaction = {
+        cancel: () => {
+          close();
+        },
+        commitPatch: (label, patch) => {
+          commitPatch(label, patch);
+        },
+        commitStroke: (event) => {
+          if (event.layerId !== layerId) {
+            transaction.cancel();
+            return;
+          }
+          const label = event.tool === 'eraser' ? 'Eraser stroke' : 'Brush stroke';
+          if (
+            !commitPatch(label, {
+              after: event.afterImageData,
+              before: event.beforeImageData,
+              rect: event.dirtyRect,
+            })
+          ) {
+            return;
+          }
+          for (const listener of strokeListeners) {
+            listener(event);
+          }
+        },
+        layerId,
+      };
+      owner = { cancel: transaction.cancel, layerId };
+      openControlPixelEdit = owner;
+      return transaction;
+    }
+
+    const originalEntry = layerCache.get(layerId);
+    const originalCache = originalEntry
+      ? {
+          hasPublishedPixels: originalEntry.hasPublishedPixels,
+          lastUsed: originalEntry.lastUsed,
+          rect: { ...originalEntry.rect },
+          stale: originalEntry.stale,
+          surface: originalEntry.surface,
+          version: originalEntry.version,
+        }
+      : null;
+    const beforeRect = originalCache?.rect ?? { ...contentRect };
+    let beforePixels: ImageData | null = null;
+    if (!isEmpty(beforeRect)) {
+      if (!originalEntry) {
+        return null;
+      }
+      try {
+        beforePixels = originalEntry.surface.ctx.getImageData(0, 0, beforeRect.width, beforeRect.height);
+      } catch {
+        return null;
+      }
+    }
+
+    let prepared: ReturnType<LayerCacheStore['prepareReplacement']>;
+    try {
+      if (originalEntry && !isEmpty(originalEntry.rect)) {
+        const baked = bakeControlPixelEditSurface({
+          backend,
+          source: originalEntry.surface,
+          sourceRect: originalEntry.rect,
+          transform: layer.transform,
+        });
+        prepared = prepareGeneratedPaintCache(layerId, baked.rect, baked.surface);
+      } else {
+        const empty = backend.createSurface(0, 0);
+        prepared = prepareGeneratedPaintCache(layerId, { height: 0, width: 0, x: 0, y: 0 }, empty);
+      }
+    } catch {
+      return null;
+    }
+
+    const before: LayerPixelSnapshot = {
+      layer: structuredClone(layer),
+      pixels: beforePixels,
+      rect: beforeRect,
+    };
+    const restoreOriginal = (): void => {
+      if (originalCache) {
+        const current = layerCache.get(layerId);
+        if (current) {
+          current.hasPublishedPixels = originalCache.hasPublishedPixels;
+          current.lastUsed = originalCache.lastUsed;
+          current.rect = { ...originalCache.rect };
+          current.stale = originalCache.stale;
+          current.surface = originalCache.surface;
+          current.version = originalCache.version;
+        }
+      } else {
+        layerCache.delete(layerId);
+      }
+      adjustedSurfaceCache.delete(layerId);
+      transformOverrides.delete(layerId);
+      scheduler.invalidate({ layers: [layerId], overlay: true });
+    };
+    const releasePersistence = bitmapStore.suspendLayer(layerId);
+    try {
+      const previewEntry = originalEntry ?? layerCache.getOrCreateRect(layerId, prepared.rect);
+      previewEntry.surface = prepared.surface;
+      previewEntry.rect = { ...prepared.rect };
+      previewEntry.hasPublishedPixels = true;
+      previewEntry.stale = false;
+      previewEntry.version += 1;
+      adjustedSurfaceCache.delete(layerId);
+      transformOverrides.set(layerId, { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
+      scheduler.invalidate({ layers: [layerId], overlay: true });
+    } catch {
+      restoreOriginal();
+      releasePersistence();
+      return null;
+    }
+
+    let closed = false;
+    let owner: { cancel: () => void; layerId: string };
+    const close = (): boolean => {
+      if (closed || openControlPixelEdit !== owner) {
+        return false;
+      }
+      closed = true;
+      openControlPixelEdit = null;
+      return true;
+    };
+    const cancel = (): void => {
+      if (!close()) {
+        return;
+      }
+      restoreOriginal();
+      releasePersistence();
+    };
+    const commit = (label: string, event?: StrokeCommittedEvent): void => {
+      if (!close()) {
+        return;
+      }
+      const currentDocument = mirror.getDocument();
+      const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layerId);
+      const edited = layerCache.get(layerId);
+      if (
+        store.getState().activeProjectId !== projectId ||
+        !canEditDocument() ||
+        canvasOperations.getSnapshot().status !== 'idle' ||
+        currentDocument?.selectedLayerId !== layerId ||
+        currentLayer !== layer ||
+        !edited ||
+        (event && event.layerId !== layerId)
+      ) {
+        restoreOriginal();
+        releasePersistence();
+        return;
+      }
+      let afterPixels: ImageData | null = null;
+      let after: LayerPixelSnapshot;
+      try {
+        if (!isEmpty(edited.rect)) {
+          afterPixels = edited.surface.ctx.getImageData(0, 0, edited.rect.width, edited.rect.height);
+        }
+        const materialized = buildMaterializedControlLayer(layer, edited.rect);
+        after = {
+          layer: materialized,
+          pixels: afterPixels,
+          rect: { ...edited.rect },
+        };
+        dispatchPreparedMutation(
+          { layer: materialized, layerId, type: 'replaceCanvasLayer' },
+          () => documentHasLayerContract(getReducerDocument(), materialized),
+          () => documentHasLayerContract(mirror.getDocument(), materialized)
+        );
+      } catch (error) {
+        restoreOriginal();
+        releasePersistence();
+        throw error;
+      }
+      transformOverrides.delete(layerId);
+      endNudgeBurst();
+      try {
+        notifyLayerPainted(layerId);
+        bitmapStore.markLayerDirty(layerId);
+        if (!history.isApplying()) {
+          history.push(createLayerSnapshotEntry({ after, apply: applyControlLayerSnapshot, before, label }));
+        }
+      } finally {
+        releasePersistence();
+      }
+      if (event) {
+        for (const listener of strokeListeners) {
+          listener(event);
+        }
+      }
+    };
+    const transaction: ControlPixelEditTransaction = {
+      cancel,
+      commitPatch: (label) => commit(label),
+      commitStroke: (event) => commit(event.tool === 'eraser' ? 'Eraser stroke' : 'Brush stroke', event),
+      layerId,
+    };
+    owner = { cancel, layerId };
+    openControlPixelEdit = owner;
+    return transaction;
   };
 
   const captureLayerCache = (
@@ -6396,6 +6721,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return;
     }
     disposed = true;
+    pipeline.cancelActiveGesture();
+    cancelOpenControlPixelEdit();
     clearOwnedFilterSession();
     clearOwnedSelectObjectSession();
     canvasOperations.dispose();

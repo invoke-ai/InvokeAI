@@ -17,7 +17,7 @@
 import type { PointerInput } from '@workbench/canvas-engine/types';
 import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
 
-import type { Tool, ToolContext } from './tool';
+import type { StrokeCommittedEvent, Tool, ToolContext } from './tool';
 
 import { createStrokeSession, type StrokeSession } from './strokeSession';
 
@@ -44,6 +44,8 @@ const MASK_STROKE_COLOR = '#ffffff';
 /** The resolved paint target for a gesture. `createdLayer` is set only when auto-created. */
 interface PaintTarget {
   layerId: string;
+  commit(event: StrokeCommittedEvent): void;
+  cancel(): void;
   /** When the gesture auto-created its layer, the created contract + insert index (for history). */
   createdLayer?: { layer: CanvasLayerContract; index: number };
   /**
@@ -86,7 +88,12 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
       return null;
     }
     // The cache (if any) keeps its current content extent; the stroke grows it.
-    return { layerId: selected.id, transparencyLocked: selected.isTransparencyLocked === true };
+    return {
+      cancel: () => undefined,
+      commit: (event) => ctx.emitStrokeCommitted(event),
+      layerId: selected.id,
+      transparencyLocked: selected.isTransparencyLocked === true,
+    };
   }
 
   if (selected && isMaskLayer(selected)) {
@@ -97,7 +104,25 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
     if (selected.isLocked || !selected.isEnabled) {
       return null;
     }
-    return { color: MASK_STROKE_COLOR, forceOpaque: true, layerId: selected.id };
+    return {
+      cancel: () => undefined,
+      color: MASK_STROKE_COLOR,
+      commit: (event) => ctx.emitStrokeCommitted(event),
+      forceOpaque: true,
+      layerId: selected.id,
+    };
+  }
+
+  if (selected?.type === 'control') {
+    const transaction = ctx.beginControlPixelEdit?.(selected.id) ?? null;
+    if (!transaction) {
+      return null;
+    }
+    return {
+      cancel: transaction.cancel,
+      commit: transaction.commitStroke,
+      layerId: transaction.layerId,
+    };
   }
 
   // Selection is an image/other raster, another layer type, or nothing: create a
@@ -123,12 +148,18 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
   // grows it from empty to the stroke's content bounds.
   const entry = ctx.layers.getOrCreateRect(layerId, { height: 0, width: 0, x: 0, y: 0 });
   entry.stale = false;
-  return { createdLayer: { index: 0, layer }, layerId };
+  return {
+    cancel: () => undefined,
+    commit: (event) => ctx.emitStrokeCommitted(event),
+    createdLayer: { index: 0, layer },
+    layerId,
+  };
 };
 
 /** Creates a brush-family tool from its per-gesture {@link PaintToolSpec}. */
 export const createPaintTool = (spec: PaintToolSpec): Tool => {
   let session: StrokeSession | null = null;
+  let target: PaintTarget | null = null;
 
   const cursorRadiusDoc = (ctx: ToolContext): number => spec.size(ctx) / 2;
 
@@ -139,22 +170,25 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
 
   const endSession = (): void => {
     session = null;
+    target = null;
   };
 
   return {
     cursor: () => 'crosshair',
     id: spec.id,
-    onDeactivate: (ctx) => {
-      if (session) {
+    onDeactivate: (ctx, opts) => {
+      if (session && target && !opts?.temporary) {
         session.cancel();
+        target.cancel();
         endSession();
       }
       ctx.setOverlayCursor(null);
       ctx.invalidate({ overlay: true });
     },
     onPointerCancel: () => {
-      if (session) {
+      if (session && target) {
         session.cancel();
+        target.cancel();
         endSession();
       }
     },
@@ -162,35 +196,42 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
       if (session || (input.buttons & PRIMARY_BUTTON) === 0) {
         return;
       }
-      const target = resolveTarget(ctx);
+      const resolvedTarget = resolveTarget(ctx);
       updateCursorRing(ctx, input);
-      if (!target) {
+      if (!resolvedTarget) {
         return;
       }
       // Transparency lock: the eraser is refused (it would alter the locked alpha);
       // the brush switches to `source-atop` so colour lands only on existing pixels.
-      if (target.transparencyLocked && spec.id === 'eraser') {
+      if (resolvedTarget.transparencyLocked && spec.id === 'eraser') {
         return;
       }
-      const composite = target.transparencyLocked && spec.id === 'brush' ? 'source-atop' : spec.composite;
-      session = createStrokeSession({
-        // Resolve the selection clip ONCE per gesture: when a selection exists the
-        // stroke is masked to it; with none the field is null and the hot path is
-        // untouched (no per-point mask lookup).
-        clipMask: ctx.getSelectionMask?.() ?? null,
-        color: target.color ?? spec.color(ctx),
-        composite,
-        createdLayer: target.createdLayer ?? null,
-        ctx,
-        layerId: target.layerId,
-        // Mask strokes are forced opaque (an alpha stencil is all-or-nothing); a
-        // brush-opacity mask stroke would silently attenuate the denoise strength.
-        opacity: target.forceOpaque ? 1 : spec.opacity(ctx),
-        size: spec.size(ctx),
-        thinning: spec.thinning(ctx),
-        tool: spec.id,
-      });
-      session.addPoints([input]);
+      const composite = resolvedTarget.transparencyLocked && spec.id === 'brush' ? 'source-atop' : spec.composite;
+      target = resolvedTarget;
+      try {
+        session = createStrokeSession({
+          // Resolve the selection clip ONCE per gesture: when a selection exists the
+          // stroke is masked to it; with none the field is null and the hot path is
+          // untouched (no per-point mask lookup).
+          clipMask: ctx.getSelectionMask?.() ?? null,
+          color: target.color ?? spec.color(ctx),
+          composite,
+          createdLayer: target.createdLayer ?? null,
+          ctx,
+          layerId: target.layerId,
+          // Mask strokes are forced opaque (an alpha stencil is all-or-nothing); a
+          // brush-opacity mask stroke would silently attenuate the denoise strength.
+          opacity: target.forceOpaque ? 1 : spec.opacity(ctx),
+          size: spec.size(ctx),
+          thinning: spec.thinning(ctx),
+          tool: spec.id,
+        });
+        session.addPoints([input]);
+      } catch {
+        session?.cancel();
+        target.cancel();
+        endSession();
+      }
     },
     onPointerMove: (ctx, input, batch) => {
       updateCursorRing(ctx, input);
@@ -200,9 +241,17 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
     },
     onPointerUp: (ctx, input) => {
       updateCursorRing(ctx, input);
-      if (session) {
-        session.commit();
-        endSession();
+      if (session && target) {
+        try {
+          const event = session.commit();
+          if (event) {
+            target.commit(event);
+          } else {
+            target.cancel();
+          }
+        } finally {
+          endSession();
+        }
       }
     },
   };

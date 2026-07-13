@@ -53,6 +53,19 @@ export interface StrokeCommittedEvent {
   createdLayer?: { layer: CanvasLayerContract; index: number };
 }
 
+export interface PixelEditPatch {
+  rect: Rect;
+  before: ImageData;
+  after: ImageData;
+}
+
+export interface ControlPixelEditTransaction {
+  readonly layerId: string;
+  commitPatch(label: string, patch: PixelEditPatch): void;
+  commitStroke(event: StrokeCommittedEvent): void;
+  cancel(): void;
+}
+
 /**
  * A transient per-layer transform override the compositor/overlay read at render
  * time (a live drag preview that never touches the mirror). The move tool sets
@@ -95,6 +108,8 @@ export interface ToolContext {
    * on activate / when a layer is clicked. Absent in minimal test harnesses.
    */
   beginTransformSession?(layerId: string): void;
+  /** Prepares direct or transactional pixel editing for a selected control layer. */
+  beginControlPixelEdit?(layerId: string): ControlPixelEditTransaction | null;
   /** Updates the active transform session's live transform (drag or numeric edit). */
   updateTransformSession?(transform: LayerTransform): void;
   /**

@@ -370,6 +370,110 @@ describe('createBitmapStore', () => {
     h.store.dispose();
   });
 
+  it('suspends debounced dirty work and resumes it only after release', async () => {
+    const h = createHarness();
+    h.store.markLayerDirty(LAYER);
+    const release = h.store.suspendLayer(LAYER);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(h.uploadImage).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+
+    release();
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    expect(h.dispatch).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it('records dirty work marked during suspension without scheduling until release', async () => {
+    const h = createHarness();
+    const release = h.store.suspendLayer(LAYER);
+    h.store.markLayerDirty(LAYER);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(h.encodeSurface).not.toHaveBeenCalled();
+
+    release();
+    await h.store.flushPendingUploads();
+
+    expect(h.encodeSurface).toHaveBeenCalledOnce();
+    expect(h.dispatch).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it('invalidates an in-flight result and keeps a barrier pending until suspension releases', async () => {
+    const uploads = [createDeferred<CanvasImageUploadResult>(), createDeferred<CanvasImageUploadResult>()];
+    let uploadIndex = 0;
+    const uploadImage = vi.fn(() => uploads[uploadIndex++]!.promise);
+    const h = createHarness({ uploadImage });
+    h.store.markLayerDirty(LAYER);
+    const barrier = h.store.flushPendingUploads();
+    await drainUntil(() => uploadImage.mock.calls.length === 1);
+
+    const release = h.store.suspendLayer(LAYER);
+    let settled = false;
+    void barrier.then(() => {
+      settled = true;
+    });
+    uploads[0]!.resolve({ height: 10, imageName: 'obsolete', width: 10 });
+    await drainUntil(() => settled);
+
+    expect(settled).toBe(false);
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(uploadImage).toHaveBeenCalledOnce();
+
+    release();
+    await drainUntil(() => uploadImage.mock.calls.length === 2);
+    uploads[1]!.resolve({ height: 10, imageName: 'fresh', width: 10 });
+    await barrier;
+
+    expect(h.dispatch).toHaveBeenCalledOnce();
+    expect(h.dispatch.mock.calls[0]![0]).toMatchObject({ source: { bitmap: { imageName: 'fresh' } } });
+    h.store.dispose();
+  });
+
+  it('supports nested suspension leases and idempotent release', async () => {
+    const h = createHarness();
+    h.store.markLayerDirty(LAYER);
+    const releaseOuter = h.store.suspendLayer(LAYER);
+    const releaseInner = h.store.suspendLayer(LAYER);
+
+    releaseOuter();
+    releaseOuter();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(h.uploadImage).not.toHaveBeenCalled();
+
+    releaseInner();
+    await h.store.flushPendingUploads();
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it.each(['reset', 'dispose'] as const)('%s settles barriers waiting on suspended dirty work', async (ending) => {
+    const h = createHarness();
+    h.store.markLayerDirty(LAYER);
+    h.store.suspendLayer(LAYER);
+    const barrier = h.store.flushPendingUploads();
+    let settled = false;
+    void barrier.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    h.store[ending]();
+    await barrier;
+
+    expect(settled).toBe(true);
+    expect(h.dispatch).not.toHaveBeenCalled();
+    if (ending === 'reset') {
+      h.store.dispose();
+    }
+  });
+
   it('a stroke landing while the barrier awaits an in-flight upload is not dropped: the barrier waits for the follow-up flush', async () => {
     const deferreds = [createDeferred<CanvasImageUploadResult>(), createDeferred<CanvasImageUploadResult>()];
     let call = 0;

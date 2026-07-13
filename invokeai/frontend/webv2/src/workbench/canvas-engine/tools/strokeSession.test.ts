@@ -1,6 +1,6 @@
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
 import type { StubRasterBackend, StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
-import type { StrokeCommittedEvent, ToolContext } from '@workbench/canvas-engine/tools/tool';
+import type { ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput } from '@workbench/canvas-engine/types';
 
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -41,15 +41,16 @@ const runStroke = (opts: { withMask: boolean }) => {
   const entry: LayerCacheEntry = layers.getOrCreate('L', 100, 100);
   const mask = opts.withMask ? backend.createSurface(100, 100) : null;
   const clipMask = mask ? { rect: { height: 100, width: 100, x: 0, y: 0 }, surface: mask } : null;
-  const strokes: StrokeCommittedEvent[] = [];
+  const emitStrokeCommitted = vi.fn();
+  const notifyLayerPainted = vi.fn();
 
   const ctx = {
     backend,
     createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
-    emitStrokeCommitted: (event: StrokeCommittedEvent) => strokes.push(event),
+    emitStrokeCommitted,
     invalidate: vi.fn(),
     layers,
-    notifyLayerPainted: vi.fn(),
+    notifyLayerPainted,
   } as unknown as ToolContext;
 
   // Only the scratch is created after this point.
@@ -67,10 +68,10 @@ const runStroke = (opts: { withMask: boolean }) => {
   });
   session.addPoints([pointer(10, 10)]);
   session.addPoints([pointer(40, 10), pointer(40, 40)]);
-  session.commit();
+  const event = session.commit();
 
   const scratch = created[0]!;
-  return { cache: entry.surface as StubRasterSurface, scratch, strokes };
+  return { cache: entry.surface as StubRasterSurface, emitStrokeCommitted, event, notifyLayerPainted, scratch };
 };
 
 const compositeOps = (surface: StubRasterSurface): unknown[] =>
@@ -103,11 +104,10 @@ describe('strokeSession: selection-constrained painting', () => {
     expect(compositeOps(withMask.cache)).not.toContain('destination-in');
   });
 
-  it('still emits a commit with a dirty rect the mask does not shift', () => {
-    const { strokes } = runStroke({ withMask: true });
-    expect(strokes).toHaveLength(1);
-    expect(strokes[0]!.dirtyRect.width).toBeGreaterThan(0);
-    expect(strokes[0]!.dirtyRect.height).toBeGreaterThan(0);
+  it('returns a commit with a dirty rect the mask does not shift', () => {
+    const { event } = runStroke({ withMask: true });
+    expect(event!.dirtyRect.width).toBeGreaterThan(0);
+    expect(event!.dirtyRect.height).toBeGreaterThan(0);
   });
 });
 
@@ -117,14 +117,15 @@ describe('strokeSession: content-sized cache growth', () => {
     const layers = createLayerCacheStore(backend);
     const entry = layers.getOrCreateRect('L', initialRect);
     entry.stale = false;
-    const strokes: StrokeCommittedEvent[] = [];
+    const emitStrokeCommitted = vi.fn();
+    const notifyLayerPainted = vi.fn();
     const ctx = {
       backend,
       createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
-      emitStrokeCommitted: (event: StrokeCommittedEvent) => strokes.push(event),
+      emitStrokeCommitted,
       invalidate: vi.fn(),
       layers,
-      notifyLayerPainted: vi.fn(),
+      notifyLayerPainted,
     } as unknown as ToolContext;
     const session = createStrokeSession({
       clipMask: null,
@@ -137,13 +138,13 @@ describe('strokeSession: content-sized cache growth', () => {
       thinning: 0,
       tool: 'brush',
     });
-    return { entry, session, strokes };
+    return { emitStrokeCommitted, entry, notifyLayerPainted, session };
   };
 
   it('grows an EMPTY (brand-new) paint cache to the stroke bounds on the first stroke', () => {
-    const { entry, session, strokes } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
+    const { entry, session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
     session.addPoints([pointer(50, 60)]);
-    session.commit();
+    const event = session.commit();
 
     // The cache adopted the stroke's content bounds, snapped OUTWARD to the 64px
     // growth-chunk grid — still content-sized (a couple of chunks), NOT an
@@ -167,7 +168,24 @@ describe('strokeSession: content-sized cache growth', () => {
     expect(entry.surface.width).toBe(entry.rect.width);
     expect(entry.surface.height).toBe(entry.rect.height);
     // The committed dirty rect is the same (chunk-padded) layer-local region.
-    expect(strokes[0]!.dirtyRect).toEqual(entry.rect);
+    expect(event!.dirtyRect).toEqual(entry.rect);
+  });
+
+  it('returns the completed event without publishing engine side effects', () => {
+    const { emitStrokeCommitted, notifyLayerPainted, session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
+    session.addPoints([pointer(10, 10)]);
+    const event = session.commit();
+
+    expect(event).toMatchObject({ layerId: 'L', tool: 'brush' });
+    expect(event!.dirtyRect.width).toBeGreaterThan(0);
+    expect(event!.dirtyRect.height).toBeGreaterThan(0);
+    expect(emitStrokeCommitted).not.toHaveBeenCalled();
+    expect(notifyLayerPainted).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the gesture produced no dirty pixels', () => {
+    const { session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
+    expect(session.commit()).toBeNull();
   });
 
   it('grows an existing cache to the UNION of its extent and an out-of-extent stroke (negative coords included)', () => {

@@ -75,8 +75,8 @@ export interface StrokeSessionConfig {
 export interface StrokeSession {
   /** Appends coalesced samples and repaints the accumulated stroke. */
   addPoints(inputs: readonly PointerInput[]): void;
-  /** Finalizes the stroke, bumps the cache version, and emits the commit event. */
-  commit(): void;
+  /** Finalizes the stroke and returns the completed edit for its owner to publish. */
+  commit(): StrokeCommittedEvent | null;
   /** Restores the pre-stroke pixels and drops the session without an event. */
   cancel(): void;
 }
@@ -254,7 +254,7 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
       paint(true);
       const entry = layers.get(layerId);
       if (!entry || !accumRect || !beforeImageData) {
-        return;
+        return null;
       }
       const afterImageData = entry.surface.ctx.getImageData(
         accumRect.x - entry.rect.x,
@@ -262,8 +262,7 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
         accumRect.width,
         accumRect.height
       );
-      ctx.notifyLayerPainted(layerId);
-      const event: StrokeCommittedEvent = {
+      return {
         afterImageData,
         beforeImageData,
         dirtyRect: accumRect,
@@ -271,7 +270,6 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
         tool,
         ...(createdLayer ? { createdLayer } : {}),
       };
-      ctx.emitStrokeCommitted(event);
     },
   };
 };
