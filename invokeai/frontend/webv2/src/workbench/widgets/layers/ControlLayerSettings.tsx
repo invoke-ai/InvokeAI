@@ -8,7 +8,7 @@ import type { ControlAdapterKind } from '@workbench/generation/canvas/addControl
 import type { CanvasControlAdapterContract, CanvasControlLayerContract } from '@workbench/types';
 
 import { createListCollection, HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
-import { Button, Field, Select, Slider } from '@workbench/components/ui';
+import { Field, Select, Slider } from '@workbench/components/ui';
 import { isControlKindSupportedForBase } from '@workbench/generation/canvas/addControlLayers';
 import { resolveDefaultFilterForModel } from '@workbench/generation/canvas/controlRecommendations';
 import { getControlValidationReason } from '@workbench/generation/canvas/controlValidation';
@@ -19,6 +19,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getCompatibleControlModels } from './controlModelOptions';
+import { LayerFilterOperationButton } from './LayerFilterOperationButton';
 import { applyStructural, applyStructuralPreview, CONTROL_ADAPTER_DEFAULTS, CONTROL_WEIGHT_BOUNDS } from './layerOps';
 import { runLayerFilterOperation } from './layerPropertiesOperation';
 
@@ -325,11 +326,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           zImageControlIndex: Math.max(0, zImageControlIndex),
         })
       : null;
-  const startFilter = useCallback(
-    () => runLayerFilterOperation(() => engine?.startFilterOperation(layer.id), onOperationStarted),
-    [engine, layer.id, onOperationStarted]
-  );
-
   return (
     <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md">
       <HStack gap="2">
@@ -426,9 +422,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           <Text fontSize="xs">{t('widgets.layers.control.transparencyEffect')}</Text>
         </Switch.Label>
       </Switch.Root>
-      <Button disabled={!engine || layer.isLocked} size="xs" variant="outline" onClick={startFilter}>
-        {t('widgets.layers.control.filter')}
-      </Button>
+      <LayerFilterOperationButton engine={engine} layer={layer} onOperationStarted={onOperationStarted} />
       {validationReason ? (
         <Text color="fg.warning" fontSize="2xs" role="alert">
           {t(`widgets.layers.control.validation.${validationReason}`)}
