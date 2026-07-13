@@ -2077,9 +2077,9 @@ class TestWebSocketAuth:
         assert admin_calls[0].kwargs["data"]["user_ids"] == ["owner-123", "owner-456"]
         assert admin_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-123": [10], "owner-456": [20]}
 
-    def test_queue_cleared_still_broadcast(self, socketio: Any) -> None:
-        """QueueClearedEvent does not carry user identity and should still be broadcast
-        to all queue subscribers — this is a sanity check that we haven't over-scoped."""
+    def test_unscoped_queue_cleared_still_broadcast(self, socketio: Any) -> None:
+        """An unscoped QueueClearedEvent (user_id=None — an admin or single-user clear that
+        deleted every user's items) should still be broadcast to all queue subscribers."""
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -2092,8 +2092,50 @@ class TestWebSocketAuth:
 
         asyncio.run(socketio._handle_queue_event(("queue_cleared", event)))
 
-        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "default" in rooms_emitted_to
+        assert len(mock_emit.call_args_list) == 1
+        assert mock_emit.call_args_list[0].kwargs.get("room") == "default"
+        assert mock_emit.call_args_list[0].kwargs.get("data")["user_id"] is None
+
+    def test_user_scoped_queue_cleared_routed_privately(self, socketio: Any) -> None:
+        """A user-scoped QueueClearedEvent only deleted that user's rows. The full event must
+        go to the owner + admin rooms; the rest of the queue room gets a sanitized companion
+        (user_id="redacted") so their queue lists refresh without treating the clear as their
+        own — otherwise another user's clear would abort their in-flight reconciliations and
+        mark their tracked items canceled."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueClearedEvent
+
+        event = QueueClearedEvent.build(queue_id="default", user_id="owner-xyz")
+
+        socketio._socket_users["sid-owner"] = {"user_id": "owner-xyz", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_cleared", event)))
+
+        emits = [
+            (c.kwargs.get("room"), c.kwargs.get("data"), c.kwargs.get("skip_sid")) for c in mock_emit.call_args_list
+        ]
+
+        # Full event goes to owner + admin rooms in a single emit (room list deduplicates a
+        # socket that is in both rooms)
+        private_emits = [(p, s) for r, p, s in emits if r == ["user:owner-xyz", "admin"]]
+        assert len(private_emits) == 1
+        assert private_emits[0][0]["user_id"] == "owner-xyz"
+
+        # Sanitized companion goes to the queue room, skipping the owner's and admins' sids
+        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        assert len(queue_emits) == 1, "expected exactly one sanitized emit to queue room"
+        sanitized_payload, skip_sid = queue_emits[0]
+        assert sanitized_payload["user_id"] == "redacted"
+        assert "sid-owner" in skip_sid
+        assert "sid-admin" in skip_sid
+        assert "sid-other" not in skip_sid
 
     def test_recall_parameters_emitted_once_to_owner_and_admin_rooms(self, socketio: Any) -> None:
         """RecallParametersUpdatedEvent must be delivered to the owner + admin rooms

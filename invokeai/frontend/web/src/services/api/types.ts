@@ -104,6 +104,7 @@ export type LoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'lora' }>;
 type WanLoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'lora'; base: 'wan' }>;
 export type VAEModelConfig = Extract<InternalAnyModelConfig, { type: 'vae' }>;
 export type ControlNetModelConfig = Extract<InternalAnyModelConfig, { type: 'controlnet' }>;
+type AnimaControlNetModelConfig = Extract<InternalAnyModelConfig, { type: 'controlnet'; base: 'anima' }>;
 export type IPAdapterModelConfig = Extract<InternalAnyModelConfig, { type: 'ip_adapter' }>;
 export type T2IAdapterModelConfig = Extract<InternalAnyModelConfig, { type: 't2i_adapter' }>;
 export type CLIPLEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_embed'; variant: 'large' }>;
@@ -334,9 +335,26 @@ export const isControlNetModelConfig = (config: AnyModelConfig): config is Contr
   return config.type === 'controlnet';
 };
 
+export const isAnimaControlNetModelConfig = (config: AnyModelConfig): config is AnimaControlNetModelConfig => {
+  return config.type === 'controlnet' && config.base === 'anima';
+};
+
+export const isAnimaInpaintControlNetModelConfig = (config: AnyModelConfig): config is AnimaControlNetModelConfig => {
+  // 4-channel (RGB + mask) variants are inpaint adapters. Models with a null cond_in_channels were installed before
+  // the field was recorded - only the inpaint variant predates it, so treat them as inpaint adapters too. (A 3ch
+  // model installed from a pre-release dev build also reads as null and must be reinstalled to register as a
+  // control layer model.)
+  return isAnimaControlNetModelConfig(config) && config.cond_in_channels !== 3;
+};
+
 export const isControlLayerModelConfig = (
   config: AnyModelConfig
 ): config is ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig => {
+  if (isAnimaControlNetModelConfig(config)) {
+    // Only the 3-channel (general control) Anima ControlNet-LLLite variants are usable as control layers; 4-channel
+    // and legacy (null cond_in_channels) variants are inpaint adapters.
+    return config.cond_in_channels === 3;
+  }
   return config.type === 'controlnet' || config.type === 't2i_adapter' || config.type === 'control_lora';
 };
 

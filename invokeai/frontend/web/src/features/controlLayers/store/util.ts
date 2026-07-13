@@ -2,6 +2,7 @@ import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
+  AnimaLLLiteConfig,
   CanvasControlLayerState,
   CanvasImageState,
   CanvasInpaintMaskState,
@@ -149,6 +150,12 @@ export const initialZImageControl: ZImageControlConfig = {
   type: 'z_image_control',
   model: null,
   weight: 0.75, // control_context_scale, recommended 0.65-0.80
+  beginEndStepPct: [0, 1],
+};
+export const initialAnimaLLLite: AnimaLLLiteConfig = {
+  type: 'anima_lllite',
+  model: null,
+  weight: 1,
   beginEndStepPct: [0, 1],
 };
 
