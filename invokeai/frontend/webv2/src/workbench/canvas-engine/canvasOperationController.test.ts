@@ -2,7 +2,7 @@ import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import type { LayerExportGuard, SelectObjectLifecycleGuard } from './engine';
+import type { LayerExportGuard } from './engine';
 
 import { createCanvasOperationController } from './canvasOperationController';
 
@@ -37,48 +37,27 @@ const createDeferred = <T>() => {
 };
 
 const filterIdentity = { kind: 'filter' as const, layerId: layer.id, projectId: 'project-1' };
-const selectObjectIdentity = { kind: 'select-object' as const, projectId: 'project-1' };
-
-const compositeGuard = {
-  bbox: { height: 10, width: 10, x: 0, y: 0 },
-  candidates: [{ cacheVersion: 1, layer, layerId: layer.id }],
-  documentFingerprint: 'document-1',
-  documentGeneration: 1,
-  participants: [{ cacheVersion: 1, layer, layerId: layer.id }],
-  projectId: 'project-1',
-};
-const selectObjectLifecycleGuard: SelectObjectLifecycleGuard = {
-  bbox: compositeGuard.bbox,
-  documentGeneration: 1,
-  kind: 'select-object-lifecycle',
-  projectId: 'project-1',
-};
-const documentSelectObjectIdentity = { kind: 'select-object' as const, projectId: 'project-1' };
+const selectObjectIdentity = { kind: 'select-object' as const, layerId: layer.id, projectId: 'project-1' };
 
 describe('createCanvasOperationController', () => {
-  it('uses document-composite identity and guards for Select Object without a layer sentinel', () => {
+  it('requires the identity to name the guarded layer for both operation kinds', () => {
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
 
     const session = controller.start({
       cleanupPreview: vi.fn(),
-      guard: selectObjectLifecycleGuard,
-      identity: documentSelectObjectIdentity,
+      guard,
+      identity: selectObjectIdentity,
     });
 
     expect(session).not.toBeNull();
-    expect(controller.getSnapshot()).toMatchObject({ identity: documentSelectObjectIdentity, status: 'active' });
-    // @ts-expect-error Select Object cannot accept a layer guard.
-    expect(controller.start({ cleanupPreview: vi.fn(), guard, identity: documentSelectObjectIdentity })).toBeNull();
-    const invalidFilterOptions = {
-      cleanupPreview: vi.fn(),
-      guard: selectObjectLifecycleGuard,
-      identity: filterIdentity,
-    };
-    if (Date.now() < 0) {
-      // @ts-expect-error Filter cannot accept a Select Object lifecycle guard.
-      controller.start(invalidFilterOptions);
-    }
-    expect(controller.start(invalidFilterOptions as never)).toBeNull();
+    expect(controller.getSnapshot()).toMatchObject({ identity: selectObjectIdentity, status: 'active' });
+    expect(
+      controller.start({ cleanupPreview: vi.fn(), guard, identity: { ...selectObjectIdentity, layerId: 'other' } })
+    ).toBeNull();
+    expect(
+      controller.start({ cleanupPreview: vi.fn(), guard, identity: { ...filterIdentity, layerId: 'other' } })
+    ).toBeNull();
+    expect(controller.getSnapshot()).toMatchObject({ identity: selectObjectIdentity, status: 'active' });
   });
   it('replaces the active operation and prevents its stale session from affecting the replacement', async () => {
     const firstWork = createDeferred<string>();
@@ -92,7 +71,7 @@ describe('createCanvasOperationController', () => {
 
     const second = controller.start({
       cleanupPreview: secondCleanup,
-      guard: selectObjectLifecycleGuard,
+      guard,
       identity: selectObjectIdentity,
     })!;
 
@@ -226,7 +205,7 @@ describe('createCanvasOperationController', () => {
       () => {
         controller.start({
           cleanupPreview: replacementCleanup,
-          guard: selectObjectLifecycleGuard,
+          guard,
           identity: selectObjectIdentity,
         });
         return undefined;
@@ -285,7 +264,7 @@ describe('createCanvasOperationController', () => {
       const cleanupPreview = vi.fn(() => {
         controller.start({
           cleanupPreview: replacementCleanup,
-          guard: selectObjectLifecycleGuard,
+          guard,
           identity: selectObjectIdentity,
         });
       });
@@ -311,7 +290,7 @@ describe('createCanvasOperationController', () => {
     const cleanupPreview = vi.fn(() => {
       controller.start({
         cleanupPreview: replacementCleanup,
-        guard: selectObjectLifecycleGuard,
+        guard,
         identity: selectObjectIdentity,
       });
     });
@@ -445,21 +424,22 @@ describe('createCanvasOperationController', () => {
     expect(controller.getSnapshot()).toMatchObject({ identity: filterIdentity, status: 'active' });
   });
 
-  it('does not close Select Object for participant cache invalidation but closes it for document lifetime invalidation', () => {
+  it('keeps Select Object open across other-layer invalidation but closes it for its own source layer', () => {
     const cleanupPreview = vi.fn();
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     controller.start({
       cleanupPreview,
-      guard: selectObjectLifecycleGuard,
+      guard,
       identity: selectObjectIdentity,
     });
 
-    controller.invalidateSource('project-1', layer.id);
+    controller.invalidateSource('project-1', 'other-layer');
+    controller.invalidateLayer('project-1', 'other-layer');
 
     expect(cleanupPreview).not.toHaveBeenCalled();
     expect(controller.getSnapshot()).toMatchObject({ identity: selectObjectIdentity, status: 'active' });
 
-    controller.invalidateDocument('project-1');
+    controller.invalidateSource('project-1', layer.id);
     expect(cleanupPreview).toHaveBeenCalledOnce();
     expect(controller.getSnapshot()).toEqual({ status: 'idle' });
   });
@@ -470,7 +450,7 @@ describe('createCanvasOperationController', () => {
     const controller = createCanvasOperationController({ isGuardCurrent: () => true });
     const session = controller.start({
       cleanupPreview: vi.fn(),
-      guard: selectObjectLifecycleGuard,
+      guard,
       identity: selectObjectIdentity,
     })!;
     const pending = session.run(() => work.promise, publish);

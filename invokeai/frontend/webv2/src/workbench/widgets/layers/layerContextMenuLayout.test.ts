@@ -92,13 +92,7 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(inpaint)[1]).toEqual({
       id: 'primary',
-      items: [
-        'add-modifiers(inpaint-noise,inpaint-denoise-limit)',
-        'rename',
-        'fit-to-bbox',
-        'select-object',
-        'extract-masked-area',
-      ],
+      items: ['add-modifiers(inpaint-noise,inpaint-denoise-limit)', 'rename', 'fit-to-bbox', 'extract-masked-area'],
       presentation: 'list',
     });
     expect(summarize(regional)[1]).toEqual({
@@ -107,7 +101,6 @@ describe('getLayerContextMenuLayout', () => {
         'add-regional(regional-positive-prompt,regional-negative-prompt,regional-reference-image)',
         'rename',
         'fit-to-bbox',
-        'select-object',
         'regional-auto-negative',
       ],
       presentation: 'list',

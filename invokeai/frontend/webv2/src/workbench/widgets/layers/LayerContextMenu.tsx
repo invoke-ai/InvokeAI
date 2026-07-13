@@ -383,8 +383,7 @@ const LayerMenu = ({
       if (!engine) {
         throw makeStatusError('not-ready');
       }
-      void layerId;
-      const result = engine.startSelectObject();
+      const result = engine.startSelectObject(layerId);
       if (result !== 'started') {
         throw makeStatusError(result);
       }

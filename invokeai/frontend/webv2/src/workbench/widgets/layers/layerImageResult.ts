@@ -1,5 +1,5 @@
 import type { RunUtilityGraphOptions, UtilityGraphResult } from '@workbench/canvas-engine/backend/utilityQueue';
-import type { CanvasCompositeExportGuard, ExportCanvasCompositeBlobResult } from '@workbench/canvas-engine/engine';
+import type { ExportBakedLayerBlobResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
 import type { SamSessionErrorCode } from '@workbench/canvas-engine/engineStores';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
@@ -12,7 +12,7 @@ export interface SelectObjectReadyResult {
   status: 'ready';
   image: CanvasImageRef;
   rect: Rect;
-  guard: CanvasCompositeExportGuard;
+  guard: LayerExportGuard;
 }
 
 export type SelectObjectRunResult =
@@ -23,7 +23,7 @@ export type SelectObjectRunResult =
   | { status: 'failed'; message: string; code: SamSessionErrorCode };
 
 export interface SelectObjectRunnerDeps {
-  exportComposite(): Promise<ExportCanvasCompositeBlobResult>;
+  exportSource(): Promise<ExportBakedLayerBlobResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
   runGraph(options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>): Promise<UtilityGraphResult>;
 }
@@ -32,7 +32,7 @@ const isAbortError = (error: unknown): boolean => error instanceof Error && erro
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export interface SelectObjectPreparedSource {
-  guard: CanvasCompositeExportGuard;
+  guard: LayerExportGuard;
   imageName: string;
   height: number;
   rect: Rect;
@@ -44,16 +44,16 @@ export type PrepareSelectObjectSourceResult =
   | Exclude<SelectObjectRunResult, SelectObjectReadyResult>;
 
 export const prepareSelectObjectSource = async (
-  deps: Pick<SelectObjectRunnerDeps, 'exportComposite' | 'uploadIntermediate'>,
+  deps: Pick<SelectObjectRunnerDeps, 'exportSource' | 'uploadIntermediate'>,
   signal?: AbortSignal,
   onPhase?: (phase: 'uploading') => void
 ): Promise<PrepareSelectObjectSourceResult> => {
   if (signal?.aborted) {
     return { status: 'aborted' };
   }
-  let exported: ExportCanvasCompositeBlobResult;
+  let exported: ExportBakedLayerBlobResult;
   try {
-    exported = await deps.exportComposite();
+    exported = await deps.exportSource();
     if (signal?.aborted) {
       return { status: 'aborted' };
     }

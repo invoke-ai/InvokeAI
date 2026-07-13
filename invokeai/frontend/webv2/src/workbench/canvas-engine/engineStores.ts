@@ -259,6 +259,8 @@ export type SamSessionInput =
 /** Narrow engine-owned Select Object state for canvas tools and future UI subscribers. */
 export interface SamSessionSnapshot {
   sourceRect: Rect;
+  layerName: string;
+  layerType: 'raster' | 'control';
   input: SamSessionInput;
   pointLabel: SamPointLabel;
   model: SamModel;
@@ -269,7 +271,7 @@ export interface SamSessionSnapshot {
   status:
     | 'ready'
     | 'scheduled'
-    | 'preparing-composite'
+    | 'preparing-source'
     | 'uploading'
     | 'processing-sam'
     | 'rendering-preview'

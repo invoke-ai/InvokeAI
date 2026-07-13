@@ -4,7 +4,7 @@ import type {
   CanvasOperationRunResult,
   CanvasOperationSession,
 } from '@workbench/canvas-engine/canvasOperationController';
-import type { CanvasCompositeExportGuard, ExportCanvasCompositeBlobResult } from '@workbench/canvas-engine/engine';
+import type { ExportBakedLayerBlobResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
 import type { SamSessionError, SamSessionErrorCode } from '@workbench/canvas-engine/engineStores';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
@@ -18,7 +18,7 @@ import { prepareSelectObjectSource, processSelectObjectSource } from './layerIma
 export type SelectObjectSessionStatus =
   | 'ready'
   | 'scheduled'
-  | 'preparing-composite'
+  | 'preparing-source'
   | 'uploading'
   | 'processing-sam'
   | 'rendering-preview'
@@ -26,7 +26,7 @@ export type SelectObjectSessionStatus =
 
 export interface SelectObjectSessionPreview<T> {
   data: T;
-  guard: CanvasCompositeExportGuard;
+  guard: LayerExportGuard;
   image: SelectObjectReadyResult['image'];
   inputHash: string;
   previewId: number;
@@ -45,19 +45,19 @@ export interface SelectObjectSessionState<T> {
   status: SelectObjectSessionStatus;
   error: SamSessionError | null;
   preview: SelectObjectSessionPreview<T> | null;
-  sourceGuard: CanvasCompositeExportGuard | null;
+  sourceGuard: LayerExportGuard | null;
 }
 
 export interface SelectObjectSessionDeps<T> {
-  captureGuard(): CanvasCompositeExportGuard | null;
+  captureGuard(): LayerExportGuard | null;
   controller: CanvasOperationController;
-  exportComposite(): Promise<ExportCanvasCompositeBlobResult>;
+  exportSource(): Promise<ExportBakedLayerBlobResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
   runGraph(options: Pick<RunUtilityGraphOptions, 'graph' | 'outputNodeId' | 'signal'>): Promise<UtilityGraphResult>;
   decodePreview(result: SelectObjectReadyResult, signal: AbortSignal): Promise<T>;
   publishPreview(preview: SelectObjectSessionPreview<T>): undefined;
   cleanupPreview(): void;
-  isGuardCurrent(guard: CanvasCompositeExportGuard): boolean;
+  isGuardCurrent(guard: LayerExportGuard): boolean;
 }
 
 export interface CreateSelectObjectSessionOptions<T> {
@@ -212,7 +212,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     publishState({ ...state, preview: null, sourceGuard: null, status: 'ready' });
   };
 
-  const isGuardCurrent = (guard: CanvasCompositeExportGuard): boolean => {
+  const isGuardCurrent = (guard: LayerExportGuard): boolean => {
     try {
       return deps.isGuardCurrent(guard);
     } catch {
@@ -220,32 +220,12 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
   };
 
-  const isSameGuard = (left: CanvasCompositeExportGuard, right: CanvasCompositeExportGuard): boolean => {
-    const sameParticipants = (
-      leftParticipants: CanvasCompositeExportGuard['candidates'],
-      rightParticipants: CanvasCompositeExportGuard['candidates']
-    ): boolean =>
-      leftParticipants.length === rightParticipants.length &&
-      leftParticipants.every((participant, index) => {
-        const other = rightParticipants[index];
-        return (
-          participant.layerId === other?.layerId &&
-          participant.layer === other.layer &&
-          participant.cacheVersion === other.cacheVersion
-        );
-      });
-    return (
-      left.projectId === right.projectId &&
-      left.documentGeneration === right.documentGeneration &&
-      left.documentFingerprint === right.documentFingerprint &&
-      left.bbox.x === right.bbox.x &&
-      left.bbox.y === right.bbox.y &&
-      left.bbox.width === right.bbox.width &&
-      left.bbox.height === right.bbox.height &&
-      sameParticipants(left.candidates, right.candidates) &&
-      sameParticipants(left.participants, right.participants)
-    );
-  };
+  const isSameGuard = (left: LayerExportGuard, right: LayerExportGuard): boolean =>
+    left.projectId === right.projectId &&
+    left.layerId === right.layerId &&
+    left.layer === right.layer &&
+    left.cacheVersion === right.cacheVersion &&
+    left.documentGeneration === right.documentGeneration;
 
   unsubscribeController = deps.controller.subscribe(() => {
     if (!disposed && deps.controller.getSnapshot().status === 'idle') {
@@ -272,7 +252,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
   };
 
   const ensureSource = async (
-    guard: CanvasCompositeExportGuard,
+    guard: LayerExportGuard,
     signal: AbortSignal,
     token: number
   ): Promise<SelectObjectPreparedSource> => {
@@ -296,12 +276,12 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     token: number,
     hash: string,
     requestState: SelectObjectSessionState<T>,
-    guard: CanvasCompositeExportGuard
+    guard: LayerExportGuard
   ): Promise<SelectObjectSessionProcessResult> => {
     let requestError: SamSessionError | null = null;
     try {
-      pendingPhase = 'preparing-composite';
-      publishState({ ...state, sourceGuard: guard, status: 'preparing-composite' });
+      pendingPhase = 'preparing-source';
+      publishState({ ...state, sourceGuard: guard, status: 'preparing-source' });
       const result = await operation.run(
         async (signal) => {
           try {
@@ -326,7 +306,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
               throw new SamSessionFailure(getProcessedSourceError(processed));
             }
             if (!isGuardCurrent(guard) || !isSameGuard(processed.guard, guard)) {
-              throw new DOMException('Select Object composite became stale.', 'AbortError');
+              throw new DOMException('Select Object layer source became stale.', 'AbortError');
             }
             publishPhase(token, 'rendering-preview');
             let data: T;
@@ -433,7 +413,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
     }
     const hash = stableInputHash(state);
     if (hash === pendingHash && pendingProcess) {
-      publishState({ ...state, error: null, status: pendingPhase ?? 'preparing-composite' });
+      publishState({ ...state, error: null, status: pendingPhase ?? 'preparing-source' });
       return pendingProcess;
     }
     if (

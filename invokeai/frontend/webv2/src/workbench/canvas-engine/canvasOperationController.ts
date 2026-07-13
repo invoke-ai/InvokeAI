@@ -1,10 +1,10 @@
-import type { LayerExportGuard, SelectObjectLifecycleGuard } from './engine';
+import type { LayerExportGuard } from './engine';
 
 export type CanvasOperationIdentity =
-  | { kind: 'select-object'; projectId: string }
+  | { kind: 'select-object'; projectId: string; layerId: string }
   | { kind: 'filter'; projectId: string; layerId: string };
 
-export type CanvasOperationGuard = LayerExportGuard | SelectObjectLifecycleGuard;
+export type CanvasOperationGuard = LayerExportGuard;
 
 export type CanvasOperationState =
   | { status: 'idle' }
@@ -34,17 +34,11 @@ export interface CanvasOperationSession {
   cancel(): void;
 }
 
-export type StartCanvasOperationOptions =
-  | {
-      identity: Extract<CanvasOperationIdentity, { kind: 'select-object' }>;
-      guard: SelectObjectLifecycleGuard;
-      cleanupPreview(): void;
-    }
-  | {
-      identity: Extract<CanvasOperationIdentity, { kind: 'filter' }>;
-      guard: LayerExportGuard;
-      cleanupPreview(): void;
-    };
+export interface StartCanvasOperationOptions {
+  identity: CanvasOperationIdentity;
+  guard: LayerExportGuard;
+  cleanupPreview(): void;
+}
 
 export interface CanvasOperationController {
   getSnapshot(): CanvasOperationState;
@@ -54,7 +48,6 @@ export interface CanvasOperationController {
   cancel(): void;
   invalidateSource(projectId: string, layerId: string): void;
   invalidateLayer(projectId: string, layerId: string): void;
-  invalidateComposite(projectId: string): void;
   invalidateProject(projectId: string): void;
   invalidateDocument(projectId: string): void;
   dispose(): void;
@@ -216,18 +209,10 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
   };
 
   const start = (options: StartCanvasOperationOptions): CanvasOperationSession | null => {
-    const layerIdentityMatches =
-      options.identity.kind === 'filter' &&
-      'layerId' in options.guard &&
-      options.identity.layerId === options.guard.layerId;
-    const compositeIdentityMatches =
-      options.identity.kind === 'select-object' &&
-      'kind' in options.guard &&
-      options.guard.kind === 'select-object-lifecycle';
     if (
       disposed ||
       options.identity.projectId !== options.guard.projectId ||
-      (!layerIdentityMatches && !compositeIdentityMatches)
+      options.identity.layerId !== options.guard.layerId
     ) {
       return null;
     }
@@ -263,10 +248,7 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
   };
 
   const invalidateTarget = (projectId: string, layerId?: string): void => {
-    if (
-      active?.identity.projectId === projectId &&
-      (layerId === undefined || (active.identity.kind === 'select-object' ? true : active.identity.layerId === layerId))
-    ) {
+    if (active?.identity.projectId === projectId && (layerId === undefined || active.identity.layerId === layerId)) {
       close(active);
     }
   };
@@ -291,22 +273,9 @@ export const createCanvasOperationController = (deps: CanvasOperationControllerD
     },
     getSnapshot: () => state,
     invalidateDocument: (projectId) => invalidateTarget(projectId),
-    invalidateComposite: (projectId) => {
-      if (active?.identity.projectId === projectId && active.identity.kind === 'select-object') {
-        close(active);
-      }
-    },
     invalidateLayer: (projectId, layerId) => invalidateTarget(projectId, layerId),
     invalidateProject: (projectId) => invalidateTarget(projectId),
-    invalidateSource: (projectId, layerId) => {
-      if (
-        active?.identity.kind === 'filter' &&
-        active.identity.projectId === projectId &&
-        active.identity.layerId === layerId
-      ) {
-        close(active);
-      }
-    },
+    invalidateSource: (projectId, layerId) => invalidateTarget(projectId, layerId),
     reset: () => {
       if (active) {
         interruptProcessing(active);

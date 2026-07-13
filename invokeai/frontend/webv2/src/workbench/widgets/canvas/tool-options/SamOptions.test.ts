@@ -47,6 +47,8 @@ const snapshot = (overrides: Partial<SamSessionSnapshot> = {}): SamSessionSnapsh
   input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
   invert: false,
   isolatedPreview: true,
+  layerName: 'Layer 1',
+  layerType: 'raster',
   model: 'segment-anything-2-large',
   pointLabel: 'include',
   sourceRect: { height: 20, width: 20, x: 0, y: 0 },
@@ -125,7 +127,7 @@ describe('getSamActionEligibility', () => {
 });
 
 describe('getSamPanelViewModel', () => {
-  it('derives visual counts, bbox state, and a localized generation-area source summary', () => {
+  it('derives visual counts, bbox state, and a localized layer source label', () => {
     expect(
       getSamPanelViewModel(
         snapshot({
@@ -138,17 +140,16 @@ describe('getSamPanelViewModel', () => {
             ],
             type: 'visual',
           },
+          layerName: 'Subject',
           sourceRect: { height: 768, width: 1024, x: 64, y: 32 },
         }),
-        (width, height) => `Área de generación ${width} por ${height}`,
-        (width, height) => `Generation area ${width} by ${height}`
+        (layerName, width, height) => `${layerName} at ${width} by ${height}`
       )
     ).toEqual({
       bboxActive: true,
       excludeCount: 1,
       includeCount: 2,
-      sourceLabel: 'Generation area 1024 by 768',
-      sourceSummary: 'Área de generación 1024 por 768',
+      sourceLabel: 'Subject at 1024 by 768',
     });
   });
 
@@ -156,15 +157,13 @@ describe('getSamPanelViewModel', () => {
     expect(
       getSamPanelViewModel(
         snapshot({ input: { prompt: 'cat', type: 'prompt' } }),
-        (w, h) => `${w} × ${h}`,
-        (w, h) => `Generation area ${w} × ${h}`
+        (layerName, w, h) => `${layerName} ${w} × ${h}`
       )
     ).toEqual({
       bboxActive: false,
       excludeCount: 0,
       includeCount: 0,
-      sourceLabel: 'Generation area 20 × 20',
-      sourceSummary: '20 × 20',
+      sourceLabel: 'Layer 1 20 × 20',
     });
   });
 });
@@ -198,7 +197,7 @@ describe('SamStatusSlot', () => {
   it.each([
     'ready',
     'scheduled',
-    'preparing-composite',
+    'preparing-source',
     'uploading',
     'processing-sam',
     'rendering-preview',
@@ -348,8 +347,9 @@ describe('single-row SAM inputs', () => {
     expect(en.widgets.layers.selectObject.settings).toBe('Select Object settings');
     expect(en.widgets.layers.selectObject.bbox).toBe('BBox');
     expect(en.widgets.layers.selectObject.technicalDetails).toBe('Technical details');
-    expect(en.widgets.layers.selectObject.sourceDimensions).toBe('{{width}} × {{height}}');
-    expect(en.widgets.layers.selectObject.sourceDimensionsLabel).toContain('{{width}}');
+    expect(en.widgets.layers.selectObject.sourceLayerLabel).toContain('{{name}}');
+    expect(en.widgets.layers.selectObject.sourceLayerLabel).toContain('{{width}}');
+    expect(en.widgets.layers.selectObject.saveAs_selection).toBe('Selection');
     expect(en.widgets.layers.selectObject.includeCount).toBe('Include {{count}}');
     expect(en.widgets.layers.selectObject.excludeCount).toBe('Exclude {{count}}');
     expect(en.widgets.layers.selectObject).not.toHaveProperty('autoProcessCompact');
@@ -394,11 +394,7 @@ describe('single-row SAM inputs', () => {
             onExclude: () => undefined,
             onInclude: () => undefined,
             pointLabel: session.pointLabel,
-            viewModel: getSamPanelViewModel(
-              session,
-              (width, height) => `${width} × ${height}`,
-              (width, height) => `Generation area ${width} × ${height}`
-            ),
+            viewModel: getSamPanelViewModel(session, (layerName, width, height) => `${layerName} ${width} × ${height}`),
           })
         )
       )
@@ -431,11 +427,13 @@ describe('getSamActionHandlers', () => {
     actions.reset();
     actions.apply();
     actions.save('control');
+    actions.save('selection');
     actions.cancel();
 
     expect(engine.processSelectObjectSession).toHaveBeenCalledOnce();
     expect(engine.resetSelectObjectSession).toHaveBeenCalledOnce();
     expect(engine.applySelectObjectSession).toHaveBeenCalledOnce();
+    expect(engine.applySelectObjectSession).toHaveBeenCalledWith(expect.any(Function));
     expect(engine.processSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
       engine.resetSelectObjectSession.mock.invocationCallOrder[0] as number
     );
@@ -443,6 +441,7 @@ describe('getSamActionHandlers', () => {
       engine.applySelectObjectSession.mock.invocationCallOrder[0] as number
     );
     expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('control', expect.any(Function));
+    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('selection', expect.any(Function));
     expect(engine.cancelSelectObjectSession).toHaveBeenCalledOnce();
   });
 });
@@ -480,7 +479,7 @@ describe('SamOptionsBar', () => {
     expect(markup).not.toContain('data-slot="body"');
     expect(markup).not.toContain('data-slot="footer"');
     expect(markup).not.toContain('data-operation=');
-    expect(markup).toContain('Generation area: 1024 × 768');
+    expect(markup).toContain('Layer 1 · Raster layer · 1024 × 768');
     expect(markup).toContain('aria-label="Select Object settings"');
     expect(markup).toContain('aria-label="Save As"');
     expect(markup.indexOf('>Visual<')).toBeLessThan(markup.indexOf('Include 1'));

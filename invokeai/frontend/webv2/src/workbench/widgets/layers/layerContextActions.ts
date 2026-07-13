@@ -428,16 +428,12 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects, layer }) => effects.startSelectObject(layer.id),
     icon: ScanSearchIcon,
     id: 'select-object',
-    isEnabled: (context) =>
-      context.hasEngine &&
-      !context.interactionLocked &&
-      context.document.bbox.width > 0 &&
-      context.document.bbox.height > 0,
-    isVisible: alwaysVisible,
+    isEnabled: hasMutablePixels,
+    isVisible: hasFilterableLayerContent,
     labelKey: 'widgets.layers.actions.selectObject',
     order: 41,
     section: 'primary',
-    supportedLayerTypes: ALL_LAYER_TYPES,
+    supportedLayerTypes: RASTER_AND_CONTROL,
   },
   {
     defaultLabel: 'Run workflow',

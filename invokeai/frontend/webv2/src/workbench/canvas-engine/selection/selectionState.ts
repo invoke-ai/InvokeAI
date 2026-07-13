@@ -21,7 +21,10 @@
  * approximation for `intersect` and for heavily overlapping compositions, where
  * the true selection outline is the boolean result rather than the union of the
  * source outlines — the ants may show interior source edges that the mask does
- * not. Mask-edge tracing is deferred; the mask itself is always exact.
+ * not. The exception is {@link SelectionState.replaceMask} (pixel-mask
+ * replacement, e.g. a Select Object result), whose ants ARE traced from the
+ * mask's true edge via {@link traceMaskOutlinePath}. The mask itself is always
+ * exact.
  *
  * ## Emptiness
  *
@@ -38,6 +41,7 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 import type { PlacedSurface, Rect, SelectionOp, Vec2 } from '@workbench/canvas-engine/types';
 
 import { intersect, isEmpty, roundOut, union } from '@workbench/canvas-engine/math/rect';
+import { traceMaskOutlinePath } from '@workbench/canvas-engine/selection/maskOutline';
 
 /** A committed selection contribution: the closed path and the op it applied. */
 export interface SelectionCommit {
@@ -94,11 +98,12 @@ export interface SelectionStateDeps {
 
 const MASK_FILL = '#ffffff';
 
+/** SVG path data for a closed rectangle in document space. */
+const rectToPathData = (r: Rect): string =>
+  `M ${r.x} ${r.y} L ${r.x + r.width} ${r.y} L ${r.x + r.width} ${r.y + r.height} L ${r.x} ${r.y + r.height} Z`;
+
 /** Builds a closed rectangle `Path2D` (document space) via the injected factory. */
-const rectPath = (createPath2D: CreatePath2D, r: Rect): Path2D =>
-  createPath2D(
-    `M ${r.x} ${r.y} L ${r.x + r.width} ${r.y} L ${r.x + r.width} ${r.y + r.height} L ${r.x} ${r.y + r.height} Z`
-  );
+const rectPath = (createPath2D: CreatePath2D, r: Rect): Path2D => createPath2D(rectToPathData(r));
 
 /** The canvas composite op that realizes each boolean selection op on the mask. */
 const compositeForOp = (op: SelectionOp): GlobalCompositeOperation => {
@@ -249,7 +254,13 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
     // selection remains authoritative and the engine may safely report failure.
     const nextMask = backend.createSurface(rect.width, rect.height);
     nextMask.ctx.putImageData(copied, 0, 0);
-    const nextPath = rectPath(createPath2D, rect);
+    // Trace the mask's true edge for the ants; a mask whose alpha never reaches
+    // the solid threshold still selected something (hasAlpha above), so fall
+    // back to tracing any non-zero coverage rather than showing no outline.
+    const alphaSource = { data: copiedData, height: source.height, width: source.width };
+    const outline =
+      traceMaskOutlinePath(alphaSource, rect) || traceMaskOutlinePath(alphaSource, rect, 1) || rectToPathData(rect);
+    const nextPath = createPath2D(outline);
 
     mask = nextMask;
     maskRect = rect;

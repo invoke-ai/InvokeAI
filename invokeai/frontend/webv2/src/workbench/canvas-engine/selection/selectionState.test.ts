@@ -170,7 +170,9 @@ describe('selectionState: replaceMask', () => {
     expect(selection.mask()?.rect).toEqual(source.placed.rect);
     expect(selection.mask()?.surface).not.toBe(source.placed.surface);
     expect(selection.mask()?.surface).not.toBe(previousSurface);
-    expect(selection.antsPaths()).toEqual([{ d: 'M 7 -3 L 9 -3 L 9 -1 L 7 -1 Z' } as unknown as Path2D]);
+    // The ants trace the mask's true edge — here only the solid (0,1) pixel —
+    // rather than the replacement's bounding rect.
+    expect(selection.antsPaths()).toEqual([{ d: 'M 7 -2 L 8 -2 L 8 -1 L 7 -1 Z' } as unknown as Path2D]);
 
     const put = maskLog(selection).find((entry) => entry.op === 'putImageData');
     const copied = put?.args[0] as ImageData | undefined;

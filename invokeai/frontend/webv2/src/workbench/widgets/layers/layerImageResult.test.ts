@@ -1,24 +1,35 @@
-import type { CanvasCompositeExportGuard } from '@workbench/canvas-engine/engine';
+import type { LayerExportGuard } from '@workbench/canvas-engine/engine';
+import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { prepareSelectObjectSource, processSelectObjectSource } from './layerImageResult';
 
 const rect = { height: 12, width: 16, x: -5, y: 7 };
+const layer: CanvasRasterLayerContractV2 = {
+  blendMode: 'normal',
+  id: 'source',
+  isEnabled: true,
+  isLocked: false,
+  name: 'Source',
+  opacity: 1,
+  source: { fill: '#fff', height: 12, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 16 },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: -5, y: 7 },
+  type: 'raster',
+};
 const guard = {
-  bbox: rect,
-  candidates: [],
-  documentFingerprint: 'document:1',
+  cacheVersion: 1,
   documentGeneration: 1,
-  participants: [],
+  layer,
+  layerId: layer.id,
   projectId: 'p1',
-} satisfies CanvasCompositeExportGuard;
+} satisfies LayerExportGuard;
 
 describe('Select Object image processing', () => {
   it('carries exact upload dimensions into the prepared source', async () => {
     await expect(
       prepareSelectObjectSource({
-        exportComposite: () => Promise.resolve({ blob: new Blob(), guard, rect, status: 'ok' }),
+        exportSource: () => Promise.resolve({ blob: new Blob(), guard, rect, status: 'ok' }),
         uploadIntermediate: () => Promise.resolve({ height: 12, imageName: 'source.png', width: 16 }),
       })
     ).resolves.toEqual({
@@ -35,7 +46,7 @@ describe('Select Object image processing', () => {
   ])('rejects upload dimensions that do not exactly match the bbox: $width x $height', async (dimensions) => {
     await expect(
       prepareSelectObjectSource({
-        exportComposite: () => Promise.resolve({ blob: new Blob(), guard, rect, status: 'ok' }),
+        exportSource: () => Promise.resolve({ blob: new Blob(), guard, rect, status: 'ok' }),
         uploadIntermediate: () => Promise.resolve({ ...dimensions, imageName: 'source.png' }),
       })
     ).resolves.toMatchObject({ status: 'dimension-mismatch' });

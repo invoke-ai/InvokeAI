@@ -1,4 +1,4 @@
-import type { CanvasCompositeExportGuard, SelectObjectLifecycleGuard } from '@workbench/canvas-engine/engine';
+import type { LayerExportGuard } from '@workbench/canvas-engine/engine';
 import type { SamSessionError } from '@workbench/canvas-engine/engineStores';
 import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
@@ -21,32 +21,18 @@ const layer: CanvasRasterLayerContractV2 = {
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: -5, y: 7 },
   type: 'raster',
 };
-const guard: CanvasCompositeExportGuard = {
-  bbox: { height: 12, width: 16, x: -5, y: 7 },
-  candidates: [{ cacheVersion: 3, layer, layerId: layer.id }],
-  documentFingerprint: 'document:3',
+const guard: LayerExportGuard = {
+  cacheVersion: 3,
   documentGeneration: 4,
-  participants: [{ cacheVersion: 3, layer, layerId: layer.id }],
+  layer,
+  layerId: layer.id,
   projectId: 'p1',
 };
-const replacementGuard: CanvasCompositeExportGuard = {
+const replacementGuard: LayerExportGuard = {
   ...guard,
-  candidates: [{ cacheVersion: 4, layer, layerId: layer.id }],
-  documentFingerprint: 'document:4',
-  participants: [{ cacheVersion: 4, layer, layerId: layer.id }],
+  cacheVersion: 4,
 };
-const cloneGuard = (source: CanvasCompositeExportGuard = guard): CanvasCompositeExportGuard => ({
-  ...source,
-  bbox: { ...source.bbox },
-  candidates: source.candidates.map((candidate) => ({ ...candidate })),
-  participants: source.participants.map((participant) => ({ ...participant })),
-});
-const lifecycleGuard: SelectObjectLifecycleGuard = {
-  bbox: guard.bbox,
-  documentGeneration: guard.documentGeneration,
-  kind: 'select-object-lifecycle',
-  projectId: guard.projectId,
-};
+const cloneGuard = (source: LayerExportGuard = guard): LayerExportGuard => ({ ...source });
 const rect = { height: 12, width: 16, x: -5, y: 7 };
 const blob = new Blob(['source'], { type: 'image/png' });
 
@@ -59,11 +45,11 @@ const deferred = <T>() => {
 };
 
 const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {}) => {
-  let currentGuard: CanvasCompositeExportGuard | null = guard;
+  let currentGuard: LayerExportGuard | null = guard;
   let controllerSubscriber: (() => void) | null = null;
   const unsubscribe = vi.fn();
   const baseController = createCanvasOperationController({
-    isGuardCurrent: (candidate) => candidate === lifecycleGuard,
+    isGuardCurrent: (candidate) => candidate === guard,
   });
   const controller = {
     ...baseController,
@@ -80,7 +66,7 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
     captureGuard: vi.fn(() => currentGuard),
     controller,
     decodePreview: vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
-    exportComposite: vi.fn(() => Promise.resolve({ blob, guard: currentGuard ?? guard, rect, status: 'ok' as const })),
+    exportSource: vi.fn(() => Promise.resolve({ blob, guard: currentGuard ?? guard, rect, status: 'ok' as const })),
     isGuardCurrent: (candidate) => candidate === currentGuard,
     publishPreview: vi.fn((): undefined => undefined),
     cleanupPreview: vi.fn(),
@@ -92,8 +78,8 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
   };
   const operation = controller.start({
     cleanupPreview: deps.cleanupPreview,
-    guard: lifecycleGuard,
-    identity: { kind: 'select-object', projectId: 'p1' },
+    guard,
+    identity: { kind: 'select-object', layerId: layer.id, projectId: 'p1' },
   });
   if (!operation) {
     throw new Error('expected Select Object operation');
@@ -107,7 +93,7 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
       controllerSubscriber?.();
     },
     session,
-    setCurrentGuard(next: CanvasCompositeExportGuard | null) {
+    setCurrentGuard(next: LayerExportGuard | null) {
       currentGuard = next;
     },
     unsubscribe,
@@ -136,14 +122,14 @@ describe('createSelectObjectSession', () => {
     });
   });
 
-  it('reports phases from the composite, upload, SAM, render, and ready boundaries', async () => {
+  it('reports phases from the source export, upload, SAM, render, and ready boundaries', async () => {
     const harness = createHarness();
     const phases: string[] = [];
     harness.session.subscribe(() => phases.push(harness.session.getSnapshot().status));
 
     await expect(harness.session.process()).resolves.toBe('published');
 
-    expect(phases).toEqual(['preparing-composite', 'uploading', 'processing-sam', 'rendering-preview', 'ready']);
+    expect(phases).toEqual(['preparing-source', 'uploading', 'processing-sam', 'rendering-preview', 'ready']);
   });
 
   it('does not publish a stale request phase after a replacement retry starts', async () => {
@@ -160,7 +146,7 @@ describe('createSelectObjectSession', () => {
     await vi.waitFor(() => expect(harness.session.getSnapshot().status).toBe('uploading'));
 
     harness.setCurrentGuard(replacementGuard);
-    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
+    vi.mocked(harness.deps.exportSource).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
     const newPending = harness.session.process();
     await expect(newPending).resolves.toBe('published');
     const readyIndex = phases.lastIndexOf('ready');
@@ -290,7 +276,7 @@ describe('createSelectObjectSession', () => {
   });
 
   it('maps empty and not-ready sources to typed errors', async () => {
-    const empty = createHarness({ exportComposite: vi.fn(() => Promise.resolve({ status: 'empty' as const })) });
+    const empty = createHarness({ exportSource: vi.fn(() => Promise.resolve({ status: 'empty' as const })) });
     await expect(empty.session.process()).resolves.toBe('error');
     expect(empty.session.getSnapshot().error).toEqual({ code: 'empty' });
 
@@ -328,14 +314,19 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot().error).toEqual({ code: 'unknown', detail: 'legacy failure detail' });
   });
 
-  it('does not close or clear a failed process on cache-only source invalidation', async () => {
+  it('survives source invalidation of other layers but closes when its own layer is invalidated', async () => {
     const harness = createHarness({ runGraph: vi.fn(() => Promise.reject(new Error('graph failed'))) });
     await expect(harness.session.process()).resolves.toBe('error');
 
-    harness.controller.invalidateSource('p1', layer.id);
+    harness.controller.invalidateSource('p1', 'other-layer');
 
     expect(harness.session.getSnapshot()).toMatchObject({ error: { code: 'queue' }, status: 'error' });
     expect(harness.controller.getSnapshot()).toMatchObject({ status: 'active' });
+
+    harness.controller.invalidateSource('p1', layer.id);
+
+    expect(harness.controller.getSnapshot()).toMatchObject({ status: 'idle' });
+    expect(harness.session.getSnapshot()).toMatchObject({ preview: null, sourceGuard: null, status: 'ready' });
   });
 
   it('reuses an uploaded export only while its exact guard remains current', async () => {
@@ -345,13 +336,13 @@ describe('createSelectObjectSession', () => {
     harness.session.update({ input: { prompt: 'dog', type: 'prompt' } });
     await expect(harness.session.process()).resolves.toBe('published');
 
-    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(1);
+    expect(harness.deps.exportSource).toHaveBeenCalledTimes(1);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(1);
     expect(harness.deps.runGraph).toHaveBeenCalledTimes(2);
     expect(harness.session.getSnapshot().sourceGuard).toBe(guard);
 
     harness.setCurrentGuard(replacementGuard);
-    vi.mocked(harness.deps.exportComposite).mockResolvedValue({
+    vi.mocked(harness.deps.exportSource).mockResolvedValue({
       blob,
       guard: replacementGuard,
       rect,
@@ -360,7 +351,7 @@ describe('createSelectObjectSession', () => {
     harness.session.update({ input: { prompt: 'bird', type: 'prompt' } });
     await expect(harness.session.process()).resolves.toBe('published');
 
-    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportSource).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
     expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
   });
@@ -369,9 +360,9 @@ describe('createSelectObjectSession', () => {
     let currentGuard = cloneGuard();
     const harness = createHarness({
       captureGuard: () => currentGuard,
-      exportComposite: vi.fn(() => Promise.resolve({ blob, guard: currentGuard, rect, status: 'ok' as const })),
+      exportSource: vi.fn(() => Promise.resolve({ blob, guard: currentGuard, rect, status: 'ok' as const })),
       isGuardCurrent: (candidate) =>
-        candidate.documentFingerprint === currentGuard.documentFingerprint &&
+        candidate.cacheVersion === currentGuard.cacheVersion &&
         candidate.documentGeneration === currentGuard.documentGeneration,
     });
     harness.session.update({
@@ -390,35 +381,26 @@ describe('createSelectObjectSession', () => {
       expect(harness.session.getSnapshot().sourceGuard).toBe(currentGuard);
     }
 
-    expect(harness.deps.exportComposite).toHaveBeenCalledOnce();
+    expect(harness.deps.exportSource).toHaveBeenCalledOnce();
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce();
     expect(harness.deps.runGraph).toHaveBeenCalledTimes(4);
   });
 
   it.each([
-    ['bbox', { ...cloneGuard(), bbox: { ...guard.bbox, x: guard.bbox.x + 1 }, documentFingerprint: 'bbox:4' }],
-    [
-      'cache participant',
-      {
-        ...cloneGuard(replacementGuard),
-        documentFingerprint: 'cache:4',
-      },
-    ],
+    ['layer reference', { ...cloneGuard(), layer: { ...layer } }],
+    ['cache version', cloneGuard(replacementGuard)],
     [
       'document generation',
       {
         ...cloneGuard(),
-        documentFingerprint: 'document:5',
         documentGeneration: guard.documentGeneration + 1,
       },
     ],
   ] as const)('does not reuse the prepared source after a changed %s guard', async (_label, nextGuard) => {
-    let currentGuard: CanvasCompositeExportGuard = guard;
+    let currentGuard: LayerExportGuard = guard;
     const harness = createHarness({
       captureGuard: () => currentGuard,
-      exportComposite: vi.fn(() =>
-        Promise.resolve({ blob, guard: currentGuard, rect: currentGuard.bbox, status: 'ok' as const })
-      ),
+      exportSource: vi.fn(() => Promise.resolve({ blob, guard: currentGuard, rect, status: 'ok' as const })),
       isGuardCurrent: (candidate) => candidate === currentGuard,
     });
     await expect(harness.session.process()).resolves.toBe('published');
@@ -427,7 +409,7 @@ describe('createSelectObjectSession', () => {
     harness.session.update({ input: { prompt: 'dog', type: 'prompt' } });
     await expect(harness.session.process()).resolves.toBe('published');
 
-    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportSource).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
   });
 
@@ -464,12 +446,12 @@ describe('createSelectObjectSession', () => {
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
 
     harness.setCurrentGuard(replacementGuard);
-    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
+    vi.mocked(harness.deps.exportSource).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
     const newPending = harness.session.process();
 
     expect(newPending).not.toBe(oldPending);
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledTimes(2));
-    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportSource).toHaveBeenCalledTimes(2);
     older.resolve({ height: 12, imageName: 'old.png', origin: 'old', width: 16 });
     await expect(oldPending).resolves.toBe('stale');
     expect(harness.session.process()).toBe(newPending);
@@ -482,23 +464,23 @@ describe('createSelectObjectSession', () => {
   });
 
   it('starts an immediate same-input retry when invalidation aborts an export that ignores its signal', async () => {
-    const oldExport = deferred<Awaited<ReturnType<SelectObjectSessionDeps<string>['exportComposite']>>>();
+    const oldExport = deferred<Awaited<ReturnType<SelectObjectSessionDeps<string>['exportSource']>>>();
     const harness = createHarness({
-      exportComposite: vi
+      exportSource: vi
         .fn()
         .mockImplementationOnce(() => oldExport.promise)
         .mockImplementationOnce(() => Promise.resolve({ blob, guard: replacementGuard, rect, status: 'ok' as const })),
     });
     const oldPending = harness.session.process();
-    await vi.waitFor(() => expect(harness.deps.exportComposite).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(harness.deps.exportSource).toHaveBeenCalledOnce());
 
     harness.setCurrentGuard(replacementGuard);
-    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
+    vi.mocked(harness.deps.exportSource).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
     const newPending = harness.session.process();
 
     expect(newPending).not.toBe(oldPending);
     await expect(newPending).resolves.toBe('published');
-    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportSource).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce();
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
     oldExport.resolve({ blob, guard, rect, status: 'ok' });
@@ -519,12 +501,12 @@ describe('createSelectObjectSession', () => {
     await vi.waitFor(() => expect(harness.deps.uploadIntermediate).toHaveBeenCalledOnce());
 
     harness.setCurrentGuard(replacementGuard);
-    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
+    vi.mocked(harness.deps.exportSource).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
     const newPending = harness.session.process();
 
     expect(newPending).not.toBe(oldPending);
     await expect(newPending).resolves.toBe('published');
-    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportSource).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
     expect(harness.deps.runGraph).toHaveBeenCalledOnce();
     oldUpload.resolve({ height: 12, imageName: 'old-input.png', width: 16 });
@@ -584,10 +566,10 @@ describe('createSelectObjectSession', () => {
     await expect(harness.session.process()).resolves.toBe('published');
 
     harness.setCurrentGuard(replacementGuard);
-    vi.mocked(harness.deps.exportComposite).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
+    vi.mocked(harness.deps.exportSource).mockResolvedValue({ blob, guard: replacementGuard, rect, status: 'ok' });
 
     await expect(harness.session.process()).resolves.toBe('published');
-    expect(harness.deps.exportComposite).toHaveBeenCalledTimes(2);
+    expect(harness.deps.exportSource).toHaveBeenCalledTimes(2);
     expect(harness.deps.uploadIntermediate).toHaveBeenCalledTimes(2);
     expect(harness.deps.runGraph).toHaveBeenCalledTimes(2);
     expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
@@ -601,7 +583,7 @@ describe('createSelectObjectSession', () => {
     await vi.advanceTimersByTimeAsync(500);
     harness.session.update({ input: { prompt: 'second', type: 'prompt' } });
     await vi.advanceTimersByTimeAsync(999);
-    expect(harness.deps.exportComposite).not.toHaveBeenCalled();
+    expect(harness.deps.exportSource).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
 
@@ -721,7 +703,7 @@ describe('createSelectObjectSession', () => {
 
     await expect(harness.session.process()).resolves.toBe('invalid');
     await vi.runAllTimersAsync();
-    expect(harness.deps.exportComposite).not.toHaveBeenCalled();
+    expect(harness.deps.exportSource).not.toHaveBeenCalled();
     expect(harness.deps.runGraph).not.toHaveBeenCalled();
   });
 
@@ -758,9 +740,9 @@ describe('createSelectObjectSession', () => {
           boundary === 'decode'
             ? vi.fn(() => wait.promise as Promise<string>)
             : vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
-        exportComposite:
+        exportSource:
           boundary === 'export'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportComposite']>)
+            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportSource']>)
             : vi.fn(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
         runGraph:
           boundary === 'queue'
@@ -775,7 +757,7 @@ describe('createSelectObjectSession', () => {
       await vi.waitFor(() => {
         const fn =
           boundary === 'export'
-            ? harness.deps.exportComposite
+            ? harness.deps.exportSource
             : boundary === 'upload'
               ? harness.deps.uploadIntermediate
               : boundary === 'queue'
@@ -814,9 +796,9 @@ describe('createSelectObjectSession', () => {
           boundary === 'decode'
             ? vi.fn(() => wait.promise as Promise<string>)
             : vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
-        exportComposite:
+        exportSource:
           boundary === 'export'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportComposite']>)
+            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportSource']>)
             : vi.fn(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
         runGraph:
           boundary === 'queue'
@@ -832,7 +814,7 @@ describe('createSelectObjectSession', () => {
       await vi.waitFor(() => {
         const fn =
           boundary === 'export'
-            ? harness.deps.exportComposite
+            ? harness.deps.exportSource
             : boundary === 'upload'
               ? harness.deps.uploadIntermediate
               : boundary === 'queue'

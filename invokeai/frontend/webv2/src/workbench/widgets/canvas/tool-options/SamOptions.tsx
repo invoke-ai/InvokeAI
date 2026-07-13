@@ -44,7 +44,6 @@ export interface SamPanelViewModel {
   excludeCount: number;
   includeCount: number;
   sourceLabel: string;
-  sourceSummary: string;
 }
 
 const SAM_PROMPT_GUIDANCE_ID = 'sam-prompt-guidance';
@@ -62,7 +61,7 @@ const SAM_ERROR_CLAMP_STYLE: CSSProperties = {
 const SAM_STATUS_TRANSLATION_KEYS: Record<SamSessionSnapshot['status'], string> = {
   committing: 'widgets.layers.selectObject.statusCommitting',
   error: 'widgets.layers.selectObject.statusError',
-  'preparing-composite': 'widgets.layers.selectObject.statusPreparingComposite',
+  'preparing-source': 'widgets.layers.selectObject.statusPreparingSource',
   'processing-sam': 'widgets.layers.selectObject.statusProcessingSam',
   ready: 'widgets.layers.selectObject.statusReady',
   'rendering-preview': 'widgets.layers.selectObject.statusRenderingPreview',
@@ -84,10 +83,16 @@ const SAM_ERROR_TRANSLATION_KEYS: Record<SamSessionErrorCode, string> = {
   upload: 'widgets.layers.selectObject.errorUpload',
 };
 
-const SAVE_TARGETS: readonly SelectObjectSaveTarget[] = ['raster', 'control', 'inpaint_mask', 'regional_guidance'];
+const SAVE_TARGETS: readonly SelectObjectSaveTarget[] = [
+  'selection',
+  'raster',
+  'control',
+  'inpaint_mask',
+  'regional_guidance',
+];
 
 const isSamProcessingStatus = (status: SamSessionSnapshot['status']): boolean =>
-  status === 'preparing-composite' ||
+  status === 'preparing-source' ||
   status === 'uploading' ||
   status === 'processing-sam' ||
   status === 'rendering-preview';
@@ -99,14 +104,12 @@ export const getSamErrorTranslationKey = (code: SamSessionErrorCode): string => 
 
 export const getSamPanelViewModel = (
   session: SamSessionSnapshot,
-  formatSourceSummary: (width: number, height: number) => string,
-  formatSourceLabel: (width: number, height: number) => string
+  formatSourceLabel: (layerName: string, width: number, height: number) => string
 ): SamPanelViewModel => ({
   bboxActive: session.input.type === 'visual' && session.input.bbox !== null,
   excludeCount: session.input.type === 'visual' ? session.input.excludePoints.length : 0,
   includeCount: session.input.type === 'visual' ? session.input.includePoints.length : 0,
-  sourceLabel: formatSourceLabel(session.sourceRect.width, session.sourceRect.height),
-  sourceSummary: formatSourceSummary(session.sourceRect.width, session.sourceRect.height),
+  sourceLabel: formatSourceLabel(session.layerName, session.sourceRect.width, session.sourceRect.height),
 });
 
 /**
@@ -166,7 +169,7 @@ export const SamStatusSlot = ({
 };
 
 export const getSamActionHandlers = (engine: ToolOptionsComponentProps['engine']) => ({
-  apply: () => void engine.applySelectObjectSession(),
+  apply: () => void engine.applySelectObjectSession(makeImageDurable),
   cancel: () => engine.cancelSelectObjectSession(),
   process: () => void engine.processSelectObjectSession(),
   reset: () => engine.resetSelectObjectSession(),
@@ -455,10 +458,13 @@ export const SamOptionsBar = ({
 }) => {
   const { t } = useTranslation();
   const eligibility = getSamActionEligibility(session, isExternalInteractionLocked);
-  const viewModel = getSamPanelViewModel(
-    session,
-    (width, height) => t('widgets.layers.selectObject.sourceDimensions', { height, width }),
-    (width, height) => t('widgets.layers.selectObject.sourceDimensionsLabel', { height, width })
+  const viewModel = getSamPanelViewModel(session, (layerName, width, height) =>
+    t('widgets.layers.selectObject.sourceLayerLabel', {
+      height,
+      name: layerName,
+      type: t(`widgets.layers.selectObject.saveAs_${session.layerType}`),
+      width,
+    })
   );
   const actions = getSamActionHandlers(engine);
   const isProcessing = isSamProcessingStatus(session.status);

@@ -221,10 +221,14 @@ export type CommitGeneratedImageResult =
   | { status: 'failed'; message: string };
 
 export interface CommitGeneratedImageOptions {
-  guard: LayerExportGuard | CanvasCompositeExportGuard;
+  guard: LayerExportGuard;
   image: CanvasImageRef;
   origin: Vec2;
   target: GeneratedImageTarget;
+  /** Overrides the undo-history label of the `replace` target. */
+  historyLabel?: string;
+  /** Overrides the new layer's name for the copy targets. */
+  copyLayerName?: string;
   signal?: AbortSignal;
 }
 
@@ -236,7 +240,7 @@ export type ReplaceSelectionFromImageResult =
 export type MaskImageResultTarget = 'inpaint_mask' | 'regional_guidance';
 
 export interface CommitMaskImageResultOptions {
-  guard: LayerExportGuard | CanvasCompositeExportGuard;
+  guard: LayerExportGuard;
   image: CanvasImageRef;
   rect: Rect;
   target: MaskImageResultTarget;
@@ -270,31 +274,6 @@ export interface LayerExportGuard {
   readonly cacheVersion: number;
   readonly documentGeneration: number;
 }
-
-export interface CanvasCompositeExportGuard {
-  readonly projectId: string;
-  readonly bbox: Rect;
-  readonly documentGeneration: number;
-  readonly documentFingerprint: string;
-  readonly candidates: readonly {
-    readonly layerId: string;
-    readonly layer: Extract<CanvasLayerContract, { type: 'raster' | 'control' }>;
-    readonly cacheVersion: number;
-  }[];
-  readonly participants: readonly CanvasCompositeExportGuard['candidates'][number][];
-}
-
-/** Stable Select Object chrome lifetime, independent of mutable raster-cache versions. */
-export interface SelectObjectLifecycleGuard {
-  readonly kind: 'select-object-lifecycle';
-  readonly projectId: string;
-  readonly bbox: Rect;
-  readonly documentGeneration: number;
-}
-
-export type ExportCanvasCompositeBlobResult =
-  | { status: 'ok'; blob: Blob; rect: Rect; guard: CanvasCompositeExportGuard }
-  | { status: 'empty' | 'not-ready' };
 
 export type ExportLayerPixelsResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard }
@@ -409,8 +388,11 @@ export type CanvasOperationActionResult = 'completed' | 'blocked' | 'stale';
 export type FilterCommitOperationResult = 'committed' | 'blocked' | 'stale';
 export type CanvasOperationMutationResult = 'updated' | 'blocked' | 'stale';
 
-export type SelectObjectSaveTarget = 'raster' | 'control' | MaskImageResultTarget;
-export type SaveSelectObjectSessionResult = CommitGeneratedImageResult | CommitMaskImageResult;
+export type SelectObjectSaveTarget = 'selection' | 'raster' | 'control' | MaskImageResultTarget;
+export type SaveSelectObjectSessionResult =
+  | CommitGeneratedImageResult
+  | CommitMaskImageResult
+  | ReplaceSelectionFromImageResult;
 
 export interface SelectObjectSessionUpdate {
   input?: SamInput;
@@ -424,19 +406,12 @@ export interface SelectObjectSessionUpdate {
 
 interface SelectObjectCommitOwner {
   controller: AbortController;
-  guard: CanvasCompositeExportGuard;
+  guard: LayerExportGuard;
   inputHash: string;
   preview: SelectObjectSessionPreview<RasterSurface>;
   previewId: number;
   session: SelectObjectSession<RasterSurface>;
   token: number;
-}
-
-interface SelectObjectExpectedMutation {
-  actionType: 'addCanvasLayer';
-  layer: CanvasLayerContract;
-  layerId: string;
-  owner: SelectObjectCommitOwner;
 }
 
 /** The public engine handle. */
@@ -456,8 +431,8 @@ export interface CanvasEngine {
   resize(cssWidth: number, cssHeight: number, dpr: number): void;
   /** Activates a tool (deactivating the previous one). */
   setTool(toolId: ToolId, opts?: { temporary?: boolean }): void;
-  /** Starts document-level Select Object over the current generation bbox. */
-  startSelectObject(): StartSelectObjectSessionResult;
+  /** Starts one engine-owned guarded Select Object session for a raster or control layer. */
+  startSelectObject(layerId: string): StartSelectObjectSessionResult;
   /** Starts one engine-owned guarded filter operation for a raster or control layer. */
   startFilterOperation(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
   updateFilterOperation(draft: LayerFilterSettings): CanvasOperationMutationResult;
@@ -470,7 +445,7 @@ export interface CanvasEngine {
   cancelFilterOperation(): void;
   updateSelectObjectSession(changes: SelectObjectSessionUpdate): CanvasOperationMutationResult;
   processSelectObjectSession(): Promise<SelectObjectSessionProcessResult>;
-  applySelectObjectSession(): Promise<ReplaceSelectionFromImageResult>;
+  applySelectObjectSession(makeImageDurable: (imageName: string) => Promise<void>): Promise<CommitGeneratedImageResult>;
   saveSelectObjectSession(
     target: SelectObjectSaveTarget,
     makeImageDurable: (imageName: string) => Promise<void>
@@ -944,13 +919,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   let selectObjectSession: SelectObjectSession<RasterSurface> | null = null;
   let selectObjectUnsubscribe: (() => void) | null = null;
   let selectObjectControllerUnsubscribe: (() => void) | null = null;
-  let selectObjectLifecycleGuard: SelectObjectLifecycleGuard | null = null;
-  let selectObjectGuard: CanvasCompositeExportGuard | null = null;
+  let selectObjectStartGuard: LayerExportGuard | null = null;
+  let selectObjectGuard: LayerExportGuard | null = null;
   let selectObjectSourceRect: Rect | null = null;
   let selectObjectPointLabel: SamPointLabel = 'include';
   let selectObjectCommitOwner: SelectObjectCommitOwner | null = null;
   let selectObjectCommitToken = 0;
-  let selectObjectExpectedMutation: SelectObjectExpectedMutation | null = null;
   let samPreview: SelectObjectSessionPreview<RasterSurface> | null = null;
   let filterSession: FilterOperationSession | null = null;
   let filterUnsubscribe: (() => void) | null = null;
@@ -1613,211 +1587,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return isLayerExportGuardCurrent(guard) ? guard : null;
   };
 
-  const planCanvasComposite = (document: CanvasDocumentContractV2) => {
-    const candidates: CanvasCompositeExportGuard['candidates'][number][] = [];
-    const participants: CanvasCompositeExportGuard['participants'][number][] = [];
-    const pending: Extract<CanvasLayerContract, { type: 'raster' | 'control' }>[] = [];
-    for (const layer of document.layers) {
-      const source = renderableSourceOf(layer);
-      if (!layer.isEnabled || (layer.type !== 'raster' && layer.type !== 'control') || !source) {
-        continue;
-      }
-      const entry = layerCache.get(layer.id);
-      const candidate = { cacheVersion: layerCache.version(layer.id), layer, layerId: layer.id };
-      candidates.push(candidate);
-      if (!entry || entry.stale || layerRasterizationJobs.has(layer.id)) {
-        pending.push(layer);
-        continue;
-      }
-      const rect = entry.rect;
-      if (
-        isEmpty(rect) ||
-        intersect(
-          document.bbox,
-          roundOut(
-            transformBounds(
-              fromTRS(
-                { x: layer.transform.x, y: layer.transform.y },
-                layer.transform.rotation,
-                layer.transform.scaleX,
-                layer.transform.scaleY
-              ),
-              rect
-            )
-          )
-        ) === null
-      ) {
-        continue;
-      }
-      participants.push(candidate);
-    }
-    return { candidates, participants, pending };
-  };
-
-  const compositeFingerprint = (
-    bbox: Rect,
-    candidates: CanvasCompositeExportGuard['candidates'],
-    participants: CanvasCompositeExportGuard['participants']
-  ): string =>
-    JSON.stringify([
-      bbox.x,
-      bbox.y,
-      bbox.width,
-      bbox.height,
-      candidates.map(({ cacheVersion, layer }) => [layer, cacheVersion]),
-      participants.map(({ layerId }) => layerId),
-    ]);
-
-  const captureCanvasCompositeExportGuard = (): CanvasCompositeExportGuard | null => {
-    const document = mirror.getDocument();
-    if (!document || document.bbox.width <= 0 || document.bbox.height <= 0) {
-      return null;
-    }
-    const bbox = { ...document.bbox };
-    const { candidates, participants } = planCanvasComposite(document);
-    return {
-      bbox,
-      candidates,
-      documentFingerprint: compositeFingerprint(bbox, candidates, participants),
-      documentGeneration: rasterDocumentGeneration,
-      participants,
-      projectId,
-    };
-  };
-
-  const isCanvasCompositeExportGuardCurrent = (guard: CanvasCompositeExportGuard): boolean => {
-    if (
-      disposed ||
-      guard.projectId !== projectId ||
-      store.getState().activeProjectId !== projectId ||
-      guard.documentGeneration !== rasterDocumentGeneration
-    ) {
-      return false;
-    }
-    const document = mirror.getDocument();
-    if (
-      !document ||
-      document.bbox.x !== guard.bbox.x ||
-      document.bbox.y !== guard.bbox.y ||
-      document.bbox.width !== guard.bbox.width ||
-      document.bbox.height !== guard.bbox.height
-    ) {
-      return false;
-    }
-    const { candidates, participants } = planCanvasComposite(document);
-    return (
-      candidates.length === guard.candidates.length &&
-      candidates.every(
-        (candidate, index) =>
-          candidate.layer === guard.candidates[index]?.layer &&
-          candidate.cacheVersion === guard.candidates[index]?.cacheVersion
-      ) &&
-      participants.length === guard.participants.length &&
-      participants.every(
-        (participant, index) =>
-          participant.layer === guard.participants[index]?.layer &&
-          participant.cacheVersion === guard.participants[index]?.cacheVersion
-      ) &&
-      compositeFingerprint(guard.bbox, candidates, participants) === guard.documentFingerprint
-    );
-  };
-
-  const captureSelectObjectLifecycleGuard = (): SelectObjectLifecycleGuard | null => {
-    const document = mirror.getDocument();
-    if (!document || document.bbox.width <= 0 || document.bbox.height <= 0) {
-      return null;
-    }
-    return {
-      bbox: { ...document.bbox },
-      documentGeneration: rasterDocumentGeneration,
-      kind: 'select-object-lifecycle',
-      projectId,
-    };
-  };
-
-  const isSelectObjectLifecycleGuardCurrent = (guard: SelectObjectLifecycleGuard): boolean => {
-    const document = mirror.getDocument();
-    return (
-      !disposed &&
-      guard.projectId === projectId &&
-      store.getState().activeProjectId === projectId &&
-      guard.documentGeneration === rasterDocumentGeneration &&
-      document !== null &&
-      document.bbox.x === guard.bbox.x &&
-      document.bbox.y === guard.bbox.y &&
-      document.bbox.width === guard.bbox.width &&
-      document.bbox.height === guard.bbox.height
-    );
-  };
-
-  const exportCanvasCompositeBlob = async (): Promise<ExportCanvasCompositeBlobResult> => {
-    const guard = captureCanvasCompositeExportGuard();
-    if (!guard || !isCanvasCompositeExportGuardCurrent(guard)) {
-      return { status: 'not-ready' };
-    }
-    const document = mirror.getDocument();
-    if (!document) {
-      return { status: 'not-ready' };
-    }
-    const { pending } = planCanvasComposite(document);
-    if (pending.length > 0) {
-      await Promise.all(pending.map((layer) => getOrStartLayerRasterization(layer, document)));
-      return { status: 'not-ready' };
-    }
-    let hasContent = false;
-    for (const participant of guard.participants) {
-      const entry = layerCache.get(participant.layerId);
-      if (!entry || entry.stale || isCurrentRasterizationJob(participant.layer)) {
-        return { status: 'not-ready' };
-      }
-      if (
-        !isEmpty(entry.rect) &&
-        intersect(
-          guard.bbox,
-          roundOut(
-            transformBounds(
-              fromTRS(
-                { x: participant.layer.transform.x, y: participant.layer.transform.y },
-                participant.layer.transform.rotation,
-                participant.layer.transform.scaleX,
-                participant.layer.transform.scaleY
-              ),
-              entry.rect
-            )
-          )
-        ) !== null
-      ) {
-        hasContent = true;
-      }
-    }
-    if (!hasContent) {
-      return { status: 'empty' };
-    }
-    const surface = backend.createSurface(guard.bbox.width, guard.bbox.height);
-    const participantIds = new Set(guard.participants.map((participant) => participant.layerId));
-    compositeDocument(
-      surface,
-      { ...document, layers: document.layers.filter((layer) => participantIds.has(layer.id)) },
-      layerCache,
-      { a: 1, b: 0, c: 0, d: 1, e: -guard.bbox.x, f: -guard.bbox.y },
-      { adjustedSurface: getAdjustedSurface, backend, checkerboardTile: null }
-    );
-    if (!isCanvasCompositeExportGuardCurrent(guard)) {
-      return { status: 'not-ready' };
-    }
-    const blob = await backend.encodeSurface(surface, 'image/png');
-    return isCanvasCompositeExportGuardCurrent(guard)
-      ? { blob, guard, rect: { ...guard.bbox }, status: 'ok' }
-      : { status: 'not-ready' };
-  };
-
   canvasOperations = createCanvasOperationController({
-    isGuardCurrent: (guard) => {
-      if ('kind' in guard) {
-        return isSelectObjectLifecycleGuardCurrent(guard);
-      }
-      return isLayerExportGuardCurrent(guard);
-    },
+    isGuardCurrent: isLayerExportGuardCurrent,
   });
   const documentEditOwner = Symbol('canvas-operation-document-edit-owner');
   type DocumentEditPermit = { epoch: number; owner?: symbol };
@@ -2561,9 +2332,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       ensureLayerCaches(doc);
       const stagedPlacement = stagedPreview?.placement;
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
-      const isolatedIds = isolatedGuard
-        ? new Set(isolatedGuard.participants.map((participant) => participant.layerId))
-        : null;
+      const isolatedIds = isolatedGuard ? new Set([isolatedGuard.layerId]) : null;
       const compositeDoc = isolatedIds
         ? { ...doc, layers: doc.layers.filter((layer) => isolatedIds.has(layer.id)) }
         : doc;
@@ -2581,7 +2350,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           !isolatedGuard && filterPreviews.size > 0
             ? new Map(Array.from(filterPreviews, ([id, preview]) => [id, preview]))
             : null,
-        clipRect: isolatedGuard?.bbox ?? null,
+        clipRect: isolatedGuard && samPreview ? samPreview.rect : null,
         // Feed the cached checkerboard tile only while the toggle is ON; passing
         // `null` renders transparent documents without a checkerboard.
         checkerboardTile: stores.checkerboard.get() ? getCheckerboardTile() : null,
@@ -2674,8 +2443,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     // preview is drawn in the COMPOSITE at the current bbox origin, so it must
     // recomposite to follow the bbox. Explicitly placed candidates do not.
     onBboxChanged: () => {
-      canvasOperations.invalidateComposite(projectId);
-      cancelSelectObjectSession();
       scheduler.invalidate(stagedPreview && !stagedPreview.placement ? { all: true } : { overlay: true });
     },
     onDocumentReplaced: () => {
@@ -2755,51 +2522,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       scheduler.invalidate({ all: true });
     },
     onLayerOrderChanged: () => {
-      canvasOperations.invalidateComposite(projectId);
-      cancelSelectObjectSession();
       scheduler.invalidate({ all: true });
     },
     onLayersChanged: (ids, sourceChangedIds) => {
       const doc = mirror.getDocument();
-      const expected = selectObjectExpectedMutation;
-      const isExactExpectedMutation =
-        expected !== null &&
-        expected.actionType === 'addCanvasLayer' &&
-        selectObjectCommitOwner === expected.owner &&
-        ids.length === 1 &&
-        ids[0] === expected.layerId &&
-        sourceChangedIds.length === 1 &&
-        sourceChangedIds[0] === expected.layerId &&
-        doc?.layers.find((layer) => layer.id === expected.layerId) === expected.layer;
-      if (expected && !isExactExpectedMutation) {
-        canvasOperations.invalidateComposite(projectId);
-        cancelSelectObjectSession();
+      for (const id of sourceChangedIds) {
+        canvasOperations.invalidateSource(projectId, id);
       }
-      if (!isExactExpectedMutation) {
-        for (const id of sourceChangedIds) {
-          canvasOperations.invalidateSource(projectId, id);
-        }
-        for (const id of ids) {
-          canvasOperations.invalidateLayer(projectId, id);
-        }
-      }
-      if (!isExactExpectedMutation && selectObjectGuard && !isCanvasCompositeExportGuardCurrent(selectObjectGuard)) {
-        cancelSelectObjectSession();
-      }
-      if (
-        !isExactExpectedMutation &&
-        selectObjectGuard &&
-        ids.some((id) => {
-          const layer = doc?.layers.find((candidate) => candidate.id === id);
-          return (
-            !!layer &&
-            (layer.type === 'raster' || layer.type === 'control') &&
-            !selectObjectGuard?.candidates.some((candidate) => candidate.layerId === id)
-          );
-        })
-      ) {
-        canvasOperations.invalidateComposite(projectId);
-        cancelSelectObjectSession();
+      for (const id of ids) {
+        canvasOperations.invalidateLayer(projectId, id);
       }
       const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
       const sourceChanged = new Set(sourceChangedIds);
@@ -3104,7 +2835,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const syncSelectObjectStore = (): void => {
     const session = selectObjectSession;
     const sourceRect = selectObjectSourceRect;
-    if (!session || !sourceRect) {
+    const startGuard = selectObjectStartGuard;
+    if (!session || !sourceRect || !startGuard) {
       stores.samSession.set(null);
       return;
     }
@@ -3114,6 +2846,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       autoProcess: state.autoProcess,
       error: state.error,
       hasPreview: state.preview !== null,
+      layerName: startGuard.layer.name,
+      layerType: startGuard.layer.type === 'control' ? 'control' : 'raster',
       input:
         state.input.type === 'visual'
           ? {
@@ -3137,7 +2871,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     selectObjectCommitToken += 1;
     const owner = selectObjectCommitOwner;
     selectObjectCommitOwner = null;
-    selectObjectExpectedMutation = null;
     owner?.controller.abort();
   };
 
@@ -3148,10 +2881,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
 
   const isSelectObjectCommitOwnerCurrent = (owner: SelectObjectCommitOwner): boolean => {
     const state = owner.session.getSnapshot();
-    const expected = selectObjectExpectedMutation;
-    const expectedMutationApplied =
-      expected?.owner === owner &&
-      mirror.getDocument()?.layers.find((layer) => layer.id === expected.layerId) === expected.layer;
     return (
       selectObjectCommitOwner === owner &&
       selectObjectCommitToken === owner.token &&
@@ -3160,7 +2889,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       state.preview?.previewId === owner.previewId &&
       state.preview.inputHash === owner.inputHash &&
       owner.preview.inputHash === owner.inputHash &&
-      (expectedMutationApplied || isCanvasCompositeExportGuardCurrent(owner.guard)) &&
+      isLayerExportGuardCurrent(owner.guard) &&
       !owner.controller.signal.aborted
     );
   };
@@ -3181,7 +2910,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       session,
       token: ++selectObjectCommitToken,
     };
-    selectObjectExpectedMutation = null;
     selectObjectCommitOwner = owner;
     syncSelectObjectStore();
     return owner;
@@ -3192,9 +2920,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return false;
     }
     selectObjectCommitOwner = null;
-    if (selectObjectExpectedMutation?.owner === owner) {
-      selectObjectExpectedMutation = null;
-    }
     syncSelectObjectStore();
     return true;
   };
@@ -3263,7 +2988,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     selectObjectUnsubscribe = null;
     selectObjectControllerUnsubscribe?.();
     selectObjectControllerUnsubscribe = null;
-    selectObjectLifecycleGuard = null;
+    selectObjectStartGuard = null;
     selectObjectGuard = null;
     selectObjectSourceRect = null;
     selectObjectPointLabel = 'include';
@@ -3278,31 +3003,61 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     return true;
   };
 
-  const startSelectObject = (): StartSelectObjectSessionResult => {
+  const startSelectObject = (layerId: string): StartSelectObjectSessionResult => {
     if (interactionLocked) {
       return 'locked';
     }
     const doc = mirror.getDocument();
-    if (!doc) {
+    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
+    if (!doc || !layer) {
       return 'missing';
     }
-    const lifecycleGuard = captureSelectObjectLifecycleGuard();
-    if (!lifecycleGuard) {
+    if (layer.type !== 'raster' && layer.type !== 'control') {
+      return 'unsupported';
+    }
+    if (!layer.isEnabled) {
+      return 'disabled';
+    }
+    if (layer.isLocked) {
+      return 'locked';
+    }
+    const guard = captureCurrentLayerExportGuard(layer.id);
+    const entry = layerCache.get(layer.id);
+    if (!guard || !entry) {
+      return 'not-ready';
+    }
+    // The session works in the layer's baked world rect (transform applied), the
+    // same space `exportBakedLayerBlob` renders the SAM source image into.
+    const sourceRect = roundOut(
+      transformBounds(
+        fromTRS(
+          { x: layer.transform.x, y: layer.transform.y },
+          layer.transform.rotation,
+          layer.transform.scaleX,
+          layer.transform.scaleY
+        ),
+        entry.rect
+      )
+    );
+    if (isEmpty(sourceRect)) {
       return 'not-ready';
     }
 
     clearOwnedFilterSession();
     clearOwnedSelectObjectSession();
-    selectObjectLifecycleGuard = lifecycleGuard;
+    selectObjectStartGuard = guard;
     selectObjectGuard = null;
-    selectObjectSourceRect = { ...lifecycleGuard.bbox };
+    selectObjectSourceRect = sourceRect;
+    if (doc.selectedLayerId !== layer.id) {
+      store.dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+    }
     const operation = canvasOperations.start({
       cleanupPreview: clearSamPreview,
-      guard: lifecycleGuard,
-      identity: { kind: 'select-object', projectId },
+      guard,
+      identity: { kind: 'select-object', layerId: layer.id, projectId },
     });
     if (!operation) {
-      selectObjectLifecycleGuard = null;
+      selectObjectStartGuard = null;
       selectObjectGuard = null;
       selectObjectSourceRect = null;
       return 'not-ready';
@@ -3310,12 +3065,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     const queueDeps = opts.selectObjectDeps;
     selectObjectSession = createSelectObjectSession({
       deps: {
-        captureGuard: captureCanvasCompositeExportGuard,
+        captureGuard: () => captureCurrentLayerExportGuard(layer.id),
         cleanupPreview: clearSamPreview,
         controller: canvasOperations,
         decodePreview: decodeSelectObjectPreview,
-        exportComposite: exportCanvasCompositeBlob,
-        isGuardCurrent: isCanvasCompositeExportGuardCurrent,
+        exportSource: () => exportBakedLayerBlob(layer.id, { includeDisabled: true }),
+        isGuardCurrent: isLayerExportGuardCurrent,
         publishPreview: (preview) => {
           selectObjectGuard = preview.guard;
           const isolationChanged = samPreview?.isolated !== preview.isolated;
@@ -3413,10 +3168,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     ) {
       return null;
     }
-    return isCanvasCompositeExportGuardCurrent(preview.guard) ? preview : null;
+    return isLayerExportGuardCurrent(preview.guard) ? preview : null;
   };
 
-  const applySelectObjectSession = async (): Promise<ReplaceSelectionFromImageResult> => {
+  const applySelectObjectSession = async (
+    makeImageDurable: (imageName: string) => Promise<void>
+  ): Promise<CommitGeneratedImageResult> => {
     if (interactionLocked) {
       return { status: 'locked' };
     }
@@ -3437,17 +3194,46 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       invalidateSelectObjectCommit();
       return { status: 'locked' };
     }
-    const result = await replaceSelectionFromImage(
-      preview.guard,
-      preview.image,
-      preview.rect,
-      owner.controller.signal,
-      documentEditOwner
-    );
+    try {
+      await makeImageDurable(preview.image.imageName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (finishSelectObjectCommit(owner)) {
+        owner.session.reportError({ code: 'unknown', detail: message });
+      }
+      return { message, status: 'failed' };
+    }
+    if (!isSelectObjectCommitOwnerCurrent(owner)) {
+      return interactionLocked ? { status: 'locked' } : { status: 'stale' };
+    }
+    if (interactionLocked) {
+      invalidateSelectObjectCommit();
+      return { status: 'locked' };
+    }
+    let result: CommitGeneratedImageResult;
+    try {
+      result = await commitGeneratedImageResult(
+        {
+          guard: preview.guard,
+          historyLabel: 'Replace layer with selected object',
+          image: preview.image,
+          origin: { x: preview.rect.x, y: preview.rect.y },
+          signal: owner.controller.signal,
+          target: 'replace',
+        },
+        documentEditOwner
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (finishSelectObjectCommit(owner)) {
+        owner.session.reportError({ code: 'unknown', detail: message });
+      }
+      return { message, status: 'failed' };
+    }
     if (!isSelectObjectCommitOwnerCurrent(owner)) {
       return result;
     }
-    if (result.status === 'selected') {
+    if (result.status === 'committed') {
       if (!clearOwnedSelectObjectSession(owner)) {
         return result;
       }
@@ -3494,6 +3280,41 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       invalidateSelectObjectCommit();
       return { status: 'locked' };
     }
+    if (target === 'selection') {
+      // The mask pixels are copied out of the intermediate image synchronously,
+      // so this is the one target that does not need a durable image.
+      const result = await replaceSelectionFromImage(
+        preview.guard,
+        preview.image,
+        preview.rect,
+        owner.controller.signal,
+        documentEditOwner
+      );
+      if (!isSelectObjectCommitOwnerCurrent(owner)) {
+        return result;
+      }
+      if (result.status === 'selected') {
+        if (!clearOwnedSelectObjectSession(owner)) {
+          return result;
+        }
+        if (selectObjectSession === null && activeToolId === 'sam') {
+          setTool('view');
+        }
+      } else {
+        if (!finishSelectObjectCommit(owner)) {
+          return result;
+        }
+        owner.session.reportError(
+          result.status === 'locked'
+            ? { code: 'locked' }
+            : {
+                code: 'unknown',
+                detail: result.status === 'failed' ? result.message : `Select Object save is ${result.status}.`,
+              }
+        );
+      }
+      return result;
+    }
     try {
       await makeImageDurable(preview.image.imageName);
     } catch (error) {
@@ -3516,6 +3337,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         target === 'raster' || target === 'control'
           ? await commitGeneratedImageResult(
               {
+                copyLayerName: target === 'raster' ? 'Segmented Object' : 'Segmented Object Control',
                 guard: preview.guard,
                 image: preview.image,
                 origin: { x: preview.rect.x, y: preview.rect.y },
@@ -3545,12 +3367,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return result;
     }
     if (result.status === 'committed') {
-      if (!clearOwnedSelectObjectSession(owner)) {
-        return result;
-      }
-      if (selectObjectSession === null && activeToolId === 'sam') {
-        setTool('view');
-      }
+      // Save As keeps the session open (legacy parity) — only Apply, the
+      // Selection target, and Cancel end it. The preview and inputs survive so
+      // the same selection can be saved to multiple targets.
+      finishSelectObjectCommit(owner);
     } else {
       if (!finishSelectObjectCommit(owner)) {
         return result;
@@ -3572,15 +3392,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return 'blocked';
     }
     const session = selectObjectSession;
-    const lifecycleGuard = selectObjectLifecycleGuard;
+    const startGuard = selectObjectStartGuard;
     const operation = canvasOperations.getSnapshot();
     if (
       !session ||
-      !lifecycleGuard ||
-      !isSelectObjectLifecycleGuardCurrent(lifecycleGuard) ||
+      !startGuard ||
+      !isLayerExportGuardCurrent(startGuard) ||
       operation.status !== 'active' ||
       operation.identity.kind !== 'select-object' ||
-      operation.identity.projectId !== projectId
+      operation.identity.projectId !== projectId ||
+      operation.identity.layerId !== startGuard.layerId
     ) {
       return 'stale';
     }
@@ -4320,7 +4141,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const replaceSelectionFromImage = async (
-    guard: LayerExportGuard | CanvasCompositeExportGuard,
+    guard: LayerExportGuard,
     image: CanvasImageRef,
     rect: Rect,
     signal?: AbortSignal,
@@ -4369,22 +4190,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (!document) {
         return { status: 'missing' };
       }
-      if ('layerId' in guard) {
-        const liveLayer = document.layers.find((candidate) => candidate.id === guard.layerId);
-        if (!liveLayer) {
-          return { status: 'missing' };
-        }
-        if (liveLayer.isLocked) {
-          return { status: 'locked' };
-        }
-        if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
-          return { status: 'unsupported' };
-        }
+      const liveLayer = document.layers.find((candidate) => candidate.id === guard.layerId);
+      if (!liveLayer) {
+        return { status: 'missing' };
+      }
+      if (liveLayer.isLocked) {
+        return { status: 'locked' };
+      }
+      if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
+        return { status: 'unsupported' };
       }
       if (!isDocumentEditPermitCurrent(permit) || pipeline.isGestureActive()) {
         return { status: 'busy' };
       }
-      if (!('participants' in guard ? isCanvasCompositeExportGuardCurrent(guard) : isLayerExportGuardCurrent(guard))) {
+      if (!isLayerExportGuardCurrent(guard)) {
         return { status: 'stale' };
       }
       if (signal?.aborted) {
@@ -4418,29 +4237,21 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     if (!document) {
       return Promise.resolve({ status: 'missing' });
     }
-    let sourceIndex = 0;
-    if ('layerId' in options.guard) {
-      const layerId = options.guard.layerId;
-      const liveLayer = document.layers.find((candidate) => candidate.id === layerId);
-      if (!liveLayer) {
-        return Promise.resolve({ status: 'missing' });
-      }
-      if (liveLayer.isLocked) {
-        return Promise.resolve({ status: 'locked' });
-      }
-      if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
-        return Promise.resolve({ status: 'unsupported' });
-      }
-      sourceIndex = document.layers.findIndex((candidate) => candidate.id === liveLayer.id);
+    const liveLayer = document.layers.find((candidate) => candidate.id === options.guard.layerId);
+    if (!liveLayer) {
+      return Promise.resolve({ status: 'missing' });
     }
+    if (liveLayer.isLocked) {
+      return Promise.resolve({ status: 'locked' });
+    }
+    if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
+      return Promise.resolve({ status: 'unsupported' });
+    }
+    const sourceIndex = document.layers.findIndex((candidate) => candidate.id === liveLayer.id);
     if (pipeline.isGestureActive()) {
       return Promise.resolve({ status: 'busy' });
     }
-    if (
-      !('participants' in options.guard
-        ? isCanvasCompositeExportGuardCurrent(options.guard)
-        : isLayerExportGuardCurrent(options.guard))
-    ) {
+    if (!isLayerExportGuardCurrent(options.guard)) {
       return Promise.resolve({ status: 'stale' });
     }
     if (options.signal?.aborted) {
@@ -4482,14 +4293,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       );
 
     endNudgeBurst();
-    if (owner === documentEditOwner && selectObjectCommitOwner) {
-      selectObjectExpectedMutation = {
-        actionType: 'addCanvasLayer',
-        layer,
-        layerId,
-        owner: selectObjectCommitOwner,
-      };
-    }
     apply();
     history.push({
       bytes: 256,
@@ -4764,7 +4567,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     const validateGuard = ():
       | {
           document: CanvasDocumentContractV2;
-          liveLayer: Extract<CanvasLayerContract, { type: 'raster' | 'control' }> | null;
+          liveLayer: Extract<CanvasLayerContract, { type: 'raster' | 'control' }>;
         }
       | { result: CommitGeneratedImageResult } => {
       if (!isDocumentEditPermitCurrent(permit)) {
@@ -4774,29 +4577,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (!document) {
         return { result: { status: 'missing' } };
       }
-      let liveLayer: Extract<CanvasLayerContract, { type: 'raster' | 'control' }> | null = null;
-      if ('layerId' in options.guard) {
-        const layerId = options.guard.layerId;
-        const candidate = document.layers.find((layer) => layer.id === layerId);
-        if (!candidate) {
-          return { result: { status: 'missing' } };
-        }
-        if (candidate.isLocked) {
-          return { result: { status: 'locked' } };
-        }
-        if (candidate.type !== 'raster' && candidate.type !== 'control') {
-          return { result: { status: 'unsupported' } };
-        }
-        liveLayer = candidate;
+      const liveLayer = document.layers.find((layer) => layer.id === options.guard.layerId);
+      if (!liveLayer) {
+        return { result: { status: 'missing' } };
+      }
+      if (liveLayer.isLocked) {
+        return { result: { status: 'locked' } };
+      }
+      if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
+        return { result: { status: 'unsupported' } };
       }
       if (pipeline.isGestureActive()) {
         return { result: { status: 'busy' } };
       }
-      if (
-        !('participants' in options.guard
-          ? isCanvasCompositeExportGuardCurrent(options.guard)
-          : isLayerExportGuardCurrent(options.guard))
-      ) {
+      if (!isLayerExportGuardCurrent(options.guard)) {
         return { result: { status: 'stale' } };
       }
       return { document, liveLayer };
@@ -4888,9 +4682,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       };
 
       if (options.target === 'replace') {
-        if (!liveLayer) {
-          return { status: 'unsupported' };
-        }
         const beforePixels = captureLayerCache(liveLayer, document);
         if (!beforePixels || beforePixels === 'not-ready') {
           return { status: 'stale' };
@@ -4925,7 +4716,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
             beforePixels.rect.width * beforePixels.rect.height * 4 +
             afterPixels.rect.width * afterPixels.rect.height * 4 +
             256,
-          label: 'Replace layer with workflow result',
+          label: options.historyLabel ?? 'Replace layer with workflow result',
           redo: () => applySnapshot(after, afterPixels, { discardPersistence: true, persist: false }),
           replayFailureAtomic: true,
           undo: () =>
@@ -4937,7 +4728,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         return { layerId: liveLayer.id, status: 'committed' };
       }
 
-      const sourceIndex = liveLayer ? document.layers.findIndex((candidate) => candidate.id === liveLayer.id) : 0;
+      const sourceIndex = document.layers.findIndex((candidate) => candidate.id === liveLayer.id);
       if (sourceIndex < 0) {
         return { status: 'missing' };
       }
@@ -4947,9 +4738,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         options.target === 'copy-control'
           ? {
               ...createControlLayer(
-                liveLayer
-                  ? nextControlLayerName(document.layers.map((layer) => layer.name))
-                  : 'Segmented Object Control',
+                options.copyLayerName ?? nextControlLayerName(document.layers.map((layer) => layer.name)),
                 layerId,
                 getMainModelBase()
               ),
@@ -4961,7 +4750,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
               id: layerId,
               isEnabled: true,
               isLocked: false,
-              name: liveLayer ? `${liveLayer.name} workflow result` : 'Segmented Object',
+              name: options.copyLayerName ?? `${liveLayer.name} workflow result`,
               opacity: 1,
               source,
               transform: identityTransform,
@@ -4990,14 +4779,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       }
 
       endNudgeBurst();
-      if (owner === documentEditOwner && selectObjectCommitOwner && 'participants' in options.guard) {
-        selectObjectExpectedMutation = {
-          actionType: 'addCanvasLayer',
-          layer: copy,
-          layerId,
-          owner: selectObjectCommitOwner,
-        };
-      }
       publishCopy(preparedCopy);
       history.push({
         bytes: rect.width * rect.height * 4 + 256,
@@ -6663,7 +6444,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   };
 
   const clearCaches = async (): Promise<void> => {
-    canvasOperations.invalidateComposite(projectId);
     cancelSelectObjectSession();
     // Flush pending paint-bitmap uploads FIRST: an unflushed stroke lives only in
     // the live `layerCache` until the debounced (1500ms) flush persists it. If we
