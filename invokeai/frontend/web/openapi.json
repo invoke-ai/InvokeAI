@@ -892,6 +892,9 @@
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                     },
                     {
@@ -1213,6 +1216,9 @@
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                     },
                     {
@@ -1532,6 +1538,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -1903,6 +1912,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -2298,6 +2310,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -3513,6 +3528,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -10729,6 +10747,29 @@
             "title": "Seed",
             "type": "integer"
           },
+          "control_lllite": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnimaLLLiteField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Anima ControlNet-LLLite conditioning (e.g. inpaint adapter, control layers). Adapters are applied in a deterministic order (sorted by model key); each model may be used at most once.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Control Lllite"
+          },
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
@@ -10760,7 +10801,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.8.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -10874,6 +10915,215 @@
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
+      },
+      "AnimaLLLiteField": {
+        "description": "An Anima ControlNet-LLLite conditioning field (e.g. inpaint adapter).",
+        "properties": {
+          "image_name": {
+            "description": "The name of the conditioning image (the initial/raster image)",
+            "title": "Image Name",
+            "type": "string"
+          },
+          "mask_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The name of the inpaint mask image (white = inpaint area)",
+            "title": "Mask Name"
+          },
+          "control_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Anima ControlNet-LLLite adapter model"
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "The strength of the LLLite adapter",
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Weight",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the adapter is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the adapter is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          }
+        },
+        "required": ["image_name", "control_model"],
+        "title": "AnimaLLLiteField",
+        "type": "object"
+      },
+      "AnimaLLLiteInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Configure an Anima ControlNet-LLLite adapter for model-level conditioning.\n\nTakes a conditioning image (the initial/raster image), an optional inpaint\nmask (white = area to inpaint), and a LLLite adapter model. Inpainting\nadapters (4-channel conditioning) require a mask; other adapters ignore it.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The conditioning image (the initial/raster image for inpainting)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask (white = area to inpaint). Required by inpainting adapters.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "control_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control Model",
+            "ui_model_base": ["anima"],
+            "ui_model_type": ["controlnet"]
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "Strength of the LLLite adapter.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the adapter is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the adapter is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "type": {
+            "const": "anima_lllite",
+            "default": "anima_lllite",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "anima", "control", "controlnet", "inpaint"],
+        "title": "Anima ControlNet-LLLite",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/AnimaLLLiteOutput"
+        }
+      },
+      "AnimaLLLiteOutput": {
+        "class": "output",
+        "description": "Anima ControlNet-LLLite output containing adapter configuration.",
+        "properties": {
+          "control": {
+            "$ref": "#/components/schemas/AnimaLLLiteField",
+            "description": "Anima ControlNet-LLLite conditioning",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "anima_lllite_output",
+            "default": "anima_lllite_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control", "type", "type"],
+        "title": "AnimaLLLiteOutput",
+        "type": "object"
       },
       "AnimaLatentsToImageInvocation": {
         "category": "latents",
@@ -11576,6 +11826,9 @@
           },
           {
             "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
           },
           {
             "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -17657,6 +17910,166 @@
         "required": ["model_name"],
         "title": "ControlNetRecallParameter",
         "description": "ControlNet configuration for recall"
+      },
+      "ControlNet_Checkpoint_Anima_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "controlnet",
+            "title": "Type",
+            "default": "controlnet"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "anima",
+            "title": "Base",
+            "default": "anima"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cond_in_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cond In Channels",
+            "description": "Number of conditioning image channels (3 = RGB control image, 4 = RGB + inpaint mask). None for models installed before this field was recorded."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "default_settings",
+          "cond_in_channels"
+        ],
+        "title": "ControlNet_Checkpoint_Anima_Config",
+        "description": "Model config for Anima ControlNet-LLLite adapter models (Safetensors checkpoint).\n\nAnima LLLite adapters are standalone adapters consisting of a shared conditioning trunk\n(lllite_conditioning1) that encodes a conditioning image, plus tiny per-Linear modules\n(lllite_dit_blocks_*) that perturb the inputs of target Linears in the Anima DiT."
       },
       "ControlNet_Checkpoint_FLUX_Config": {
         "properties": {
@@ -28816,6 +29229,9 @@
                   "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
                 },
                 {
@@ -29633,6 +30049,9 @@
               "oneOf": [
                 {
                   "$ref": "#/components/schemas/AnimaConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/AnimaLLLiteOutput"
                 },
                 {
                   "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
@@ -36512,6 +36931,9 @@
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
               },
               {
@@ -37288,6 +37710,9 @@
                 "$ref": "#/components/schemas/AnimaConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteOutput"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
               },
               {
@@ -37660,6 +38085,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
@@ -38486,6 +38914,9 @@
           "anima_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "anima_lllite": {
+            "$ref": "#/components/schemas/AnimaLLLiteOutput"
+          },
           "anima_lora_collection_loader": {
             "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
           },
@@ -39253,6 +39684,7 @@
           "anima_denoise",
           "anima_i2l",
           "anima_l2i",
+          "anima_lllite",
           "anima_lora_collection_loader",
           "anima_lora_loader",
           "anima_model_loader",
@@ -39585,6 +40017,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
@@ -40484,6 +40919,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
@@ -55464,6 +55902,9 @@
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
               },
               {
@@ -56036,6 +56477,9 @@
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                   },
                   {
@@ -56493,6 +56937,9 @@
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
               },
               {
@@ -56798,6 +57245,9 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -57554,6 +58004,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
