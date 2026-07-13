@@ -6568,6 +6568,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     let editRect: Rect | null = null;
     let editSurface: RasterSurface | null = null;
     let controlCommitStarted = false;
+    let controlRollbackStarted = false;
     let controlGrowthSnapshot:
       | {
           hasPublishedPixels: boolean;
@@ -6581,32 +6582,47 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       | null
       | undefined;
     const rollbackControlEdit = (): void => {
-      if (target.kind !== 'control') {
+      if (target.kind !== 'control' || controlRollbackStarted) {
         return;
       }
+      controlRollbackStarted = true;
+      const growthSnapshot = controlGrowthSnapshot;
+      const rollbackBefore = before;
+      const rollbackOrigin = editOrigin;
+      const rollbackRect = editRect;
+      const rollbackSurface = editSurface;
+      controlGrowthSnapshot = undefined;
+      before = null;
+      editOrigin = null;
+      editRect = null;
+      editSurface = null;
       try {
-        if (controlGrowthSnapshot !== undefined) {
-          if (controlGrowthSnapshot === null) {
+        if (growthSnapshot !== undefined) {
+          if (growthSnapshot === null) {
             layerCache.delete(layerId);
           } else {
             const current = layerCache.get(layerId);
             if (current) {
-              controlGrowthSnapshot.surface.resize(controlGrowthSnapshot.rect.width, controlGrowthSnapshot.rect.height);
-              if (controlGrowthSnapshot.pixels) {
-                controlGrowthSnapshot.surface.ctx.putImageData(controlGrowthSnapshot.pixels, 0, 0);
+              growthSnapshot.surface.resize(growthSnapshot.rect.width, growthSnapshot.rect.height);
+              if (growthSnapshot.pixels) {
+                growthSnapshot.surface.ctx.putImageData(growthSnapshot.pixels, 0, 0);
               }
-              current.hasPublishedPixels = controlGrowthSnapshot.hasPublishedPixels;
-              current.lastUsed = controlGrowthSnapshot.lastUsed;
-              current.rect = { ...controlGrowthSnapshot.rect };
-              current.stale = controlGrowthSnapshot.stale;
-              current.surface = controlGrowthSnapshot.surface;
-              current.version = controlGrowthSnapshot.version;
+              current.hasPublishedPixels = growthSnapshot.hasPublishedPixels;
+              current.lastUsed = growthSnapshot.lastUsed;
+              current.rect = { ...growthSnapshot.rect };
+              current.stale = growthSnapshot.stale;
+              current.surface = growthSnapshot.surface;
+              current.version = growthSnapshot.version;
             }
           }
           adjustedSurfaceCache.delete(layerId);
           scheduler.invalidate({ layers: [layerId] });
-        } else if (before && editOrigin && editRect && editSurface) {
-          editSurface.ctx.putImageData(before, editRect.x - editOrigin.x, editRect.y - editOrigin.y);
+        } else if (rollbackBefore && rollbackOrigin && rollbackRect && rollbackSurface) {
+          rollbackSurface.ctx.putImageData(
+            rollbackBefore,
+            rollbackRect.x - rollbackOrigin.x,
+            rollbackRect.y - rollbackOrigin.y
+          );
           adjustedSurfaceCache.delete(layerId);
           scheduler.invalidate({ layers: [layerId] });
         }

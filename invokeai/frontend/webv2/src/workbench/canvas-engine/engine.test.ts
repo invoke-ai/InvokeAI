@@ -12619,6 +12619,58 @@ describe('engine selection: fill / erase', () => {
     h.engine.dispose();
   });
 
+  it('keeps materialized no-effect rollback authoritative when growth restoration throws once', async () => {
+    const h = createControlSelectionHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 },
+    });
+    await h.publishInitialCache();
+    const beforeDocument = structuredClone(h.engine.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'control');
+    const beforeThumbnailVersion = h.engine.stores.thumbnailVersion.get('control');
+    const createSurface = h.backend.createSurface.bind(h.backend);
+    let didThrow = false;
+    vi.spyOn(h.backend, 'createSurface').mockImplementation((width, height) => {
+      const surface = createSurface(width, height);
+      const resize = surface.resize.bind(surface);
+      surface.resize = (nextWidth, nextHeight) => {
+        if (!didThrow && surface.width === 100 && nextWidth === 20 && nextHeight === 20) {
+          didThrow = true;
+          throw new Error('selection rollback restoration failed');
+        }
+        resize(nextWidth, nextHeight);
+      };
+      return surface;
+    });
+    h.engine.selectAll();
+    h.setSelectionPixelWrites(false);
+
+    expect(() => h.engine.fillSelection()).toThrow('selection rollback restoration failed');
+
+    expect(didThrow).toBe(true);
+    expect(h.engine.getDocument()).toEqual(beforeDocument);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.thumbnailVersion.get('control')).toBe(beforeThumbnailVersion);
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+
+    vi.mocked(h.backend.createSurface).mockRestore();
+    h.setSelectionPixelWrites(true);
+    h.engine.fillSelection();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledTimes(2);
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledTimes(2);
+    h.engine.dispose();
+  });
+
   it('rolls back a direct control selection edit when masked compositing fails', async () => {
     const h = createControlSelectionHarness({
       source: { bitmap: { height: 10, imageName: 'paint-bitmap', width: 10 }, type: 'paint' },
