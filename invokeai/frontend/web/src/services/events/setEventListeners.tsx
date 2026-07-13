@@ -541,11 +541,13 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
     // Clearing the queue deletes the in-progress item without emitting a per-item terminal status
-    // event, so the progress bar must be reset here — and the coordinator must mark its tracked
-    // items terminal so a trailing invocation_progress event cannot repopulate the bar. The
-    // coordinator reports whether the clear applied to this client's items: a user-scoped clear
-    // by another user (multiuser mode) leaves them untouched, and only the queue tags below need
-    // refreshing.
+    // event, so the progress bar must be reset here — and the coordinator must mark the deleted
+    // tracked items terminal so a trailing invocation_progress event cannot repopulate the bar.
+    // The coordinator scopes a user-scoped clear (multiuser mode) to that user's items — on an
+    // admin client that may be a subset of the tracked items; on another user's client it is
+    // none of them — and reports whether the clear applied to any tracked item, so the progress
+    // bar is only reset when the clear could have deleted the item behind it. The queue tags
+    // below always need refreshing.
     if (workflowExecutionCoordinator.onQueueCleared(data)) {
       $lastProgressEvent.set(null);
     }

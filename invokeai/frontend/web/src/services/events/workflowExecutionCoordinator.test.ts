@@ -30,6 +30,7 @@ const buildQueueStatusEvent = (
     batch_id: 'batch-1',
     origin: 'workflows',
     destination: 'gallery',
+    user_id: 'user-1',
     status: 'completed',
     status_sequence: 1,
     batch_status: {
@@ -370,15 +371,21 @@ describe(createWorkflowExecutionCoordinator.name, () => {
     const { coordinator, nodeExecutionStates, queueItemRequests } = createCoordinatorHarness('user-b');
 
     coordinator.onQueueItemStatusChanged(
-      buildQueueStatusEvent({ item_id: 1, status: 'completed', origin: 'workflows' })
+      buildQueueStatusEvent({ item_id: 1, status: 'completed', origin: 'workflows', user_id: 'user-b' })
     );
-    coordinator.onQueueItemStatusChanged(buildQueueStatusEvent({ item_id: 2, status: 'in_progress', origin: null }));
-    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 2 }))).toBe(true);
+    coordinator.onQueueItemStatusChanged(
+      buildQueueStatusEvent({ item_id: 2, status: 'in_progress', origin: null, user_id: 'user-b' })
+    );
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 2, user_id: 'user-b' }))).toBe(
+      true
+    );
 
     expect(coordinator.onQueueCleared(buildQueueClearedEvent({ user_id: 'redacted' }))).toBe(false);
 
     expect(queueItemRequests.get(1)?.abort).not.toHaveBeenCalled();
-    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 2 }))).toBe(true);
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 2, user_id: 'user-b' }))).toBe(
+      true
+    );
 
     queueItemRequests.get(1)?.resolve(buildQueueItem('completed'));
     await Promise.resolve();
@@ -386,6 +393,68 @@ describe(createWorkflowExecutionCoordinator.name, () => {
 
     expect(nodeExecutionStates['node-1']?.status).toBe(zNodeStatus.enum.COMPLETED);
     expect(nodeExecutionStates['node-1']?.outputs).toHaveLength(1);
+  });
+
+  it("applies another user's scoped clear to just that user's items on an admin client", async () => {
+    // Admins receive every user's events (and the full, non-redacted scoped queue_cleared event),
+    // so they may be tracking the cleared user's active item. The clear deletes that user's rows
+    // without per-item terminal events: the cleared user's tracked items must be marked terminal
+    // so trailing events are rejected, while the admin's own reconciliation and other users' live
+    // items are untouched.
+    const { coordinator, nodeExecutionStates, queueItemRequests } = createCoordinatorHarness('admin-1');
+
+    // The admin's own completed workflow item, reconciliation in flight.
+    coordinator.onQueueItemStatusChanged(
+      buildQueueStatusEvent({ item_id: 1, status: 'completed', origin: 'workflows', user_id: 'admin-1' })
+    );
+    // User A's in-progress item, actively emitting progress on the admin's client.
+    coordinator.onQueueItemStatusChanged(
+      buildQueueStatusEvent({ item_id: 2, status: 'in_progress', origin: null, user_id: 'user-a' })
+    );
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 2, user_id: 'user-a' }))).toBe(
+      true
+    );
+    // User C's in-progress item, unaffected by user A's clear.
+    coordinator.onQueueItemStatusChanged(
+      buildQueueStatusEvent({ item_id: 3, status: 'in_progress', origin: null, user_id: 'user-c' })
+    );
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 3, user_id: 'user-c' }))).toBe(
+      true
+    );
+
+    expect(coordinator.onQueueCleared(buildQueueClearedEvent({ user_id: 'user-a' }))).toBe(true);
+
+    // User A's item is gone: a trailing progress event must be rejected, not repopulate the bar.
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 2, user_id: 'user-a' }))).toBe(
+      false
+    );
+    // User C's item is still live.
+    expect(coordinator.onInvocationProgress(buildInvocationProgressEvent({ item_id: 3, user_id: 'user-c' }))).toBe(
+      true
+    );
+
+    // The admin's own reconciliation was not aborted and completes normally.
+    expect(queueItemRequests.get(1)?.abort).not.toHaveBeenCalled();
+    queueItemRequests.get(1)?.resolve(buildQueueItem('completed'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(nodeExecutionStates['node-1']?.status).toBe(zNodeStatus.enum.COMPLETED);
+    expect(nodeExecutionStates['node-1']?.outputs).toHaveLength(1);
+  });
+
+  it("aborts the cleared user's in-flight reconciliation on an admin client", () => {
+    // The scoped clear deleted the user's rows, so a reconciliation fetch for their terminal item
+    // can never succeed and must be aborted.
+    const { coordinator, queueItemRequests } = createCoordinatorHarness('admin-1');
+
+    coordinator.onQueueItemStatusChanged(
+      buildQueueStatusEvent({ item_id: 1, status: 'completed', origin: 'workflows', user_id: 'user-a' })
+    );
+
+    expect(coordinator.onQueueCleared(buildQueueClearedEvent({ user_id: 'user-a' }))).toBe(true);
+
+    expect(queueItemRequests.get(1)?.abort).toHaveBeenCalled();
   });
 
   it('still clears canvas workflow integration processing on late invocation errors', () => {

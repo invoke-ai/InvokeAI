@@ -43,6 +43,12 @@ type WorkflowExecutionCoordinatorDeps = {
 
 export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordinatorDeps) => {
   const workflowExecutionStates = new LRUCache<number, WorkflowExecutionState>({ max: 100 });
+  // Each tracked item's owner, recorded from incoming events, lets a user-scoped queue clear be
+  // applied to just that user's items. Every event reaching the coordinator carries a real owner:
+  // invocation and status events are private to the owner and admins, and the sanitized
+  // (user_id="redacted") companions are filtered out before the coordinator. Sized to match
+  // workflowExecutionStates - an item without a tracked state needs no owner.
+  const itemOwnerUserIds = new LRUCache<number, string>({ max: 100 });
   const pendingWorkflowReconciliationRequests = new Map<number, ReconciliationRequest>();
   let activeWorkflowQueueItemId: number | null = null;
 
@@ -77,26 +83,45 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
   };
 
   const onQueueCleared = (data: S['QueueClearedEvent']): boolean => {
-    // A user-scoped clear (multiuser mode) deletes only that user's queue items, but the event is
-    // broadcast to every queue subscriber (sanitized to user_id="redacted" for non-owner,
-    // non-admin recipients). Another user's clear leaves this client's items untouched, so it must
-    // not mark them canceled or abort their pending reconciliations. An unscoped clear
-    // (user_id=null — an admin or single-user clear) deletes everything and always applies.
-    const clearedUserId = data.user_id ?? null;
-    if (clearedUserId !== null && clearedUserId !== deps.getCurrentUserId()) {
-      return false;
-    }
     // Clearing the queue deletes its items without emitting per-item terminal status events, so the
-    // tracked items must be marked terminal here for trailing invocation events to be rejected.
-    cancelPendingWorkflowReconciliations();
+    // deleted tracked items must be marked terminal here for trailing invocation events to be
+    // rejected, and their pending reconciliations aborted. Which items were deleted depends on the
+    // event's scope:
+    // - An unscoped clear (user_id=null — an admin or single-user clear) deleted every item.
+    // - A clear scoped to the current user deleted all of this client's items.
+    // - Another user's scoped clear reaches admins in full — they track every user's items, so the
+    //   cleared user's items must be terminated without disturbing other items or this client's
+    //   own reconciliations — and reaches everyone else as a sanitized user_id="redacted"
+    //   broadcast, which matches no tracked owner and applies to nothing.
+    // Returns whether the clear applied to any item this client tracks, so the caller knows
+    // whether to reset progress UI.
+    const clearedUserId = data.user_id ?? null;
+    const clearAppliesToAllItems = clearedUserId === null || clearedUserId === deps.getCurrentUserId();
+    if (clearAppliesToAllItems) {
+      cancelPendingWorkflowReconciliations();
+    }
+    let applied = clearAppliesToAllItems;
     for (const itemId of [...workflowExecutionStates.keys()]) {
+      if (!clearAppliesToAllItems) {
+        if (itemOwnerUserIds.get(itemId) !== clearedUserId) {
+          continue;
+        }
+        const req = pendingWorkflowReconciliationRequests.get(itemId);
+        if (req) {
+          req.abort?.();
+          req.unsubscribe?.();
+          pendingWorkflowReconciliationRequests.delete(itemId);
+          applied = true;
+        }
+      }
       const state = workflowExecutionStates.get(itemId);
       if (!state || isTerminalQueueStatus(state.queueStatus)) {
         continue;
       }
       workflowExecutionStates.set(itemId, { ...state, queueStatus: 'canceled' });
+      applied = true;
     }
-    return true;
+    return applied;
   };
 
   const reconcileWorkflowQueueItemResults = (itemId: number, status: TerminalQueueStatus) => {
@@ -133,6 +158,7 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
   };
 
   const onInvocationStarted = (data: S['InvocationStartedEvent']) => {
+    itemOwnerUserIds.set(data.item_id, data.user_id);
     if (
       !transitionWorkflowEvent(data.item_id, {
         type: 'invocation_started',
@@ -154,6 +180,7 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
   };
 
   const onInvocationProgress = (data: S['InvocationProgressEvent']) => {
+    itemOwnerUserIds.set(data.item_id, data.user_id);
     if (
       !transitionWorkflowEvent(data.item_id, {
         type: 'invocation_progress',
@@ -179,6 +206,7 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
   };
 
   const onInvocationError = (data: S['InvocationErrorEvent']) => {
+    itemOwnerUserIds.set(data.item_id, data.user_id);
     if (
       !transitionWorkflowEvent(data.item_id, {
         type: 'invocation_error',
@@ -205,6 +233,7 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
   };
 
   const onInvocationComplete = (data: S['InvocationCompleteEvent']) => {
+    itemOwnerUserIds.set(data.item_id, data.user_id);
     if (
       data.origin === 'workflows' &&
       activeWorkflowQueueItemId !== null &&
@@ -224,6 +253,7 @@ export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordi
   };
 
   const onQueueItemStatusChanged = (data: S['QueueItemStatusChangedEvent']) => {
+    itemOwnerUserIds.set(data.item_id, data.user_id);
     if (
       !transitionWorkflowEvent(data.item_id, {
         type: 'queue_item_status_changed',
