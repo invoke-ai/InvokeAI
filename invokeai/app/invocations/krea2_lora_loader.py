@@ -60,6 +60,12 @@ class Krea2LoRALoaderInvocation(BaseInvocation):
         if not context.models.exists(lora_key):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
+        if self.lora.base is not BaseModelType.Krea2:
+            raise ValueError(
+                f"LoRA '{lora_key}' is for {self.lora.base.value if self.lora.base else 'unknown'} models, "
+                "not Krea-2 models. Ensure you are using a Krea-2 compatible LoRA."
+            )
+
         if self.transformer and any(lora.lora.key == lora_key for lora in self.transformer.loras):
             raise ValueError(f'LoRA "{lora_key}" already applied to transformer.')
         if self.qwen3_vl_encoder and any(lora.lora.key == lora_key for lora in self.qwen3_vl_encoder.loras):
@@ -112,6 +118,15 @@ class Krea2LoRACollectionLoader(BaseInvocation):
             output.transformer = self.transformer.model_copy(deep=True)
         if self.qwen3_vl_encoder is not None:
             output.qwen3_vl_encoder = self.qwen3_vl_encoder.model_copy(deep=True)
+
+        # Seed the dedup set with LoRAs already present on the incoming fields so chaining collection
+        # loaders can't apply the same LoRA twice (the transformer and encoder are kept in sync below).
+        if self.transformer is not None:
+            added_loras.extend(existing.lora.key for existing in self.transformer.loras)
+        if self.qwen3_vl_encoder is not None:
+            added_loras.extend(
+                existing.lora.key for existing in self.qwen3_vl_encoder.loras if existing.lora.key not in added_loras
+            )
 
         for lora in loras:
             if lora is None:

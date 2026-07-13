@@ -1073,11 +1073,11 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     assert(isCompatibleWithMainModel(parsed, store));
-    // Z-Image, FLUX.2 Klein, and Krea-2 have dedicated VAE handlers; avoid rendering a duplicate row.
+    // Z-Image, FLUX.2 Klein and Krea-2 have dedicated VAE handlers; avoid rendering a duplicate row.
     const base = selectBase(store.getState());
     assert(
       base !== 'z-image' && base !== 'flux2' && base !== 'krea-2',
-      'VAEModel handler does not apply to Z-Image, FLUX.2 Klein, or Krea-2'
+      'VAEModel handler does not apply to Z-Image, FLUX.2 Klein or Krea-2'
     );
     return Promise.resolve(parsed);
   },
@@ -1219,15 +1219,14 @@ const Krea2Qwen3VlEncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 const Krea2SeedVarianceEnabled: SingleMetadataHandler<boolean> = {
   [SingleMetadataKey]: true,
   type: 'Krea2SeedVarianceEnabled',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
+    // Only applies to Krea-2 models, and only when the field is actually present — otherwise recalling
+    // an unrelated/older image would silently clear the user's current enhancer state. (A synchronous
+    // throw here is turned into a rejected promise by the parse runner, skipping the handler.)
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2SeedVarianceEnabled handler only applies to Krea-2 models');
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceEnabled');
-    try {
-      const raw = getProperty(metadata, 'krea2_seed_variance_enabled');
-      return Promise.resolve(z.boolean().parse(raw));
-    } catch {
-      // Default to false when metadata doesn't contain this field (e.g. older images).
-      return Promise.resolve(false);
-    }
+    const raw = getProperty(metadata, 'krea2_seed_variance_enabled');
+    return Promise.resolve(z.boolean().parse(raw));
   },
   recall: (value, store) => {
     store.dispatch(setKrea2SeedVarianceEnabled(value));
@@ -1242,7 +1241,11 @@ const Krea2SeedVarianceEnabled: SingleMetadataHandler<boolean> = {
 const Krea2SeedVarianceStrength: SingleMetadataHandler<number> = {
   [SingleMetadataKey]: true,
   type: 'Krea2SeedVarianceStrength',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
+    assert(
+      selectBase(store.getState()) === 'krea-2',
+      'Krea2SeedVarianceStrength handler only applies to Krea-2 models'
+    );
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceStrength');
     const raw = getProperty(metadata, 'krea2_seed_variance_strength');
     return Promise.resolve(z.number().min(0).max(100).parse(raw));
@@ -1260,7 +1263,11 @@ const Krea2SeedVarianceStrength: SingleMetadataHandler<number> = {
 const Krea2SeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
   [SingleMetadataKey]: true,
   type: 'Krea2SeedVarianceRandomizePercent',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
+    assert(
+      selectBase(store.getState()) === 'krea-2',
+      'Krea2SeedVarianceRandomizePercent handler only applies to Krea-2 models'
+    );
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceRandomizePercent');
     const raw = getProperty(metadata, 'krea2_seed_variance_randomize_percent');
     return Promise.resolve(z.number().min(1).max(100).parse(raw));
@@ -1278,14 +1285,11 @@ const Krea2SeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
 const Krea2RebalanceEnabled: SingleMetadataHandler<boolean> = {
   [SingleMetadataKey]: true,
   type: 'Krea2RebalanceEnabled',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceEnabled handler only applies to Krea-2 models');
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceEnabled');
-    try {
-      const raw = getProperty(metadata, 'krea2_rebalance_enabled');
-      return Promise.resolve(z.boolean().parse(raw));
-    } catch {
-      return Promise.resolve(false);
-    }
+    const raw = getProperty(metadata, 'krea2_rebalance_enabled');
+    return Promise.resolve(z.boolean().parse(raw));
   },
   recall: (value, store) => {
     store.dispatch(setKrea2RebalanceEnabled(value));
@@ -1300,7 +1304,8 @@ const Krea2RebalanceEnabled: SingleMetadataHandler<boolean> = {
 const Krea2RebalanceMultiplier: SingleMetadataHandler<number> = {
   [SingleMetadataKey]: true,
   type: 'Krea2RebalanceMultiplier',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceMultiplier handler only applies to Krea-2 models');
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceMultiplier');
     const raw = getProperty(metadata, 'krea2_rebalance_multiplier');
     return Promise.resolve(z.number().min(0).max(20).parse(raw));
@@ -1318,7 +1323,8 @@ const Krea2RebalanceMultiplier: SingleMetadataHandler<number> = {
 const Krea2RebalanceWeights: SingleMetadataHandler<string> = {
   [SingleMetadataKey]: true,
   type: 'Krea2RebalanceWeights',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceWeights handler only applies to Krea-2 models');
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceWeights');
     const raw = getProperty(metadata, 'krea2_rebalance_weights');
     return Promise.resolve(z.string().parse(raw));

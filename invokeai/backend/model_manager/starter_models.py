@@ -1929,6 +1929,15 @@ anima_bundle: list[StarterModel] = [
     anima_lllite_sketch,
 ]
 
+krea2_bundle: list[StarterModel] = [
+    qwen_image_vae,
+    qwen3_vl_encoder_4b,
+    krea2_turbo,
+    krea2_raw,
+    krea2_turbo_gguf_q4_k_m,
+    krea2_turbo_gguf_q8_0,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
@@ -1937,6 +1946,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
+    BaseModelType.Krea2: StarterModelBundle(name="Krea-2", models=krea2_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

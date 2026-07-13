@@ -1,3 +1,6 @@
+from contextlib import ExitStack
+from typing import Iterator, Tuple
+
 import torch
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
@@ -17,10 +20,14 @@ from invokeai.backend.krea2.sampling_utils import (
     KREA2_START_IDX,
 )
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_QWEN3VL_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     Krea2ConditioningInfo,
 )
+from invokeai.backend.util.devices import TorchDevice
 
 # Prompt template from diffusers Krea2Pipeline.get_text_hidden_states. The prefix (a system turn that
 # instructs the model to describe the image) is the same "generate" template used by Qwen-Image, which
@@ -76,8 +83,22 @@ class Krea2TextEncoderInvocation(BaseInvocation):
 
         context.util.signal_progress("Running Qwen3-VL text encoder")
 
-        with tokenizer_info as tokenizer, text_encoder_info.model_on_device() as (_, text_encoder):
+        with ExitStack() as exit_stack:
+            tokenizer = exit_stack.enter_context(tokenizer_info)
+            (cached_weights, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
             device = get_effective_device(text_encoder)
+
+            # Apply any Qwen3-VL text-encoder LoRA patches (smart/sidecar patching, fp8-aware). Without
+            # this, the encoder portion of a Krea-2 LoRA would be silently ignored.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=text_encoder,
+                    patches=self._lora_iterator(context),
+                    prefix=KREA2_LORA_QWEN3VL_PREFIX,
+                    dtype=TorchDevice.choose_bfloat16_safe_dtype(device),
+                    cached_weights=cached_weights,
+                )
+            )
 
             model_inputs = tokenizer(
                 text,
@@ -111,10 +132,23 @@ class Krea2TextEncoderInvocation(BaseInvocation):
             prompt_embeds = stacked[:, KREA2_START_IDX:]
             prompt_mask = attention_mask[:, KREA2_START_IDX:].bool()
 
-            prompt_embeds = prompt_embeds.to(dtype=torch.bfloat16)
+            # Match the device-safe compute dtype used by the denoise loop (falls back from bf16 to
+            # fp16/fp32 on devices without bf16 support) rather than forcing bfloat16.
+            prompt_embeds = prompt_embeds.to(dtype=TorchDevice.choose_bfloat16_safe_dtype(device))
 
         # If every token is valid (no padding), the mask is unnecessary.
         if prompt_mask is not None and bool(prompt_mask.all()):
             prompt_mask = None
 
         return prompt_embeds, prompt_mask
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+        """Iterate over the LoRA models to apply to the Qwen3-VL text encoder."""
+        for lora in self.qwen3_vl_encoder.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            yield (lora_info.model, lora.weight)
+            del lora_info

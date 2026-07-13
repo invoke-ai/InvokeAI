@@ -139,7 +139,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         if isinstance(self.cfg_scale, float):
             return [self.cfg_scale] * num_timesteps
         if isinstance(self.cfg_scale, list):
-            assert len(self.cfg_scale) == num_timesteps
+            if len(self.cfg_scale) != num_timesteps:
+                raise ValueError(
+                    f"cfg_scale list has {len(self.cfg_scale)} values but the model is configured for "
+                    f"{num_timesteps} steps. Provide one CFG value per configured step (or a single float)."
+                )
             return self.cfg_scale
         raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
 
@@ -154,21 +158,25 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         Prefer the classified variant (works for diffusers, single-file and GGUF alike); fall back to
         the pipeline-level ``is_distilled`` flag in model_index.json, then default to distilled.
+
+        A failed config lookup is a real error and is allowed to propagate — silently defaulting to the
+        Turbo shift would apply the wrong sampling schedule to a Raw model.
         """
         from invokeai.backend.model_manager.taxonomy import Krea2VariantType
 
+        config = context.models.get_config(self.transformer.transformer)
+        variant = getattr(config, "variant", None)
+        if variant is not None:
+            return variant != Krea2VariantType.Base
+        # No classified variant (unexpected for Krea-2) — fall back to the pipeline-level flag. Only a
+        # missing/malformed model_index.json is tolerated here; it defaults to the distilled behavior.
         try:
-            config = context.models.get_config(self.transformer.transformer)
-            variant = getattr(config, "variant", None)
-            if variant is not None:
-                return variant != Krea2VariantType.Base
             model_index = context.models.get_absolute_path(config) / "model_index.json"
             if model_index.is_file():
                 with open(model_index) as f:
                     return bool(json.load(f).get("is_distilled", False))
-        except Exception:
+        except (OSError, ValueError):
             pass
-        # Default to the distilled Turbo behavior.
         return True
 
     def _run_diffusion(self, context: InvocationContext):
@@ -176,8 +184,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         self._validate_inputs()
 
-        inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
+        inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
         transformer_info = context.models.load(self.transformer.transformer)
 
@@ -232,17 +240,23 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Clip the schedule based on denoising_start/denoising_end for img2img strength.
         sigmas_sched = scheduler.sigmas  # (N+1,) including terminal 0
-        if self.denoising_start > 0 or self.denoising_end < 1:
-            total_sigmas = len(sigmas_sched) - 1
-            start_idx = int(round(self.denoising_start * total_sigmas))
-            end_idx = int(round(self.denoising_end * total_sigmas))
+        total_sigmas = len(sigmas_sched) - 1  # == self.steps
+        is_clipped = self.denoising_start > 0 or self.denoising_end < 1
+        start_idx = int(round(self.denoising_start * total_sigmas))
+        end_idx = int(round(self.denoising_end * total_sigmas))
+        if is_clipped:
             sigmas_sched = sigmas_sched[start_idx : end_idx + 1]
             timesteps_sched = sigmas_sched[:-1] * scheduler.config.num_train_timesteps
         else:
             timesteps_sched = scheduler.timesteps
 
         total_steps = len(timesteps_sched)
-        cfg_scale = self._prepare_cfg_scale(total_steps)
+
+        # Build the CFG schedule against the FULL step count, then clip it to the active window. This way a
+        # caller-supplied per-step CFG list (one value per configured step) survives the reduction caused
+        # by denoising_start/denoising_end; a scalar is simply broadcast.
+        full_cfg_scale = self._prepare_cfg_scale(total_sigmas)
+        cfg_scale = full_cfg_scale[start_idx:end_idx] if is_clipped else full_cfg_scale
 
         # Load initial latents (img2img).
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
