@@ -616,7 +616,7 @@ wheels = [
 
 [[package]]
 name = "diffusers"
-version = "0.37.0"
+version = "0.39.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or sys_platform == 'darwin' or sys_platform == 'win32' or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
@@ -629,9 +629,9 @@ dependencies = [
     { name = "requests", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or sys_platform == 'darwin' or sys_platform == 'win32' or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
     { name = "safetensors", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or sys_platform == 'darwin' or sys_platform == 'win32' or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/58/3b/01d0ff800b811c5ad8bba682f4c6abf1d7071cd81464c01724333fefb7ba/diffusers-0.37.0.tar.gz", hash = "sha256:408789af73898585f525afd07ca72b3955affea4216a669558e9f59b5b1fe704", size = 4141136, upload-time = "2026-03-05T14:58:39.704Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/81/6095237b86a3116c4789f28c4435d5296c00c0fc74ffde99008fd6b3a36c/diffusers-0.39.0.tar.gz", hash = "sha256:14bb1d98c85a0e463d734c99aaa73b480a7bc9bad22af30fbf730ef8f09c1d67", size = 4651240, upload-time = "2026-07-03T08:48:47.904Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/55/586a3a2b9c95f371c9c3cb048c3cac15aedcce8d6d53ebd6bbc46860722d/diffusers-0.37.0-py3-none-any.whl", hash = "sha256:7eab74bf896974250b5e1027cae813aba1004f02d97c9b44891b83713386aa08", size = 5000449, upload-time = "2026-03-05T14:58:37.361Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/3f/7469c46e9d22307ea686bab687d70e6bf328722952f9d10339f5e913e608/diffusers-0.39.0-py3-none-any.whl", hash = "sha256:912aca51b5787365110806e984d5555735bf8a461073bb8459029d0bca7870ef", size = 5631176, upload-time = "2026-07-03T08:48:45.337Z" },
 ]
 
 [package.optional-dependencies]
@@ -1125,7 +1125,7 @@ requires-dist = [
     { name = "blake3" },
     { name = "compel", specifier = ">=2.4.0,<3" },
     { name = "deprecated" },
-    { name = "diffusers", extras = ["torch"], specifier = "==0.37.0" },
+    { name = "diffusers", extras = ["torch"], specifier = "==0.39.0" },
     { name = "dnspython" },
     { name = "dynamicprompts" },
     { name = "einops" },

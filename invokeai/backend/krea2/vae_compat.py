@@ -12,6 +12,7 @@ encode/decode nodes read.
 from typing import Any
 
 import accelerate
+from diffusers.models.autoencoders import AutoencoderKLWan
 from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
 
 
@@ -25,6 +26,8 @@ def as_qwen_image_vae(model: Any) -> AutoencoderKLQwenImage:
     """
     if isinstance(model, AutoencoderKLQwenImage):
         return model
+    if not isinstance(model, AutoencoderKLWan):
+        raise TypeError(f"Expected AutoencoderKLQwenImage or AutoencoderKLWan, got {type(model).__name__}.")
 
     src_state_dict = model.state_dict()
     with accelerate.init_empty_weights():

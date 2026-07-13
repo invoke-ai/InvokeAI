@@ -143,6 +143,12 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             return self.cfg_scale
         raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
 
+    def _validate_inputs(self) -> None:
+        if self.denoising_start >= self.denoising_end:
+            raise ValueError("denoising_start must be less than denoising_end.")
+        if self.denoise_mask is not None and self.latents is None:
+            raise ValueError("Initial latents are required when a denoise mask is provided.")
+
     def _is_distilled(self, context: InvocationContext) -> bool:
         """Whether the transformer is the distilled Turbo checkpoint (fixed mu) vs. Raw (dynamic mu).
 
@@ -167,6 +173,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _run_diffusion(self, context: InvocationContext):
         from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+
+        self._validate_inputs()
 
         inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
