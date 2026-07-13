@@ -320,6 +320,18 @@ type SelectionPixelTarget =
   | { kind: 'raster'; layerId: string; transparencyLocked: boolean }
   | { kind: 'control'; transaction: ControlPixelEditTransaction; transparencyLocked: false };
 
+const isImageDataEqual = (left: ImageData, right: ImageData): boolean => {
+  if (left.width !== right.width || left.height !== right.height || left.data.length !== right.data.length) {
+    return false;
+  }
+  for (let index = 0; index < left.data.length; index += 1) {
+    if (left.data[index] !== right.data[index]) {
+      return false;
+    }
+  }
+  return true;
+};
+
 /** Structural equality for JSON-safe canvas contracts (including synthetic mask paint sources). */
 const isDeeplyEqual = (left: unknown, right: unknown): boolean => {
   if (Object.is(left, right)) {
@@ -6568,6 +6580,40 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         }
       | null
       | undefined;
+    const rollbackControlEdit = (): void => {
+      if (target.kind !== 'control') {
+        return;
+      }
+      try {
+        if (controlGrowthSnapshot !== undefined) {
+          if (controlGrowthSnapshot === null) {
+            layerCache.delete(layerId);
+          } else {
+            const current = layerCache.get(layerId);
+            if (current) {
+              controlGrowthSnapshot.surface.resize(controlGrowthSnapshot.rect.width, controlGrowthSnapshot.rect.height);
+              if (controlGrowthSnapshot.pixels) {
+                controlGrowthSnapshot.surface.ctx.putImageData(controlGrowthSnapshot.pixels, 0, 0);
+              }
+              current.hasPublishedPixels = controlGrowthSnapshot.hasPublishedPixels;
+              current.lastUsed = controlGrowthSnapshot.lastUsed;
+              current.rect = { ...controlGrowthSnapshot.rect };
+              current.stale = controlGrowthSnapshot.stale;
+              current.surface = controlGrowthSnapshot.surface;
+              current.version = controlGrowthSnapshot.version;
+            }
+          }
+          adjustedSurfaceCache.delete(layerId);
+          scheduler.invalidate({ layers: [layerId] });
+        } else if (before && editOrigin && editRect && editSurface) {
+          editSurface.ctx.putImageData(before, editRect.x - editOrigin.x, editRect.y - editOrigin.y);
+          adjustedSurfaceCache.delete(layerId);
+          scheduler.invalidate({ layers: [layerId] });
+        }
+      } finally {
+        target.transaction.cancel();
+      }
+    };
     try {
       if (target.kind === 'control' && kind === 'fill') {
         const existing = layerCache.get(layerId);
@@ -6648,6 +6694,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       const after = surface.ctx.getImageData(rect.x - origin.x, rect.y - origin.y, rect.width, rect.height);
       const label = kind === 'fill' ? 'Fill selection' : 'Erase selection';
       if (target.kind === 'control') {
+        if (isImageDataEqual(before, after)) {
+          rollbackControlEdit();
+          return;
+        }
         controlCommitStarted = true;
         target.transaction.commitPatch(label, { after, before, rect });
       } else {
@@ -6675,35 +6725,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         // rethrowing; restoring its preview here would overwrite that rollback.
         throw error;
       }
-      try {
-        if (controlGrowthSnapshot !== undefined) {
-          if (controlGrowthSnapshot === null) {
-            layerCache.delete(layerId);
-          } else {
-            const current = layerCache.get(layerId);
-            if (current) {
-              controlGrowthSnapshot.surface.resize(controlGrowthSnapshot.rect.width, controlGrowthSnapshot.rect.height);
-              if (controlGrowthSnapshot.pixels) {
-                controlGrowthSnapshot.surface.ctx.putImageData(controlGrowthSnapshot.pixels, 0, 0);
-              }
-              current.hasPublishedPixels = controlGrowthSnapshot.hasPublishedPixels;
-              current.lastUsed = controlGrowthSnapshot.lastUsed;
-              current.rect = { ...controlGrowthSnapshot.rect };
-              current.stale = controlGrowthSnapshot.stale;
-              current.surface = controlGrowthSnapshot.surface;
-              current.version = controlGrowthSnapshot.version;
-            }
-          }
-          adjustedSurfaceCache.delete(layerId);
-          scheduler.invalidate({ layers: [layerId] });
-        } else if (before && editOrigin && editRect && editSurface) {
-          editSurface.ctx.putImageData(before, editRect.x - editOrigin.x, editRect.y - editOrigin.y);
-          adjustedSurfaceCache.delete(layerId);
-          scheduler.invalidate({ layers: [layerId] });
-        }
-      } finally {
-        target.transaction.cancel();
-      }
+      rollbackControlEdit();
       throw error;
     }
   };

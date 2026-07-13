@@ -2087,7 +2087,10 @@ type ControlPaintHarnessOverrides = Partial<Omit<CanvasControlLayerContract, 'so
   source: CanvasControlLayerContract['source'];
 };
 
-const createControlPaintHarness = (overrides: ControlPaintHarnessOverrides) => {
+const createControlPaintHarness = (
+  overrides: ControlPaintHarnessOverrides,
+  selectionPixelWrites?: { enabled: boolean }
+) => {
   const raf = createControllableRaf();
   vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
   vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -2125,7 +2128,35 @@ const createControlPaintHarness = (overrides: ControlPaintHarnessOverrides) => {
     width: 100,
   };
   const { projectId, store } = createReducerBackedStore(document);
-  const backend = createTestStubRasterBackend();
+  const baseBackend = createTestStubRasterBackend();
+  const backend: StubRasterBackend = {
+    ...baseBackend,
+    createSurface: (width, height) => {
+      const surface = baseBackend.createSurface(width, height);
+      if (!selectionPixelWrites) {
+        return surface;
+      }
+      const originalCtx = surface.ctx;
+      const ctx = new Proxy(originalCtx, {
+        get(target, property, receiver) {
+          const value = Reflect.get(target, property, receiver);
+          if (property !== 'getImageData' || typeof value !== 'function') {
+            return value;
+          }
+          return (...args: unknown[]) => {
+            const imageData = Reflect.apply(value, target, args) as ImageData;
+            if (selectionPixelWrites.enabled && imageData.data.length > 0) {
+              const drawCount = surface.callLog.filter((entry) => entry.op === 'drawImage').length;
+              imageData.data[0] = drawCount % 256;
+            }
+            return imageData;
+          };
+        },
+      });
+      Object.defineProperty(surface, 'ctx', { configurable: true, value: ctx });
+      return surface;
+    },
+  };
   const bitmapStore = createSpyBitmapStore();
   const engine = createCanvasEngine({
     backend,
@@ -2157,7 +2188,15 @@ const createControlPaintHarness = (overrides: ControlPaintHarnessOverrides) => {
   };
 };
 
-const createControlSelectionHarness = createControlPaintHarness;
+const createControlSelectionHarness = (overrides: ControlPaintHarnessOverrides) => {
+  const selectionPixelWrites = { enabled: true };
+  return {
+    ...createControlPaintHarness(overrides, selectionPixelWrites),
+    setSelectionPixelWrites: (enabled: boolean) => {
+      selectionPixelWrites.enabled = enabled;
+    },
+  };
+};
 
 /** A minimal in-memory bitmap store: records dirty-marks, never touches the network. */
 const createSpyBitmapStore = (): BitmapStore & {
@@ -12472,6 +12511,111 @@ describe('engine selection: fill / erase', () => {
     expect(h.engine.getDocument()).toEqual(before);
     expect(h.engine.stores.canUndo.get()).toBe(false);
     expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    h.engine.dispose();
+  });
+
+  it.each(['fill', 'erase'] as const)('does not publish a byte-identical direct control %s', async (kind) => {
+    const h = createControlSelectionHarness({
+      source: { bitmap: { height: 10, imageName: 'paint-bitmap', width: 10 }, type: 'paint' },
+    });
+    await h.publishInitialCache();
+    h.engine.setTool('lasso');
+    h.overlay.fire('pointerdown', pointerAt(0, 0));
+    h.overlay.fire('pointermove', pointerAt(5, 0));
+    h.overlay.fire('pointermove', pointerAt(5, 5));
+    h.overlay.fire('pointermove', pointerAt(0, 5));
+    h.overlay.fire('pointerup', pointerAt(0, 0, { buttons: 0 }));
+    const beforeDocument = structuredClone(h.engine.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'control');
+    const beforeThumbnailVersion = h.engine.stores.thumbnailVersion.get('control');
+    h.setSelectionPixelWrites(false);
+
+    if (kind === 'fill') {
+      h.engine.fillSelection();
+    } else {
+      h.engine.eraseSelection();
+    }
+
+    expect(h.engine.getDocument()).toEqual(beforeDocument);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    expect(h.engine.stores.thumbnailVersion.get('control')).toBe(beforeThumbnailVersion);
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+
+    h.setSelectionPixelWrites(true);
+    if (kind === 'fill') {
+      h.engine.fillSelection();
+    } else {
+      h.engine.eraseSelection();
+    }
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.dispose();
+  });
+
+  it('restores direct control cache growth after a byte-identical fill', async () => {
+    const h = createControlSelectionHarness({ source: { bitmap: null, type: 'paint' } });
+    const beforeDocument = structuredClone(h.engine.getDocument());
+    const beforeExport = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    const beforeThumbnailVersion = h.engine.stores.thumbnailVersion.get('control');
+    h.engine.selectAll();
+    h.setSelectionPixelWrites(false);
+
+    h.engine.fillSelection();
+
+    expect(h.engine.getDocument()).toEqual(beforeDocument);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    expect(h.engine.stores.thumbnailVersion.get('control')).toBe(beforeThumbnailVersion);
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe(beforeExport.status);
+
+    h.setSelectionPixelWrites(true);
+    h.engine.fillSelection();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.dispose();
+  });
+
+  it('rolls back a byte-identical materialized control selection edit', async () => {
+    const h = createControlSelectionHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 },
+    });
+    await h.publishInitialCache();
+    const beforeDocument = structuredClone(h.engine.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'control');
+    const beforeThumbnailVersion = h.engine.stores.thumbnailVersion.get('control');
+    h.engine.selectAll();
+    h.setSelectionPixelWrites(false);
+
+    h.engine.fillSelection();
+
+    expect(h.engine.getDocument()).toEqual(beforeDocument);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.thumbnailVersion.get('control')).toBe(beforeThumbnailVersion);
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+
+    h.setSelectionPixelWrites(true);
+    h.engine.fillSelection();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledTimes(2);
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledTimes(2);
     h.engine.dispose();
   });
 
