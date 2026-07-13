@@ -320,6 +320,7 @@ class Krea2CheckpointModel(ModelLoader):
             sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True, strict=False)
+        _reject_incomplete_load(model, what="Krea-2 single-file checkpoint")
         # Honor the fp8-storage setting (re-quantizes the dequantized weights to fp8-resident on CUDA).
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
@@ -350,11 +351,8 @@ class Krea2GGUFCheckpointModel(ModelLoader):
     def _load_from_gguf(self, config: AnyModelConfig) -> AnyModel:
         from diffusers import Krea2Transformer2DModel
 
-        from invokeai.backend.util.logging import InvokeAILogger
-
         if not isinstance(config, Main_GGUF_Krea2_Config):
             raise TypeError(f"Expected Main_GGUF_Krea2_Config, got {type(config).__name__}.")
-        logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
         model_path = Path(config.path)
         target_device = TorchDevice.choose_torch_device()
@@ -370,17 +368,11 @@ class Krea2GGUFCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
 
-        missing_keys, unexpected_keys = model.load_state_dict(sd, assign=True, strict=False)
-        # Surface key-format mismatches: GGUF conversions (city96/ComfyUI) may use original/ComfyUI key
-        # names that differ from the diffusers Krea2Transformer2DModel. If many params remain on meta,
-        # a dedicated GGUF->diffusers key conversion is needed (cf. Z-Image's _convert_z_image_gguf_to_diffusers).
-        still_meta = [name for name, p in model.named_parameters() if p.is_meta]
-        if still_meta:
-            logger.warning(
-                f"Krea-2 GGUF load left {len(still_meta)} parameters on meta (missing from state dict). "
-                f"First few: {still_meta[:8]}. unexpected_keys={len(unexpected_keys)}. "
-                "This likely means the GGUF uses a key naming that needs conversion to diffusers format."
-            )
+        model.load_state_dict(sd, assign=True, strict=False)
+        # Reject GGUF layouts that don't fully populate the diffusers Krea2Transformer2DModel (city96/
+        # ComfyUI GGUFs may use key names needing conversion). Failing here beats a confusing meta-tensor
+        # crash mid-inference.
+        _reject_incomplete_load(model, what="Krea-2 GGUF checkpoint")
         return model
 
 
@@ -450,6 +442,23 @@ def _remap_qwen3vl_singlefile_keys(sd: dict[str, Any]) -> dict[str, Any]:
             # Bare language-model keys (layers.* / embed_tokens / norm) belong under language_model.
             out["language_model." + key] = v
     return out
+
+
+def _reject_incomplete_load(model: Any, *, what: str) -> None:
+    """Raise if a ``load_state_dict(strict=False)`` left required parameters on the meta device.
+
+    ``strict=False`` is used to tolerate benign extra/renamed keys, but it also silently accepts a
+    checkpoint that omits required weights — those tensors stay on the meta device and only fail much
+    later during inference. Reject such loads here, naming the offending parameters, so an incomplete,
+    misidentified, or differently-converted checkpoint fails at load time with an actionable message.
+    """
+    still_meta = [name for name, p in model.named_parameters() if getattr(p, "is_meta", False)]
+    if still_meta:
+        raise RuntimeError(
+            f"{what} is incomplete: {len(still_meta)} parameter(s) were not provided by the checkpoint "
+            f"and remain uninitialized (meta device). First few: {still_meta[:8]}. The file is likely "
+            "incomplete, misidentified, or uses a key layout that needs conversion."
+        )
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint)
@@ -538,6 +547,7 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
             sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True, strict=False)
+        _reject_incomplete_load(model, what="Qwen3-VL encoder checkpoint")
 
         # Keep an fp8 encoder running in fp8 (storage=float8_e4m3fn, per-layer upcast to the compute
         # dtype during forward) on CUDA. `_should_use_fp8` deliberately excludes text encoders (and the

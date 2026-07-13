@@ -1398,12 +1398,12 @@ class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         Krea-2-Raw sets ``is_distilled=false`` (undistilled Base, more steps, CFG on). The transformer
         architectures are identical, so this flag is the only reliable discriminator.
         """
-        try:
-            config = get_config_dict_or_raise(mod.path / "model_index.json")
-            if config.get("is_distilled", True) is False:
-                return Krea2VariantType.Base
-        except Exception:
-            pass
+        # model_index.json was already validated by the class-name check in from_model_on_disk, so a
+        # read/parse failure here is a genuine identification error and is allowed to propagate rather
+        # than being silently registered as Turbo (which would give a Raw model the wrong defaults).
+        config = get_config_dict_or_raise(mod.path / "model_index.json")
+        if config.get("is_distilled", True) is False:
+            return Krea2VariantType.Base
         return Krea2VariantType.Turbo
 
 

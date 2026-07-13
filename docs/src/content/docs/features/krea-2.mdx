@@ -1,0 +1,71 @@
+---
+title: Krea-2
+description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow and the conditioning enhancers.
+lastUpdated: 2026-07-13
+sidebar:
+  order: 5
+---
+
+Krea-2 is a ~12B single-stream diffusion-transformer text-to-image family. InvokeAI supports both
+published checkpoints:
+
+- **Krea-2-Turbo** — distilled for fast, low-step generation. Runs at **8 steps** with **CFG disabled**
+  (CFG Scale `1.0`). This is the recommended checkpoint for everyday use.
+- **Krea-2-Raw** — the undistilled base checkpoint. Runs at **more steps (~28)** with **CFG enabled**
+  (CFG Scale ~`4.5`) and supports negative prompts. It is primarily intended as a base for
+  finetuning / LoRA training, but full inference is supported.
+
+The variant is detected automatically on install, and selecting a Krea-2 model sets sensible defaults
+(steps, CFG, 1024×1024) for that variant.
+
+## Hardware
+
+Krea-2 is a large model. See the [System Requirements](../../start-here/system-requirements) table for
+details. In short, on a 24 GB card enable **FP8** in the model's Default Settings to fit 1024² (with a
+LoRA). For lower VRAM, use a **GGUF** transformer (Q4_K ≈ 12 GB total).
+
+## Installing
+
+The easiest path is the **Krea-2 launchpad bundle** in the Model Manager, which installs the models and
+their dependencies together.
+
+Krea-2 needs three components:
+
+| Component | Diffusers install | GGUF / single-file install |
+|---|---|---|
+| Transformer | bundled in the pipeline | the `.gguf` / single-file checkpoint |
+| VAE (Qwen-Image) | bundled | installed separately |
+| Text encoder (Qwen3-VL) | bundled | installed separately |
+
+- **Diffusers** (e.g. `krea/Krea-2-Turbo`, `krea/Krea-2-Raw`): a single ~26 GB install that bundles the
+  VAE and text encoder. Nothing else is required.
+- **GGUF / single-file**: the checkpoint ships **only the transformer**. You must also install a
+  standalone **Qwen-Image VAE** and a **Qwen3-VL encoder** (both included in the launchpad bundle).
+
+When you select a GGUF/single-file Krea-2 model, InvokeAI auto-selects an installed VAE and Qwen3-VL
+encoder if you have them. If none are installed, you'll be prompted to pick them (in the model dropdowns)
+before you can generate. Selecting a Diffusers Krea-2 model clears those standalone selections and uses
+the bundled components.
+
+:::note[Qwen3-VL encoder download]
+Single-file Qwen3-VL encoders bundle only the weights. The tokenizer/config are fetched once from
+HuggingFace (`Qwen/Qwen3-VL-4B-Instruct`) on first use, then cached for offline use. A single-file fp8
+encoder is kept resident in fp8 (roughly half the VRAM of the bf16 encoder).
+:::
+
+## Conditioning enhancers
+
+Two optional, off-by-default toggles are available under **Advanced Options** (below CFG Scale). They
+transform the text conditioning and are especially useful for the distilled Turbo checkpoint:
+
+- **Conditioning Rebalance** — per-layer weighting of the text embedding to improve prompt adherence.
+- **Seed Variance Enhancer** — injects controlled noise into the conditioning to restore per-seed
+  diversity (the distilled model otherwise produces near-identical images across seeds), trading some
+  prompt adherence for variety.
+
+Both are recorded in image metadata and can be recalled.
+
+## LoRA
+
+Krea-2 LoRAs (diffusers PEFT format) are supported and apply to both the transformer and — where the
+LoRA includes text-encoder layers — the Qwen3-VL encoder.

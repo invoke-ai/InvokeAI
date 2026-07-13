@@ -1756,6 +1756,7 @@
         "krea2RebalanceEnabled": "Conditioning Rebalance",
         "krea2RebalanceMultiplier": "Rebalance Multiplier",
         "krea2RebalanceWeights": "Per-Layer Weights (12)",
+        "krea2RebalanceWeightsPlaceholder": "1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",

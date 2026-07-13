@@ -157,5 +157,6 @@ export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusers
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectQwen3VLEncoderModels = buildModelsSelector(isQwen3VLEncoderModelConfig);
 export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
 export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();
