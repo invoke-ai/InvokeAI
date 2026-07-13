@@ -4080,6 +4080,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         openControlPixelEdit = null;
         return true;
       };
+      const restorePatch = (patch: PixelEditPatch): void => {
+        const entry = layerCache.get(layerId);
+        if (entry) {
+          entry.surface.ctx.putImageData(patch.before, patch.rect.x - entry.rect.x, patch.rect.y - entry.rect.y);
+          adjustedSurfaceCache.delete(layerId);
+          scheduler.invalidate({ layers: [layerId] });
+        }
+      };
       const commitPatch = (label: string, patch: PixelEditPatch): boolean => {
         if (closed || openControlPixelEdit !== owner) {
           return false;
@@ -4094,30 +4102,32 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           currentLayer !== layer
         ) {
           close();
-          const entry = layerCache.get(layerId);
-          if (entry) {
-            entry.surface.ctx.putImageData(patch.before, patch.rect.x - entry.rect.x, patch.rect.y - entry.rect.y);
-            adjustedSurfaceCache.delete(layerId);
-            scheduler.invalidate({ layers: [layerId] });
-          }
+          restorePatch(patch);
           return false;
         }
         close();
-        endNudgeBurst();
-        notifyLayerPainted(layerId);
-        bitmapStore.markLayerDirty(layerId);
-        if (!history.isApplying()) {
-          history.push(
-            createImagePatchEntry({
+        let historyEntry: HistoryEntry | null = null;
+        try {
+          if (!history.isApplying()) {
+            historyEntry = createImagePatchEntry({
               after: patch.after,
               apply: applyImagePatch,
               before: patch.before,
               label,
               layerId,
               rect: patch.rect,
-            })
-          );
+            });
+          }
+        } catch (error) {
+          restorePatch(patch);
+          throw error;
         }
+        endNudgeBurst();
+        if (historyEntry) {
+          history.push(historyEntry);
+        }
+        notifyLayerPainted(layerId);
+        bitmapStore.markLayerDirty(layerId);
         return true;
       };
       const transaction: ControlPixelEditTransaction = {
@@ -4201,24 +4211,37 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       rect: beforeRect,
     };
     const restoreOriginal = (): void => {
-      if (originalCache) {
-        const current = layerCache.get(layerId);
-        if (current) {
-          current.hasPublishedPixels = originalCache.hasPublishedPixels;
-          current.lastUsed = originalCache.lastUsed;
-          current.rect = { ...originalCache.rect };
-          current.stale = originalCache.stale;
-          current.surface = originalCache.surface;
-          current.version = originalCache.version;
+      try {
+        if (originalCache) {
+          const current = layerCache.get(layerId);
+          if (current) {
+            current.hasPublishedPixels = originalCache.hasPublishedPixels;
+            current.lastUsed = originalCache.lastUsed;
+            current.rect = { ...originalCache.rect };
+            current.stale = originalCache.stale;
+            current.surface = originalCache.surface;
+            current.version = originalCache.version;
+          }
+        } else {
+          layerCache.delete(layerId);
         }
-      } else {
-        layerCache.delete(layerId);
+      } finally {
+        try {
+          adjustedSurfaceCache.delete(layerId);
+        } finally {
+          transformOverrides.delete(layerId);
+          scheduler.invalidate({ layers: [layerId], overlay: true });
+        }
       }
-      adjustedSurfaceCache.delete(layerId);
-      transformOverrides.delete(layerId);
-      scheduler.invalidate({ layers: [layerId], overlay: true });
     };
     const releasePersistence = bitmapStore.suspendLayer(layerId);
+    const restoreAndRelease = (): void => {
+      try {
+        restoreOriginal();
+      } finally {
+        releasePersistence();
+      }
+    };
     try {
       const previewEntry = originalEntry ?? layerCache.getOrCreateRect(layerId, prepared.rect);
       previewEntry.surface = prepared.surface;
@@ -4230,8 +4253,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       transformOverrides.set(layerId, { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
       scheduler.invalidate({ layers: [layerId], overlay: true });
     } catch {
-      restoreOriginal();
-      releasePersistence();
+      restoreAndRelease();
       return null;
     }
 
@@ -4249,8 +4271,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       if (!close()) {
         return;
       }
-      restoreOriginal();
-      releasePersistence();
+      restoreAndRelease();
     };
     const commit = (label: string, event?: StrokeCommittedEvent): void => {
       if (!close()) {
@@ -4268,12 +4289,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         !edited ||
         (event && event.layerId !== layerId)
       ) {
-        restoreOriginal();
-        releasePersistence();
+        restoreAndRelease();
         return;
       }
       let afterPixels: ImageData | null = null;
       let after: LayerPixelSnapshot;
+      let historyEntry: HistoryEntry | null = null;
       try {
         if (!isEmpty(edited.rect)) {
           afterPixels = edited.surface.ctx.getImageData(0, 0, edited.rect.width, edited.rect.height);
@@ -4284,24 +4305,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           pixels: afterPixels,
           rect: { ...edited.rect },
         };
+        if (!history.isApplying()) {
+          historyEntry = createLayerSnapshotEntry({ after, apply: applyControlLayerSnapshot, before, label });
+        }
         dispatchPreparedMutation(
           { layer: materialized, layerId, type: 'replaceCanvasLayer' },
           () => documentHasLayerContract(getReducerDocument(), materialized),
           () => documentHasLayerContract(mirror.getDocument(), materialized)
         );
       } catch (error) {
-        restoreOriginal();
-        releasePersistence();
+        restoreAndRelease();
         throw error;
       }
       transformOverrides.delete(layerId);
       endNudgeBurst();
       try {
+        if (historyEntry) {
+          history.push(historyEntry);
+        }
         notifyLayerPainted(layerId);
         bitmapStore.markLayerDirty(layerId);
-        if (!history.isApplying()) {
-          history.push(createLayerSnapshotEntry({ after, apply: applyControlLayerSnapshot, before, label }));
-        }
       } finally {
         releasePersistence();
       }

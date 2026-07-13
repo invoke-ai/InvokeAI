@@ -217,13 +217,13 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
    * tombstones for the lifetime of the engine.
    */
   const layerGenerations = new Map<string, number>();
-  /** Active nested persistence-suspension lease count per layer. */
-  const suspensionCounts = new Map<string, number>();
+  /** Active nested persistence-suspension generation per layer. */
+  const suspensions = new Map<string, { count: number; token: symbol }>();
   /** Barriers waiting for a suspended dirty layer to resume or be reset/disposed. */
   const suspensionWaiters = new Set<() => void>();
   let disposed = false;
 
-  const isSuspended = (layerId: string): boolean => (suspensionCounts.get(layerId) ?? 0) > 0;
+  const isSuspended = (layerId: string): boolean => (suspensions.get(layerId)?.count ?? 0) > 0;
   const notifySuspensionWaiters = (): void => {
     const waiters = [...suspensionWaiters];
     suspensionWaiters.clear();
@@ -501,8 +501,10 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     if (disposed) {
       return () => undefined;
     }
-    const count = suspensionCounts.get(layerId) ?? 0;
-    suspensionCounts.set(layerId, count + 1);
+    const currentSuspension = suspensions.get(layerId);
+    const count = currentSuspension?.count ?? 0;
+    const token = currentSuspension?.token ?? Symbol(layerId);
+    suspensions.set(layerId, { count: count + 1, token });
     if (count === 0) {
       const hadPendingWork = dirty.has(layerId) || debounceTimers.has(layerId) || inFlight.has(layerId);
       clearTimer(layerId);
@@ -521,14 +523,17 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
         return;
       }
       released = true;
-      const current = suspensionCounts.get(layerId) ?? 0;
-      if (current <= 1) {
-        suspensionCounts.delete(layerId);
+      const current = suspensions.get(layerId);
+      if (!current || current.token !== token) {
+        return;
+      }
+      if (current.count <= 1) {
+        suspensions.delete(layerId);
         if (dirty.has(layerId) && !disposed) {
           scheduleFlush(layerId);
         }
       } else {
-        suspensionCounts.set(layerId, current - 1);
+        suspensions.set(layerId, { count: current.count - 1, token });
       }
       notifySuspensionWaiters();
     };
@@ -609,7 +614,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     debounceTimers.clear();
     dirty.clear();
     dirtyReason.clear();
-    suspensionCounts.clear();
+    suspensions.clear();
     notifySuspensionWaiters();
     // The self-echo map is per-(old)document; a reused layer id in the new
     // document must not inherit it. `hashToImage` is content-addressed and kept.
@@ -624,7 +629,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     debounceTimers.clear();
     dirty.clear();
     dirtyReason.clear();
-    suspensionCounts.clear();
+    suspensions.clear();
     notifySuspensionWaiters();
     inFlight.clear();
     hashToImage.clear();

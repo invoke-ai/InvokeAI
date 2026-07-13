@@ -286,6 +286,89 @@ describe('paint tool: target resolution', () => {
     expect(transaction.commitStroke).not.toHaveBeenCalled();
   });
 
+  it('aborts the control transaction and releases the gesture after pointer-move painting fails', () => {
+    const transaction = controlTransaction();
+    const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    const drawImage = vi.spyOn(cacheSurface(h, 'control').ctx, 'drawImage').mockImplementation(() => {
+      throw new Error('move paint failed');
+    });
+
+    expect(() => move(brush, h.ctx, pointer(20, 20), [pointer(20, 20)])).toThrow('move paint failed');
+
+    expect(transaction.cancel).toHaveBeenCalledOnce();
+    expect(transaction.commitStroke).not.toHaveBeenCalled();
+    expect(h.dispatched).toHaveLength(0);
+    expect(h.painted).toHaveLength(0);
+    expect(h.strokes).toHaveLength(0);
+
+    drawImage.mockRestore();
+    down(brush, h.ctx, pointer(30, 30));
+    expect(h.beginControlPixelEdit).toHaveBeenCalledTimes(2);
+  });
+
+  it('aborts the control transaction and releases the gesture after stroke finalization fails', () => {
+    const transaction = controlTransaction();
+    const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    const getImageData = vi.spyOn(cacheSurface(h, 'control').ctx, 'getImageData').mockImplementation(() => {
+      throw new Error('stroke finalization failed');
+    });
+
+    expect(() => up(brush, h.ctx, pointer(10, 10, { buttons: 0 }))).toThrow('stroke finalization failed');
+
+    expect(transaction.cancel).toHaveBeenCalledOnce();
+    expect(transaction.commitStroke).not.toHaveBeenCalled();
+    expect(h.dispatched).toHaveLength(0);
+    expect(h.painted).toHaveLength(0);
+    expect(h.strokes).toHaveLength(0);
+
+    getImageData.mockRestore();
+    down(brush, h.ctx, pointer(30, 30));
+    expect(h.beginControlPixelEdit).toHaveBeenCalledTimes(2);
+  });
+
+  it('still cancels the control transaction and releases the gesture when pixel restoration fails', () => {
+    const transaction = controlTransaction();
+    const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    const putImageData = vi.spyOn(cacheSurface(h, 'control').ctx, 'putImageData').mockImplementation(() => {
+      throw new Error('pixel restoration failed');
+    });
+
+    expect(() => cancel(brush, h.ctx)).toThrow('pixel restoration failed');
+
+    expect(transaction.cancel).toHaveBeenCalledOnce();
+    expect(transaction.commitStroke).not.toHaveBeenCalled();
+    expect(h.dispatched).toHaveLength(0);
+    expect(h.painted).toHaveLength(0);
+    expect(h.strokes).toHaveLength(0);
+
+    putImageData.mockRestore();
+    down(brush, h.ctx, pointer(30, 30));
+    expect(h.beginControlPixelEdit).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not roll back an accepted stroke when transaction publication throws', () => {
+    const transaction = controlTransaction();
+    vi.mocked(transaction.commitStroke).mockImplementation(() => {
+      throw new Error('listener publication failed');
+    });
+    const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+
+    expect(() => up(brush, h.ctx, pointer(10, 10, { buttons: 0 }))).toThrow('listener publication failed');
+
+    expect(transaction.commitStroke).toHaveBeenCalledOnce();
+    expect(transaction.cancel).not.toHaveBeenCalled();
+    down(brush, h.ctx, pointer(30, 30));
+    expect(h.beginControlPixelEdit).toHaveBeenCalledTimes(2);
+  });
+
   it('does not fall through to raster auto-create when control preparation is rejected', () => {
     const h = createHarness(makeDoc([controlImageLayer('control')], 'control'), null);
     const brush = createBrushTool();

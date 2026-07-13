@@ -1,3 +1,5 @@
+import type * as ImagePatchModule from '@workbench/canvas-engine/history/imagePatch';
+import type * as LayerSnapshotModule from '@workbench/canvas-engine/history/layerSnapshot';
 import type * as AdjustedSurfaceCacheModule from '@workbench/canvas-engine/render/adjustedSurfaceCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type {
@@ -35,6 +37,12 @@ import { createCanvasEngine } from './engine';
 // factory wraps the real implementation, preserving all behaviour.
 const adjustedSurfaceCacheDeletes = vi.hoisted(() => [] as string[]);
 const adjustedSurfaceCacheGets = vi.hoisted(() => [] as string[]);
+const adjustedSurfaceCacheDeleteFaults = vi.hoisted(() => new Set<string>());
+const historyPreparationFaults = vi.hoisted(() => ({
+  imagePatch: false,
+  imagePatchBefore: null as ImageData | null,
+  layerSnapshot: false,
+}));
 
 vi.mock('@workbench/canvas-engine/render/adjustedSurfaceCache', async (importOriginal) => {
   const actual = await importOriginal<typeof AdjustedSurfaceCacheModule>();
@@ -46,6 +54,9 @@ vi.mock('@workbench/canvas-engine/render/adjustedSurfaceCache', async (importOri
         ...cache,
         delete: (layerId: string) => {
           adjustedSurfaceCacheDeletes.push(layerId);
+          if (adjustedSurfaceCacheDeleteFaults.has(layerId)) {
+            throw new Error('adjusted surface cache delete failed');
+          }
           cache.delete(layerId);
         },
         get: (...args: Parameters<typeof cache.get>) => {
@@ -53,6 +64,33 @@ vi.mock('@workbench/canvas-engine/render/adjustedSurfaceCache', async (importOri
           return cache.get(...args);
         },
       };
+    },
+  };
+});
+
+vi.mock('./history/imagePatch', async (importOriginal) => {
+  const actual = await importOriginal<typeof ImagePatchModule>();
+  return {
+    ...actual,
+    createImagePatchEntry: (...args: Parameters<typeof actual.createImagePatchEntry>) => {
+      historyPreparationFaults.imagePatchBefore = args[0].before;
+      if (historyPreparationFaults.imagePatch) {
+        throw new Error('image patch preparation failed');
+      }
+      return actual.createImagePatchEntry(...args);
+    },
+  };
+});
+
+vi.mock('./history/layerSnapshot', async (importOriginal) => {
+  const actual = await importOriginal<typeof LayerSnapshotModule>();
+  return {
+    ...actual,
+    createLayerSnapshotEntry: (...args: Parameters<typeof actual.createLayerSnapshotEntry>) => {
+      if (historyPreparationFaults.layerSnapshot) {
+        throw new Error('layer snapshot preparation failed');
+      }
+      return actual.createLayerSnapshotEntry(...args);
     },
   };
 });
@@ -455,6 +493,10 @@ const flushMicrotasks = (): Promise<void> =>
   });
 
 afterEach(() => {
+  adjustedSurfaceCacheDeleteFaults.clear();
+  historyPreparationFaults.imagePatch = false;
+  historyPreparationFaults.imagePatchBefore = null;
+  historyPreparationFaults.layerSnapshot = false;
   vi.unstubAllGlobals();
 });
 
@@ -2211,6 +2253,33 @@ describe('engine-owned control pixel editing', () => {
     h.engine.dispose();
   });
 
+  it('restores a direct control stroke when image-patch history preparation fails', async () => {
+    const h = createControlPaintHarness({ source: { bitmap: null, type: 'paint' } });
+    const before = structuredClone(h.engine.getDocument());
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(40, 40));
+    historyPreparationFaults.imagePatch = true;
+
+    expect(() => h.overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }))).toThrow(
+      'image patch preparation failed'
+    );
+
+    expect(h.engine.getDocument()).toEqual(before);
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.strokes).toHaveLength(0);
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      const finalPixelWrite = (restored.surface as StubRasterSurface).callLog
+        .filter((entry) => entry.op === 'putImageData')
+        .at(-1);
+      expect(finalPixelWrite?.args[0]).toBe(historyPreparationFaults.imagePatchBefore);
+    }
+    h.engine.dispose();
+  });
+
   it('materializes an image control plus brush stroke as one reversible edit', async () => {
     const h = createControlPaintHarness({
       source: { image: { height: 10, imageName: 'control-image', width: 20 }, type: 'image' },
@@ -2248,6 +2317,70 @@ describe('engine-owned control pixel editing', () => {
 
     h.engine.redo();
     expect(h.engine.getDocument()!.layers[0]).toEqual(after);
+    h.engine.dispose();
+  });
+
+  it('restores a materialized control when layer-snapshot history preparation fails', async () => {
+    const h = createControlPaintHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 20 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 7, y: 11 },
+    });
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'control');
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    historyPreparationFaults.layerSnapshot = true;
+
+    expect(() => h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }))).toThrow(
+      'layer snapshot preparation failed'
+    );
+
+    expect(h.engine.getDocument()).toEqual(before);
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.strokes).toHaveLength(0);
+    h.engine.dispose();
+  });
+
+  it('releases materialized persistence and edit ownership when rollback cleanup throws', async () => {
+    const h = createControlPaintHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 20 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 7, y: 11 },
+    });
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.getDocument());
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    historyPreparationFaults.layerSnapshot = true;
+    adjustedSurfaceCacheDeleteFaults.add('control');
+
+    expect(() => h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }))).toThrow(
+      'adjusted surface cache delete failed'
+    );
+
+    expect(h.engine.getDocument()).toEqual(before);
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.strokes).toHaveLength(0);
+
+    historyPreparationFaults.layerSnapshot = false;
+    adjustedSurfaceCacheDeleteFaults.clear();
+    h.overlay.fire('pointerdown', pointerAt(30, 30));
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledTimes(2);
+    h.overlay.fire('pointercancel', pointerAt(30, 30, { buttons: 0 }));
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledTimes(2);
     h.engine.dispose();
   });
 

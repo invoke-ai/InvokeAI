@@ -452,6 +452,35 @@ describe('createBitmapStore', () => {
     h.store.dispose();
   });
 
+  it('ignores a stale suspension release after reset reuses the same layer id', async () => {
+    const h = createHarness();
+    const releaseOldDocument = h.store.suspendLayer(LAYER);
+
+    h.store.reset();
+
+    const releaseNewDocument = h.store.suspendLayer(LAYER);
+    h.store.markLayerDirty(LAYER);
+    const barrier = h.store.flushPendingUploads();
+    let settled = false;
+    void barrier.then(() => {
+      settled = true;
+    });
+
+    releaseOldDocument();
+    await vi.advanceTimersByTimeAsync(3000);
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
+    expect(h.encodeSurface).not.toHaveBeenCalled();
+
+    releaseNewDocument();
+    await barrier;
+
+    expect(h.encodeSurface).toHaveBeenCalledOnce();
+    expect(h.dispatch).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
   it.each(['reset', 'dispose'] as const)('%s settles barriers waiting on suspended dirty work', async (ending) => {
     const h = createHarness();
     h.store.markLayerDirty(LAYER);

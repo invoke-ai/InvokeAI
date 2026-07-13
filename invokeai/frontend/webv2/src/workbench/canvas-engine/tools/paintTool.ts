@@ -173,23 +173,36 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
     target = null;
   };
 
+  const abortSession = (): void => {
+    const activeSession = session;
+    const activeTarget = target;
+    try {
+      activeSession?.cancel();
+    } finally {
+      try {
+        activeTarget?.cancel();
+      } finally {
+        endSession();
+      }
+    }
+  };
+
   return {
     cursor: () => 'crosshair',
     id: spec.id,
     onDeactivate: (ctx, opts) => {
-      if (session && target && !opts?.temporary) {
-        session.cancel();
-        target.cancel();
-        endSession();
+      try {
+        if ((session || target) && !opts?.temporary) {
+          abortSession();
+        }
+      } finally {
+        ctx.setOverlayCursor(null);
+        ctx.invalidate({ overlay: true });
       }
-      ctx.setOverlayCursor(null);
-      ctx.invalidate({ overlay: true });
     },
     onPointerCancel: () => {
-      if (session && target) {
-        session.cancel();
-        target.cancel();
-        endSession();
+      if (session || target) {
+        abortSession();
       }
     },
     onPointerDown: (ctx, input) => {
@@ -228,29 +241,37 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
         });
         session.addPoints([input]);
       } catch {
-        session?.cancel();
-        target.cancel();
-        endSession();
+        abortSession();
       }
     },
     onPointerMove: (ctx, input, batch) => {
       updateCursorRing(ctx, input);
       if (session) {
-        session.addPoints(batch);
+        try {
+          session.addPoints(batch);
+        } catch (error) {
+          abortSession();
+          throw error;
+        }
       }
     },
     onPointerUp: (ctx, input) => {
       updateCursorRing(ctx, input);
       if (session && target) {
+        const activeSession = session;
+        const activeTarget = target;
+        let event: StrokeCommittedEvent | null;
         try {
-          const event = session.commit();
-          if (event) {
-            target.commit(event);
-          } else {
-            target.cancel();
-          }
-        } finally {
-          endSession();
+          event = activeSession.commit();
+        } catch (error) {
+          abortSession();
+          throw error;
+        }
+        endSession();
+        if (event) {
+          activeTarget.commit(event);
+        } else {
+          activeTarget.cancel();
         }
       }
     },
