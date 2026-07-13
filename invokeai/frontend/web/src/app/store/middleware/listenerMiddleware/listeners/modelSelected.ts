@@ -52,7 +52,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import { modelConfigsAdapterSelectors, modelsApi, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
   selectAnimaQwen3EncoderModels,
   selectAnimaVAEModels,
@@ -324,12 +324,14 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           // GGUF transformer ships only the transformer, so auto-select standalone components if the user
           // hasn't already picked them - this unblocks the readiness check after installing the starter pack.
           const modelConfigsResult = selectModelConfigsQuery(state);
-          const newModelConfig = modelConfigsResult.data
-            ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
-            : undefined;
-          const isDiffusers = newModelConfig?.format === 'diffusers';
-
-          if (isDiffusers) {
+          const newModelConfig =
+            (modelConfigsResult.data
+              ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
+              : undefined) ?? modelsApi.endpoints.getModelConfig.select(newModel.key)(state).data;
+          if (!newModelConfig) {
+            // The model list may not be populated yet during startup or metadata recall. Defer component
+            // changes until the selected model's format is known instead of treating unknown as single-file.
+          } else if (newModelConfig.format === 'diffusers') {
             if (krea2VaeModel) {
               dispatch(krea2VaeModelSelected(null));
               modelsUpdatedDisabledOrCleared += 1;
@@ -578,10 +580,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       if (newBase === 'krea-2' && state.params.model?.base === 'krea-2' && newModel.key !== state.params.model?.key) {
         const { krea2VaeModel, krea2Qwen3VlEncoderModel } = state.params;
         const modelConfigsResult = selectModelConfigsQuery(state);
-        const newModelConfig = modelConfigsResult.data
-          ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
-          : undefined;
-        if (newModelConfig?.format === 'diffusers') {
+        const newModelConfig =
+          (modelConfigsResult.data
+            ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
+            : undefined) ?? modelsApi.endpoints.getModelConfig.select(newModel.key)(state).data;
+        if (!newModelConfig) {
+          // Defer until the model format is known.
+        } else if (newModelConfig.format === 'diffusers') {
           if (krea2VaeModel) {
             dispatch(krea2VaeModelSelected(null));
           }

@@ -66,19 +66,29 @@ class Krea2LoRALoaderInvocation(BaseInvocation):
                 "not Krea-2 models. Ensure you are using a Krea-2 compatible LoRA."
             )
 
-        if self.transformer and any(lora.lora.key == lora_key for lora in self.transformer.loras):
-            raise ValueError(f'LoRA "{lora_key}" already applied to transformer.')
-        if self.qwen3_vl_encoder and any(lora.lora.key == lora_key for lora in self.qwen3_vl_encoder.loras):
-            raise ValueError(f'LoRA "{lora_key}" already applied to Qwen3-VL encoder.')
-
         output = Krea2LoRALoaderOutput()
 
         if self.transformer is not None:
             output.transformer = self.transformer.model_copy(deep=True)
-            output.transformer.loras.append(LoRAField(lora=self.lora, weight=self.weight))
         if self.qwen3_vl_encoder is not None:
             output.qwen3_vl_encoder = self.qwen3_vl_encoder.model_copy(deep=True)
-            output.qwen3_vl_encoder.loras.append(LoRAField(lora=self.lora, weight=self.weight))
+
+        transformer_lora = (
+            next((item for item in output.transformer.loras if item.lora.key == lora_key), None)
+            if output.transformer is not None
+            else None
+        )
+        encoder_lora = (
+            next((item for item in output.qwen3_vl_encoder.loras if item.lora.key == lora_key), None)
+            if output.qwen3_vl_encoder is not None
+            else None
+        )
+        effective_lora = transformer_lora or encoder_lora or LoRAField(lora=self.lora, weight=self.weight)
+
+        if output.transformer is not None and transformer_lora is None:
+            output.transformer.loras.append(effective_lora.model_copy(deep=True))
+        if output.qwen3_vl_encoder is not None and encoder_lora is None:
+            output.qwen3_vl_encoder.loras.append(effective_lora.model_copy(deep=True))
 
         return output
 
@@ -112,40 +122,39 @@ class Krea2LoRACollectionLoader(BaseInvocation):
     def invoke(self, context: InvocationContext) -> Krea2LoRALoaderOutput:
         output = Krea2LoRALoaderOutput()
         loras = self.loras if isinstance(self.loras, list) else [self.loras]
-        added_loras: list[str] = []
-
         if self.transformer is not None:
             output.transformer = self.transformer.model_copy(deep=True)
         if self.qwen3_vl_encoder is not None:
             output.qwen3_vl_encoder = self.qwen3_vl_encoder.model_copy(deep=True)
 
-        # Seed the dedup set with LoRAs already present on the incoming fields so chaining collection
-        # loaders can't apply the same LoRA twice (the transformer and encoder are kept in sync below).
-        if self.transformer is not None:
-            added_loras.extend(existing.lora.key for existing in self.transformer.loras)
-        if self.qwen3_vl_encoder is not None:
-            added_loras.extend(
-                existing.lora.key for existing in self.qwen3_vl_encoder.loras if existing.lora.key not in added_loras
-            )
-
         for lora in loras:
             if lora is None:
                 continue
-            if lora.lora.key in added_loras:
-                continue
             if not context.models.exists(lora.lora.key):
-                raise Exception(f"Unknown lora: {lora.lora.key}!")
+                raise ValueError(f"Unknown lora: {lora.lora.key}!")
             if lora.lora.base is not BaseModelType.Krea2:
                 raise ValueError(
                     f"LoRA '{lora.lora.key}' is for {lora.lora.base.value if lora.lora.base else 'unknown'} models, "
                     "not Krea-2 models. Ensure you are using a Krea-2 compatible LoRA."
                 )
 
-            added_loras.append(lora.lora.key)
+            transformer_lora = (
+                next((item for item in output.transformer.loras if item.lora.key == lora.lora.key), None)
+                if output.transformer is not None
+                else None
+            )
+            encoder_lora = (
+                next((item for item in output.qwen3_vl_encoder.loras if item.lora.key == lora.lora.key), None)
+                if output.qwen3_vl_encoder is not None
+                else None
+            )
+            effective_lora = transformer_lora or encoder_lora or lora
 
             if self.transformer is not None and output.transformer is not None:
-                output.transformer.loras.append(lora)
+                if transformer_lora is None:
+                    output.transformer.loras.append(effective_lora.model_copy(deep=True))
             if self.qwen3_vl_encoder is not None and output.qwen3_vl_encoder is not None:
-                output.qwen3_vl_encoder.loras.append(lora)
+                if encoder_lora is None:
+                    output.qwen3_vl_encoder.loras.append(effective_lora.model_copy(deep=True))
 
         return output

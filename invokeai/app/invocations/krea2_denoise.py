@@ -147,6 +147,18 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             return self.cfg_scale
         raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
 
+    @staticmethod
+    def _should_apply_cfg_for_step(cfg_scale: float, *, has_negative_conditioning: bool) -> bool:
+        return has_negative_conditioning and cfg_scale > 1.0
+
+    @staticmethod
+    def _validate_effective_schedule(*, start_idx: int, end_idx: int) -> None:
+        if end_idx <= start_idx:
+            raise ValueError(
+                "The requested denoising range does not contain any effective denoising steps at the configured "
+                "step count. Increase denoising_end, decrease denoising_start, or increase steps."
+            )
+
     def _validate_inputs(self) -> None:
         if self.denoising_start >= self.denoising_end:
             raise ValueError("denoising_start must be less than denoising_end.")
@@ -193,19 +205,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             context, self.positive_conditioning.conditioning_name, inference_dtype, device
         )
 
-        # CFG: standard formulation, enabled only when cfg_scale > 1 and negative conditioning is provided.
-        if isinstance(self.cfg_scale, list):
-            any_cfg_above_one = any(v > 1.0 for v in self.cfg_scale)
-        else:
-            any_cfg_above_one = self.cfg_scale > 1.0
-        do_cfg = self.negative_conditioning is not None and any_cfg_above_one
-        neg_prompt_embeds = None
-        neg_prompt_mask = None
-        if do_cfg:
-            neg_prompt_embeds, neg_prompt_mask = self._load_text_conditioning(
-                context, self.negative_conditioning.conditioning_name, inference_dtype, device
-            )
-
         latent_height = self.height // LATENT_SCALE_FACTOR
         latent_width = self.width // LATENT_SCALE_FACTOR
         grid_height = latent_height // 2
@@ -244,6 +243,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         is_clipped = self.denoising_start > 0 or self.denoising_end < 1
         start_idx = int(round(self.denoising_start * total_sigmas))
         end_idx = int(round(self.denoising_end * total_sigmas))
+        self._validate_effective_schedule(start_idx=start_idx, end_idx=end_idx)
         if is_clipped:
             sigmas_sched = sigmas_sched[start_idx : end_idx + 1]
             timesteps_sched = sigmas_sched[:-1] * scheduler.config.num_train_timesteps
@@ -257,6 +257,17 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # by denoising_start/denoising_end; a scalar is simply broadcast.
         full_cfg_scale = self._prepare_cfg_scale(total_sigmas)
         cfg_scale = full_cfg_scale[start_idx:end_idx] if is_clipped else full_cfg_scale
+
+        # Load negative conditioning only if at least one active step actually uses CFG. CFG is still
+        # decided per step below so values at or below 1.0 use the conditional prediction directly.
+        has_negative_conditioning = self.negative_conditioning is not None
+        do_cfg = has_negative_conditioning and any(value > 1.0 for value in cfg_scale)
+        neg_prompt_embeds = None
+        neg_prompt_mask = None
+        if do_cfg and self.negative_conditioning is not None:
+            neg_prompt_embeds, neg_prompt_mask = self._load_text_conditioning(
+                context, self.negative_conditioning.conditioning_name, inference_dtype, device
+            )
 
         # Load initial latents (img2img).
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
@@ -274,9 +285,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
             latents = noise
-
-        if total_steps <= 0:
-            return latents.unsqueeze(2)
 
         # Pack latents into 2x2 patches: (B, C, H, W) -> (B, grid_h*grid_w, C*4).
         latents = pack_latents(latents, 1, KREA2_LATENT_CHANNELS, latent_height, latent_width)
@@ -351,7 +359,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     return_dict=False,
                 )[0]
 
-                if do_cfg and neg_prompt_embeds is not None:
+                if self._should_apply_cfg_for_step(
+                    cfg_scale[step_idx], has_negative_conditioning=neg_prompt_embeds is not None
+                ):
                     noise_pred_uncond = transformer(
                         hidden_states=latents,
                         encoder_hidden_states=neg_prompt_embeds,

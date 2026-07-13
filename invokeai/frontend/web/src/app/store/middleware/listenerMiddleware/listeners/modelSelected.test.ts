@@ -116,9 +116,15 @@ vi.mock('services/api/hooks/modelsByType', () => ({
 // model's format (diffusers vs. single-file/GGUF), which drives clear-vs-auto-select.
 const mockSelectModelConfigsQuery = vi.fn((_state: unknown) => ({ data: undefined }) as { data: unknown });
 const mockSelectModelById = vi.fn((_data: unknown, _key: string) => undefined as unknown);
+const mockSelectIndividualModelConfig = vi.fn((_state: unknown) => ({ data: undefined }) as { data: unknown });
 
 vi.mock('services/api/endpoints/models', () => ({
   modelConfigsAdapterSelectors: { selectById: (data: unknown, key: string) => mockSelectModelById(data, key) },
+  modelsApi: {
+    endpoints: {
+      getModelConfig: { select: (_key: string) => (state: unknown) => mockSelectIndividualModelConfig(state) },
+    },
+  },
   selectModelConfigsQuery: (state: unknown) => mockSelectModelConfigsQuery(state),
 }));
 
@@ -364,8 +370,9 @@ describe('modelSelected listener - Krea-2 defaulting', () => {
     mockSelectQwenImageVAEModels.mockReturnValue([mockKrea2Vae]);
     mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
     mockSelectQwen3VLEncoderModels.mockReturnValue([mockKrea2Qwen3VlEncoder]);
-    mockSelectModelConfigsQuery.mockReturnValue({ data: undefined });
-    mockSelectModelById.mockReturnValue(undefined);
+    mockSelectModelConfigsQuery.mockReturnValue({ data: {} });
+    mockSelectModelById.mockReturnValue({ format: 'checkpoint' });
+    mockSelectIndividualModelConfig.mockReturnValue({ data: undefined });
   });
 
   it('auto-selects a standalone VAE and Qwen3-VL encoder when switching to a single-file/GGUF Krea-2 model', () => {
@@ -413,6 +420,42 @@ describe('modelSelected listener - Krea-2 defaulting', () => {
 
     expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)).toBeUndefined();
     expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)).toBeUndefined();
+  });
+
+  it('defers standalone component changes while the selected model format is unknown', () => {
+    mockSelectModelConfigsQuery.mockReturnValue({ data: undefined });
+    mockSelectModelById.mockReturnValue(undefined);
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockKrea2MainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)).toBeUndefined();
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)).toBeUndefined();
+  });
+
+  it('uses the individual model-config cache when the list cache is unavailable', () => {
+    mockSelectModelConfigsQuery.mockReturnValue({ data: undefined });
+    mockSelectModelById.mockReturnValue(undefined);
+    mockSelectIndividualModelConfig.mockReturnValue({ data: { format: 'diffusers' } });
+    const state = buildMockState({
+      model: mockKrea2MainModel,
+      krea2VaeModel: { key: 'stale-vae', hash: 'h', name: 'Stale VAE', base: 'qwen-image', type: 'vae' },
+      krea2Qwen3VlEncoderModel: {
+        key: 'stale-enc',
+        hash: 'h',
+        name: 'Stale Enc',
+        base: 'any',
+        type: 'qwen3_vl_encoder',
+      },
+    });
+    const nextKreaModel = { ...mockKrea2MainModel, key: 'next-krea-key' };
+    const action = modelSelected(zParameterModel.parse(nextKreaModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)?.payload).toBeNull();
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)?.payload).toBeNull();
   });
 
   it('does not overwrite standalone components the user already selected', () => {

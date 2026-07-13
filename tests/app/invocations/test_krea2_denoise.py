@@ -51,6 +51,32 @@ class TestPrepareCfgScale:
         with pytest.raises(ValueError, match="cfg_scale list has 3 values but the model is configured for 8 steps"):
             invocation._prepare_cfg_scale(8)
 
+
+class TestCfgForStep:
+    def test_scale_above_one_uses_cfg_when_negative_conditioning_is_available(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        assert invocation._should_apply_cfg_for_step(4.0, has_negative_conditioning=True) is True
+
+    @pytest.mark.parametrize("cfg_scale", [1.0, 0.5])
+    def test_scale_at_or_below_one_does_not_use_cfg(self, cfg_scale: float) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        assert invocation._should_apply_cfg_for_step(cfg_scale, has_negative_conditioning=True) is False
+
+    def test_missing_negative_conditioning_does_not_use_cfg(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        assert invocation._should_apply_cfg_for_step(4.0, has_negative_conditioning=False) is False
+
+
+class TestEffectiveScheduleValidation:
+    def test_rejects_a_fractional_range_that_rounds_to_zero_steps(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        with pytest.raises(ValueError, match="does not contain any effective denoising steps"):
+            invocation._validate_effective_schedule(start_idx=0, end_idx=0)
+
+    def test_accepts_a_range_with_at_least_one_effective_step(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        invocation._validate_effective_schedule(start_idx=0, end_idx=1)
+
     def test_invalid_type_raises(self) -> None:
         invocation = Krea2DenoiseInvocation.model_construct(cfg_scale="nonsense")
         with pytest.raises(ValueError, match="Invalid CFG scale type"):

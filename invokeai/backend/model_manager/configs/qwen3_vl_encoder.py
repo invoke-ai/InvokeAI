@@ -63,6 +63,22 @@ class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
             },
         )
 
+        if config_path_nested.exists():
+            weights_path = mod.path / "text_encoder"
+            tokenizer_path = mod.path / "tokenizer"
+        else:
+            weights_path = mod.path
+            tokenizer_path = mod.path
+
+        has_weights = any(weights_path.glob("*.safetensors")) or any(weights_path.glob("*.bin"))
+        has_tokenizer = (tokenizer_path / "tokenizer.json").exists() or (
+            (tokenizer_path / "vocab.json").exists() and (tokenizer_path / "merges.txt").exists()
+        )
+        if not has_weights:
+            raise NotAMatchError("standalone Qwen3-VL encoder directory does not contain model weights")
+        if not has_tokenizer:
+            raise NotAMatchError("standalone Qwen3-VL encoder directory does not contain tokenizer files")
+
         return cls(**override_fields)
 
 

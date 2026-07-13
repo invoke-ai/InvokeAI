@@ -912,6 +912,25 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
 
     @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
+        has_transformer_blocks = state_dict_has_any_keys_starting_with(
+            state_dict, {"transformer.transformer_blocks.", "transformer_blocks."}
+        )
+        has_lora_down = state_dict_has_any_keys_ending_with(state_dict, {"lora_A.weight", "lora_down.weight"})
+        has_lora_up = state_dict_has_any_keys_ending_with(state_dict, {"lora_B.weight", "lora_up.weight"})
+        if explicit_krea2_override and has_transformer_blocks and has_lora_down and has_lora_up:
+            return cls(**override_fields)
+
+        cls._validate_looks_like_lora(mod)
+        cls._validate_base(mod)
+        return cls(**override_fields)
+
+    @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
         """Krea-2 LoRAs have keys like transformer.text_fusion.* / transformer.transformer_blocks.* with
         a lora_A/lora_B (or lora_down/lora_up) suffix. The text-fusion stage is unique to Krea-2."""

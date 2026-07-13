@@ -8,6 +8,7 @@ real (diffusers ``Krea2Transformer2DModel`` / transformers ``Qwen3VLModel``) arc
 """
 
 import re
+from types import SimpleNamespace
 
 import accelerate
 import pytest
@@ -17,10 +18,34 @@ from invokeai.backend.model_manager.load.model_loaders.krea2 import (
     _convert_krea2_native_to_diffusers,
     _dequantize_scaled_fp8,
     _is_native_krea2_format,
+    _normalize_qwen3vl_rope_config,
     _reject_incomplete_load,
     _remap_qwen3vl_singlefile_keys,
     _strip_comfyui_prefix,
 )
+
+
+class TestNormalizeQwen3vlRopeConfig:
+    def test_copies_rope_parameters_when_rope_scaling_is_missing(self) -> None:
+        rope_parameters = {"rope_type": "default", "rope_theta": 1000000.0}
+        text_config = SimpleNamespace(rope_parameters=rope_parameters, rope_scaling=None)
+        config = SimpleNamespace(text_config=text_config)
+
+        assert _normalize_qwen3vl_rope_config(config) is config
+        assert text_config.rope_scaling == rope_parameters
+
+    def test_preserves_existing_rope_scaling(self) -> None:
+        existing = {"rope_type": "existing"}
+        text_config = SimpleNamespace(rope_parameters={"rope_type": "new"}, rope_scaling=existing)
+        config = SimpleNamespace(text_config=text_config)
+
+        _normalize_qwen3vl_rope_config(config)
+
+        assert text_config.rope_scaling is existing
+
+    def test_accepts_config_without_a_text_config(self) -> None:
+        config = SimpleNamespace()
+        assert _normalize_qwen3vl_rope_config(config) is config
 
 
 class TestStripComfyuiPrefix:

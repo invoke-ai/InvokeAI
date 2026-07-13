@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import accelerate
-from transformers import AutoTokenizer
+from transformers import AutoConfig, AutoTokenizer
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -26,6 +26,16 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
+
+
+def _normalize_qwen3vl_rope_config(config: Any) -> Any:
+    """Mirror Qwen3-VL rope_parameters into rope_scaling for Transformers compatibility."""
+    text_config = getattr(config, "text_config", None)
+    if text_config is not None:
+        rope_params = getattr(text_config, "rope_parameters", None)
+        if getattr(text_config, "rope_scaling", None) is None and rope_params is not None:
+            text_config.rope_scaling = rope_params
+    return config
 
 
 def _strip_comfyui_prefix(sd: dict[str, Any]) -> dict[str, Any]:
@@ -241,14 +251,7 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
             # Krea-2's Qwen3-VL text_encoder config stores rope settings under `rope_parameters`, but the
             # installed transformers' Qwen3VL rotary embedding reads `rope_scaling` (None here) → crash.
             # Patch the config so rope_scaling mirrors rope_parameters before instantiating the model.
-            from transformers import AutoConfig
-
-            te_config = AutoConfig.from_pretrained(model_path, local_files_only=True)
-            text_config = getattr(te_config, "text_config", None)
-            if text_config is not None:
-                rope_params = getattr(text_config, "rope_parameters", None)
-                if getattr(text_config, "rope_scaling", None) is None and rope_params is not None:
-                    text_config.rope_scaling = rope_params
+            te_config = _normalize_qwen3vl_rope_config(AutoConfig.from_pretrained(model_path, local_files_only=True))
             extra_kwargs["config"] = te_config
 
         try:
@@ -409,8 +412,12 @@ class Qwen3VLEncoderLoader(ModelLoader):
             case SubModelType.TextEncoder:
                 target_device = TorchDevice.choose_torch_device()
                 model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+                te_config = _normalize_qwen3vl_rope_config(
+                    AutoConfig.from_pretrained(text_encoder_path, local_files_only=True)
+                )
                 return Qwen3VLModel.from_pretrained(
                     text_encoder_path,
+                    config=te_config,
                     torch_dtype=model_dtype,
                     low_cpu_mem_usage=True,
                     local_files_only=True,
@@ -500,19 +507,11 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
             return AutoTokenizer.from_pretrained(self.DEFAULT_HF_REPO, extra_special_tokens={})
 
     def _load_hf_config(self) -> Any:
-        from transformers import AutoConfig
-
         try:
             te_config = AutoConfig.from_pretrained(self.DEFAULT_HF_REPO, local_files_only=True)
         except Exception:
             te_config = AutoConfig.from_pretrained(self.DEFAULT_HF_REPO)
-        # transformers' Qwen3-VL rotary embedding reads `rope_scaling`; the config stores `rope_parameters`.
-        text_config = getattr(te_config, "text_config", None)
-        if text_config is not None:
-            rope_params = getattr(text_config, "rope_parameters", None)
-            if getattr(text_config, "rope_scaling", None) is None and rope_params is not None:
-                text_config.rope_scaling = rope_params
-        return te_config
+        return _normalize_qwen3vl_rope_config(te_config)
 
     def _load_text_encoder(self, config: Qwen3VLEncoder_Checkpoint_Config) -> AnyModel:
         import torch

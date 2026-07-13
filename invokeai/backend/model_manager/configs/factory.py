@@ -1,3 +1,4 @@
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -421,12 +422,33 @@ class ModelConfigFactory:
                     f"Expected one of: {', '.join(sorted(_MODEL_EXTENSIONS))}"
                 )
         else:
-            # A config file at the root (model_index.json / config.json) is an unambiguous
-            # diffusers/transformers model marker, so accept the directory regardless of file
-            # count. HF snapshots often bundle extra non-model assets (e.g. a model-card `images/`
-            # folder) that would otherwise trip the general-purpose-directory guard below.
-            has_root_config = any((path / config).exists() for config in _CONFIG_FILES)
-            if has_root_config:
+            # Recognized Diffusers/Transformers configs are safe model markers. A generic config.json
+            # is not sufficient because many large application directories contain one.
+            recognized_root_config = False
+            for config_name in _CONFIG_FILES:
+                config_path = path / config_name
+                if not config_path.exists():
+                    continue
+                try:
+                    config = json.loads(config_path.read_text())
+                except (OSError, ValueError):
+                    continue
+                if config_name == "model_index.json":
+                    recognized_root_config = isinstance(config.get("_class_name"), str)
+                else:
+                    architectures = config.get("architectures")
+                    recognized_root_config = (
+                        isinstance(config.get("_class_name"), str)
+                        or isinstance(config.get("model_type"), str)
+                        or (
+                            isinstance(architectures, list)
+                            and bool(architectures)
+                            and isinstance(architectures[0], str)
+                        )
+                    )
+                if recognized_root_config:
+                    break
+            if recognized_root_config:
                 return
 
             # For directories, do a quick file count check with early exit
