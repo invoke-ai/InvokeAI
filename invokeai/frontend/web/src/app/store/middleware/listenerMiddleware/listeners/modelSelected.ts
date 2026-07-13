@@ -69,6 +69,8 @@ import {
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
 import { isExternalApiModelConfig, isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
 
+import { getKrea2ComponentUpdates } from './krea2ComponentSync';
+
 const log = logger('models');
 
 export const addModelSelectedListener = (startAppListening: AppStartListening) => {
@@ -332,27 +334,38 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             // The model list may not be populated yet during startup or metadata recall. Defer component
             // changes until the selected model's format is known instead of treating unknown as single-file.
           } else if (newModelConfig.format === 'diffusers') {
-            if (krea2VaeModel) {
-              dispatch(krea2VaeModelSelected(null));
+            const updates = getKrea2ComponentUpdates({
+              format: newModelConfig.format,
+              selectedVae: krea2VaeModel,
+              selectedEncoder: krea2Qwen3VlEncoderModel,
+              availableQwenImageVaes: selectQwenImageVAEModels(state),
+              availableAnimaVaes: selectAnimaVAEModels(state),
+              availableEncoders: selectQwen3VLEncoderModels(state),
+            });
+            if ('vae' in updates) {
+              dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
               modelsUpdatedDisabledOrCleared += 1;
             }
-            if (krea2Qwen3VlEncoderModel) {
-              dispatch(krea2Qwen3VlEncoderModelSelected(null));
+            if ('encoder' in updates) {
+              dispatch(
+                krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null)
+              );
               modelsUpdatedDisabledOrCleared += 1;
             }
           } else {
-            if (!krea2VaeModel) {
-              // Krea-2 shares the Qwen-Image VAE; the dropdown also accepts anima-tagged copies.
-              const vae = selectQwenImageVAEModels(state)[0] ?? selectAnimaVAEModels(state)[0];
-              if (vae) {
-                dispatch(krea2VaeModelSelected(zModelIdentifierField.parse(vae)));
-              }
+            const updates = getKrea2ComponentUpdates({
+              format: newModelConfig.format,
+              selectedVae: krea2VaeModel,
+              selectedEncoder: krea2Qwen3VlEncoderModel,
+              availableQwenImageVaes: selectQwenImageVAEModels(state),
+              availableAnimaVaes: selectAnimaVAEModels(state),
+              availableEncoders: selectQwen3VLEncoderModels(state),
+            });
+            if (updates.vae) {
+              dispatch(krea2VaeModelSelected(zModelIdentifierField.parse(updates.vae)));
             }
-            if (!krea2Qwen3VlEncoderModel) {
-              const encoder = selectQwen3VLEncoderModels(state)[0];
-              if (encoder) {
-                dispatch(krea2Qwen3VlEncoderModelSelected(zModelIdentifierField.parse(encoder)));
-              }
+            if (updates.encoder) {
+              dispatch(krea2Qwen3VlEncoderModelSelected(zModelIdentifierField.parse(updates.encoder)));
             }
           }
         }
@@ -586,25 +599,22 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             : undefined) ?? modelsApi.endpoints.getModelConfig.select(newModel.key)(state).data;
         if (!newModelConfig) {
           // Defer until the model format is known.
-        } else if (newModelConfig.format === 'diffusers') {
-          if (krea2VaeModel) {
-            dispatch(krea2VaeModelSelected(null));
-          }
-          if (krea2Qwen3VlEncoderModel) {
-            dispatch(krea2Qwen3VlEncoderModelSelected(null));
-          }
         } else {
-          if (!krea2VaeModel) {
-            const vae = selectQwenImageVAEModels(state)[0] ?? selectAnimaVAEModels(state)[0];
-            if (vae) {
-              dispatch(krea2VaeModelSelected(zModelIdentifierField.parse(vae)));
-            }
+          const updates = getKrea2ComponentUpdates({
+            format: newModelConfig.format,
+            selectedVae: krea2VaeModel,
+            selectedEncoder: krea2Qwen3VlEncoderModel,
+            availableQwenImageVaes: selectQwenImageVAEModels(state),
+            availableAnimaVaes: selectAnimaVAEModels(state),
+            availableEncoders: selectQwen3VLEncoderModels(state),
+          });
+          if ('vae' in updates) {
+            dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
           }
-          if (!krea2Qwen3VlEncoderModel) {
-            const encoder = selectQwen3VLEncoderModels(state)[0];
-            if (encoder) {
-              dispatch(krea2Qwen3VlEncoderModelSelected(zModelIdentifierField.parse(encoder)));
-            }
+          if ('encoder' in updates) {
+            dispatch(
+              krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null)
+            );
           }
         }
       }

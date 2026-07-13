@@ -52,15 +52,15 @@ vi.mock('features/metadata/util/modelFetchingHelpers', () => ({
 }));
 
 vi.mock('features/nodes/util/graph/generation/addImageToImage', () => ({
-  addImageToImage: vi.fn(),
+  addImageToImage: vi.fn(({ l2i }) => Promise.resolve(l2i)),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addInpaint', () => ({
-  addInpaint: vi.fn(),
+  addInpaint: vi.fn(({ l2i }) => Promise.resolve(l2i)),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addOutpaint', () => ({
-  addOutpaint: vi.fn(),
+  addOutpaint: vi.fn(({ l2i }) => Promise.resolve(l2i)),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addKrea2LoRAs', () => ({
@@ -99,6 +99,9 @@ vi.mock('services/api/types', async () => {
   };
 });
 
+import { addImageToImage } from './addImageToImage';
+import { addInpaint } from './addInpaint';
+import { addOutpaint } from './addOutpaint';
 import { buildKrea2Graph } from './buildKrea2Graph';
 
 type BuiltGraph = Awaited<ReturnType<typeof buildKrea2Graph>>['g'];
@@ -107,6 +110,15 @@ const buildTxt2Img = () =>
   buildKrea2Graph({
     generationMode: 'txt2img',
     manager: null,
+    state: {
+      system: { shouldUseNSFWChecker: false, shouldUseWatermarker: false },
+    } as never,
+  });
+
+const buildCanvasMode = (generationMode: 'img2img' | 'inpaint' | 'outpaint') =>
+  buildKrea2Graph({
+    generationMode,
+    manager: { id: 'manager' } as never,
     state: {
       system: { shouldUseNSFWChecker: false, shouldUseWatermarker: false },
     } as never,
@@ -131,6 +143,18 @@ describe('buildKrea2Graph', () => {
     expect(types).toContain('krea2_denoise');
     // Krea-2 decodes with the Qwen-Image VAE node.
     expect(types).toContain('qwen_image_l2i');
+  });
+
+  it.each([
+    ['img2img', addImageToImage],
+    ['inpaint', addInpaint],
+    ['outpaint', addOutpaint],
+  ] as const)('builds the %s graph through its canvas integration', async (mode, integration) => {
+    const { g } = await buildCanvasMode(mode);
+
+    expect(integration).toHaveBeenCalledOnce();
+    expect(nodeTypesOf(g)).toContain('qwen_image_i2l');
+    expect((g.getMetadataNode() as unknown as Record<string, unknown>).generation_mode).toBe(`krea2_${mode}`);
   });
 
   describe('CFG gating (negative conditioning)', () => {

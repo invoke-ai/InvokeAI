@@ -1173,6 +1173,7 @@ const Krea2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'Krea2VAEModel',
   parse: async (metadata, store) => {
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2VAEModel');
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
@@ -1197,6 +1198,7 @@ const Krea2Qwen3VlEncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'Krea2Qwen3VlEncoderModel',
   parse: async (metadata, store) => {
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2Qwen3VlEncoderModel');
     const raw = getProperty(metadata, 'qwen3_vl_encoder');
     const parsed = await parseModelIdentifier(raw, store, 'qwen3_vl_encoder');
     assert(parsed.type === 'qwen3_vl_encoder');

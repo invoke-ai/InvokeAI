@@ -179,16 +179,23 @@ describe('ImageMetadataHandlers — Krea-2 recall gating', () => {
   // transformers, recalled into dedicated (krea2VaeModel / krea2Qwen3VlEncoderModel) slots — but only when
   // the current main model is actually Krea-2.
   describe('Krea2VAEModel', () => {
-    it('parses metadata.vae when the current main model is Krea-2', async () => {
-      currentBase = 'krea-2';
-      nextResolved = fakeModel('vae', 'krea-2');
-      const store = makeStore();
+    it.each(['qwen-image', 'anima'] as const)(
+      'parses a supported %s VAE when the current and metadata main models are Krea-2',
+      async (vaeBase) => {
+        currentBase = 'krea-2';
+        nextResolved = fakeModel('vae', vaeBase);
+        const store = makeStore();
 
-      const parsed = await ImageMetadataHandlers.Krea2VAEModel.parse({ vae: nextResolved }, store);
+        const parsed = await ImageMetadataHandlers.Krea2VAEModel.parse(
+          { model: fakeModel('main', 'krea-2'), vae: nextResolved },
+          store
+        );
 
-      expect(parsed.key).toBe('vae-key');
-      expect(parsed.type).toBe('vae');
-    });
+        expect(parsed.key).toBe('vae-key');
+        expect(parsed.type).toBe('vae');
+        expect(parsed.base).toBe(vaeBase);
+      }
+    );
 
     it('rejects parsing when the current main model is not Krea-2', async () => {
       currentBase = 'sdxl';
@@ -196,6 +203,19 @@ describe('ImageMetadataHandlers — Krea-2 recall gating', () => {
       const store = makeStore();
 
       await expect(ImageMetadataHandlers.Krea2VAEModel.parse({ vae: nextResolved }, store)).rejects.toThrow();
+    });
+
+    it('rejects VAE metadata from a non-Krea-2 image even when Krea-2 is currently selected', async () => {
+      currentBase = 'krea-2';
+      nextResolved = fakeModel('vae', 'sdxl');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Krea2VAEModel.parse(
+          { model: fakeModel('qwen3_vl_encoder', 'sdxl'), vae: nextResolved },
+          store
+        )
+      ).rejects.toThrow();
     });
   });
 
@@ -206,7 +226,7 @@ describe('ImageMetadataHandlers — Krea-2 recall gating', () => {
       const store = makeStore();
 
       const parsed = await ImageMetadataHandlers.Krea2Qwen3VlEncoderModel.parse(
-        { qwen3_vl_encoder: nextResolved },
+        { model: fakeModel('main', 'krea-2'), qwen3_vl_encoder: nextResolved },
         store
       );
 
@@ -221,6 +241,19 @@ describe('ImageMetadataHandlers — Krea-2 recall gating', () => {
 
       await expect(
         ImageMetadataHandlers.Krea2Qwen3VlEncoderModel.parse({ qwen3_vl_encoder: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+
+    it('rejects encoder metadata from a non-Krea-2 image even when Krea-2 is currently selected', async () => {
+      currentBase = 'krea-2';
+      nextResolved = fakeModel('qwen3_vl_encoder', 'any');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Krea2Qwen3VlEncoderModel.parse(
+          { model: fakeModel('qwen3_vl_encoder', 'flux'), qwen3_vl_encoder: nextResolved },
+          store
+        )
       ).rejects.toThrow();
     });
   });

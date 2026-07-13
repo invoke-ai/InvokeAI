@@ -27,6 +27,15 @@ def _ambiguous_transformer_only_lora() -> MagicMock:
     return mod
 
 
+def _ambiguous_text_encoder_only_lora() -> MagicMock:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "text_encoder.language_model.layers.0.self_attn.q_proj.lora_A.weight": object(),
+        "text_encoder.language_model.layers.0.self_attn.q_proj.lora_B.weight": object(),
+    }
+    return mod
+
+
 @patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
 def test_explicit_krea2_override_accepts_ambiguous_transformer_only_lora(_raise_if_not_file) -> None:
     config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(
@@ -51,3 +60,18 @@ def test_explicit_krea2_override_rejects_incomplete_lora_pair(_raise_if_not_file
 
     with pytest.raises(NotAMatchError):
         LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_text_encoder_only_lora(_raise_if_not_file) -> None:
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(
+        _ambiguous_text_encoder_only_lora(), {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2}
+    )
+
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_rejects_ambiguous_text_encoder_only_lora(_raise_if_not_file) -> None:
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(_ambiguous_text_encoder_only_lora(), {**_REQUIRED_FIELDS})

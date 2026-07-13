@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from invokeai.app.invocations.krea2_lora_loader import Krea2LoRACollectionLoader, Krea2LoRALoaderInvocation
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, Qwen3VLEncoderField, TransformerField
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
@@ -29,8 +31,13 @@ def _encoder(loras: list[LoRAField]) -> Qwen3VLEncoderField:
     )
 
 
-def _context() -> SimpleNamespace:
-    return SimpleNamespace(models=SimpleNamespace(exists=lambda _key: True))
+def _context(stored_base: BaseModelType = BaseModelType.Krea2) -> SimpleNamespace:
+    return SimpleNamespace(
+        models=SimpleNamespace(
+            exists=lambda _key: True,
+            get_config=lambda _identifier: SimpleNamespace(base=stored_base, type=ModelType.LoRA),
+        )
+    )
 
 
 def test_collection_loader_repairs_transformer_only_lora_state() -> None:
@@ -97,3 +104,42 @@ def test_single_loader_rejects_non_krea_lora() -> None:
         assert "not Krea-2 models" in str(error)
     else:
         raise AssertionError("Expected a non-Krea LoRA to be rejected")
+
+
+@pytest.mark.parametrize("loader_type", ["single", "collection"])
+def test_loader_rejects_forged_krea_identifier_for_non_krea_stored_model(loader_type: str) -> None:
+    lora = _lora("forged")
+    if loader_type == "single":
+        invocation = Krea2LoRALoaderInvocation.model_construct(
+            lora=lora.lora, weight=lora.weight, transformer=_transformer([]), qwen3_vl_encoder=_encoder([])
+        )
+    else:
+        invocation = Krea2LoRACollectionLoader.model_construct(
+            loras=[lora], transformer=_transformer([]), qwen3_vl_encoder=_encoder([])
+        )
+
+    with pytest.raises(ValueError, match="not Krea-2"):
+        invocation.invoke(_context(BaseModelType.Flux))
+
+
+@pytest.mark.parametrize("loader_type", ["single", "collection"])
+def test_loader_rejects_conflicting_existing_weights(loader_type: str) -> None:
+    requested = _lora()
+    transformer_lora = requested.model_copy(update={"weight": 0.25})
+    encoder_lora = requested.model_copy(update={"weight": 0.75})
+    if loader_type == "single":
+        invocation = Krea2LoRALoaderInvocation.model_construct(
+            lora=requested.lora,
+            weight=requested.weight,
+            transformer=_transformer([transformer_lora]),
+            qwen3_vl_encoder=_encoder([encoder_lora]),
+        )
+    else:
+        invocation = Krea2LoRACollectionLoader.model_construct(
+            loras=[requested],
+            transformer=_transformer([transformer_lora]),
+            qwen3_vl_encoder=_encoder([encoder_lora]),
+        )
+
+    with pytest.raises(ValueError, match="conflicting weights"):
+        invocation.invoke(_context())

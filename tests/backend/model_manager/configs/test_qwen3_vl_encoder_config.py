@@ -68,8 +68,9 @@ class TestIsQwen3VLEncoderStateDict:
 
 
 class TestQwen3VLEncoderCheckpointConfig:
-    def _make_mock_mod(self, state_dict: dict) -> MagicMock:
+    def _make_mock_mod(self, state_dict: dict, suffix: str = ".safetensors") -> MagicMock:
         mod = MagicMock()
+        mod.path = Path(f"/fake/qwen3vl{suffix}")
         mod.load_state_dict.return_value = state_dict
         return mod
 
@@ -78,7 +79,8 @@ class TestQwen3VLEncoderCheckpointConfig:
     def test_matches_vl_single_file(self, _rfo, _rif) -> None:
         mod = self._make_mock_mod(
             {
-                "model.layers.0.self_attn.q_proj.weight": object(),
+                "model.embed_tokens.weight": MagicMock(shape=(151936, 2560)),
+                "model.layers.35.self_attn.q_proj.weight": object(),
                 "model.visual.blocks.0.attn.qkv.weight": object(),
             }
         )
@@ -99,11 +101,46 @@ class TestQwen3VLEncoderCheckpointConfig:
         with pytest.raises(NotAMatchError):
             Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
 
+    @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_if_not_file")
+    @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_for_override_fields")
+    def test_rejects_non_safetensors_checkpoint(self, _rfo, _rif) -> None:
+        mod = self._make_mock_mod(
+            {
+                "model.layers.35.self_attn.q_proj.weight": object(),
+                "model.visual.blocks.0.attn.qkv.weight": object(),
+            },
+            suffix=".bin",
+        )
+
+        with pytest.raises(NotAMatchError, match="safetensors"):
+            Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+    @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_if_not_file")
+    @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_for_override_fields")
+    def test_rejects_non_4b_checkpoint_shape(self, _rfo, _rif) -> None:
+        mod = self._make_mock_mod(
+            {
+                "model.embed_tokens.weight": MagicMock(shape=(151936, 4096)),
+                "model.layers.35.self_attn.q_proj.weight": object(),
+                "model.visual.blocks.0.attn.qkv.weight": object(),
+            }
+        )
+
+        with pytest.raises(NotAMatchError, match="4B|hidden"):
+            Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
 
 class TestQwen3VLEncoderDirectoryConfig:
     @staticmethod
-    def _write_config(path: Path) -> None:
-        path.write_text(json.dumps({"architectures": ["Qwen3VLModel"]}))
+    def _write_config(path: Path, *, hidden_size: int = 2560, num_hidden_layers: int = 36) -> None:
+        path.write_text(
+            json.dumps(
+                {
+                    "architectures": ["Qwen3VLModel"],
+                    "text_config": {"hidden_size": hidden_size, "num_hidden_layers": num_hidden_layers},
+                }
+            )
+        )
 
     @staticmethod
     def _fields(path: Path) -> dict:
@@ -143,3 +180,70 @@ class TestQwen3VLEncoderDirectoryConfig:
         config = Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
 
         assert config.format is ModelFormat.Qwen3VLEncoder
+
+    @pytest.mark.parametrize(("hidden_size", "num_hidden_layers"), [(4096, 36), (2560, 28)])
+    def test_rejects_non_4b_directory_config(self, tmp_path: Path, hidden_size: int, num_hidden_layers: int) -> None:
+        self._write_config(tmp_path / "config.json", hidden_size=hidden_size, num_hidden_layers=num_hidden_layers)
+        (tmp_path / "model.safetensors").touch()
+        (tmp_path / "tokenizer.json").touch()
+
+        with pytest.raises(NotAMatchError, match="4B|hidden|layers"):
+            Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
+
+    def test_rejects_malformed_text_config(self, tmp_path: Path) -> None:
+        (tmp_path / "config.json").write_text(json.dumps({"architectures": ["Qwen3VLModel"], "text_config": []}))
+        (tmp_path / "model.safetensors").touch()
+        (tmp_path / "tokenizer.json").touch()
+
+        with pytest.raises(NotAMatchError, match="text_config"):
+            Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
+
+    @pytest.mark.parametrize("artifact", ["adapter_model.safetensors", "training_args.bin"])
+    def test_rejects_unrecognized_weight_artifact(self, tmp_path: Path, artifact: str) -> None:
+        self._write_config(tmp_path / "config.json")
+        (tmp_path / artifact).touch()
+        (tmp_path / "tokenizer.json").touch()
+
+        with pytest.raises(NotAMatchError, match="weights"):
+            Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
+
+    def test_rejects_incomplete_sharded_checkpoint(self, tmp_path: Path) -> None:
+        self._write_config(tmp_path / "config.json")
+        (tmp_path / "model-00001-of-00002.safetensors").touch()
+        (tmp_path / "model.safetensors.index.json").write_text(
+            json.dumps(
+                {
+                    "weight_map": {
+                        "language_model.layers.0.weight": "model-00001-of-00002.safetensors",
+                        "language_model.layers.35.weight": "model-00002-of-00002.safetensors",
+                    }
+                }
+            )
+        )
+        (tmp_path / "tokenizer.json").touch()
+
+        with pytest.raises(NotAMatchError, match="missing|weights"):
+            Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
+
+    @pytest.mark.parametrize("index_name", ["model.safetensors.index.json", "pytorch_model.bin.index.json"])
+    def test_accepts_complete_sharded_checkpoint(self, tmp_path: Path, index_name: str) -> None:
+        self._write_config(tmp_path / "config.json")
+        suffix = "safetensors" if index_name.startswith("model") else "bin"
+        shard_names = [f"model-00001-of-00002.{suffix}", f"model-00002-of-00002.{suffix}"]
+        for shard_name in shard_names:
+            (tmp_path / shard_name).touch()
+        (tmp_path / index_name).write_text(
+            json.dumps(
+                {
+                    "weight_map": {
+                        "language_model.layers.0.weight": shard_names[0],
+                        "language_model.layers.35.weight": shard_names[1],
+                    }
+                }
+            )
+        )
+        (tmp_path / "tokenizer.json").touch()
+
+        config = Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
+
+        assert config.type is ModelType.Qwen3VLEncoder

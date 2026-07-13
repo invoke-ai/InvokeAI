@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, Literal, Self
 
 from pydantic import Field
@@ -5,6 +6,7 @@ from pydantic import Field
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
+    get_config_dict_or_raise,
     raise_for_class_name,
     raise_for_override_fields,
     raise_if_not_dir,
@@ -12,6 +14,62 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+
+_KREA2_QWEN3_VL_HIDDEN_SIZE = 2560
+_KREA2_QWEN3_VL_NUM_HIDDEN_LAYERS = 36
+
+
+def _validate_krea2_qwen3_vl_config(config_path: Path) -> None:
+    config = get_config_dict_or_raise(config_path)
+    text_config = config.get("text_config", config)
+    if not isinstance(text_config, dict):
+        raise NotAMatchError("Qwen3-VL text_config must be an object")
+    hidden_size = text_config.get("hidden_size")
+    num_hidden_layers = text_config.get("num_hidden_layers")
+    if hidden_size != _KREA2_QWEN3_VL_HIDDEN_SIZE:
+        raise NotAMatchError(
+            f"Krea-2 requires the Qwen3-VL 4B hidden size {_KREA2_QWEN3_VL_HIDDEN_SIZE}, got {hidden_size}"
+        )
+    if num_hidden_layers != _KREA2_QWEN3_VL_NUM_HIDDEN_LAYERS:
+        raise NotAMatchError(
+            f"Krea-2 requires {_KREA2_QWEN3_VL_NUM_HIDDEN_LAYERS} Qwen3-VL layers, got {num_hidden_layers}"
+        )
+
+
+def _has_complete_pretrained_weights(weights_path: Path) -> bool:
+    if (weights_path / "model.safetensors").is_file() or (weights_path / "pytorch_model.bin").is_file():
+        return True
+
+    for index_name in ("model.safetensors.index.json", "pytorch_model.bin.index.json"):
+        index_path = weights_path / index_name
+        if not index_path.is_file():
+            continue
+        index = get_config_dict_or_raise(index_path)
+        weight_map = index.get("weight_map")
+        if not isinstance(weight_map, dict) or not weight_map:
+            return False
+        referenced_files = {filename for filename in weight_map.values() if isinstance(filename, str)}
+        return bool(referenced_files) and all((weights_path / filename).is_file() for filename in referenced_files)
+    return False
+
+
+def _validate_krea2_qwen3_vl_checkpoint_shape(state_dict: dict[str | int, Any]) -> None:
+    embed_keys = (
+        "model.embed_tokens.weight",
+        "model.language_model.embed_tokens.weight",
+        "language_model.embed_tokens.weight",
+        "embed_tokens.weight",
+    )
+    embed = next((state_dict[key] for key in embed_keys if key in state_dict), None)
+    shape = getattr(embed, "shape", ())
+    if len(shape) < 2 or shape[1] != _KREA2_QWEN3_VL_HIDDEN_SIZE:
+        hidden_size = shape[1] if len(shape) >= 2 else None
+        raise NotAMatchError(
+            f"Krea-2 requires a Qwen3-VL 4B checkpoint with hidden size "
+            f"{_KREA2_QWEN3_VL_HIDDEN_SIZE}, got {hidden_size}"
+        )
+    if not any(isinstance(key, str) and ".layers.35." in key for key in state_dict):
+        raise NotAMatchError("Krea-2 requires a Qwen3-VL 4B checkpoint containing language-model layer 35")
 
 
 class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
@@ -62,6 +120,7 @@ class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
                 "Qwen3VLForConditionalGeneration",
             },
         )
+        _validate_krea2_qwen3_vl_config(expected_config_path)
 
         if config_path_nested.exists():
             weights_path = mod.path / "text_encoder"
@@ -70,7 +129,7 @@ class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
             weights_path = mod.path
             tokenizer_path = mod.path
 
-        has_weights = any(weights_path.glob("*.safetensors")) or any(weights_path.glob("*.bin"))
+        has_weights = _has_complete_pretrained_weights(weights_path)
         has_tokenizer = (tokenizer_path / "tokenizer.json").exists() or (
             (tokenizer_path / "vocab.json").exists() and (tokenizer_path / "merges.txt").exists()
         )
@@ -113,7 +172,12 @@ class Qwen3VLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        if not _is_qwen3_vl_encoder_state_dict(mod.load_state_dict()):
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
+
+        state_dict = mod.load_state_dict()
+        if not _is_qwen3_vl_encoder_state_dict(state_dict):
             raise NotAMatchError("state dict does not look like a single-file Qwen3-VL encoder")
+        _validate_krea2_qwen3_vl_checkpoint_shape(state_dict)
 
         return cls(**override_fields)

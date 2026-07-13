@@ -906,6 +906,18 @@ def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(k, str) and ("text_fusion" in k or "time_mod_proj" in k) for k in state_dict.keys())
 
 
+def _has_complete_lora_pair_for_prefixes(state_dict: dict[str | int, Any], prefixes: tuple[str, ...]) -> bool:
+    string_keys = {key for key in state_dict if isinstance(key, str)}
+    pairs = (("lora_A.weight", "lora_B.weight"), ("lora_down.weight", "lora_up.weight"))
+    for key in string_keys:
+        if not key.startswith(prefixes):
+            continue
+        for down_suffix, up_suffix in pairs:
+            if key.endswith(down_suffix) and f"{key[: -len(down_suffix)]}{up_suffix}" in string_keys:
+                return True
+    return False
+
+
 class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Krea-2 LoRA models in LyCORIS (single-file diffusers PEFT) format."""
 
@@ -918,12 +930,17 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         state_dict = mod.load_state_dict()
         explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
-        has_transformer_blocks = state_dict_has_any_keys_starting_with(
-            state_dict, {"transformer.transformer_blocks.", "transformer_blocks."}
+        has_supported_explicit_pair = _has_complete_lora_pair_for_prefixes(
+            state_dict,
+            (
+                "transformer.transformer_blocks.",
+                "transformer_blocks.",
+                "base_model.model.transformer.transformer_blocks.",
+                "text_encoder.",
+                "base_model.model.text_encoder.",
+            ),
         )
-        has_lora_down = state_dict_has_any_keys_ending_with(state_dict, {"lora_A.weight", "lora_down.weight"})
-        has_lora_up = state_dict_has_any_keys_ending_with(state_dict, {"lora_B.weight", "lora_up.weight"})
-        if explicit_krea2_override and has_transformer_blocks and has_lora_down and has_lora_up:
+        if explicit_krea2_override and has_supported_explicit_pair:
             return cls(**override_fields)
 
         cls._validate_looks_like_lora(mod)

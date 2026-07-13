@@ -1,8 +1,14 @@
+from contextlib import contextmanager, nullcontext
+from types import SimpleNamespace
+
 import pytest
 import torch
 
-from invokeai.app.invocations.fields import DenoiseMaskField
+from invokeai.app.invocations.fields import DenoiseMaskField, Krea2ConditioningField, LatentsField
 from invokeai.app.invocations.krea2_denoise import KREA2_LATENT_CHANNELS, Krea2DenoiseInvocation
+from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
 
 
 @pytest.mark.parametrize(("denoising_start", "denoising_end"), [(0.75, 0.25), (0.5, 0.5)])
@@ -116,3 +122,132 @@ def test_get_noise_is_deterministic_and_correctly_shaped() -> None:
     # Same seed -> identical noise (reproducibility); different seed -> different noise.
     assert torch.equal(noise_a, noise_b)
     assert not torch.equal(noise_a, noise_other)
+
+
+class _Scheduler:
+    def __init__(self, **_kwargs) -> None:
+        self.config = SimpleNamespace(num_train_timesteps=1000)
+
+    def set_timesteps(self, *, sigmas, mu, device) -> None:
+        del mu
+        self.sigmas = torch.tensor([*sigmas, 0.0], device=device)
+        self.timesteps = self.sigmas[:-1] * self.config.num_train_timesteps
+
+
+class _Transformer:
+    def __init__(self) -> None:
+        self.conditioning_values: list[float] = []
+
+    def __call__(self, *, hidden_states, encoder_hidden_states, **_kwargs):
+        self.conditioning_values.append(float(encoder_hidden_states.mean()))
+        return (torch.zeros_like(hidden_states),)
+
+
+class _TransformerInfo:
+    def __init__(self, transformer: _Transformer) -> None:
+        self.transformer = transformer
+
+    @contextmanager
+    def model_on_device(self, **_kwargs):
+        yield ({}, self.transformer)
+
+
+def _model_identifier() -> ModelIdentifierField:
+    return ModelIdentifierField(
+        key="krea-model",
+        hash="model-hash",
+        name="Krea Model",
+        base=BaseModelType.Krea2,
+        type=ModelType.Main,
+    )
+
+
+def _runtime_invocation(*, cfg_scale: float | list[float], with_mask: bool = False) -> Krea2DenoiseInvocation:
+    return Krea2DenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=_model_identifier(), loras=[]),
+        positive_conditioning=Krea2ConditioningField(conditioning_name="positive"),
+        negative_conditioning=Krea2ConditioningField(conditioning_name="negative"),
+        cfg_scale=cfg_scale,
+        width=16,
+        height=16,
+        steps=2,
+        seed=1,
+        shift=1.15,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        latents=LatentsField(latents_name="init") if with_mask else None,
+        denoise_mask=DenoiseMaskField(mask_name="mask") if with_mask else None,
+    )
+
+
+def _runtime_context(tmp_path, transformer: _Transformer):
+    conditionings = {
+        "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
+        "negative": ConditioningFieldData(
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, 2, 12, 8))]
+        ),
+    }
+    tensors = {
+        "init": torch.zeros(1, KREA2_LATENT_CHANNELS, 2, 2),
+        "mask": torch.zeros(1, 1, 16, 16),
+    }
+    config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Turbo)
+    return SimpleNamespace(
+        models=SimpleNamespace(
+            load=lambda _identifier: _TransformerInfo(transformer),
+            get_config=lambda _identifier: config,
+            get_absolute_path=lambda _config: tmp_path,
+        ),
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda name: tensors[name]),
+        util=SimpleNamespace(sd_step_callback=lambda *_args: None),
+    )
+
+
+def _patch_runtime(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "diffusers.schedulers.scheduling_flow_match_euler_discrete.FlowMatchEulerDiscreteScheduler", _Scheduler
+    )
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_denoise.TorchDevice.choose_torch_device", lambda: torch.device("cpu")
+    )
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_denoise.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.float32,
+    )
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_denoise.LayerPatcher.apply_smart_model_patches",
+        lambda **_kwargs: nullcontext(),
+    )
+
+
+def test_run_diffusion_applies_mixed_cfg_only_at_enabled_steps(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+
+    latents = _runtime_invocation(cfg_scale=[2.0, 1.0])._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    assert transformer.conditioning_values == [1.0, 0.0, 1.0]
+
+
+def test_run_diffusion_reaches_masked_denoising_merge(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    merge_sigmas: list[float] = []
+
+    class _InpaintExtension:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        def merge_intermediate_latents_with_init_latents(self, latents, sigma):
+            merge_sigmas.append(sigma)
+            return latents
+
+    monkeypatch.setattr("invokeai.app.invocations.krea2_denoise.RectifiedFlowInpaintExtension", _InpaintExtension)
+
+    latents = _runtime_invocation(cfg_scale=1.0, with_mask=True)._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    assert len(merge_sigmas) == 2
+    assert transformer.conditioning_values == [1.0, 1.0]

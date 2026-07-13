@@ -806,6 +806,19 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.qwenImageQwenVLEncoderModel = null;
       }
 
+      if (state._version === 3) {
+        // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields
+        state._version = 4;
+        state.krea2VaeModel = null;
+        state.krea2Qwen3VlEncoderModel = null;
+        state.krea2SeedVarianceEnabled = false;
+        state.krea2SeedVarianceStrength = 20;
+        state.krea2SeedVarianceRandomizePercent = 50;
+        state.krea2RebalanceEnabled = false;
+        state.krea2RebalanceMultiplier = 4;
+        state.krea2RebalanceWeights = '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0';
+      }
+
       return zParamsState.parse(state);
     },
   },

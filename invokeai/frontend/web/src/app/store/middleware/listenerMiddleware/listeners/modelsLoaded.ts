@@ -5,6 +5,8 @@ import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,
   fluxVAESelected,
+  krea2Qwen3VlEncoderModelSelected,
+  krea2VaeModelSelected,
   modelChanged,
   refinerModelChanged,
   t5EncoderModelSelected,
@@ -19,6 +21,7 @@ import {
   isRegionalGuidanceFLUXReduxConfig,
   isRegionalGuidanceIPAdapterConfig,
 } from 'features/controlLayers/store/types';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   postProcessingModelChanged,
@@ -35,6 +38,7 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isAnimaVAEModelConfig,
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
@@ -44,11 +48,15 @@ import {
   isLoRAModelConfig,
   isNonFluxVAEModelConfig,
   isNonRefinerMainModelConfig,
+  isQwen3VLEncoderModelConfig,
+  isQwenImageVAEModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
+
+import { getKrea2ComponentUpdates } from './krea2ComponentSync';
 
 const log = logger('models');
 
@@ -75,6 +83,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       const models = modelConfigsAdapterSelectors.selectAll(action.payload);
 
       handleMainModels(models, state, dispatch, log);
+      handleKrea2Components(models, state, dispatch, log);
       handleRefinerModels(models, state, dispatch, log);
       handleVAEModels(models, state, dispatch, log);
       handleLoRAModels(models, state, dispatch, log);
@@ -89,6 +98,31 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleFLUXReduxModels(models, state, dispatch, log);
     },
   });
+};
+
+export const handleKrea2Components: ModelHandler = (models, state, dispatch) => {
+  if (state.params.model?.base !== 'krea-2') {
+    return;
+  }
+  const selectedModel = models.find((model) => model.key === state.params.model?.key);
+  if (!selectedModel || !isNonRefinerMainModelConfig(selectedModel)) {
+    return;
+  }
+
+  const updates = getKrea2ComponentUpdates({
+    format: selectedModel.format,
+    selectedVae: state.params.krea2VaeModel,
+    selectedEncoder: state.params.krea2Qwen3VlEncoderModel,
+    availableQwenImageVaes: models.filter((model) => isQwenImageVAEModelConfig(model)),
+    availableAnimaVaes: models.filter((model) => isAnimaVAEModelConfig(model)),
+    availableEncoders: models.filter(isQwen3VLEncoderModelConfig),
+  });
+  if ('vae' in updates) {
+    dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
+  }
+  if ('encoder' in updates) {
+    dispatch(krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null));
+  }
 };
 
 type ModelHandler = (

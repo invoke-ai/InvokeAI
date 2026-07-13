@@ -1420,6 +1420,9 @@ class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
 
         raise_for_override_fields(cls, override_fields)
 
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
+
         cls._validate_looks_like_krea2_model(mod)
 
         cls._validate_does_not_look_like_gguf_quantized(mod)

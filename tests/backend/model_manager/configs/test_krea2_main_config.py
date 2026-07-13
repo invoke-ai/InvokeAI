@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.main import (
     MainModelDefaultSettings,
     _get_krea2_variant_from_name,
@@ -175,6 +176,18 @@ class TestKrea2CheckpointVariantDetection:
         mod = self._make_mock_mod("krea2_turbo_fp8_scaled.safetensors")
         config = Main_Checkpoint_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
         assert config.variant == Krea2VariantType.Turbo
+
+    @patch("invokeai.backend.model_manager.configs.main._has_krea2_keys", return_value=True)
+    @patch("invokeai.backend.model_manager.configs.main._has_ggml_tensors", return_value=False)
+    @patch("invokeai.backend.model_manager.configs.main.raise_if_not_file")
+    @patch("invokeai.backend.model_manager.configs.main.raise_for_override_fields")
+    def test_rejects_non_safetensors_checkpoint(self, _rfo, _rif, _hgt, _hkk) -> None:
+        from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config
+
+        mod = self._make_mock_mod("krea2_turbo.bin")
+
+        with pytest.raises(NotAMatchError, match="safetensors"):
+            Main_Checkpoint_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
 
 
 class TestKrea2DiffusersVariantDetection:

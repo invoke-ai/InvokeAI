@@ -60,9 +60,14 @@ class Krea2LoRALoaderInvocation(BaseInvocation):
         if not context.models.exists(lora_key):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
-        if self.lora.base is not BaseModelType.Krea2:
+        stored_config = context.models.get_config(lora_key)
+        if (
+            self.lora.base is not BaseModelType.Krea2
+            or stored_config.base is not BaseModelType.Krea2
+            or stored_config.type is not ModelType.LoRA
+        ):
             raise ValueError(
-                f"LoRA '{lora_key}' is for {self.lora.base.value if self.lora.base else 'unknown'} models, "
+                f"LoRA '{lora_key}' is for {stored_config.base.value if stored_config.base else 'unknown'} models, "
                 "not Krea-2 models. Ensure you are using a Krea-2 compatible LoRA."
             )
 
@@ -83,6 +88,11 @@ class Krea2LoRALoaderInvocation(BaseInvocation):
             if output.qwen3_vl_encoder is not None
             else None
         )
+        if transformer_lora is not None and encoder_lora is not None and transformer_lora.weight != encoder_lora.weight:
+            raise ValueError(
+                f"LoRA '{lora_key}' has conflicting weights on the transformer ({transformer_lora.weight}) and "
+                f"Qwen3-VL encoder ({encoder_lora.weight})."
+            )
         effective_lora = transformer_lora or encoder_lora or LoRAField(lora=self.lora, weight=self.weight)
 
         if output.transformer is not None and transformer_lora is None:
@@ -132,9 +142,15 @@ class Krea2LoRACollectionLoader(BaseInvocation):
                 continue
             if not context.models.exists(lora.lora.key):
                 raise ValueError(f"Unknown lora: {lora.lora.key}!")
-            if lora.lora.base is not BaseModelType.Krea2:
+            stored_config = context.models.get_config(lora.lora.key)
+            if (
+                lora.lora.base is not BaseModelType.Krea2
+                or stored_config.base is not BaseModelType.Krea2
+                or stored_config.type is not ModelType.LoRA
+            ):
                 raise ValueError(
-                    f"LoRA '{lora.lora.key}' is for {lora.lora.base.value if lora.lora.base else 'unknown'} models, "
+                    f"LoRA '{lora.lora.key}' is for "
+                    f"{stored_config.base.value if stored_config.base else 'unknown'} models, "
                     "not Krea-2 models. Ensure you are using a Krea-2 compatible LoRA."
                 )
 
@@ -148,6 +164,15 @@ class Krea2LoRACollectionLoader(BaseInvocation):
                 if output.qwen3_vl_encoder is not None
                 else None
             )
+            if (
+                transformer_lora is not None
+                and encoder_lora is not None
+                and transformer_lora.weight != encoder_lora.weight
+            ):
+                raise ValueError(
+                    f"LoRA '{lora.lora.key}' has conflicting weights on the transformer "
+                    f"({transformer_lora.weight}) and Qwen3-VL encoder ({encoder_lora.weight})."
+                )
             effective_lora = transformer_lora or encoder_lora or lora
 
             if self.transformer is not None and output.transformer is not None:
