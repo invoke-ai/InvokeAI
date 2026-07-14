@@ -483,4 +483,20 @@ describe('createHistory: failure-atomic replay', () => {
     expect(history.canUndo()).toBe(false);
     expect(history.canRedo()).toBe(false);
   });
+
+  it('trims oldest entries by retained bytes while preserving the newest undo history', () => {
+    const log: string[] = [];
+    const history = createHistory({ byteBudget: 1_000 });
+    history.push({ ...makeEntry('oldest', log), bytes: 40 });
+    history.push({ ...makeEntry('middle', log), bytes: 50 });
+    history.push({ ...makeEntry('newest', log), bytes: 60 });
+
+    history.trimToBytes(110);
+
+    expect(history.byteSize()).toBe(110);
+    history.undo();
+    history.undo();
+    history.undo();
+    expect(log).toEqual(['undo:newest', 'undo:middle']);
+  });
 });

@@ -1,4 +1,4 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasCoreStoreCapability, CanvasSelectionCapability } from '@workbench/canvas-engine/api';
 import type { SelectionOp } from '@workbench/canvas-engine/types';
 
 import { HStack, Text } from '@chakra-ui/react';
@@ -20,8 +20,10 @@ const OP_MODE_LABEL_KEYS: Record<SelectionOp, string> = {
   subtract: 'widgets.canvas.toolOptions.selectionSubtract',
 };
 
+type LassoEngine = CanvasCoreStoreCapability & { readonly selection: CanvasSelectionCapability };
+
 /** One op-mode button with a stable click handler (avoids a per-render closure in the map). */
-const OpModeButton = ({ engine, mode, active }: { engine: CanvasEngine; mode: SelectionOp; active: boolean }) => {
+const OpModeButton = ({ engine, mode, active }: { engine: LassoEngine; mode: SelectionOp; active: boolean }) => {
   const { t } = useTranslation();
   const onClick = useCallback(() => engine.stores.lassoOptions.set({ mode }), [engine, mode]);
   return (
@@ -54,10 +56,10 @@ export const LassoOptions = ({ engine }: ToolOptionsComponentProps) => {
     return isLayerPixelEditEligible(layer);
   });
 
-  const onFill = useCallback(() => engine.fillSelection(), [engine]);
-  const onErase = useCallback(() => engine.eraseSelection(), [engine]);
-  const onInvert = useCallback(() => engine.invertSelection(), [engine]);
-  const onDeselect = useCallback(() => engine.deselect(), [engine]);
+  const onFill = useCallback(() => engine.selection.fillSelection(), [engine]);
+  const onErase = useCallback(() => engine.selection.eraseSelection(), [engine]);
+  const onInvert = useCallback(() => engine.selection.invertSelection(), [engine]);
+  const onDeselect = useCallback(() => engine.selection.deselect(), [engine]);
 
   const canEdit = hasSelection && canPaintTarget;
 

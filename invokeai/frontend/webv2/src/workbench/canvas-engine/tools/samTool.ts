@@ -1,4 +1,4 @@
-import type { SamVisualInput } from '@workbench/canvas-engine/engineStores';
+import type { SamVisualInput } from '@workbench/canvas-engine/samInteraction';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
 import { canonicalizeDocumentSamPoint } from '@workbench/canvas-engine/samCoordinates';
@@ -38,7 +38,7 @@ export const createSamTool = (): Tool => {
   };
 
   const updateGesture = (ctx: ToolContext, input: PointerInput, state: GestureState): void => {
-    const snapshot = ctx.stores.samSession.get();
+    const snapshot = ctx.getSamInteraction?.();
     if (!snapshot || snapshot.input.type !== 'visual') {
       return;
     }
@@ -76,7 +76,7 @@ export const createSamTool = (): Tool => {
     onDeactivate: (ctx) => cancelGesture(ctx),
     onPointerCancel: (ctx) => cancelGesture(ctx),
     onPointerDown: (ctx, input) => {
-      const snapshot = ctx.stores.samSession.get();
+      const snapshot = ctx.getSamInteraction?.();
       if (
         gesture ||
         !snapshot ||
@@ -125,7 +125,7 @@ export const createSamTool = (): Tool => {
         return;
       }
 
-      const snapshot = ctx.stores.samSession.get();
+      const snapshot = ctx.getSamInteraction?.();
       if (!snapshot || snapshot.input.type !== 'visual') {
         return;
       }

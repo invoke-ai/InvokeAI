@@ -81,7 +81,7 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
       if (selected && commit) {
         const before = selected.source;
         const after: ShapeSource = { ...before, ...patch };
-        engine.commitStructural(
+        engine.layers.commitStructural(
           t('widgets.canvas.toolOptions.shapeEdit'),
           { id: selected.id, source: after, type: 'updateCanvasLayerSource' },
           { id: selected.id, source: before, type: 'updateCanvasLayerSource' }

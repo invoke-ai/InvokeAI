@@ -20,6 +20,7 @@ import type { LayerCacheEntry } from './layerCache';
 import type { RasterBackend, RasterSurface } from './raster';
 
 import { adjustmentsKey, applyAdjustments, isIdentityAdjustments } from './adjustments';
+import { createDerivedSurfaceCache, type DerivedSurfaceCache } from './derivedSurfaceCache';
 
 /** The imperative adjusted-surface store returned by {@link createAdjustedSurfaceCache}. */
 export interface AdjustedSurfaceCache {
@@ -38,20 +39,17 @@ export interface AdjustedSurfaceCache {
   delete(layerId: string): void;
   /** Number of memoized adjusted surfaces (for tests / accounting). */
   size(): number;
+  /** Bytes held by adjusted surfaces. */
+  byteSize(): number;
   /** Releases all memoized surfaces. */
   dispose(): void;
 }
 
-interface CacheSlot {
-  version: number;
-  key: string;
-  surface: RasterSurface;
-}
-
 /** Creates an {@link AdjustedSurfaceCache} backed by the given {@link RasterBackend}. */
-export const createAdjustedSurfaceCache = (backend: RasterBackend): AdjustedSurfaceCache => {
-  const slots = new Map<string, CacheSlot>();
-
+export const createAdjustedSurfaceCache = (
+  backend: RasterBackend,
+  cache: DerivedSurfaceCache = createDerivedSurfaceCache()
+): AdjustedSurfaceCache => {
   const get = (
     layerId: string,
     entry: LayerCacheEntry,
@@ -60,7 +58,7 @@ export const createAdjustedSurfaceCache = (backend: RasterBackend): AdjustedSurf
     if (isIdentityAdjustments(adjustments)) {
       // Identity: nothing to cache — drop any stale slot and let the caller draw
       // the original surface.
-      slots.delete(layerId);
+      cache.delete(layerId, 'adjustments');
       return null;
     }
     const { height, width } = entry.surface;
@@ -68,38 +66,40 @@ export const createAdjustedSurfaceCache = (backend: RasterBackend): AdjustedSurf
       return null;
     }
     const key = adjustmentsKey(adjustments);
-    const existing = slots.get(layerId);
-    if (existing && existing.version === entry.version && existing.key === key) {
-      return existing.surface;
-    }
-
-    // (Re)build the adjusted surface: copy the source pixels, apply the LUTs.
-    const surface = existing?.surface ?? backend.createSurface(width, height);
-    if (surface.width !== width || surface.height !== height) {
-      surface.resize(width, height);
-    }
-    const ctx = surface.ctx;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, width, height);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.drawImage(entry.surface.canvas, 0, 0);
-    const imageData = ctx.getImageData(0, 0, width, height);
-    applyAdjustments(imageData, adjustments);
-    ctx.putImageData(imageData, 0, 0);
-
-    slots.set(layerId, { key, surface, version: entry.version });
-    return surface;
+    return cache.get({
+      create: (target) => {
+        const surface = target ?? backend.createSurface(width, height);
+        if (surface.width !== width || surface.height !== height) {
+          surface.resize(width, height);
+        }
+        const ctx = surface.ctx;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(entry.surface.canvas, 0, 0);
+        const imageData = ctx.getImageData(0, 0, width, height);
+        applyAdjustments(imageData, adjustments);
+        ctx.putImageData(imageData, 0, 0);
+        return surface;
+      },
+      kind: 'adjustments',
+      layerId,
+      paramsKey: key,
+      source: entry.surface,
+      sourceVersion: entry.version,
+    });
   };
 
   return {
+    byteSize: cache.byteSize,
     delete: (layerId) => {
-      slots.delete(layerId);
+      cache.delete(layerId, 'adjustments');
     },
     dispose: () => {
-      slots.clear();
+      cache.dispose();
     },
     get,
-    size: () => slots.size,
+    size: cache.size,
   };
 };

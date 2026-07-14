@@ -24,11 +24,15 @@
  * same project is still running (the Invoke hotkey can be mashed).
  */
 
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type {
+  CanvasDocumentCapability,
+  CanvasExportCapability,
+  CanvasLifecycleCapability,
+} from '@workbench/canvas-engine/api';
 import type {
   CompositeDedupeCache,
   ExecuteCompositePlanDeps,
-} from '@workbench/canvas-engine/export/compositeForGeneration';
+} from '@workbench/canvas-operations/compositeForGeneration';
 import type { ControlLayerGraphInput } from '@workbench/generation/canvas/addControlLayers';
 import type {
   RegionalGuidanceInput,
@@ -46,14 +50,14 @@ import type {
 import type { CanvasCompositingSettings } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
-import { getEngine } from '@workbench/canvas-engine/engineRegistry';
 import {
   computeCompositeContentBounds,
   executeCompositePlan,
   executeControlComposite,
   executeMaskComposite,
   executeRegionalMaskComposite,
-} from '@workbench/canvas-engine/export/compositeForGeneration';
+} from '@workbench/canvas-operations/compositeForGeneration';
+import { getEngine } from '@workbench/canvas-operations/engineRegistry';
 import {
   getRegionalGuidanceRejectionReason,
   isRegionalGuidanceSupportedForBase,
@@ -482,10 +486,15 @@ export const createBoundedCompositeDedupeCache = (capacity = DEDUPE_CACHE_CAPACI
 
 // Project ids with a prepare in flight (survives across the async orchestrator).
 const inFlightProjects = new Set<string>();
+type CanvasInvocationEngine = {
+  readonly document: CanvasDocumentCapability;
+  readonly exports: CanvasExportCapability;
+  readonly lifecycle: CanvasLifecycleCapability;
+};
 // Per-engine dedupe caches, dropped when the engine is disposed and GC'd.
-const dedupeCachesByEngine = new WeakMap<CanvasEngine, CompositeDedupeCache>();
+const dedupeCachesByEngine = new WeakMap<CanvasInvocationEngine, CompositeDedupeCache>();
 
-const getEngineDedupeCache = (engine: CanvasEngine): CompositeDedupeCache => {
+const getEngineDedupeCache = (engine: CanvasInvocationEngine): CompositeDedupeCache => {
   let cache = dedupeCachesByEngine.get(engine);
   if (!cache) {
     cache = createBoundedCompositeDedupeCache();
@@ -527,10 +536,10 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     dedupe: getEngineDedupeCache(engine),
     destination: args.destination,
     dispatch: args.dispatch,
-    executorDeps: engine.getCompositeExecutorDeps(),
-    flushPendingUploads: () => engine.flushPendingUploads(),
+    executorDeps: engine.exports.getCompositeExecutorDeps(),
+    flushPendingUploads: () => engine.lifecycle.flushPendingUploads(),
     generateValues: args.generateValues,
-    getDocument: () => engine.getDocument(),
+    getDocument: () => engine.document.getDocument(),
     inFlight: inFlightProjects,
     models: args.models,
     projectId: args.projectId,

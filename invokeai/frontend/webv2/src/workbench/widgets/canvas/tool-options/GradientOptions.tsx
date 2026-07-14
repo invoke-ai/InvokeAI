@@ -92,7 +92,7 @@ export const GradientOptions = ({ engine }: ToolOptionsComponentProps) => {
       if (selected && commit) {
         const before = selected.source;
         const after: GradientSource = { ...before, angle: next.angle, kind: next.kind, stops: next.stops };
-        engine.commitStructural(
+        engine.layers.commitStructural(
           t('widgets.canvas.toolOptions.gradientEdit'),
           { id: selected.id, source: after, type: 'updateCanvasLayerSource' },
           { id: selected.id, source: before, type: 'updateCanvasLayerSource' }

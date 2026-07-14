@@ -1,4 +1,4 @@
-import type { CanvasImageUploadResult } from '@workbench/canvas-engine/backend/canvasImages';
+import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';

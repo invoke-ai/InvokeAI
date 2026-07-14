@@ -80,6 +80,10 @@ export interface History {
   isApplying(): boolean;
   /** Drops both stacks (document replace / project switch / snapshot restore). */
   clear(): void;
+  /** Current retained bytes across undo and redo stacks. */
+  byteSize(): number;
+  /** Evicts oldest entries until retained bytes are at or below `budgetBytes`. */
+  trimToBytes(budgetBytes: number): void;
   /** Subscribes to any change in `canUndo`/`canRedo`. Returns an unsubscribe function. */
   subscribe(listener: () => void): () => void;
 }
@@ -287,8 +291,31 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
     notify();
   };
 
+  const trimToBytes = (budgetBytes: number): void => {
+    const budget = Math.max(0, budgetBytes);
+    let changed = false;
+    while (undoBytes + redoBytes > budget && undoStack.length > 0) {
+      const evicted = undoStack.shift();
+      if (evicted) {
+        undoBytes -= evicted.bytes;
+        changed = true;
+      }
+    }
+    while (undoBytes + redoBytes > budget && redoStack.length > 0) {
+      const evicted = redoStack.shift();
+      if (evicted) {
+        redoBytes -= evicted.bytes;
+        changed = true;
+      }
+    }
+    if (changed) {
+      notify();
+    }
+  };
+
   return {
     amendLast,
+    byteSize: () => undoBytes + redoBytes,
     canRedo: () => redoStack.length > 0,
     canUndo: () => undoStack.length > 0,
     clear,
@@ -301,6 +328,7 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
         listeners.delete(listener);
       };
     },
+    trimToBytes,
     undo,
   };
 };

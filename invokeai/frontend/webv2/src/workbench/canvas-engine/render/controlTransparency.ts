@@ -44,9 +44,13 @@ export const renderControlTransparency = (
   backend: RasterBackend,
   cache: RasterSurface,
   width: number,
-  height: number
+  height: number,
+  target: RasterSurface | null = null
 ): RasterSurface => {
-  const out = backend.createSurface(width, height);
+  const out = target ?? backend.createSurface(width, height);
+  if (out.width !== width || out.height !== height) {
+    out.resize(width, height);
+  }
   const ctx = out.ctx;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, width, height);

@@ -1,4 +1,4 @@
-import type { CanvasImageUploadResult } from '@workbench/canvas-engine/backend/canvasImages';
+import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type {
@@ -16,8 +16,8 @@ import type {
 } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
-import { createCompositeDedupeCache } from '@workbench/canvas-engine/export/compositeForGeneration';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { createCompositeDedupeCache } from '@workbench/canvas-operations/compositeForGeneration';
 import { getDefaultGenerateSettings } from '@workbench/generation/baseGenerationPolicies';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

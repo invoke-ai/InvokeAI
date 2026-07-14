@@ -136,13 +136,13 @@ export const TextOptions = ({ engine }: ToolOptionsComponentProps) => {
     (patch: Partial<TextToolOptions>, commit: boolean) => {
       engine.stores.textOptions.set({ align, color, fontFamily, fontSize, fontWeight, lineHeight, ...patch });
       if (session) {
-        engine.updateTextEditStyle(patch);
+        engine.layers.updateTextEditStyle(patch);
         return;
       }
       if (selected && commit) {
         const before = selected.source;
         const after: TextSource = { ...before, ...patch };
-        engine.commitStructural(
+        engine.layers.commitStructural(
           t('widgets.canvas.toolOptions.textEdit'),
           { id: selected.id, source: after, type: 'updateCanvasLayerSource' },
           { id: selected.id, source: before, type: 'updateCanvasLayerSource' }

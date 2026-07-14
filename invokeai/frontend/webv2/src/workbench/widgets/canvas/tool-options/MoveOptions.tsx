@@ -39,7 +39,7 @@ export const MoveOptions = ({ engine }: ToolOptionsComponentProps) => {
       }
       const forwardTransform = axis === 'x' ? { x: next } : { y: next };
       const inverseTransform = axis === 'x' ? { x: selected.x } : { y: selected.y };
-      engine.commitStructural(
+      engine.layers.commitStructural(
         t('widgets.canvas.toolOptions.movePosition'),
         { id: selected.id, patch: { transform: forwardTransform }, type: 'updateCanvasLayer' },
         { id: selected.id, patch: { transform: inverseTransform }, type: 'updateCanvasLayer' }

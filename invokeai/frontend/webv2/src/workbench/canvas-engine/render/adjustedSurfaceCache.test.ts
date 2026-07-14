@@ -49,6 +49,7 @@ describe('createAdjustedSurfaceCache', () => {
     expect(second).toBe(first);
     expect(drawImageCount(stub)).toBe(1);
     expect(cache.size()).toBe(1);
+    expect(cache.byteSize()).toBe(10 * 10 * 4);
   });
 
   it('rebuilds when the adjustments value changes', () => {
@@ -76,8 +77,9 @@ describe('createAdjustedSurfaceCache', () => {
 
     // Layer 'a' is edited: its cache version bumps → its adjusted surface rebuilds.
     const editedA = makeEntry('a', surfaceA, 1);
-    cache.get('a', editedA, BRIGHTEN);
-    expect(drawImageCount(surfaceA)).toBe(2);
+    const rebuiltA = cache.get('a', editedA, BRIGHTEN) as StubRasterSurface;
+    expect(rebuiltA).not.toBe(surfaceA);
+    expect(drawImageCount(rebuiltA)).toBe(1);
 
     // Layer 'b' is untouched (same version) → reused, no rebuild.
     const reusedB = cache.get('b', entryB, BRIGHTEN);
@@ -98,5 +100,6 @@ describe('createAdjustedSurfaceCache', () => {
     cache.get('a', entry, BRIGHTEN);
     cache.delete('a');
     expect(cache.size()).toBe(0);
+    expect(cache.byteSize()).toBe(0);
   });
 });

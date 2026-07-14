@@ -14,10 +14,10 @@
  * then.
  */
 
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { ImageResolver } from '@workbench/canvas-engine/render/rasterizers';
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 
-import { getOrCreateEngine, releaseEngine } from '@workbench/canvas-engine/engineRegistry';
+import { getOrCreateEngine, releaseEngine } from '@workbench/canvas-operations/engineRegistry';
 import { getImageFullUrl } from '@workbench/gallery/api';
 import { useActiveProjectId, useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useEffect, useState } from 'react';

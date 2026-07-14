@@ -13,12 +13,15 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasBlendMode, CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 import { LAYER_GROUP_COUNT, layerGroupRank } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
+import { intersect, transformBounds } from '@workbench/canvas-engine/math/rect';
 
+import type { DerivedSurfaceCache } from './derivedSurfaceCache';
 import type { LayerCacheEntry, LayerCacheStore } from './layerCache';
 import type { RasterBackend, RasterSurface } from './raster';
 
@@ -150,6 +153,10 @@ export interface CompositeOptions {
    * layers; absent ⇒ adjustments are ignored (a bare test call draws raw pixels).
    */
   adjustedSurface?: ((layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null) | null;
+  /** Shared memoized surfaces for mask and control display effects. */
+  derivedSurfaces?: DerivedSurfaceCache | null;
+  /** Optional deterministic render counters; omitted in the normal zero-overhead path. */
+  diagnostics?: CanvasDiagnostics | null;
 }
 
 type Ctx = RasterSurface['ctx'];
@@ -164,6 +171,30 @@ const setTransformFromMat = (ctx: Ctx, m: Mat2d): void => {
 
 const identityTransform = (ctx: Ctx): void => {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+};
+
+const getEffectiveLayerMatrix = (layer: CanvasLayerContract, opts: CompositeOptions): Mat2d => {
+  const override = opts.transformOverrides?.get(layer.id);
+  return fromTRS(
+    { x: override?.x ?? layer.transform.x, y: override?.y ?? layer.transform.y },
+    override?.rotation ?? layer.transform.rotation,
+    override?.scaleX ?? layer.transform.scaleX,
+    override?.scaleY ?? layer.transform.scaleY
+  );
+};
+
+const isDefinitelyOffscreen = (
+  layer: CanvasLayerContract,
+  entry: LayerCacheEntry,
+  view: Mat2d,
+  target: RasterSurface,
+  opts: CompositeOptions
+): boolean => {
+  const bounds = transformBounds(multiply(view, getEffectiveLayerMatrix(layer, opts)), entry.rect);
+  if (![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite)) {
+    return false;
+  }
+  return intersect(bounds, { height: target.height, width: target.width, x: 0, y: 0 }) === null;
 };
 
 /**
@@ -234,13 +265,23 @@ const drawMaskLayer = (
   ctx: Ctx,
   layer: Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }>,
   surface: RasterSurface,
+  sourceVersion: number,
   origin: Vec2,
   opts: CompositeOptions
 ): void => {
   const fill = layer.mask.fill;
   if (opts.backend) {
     const tile = opts.maskPatternTile ? opts.maskPatternTile(fill.style, fill.color) : null;
-    const colorized = colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile);
+    const colorized = opts.derivedSurfaces
+      ? opts.derivedSurfaces.get({
+          create: (target) => colorizeMask(opts.backend!, surface, surface.width, surface.height, fill, tile, target),
+          kind: 'mask-fill',
+          layerId: layer.id,
+          paramsKey: `${fill.style}:${fill.color}`,
+          source: surface,
+          sourceVersion,
+        })
+      : colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile);
     // The outer loop already set globalAlpha = layer.opacity; blit the colorized
     // overlay at the mask's local content origin.
     ctx.drawImage(colorized.canvas, origin.x, origin.y);
@@ -269,13 +310,7 @@ const drawCachedLayer = (
   ctx.globalAlpha = layer.opacity;
   ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
 
-  const override = opts.transformOverrides?.get(layer.id);
-  const layerMat = fromTRS(
-    { x: override?.x ?? layer.transform.x, y: override?.y ?? layer.transform.y },
-    override?.rotation ?? layer.transform.rotation,
-    override?.scaleX ?? layer.transform.scaleX,
-    override?.scaleY ?? layer.transform.scaleY
-  );
+  const layerMat = getEffectiveLayerMatrix(layer, opts);
   setTransformFromMat(ctx, multiply(view, layerMat));
 
   // The cache surface holds pixels for `entry.rect` in layer-local space; draw
@@ -288,15 +323,41 @@ const drawCachedLayer = (
     // the same display-only control transparency effect used after commit.
     const displayPreview =
       layer.type === 'control' && layer.withTransparencyEffect && opts.backend
-        ? renderControlTransparency(opts.backend, preview.surface, preview.surface.width, preview.surface.height)
+        ? opts.derivedSurfaces
+          ? opts.derivedSurfaces.get({
+              create: (target) =>
+                renderControlTransparency(
+                  opts.backend!,
+                  preview.surface,
+                  preview.surface.width,
+                  preview.surface.height,
+                  target
+                ),
+              kind: 'control-transparency',
+              layerId: layer.id,
+              paramsKey: 'preview',
+              source: preview.surface,
+              sourceVersion: 0,
+            })
+          : renderControlTransparency(opts.backend, preview.surface, preview.surface.width, preview.surface.height)
         : preview.surface;
     ctx.drawImage(displayPreview.canvas, preview.rect.x, preview.rect.y);
   } else if (isMaskLayer(layer)) {
-    drawMaskLayer(ctx, layer, entry.surface, origin, opts);
+    drawMaskLayer(ctx, layer, entry.surface, entry.version, origin, opts);
   } else if (layer.type === 'control' && layer.withTransparencyEffect && opts.backend) {
     // Display-only lightness→alpha effect (legacy `LightnessToAlphaFilter`): dark
     // areas of the control map drop out so underlying content shows through.
-    const effect = renderControlTransparency(opts.backend, entry.surface, entry.surface.width, entry.surface.height);
+    const effect = opts.derivedSurfaces
+      ? opts.derivedSurfaces.get({
+          create: (target) =>
+            renderControlTransparency(opts.backend!, entry.surface, entry.surface.width, entry.surface.height, target),
+          kind: 'control-transparency',
+          layerId: layer.id,
+          paramsKey: 'committed',
+          source: entry.surface,
+          sourceVersion: entry.version,
+        })
+      : renderControlTransparency(opts.backend, entry.surface, entry.surface.width, entry.surface.height);
     ctx.drawImage(effect.canvas, origin.x, origin.y);
   } else {
     // Raster layers may carry non-destructive adjustments; the engine supplies a
@@ -321,6 +382,7 @@ export const compositeDocument = (
   opts: CompositeOptions = {}
 ): void => {
   const ctx = target.ctx;
+  opts.diagnostics?.increment('compositeFrames');
 
   ctx.save();
 
@@ -364,13 +426,19 @@ export const compositeDocument = (
       ) {
         continue;
       }
+      opts.diagnostics?.increment('layersConsidered');
       const entry = caches.get(layer.id);
       // Skip layers with no cache or an empty content rect (a brand-new / cleared
       // paint / mask layer holds no pixels — nothing to draw).
       if (!entry || entry.rect.width <= 0 || entry.rect.height <= 0) {
         continue;
       }
+      if (isDefinitelyOffscreen(layer, entry, view, target, opts)) {
+        opts.diagnostics?.increment('layersCulled');
+        continue;
+      }
       drawCachedLayer(ctx, layer, entry, view, opts);
+      opts.diagnostics?.increment('layersDrawn');
     }
   };
   for (let rank = 0; rank < LAYER_GROUP_COUNT; rank++) {

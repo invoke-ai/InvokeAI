@@ -1,5 +1,6 @@
-import type { CanvasOperationState } from '@workbench/canvas-engine/canvasOperationController';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
+
+import type { CanvasOperationUIEngine } from './operationUIEngine';
 
 import { FilterOptions } from './FilterOptions';
 import { SamOptions } from './SamOptions';
@@ -14,7 +15,7 @@ export const CanvasOperationBar = ({
   isExternalInteractionLocked,
   operation,
 }: {
-  engine: CanvasEngine;
+  engine: CanvasOperationUIEngine;
   isExternalInteractionLocked: boolean;
   operation: Extract<CanvasOperationState, { status: 'active' }>;
 }) => (

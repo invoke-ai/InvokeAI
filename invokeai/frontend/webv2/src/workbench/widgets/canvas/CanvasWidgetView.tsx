@@ -102,7 +102,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     // The container and the canvas targets share a top-left origin, so its rect
     // gives the same screen coords the pointer pipeline feeds the viewport.
     const rect = event.currentTarget.getBoundingClientRect();
-    const layerId = engine.contextMenuLayerIdAt({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+    const layerId = engine.tools.contextMenuLayerIdAt({ x: event.clientX - rect.left, y: event.clientY - rect.top });
     if (!layerId) {
       setLayerMenuTarget(null);
       return;
@@ -119,7 +119,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     return typeof values?.model?.base === 'string' ? values.model.base : null;
   });
   useEffect(() => {
-    engine?.setBboxGrid(gridSizeForModelBase(modelBase));
+    engine?.viewport.setBboxGrid(gridSizeForModelBase(modelBase));
   }, [engine, modelBase]);
 
   // Canvas view settings (checkerboard / grid / invert-scroll) persist in the
@@ -178,8 +178,8 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
 
   useLayoutEffect(() => {
-    engine?.setInteractionLocked(isInteractionLocked);
-    return () => engine?.setInteractionLocked(false);
+    engine?.tools.setInteractionLocked(isInteractionLocked);
+    return () => engine?.tools.setInteractionLocked(false);
   }, [engine, isInteractionLocked]);
 
   // "Show progress on canvas" gates ONLY the selected placeholder's live denoise
@@ -210,7 +210,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   // `setStagedPreview` re-runs only when `previewKey` actually changes (which
   // includes every new progress frame) — never on unrelated re-renders.
   const applyStagedPreview = useEffectEvent(() => {
-    engine?.setStagedPreview(previewSource);
+    engine?.previews.setStagedPreview(previewSource);
   });
   useEffect(() => {
     applyStagedPreview();
@@ -218,7 +218,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   // Clear the preview when the widget (or engine) goes away, so an accepted /
   // discarded candidate never lingers over the canvas.
   useEffect(() => {
-    return () => engine?.setStagedPreview(null);
+    return () => engine?.previews.setStagedPreview(null);
   }, [engine]);
 
   const executeCanvasHotkey = useEffectEvent((commandId: string) => {
@@ -243,7 +243,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
 
     if (isInteractionLocked) {
       if (commandId === 'canvas.tool.view') {
-        engine?.setTool('view');
+        engine?.tools.setTool('view');
       }
       return;
     }
@@ -251,7 +251,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     // Arrow-key nudge: engine owns the bounds/lock logic (no-op with no/locked selection).
     const nudge = NUDGE_DELTAS[commandId];
     if (nudge) {
-      engine?.nudgeSelectedLayer(nudge.dx, nudge.dy);
+      engine?.layers.nudgeSelectedLayer(nudge.dx, nudge.dy);
       return;
     }
 
@@ -267,7 +267,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
         return;
       }
       const { forward, inverse } = reorderLayerActions(currentIds, nextIds);
-      engine.commitStructural(t('widgets.canvas.commands.reorderLayer'), forward, inverse);
+      engine.layers.commitStructural(t('widgets.canvas.commands.reorderLayer'), forward, inverse);
       return;
     }
 
@@ -275,11 +275,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       // Staged images take priority; otherwise delete the selected layer (undoable).
       if (engine && selectedLayer && selectedIndex >= 0) {
         const { forward, inverse } = deleteLayerActions(selectedLayer, selectedIndex);
-        engine.commitStructural(t('widgets.canvas.commands.deleteLayer'), forward, inverse);
+        engine.layers.commitStructural(t('widgets.canvas.commands.deleteLayer'), forward, inverse);
       }
     } else if (commandId === 'canvas.resetSelected') {
       if (engine && selectedLayer) {
-        engine.clearMask(selectedLayer.id);
+        engine.layers.clearMask(selectedLayer.id);
       }
     } else if (commandId === 'canvas.undo') {
       // Canvas undo/redo is engine-scoped: it drives the engine-owned pixel/
@@ -287,55 +287,55 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       // history is empty this is a no-op — it deliberately does not fall back to
       // `undoProjectChange` (project undo keeps its own commands/hotkeys, e.g.
       // the workflow editor's `workflows.undo`).
-      engine?.undo();
+      engine?.history.undo();
     } else if (commandId === 'canvas.redo') {
-      engine?.redo();
+      engine?.history.redo();
     } else if (commandId === 'canvas.tool.view') {
-      engine?.setTool('view');
+      engine?.tools.setTool('view');
     } else if (commandId === 'canvas.tool.move') {
-      engine?.setTool('move');
+      engine?.tools.setTool('move');
     } else if (commandId === 'canvas.transformSelected') {
       // Selecting the transform tool opens a session on the selected layer (if any
       // eligible one); Apply/Cancel (enter/esc) are handled engine-side.
-      engine?.setTool('transform');
+      engine?.tools.setTool('transform');
     } else if (commandId === 'canvas.tool.bbox') {
-      engine?.setTool('bbox');
+      engine?.tools.setTool('bbox');
     } else if (commandId === 'canvas.tool.brush') {
-      engine?.setTool('brush');
+      engine?.tools.setTool('brush');
     } else if (commandId === 'canvas.tool.eraser') {
-      engine?.setTool('eraser');
+      engine?.tools.setTool('eraser');
     } else if (commandId === 'canvas.tool.lasso') {
-      engine?.setTool('lasso');
+      engine?.tools.setTool('lasso');
     } else if (commandId === 'canvas.tool.shape') {
-      engine?.setTool('shape');
+      engine?.tools.setTool('shape');
     } else if (commandId === 'canvas.tool.text') {
-      engine?.setTool('text');
+      engine?.tools.setTool('text');
     } else if (commandId === 'canvas.tool.gradient') {
-      engine?.setTool('gradient');
+      engine?.tools.setTool('gradient');
     } else if (commandId === 'canvas.selectAll') {
-      engine?.selectAll();
+      engine?.selection.selectAll();
     } else if (commandId === 'canvas.deselect') {
-      engine?.deselect();
+      engine?.selection.deselect();
     } else if (commandId === 'canvas.invertSelection') {
-      engine?.invertSelection();
+      engine?.selection.invertSelection();
     } else if (commandId === 'canvas.brushSizeDown') {
-      engine?.stepBrushSize(-1);
+      engine?.tools.stepBrushSize(-1);
     } else if (commandId === 'canvas.brushSizeUp') {
-      engine?.stepBrushSize(1);
+      engine?.tools.stepBrushSize(1);
     } else if (commandId === 'canvas.duplicateLayer') {
       if (engine && selectedLayer) {
         const { forward, inverse } = duplicateLayerActions(selectedLayer.id, createLayerId());
-        engine.commitStructural(t('widgets.canvas.commands.duplicateLayer'), forward, inverse);
+        engine.layers.commitStructural(t('widgets.canvas.commands.duplicateLayer'), forward, inverse);
       }
     } else if (commandId === 'canvas.mergeDown') {
       // Gate on the SAME predicate the layers panel's context menu uses to
       // enable/disable its "Merge Down" item (`canMergeLayerDown`), so the hotkey
       // can never fire where the menu would refuse — e.g. a mask layer selected,
-      // or a mask directly below the selection. `engine.mergeLayerDown` also
+      // or a mask directly below the selection. `engine.layers.mergeLayerDown` also
       // guards this itself (defense in depth for callers other than this hotkey),
       // but checking here keeps the two surfaces visibly in lockstep.
       if (engine && selectedLayer && canMergeLayerDown(layers, selectedIndex, true)) {
-        engine.mergeLayerDown(selectedLayer.id);
+        engine.layers.mergeLayerDown(selectedLayer.id);
       }
     }
   });

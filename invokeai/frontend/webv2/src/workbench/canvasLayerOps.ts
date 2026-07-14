@@ -1,7 +1,7 @@
 /**
  * Pure builders for the structural document edits shared by the layers panel and
  * the canvas widget's layer hotkeys: each returns the forward + inverse reducer
- * action pair for `engine.commitStructural` / `applyStructural`, so the
+ * action pair for `engine.layers.commitStructural` / `applyStructural`, so the
  * inverse-construction logic lives in exactly one place.
  *
  * Index convention matches the contract and the layers panel: index 0 is the

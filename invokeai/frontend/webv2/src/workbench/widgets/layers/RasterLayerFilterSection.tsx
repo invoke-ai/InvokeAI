@@ -1,14 +1,21 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { LayerFilterOperationEngine } from '@workbench/widgets/layers/LayerFilterOperationButton';
+
+import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
 
 import { LayerFilterOperationButton } from './LayerFilterOperationButton';
 
 interface RasterLayerFilterSectionProps {
-  engine: CanvasEngine | null;
+  engine: LayerFilterOperationEngine | null;
   layer: CanvasRasterLayerContractV2;
   onOperationStarted(): void;
 }
 
 export const RasterLayerFilterSection = ({ engine, layer, onOperationStarted }: RasterLayerFilterSectionProps) => (
-  <LayerFilterOperationButton engine={engine} layer={layer} onOperationStarted={onOperationStarted} />
+  <LayerFilterOperationButton
+    engine={engine}
+    layer={layer}
+    onOperationStarted={onOperationStarted}
+    operations={engine ? getCanvasOperations(engine) : null}
+  />
 );

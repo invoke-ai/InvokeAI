@@ -1,4 +1,4 @@
-import type { CanvasEngine, StartFilterOperationResult } from '@workbench/canvas-engine/engine';
+import type { StartFilterOperationResult } from '@workbench/canvas-operations/api';
 import type * as WorkbenchUI from '@workbench/components/ui';
 import type { ReactNode } from 'react';
 
@@ -8,7 +8,7 @@ import { createControlLayer, createEmptyPaintLayer } from '@workbench/widgets/la
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LayerFilterOperationButton } from './LayerFilterOperationButton';
+import { LayerFilterOperationButton, type LayerFilterOperationEngine } from './LayerFilterOperationButton';
 
 interface CapturedButtonProps {
   children?: ReactNode;
@@ -64,15 +64,28 @@ const createEngine = (
 ) => {
   const hasExportableLayerContent = vi.fn(() => hasExportableContent);
   const startFilterOperation = vi.fn(launch);
-  const engine = { hasExportableLayerContent, startFilterOperation } as unknown as CanvasEngine;
+  const engine = {
+    exports: { hasExportableLayerContent },
+    operations: { startFilterOperation },
+  } as unknown as LayerFilterOperationEngine;
 
   return { engine, hasExportableLayerContent, startFilterOperation };
 };
 
-const renderButton = (engine: CanvasEngine | null, layer: TestLayer, onOperationStarted = vi.fn()) => {
+const renderButton = (engine: LayerFilterOperationEngine | null, layer: TestLayer, onOperationStarted = vi.fn()) => {
   renderToStaticMarkup(
     <ChakraProvider value={system}>
-      <LayerFilterOperationButton engine={engine} layer={layer} onOperationStarted={onOperationStarted} />
+      <LayerFilterOperationButton
+        engine={engine}
+        layer={layer}
+        onOperationStarted={onOperationStarted}
+        operations={
+          engine
+            ? (engine as unknown as { operations: { startFilterOperation(id: string): StartFilterOperationResult } })
+                .operations
+            : null
+        }
+      />
     </ChakraProvider>
   );
 

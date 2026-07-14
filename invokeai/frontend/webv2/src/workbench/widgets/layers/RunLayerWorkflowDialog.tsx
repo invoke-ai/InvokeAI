@@ -1,11 +1,11 @@
 import type { SelectValueChangeDetails } from '@chakra-ui/react';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasExportCapability, CanvasLayerCapability } from '@workbench/canvas-engine/api';
 import type { ProjectGraphState } from '@workbench/workflows/types';
 import type { FormEvent } from 'react';
 
 import { chakra, createListCollection, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
 import { socketHub } from '@workbench/backend/socketHub';
-import { runUtilityGraph } from '@workbench/canvas-engine/backend/utilityQueue';
+import { runUtilityGraph } from '@workbench/canvas-operations/backend/utilityQueue';
 import { Button, CloseButton, Field, Select } from '@workbench/components/ui';
 import { getGalleryImageByName, makeImageDurable, saveImageToGallery } from '@workbench/gallery/api';
 import { useNotify } from '@workbench/useNotify';
@@ -113,7 +113,7 @@ export const useLayerWorkflowAvailability = (): LayerWorkflowAvailability => {
 
 interface RunLayerWorkflowDialogProps {
   availability: LayerWorkflowAvailability;
-  engine: CanvasEngine | null;
+  engine: { readonly exports: CanvasExportCapability; readonly layers: CanvasLayerCapability } | null;
   isOpen: boolean;
   layerId: string;
   onClose(): void;
@@ -348,17 +348,17 @@ export const RunLayerWorkflowDialog = ({
     setIsRunning(true);
 
     try {
-      const executorDeps = engine.getCompositeExecutorDeps();
+      const executorDeps = engine.exports.getCompositeExecutorDeps();
       const result = await runLayerWorkflow({
         deps: {
           appendStaging: (targetProjectId, candidate) =>
             dispatch({ candidate, projectId: targetProjectId, type: 'appendCanvasStagingCandidate' }),
           buildGraph: buildLayerWorkflowGraph,
-          commitGenerated: (options) => engine.commitGeneratedImageResult(options),
+          commitGenerated: (options) => engine.layers.commitGeneratedImageResult(options),
           createRequestId: () => crypto.randomUUID(),
-          exportLayer: (targetLayerId) => engine.exportBakedLayerBlob(targetLayerId, { includeDisabled: true }),
+          exportLayer: (targetLayerId) => engine.exports.exportBakedLayerBlob(targetLayerId, { includeDisabled: true }),
           getImage: getGalleryImageByName,
-          isGuardCurrent: (guard) => engine.isLayerExportGuardCurrent(guard),
+          isGuardCurrent: (guard) => engine.exports.isLayerExportGuardCurrent(guard),
           makeDurable: makeImageDurable,
           runGraph: (options) => runUtilityGraph({ ...options, hub: socketHub }),
           saveToGallery: saveImageToGallery,

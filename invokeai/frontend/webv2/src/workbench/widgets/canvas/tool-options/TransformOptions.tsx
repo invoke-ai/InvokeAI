@@ -36,7 +36,7 @@ export const TransformOptions = ({ engine }: ToolOptionsComponentProps) => {
       if (!transform) {
         return;
       }
-      engine.updateTransformSession({ ...transform, ...next });
+      engine.layers.updateTransformSession({ ...transform, ...next });
     },
     [engine, transform]
   );
@@ -82,8 +82,8 @@ export const TransformOptions = ({ engine }: ToolOptionsComponentProps) => {
     [patch]
   );
 
-  const onApply = useCallback(() => engine.applyTransform(), [engine]);
-  const onCancel = useCallback(() => engine.cancelTransform(), [engine]);
+  const onApply = useCallback(() => engine.layers.applyTransform(), [engine]);
+  const onCancel = useCallback(() => engine.layers.cancelTransform(), [engine]);
 
   const disabled = !transform;
 

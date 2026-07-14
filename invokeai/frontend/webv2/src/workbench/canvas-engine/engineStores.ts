@@ -13,12 +13,10 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
-import type { SamModel } from '@workbench/generation/canvas/samGraph';
 import type { CanvasLayerSourceContract } from '@workbench/types';
-import type { FilterOperationSessionState } from '@workbench/widgets/layers/filterOperationSession';
-export type { FilterOperationSessionState } from '@workbench/widgets/layers/filterOperationSession';
 
 import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 
@@ -225,62 +223,6 @@ export interface TextEditSession {
   transform: LayerTransform;
 }
 
-export type SamPointLabel = 'include' | 'exclude';
-
-export type SamSessionErrorCode =
-  | 'invalid'
-  | 'not-ready'
-  | 'empty'
-  | 'upload'
-  | 'queue'
-  | 'no-output'
-  | 'reconcile'
-  | 'output-dimension'
-  | 'decode'
-  | 'locked'
-  | 'unknown';
-
-export interface SamSessionError {
-  code: SamSessionErrorCode;
-  detail?: string;
-}
-
-export interface SamVisualInput {
-  type: 'visual';
-  includePoints: Vec2[];
-  excludePoints: Vec2[];
-  bbox: Rect | null;
-}
-
-export type SamSessionInput =
-  | SamVisualInput
-  | { type: 'prompt'; prompt: string; includePoints?: never; excludePoints?: never; bbox?: never };
-
-/** Narrow engine-owned Select Object state for canvas tools and future UI subscribers. */
-export interface SamSessionSnapshot {
-  sourceRect: Rect;
-  layerName: string;
-  layerType: 'raster' | 'control';
-  input: SamSessionInput;
-  pointLabel: SamPointLabel;
-  model: SamModel;
-  invert: boolean;
-  applyPolygonRefinement: boolean;
-  autoProcess: boolean;
-  isolatedPreview: boolean;
-  status:
-    | 'ready'
-    | 'scheduled'
-    | 'preparing-source'
-    | 'uploading'
-    | 'processing-sam'
-    | 'rendering-preview'
-    | 'committing'
-    | 'error';
-  error: SamSessionError | null;
-  hasPreview: boolean;
-}
-
 /** A single-value store, `useSyncExternalStore`-compatible. */
 export interface ScalarStore<T> {
   get(): T;
@@ -483,6 +425,8 @@ export interface EngineStores {
    * mask gains/loses content.
    */
   hasSelection: ScalarStore<boolean>;
+  /** Core-only visual SAM interaction state; application session status remains outside the engine. */
+  samInteraction: ScalarStore<SamInteractionState | null>;
   /**
    * The in-progress lasso polygon (document-space points) during a lasso drag,
    * or `null` when idle. The overlay renders it as a live dashed preview in
@@ -558,10 +502,6 @@ export interface EngineStores {
    * Purely an interaction preference — no render effect.
    */
   snapToGrid: ScalarStore<boolean>;
-  /** Active Select Object session state, or `null`; intentionally React-free and narrowly shaped. */
-  samSession: ScalarStore<SamSessionSnapshot | null>;
-  /** Active guarded layer-filter session state, independent of any launching view. */
-  filterSession: ScalarStore<FilterOperationSessionState | null>;
   /** Whether an engine-owned operation currently excludes ordinary document edits. */
   documentEditingLocked: ScalarStore<boolean>;
 }
@@ -680,7 +620,6 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
   documentEditingLocked: createScalarStore<boolean>(false),
-  filterSession: createScalarStore<FilterOperationSessionState | null>(null),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),
   gradientOptions: createScalarStore<GradientToolOptions>(
@@ -691,7 +630,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   lassoOptions: createScalarStore<LassoToolOptions>({ ...DEFAULT_LASSO_OPTIONS }, lassoOptionsEqual),
   lassoPreview: createScalarStore<readonly Vec2[] | null>(null),
   ruleOfThirds: createScalarStore<boolean>(false),
-  samSession: createScalarStore<SamSessionSnapshot | null>(null),
+  samInteraction: createScalarStore(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
   shapePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, shapePreviewEqual),
   showBbox: createScalarStore<boolean>(true),

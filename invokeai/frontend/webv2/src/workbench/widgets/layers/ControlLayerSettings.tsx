@@ -3,11 +3,14 @@ import type {
   SelectValueChangeDetails,
   SliderValueChangeDetails,
 } from '@chakra-ui/react';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasDocumentCapability } from '@workbench/canvas-engine/api';
 import type { ControlAdapterKind } from '@workbench/generation/canvas/addControlLayers';
 import type { CanvasControlAdapterContract, CanvasControlLayerContract } from '@workbench/types';
+import type { LayerFilterOperationEngine } from '@workbench/widgets/layers/LayerFilterOperationButton';
+import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
 import { createListCollection, HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
+import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
 import { Field, Select, Slider } from '@workbench/components/ui';
 import { isControlKindSupportedForBase } from '@workbench/generation/canvas/addControlLayers';
 import { resolveDefaultFilterForModel } from '@workbench/generation/canvas/controlRecommendations';
@@ -53,7 +56,9 @@ const useSelectedMainModel = () => {
 };
 
 interface ControlLayerSettingsProps {
-  engine: CanvasEngine | null;
+  engine:
+    | (CanvasStructuralEngine & LayerFilterOperationEngine & { readonly document: CanvasDocumentCapability })
+    | null;
   layer: CanvasControlLayerContract;
   onOperationStarted(): void;
 }
@@ -141,7 +146,10 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         const selected = models.find((candidate) => candidate.key === model);
         const recommendation = resolveDefaultFilterForModel(selected);
         if (recommendation && !layer.filter) {
-          runLayerFilterOperation(() => engine?.startFilterOperation(layer.id, recommendation), onOperationStarted);
+          runLayerFilterOperation(
+            () => (engine ? getCanvasOperations(engine).startFilterOperation(layer.id, recommendation) : 'not-ready'),
+            onOperationStarted
+          );
         }
       }
     },
@@ -286,30 +294,30 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
 
   const selectedModelName = modelOptions.find((model) => model.key === adapter.model)?.name;
   const adapterModel = models.find((model) => model.key === adapter.model) ?? null;
-  const hasContent = engine?.hasExportableLayerContent(layer.id) ?? false;
+  const hasContent = engine?.exports.hasExportableLayerContent(layer.id) ?? false;
   const controlLoraIndex =
     adapter.kind === 'control_lora' && engine
-      ? (engine
+      ? (engine.document
           .getDocument()
           ?.layers.filter(
             (candidate) =>
               candidate.isEnabled &&
               candidate.type === 'control' &&
               candidate.adapter.kind === 'control_lora' &&
-              engine.hasExportableLayerContent(candidate.id)
+              engine.exports.hasExportableLayerContent(candidate.id)
           )
           .findIndex((candidate) => candidate.id === layer.id) ?? 0)
       : 0;
   const zImageControlIndex =
     adapter.kind === 'z_image_control' && engine
-      ? (engine
+      ? (engine.document
           .getDocument()
           ?.layers.filter(
             (candidate) =>
               candidate.isEnabled &&
               candidate.type === 'control' &&
               candidate.adapter.kind === 'z_image_control' &&
-              engine.hasExportableLayerContent(candidate.id)
+              engine.exports.hasExportableLayerContent(candidate.id)
           )
           .findIndex((candidate) => candidate.id === layer.id) ?? 0)
       : 0;
@@ -422,7 +430,12 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           <Text fontSize="xs">{t('widgets.layers.control.transparencyEffect')}</Text>
         </Switch.Label>
       </Switch.Root>
-      <LayerFilterOperationButton engine={engine} layer={layer} onOperationStarted={onOperationStarted} />
+      <LayerFilterOperationButton
+        engine={engine}
+        layer={layer}
+        onOperationStarted={onOperationStarted}
+        operations={engine ? getCanvasOperations(engine) : null}
+      />
       {validationReason ? (
         <Text color="fg.warning" fontSize="2xs" role="alert">
           {t(`widgets.layers.control.validation.${validationReason}`)}

@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the canvas ref callback is memoized on [engine, layerId, version]; it is intentionally re-created when the layer's thumbnail version bumps so the cache is re-blitted. */
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasCoreStoreCapability, CanvasPreviewCapability } from '@workbench/canvas-engine/api';
 import type { LayerThumbnailFallbackStage } from '@workbench/canvas-engine/render/thumbnail';
 import type { CanvasLayerContract } from '@workbench/types';
 import type { CSSProperties } from 'react';
@@ -21,13 +21,24 @@ const THUMBNAIL_MAX_PX = 96;
 const CANVAS_STYLE: CSSProperties = { height: '100%', objectFit: 'contain', width: '100%' };
 const IMG_STYLE: CSSProperties = { height: '100%', objectFit: 'cover', width: '100%' };
 
+type LayerThumbnailEngine = CanvasCoreStoreCapability & {
+  readonly previews: CanvasPreviewCapability;
+  readonly projectId: string;
+};
+
 /**
  * A layer's thumbnail: the engine's live cache pixels drawn onto a `<canvas>`,
  * redrawn whenever the layer's `thumbnailVersion` bumps. Falls back to the
  * persisted image thumbnail (for image-source layers) or a placeholder icon
  * when there is no engine / no cache yet.
  */
-const LayerThumbnailContent = ({ engine, layer }: { engine: CanvasEngine | null; layer: CanvasLayerContract }) => {
+const LayerThumbnailContent = ({
+  engine,
+  layer,
+}: {
+  engine: LayerThumbnailEngine | null;
+  layer: CanvasLayerContract;
+}) => {
   // Re-renders (and thus re-runs the ref callback below) when the cache repaints.
   const version = useLayerThumbnailVersion(engine, layer.id);
   const status = useLayerThumbnailStatus(engine, layer.id);
@@ -44,9 +55,9 @@ const LayerThumbnailContent = ({ engine, layer }: { engine: CanvasEngine | null;
         return;
       }
       if (status === 'idle') {
-        void engine.requestLayerThumbnail(layer.id);
+        void engine.previews.requestLayerThumbnail(layer.id);
       }
-      const didDraw = engine.drawLayerThumbnail(layer.id, canvas, THUMBNAIL_MAX_PX);
+      const didDraw = engine.previews.drawLayerThumbnail(layer.id, canvas, THUMBNAIL_MAX_PX);
       setDrawn(didDraw);
       if (didDraw) {
         setFallbackStage('thumbnail');
@@ -62,7 +73,7 @@ const LayerThumbnailContent = ({ engine, layer }: { engine: CanvasEngine | null;
   const retry = useCallback(() => {
     setFallbackStage('thumbnail');
     if (engine) {
-      void engine.requestLayerThumbnail(layer.id);
+      void engine.previews.requestLayerThumbnail(layer.id);
     }
   }, [engine, layer.id]);
 
@@ -119,7 +130,13 @@ const LayerThumbnailContent = ({ engine, layer }: { engine: CanvasEngine | null;
  * The keyed boundary resets local draw/fallback state when a row is reused for a
  * different project, layer, or persisted image. No effect-based reset is needed.
  */
-export const LayerThumbnail = ({ engine, layer }: { engine: CanvasEngine | null; layer: CanvasLayerContract }) => {
+export const LayerThumbnail = ({
+  engine,
+  layer,
+}: {
+  engine: LayerThumbnailEngine | null;
+  layer: CanvasLayerContract;
+}) => {
   const imageName = resolveLayerThumbnailImageRef(layer)?.imageName ?? 'none';
   return (
     <LayerThumbnailContent

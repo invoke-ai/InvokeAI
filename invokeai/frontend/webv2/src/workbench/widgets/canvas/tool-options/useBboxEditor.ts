@@ -1,3 +1,4 @@
+import type { CanvasCoreStoreCapability, CanvasLayerCapability } from '@workbench/canvas-engine/api';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { bboxEquals, roundBbox } from '@workbench/canvas-engine/tools/bboxHitTest';
@@ -6,12 +7,12 @@ import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ToolOptionsComponentProps } from './ToolOptionsBar';
+export type BboxEditorEngine = CanvasCoreStoreCapability & { readonly layers: CanvasLayerCapability };
 
 const bboxEqualsSelected = (a: Rect | null, b: Rect | null): boolean =>
   a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height);
 
-export const useBboxEditor = (engine: ToolOptionsComponentProps['engine']) => {
+export const useBboxEditor = (engine: BboxEditorEngine) => {
   const { t } = useTranslation();
   const bbox = useActiveProjectSelector((project) => project.canvas.document.bbox, bboxEqualsSelected);
   const options = useBboxOptions(engine);
@@ -23,7 +24,7 @@ export const useBboxEditor = (engine: ToolOptionsComponentProps['engine']) => {
       if (bboxEquals(rounded, bbox)) {
         return;
       }
-      engine.commitStructural(
+      engine.layers.commitStructural(
         t('widgets.canvas.toolOptions.setFrame'),
         { bbox: rounded, type: 'setCanvasBbox' },
         { bbox: roundBbox(bbox), type: 'setCanvasBbox' }

@@ -1,4 +1,4 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -14,19 +14,27 @@ interface SharedLaunchProps {
   engine: CanvasEngine | null;
   layer: CanvasControlLayerContract | CanvasRasterLayerContractV2;
   onOperationStarted(): void;
+  operations: unknown;
 }
 
-const { dispatch, renderSharedLaunch } = vi.hoisted(() => ({
+const { dispatch, operations, renderSharedLaunch } = vi.hoisted(() => ({
   dispatch: vi.fn(),
+  operations: { startFilterOperation: vi.fn() },
   renderSharedLaunch: vi.fn(),
 }));
-const ENGINE = { hasExportableLayerContent: vi.fn(() => false) } as unknown as CanvasEngine;
+const ENGINE = {
+  document: { getDocument: vi.fn(() => ({ layers: [] })) },
+  exports: { hasExportableLayerContent: vi.fn(() => false) },
+} as unknown as CanvasEngine;
 
 vi.mock('./LayerFilterOperationButton', () => ({
   LayerFilterOperationButton: (props: SharedLaunchProps) => {
     renderSharedLaunch(props);
     return <span>shared filter launch</span>;
   },
+}));
+vi.mock('@workbench/canvas-operations/createCanvasEngine', () => ({
+  getCanvasOperations: () => operations,
 }));
 vi.mock('@workbench/models/modelsStore', () => ({
   useModelsSelector: (selector: (snapshot: { models: never[] }) => unknown) => selector({ models: [] }),
@@ -53,7 +61,9 @@ describe('layer filter launch delegation', () => {
     );
 
     expect(renderSharedLaunch).toHaveBeenCalledOnce();
-    expect(renderSharedLaunch).toHaveBeenCalledWith({ engine: ENGINE, layer, onOperationStarted });
+    expect(renderSharedLaunch).toHaveBeenCalledWith(
+      expect.objectContaining({ engine: ENGINE, layer, onOperationStarted, operations: expect.any(Object) })
+    );
   });
 
   it('delegates control-layer launch rendering to the shared control with the original props', () => {
@@ -67,6 +77,8 @@ describe('layer filter launch delegation', () => {
     );
 
     expect(renderSharedLaunch).toHaveBeenCalledOnce();
-    expect(renderSharedLaunch).toHaveBeenCalledWith({ engine: ENGINE, layer, onOperationStarted });
+    expect(renderSharedLaunch).toHaveBeenCalledWith(
+      expect.objectContaining({ engine: ENGINE, layer, onOperationStarted, operations: expect.any(Object) })
+    );
   });
 });

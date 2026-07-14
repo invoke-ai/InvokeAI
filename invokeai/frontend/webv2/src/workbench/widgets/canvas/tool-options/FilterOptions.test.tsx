@@ -1,5 +1,5 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/engine';
-import type { FilterOperationSessionState } from '@workbench/widgets/layers/filterOperationSession';
+import type { FilterOperationSessionState } from '@workbench/canvas-operations/filterOperationSession';
 import type { ComponentProps } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';

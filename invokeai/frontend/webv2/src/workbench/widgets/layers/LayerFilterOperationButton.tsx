@@ -1,4 +1,5 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasOperationCapability } from '@workbench/canvas-operations/api';
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { Box } from '@chakra-ui/react';
@@ -15,20 +16,28 @@ import {
   runLayerFilterOperation,
 } from './layerPropertiesOperation';
 
+export type LayerFilterOperationEngine = CanvasEngine;
+
 interface LayerFilterOperationButtonProps {
-  engine: CanvasEngine | null;
+  engine: LayerFilterOperationEngine | null;
   layer: CanvasRasterLayerContractV2 | CanvasControlLayerContract;
   onOperationStarted(): void;
+  operations: Pick<CanvasOperationCapability, 'startFilterOperation'> | null;
 }
 
-export const LayerFilterOperationButton = ({ engine, layer, onOperationStarted }: LayerFilterOperationButtonProps) => {
+export const LayerFilterOperationButton = ({
+  engine,
+  layer,
+  onOperationStarted,
+  operations,
+}: LayerFilterOperationButtonProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
   useLayerThumbnailVersion(engine, layer.id);
 
   const disabledReason = getLayerFilterLaunchDisabledReason({
     hasEngine: engine !== null,
-    hasExportableContent: engine?.hasExportableLayerContent(layer.id) ?? false,
+    hasExportableContent: engine?.exports.hasExportableLayerContent(layer.id) ?? false,
     isEnabled: layer.isEnabled,
     isLocked: layer.isLocked,
   });
@@ -41,11 +50,11 @@ export const LayerFilterOperationButton = ({ engine, layer, onOperationStarted }
   );
 
   const start = useCallback(() => {
-    if (!engine || disabledReason) {
+    if (!engine || !operations || disabledReason) {
       return;
     }
-    runLayerFilterOperation(() => engine.startFilterOperation(layer.id), onOperationStarted, onOperationRejected);
-  }, [disabledReason, engine, layer.id, onOperationRejected, onOperationStarted]);
+    runLayerFilterOperation(() => operations.startFilterOperation(layer.id), onOperationStarted, onOperationRejected);
+  }, [disabledReason, engine, layer.id, onOperationRejected, onOperationStarted, operations]);
 
   return (
     <Tooltip

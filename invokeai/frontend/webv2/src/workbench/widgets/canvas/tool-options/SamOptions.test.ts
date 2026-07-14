@@ -1,4 +1,4 @@
-import type { SamSessionSnapshot } from '@workbench/canvas-engine/engineStores';
+import type { SamSessionSnapshot } from '@workbench/canvas-operations/operationTypes';
 import type { ComponentProps } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -419,14 +419,14 @@ describe('getSamActionHandlers', () => {
   });
 
   it('wires every bar action and save target to the engine', () => {
-    const engine = {
+    const operations = {
       applySelectObjectSession: vi.fn(),
       cancelSelectObjectSession: vi.fn(),
       processSelectObjectSession: vi.fn(),
       resetSelectObjectSession: vi.fn(),
       saveSelectObjectSession: vi.fn(),
     };
-    const actions = getSamActionHandlers(engine as never);
+    const actions = getSamActionHandlers(operations as never);
 
     actions.process();
     actions.reset();
@@ -438,34 +438,36 @@ describe('getSamActionHandlers', () => {
     actions.save('selection');
     actions.cancel();
 
-    expect(engine.processSelectObjectSession).toHaveBeenCalledOnce();
-    expect(engine.resetSelectObjectSession).toHaveBeenCalledOnce();
-    expect(engine.applySelectObjectSession).toHaveBeenCalledOnce();
-    expect(engine.applySelectObjectSession).toHaveBeenCalledWith(keepSamImageIntermediate);
-    expect(engine.processSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
-      engine.resetSelectObjectSession.mock.invocationCallOrder[0] as number
+    expect(operations.processSelectObjectSession).toHaveBeenCalledOnce();
+    expect(operations.resetSelectObjectSession).toHaveBeenCalledOnce();
+    expect(operations.applySelectObjectSession).toHaveBeenCalledOnce();
+    expect(operations.applySelectObjectSession).toHaveBeenCalledWith(keepSamImageIntermediate);
+    expect(operations.processSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
+      operations.resetSelectObjectSession.mock.invocationCallOrder[0] as number
     );
-    expect(engine.resetSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
-      engine.applySelectObjectSession.mock.invocationCallOrder[0] as number
+    expect(operations.resetSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
+      operations.applySelectObjectSession.mock.invocationCallOrder[0] as number
     );
-    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('raster', keepSamImageIntermediate);
-    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('control', keepSamImageIntermediate);
-    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('inpaint_mask', keepSamImageIntermediate);
-    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('regional_guidance', keepSamImageIntermediate);
-    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('selection', keepSamImageIntermediate);
-    expect(engine.cancelSelectObjectSession).toHaveBeenCalledOnce();
+    expect(operations.saveSelectObjectSession).toHaveBeenCalledWith('raster', keepSamImageIntermediate);
+    expect(operations.saveSelectObjectSession).toHaveBeenCalledWith('control', keepSamImageIntermediate);
+    expect(operations.saveSelectObjectSession).toHaveBeenCalledWith('inpaint_mask', keepSamImageIntermediate);
+    expect(operations.saveSelectObjectSession).toHaveBeenCalledWith('regional_guidance', keepSamImageIntermediate);
+    expect(operations.saveSelectObjectSession).toHaveBeenCalledWith('selection', keepSamImageIntermediate);
+    expect(operations.cancelSelectObjectSession).toHaveBeenCalledOnce();
   });
 });
 
 describe('SamOptionsBar', () => {
   it('server-renders one row of controls in stable order without panel slots', () => {
     const engine = {
-      applySelectObjectSession: vi.fn(),
-      cancelSelectObjectSession: vi.fn(),
-      processSelectObjectSession: vi.fn(),
-      resetSelectObjectSession: vi.fn(),
-      saveSelectObjectSession: vi.fn(),
-      updateSelectObjectSession: vi.fn(),
+      operations: {
+        applySelectObjectSession: vi.fn(),
+        cancelSelectObjectSession: vi.fn(),
+        processSelectObjectSession: vi.fn(),
+        resetSelectObjectSession: vi.fn(),
+        saveSelectObjectSession: vi.fn(),
+        updateSelectObjectSession: vi.fn(),
+      },
     };
     const markup = renderToStaticMarkup(
       createElement(
@@ -476,6 +478,7 @@ describe('SamOptionsBar', () => {
           { i18n: testI18n },
           createElement(SamOptionsBar, {
             engine: engine as never,
+            operations: engine.operations as never,
             session: snapshot({
               hasPreview: true,
               input: { bbox: null, excludePoints: [], includePoints: [{ x: 4, y: 5 }], type: 'visual' },

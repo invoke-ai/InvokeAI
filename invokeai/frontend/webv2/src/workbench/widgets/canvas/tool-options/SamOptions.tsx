@@ -1,6 +1,10 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { SelectObjectSaveTarget } from '@workbench/canvas-engine/engine';
-import type { SamSessionError, SamSessionErrorCode, SamSessionSnapshot } from '@workbench/canvas-engine/engineStores';
+import type { CanvasOperationCapability, SelectObjectSaveTarget } from '@workbench/canvas-operations/api';
+import type {
+  SamSessionError,
+  SamSessionErrorCode,
+  SamSessionSnapshot,
+} from '@workbench/canvas-operations/operationTypes';
 import type { SamModel } from '@workbench/generation/canvas/samGraph';
 import type { ChangeEvent } from 'react';
 
@@ -19,6 +23,7 @@ import {
   Text,
   VisuallyHidden,
 } from '@chakra-ui/react';
+import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
 import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
 import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
 import { CanvasFloatingBar, CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
@@ -26,7 +31,7 @@ import { useSamSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { ChevronDownIcon, SettingsIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { ToolOptionsComponentProps } from './ToolOptionsBar';
+import type { CanvasOperationUIEngine } from './operationUIEngine';
 
 import { OperationStatusSlot } from './OperationStatusSlot';
 
@@ -135,12 +140,12 @@ export const SamStatusSlot = ({
 /** Legacy parity: canvas adoption keeps the SAM result intermediate and out of the gallery. */
 export const keepSamImageIntermediate = (_imageName: string): Promise<void> => Promise.resolve();
 
-export const getSamActionHandlers = (engine: ToolOptionsComponentProps['engine']) => ({
-  apply: () => void engine.applySelectObjectSession(keepSamImageIntermediate),
-  cancel: () => engine.cancelSelectObjectSession(),
-  process: () => void engine.processSelectObjectSession(),
-  reset: () => engine.resetSelectObjectSession(),
-  save: (target: SelectObjectSaveTarget) => void engine.saveSelectObjectSession(target, keepSamImageIntermediate),
+export const getSamActionHandlers = (operations: CanvasOperationCapability) => ({
+  apply: () => void operations.applySelectObjectSession(keepSamImageIntermediate),
+  cancel: () => operations.cancelSelectObjectSession(),
+  process: () => void operations.processSelectObjectSession(),
+  reset: () => operations.resetSelectObjectSession(),
+  save: (target: SelectObjectSaveTarget) => void operations.saveSelectObjectSession(target, keepSamImageIntermediate),
 });
 
 export const getSamActionEligibility = (
@@ -417,10 +422,12 @@ const SamSaveItem = ({
 
 export const SamOptionsBar = ({
   engine,
+  operations,
   session,
   isExternalInteractionLocked = false,
-}: ToolOptionsComponentProps & {
+}: { engine: CanvasOperationUIEngine } & {
   isExternalInteractionLocked?: boolean;
+  operations: CanvasOperationCapability;
   session: SamSessionSnapshot;
 }) => {
   const { t } = useTranslation();
@@ -433,11 +440,11 @@ export const SamOptionsBar = ({
       width,
     })
   );
-  const actions = getSamActionHandlers(engine);
+  const actions = getSamActionHandlers(operations);
   const isProcessing = isSamProcessingStatus(session.status);
   const isBusy = !session.error && (isProcessing || session.status === 'scheduled' || session.status === 'committing');
   const setBoolean = (key: 'applyPolygonRefinement' | 'autoProcess' | 'invert' | 'isolatedPreview', value: boolean) =>
-    engine.updateSelectObjectSession({ [key]: value });
+    operations.updateSelectObjectSession({ [key]: value });
 
   return (
     <CanvasFloatingBar maxW="full">
@@ -462,9 +469,11 @@ export const SamOptionsBar = ({
           mode={session.input.type}
           promptLabel={t('widgets.layers.selectObject.promptMode')}
           visualLabel={t('widgets.layers.selectObject.visual')}
-          onPrompt={() => engine.updateSelectObjectSession({ input: { prompt: '', type: 'prompt' } })}
+          onPrompt={() =>
+            getCanvasOperations(engine).updateSelectObjectSession({ input: { prompt: '', type: 'prompt' } })
+          }
           onVisual={() =>
-            engine.updateSelectObjectSession({
+            getCanvasOperations(engine).updateSelectObjectSession({
               input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
             })
           }
@@ -474,15 +483,17 @@ export const SamOptionsBar = ({
             disabled={!eligibility.canEditInputs}
             pointLabel={session.pointLabel}
             viewModel={viewModel}
-            onExclude={() => engine.updateSelectObjectSession({ pointLabel: 'exclude' })}
-            onInclude={() => engine.updateSelectObjectSession({ pointLabel: 'include' })}
+            onExclude={() => getCanvasOperations(engine).updateSelectObjectSession({ pointLabel: 'exclude' })}
+            onInclude={() => getCanvasOperations(engine).updateSelectObjectSession({ pointLabel: 'include' })}
           />
         ) : (
           <SamPromptBody
             disabled={!eligibility.canEditInputs}
             prompt={session.input.prompt}
             onChange={(event) =>
-              engine.updateSelectObjectSession({ input: { prompt: event.currentTarget.value, type: 'prompt' } })
+              getCanvasOperations(engine).updateSelectObjectSession({
+                input: { prompt: event.currentTarget.value, type: 'prompt' },
+              })
             }
           />
         )}
@@ -508,7 +519,7 @@ export const SamOptionsBar = ({
           eligibility={eligibility}
           isProcessing={isProcessing}
           session={session}
-          onModelChange={(model) => engine.updateSelectObjectSession({ model })}
+          onModelChange={(model) => getCanvasOperations(engine).updateSelectObjectSession({ model })}
           onToggle={setBoolean}
         />
         <CanvasFloatingBarDivider />
@@ -566,10 +577,20 @@ export const SamOptionsBar = ({
 export const SamOptions = ({
   engine,
   isExternalInteractionLocked = false,
-}: ToolOptionsComponentProps & { isExternalInteractionLocked?: boolean }) => {
+}: {
+  engine: CanvasOperationUIEngine;
+  isExternalInteractionLocked?: boolean;
+}) => {
   const session = useSamSession(engine);
   if (!session) {
     return null;
   }
-  return <SamOptionsBar engine={engine} isExternalInteractionLocked={isExternalInteractionLocked} session={session} />;
+  return (
+    <SamOptionsBar
+      engine={engine}
+      isExternalInteractionLocked={isExternalInteractionLocked}
+      operations={getCanvasOperations(engine)}
+      session={session}
+    />
+  );
 };

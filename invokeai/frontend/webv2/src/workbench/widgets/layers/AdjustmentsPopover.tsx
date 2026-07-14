@@ -1,6 +1,6 @@
 import type { SliderValueChangeDetails } from '@chakra-ui/react';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { CanvasAdjustmentsContract, CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import { createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
@@ -48,7 +48,7 @@ const withCurve = (
 const formatSigned = (value: number): string => `${value > 0 ? '+' : ''}${Math.round(value * 100)}`;
 
 interface AdjustmentsPopoverProps {
-  engine: CanvasEngine | null;
+  engine: CanvasStructuralEngine | null;
   layer: CanvasRasterLayerContractV2;
 }
 
@@ -72,7 +72,7 @@ export const AdjustmentsPopover = ({ engine, layer }: AdjustmentsPopoverProps) =
 
 interface AdjustmentsControlsProps {
   adjustments: CanvasAdjustmentsContract;
-  engine: CanvasEngine | null;
+  engine: CanvasStructuralEngine | null;
   layer: CanvasRasterLayerContractV2;
 }
 

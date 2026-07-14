@@ -1,6 +1,6 @@
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
-import type { CanvasOperationState } from '@workbench/canvas-engine/canvasOperationController';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
 import type { ReactNode } from 'react';
 
 import { Box } from '@chakra-ui/react';

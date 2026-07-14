@@ -1,4 +1,4 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasCoreStoreCapability, CanvasToolCapability } from '@workbench/canvas-engine/api';
 import type { ToolId } from '@workbench/canvas-engine/types';
 
 import { Box } from '@chakra-ui/react';
@@ -21,19 +21,21 @@ import { useTranslation } from 'react-i18next';
 import { isCanvasToolEnabled } from './canvasInteractionLock';
 import { useCanvasActiveTool } from './engineStoreHooks';
 
+type ToolStripEngine = CanvasCoreStoreCapability & { readonly tools: CanvasToolCapability };
+
 interface ToolStripButtonProps {
-  engine: CanvasEngine;
+  engine: ToolStripEngine;
   icon: typeof HandIcon;
   isInteractionLocked: boolean;
   label: string;
   toolId: ToolId;
 }
 
-/** One sticky tool button: active state comes straight from the engine's transient store, click drives `engine.setTool`. */
+/** One sticky tool button: active state comes from core stores; click drives the tool capability. */
 const ToolStripButton = ({ engine, icon, isInteractionLocked, label, toolId }: ToolStripButtonProps) => {
   const activeTool = useCanvasActiveTool(engine);
   const isDisabled = !isCanvasToolEnabled(toolId, isInteractionLocked);
-  const onClick = useCallback(() => engine.setTool(toolId), [engine, toolId]);
+  const onClick = useCallback(() => engine.tools.setTool(toolId), [engine, toolId]);
 
   return (
     <ToolbarButton disabled={isDisabled} icon={icon} isActive={activeTool === toolId} label={label} onClick={onClick} />
@@ -49,7 +51,7 @@ const ToolStripRoot = ({
   engine,
   isInteractionLocked = false,
 }: {
-  engine: CanvasEngine;
+  engine: ToolStripEngine;
   isInteractionLocked?: boolean;
 }) => {
   const { t } = useTranslation();

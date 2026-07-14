@@ -7,12 +7,14 @@ import type {
   CanvasRasterLayerContractV2,
 } from '@workbench/types';
 
+import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
 import { describe, expect, it } from 'vitest';
 
 import type { RasterCallLogEntry, StubRasterSurface } from './raster.testStub';
 
 import { compositeDocument, createCheckerboardTile, shouldSmoothAtZoom } from './compositor';
+import { createDerivedSurfaceCache } from './derivedSurfaceCache';
 import { createLayerCacheStore } from './layerCache';
 import { createTestStubRasterBackend } from './raster.testStub';
 
@@ -377,6 +379,82 @@ describe('compositeDocument', () => {
     expect(findSet(colorized!.callLog, 'fillStyle')).toContain('#ff0000');
     // The colorized overlay is then blitted onto the target.
     expect(target.callLog.some((e) => e.op === 'drawImage')).toBe(true);
+  });
+
+  it('performs no effect allocations or pixel readbacks on a warmed unchanged composite', () => {
+    const base = createTestStubRasterBackend();
+    const created: StubRasterSurface[] = [];
+    const backend = {
+      ...base,
+      createSurface: (w: number, h: number): StubRasterSurface => {
+        const surface = base.createSurface(w, h);
+        created.push(surface);
+        return surface;
+      },
+    };
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('control', 10, 10);
+    caches.getOrCreate('mask', 10, 10);
+    const target = backend.createSurface(100, 100);
+    const derivedSurfaces = createDerivedSurfaceCache();
+    const control = controlLayer('control');
+    if (control.type !== 'control') {
+      throw new Error('Expected control fixture');
+    }
+    const doc = makeDoc([{ ...control, withTransparencyEffect: true }, maskLayer('mask')]);
+
+    compositeDocument(target, doc, caches, VIEW, { backend, derivedSurfaces });
+    const allocationsAfterWarmup = created.length;
+    const readbacksAfterWarmup = created.reduce(
+      (count, surface) => count + surface.callLog.filter((entry) => entry.op === 'getImageData').length,
+      0
+    );
+
+    compositeDocument(target, doc, caches, VIEW, { backend, derivedSurfaces });
+    expect(created).toHaveLength(allocationsAfterWarmup);
+    expect(
+      created.reduce(
+        (count, surface) => count + surface.callLog.filter((entry) => entry.op === 'getImageData').length,
+        0
+      )
+    ).toBe(readbacksAfterWarmup);
+  });
+
+  it('culls a fully offscreen effect layer before derived work or drawing', () => {
+    const base = createTestStubRasterBackend();
+    let allocations = 0;
+    const backend = {
+      ...base,
+      createSurface: (w: number, h: number): StubRasterSurface => {
+        allocations += 1;
+        return base.createSurface(w, h);
+      },
+    };
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('control', 10, 10);
+    const target = backend.createSurface(100, 100);
+    const control = controlLayer('control');
+    if (control.type !== 'control') {
+      throw new Error('Expected control fixture');
+    }
+    const doc = makeDoc([{ ...control, transform: { ...control.transform, x: 1_000 }, withTransparencyEffect: true }]);
+    const allocationsBeforeComposite = allocations;
+    const diagnostics = createCanvasDiagnostics(true);
+
+    compositeDocument(target, doc, caches, VIEW, {
+      backend,
+      derivedSurfaces: createDerivedSurfaceCache(),
+      diagnostics,
+    });
+
+    expect(allocations).toBe(allocationsBeforeComposite);
+    expect(target.callLog.filter((entry) => entry.op === 'drawImage')).toHaveLength(0);
+    expect(diagnostics.snapshot()).toMatchObject({
+      compositeFrames: 1,
+      layersConsidered: 1,
+      layersCulled: 1,
+      layersDrawn: 0,
+    });
   });
 
   it('draws mask layers ABOVE all non-mask layers regardless of their global z position', () => {

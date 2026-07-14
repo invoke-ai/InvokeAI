@@ -1,6 +1,6 @@
-import type { CanvasOperationState } from '@workbench/canvas-engine/canvasOperationController';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { ToolId } from '@workbench/canvas-engine/types';
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
 import type { ComponentType } from 'react';
 
 import { HStack, Text } from '@chakra-ui/react';

@@ -1,5 +1,3 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
-
 import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { nextLayerName } from '@workbench/workbenchState';
@@ -29,7 +27,7 @@ import { useSelectedModelBase } from './useSelectedModelBase';
  */
 export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
   const { t } = useTranslation();
-  const engine: CanvasEngine | null = useCanvasEngine();
+  const engine = useCanvasEngine();
   const dispatch = useWorkbenchDispatch();
   const base = useSelectedModelBase();
   const layerNames = useActiveProjectSelector(

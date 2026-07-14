@@ -1,8 +1,8 @@
 import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { GenerateReferenceImage, GenerateReferenceImageAsset, IPAdapterMethod } from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
 import type { CanvasMaskContract, CanvasMaskFillContract, CanvasRegionalGuidanceLayerContract } from '@workbench/types';
+import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 import type { ChangeEvent, CSSProperties, FocusEvent, KeyboardEvent } from 'react';
 
 import { Box, createListCollection, HStack, IconButton, Input, Stack, Switch, Text } from '@chakra-ui/react';
@@ -67,7 +67,7 @@ const referenceImageDropId = (layerId: string, refId: string): string => `region
 const createReferenceImage = (base: string | null): GenerateReferenceImage => createRegionalReferenceImage(base);
 
 interface RegionalGuidanceSettingsProps {
-  engine: CanvasEngine | null;
+  engine: CanvasStructuralEngine | null;
   layer: CanvasRegionalGuidanceLayerContract;
 }
 
@@ -218,7 +218,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   );
 
   const handleInvert = useCallback(() => {
-    engine?.invertMask(layer.id);
+    engine?.layers.invertMask(layer.id);
   }, [engine, layer.id]);
 
   // Reference-image helpers ---------------------------------------------------

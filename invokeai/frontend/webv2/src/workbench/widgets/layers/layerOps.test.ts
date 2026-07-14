@@ -1,4 +1,3 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
@@ -7,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   applyStructuralPreview,
   applyStructural,
+  type CanvasStructuralEngine,
   canConvertRasterControl,
   canMergeLayerDown,
   convertRasterToControl,
@@ -177,7 +177,7 @@ describe('applyStructural', () => {
 
   it('routes through the engine history when an engine is attached', () => {
     const commitStructural = vi.fn();
-    const engine = { commitStructural } as unknown as CanvasEngine;
+    const engine = { layers: { commitStructural } } as unknown as CanvasStructuralEngine;
     const dispatch = vi.fn();
 
     applyStructural(engine, dispatch, 'Delete layer', forward, inverse);
@@ -200,7 +200,7 @@ describe('applyStructuralPreview', () => {
   it('routes a live document edit through the engine guard', () => {
     const action = { id: 'layer', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' } as const;
     const applyPreview = vi.fn(() => false);
-    const engine = { applyStructuralPreview: applyPreview } as unknown as CanvasEngine;
+    const engine = { layers: { applyStructuralPreview: applyPreview } } as unknown as CanvasStructuralEngine;
     const dispatch = vi.fn();
 
     expect(applyStructuralPreview(engine, dispatch, action)).toBe(false);

@@ -88,7 +88,7 @@ export const enqueueWorkflowGraph = async (request: EnqueueWorkflowRequest): Pro
 
 /**
  * Enqueues a small graph OUTSIDE any project's queue, tagged with a caller-built
- * utility origin (`webv2:util:<id>`). Used by {@link import('@workbench/canvas-engine/backend/utilityQueue').runUtilityGraph}
+ * utility origin (`webv2:util:<id>`). Used by {@link import('@workbench/canvas-operations/backend/utilityQueue').runUtilityGraph}
  * for filter previews / SAM: the origin is intentionally opaque to project
  * routing (see `events.ts`), so results are never staged or added to the gallery.
  * A single deterministic run (no seed/prompt batch data).

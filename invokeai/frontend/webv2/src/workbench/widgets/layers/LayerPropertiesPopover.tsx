@@ -1,4 +1,4 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { CanvasLayerContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';

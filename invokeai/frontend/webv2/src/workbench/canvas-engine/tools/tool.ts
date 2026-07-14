@@ -13,12 +13,13 @@
  * Zero React, zero import-time side effects.
  */
 
-import type { EngineStores, SamVisualInput } from '@workbench/canvas-engine/engineStores';
+import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { InvalidatePayload } from '@workbench/canvas-engine/render/scheduler';
+import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engine/samInteraction';
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -28,7 +29,7 @@ import type { WorkbenchAction } from '@workbench/workbenchState';
 
 /**
  * Emitted once per completed brush/eraser gesture. Persistence (Task P2.2) and
- * history (Task P2.3) subscribe via `engine.onStrokeCommitted`. `beforeImageData`
+ * history (Task P2.3) subscribe via `engine.tools.onStrokeCommitted`. `beforeImageData`
  * and `afterImageData` are both sized to `dirtyRect`, so an undo can restore the
  * pre-stroke pixels and a redo can re-apply the post-stroke pixels cheaply.
  */
@@ -144,6 +145,8 @@ export interface ToolContext {
   createLayerId(): string;
   /** The transient engine stores (tool options live here). */
   stores: EngineStores;
+  /** Reads core visual Select Object interaction state without depending on application sessions. */
+  getSamInteraction?(): SamInteractionState | null;
   /** Sets (or clears) the brush cursor ring drawn on the overlay. */
   setOverlayCursor(cursor: OverlayCursor | null): void;
   /**
@@ -153,7 +156,7 @@ export interface ToolContext {
    * handle) — pointer-move does not otherwise refresh the cursor.
    */
   updateCursor(): void;
-  /** Emits a completed-stroke event to `engine.onStrokeCommitted` subscribers. */
+  /** Emits a completed-stroke event to `engine.tools.onStrokeCommitted` subscribers. */
   emitStrokeCommitted(event: StrokeCommittedEvent): void;
   /** Bumps a layer's cache version (without marking it stale) after a direct paint, and recomposites. */
   notifyLayerPainted(layerId: string): void;

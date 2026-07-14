@@ -1,6 +1,6 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { Rect } from '@workbench/canvas-engine/types';
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { Project, WidgetViewProps } from '@workbench/types';
 
 import { Box, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
@@ -95,7 +95,7 @@ const CanvasHeaderActionsInner = ({
   }, [editingLocked]);
 
   const setZoom = (value: number) => {
-    const viewport = engine.getViewport();
+    const viewport = engine.viewport.getViewport();
     const size = viewport.getViewportSize();
     viewport.zoomAtPoint(value, { x: size.width / 2, y: size.height / 2 });
   };
@@ -112,13 +112,13 @@ const CanvasHeaderActionsInner = ({
     if (editingLocked || !rect) {
       return;
     }
-    engine.commitStructural(
+    engine.layers.commitStructural(
       t('widgets.canvas.commands.fitBbox'),
       { bbox: rect, type: 'setCanvasBbox' },
       { bbox: document.bbox, type: 'setCanvasBbox' }
     );
     if (refit) {
-      engine.fitToView();
+      engine.viewport.fitToView();
     }
   };
 
@@ -193,7 +193,7 @@ const CanvasHeaderActionsInner = ({
       </Menu.Root>
 
       <Tooltip content={t('widgets.canvas.controls.fitToView')}>
-        <IconButton color="fg.muted" size="2xs" variant="ghost" onClick={() => engine.fitToView()}>
+        <IconButton color="fg.muted" size="2xs" variant="ghost" onClick={() => engine.viewport.fitToView()}>
           <MaximizeIcon />
         </IconButton>
       </Tooltip>
@@ -230,7 +230,7 @@ const CanvasHeaderActionsInner = ({
           disabled={editingLocked || !canUndo}
           size="2xs"
           variant="ghost"
-          onClick={() => engine.undo()}
+          onClick={() => engine.history.undo()}
         >
           <Undo2Icon />
         </IconButton>
@@ -242,7 +242,7 @@ const CanvasHeaderActionsInner = ({
           disabled={editingLocked || !canRedo}
           size="2xs"
           variant="ghost"
-          onClick={() => engine.redo()}
+          onClick={() => engine.history.redo()}
         >
           <Redo2Icon />
         </IconButton>
@@ -347,15 +347,19 @@ const CanvasSettingsMenu = ({ editingLocked, engine }: { editingLocked: boolean;
                   <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                     {t('widgets.canvas.settings.sections.debug')}
                   </Menu.ItemGroupLabel>
-                  <Menu.Item value="debug-clear-caches" onClick={() => void engine.clearCaches()}>
+                  <Menu.Item value="debug-clear-caches" onClick={() => void engine.diagnostics.clearCaches()}>
                     <Icon as={DatabaseIcon} boxSize="3.5" color="fg.subtle" />
                     <Menu.ItemText fontSize="xs">{t('widgets.canvas.settings.clearCaches')}</Menu.ItemText>
                   </Menu.Item>
-                  <Menu.Item value="debug-log-info" onClick={() => engine.logDebugInfo()}>
+                  <Menu.Item value="debug-log-info" onClick={() => engine.diagnostics.logDebugInfo()}>
                     <Icon as={BugIcon} boxSize="3.5" color="fg.subtle" />
                     <Menu.ItemText fontSize="xs">{t('widgets.canvas.settings.logDebugInfo')}</Menu.ItemText>
                   </Menu.Item>
-                  <Menu.Item disabled={editingLocked} value="debug-clear-history" onClick={() => engine.clearHistory()}>
+                  <Menu.Item
+                    disabled={editingLocked}
+                    value="debug-clear-history"
+                    onClick={() => engine.history.clearHistory()}
+                  >
                     <Icon as={Trash2Icon} boxSize="3.5" color="fg.subtle" />
                     <Menu.ItemText fontSize="xs">{t('widgets.canvas.settings.clearHistory')}</Menu.ItemText>
                   </Menu.Item>

@@ -1,6 +1,6 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop -- the editable's style object is derived from the live session/viewport and intentionally recomputed each render. */
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { TextEditSession } from '@workbench/canvas-engine/engineStores';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop -- the editable's style object is derived from the live session/viewport and intentionally recomputed each render. */
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { useTextEditSession } from '@workbench/widgets/canvas/engineStoreHooks';
@@ -32,7 +32,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 /** Re-renders on any viewport (pan/zoom) change via a value-stable snapshot string. */
 const useViewportTick = (engine: CanvasEngine): string => {
-  const viewport = engine.getViewport();
+  const viewport = engine.viewport.getViewport();
   const subscribe = useCallback((onChange: () => void) => viewport.subscribe(onChange), [viewport]);
   const getSnapshot = useCallback(() => {
     const { pan, zoom } = viewport.getState();
@@ -71,7 +71,7 @@ interface TextEditableProps {
 const TextEditable = ({ engine, session }: TextEditableProps) => {
   // Re-render on pan/zoom so the transform below tracks the viewport.
   useViewportTick(engine);
-  const viewport = engine.getViewport();
+  const viewport = engine.viewport.getViewport();
   const { source, transform } = session;
 
   // Seeds content + focus once when the element mounts, and registers a live-
@@ -82,10 +82,10 @@ const TextEditable = ({ engine, session }: TextEditableProps) => {
     (el: HTMLDivElement | null) => {
       if (!el) {
         // Unmount: stop the engine from reading a detached element.
-        engine.setTextEditContentReader(null);
+        engine.layers.setTextEditContentReader(null);
         return;
       }
-      engine.setTextEditContentReader(() => readEditableText(el));
+      engine.layers.setTextEditContentReader(() => readEditableText(el));
       if (el.dataset.seeded === 'true') {
         return;
       }
@@ -101,7 +101,7 @@ const TextEditable = ({ engine, session }: TextEditableProps) => {
 
   const onBlur = useCallback(
     (event: { currentTarget: HTMLElement }) => {
-      engine.commitTextEdit(readEditableText(event.currentTarget));
+      engine.layers.commitTextEdit(readEditableText(event.currentTarget));
     },
     [engine]
   );
@@ -112,12 +112,12 @@ const TextEditable = ({ engine, session }: TextEditableProps) => {
       event.stopPropagation();
       if (event.key === 'Escape') {
         event.preventDefault();
-        engine.cancelTextEdit();
+        engine.layers.cancelTextEdit();
         return;
       }
       if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
-        engine.commitTextEdit(readEditableText(event.currentTarget));
+        engine.layers.commitTextEdit(readEditableText(event.currentTarget));
       }
     },
     [engine]

@@ -1,10 +1,10 @@
-import type { RunUtilityGraphOptions, UtilityGraphResult } from '@workbench/canvas-engine/backend/utilityQueue';
 import type {
   CommitGeneratedImageOptions,
   CommitGeneratedImageResult,
   ExportBakedLayerBlobResult,
   LayerExportGuard,
 } from '@workbench/canvas-engine/engine';
+import type { RunUtilityGraphOptions, UtilityGraphResult } from '@workbench/canvas-operations/backend/utilityQueue';
 import type { GalleryImage } from '@workbench/gallery/api';
 import type { CanvasStagingCandidateContract } from '@workbench/types';
 import type {

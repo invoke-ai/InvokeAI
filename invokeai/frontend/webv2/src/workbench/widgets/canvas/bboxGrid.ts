@@ -2,7 +2,7 @@
  * Maps a model base to the bbox snapping grid size (document px), mirroring the
  * legacy `getGridSize` rule: generation dimensions must land on a base-specific
  * multiple. React reads the active generate model's base and feeds the result
- * into `engine.setBboxGrid`; the engine itself stays model-agnostic.
+ * into `engine.viewport.setBboxGrid`; the engine itself stays model-agnostic.
  */
 
 /** Default grid when no model is selected (or an unknown base). */

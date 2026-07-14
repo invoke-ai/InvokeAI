@@ -1,4 +1,5 @@
-import type { BooleanRasterOperation, CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { BooleanRasterOperation } from '@workbench/canvas-engine/engine';
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { GenerateReferenceImage } from '@workbench/generation/types';
 import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasMaskContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
@@ -7,6 +8,7 @@ import type { ComponentProps, Dispatch } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
+import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
 import { deleteLayerActions, duplicateLayerActions } from '@workbench/canvasLayerOps';
 import { IconButton, MenuContent, RenameDialog } from '@workbench/components/ui';
 import { uploadGalleryImage } from '@workbench/gallery/api';
@@ -188,7 +190,7 @@ const LayerMenu = ({
   // Re-render when live, not-yet-persisted paint/mask pixels change.
   useLayerThumbnailVersion(engine, layer.id);
   const hasSupportedContent = engine
-    ? engine.hasExportableLayerContent(layer.id)
+    ? engine.exports.hasExportableLayerContent(layer.id)
     : hasPureExportableLayerContent(layer, document);
   const [internalDialogKind, setInternalDialogKind] = useState<LayerMenuDialogKind | null>(null);
   // Controlled (canvas) vs. uncontrolled (panel): the canvas parent owns the
@@ -295,13 +297,13 @@ const LayerMenu = ({
 
   const handleMerge = useCallback(() => {
     // Pixel work: engine-only, and not recorded on the undo history.
-    engine?.mergeLayerDown(layer.id);
+    engine?.layers.mergeLayerDown(layer.id);
   }, [engine, layer.id]);
 
   const handleRasterize = useCallback(() => {
     // Bakes the parametric source to pixels; the engine records ONE undoable
     // entry (inverse re-converts to the parametric source).
-    engine?.rasterizeLayer(layer.id);
+    engine?.layers.rasterizeLayer(layer.id);
   }, [engine, layer.id]);
 
   const addCopy = useCallback(
@@ -310,7 +312,7 @@ const LayerMenu = ({
         throw new Error(t('widgets.layers.actions.copyFailed'));
       }
       if (engine) {
-        if (!engine.commitLayerCopy(label, layer.id, copied, index)) {
+        if (!engine.layers.commitLayerCopy(label, layer.id, copied, index)) {
           throw new Error(t('widgets.layers.actions.copyFailed'));
         }
         return;
@@ -344,7 +346,7 @@ const LayerMenu = ({
       if (engine) {
         // Pass the immutable live object: the engine rejects stale menu actions
         // by identity and clones the inverse contract internally.
-        if (!engine.commitLayerConversion(label, layer, converted)) {
+        if (!engine.layers.commitLayerConversion(label, layer, converted)) {
           throw makeStatusError('not-ready');
         }
       } else {
@@ -383,7 +385,7 @@ const LayerMenu = ({
       if (!engine) {
         throw makeStatusError('not-ready');
       }
-      const result = engine.startSelectObject(layerId);
+      const result = getCanvasOperations(engine).startSelectObject(layerId);
       if (result !== 'started') {
         throw makeStatusError(result);
       }
@@ -395,7 +397,7 @@ const LayerMenu = ({
       if (!engine) {
         throw makeStatusError('not-ready');
       }
-      const result = engine.startFilterOperation(layerId);
+      const result = getCanvasOperations(engine).startFilterOperation(layerId);
       if (result !== 'started') {
         throw makeStatusError(result);
       }
@@ -411,7 +413,7 @@ const LayerMenu = ({
 
   const handleTransform = useCallback(() => {
     dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
-    engine?.setTool('transform');
+    engine?.tools.setTool('transform');
   }, [dispatch, engine, layer.id]);
 
   const handleFitToBbox = useCallback(() => {
@@ -426,7 +428,7 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = await engine.exportBakedLayerBlob(layer.id, { includeDisabled: true });
+    const result = await engine.exports.exportBakedLayerBlob(layer.id, { includeDisabled: true });
     if (result.status !== 'ok') {
       throw makeStatusError(result.status);
     }
@@ -438,7 +440,7 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = await engine.exportBakedLayerBlob(layer.id, { includeDisabled: true });
+    const result = await engine.exports.exportBakedLayerBlob(layer.id, { includeDisabled: true });
     if (result.status !== 'ok') {
       throw makeStatusError(result.status);
     }
@@ -449,7 +451,7 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = await engine.cropLayerToBbox(layer.id);
+    const result = await engine.layers.cropLayerToBbox(layer.id);
     switch (result.status) {
       case 'cropped':
         notify.success(t('widgets.layers.actions.cropped'));
@@ -474,7 +476,7 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = await engine.extractMaskedArea(layer.id);
+    const result = await engine.exports.extractMaskedArea(layer.id);
     if (result.status !== 'extracted') {
       throw makeStatusError(result.status);
     }
@@ -493,7 +495,7 @@ const LayerMenu = ({
       if (!engine) {
         throw makeStatusError('not-ready');
       }
-      const result = await engine.booleanMergeRasterLayers(layer.id, operation);
+      const result = await engine.layers.booleanMergeRasterLayers(layer.id, operation);
       if (result !== 'merged') {
         throw makeStatusError(result);
       }
@@ -509,7 +511,7 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    if ((await engine.copyLayerToRaster(layer.id)) === null) {
+    if ((await engine.layers.copyLayerToRaster(layer.id)) === null) {
       throw new Error(t('widgets.layers.actions.copyFailed'));
     }
   }, [addCopy, engine, getActionLabel, layer, makeStatusError, t]);

@@ -1,12 +1,12 @@
 import type { NumberInput as ChakraNumberInput } from '@chakra-ui/react';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { BboxEditorEngine } from '@workbench/widgets/canvas/tool-options/useBboxEditor';
 
 import { HStack, NumberInput, Text } from '@chakra-ui/react';
 import { useBboxEditor } from '@workbench/widgets/canvas/tool-options/useBboxEditor';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const BboxDetailsBar = ({ engine }: { engine: CanvasEngine }) => {
+export const BboxDetailsBar = ({ engine }: { engine: BboxEditorEngine }) => {
   const { t } = useTranslation();
   const { bbox, setHeight, setWidth, setX, setY } = useBboxEditor(engine);
 

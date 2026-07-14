@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the container ref callback is intentionally re-created when `engine` changes, so a project switch detaches the old engine and attaches the new one. */
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
@@ -68,17 +68,17 @@ export const CanvasSurface = ({
       return;
     }
 
-    engine.attach(screen, overlay);
+    engine.surface.attach(screen, overlay);
 
     const syncSize = () => {
       const dpr = globalThis.devicePixelRatio || 1;
-      engine.resize(container.clientWidth, container.clientHeight, dpr);
+      engine.surface.resize(container.clientWidth, container.clientHeight, dpr);
     };
 
     syncSize();
     // Fit the document into view on first attach, once the viewport is sized.
-    if (engine.getDocument()) {
-      engine.fitToView();
+    if (engine.document.getDocument()) {
+      engine.viewport.fitToView();
     }
 
     const observer = new ResizeObserver(syncSize);
@@ -86,7 +86,7 @@ export const CanvasSurface = ({
 
     return () => {
       observer.disconnect();
-      engine.detach();
+      engine.surface.detach();
     };
   };
 

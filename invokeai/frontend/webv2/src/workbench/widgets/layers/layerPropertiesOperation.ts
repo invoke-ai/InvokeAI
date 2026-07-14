@@ -1,4 +1,4 @@
-import type { StartFilterOperationResult } from '@workbench/canvas-engine/engine';
+import type { StartFilterOperationResult } from '@workbench/canvas-operations/api';
 
 interface LayerPropertiesOpenOwnership {
   requestToken: number | null;

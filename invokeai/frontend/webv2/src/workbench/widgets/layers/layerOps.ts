@@ -5,7 +5,7 @@
  * attached) or as a plain reducer dispatch (when it is not).
  */
 
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasLayerCapability } from '@workbench/canvas-engine/api';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { GenerateReferenceImage } from '@workbench/generation/types';
 import type {
@@ -24,6 +24,8 @@ import type {
 } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
+
+export type CanvasStructuralEngine = { readonly layers: CanvasLayerCapability };
 
 import { getSourceContentRect, isMergeableRasterLayer } from '@workbench/canvas-engine/document/sources';
 import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
@@ -653,14 +655,14 @@ export const canMergeLayerDown = (
  * dispatch (no undo entry — acceptable when the canvas is not mounted).
  */
 export const applyStructural = (
-  engine: CanvasEngine | null,
+  engine: CanvasStructuralEngine | null,
   dispatch: Dispatch<WorkbenchAction>,
   label: string,
   forward: WorkbenchAction,
   inverse: WorkbenchAction
 ): void => {
   if (engine) {
-    engine.commitStructural(label, forward, inverse);
+    engine.layers.commitStructural(label, forward, inverse);
   } else {
     dispatch(forward);
   }
@@ -668,12 +670,12 @@ export const applyStructural = (
 
 /** Applies a guarded live edit without recording history until the interaction ends. */
 export const applyStructuralPreview = (
-  engine: CanvasEngine | null,
+  engine: CanvasStructuralEngine | null,
   dispatch: Dispatch<WorkbenchAction>,
   action: WorkbenchAction
 ): boolean => {
   if (engine) {
-    return engine.applyStructuralPreview(action);
+    return engine.layers.applyStructuralPreview(action);
   }
   dispatch(action);
   return true;

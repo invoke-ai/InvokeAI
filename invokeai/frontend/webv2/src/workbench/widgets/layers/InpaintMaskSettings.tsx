@@ -1,6 +1,6 @@
 import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { CanvasInpaintMaskLayerContract, CanvasMaskFillContract } from '@workbench/types';
+import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
 import { createListCollection, HStack, Stack } from '@chakra-ui/react';
 import { Button, ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
@@ -26,7 +26,7 @@ const noiseConfig = (value: number) => ({ layerType: 'inpaint_mask', noiseLevel:
 const denoiseConfig = (value: number) => ({ layerType: 'inpaint_mask', denoiseLimit: value }) as const;
 
 interface InpaintMaskSettingsProps {
-  engine: CanvasEngine | null;
+  engine: CanvasStructuralEngine | null;
   layer: CanvasInpaintMaskLayerContract;
 }
 
@@ -194,7 +194,7 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
   );
 
   const handleInvert = useCallback(() => {
-    engine?.invertMask(layer.id);
+    engine?.layers.invertMask(layer.id);
   }, [engine, layer.id]);
 
   const styleValue = useMemo(() => [fill.style], [fill.style]);

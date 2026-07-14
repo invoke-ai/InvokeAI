@@ -12,15 +12,14 @@ import type { CanvasDocumentContractV2, CanvasStateContractV2, WorkbenchState } 
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { EngineStore } from './engine';
 import type { StrokeCommittedEvent } from './tools/tool';
 
-import { createCanvasEngine } from './engine';
-
-vi.mock('./backend/canvasImages', () => ({
+vi.mock('@workbench/canvas-operations/backend/canvasImages', () => ({
   CanvasImageUploadError: class extends Error {},
   uploadCanvasImage: vi.fn(() => Promise.resolve({ height: 64, imageName: 'mask-img', width: 64 })),
 }));
@@ -193,11 +192,11 @@ const setupEngine = (doc: CanvasDocumentContractV2) => {
     store: reactive.store,
   });
   const strokes: StrokeCommittedEvent[] = [];
-  engine.onStrokeCommitted((event) => strokes.push(event));
+  engine.tools.onStrokeCommitted((event) => strokes.push(event));
 
   const screen = createInputCanvas();
   const overlay = createInputCanvas();
-  engine.attach(screen.element, overlay.element);
+  engine.surface.attach(screen.element, overlay.element);
   raf.flush();
 
   return { dispatch: reactive.dispatch, engine, overlay, raf, setDocument: reactive.setDocument, strokes };
@@ -210,7 +209,7 @@ afterEach(() => {
 describe('inpaint mask painting', () => {
   it('routes a brush stroke into the selected mask cache (no auto-created paint layer)', () => {
     const { dispatch, engine, overlay, strokes } = setupEngine(maskDoc());
-    engine.setTool('brush');
+    engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(40, 40));
     overlay.fire('pointerup', pointerAt(40, 40, 0));
@@ -221,18 +220,18 @@ describe('inpaint mask painting', () => {
     // A mask target must NOT spawn a fresh paint layer (the auto-create path).
     const added = dispatch.mock.calls.map((c) => c[0]).filter((a) => a.type === 'addCanvasLayer');
     expect(added).toHaveLength(0);
-    engine.dispose();
+    engine.lifecycle.dispose();
   });
 
   it('erases from the mask cache with the eraser (destination-out) as a committed stroke', () => {
     const { engine, overlay, strokes } = setupEngine(maskDoc());
     // Paint some coverage first.
-    engine.setTool('brush');
+    engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(60, 60));
     overlay.fire('pointerup', pointerAt(60, 60, 0));
     // Then erase.
-    engine.setTool('eraser');
+    engine.tools.setTool('eraser');
     overlay.fire('pointerdown', pointerAt(30, 30));
     overlay.fire('pointermove', pointerAt(40, 40));
     overlay.fire('pointerup', pointerAt(40, 40, 0));
@@ -240,14 +239,14 @@ describe('inpaint mask painting', () => {
     expect(strokes).toHaveLength(2);
     expect(strokes[1]!.tool).toBe('eraser');
     expect(strokes[1]!.layerId).toBe('mask1');
-    engine.dispose();
+    engine.lifecycle.dispose();
   });
 
   it('does not paint into a locked mask', () => {
     const doc = maskDoc();
     doc.layers[0]!.isLocked = true;
     const { dispatch, engine, overlay, strokes } = setupEngine(doc);
-    engine.setTool('brush');
+    engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(40, 40));
     overlay.fire('pointerup', pointerAt(40, 40, 0));
@@ -255,17 +254,17 @@ describe('inpaint mask painting', () => {
     expect(strokes).toHaveLength(0);
     // Also never spawns a paint layer over the locked mask.
     expect(dispatch.mock.calls.map((c) => c[0]).some((a) => a.type === 'addCanvasLayer')).toBe(false);
-    engine.dispose();
+    engine.lifecycle.dispose();
   });
 
   it('persists the mask via updateCanvasLayerConfig (bitmap + offset) after a stroke flush', async () => {
     const { dispatch, engine, overlay } = setupEngine(maskDoc());
-    engine.setTool('brush');
+    engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(50, 50));
     overlay.fire('pointerup', pointerAt(50, 50, 0));
 
-    await engine.flushPendingUploads();
+    await engine.lifecycle.flushPendingUploads();
 
     const configDispatch = dispatch.mock.calls
       .map((c) => c[0])
@@ -284,7 +283,7 @@ describe('inpaint mask painting', () => {
     // The mask persistence must NEVER dispatch a paint source (that would convert
     // the mask into a raster paint layer).
     expect(dispatch.mock.calls.map((c) => c[0]).some((a) => a.type === 'updateCanvasLayerSource')).toBe(false);
-    engine.dispose();
+    engine.lifecycle.dispose();
   });
 });
 
@@ -292,24 +291,24 @@ describe('mask invert', () => {
   it('inverts a mask as an undoable op and returns true', () => {
     const { engine } = setupEngine(maskDoc());
     expect(engine.stores.canUndo.get()).toBe(false);
-    expect(engine.invertMask('mask1')).toBe(true);
+    expect(engine.layers.invertMask('mask1')).toBe(true);
     // One undoable image patch was recorded.
     expect(engine.stores.canUndo.get()).toBe(true);
     // Round trips: undo then redo restore without throwing.
-    engine.undo();
+    engine.history.undo();
     expect(engine.stores.canRedo.get()).toBe(true);
-    engine.redo();
+    engine.history.redo();
     expect(engine.stores.canUndo.get()).toBe(true);
-    engine.dispose();
+    engine.lifecycle.dispose();
   });
 
   it('returns false for a missing layer, a non-mask layer, or a locked mask', () => {
     const lockedDoc = maskDoc();
     lockedDoc.layers[0]!.isLocked = true;
     const { engine } = setupEngine(lockedDoc);
-    expect(engine.invertMask('nope')).toBe(false);
-    expect(engine.invertMask('mask1')).toBe(false); // locked
-    engine.dispose();
+    expect(engine.layers.invertMask('nope')).toBe(false);
+    expect(engine.layers.invertMask('mask1')).toBe(false); // locked
+    engine.lifecycle.dispose();
   });
 
   // Regression: the invert domain used to come ONLY from `getSourceContentRect`,
@@ -343,10 +342,10 @@ describe('mask invert', () => {
     });
     const overlay = createInputCanvas();
     const screen = createInputCanvas();
-    engine.attach(screen.element, overlay.element);
+    engine.surface.attach(screen.element, overlay.element);
     raf.flush();
 
-    engine.setTool('brush');
+    engine.tools.setTool('brush');
     // Paint well outside the document bbox (0,0,100,100 per `maskDoc`). The live
     // cache grows to cover the stroke immediately; deliberately never call
     // `flushPendingUploads()`, so the contract's `mask.bitmap` stays null and
@@ -355,7 +354,7 @@ describe('mask invert', () => {
     overlay.fire('pointermove', pointerAt(180, 180));
     overlay.fire('pointerup', pointerAt(180, 180, 0));
 
-    expect(engine.invertMask('mask1')).toBe(true);
+    expect(engine.layers.invertMask('mask1')).toBe(true);
 
     // Growing the cache (both while painting and inside `invertMask` itself)
     // reallocates a fresh backing surface each time its extent changes, so
@@ -378,7 +377,7 @@ describe('mask invert', () => {
     expect(sx + sw).toBeGreaterThan(110);
     expect(sy + sh).toBeGreaterThan(110);
 
-    engine.dispose();
+    engine.lifecycle.dispose();
   });
 
   it('extracts through a live unflushed mask whose contract bitmap is still null', async () => {
@@ -407,42 +406,42 @@ describe('mask invert', () => {
     });
     const overlay = createInputCanvas();
     const screen = createInputCanvas();
-    engine.attach(screen.element, overlay.element);
+    engine.surface.attach(screen.element, overlay.element);
     raf.flush();
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });
     raf.flush();
 
-    engine.setTool('brush');
+    engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(50, 50));
     overlay.fire('pointerup', pointerAt(50, 50, 0));
 
-    expect(await engine.extractMaskedArea('mask1')).toMatchObject({ status: 'extracted' });
-    engine.dispose();
+    expect(await engine.exports.extractMaskedArea('mask1')).toMatchObject({ status: 'extracted' });
+    engine.lifecycle.dispose();
   });
 });
 
 describe('mask clear', () => {
   it('clears a live unflushed inpaint mask and restores it through undo', () => {
     const { engine, overlay } = setupEngine(maskDoc());
-    engine.setTool('brush');
+    engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(50, 50));
     overlay.fire('pointerup', pointerAt(50, 50, 0));
 
-    expect(engine.clearMask('mask1')).toBe(true);
-    expect(engine.clearMask('mask1')).toBe(false);
+    expect(engine.layers.clearMask('mask1')).toBe(true);
+    expect(engine.layers.clearMask('mask1')).toBe(false);
     expect(engine.stores.canUndo.get()).toBe(true);
 
-    engine.undo();
+    engine.history.undo();
     expect(engine.stores.canRedo.get()).toBe(true);
-    engine.redo();
-    expect(engine.clearMask('mask1')).toBe(false);
-    engine.undo();
-    expect(engine.clearMask('mask1')).toBe(true);
-    engine.dispose();
+    engine.history.redo();
+    expect(engine.layers.clearMask('mask1')).toBe(false);
+    engine.history.undo();
+    expect(engine.layers.clearMask('mask1')).toBe(true);
+    engine.lifecycle.dispose();
   });
 
   it('clears a regional-guidance mask', () => {
@@ -463,13 +462,13 @@ describe('mask clear', () => {
       type: 'regional_guidance',
     };
     const { engine, overlay } = setupEngine(doc);
-    engine.setTool('brush');
+    engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(50, 50));
     overlay.fire('pointerup', pointerAt(50, 50, 0));
 
-    expect(engine.clearMask('mask1')).toBe(true);
-    engine.dispose();
+    expect(engine.layers.clearMask('mask1')).toBe(true);
+    engine.lifecycle.dispose();
   });
 
   it('clears a cold hidden persisted mask and restores its bitmap reference on undo', () => {
@@ -486,14 +485,14 @@ describe('mask clear', () => {
     };
     const { dispatch, engine } = setupEngine(doc);
 
-    expect(engine.clearMask('mask1')).toBe(true);
+    expect(engine.layers.clearMask('mask1')).toBe(true);
     expect(dispatch.mock.calls.at(-1)?.[0]).toMatchObject({
       config: { mask: { bitmap: null } },
       id: 'mask1',
       type: 'updateCanvasLayerConfig',
     });
 
-    engine.undo();
+    engine.history.undo();
     expect(dispatch.mock.calls.at(-1)?.[0]).toMatchObject({
       config: {
         mask: { bitmap: { imageName: 'persisted-mask' }, offset: { x: 7, y: 9 } },
@@ -501,7 +500,7 @@ describe('mask clear', () => {
       id: 'mask1',
       type: 'updateCanvasLayerConfig',
     });
-    engine.dispose();
+    engine.lifecycle.dispose();
   });
 
   it('refuses missing, non-mask, locked, and empty layers', () => {
@@ -509,9 +508,9 @@ describe('mask clear', () => {
     locked.layers[0]!.isLocked = true;
     const { engine } = setupEngine(locked);
 
-    expect(engine.clearMask('missing')).toBe(false);
-    expect(engine.clearMask('mask1')).toBe(false);
-    engine.dispose();
+    expect(engine.layers.clearMask('missing')).toBe(false);
+    expect(engine.layers.clearMask('mask1')).toBe(false);
+    engine.lifecycle.dispose();
 
     const raster = maskDoc();
     raster.layers[0] = {
@@ -526,11 +525,11 @@ describe('mask clear', () => {
       type: 'raster',
     };
     const { engine: rasterEngine } = setupEngine(raster);
-    expect(rasterEngine.clearMask('mask1')).toBe(false);
-    rasterEngine.dispose();
+    expect(rasterEngine.layers.clearMask('mask1')).toBe(false);
+    rasterEngine.lifecycle.dispose();
 
     const { engine: emptyEngine } = setupEngine(maskDoc());
-    expect(emptyEngine.clearMask('mask1')).toBe(false);
-    emptyEngine.dispose();
+    expect(emptyEngine.layers.clearMask('mask1')).toBe(false);
+    emptyEngine.lifecycle.dispose();
   });
 });

@@ -1,19 +1,10 @@
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
+import type { SamInput, SamModel } from '@workbench/canvas-operations/operationTypes';
 import type { BackendGraphContract } from '@workbench/types';
+export type { SamInput, SamModel } from '@workbench/canvas-operations/operationTypes';
 
 import { documentToExportLocalSamPoint } from '@workbench/canvas-engine/samCoordinates';
 import { addEdge, addNode } from '@workbench/generation/graphBuilder';
-
-export type SamModel = 'segment-anything-2-large' | 'segment-anything-huge';
-
-export type SamInput =
-  | { type: 'prompt'; prompt: string }
-  | {
-      type: 'visual';
-      includePoints: readonly Vec2[];
-      excludePoints: readonly Vec2[];
-      bbox?: Rect | null;
-    };
 
 export interface BuildSamGraphOptions {
   imageName: string;

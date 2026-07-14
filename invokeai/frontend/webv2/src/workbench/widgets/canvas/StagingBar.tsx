@@ -73,7 +73,7 @@ interface StagingBarProps {
  * is in flight or staged candidates await a decision. It drives the reducer's
  * staging actions (cycle / accept / discard / auto-switch); the candidate and
  * live progress pixels themselves are drawn on the engine canvas via
- * `engine.setStagedPreview` (wired in {@link CanvasWidgetView}). Rendered inside
+ * `engine.previews.setStagedPreview` (wired in {@link CanvasWidgetView}). Rendered inside
  * the canvas's bottom-center floating group, stacked directly above the tool
  * options bar; positioning is the parent's job.
  */

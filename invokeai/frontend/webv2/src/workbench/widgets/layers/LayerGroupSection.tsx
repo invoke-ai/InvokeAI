@@ -1,5 +1,5 @@
 import type { DragEndEvent } from '@dnd-kit/core';
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { CanvasLayerContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { LucideIcon } from 'lucide-react';
@@ -224,7 +224,7 @@ const GroupActions = ({
     // means a cache is still decoding — nothing was merged, so tell the user
     // instead of silently half-working. Engine pixel work: not undoable,
     // mirroring the per-row "merge down".
-    if (engine?.mergeVisibleRasterLayers() === 'not-ready') {
+    if (engine?.layers.mergeVisibleRasterLayers() === 'not-ready') {
       toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
     }
   }, [engine, t]);
@@ -236,7 +236,7 @@ const GroupActions = ({
     // Read-only: no dispatch, no history. The engine lazily loads `ag-psd`,
     // bakes the raster layers, and triggers the download. Surface the refusal
     // cases (still-loading caches / oversized bounds / nothing to export).
-    void engine.exportRasterLayersToPsd(projectName).then((result) => {
+    void engine.exports.exportRasterLayersToPsd(projectName).then((result) => {
       if (result === 'not-ready') {
         toaster.create({ title: t('widgets.layers.groupActions.exportNotReady'), type: 'warning' });
       } else if (result === 'too-large') {
