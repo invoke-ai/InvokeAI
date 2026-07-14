@@ -6,8 +6,8 @@ import { SamOptions } from './SamOptions';
 
 /**
  * Bottom-center controls for the active guarded operation, independent of
- * temporary tools. Select Object renders single-row bar chrome (like the
- * per-tool options bars); Filter renders the full operation panel.
+ * temporary tools. Both operations render single-row floating-bar chrome,
+ * matching the per-tool options bars.
  */
 export const CanvasOperationBar = ({
   engine,
