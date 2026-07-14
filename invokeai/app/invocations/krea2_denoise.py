@@ -24,7 +24,11 @@ from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.krea2.sampling_utils import (
+    KREA2_BASE_IMAGE_SEQ_LEN,
+    KREA2_BASE_SHIFT,
     KREA2_DISTILLED_MU,
+    KREA2_MAX_IMAGE_SEQ_LEN,
+    KREA2_MAX_SHIFT,
     build_sigmas,
     calculate_shift,
     pack_latents,
@@ -232,7 +236,16 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         elif self._is_distilled(context):
             mu = KREA2_DISTILLED_MU
         else:
-            mu = calculate_shift(image_seq_len)
+            # Resolution-aware shift. Honor the loaded scheduler's config so a Raw checkpoint that ships a
+            # customized scheduler_config.json is sampled with its own shift params, falling back to the
+            # Krea-2 defaults for the stock scheduler (and for any field the config omits).
+            mu = calculate_shift(
+                image_seq_len,
+                base_image_seq_len=getattr(scheduler.config, "base_image_seq_len", KREA2_BASE_IMAGE_SEQ_LEN),
+                max_image_seq_len=getattr(scheduler.config, "max_image_seq_len", KREA2_MAX_IMAGE_SEQ_LEN),
+                base_shift=getattr(scheduler.config, "base_shift", KREA2_BASE_SHIFT),
+                max_shift=getattr(scheduler.config, "max_shift", KREA2_MAX_SHIFT),
+            )
 
         init_sigmas = build_sigmas(self.steps)
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)

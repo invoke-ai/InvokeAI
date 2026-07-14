@@ -178,6 +178,18 @@ class TestConvertKrea2NativeToDiffusers:
         assert table.shape == (6, 2)
         assert torch.equal(table, torch.arange(12, dtype=torch.float32).reshape(6, 2))
 
+    def test_final_layer_modulation_is_reshaped_to_two_by_hidden(self) -> None:
+        # Krea2FinalLayer.scale_shift_table is (2, hidden) (scale, shift). The flat native
+        # last.modulation.lin must be reshaped (not merely renamed), otherwise load_state_dict(assign=True)
+        # installs a wrong-shaped 1-D parameter that the meta-only completeness guard cannot catch and the
+        # final layer fails at inference.
+        sd = {"last.modulation.lin": torch.arange(8, dtype=torch.float32)}  # 2 * hidden, hidden=4
+        out = _convert_krea2_native_to_diffusers(sd)
+        assert "final_layer.scale_shift_table" in out
+        table = out["final_layer.scale_shift_table"]
+        assert table.shape == (2, 4)
+        assert torch.equal(table, torch.arange(8, dtype=torch.float32).reshape(2, 4))
+
     def test_non_string_keys_pass_through(self) -> None:
         sentinel = object()
         out = _convert_krea2_native_to_diffusers({sentinel: torch.zeros(1)})  # type: ignore[dict-item]

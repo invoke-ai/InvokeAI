@@ -154,6 +154,11 @@ def _convert_krea2_native_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
             k = "final_layer.norm.weight"
         elif k == "last.modulation.lin":
             k = "final_layer.scale_shift_table"
+            # Krea2FinalLayer.scale_shift_table is (2, hidden) (scale, shift). Reshape the flat native
+            # table just like the per-block (6, hidden) tables below - otherwise load_state_dict(assign=True)
+            # installs a wrong-shaped 1-D parameter (which the meta-only completeness guard cannot catch)
+            # and the final layer fails at inference.
+            value = torch.as_tensor(_to_plain_tensor(value)).reshape(2, -1)
 
         # Within-block sub-module renames (apply to transformer_blocks.* and text_fusion.*).
         k = k.replace(".attn.wq.weight", ".attn.to_q.weight")
