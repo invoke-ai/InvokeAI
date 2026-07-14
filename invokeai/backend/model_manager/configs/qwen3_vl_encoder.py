@@ -48,8 +48,20 @@ def _has_complete_pretrained_weights(weights_path: Path) -> bool:
         weight_map = index.get("weight_map")
         if not isinstance(weight_map, dict) or not weight_map:
             return False
-        referenced_files = {filename for filename in weight_map.values() if isinstance(filename, str)}
-        return bool(referenced_files) and all((weights_path / filename).is_file() for filename in referenced_files)
+        filenames = list(weight_map.values())
+        if not all(isinstance(filename, str) and filename for filename in filenames):
+            return False
+        root = weights_path.resolve()
+        referenced_files: set[Path] = set()
+        for filename in filenames:
+            filename_path = Path(filename)
+            if filename_path.is_absolute():
+                return False
+            candidate = (weights_path / filename_path).resolve()
+            if not candidate.is_relative_to(root):
+                return False
+            referenced_files.add(candidate)
+        return bool(referenced_files) and all(path.is_file() for path in referenced_files)
     return False
 
 

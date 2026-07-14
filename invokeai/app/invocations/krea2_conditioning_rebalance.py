@@ -1,3 +1,5 @@
+import math
+
 import torch
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
@@ -40,6 +42,7 @@ class Krea2ConditioningRebalanceInvocation(BaseInvocation):
     )
     multiplier: float = InputField(
         default=4.0,
+        allow_inf_nan=False,
         description="Overall multiplier applied to the conditioning after per-layer weighting.",
     )
 
@@ -50,6 +53,8 @@ class Krea2ConditioningRebalanceInvocation(BaseInvocation):
             raise ValueError(f"per_layer_weights must be comma-separated numbers: {e}") from e
         if len(weights) != _NUM_TEXT_LAYERS:
             raise ValueError(f"per_layer_weights must have exactly {_NUM_TEXT_LAYERS} values, got {len(weights)}.")
+        if not all(math.isfinite(weight) for weight in weights):
+            raise ValueError("per_layer_weights must contain only finite values.")
         return weights
 
     @torch.no_grad()

@@ -58,7 +58,7 @@ class Krea2ModelLoaderInvocation(BaseInvocation):
         description="Standalone VAE model. Krea-2 uses the Qwen-Image VAE (16-channel). "
         "If not provided, the VAE is loaded from the Krea-2 (diffusers) model.",
         input=Input.Direct,
-        ui_model_base=BaseModelType.QwenImage,
+        ui_model_base=[BaseModelType.QwenImage, BaseModelType.Anima],
         ui_model_type=ModelType.VAE,
         title="VAE",
     )
@@ -73,11 +73,25 @@ class Krea2ModelLoaderInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> Krea2ModelLoaderOutput:
+        main_config = context.models.get_config(self.model)
+        if main_config.base is not BaseModelType.Krea2 or main_config.type is not ModelType.Main:
+            raise ValueError(
+                f"Model '{main_config.name}' is not a Krea-2 main model. Select a Krea-2 transformer model."
+            )
+
         # Transformer always comes from the main model.
         transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
 
         # Determine VAE source.
         if self.vae_model is not None:
+            vae_config = context.models.get_config(self.vae_model)
+            if vae_config.type is not ModelType.VAE or vae_config.base not in (
+                BaseModelType.QwenImage,
+                BaseModelType.Anima,
+            ):
+                raise ValueError(
+                    f"VAE '{vae_config.name}' is not compatible with Krea-2. Select a Qwen Image or Anima VAE."
+                )
             vae = self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
         else:
             self._validate_diffusers_format(context, self.model, "Krea-2")
@@ -85,6 +99,9 @@ class Krea2ModelLoaderInvocation(BaseInvocation):
 
         # Determine Qwen3-VL Encoder source.
         if self.qwen3_vl_encoder_model is not None:
+            encoder_config = context.models.get_config(self.qwen3_vl_encoder_model)
+            if encoder_config.type is not ModelType.Qwen3VLEncoder:
+                raise ValueError(f"Encoder '{encoder_config.name}' is not a Qwen3-VL encoder compatible with Krea-2.")
             tokenizer = self.qwen3_vl_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.qwen3_vl_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:

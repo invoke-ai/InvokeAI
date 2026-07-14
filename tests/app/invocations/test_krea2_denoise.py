@@ -1,3 +1,4 @@
+import math
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 
@@ -41,6 +42,47 @@ def test_validate_inputs_accepts_a_valid_configuration() -> None:
     )
     # A full-range denoise with no mask is valid and must not raise.
     invocation._validate_inputs()
+
+
+def _validation_payload() -> dict:
+    model = ModelIdentifierField(
+        key="krea-model",
+        hash="model-hash",
+        name="Krea Model",
+        base=BaseModelType.Krea2,
+        type=ModelType.Main,
+    )
+    return {
+        "transformer": TransformerField(transformer=model, loras=[]),
+        "positive_conditioning": Krea2ConditioningField(conditioning_name="positive"),
+    }
+
+
+@pytest.mark.parametrize(("field", "value"), [("width", 0), ("width", -16), ("height", 0), ("height", -16)])
+def test_model_validation_rejects_non_positive_dimensions(field: str, value: int) -> None:
+    with pytest.raises(ValueError):
+        Krea2DenoiseInvocation(**_validation_payload(), **{field: value})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("cfg_scale", math.nan),
+        ("cfg_scale", math.inf),
+        ("cfg_scale", [1.0, math.nan]),
+        ("shift", math.nan),
+        ("shift", math.inf),
+    ],
+)
+def test_model_validation_rejects_non_finite_sampling_values(field: str, value: object) -> None:
+    with pytest.raises(ValueError):
+        Krea2DenoiseInvocation(**_validation_payload(), **{field: value})
+
+
+def test_model_validation_accepts_positive_dimensions_and_finite_sampling_values() -> None:
+    invocation = Krea2DenoiseInvocation(**_validation_payload(), width=16, height=32, cfg_scale=[1.0] * 8, shift=1.15)
+    assert invocation.width == 16
+    assert invocation.height == 32
 
 
 class TestPrepareCfgScale:

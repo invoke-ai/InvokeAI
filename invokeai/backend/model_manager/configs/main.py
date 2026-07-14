@@ -105,7 +105,9 @@ class MainModelDefaultSettings(BaseModel):
                 # Krea-2-Raw (Base, undistilled) needs more steps and CFG; Turbo (distilled) uses 8
                 # steps with CFG disabled. cfg_scale has a floor of 1 (ge=1); 1.0 means "no guidance".
                 if variant == Krea2VariantType.Base:
-                    return cls(steps=28, cfg_scale=4.5, width=1024, height=1024)
+                    # Diffusers' Krea-2 guidance 4.5 uses cond + 4.5 * (cond - uncond), which is
+                    # equivalent to InvokeAI's standard CFG convention at scale 5.5.
+                    return cls(steps=28, cfg_scale=5.5, width=1024, height=1024)
                 return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
@@ -1410,7 +1412,7 @@ class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         # read/parse failure here is a genuine identification error and is allowed to propagate rather
         # than being silently registered as Turbo (which would give a Raw model the wrong defaults).
         config = get_config_dict_or_raise(mod.path / "model_index.json")
-        if config.get("is_distilled", True) is False:
+        if config.get("is_distilled", False) is False:
             return Krea2VariantType.Base
         return Krea2VariantType.Turbo
 

@@ -1177,6 +1177,7 @@ const Krea2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
+    assert(parsed.base === 'qwen-image' || parsed.base === 'anima', 'Krea2VAEModel requires a Qwen Image or Anima VAE');
     // Only recall if the current main model is Krea-2 (its VAE dropdown differs from other bases).
     const base = selectBase(store.getState());
     assert(base === 'krea-2', 'Krea2VAEModel handler only works with Krea-2 models');

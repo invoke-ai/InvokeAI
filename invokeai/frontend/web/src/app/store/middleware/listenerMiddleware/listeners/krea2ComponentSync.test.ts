@@ -51,4 +51,48 @@ describe('getKrea2ComponentUpdates', () => {
       })
     ).toEqual({});
   });
+
+  it('replaces stale standalone selections with installed compatible components', () => {
+    const staleVae = { ...vae, key: 'deleted-vae' };
+    const staleEncoder = { ...encoder, key: 'deleted-encoder' };
+
+    expect(
+      getKrea2ComponentUpdates({
+        format: 'checkpoint',
+        selectedVae: staleVae,
+        selectedEncoder: staleEncoder,
+        availableQwenImageVaes: [vae],
+        availableAnimaVaes: [],
+        availableEncoders: [encoder],
+      })
+    ).toEqual({ vae, encoder });
+  });
+
+  it('clears stale standalone selections when no compatible replacement is installed', () => {
+    expect(
+      getKrea2ComponentUpdates({
+        format: 'checkpoint',
+        selectedVae: { ...vae, key: 'deleted-vae' },
+        selectedEncoder: { ...encoder, key: 'deleted-encoder' },
+        availableQwenImageVaes: [],
+        availableAnimaVaes: [],
+        availableEncoders: [],
+      })
+    ).toEqual({ vae: null, encoder: null });
+  });
+
+  it('replaces an installed but incompatible VAE selection', () => {
+    const incompatibleVae = { ...vae, key: 'sdxl-vae', base: 'sdxl' as const };
+
+    expect(
+      getKrea2ComponentUpdates({
+        format: 'checkpoint',
+        selectedVae: incompatibleVae,
+        selectedEncoder: encoder,
+        availableQwenImageVaes: [vae],
+        availableAnimaVaes: [],
+        availableEncoders: [encoder],
+      })
+    ).toEqual({ vae });
+  });
 });

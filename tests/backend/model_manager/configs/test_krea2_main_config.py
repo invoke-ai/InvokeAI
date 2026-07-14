@@ -221,12 +221,12 @@ class TestKrea2DiffusersVariantDetection:
             mod = self._make_mock_mod_with_model_index(tmpdir, {"_class_name": "Krea2Pipeline", "is_distilled": True})
             assert Main_Diffusers_Krea2_Config._get_variant(mod) == Krea2VariantType.Turbo
 
-    def test_is_distilled_absent_defaults_to_turbo(self) -> None:
+    def test_is_distilled_absent_defaults_to_base(self) -> None:
         from invokeai.backend.model_manager.configs.main import Main_Diffusers_Krea2_Config
 
         with TemporaryDirectory() as tmpdir:
             mod = self._make_mock_mod_with_model_index(tmpdir, {"_class_name": "Krea2Pipeline"})
-            assert Main_Diffusers_Krea2_Config._get_variant(mod) == Krea2VariantType.Turbo
+            assert Main_Diffusers_Krea2_Config._get_variant(mod) == Krea2VariantType.Base
 
 
 class TestKrea2DefaultSettings:
@@ -243,7 +243,7 @@ class TestKrea2DefaultSettings:
     def test_base_defaults(self) -> None:
         ds = MainModelDefaultSettings.from_base(BaseModelType.Krea2, Krea2VariantType.Base)
         assert ds is not None
+        assert ds.cfg_scale == 5.5
         assert ds.steps == 28
-        assert ds.cfg_scale == 4.5
         assert ds.width == 1024
         assert ds.height == 1024

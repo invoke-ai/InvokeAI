@@ -67,4 +67,19 @@ describe('handleKrea2Components', () => {
     expect(dispatch).toHaveBeenCalledWith(krea2VaeModelSelected(null));
     expect(dispatch).toHaveBeenCalledWith(krea2Qwen3VlEncoderModelSelected(null));
   });
+
+  it('replaces deleted standalone components when the model list refreshes', () => {
+    const dispatch = vi.fn();
+    const state = makeState({
+      krea2VaeModel: { ...vae, key: 'deleted-vae' },
+      krea2Qwen3VlEncoderModel: { ...encoder, key: 'deleted-encoder' },
+    });
+
+    handleKrea2Components([mainModel, vae, encoder] as unknown as AnyModelConfig[], state, dispatch, null as never);
+
+    expect(dispatch).toHaveBeenCalledWith(krea2VaeModelSelected(expect.objectContaining({ key: vae.key })));
+    expect(dispatch).toHaveBeenCalledWith(
+      krea2Qwen3VlEncoderModelSelected(expect.objectContaining({ key: encoder.key }))
+    );
+  });
 });

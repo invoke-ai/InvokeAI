@@ -169,6 +169,46 @@ _MAX_FILES_IN_MODEL_DIR = 50
 # Maximum depth to search for model files in directories
 _MAX_SEARCH_DEPTH = 2
 
+# Classes introduced by the versions pinned by this checkout may not exist in the interpreter used by
+# lightweight config tests. Keep explicit markers only for those newly supported classes; established
+# classes are resolved from the installed Diffusers/Transformers exports below.
+_PINNED_MODEL_CLASS_MARKERS = {"Krea2Pipeline"}
+
+
+def _is_known_model_marker(config_name: str, config: Any) -> bool:
+    """Return whether a root config names a class/model type provided by our model libraries."""
+    import diffusers
+    import transformers
+    from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
+
+    if not isinstance(config, dict):
+        return False
+
+    def has_export(module: Any, name: Any) -> bool:
+        if not isinstance(name, str) or not name:
+            return False
+        try:
+            return getattr(module, name, None) is not None
+        except Exception:
+            return False
+
+    if config_name == "model_index.json":
+        class_name = config.get("_class_name")
+        return class_name in _PINNED_MODEL_CLASS_MARKERS or has_export(diffusers, class_name)
+
+    class_name = config.get("_class_name")
+    if (
+        class_name in _PINNED_MODEL_CLASS_MARKERS
+        or has_export(diffusers, class_name)
+        or has_export(transformers, class_name)
+    ):
+        return True
+    model_type = config.get("model_type")
+    if isinstance(model_type, str) and model_type in CONFIG_MAPPING_NAMES:
+        return True
+    architectures = config.get("architectures")
+    return isinstance(architectures, list) and any(has_export(transformers, name) for name in architectures)
+
 
 # The types are listed explicitly because IDEs/LSPs can't identify the correct types
 # when AnyModelConfig is constructed dynamically using ModelConfigBase.all_config_classes
@@ -436,19 +476,7 @@ class ModelConfigFactory:
                     config = json.loads(config_path.read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     continue
-                if config_name == "model_index.json":
-                    recognized_root_config = isinstance(config.get("_class_name"), str)
-                else:
-                    architectures = config.get("architectures")
-                    recognized_root_config = (
-                        isinstance(config.get("_class_name"), str)
-                        or isinstance(config.get("model_type"), str)
-                        or (
-                            isinstance(architectures, list)
-                            and bool(architectures)
-                            and isinstance(architectures[0], str)
-                        )
-                    )
+                recognized_root_config = _is_known_model_marker(config_name, config)
                 if recognized_root_config:
                     break
             if recognized_root_config:

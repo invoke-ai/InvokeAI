@@ -361,11 +361,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               availableAnimaVaes: selectAnimaVAEModels(state),
               availableEncoders: selectQwen3VLEncoderModels(state),
             });
-            if (updates.vae) {
-              dispatch(krea2VaeModelSelected(zModelIdentifierField.parse(updates.vae)));
+            if ('vae' in updates) {
+              dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
             }
-            if (updates.encoder) {
-              dispatch(krea2Qwen3VlEncoderModelSelected(zModelIdentifierField.parse(updates.encoder)));
+            if ('encoder' in updates) {
+              dispatch(
+                krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null)
+              );
             }
           }
         }

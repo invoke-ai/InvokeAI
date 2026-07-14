@@ -459,16 +459,28 @@ describe('modelSelected listener - Krea-2 defaulting', () => {
   });
 
   it('does not overwrite standalone components the user already selected', () => {
+    const existingVae = {
+      key: 'existing-vae',
+      hash: 'h',
+      name: 'Existing VAE',
+      base: 'qwen-image',
+      type: 'vae',
+      format: 'checkpoint',
+    } as const;
+    const existingEncoder = {
+      key: 'existing-enc',
+      hash: 'h',
+      name: 'Existing Enc',
+      base: 'any',
+      type: 'qwen3_vl_encoder',
+      format: 'qwen3_vl_encoder',
+    } as const;
+    mockSelectQwenImageVAEModels.mockReturnValue([existingVae]);
+    mockSelectQwen3VLEncoderModels.mockReturnValue([existingEncoder]);
     const state = buildMockState({
       model: mockFluxMainModel,
-      krea2VaeModel: { key: 'existing-vae', hash: 'h', name: 'Existing VAE', base: 'qwen-image', type: 'vae' },
-      krea2Qwen3VlEncoderModel: {
-        key: 'existing-enc',
-        hash: 'h',
-        name: 'Existing Enc',
-        base: 'any',
-        type: 'qwen3_vl_encoder',
-      },
+      krea2VaeModel: existingVae,
+      krea2Qwen3VlEncoderModel: existingEncoder,
     });
     const action = modelSelected(zParameterModel.parse(mockKrea2MainModel));
 
@@ -477,6 +489,31 @@ describe('modelSelected listener - Krea-2 defaulting', () => {
     // Already set + non-diffusers -> nothing dispatched for the standalone slots.
     expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)).toBeUndefined();
     expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)).toBeUndefined();
+  });
+
+  it('clears stale standalone components when no replacement is installed', () => {
+    mockSelectQwenImageVAEModels.mockReturnValue([]);
+    mockSelectAnimaVAEModels.mockReturnValue([]);
+    mockSelectQwen3VLEncoderModels.mockReturnValue([]);
+    const state = buildMockState({
+      model: mockFluxMainModel,
+      krea2VaeModel: { key: 'deleted-vae', hash: 'h', name: 'Deleted VAE', base: 'qwen-image', type: 'vae' },
+      krea2Qwen3VlEncoderModel: {
+        key: 'deleted-enc',
+        hash: 'h',
+        name: 'Deleted Enc',
+        base: 'any',
+        type: 'qwen3_vl_encoder',
+      },
+    });
+
+    capturedEffect!(modelSelected(zParameterModel.parse(mockKrea2MainModel)), {
+      getState: () => state,
+      dispatch: mockDispatch,
+    });
+
+    expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)?.payload).toBeNull();
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)?.payload).toBeNull();
   });
 
   it('clears stale standalone overrides when switching to a Diffusers Krea-2 model', () => {

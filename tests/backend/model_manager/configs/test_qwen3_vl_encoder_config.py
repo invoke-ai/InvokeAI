@@ -247,3 +247,37 @@ class TestQwen3VLEncoderDirectoryConfig:
         config = Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
 
         assert config.type is ModelType.Qwen3VLEncoder
+
+    @pytest.mark.parametrize("bad_filename", [7, "../outside.safetensors", "/tmp/outside.safetensors"])
+    def test_rejects_unsafe_or_non_string_shard_names(self, tmp_path: Path, bad_filename: object) -> None:
+        self._write_config(tmp_path / "config.json")
+        valid_shard = "model-00001-of-00002.safetensors"
+        (tmp_path / valid_shard).touch()
+        outside = tmp_path.parent / "outside.safetensors"
+        outside.touch()
+        (tmp_path / "model.safetensors.index.json").write_text(
+            json.dumps(
+                {
+                    "weight_map": {
+                        "language_model.layers.0.weight": valid_shard,
+                        "language_model.layers.35.weight": bad_filename,
+                    }
+                }
+            )
+        )
+        (tmp_path / "tokenizer.json").touch()
+
+        with pytest.raises(NotAMatchError, match="weights|shard|index"):
+            Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
+
+    def test_rejects_existing_absolute_shard_path(self, tmp_path: Path) -> None:
+        self._write_config(tmp_path / "config.json")
+        outside = tmp_path.parent / "absolute-outside.safetensors"
+        outside.touch()
+        (tmp_path / "model.safetensors.index.json").write_text(
+            json.dumps({"weight_map": {"language_model.layers.0.weight": outside.as_posix()}})
+        )
+        (tmp_path / "tokenizer.json").touch()
+
+        with pytest.raises(NotAMatchError, match="weights|shard|index"):
+            Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))

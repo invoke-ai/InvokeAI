@@ -26,9 +26,17 @@ export const getKrea2ComponentUpdates = (arg: Krea2ComponentSyncArg): Krea2Compo
 
   const defaultVae = availableQwenImageVaes[0] ?? availableAnimaVaes[0];
   const defaultEncoder = availableEncoders[0];
+  const availableVaes = [...availableQwenImageVaes, ...availableAnimaVaes];
+  const hasSelectedVae = selectedVae !== null && selectedVae !== undefined;
+  const hasSelectedEncoder = selectedEncoder !== null && selectedEncoder !== undefined;
+  const selectedVaeIsAvailable = hasSelectedVae && availableVaes.some((vae) => vae.key === selectedVae.key);
+  const selectedEncoderIsAvailable =
+    hasSelectedEncoder && availableEncoders.some((encoder) => encoder.key === selectedEncoder.key);
 
   return {
-    ...(!selectedVae && defaultVae ? { vae: defaultVae } : {}),
-    ...(!selectedEncoder && defaultEncoder ? { encoder: defaultEncoder } : {}),
+    ...(!selectedVaeIsAvailable && (hasSelectedVae || defaultVae) ? { vae: defaultVae ?? null } : {}),
+    ...(!selectedEncoderIsAvailable && (hasSelectedEncoder || defaultEncoder)
+      ? { encoder: defaultEncoder ?? null }
+      : {}),
   };
 };

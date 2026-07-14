@@ -12,7 +12,7 @@ published checkpoints:
 - **Krea-2-Turbo** — distilled for fast, low-step generation. Runs at **8 steps** with **CFG disabled**
   (CFG Scale `1.0`). This is the recommended checkpoint for everyday use.
 - **Krea-2-Raw** — the undistilled base checkpoint. Runs at **more steps (~28)** with **CFG enabled**
-  (CFG Scale ~`4.5`) and supports negative prompts. It is primarily intended as a base for
+  (CFG Scale ~`5.5`, equivalent to the reference pipeline's guidance `4.5`) and supports negative prompts. It is primarily intended as a base for
   finetuning / LoRA training, but full inference is supported.
 
 The variant is detected automatically on install, and selecting a Krea-2 model sets sensible defaults
@@ -31,11 +31,11 @@ their dependencies together.
 
 Krea-2 needs three components:
 
-| Component | Diffusers install | GGUF / single-file install |
-|---|---|---|
-| Transformer | bundled in the pipeline | the `.gguf` / single-file checkpoint |
-| VAE (Qwen-Image) | bundled | installed separately |
-| Text encoder (Qwen3-VL) | bundled | installed separately |
+| Component               | Diffusers install       | GGUF / single-file install           |
+| ----------------------- | ----------------------- | ------------------------------------ |
+| Transformer             | bundled in the pipeline | the `.gguf` / single-file checkpoint |
+| VAE (Qwen-Image)        | bundled                 | installed separately                 |
+| Text encoder (Qwen3-VL) | bundled                 | installed separately                 |
 
 - **Diffusers** (e.g. `krea/Krea-2-Turbo`, `krea/Krea-2-Raw`): a single ~26 GB install that bundles the
   VAE and text encoder. Nothing else is required.

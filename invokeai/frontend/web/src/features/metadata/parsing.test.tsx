@@ -217,6 +217,16 @@ describe('ImageMetadataHandlers — Krea-2 recall gating', () => {
         )
       ).rejects.toThrow();
     });
+
+    it.each(['sdxl', 'flux'] as const)('rejects an incompatible %s VAE from Krea-2 image metadata', async (vaeBase) => {
+      currentBase = 'krea-2';
+      nextResolved = fakeModel('vae', vaeBase);
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Krea2VAEModel.parse({ model: fakeModel('main', 'krea-2'), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
   });
 
   describe('Krea2Qwen3VlEncoderModel', () => {

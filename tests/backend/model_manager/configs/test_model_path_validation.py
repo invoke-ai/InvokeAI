@@ -19,6 +19,30 @@ def test_large_directory_with_generic_config_is_rejected(tmp_path: Path) -> None
         ModelConfigFactory._validate_path_looks_like_model(tmp_path)
 
 
+def test_large_directory_with_non_object_config_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "config.json").write_text("[]")
+    _fill_directory(tmp_path)
+
+    with pytest.raises(ValueError, match="general-purpose directory"):
+        ModelConfigFactory._validate_path_looks_like_model(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"model_type": "application"},
+        {"architectures": ["ApplicationService"]},
+        {"_class_name": "ApplicationPipeline"},
+    ],
+)
+def test_large_directory_with_unrecognized_model_markers_is_rejected(tmp_path: Path, config: dict) -> None:
+    (tmp_path / "config.json").write_text(json.dumps(config))
+    _fill_directory(tmp_path)
+
+    with pytest.raises(ValueError, match="general-purpose directory"):
+        ModelConfigFactory._validate_path_looks_like_model(tmp_path)
+
+
 def test_large_directory_with_transformers_config_is_accepted(tmp_path: Path) -> None:
     (tmp_path / "config.json").write_text(json.dumps({"architectures": ["Qwen3VLModel"]}))
     _fill_directory(tmp_path)

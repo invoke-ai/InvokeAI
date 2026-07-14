@@ -33,6 +33,7 @@ class Krea2SeedVarianceInvocation(BaseInvocation):
     )
     strength: float = InputField(
         default=20.0,
+        allow_inf_nan=False,
         description="Magnitude of the uniform noise added to the embeddings (noise in [-strength, +strength]).",
     )
     randomize_percent: float = InputField(

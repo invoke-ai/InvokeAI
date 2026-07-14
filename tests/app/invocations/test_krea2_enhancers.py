@@ -5,6 +5,7 @@ denoise. The load-bearing logic - the per-layer gain broadcast, the exact-count 
 seeded-noise determinism / out-of-place property - is exercised here with a stub conditioning context.
 """
 
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -52,6 +53,31 @@ class TestRebalanceParseWeights:
         invocation = Krea2ConditioningRebalanceInvocation.model_construct(per_layer_weights="a,b,c,d,e,f,g,h,i,j,k,l")
         with pytest.raises(ValueError, match="comma-separated numbers"):
             invocation._parse_weights()
+
+    @pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
+    def test_rejects_non_finite_weights(self, value: str) -> None:
+        values = ["1"] * 11 + [value]
+        invocation = Krea2ConditioningRebalanceInvocation.model_construct(per_layer_weights=",".join(values))
+        with pytest.raises(ValueError, match="finite"):
+            invocation._parse_weights()
+
+
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+def test_rebalance_rejects_non_finite_multiplier(value: float) -> None:
+    with pytest.raises(ValueError):
+        Krea2ConditioningRebalanceInvocation(
+            conditioning=Krea2ConditioningField(conditioning_name="c"),
+            multiplier=value,
+        )
+
+
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+def test_seed_variance_rejects_non_finite_strength(value: float) -> None:
+    with pytest.raises(ValueError):
+        Krea2SeedVarianceInvocation(
+            conditioning=Krea2ConditioningField(conditioning_name="c"),
+            strength=value,
+        )
 
 
 def test_rebalance_applies_per_layer_gains_on_the_layer_axis() -> None:

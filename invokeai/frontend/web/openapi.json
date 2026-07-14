@@ -44152,6 +44152,7 @@
           "width": {
             "default": 1024,
             "description": "Width of the generated image.",
+            "exclusiveMinimum": 0,
             "field_kind": "input",
             "input": "any",
             "multipleOf": 16,
@@ -44163,6 +44164,7 @@
           "height": {
             "default": 1024,
             "description": "Height of the generated image.",
+            "exclusiveMinimum": 0,
             "field_kind": "input",
             "input": "any",
             "multipleOf": 16,
@@ -44544,7 +44546,7 @@
             "orig_default": null,
             "orig_required": false,
             "title": "VAE",
-            "ui_model_base": ["qwen-image"],
+            "ui_model_base": ["qwen-image", "anima"],
             "ui_model_type": ["vae"]
           },
           "qwen3_vl_encoder_model": {

@@ -1,10 +1,12 @@
 import json
+import math
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Callable, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
+from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
@@ -81,8 +83,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     # CFG uses the standard formulation (uncond + cfg_scale*(cond-uncond)); cfg_scale <= 1 disables it.
     # Krea-2-Turbo is distilled and runs with CFG disabled (cfg_scale=1.0).
     cfg_scale: float | list[float] = InputField(default=1.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
-    width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
-    height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
+    width: int = InputField(default=1024, gt=0, multiple_of=16, description="Width of the generated image.")
+    height: int = InputField(default=1024, gt=0, multiple_of=16, description="Height of the generated image.")
     steps: int = InputField(default=8, gt=0, description=FieldDescriptions.steps)
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
     shift: Optional[float] = InputField(
@@ -90,6 +92,21 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="Override the resolution-aware timestep shift (mu). Leave unset to use the model default "
         "(mu=1.15 for the distilled Turbo checkpoint).",
     )
+
+    @field_validator("cfg_scale")
+    @classmethod
+    def validate_cfg_scale_is_finite(cls, value: float | list[float]) -> float | list[float]:
+        values = value if isinstance(value, list) else [value]
+        if not all(math.isfinite(item) for item in values):
+            raise ValueError("cfg_scale values must be finite.")
+        return value
+
+    @field_validator("shift")
+    @classmethod
+    def validate_shift_is_finite(cls, value: float | None) -> float | None:
+        if value is not None and not math.isfinite(value):
+            raise ValueError("shift must be finite.")
+        return value
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
