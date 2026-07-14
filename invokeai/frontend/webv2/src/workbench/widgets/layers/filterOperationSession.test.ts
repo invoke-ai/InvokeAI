@@ -397,4 +397,19 @@ describe('auto-process', () => {
     expect(deps.runFilter).toHaveBeenCalledTimes(1);
     session.dispose();
   });
+
+  it('setAutoProcess(true) does not schedule while a run is in flight', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    const inFlight = session.process();
+    session.setAutoProcess(false);
+    session.setAutoProcess(true);
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
+    vi.useRealTimers();
+    await inFlight;
+    expect(deps.runFilter).toHaveBeenCalledTimes(1);
+    session.dispose();
+  });
 });
