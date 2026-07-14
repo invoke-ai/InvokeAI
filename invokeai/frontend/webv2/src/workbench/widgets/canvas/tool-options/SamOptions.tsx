@@ -21,7 +21,6 @@ import {
   VisuallyHidden,
 } from '@chakra-ui/react';
 import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
-import { makeImageDurable } from '@workbench/gallery/api';
 import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
 import { CanvasFloatingBar, CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
 import { useSamSession } from '@workbench/widgets/canvas/engineStoreHooks';
@@ -168,12 +167,15 @@ export const SamStatusSlot = ({
   );
 };
 
+/** Legacy parity: canvas adoption keeps the SAM result intermediate and out of the gallery. */
+export const keepSamImageIntermediate = (_imageName: string): Promise<void> => Promise.resolve();
+
 export const getSamActionHandlers = (engine: ToolOptionsComponentProps['engine']) => ({
-  apply: () => void engine.applySelectObjectSession(makeImageDurable),
+  apply: () => void engine.applySelectObjectSession(keepSamImageIntermediate),
   cancel: () => engine.cancelSelectObjectSession(),
   process: () => void engine.processSelectObjectSession(),
   reset: () => engine.resetSelectObjectSession(),
-  save: (target: SelectObjectSaveTarget) => void engine.saveSelectObjectSession(target, makeImageDurable),
+  save: (target: SelectObjectSaveTarget) => void engine.saveSelectObjectSession(target, keepSamImageIntermediate),
 });
 
 export const getSamActionEligibility = (

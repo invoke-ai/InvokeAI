@@ -15,6 +15,7 @@ import {
   getSamActionHandlers,
   getSamErrorTranslationKey,
   getSamStatusTranslationKey,
+  keepSamImageIntermediate,
   SamPromptBody,
   SamModeToggle,
   SamOptionsBar,
@@ -413,6 +414,10 @@ describe('single-row SAM inputs', () => {
 });
 
 describe('getSamActionHandlers', () => {
+  it('keeps adopted SAM images intermediate', async () => {
+    await expect(keepSamImageIntermediate('sam-selection.png')).resolves.toBeUndefined();
+  });
+
   it('wires every bar action and save target to the engine', () => {
     const engine = {
       applySelectObjectSession: vi.fn(),
@@ -426,22 +431,28 @@ describe('getSamActionHandlers', () => {
     actions.process();
     actions.reset();
     actions.apply();
+    actions.save('raster');
     actions.save('control');
+    actions.save('inpaint_mask');
+    actions.save('regional_guidance');
     actions.save('selection');
     actions.cancel();
 
     expect(engine.processSelectObjectSession).toHaveBeenCalledOnce();
     expect(engine.resetSelectObjectSession).toHaveBeenCalledOnce();
     expect(engine.applySelectObjectSession).toHaveBeenCalledOnce();
-    expect(engine.applySelectObjectSession).toHaveBeenCalledWith(expect.any(Function));
+    expect(engine.applySelectObjectSession).toHaveBeenCalledWith(keepSamImageIntermediate);
     expect(engine.processSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
       engine.resetSelectObjectSession.mock.invocationCallOrder[0] as number
     );
     expect(engine.resetSelectObjectSession.mock.invocationCallOrder[0]).toBeLessThan(
       engine.applySelectObjectSession.mock.invocationCallOrder[0] as number
     );
-    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('control', expect.any(Function));
-    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('selection', expect.any(Function));
+    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('raster', keepSamImageIntermediate);
+    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('control', keepSamImageIntermediate);
+    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('inpaint_mask', keepSamImageIntermediate);
+    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('regional_guidance', keepSamImageIntermediate);
+    expect(engine.saveSelectObjectSession).toHaveBeenCalledWith('selection', keepSamImageIntermediate);
     expect(engine.cancelSelectObjectSession).toHaveBeenCalledOnce();
   });
 });
