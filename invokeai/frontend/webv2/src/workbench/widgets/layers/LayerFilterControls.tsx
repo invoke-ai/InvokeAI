@@ -19,7 +19,8 @@ import { ModelSelect } from '@workbench/models/components/ModelSelect';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
+const SELECT_POSITIONING_DOWN = { placement: 'bottom-end', sameWidth: false } as const;
+const SELECT_POSITIONING_UP = { placement: 'top-end', sameWidth: false } as const;
 const SPANDREL_MODEL_TYPES: ModelTaxonomyType[] = ['spandrel_image_to_image'];
 
 interface LayerFilterControlsProps {
@@ -36,8 +37,20 @@ type LayerFilterControlsVariant = 'operation' | 'property';
 
 export const getLayerFilterControlPolicy = (variant: LayerFilterControlsVariant) =>
   variant === 'operation'
-    ? ({ controlMinH: '10', controlSize: 'md', modelSize: 'md' } as const)
-    : ({ controlMinH: undefined, controlSize: 'xs', modelSize: 'xs' } as const);
+    ? ({
+        controlMinH: undefined,
+        controlSize: 'xs',
+        fieldW: { enum: '9rem', filter: '11rem', model: '14rem', number: '13rem', string: '9rem' },
+        modelSize: 'xs',
+        positioning: SELECT_POSITIONING_UP,
+      } as const)
+    : ({
+        controlMinH: undefined,
+        controlSize: 'xs',
+        fieldW: undefined,
+        modelSize: 'xs',
+        positioning: SELECT_POSITIONING_DOWN,
+      } as const);
 
 export const LayerFilterControls = ({
   disabled,
@@ -83,12 +96,12 @@ export const LayerFilterControls = ({
 
   return (
     <>
-      <Field label={t('widgets.layers.control.filter')}>
+      <Field label={t('widgets.layers.control.filter')} w={policy.fieldW?.filter}>
         <Select
           aria-label={t('widgets.layers.control.filter')}
           collection={filterCollection}
           disabled={disabled}
-          positioning={SELECT_POSITIONING}
+          positioning={policy.positioning}
           size={policy.controlSize}
           triggerProps={filterTriggerProps}
           value={filterValue}
@@ -201,7 +214,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
         colorPalette="accent"
         disabled={disabled}
         minH={policy.controlMinH}
-        size={policy.controlSize === 'md' ? 'sm' : 'xs'}
+        size="xs"
         onCheckedChange={handleBoolean}
       >
         <Switch.HiddenInput />
@@ -217,12 +230,12 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
 
   if (param.kind === 'enum' && enumCollection) {
     return (
-      <Field label={label}>
+      <Field label={label} w={policy.fieldW?.enum}>
         <Select
           aria-label={label}
           collection={enumCollection}
           disabled={disabled}
-          positioning={SELECT_POSITIONING}
+          positioning={policy.positioning}
           size={policy.controlSize}
           triggerProps={enumTriggerProps}
           value={enumValue}
@@ -236,7 +249,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
   if (param.kind === 'model') {
     const model = isSpandrelModelIdentifier(value) ? (value as { key: string }) : null;
     return (
-      <Field label={label} required>
+      <Field label={label} required w={policy.fieldW?.model}>
         <ModelSelect
           disabled={disabled}
           invalid={!model}
@@ -252,7 +265,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
 
   if (param.kind === 'string') {
     return (
-      <Field label={label}>
+      <Field label={label} w={policy.fieldW?.string}>
         <Input
           disabled={disabled}
           minH={policy.controlMinH}
@@ -269,7 +282,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
   }
 
   return (
-    <Field label={label}>
+    <Field label={label} w={policy.fieldW?.number}>
       <HStack gap="2">
         <Slider
           aria-label={labelAria}
