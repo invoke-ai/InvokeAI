@@ -2,7 +2,7 @@
 import type { SelectObjectSaveTarget } from '@workbench/canvas-engine/engine';
 import type { SamSessionError, SamSessionErrorCode, SamSessionSnapshot } from '@workbench/canvas-engine/engineStores';
 import type { SamModel } from '@workbench/generation/canvas/samGraph';
-import type { ChangeEvent, CSSProperties } from 'react';
+import type { ChangeEvent } from 'react';
 
 import {
   Flex,
@@ -14,7 +14,6 @@ import {
   NativeSelect,
   Popover,
   Portal,
-  Spinner,
   Stack,
   Switch,
   Text,
@@ -24,10 +23,12 @@ import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
 import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
 import { CanvasFloatingBar, CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
 import { useSamSession } from '@workbench/widgets/canvas/engineStoreHooks';
-import { ChevronDownIcon, InfoIcon, SettingsIcon } from 'lucide-react';
+import { ChevronDownIcon, SettingsIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { ToolOptionsComponentProps } from './ToolOptionsBar';
+
+import { OperationStatusSlot } from './OperationStatusSlot';
 
 export interface SamActionEligibility {
   canApply: boolean;
@@ -49,13 +50,6 @@ const SAM_PROMPT_GUIDANCE_ID = 'sam-prompt-guidance';
 const SAM_VISUAL_GUIDANCE_ID = 'sam-visual-guidance';
 
 const SAM_UPWARD_POSITIONING = { placement: 'top-end' } as const;
-
-const SAM_ERROR_CLAMP_STYLE: CSSProperties = {
-  display: '-webkit-box',
-  overflow: 'hidden',
-  WebkitBoxOrient: 'vertical',
-  WebkitLineClamp: 2,
-};
 
 const SAM_STATUS_TRANSLATION_KEYS: Record<SamSessionSnapshot['status'], string> = {
   committing: 'widgets.layers.selectObject.statusCommitting',
@@ -112,9 +106,9 @@ export const getSamPanelViewModel = (
 });
 
 /**
- * The always-mounted status slot: reserves its width so status/error text
- * appearing never shifts the surrounding controls, and keeps the polite live
- * region in the tree before content arrives so announcements are reliable.
+ * SAM-flavored adapter over {@link OperationStatusSlot}: the always-mounted
+ * status slot that reserves its width so status/error text appearing never
+ * shifts the surrounding controls.
  */
 export const SamStatusSlot = ({
   error,
@@ -128,44 +122,15 @@ export const SamStatusSlot = ({
   isBusy: boolean;
   statusText: string;
   technicalDetailsLabel: string;
-}) => {
-  const detail = error?.detail?.trim();
-  return (
-    <Flex
-      align="center"
-      color={error ? 'fg.error' : 'fg.muted'}
-      flex="0 1 auto"
-      fontSize="xs"
-      gap="1"
-      maxW="16rem"
-      minW="8rem"
-    >
-      {error && errorText ? (
-        <>
-          <span aria-live="assertive" role="alert" style={SAM_ERROR_CLAMP_STYLE}>
-            {errorText}
-          </span>
-          {detail && detail !== errorText ? (
-            <Tooltip content={detail}>
-              <IconButton aria-label={technicalDetailsLabel} flexShrink="0" size="xs" tabIndex={0} variant="ghost">
-                <InfoIcon />
-              </IconButton>
-            </Tooltip>
-          ) : null}
-        </>
-      ) : (
-        <Flex align="center" aria-live="polite" gap="2" minW="0" role="status">
-          {isBusy ? (
-            <>
-              <Spinner flexShrink="0" size="xs" />
-              <span>{statusText}</span>
-            </>
-          ) : null}
-        </Flex>
-      )}
-    </Flex>
-  );
-};
+}) => (
+  <OperationStatusSlot
+    errorDetail={error?.detail ?? null}
+    errorText={error && errorText ? errorText : null}
+    isBusy={isBusy}
+    statusText={statusText}
+    technicalDetailsLabel={technicalDetailsLabel}
+  />
+);
 
 /** Legacy parity: canvas adoption keeps the SAM result intermediate and out of the gallery. */
 export const keepSamImageIntermediate = (_imageName: string): Promise<void> => Promise.resolve();
