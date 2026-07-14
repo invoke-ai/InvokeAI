@@ -31,7 +31,7 @@ export const isLayerPixelEditEligible = (layer: CanvasLayerContract | undefined)
   !!layer &&
   !layer.isLocked &&
   layer.isEnabled &&
-  ((layer.type === 'raster' && layer.source.type === 'paint') || layer.type === 'control');
+  ((layer.type === 'raster' && layer.source.type === 'paint') || (layer.type === 'control' && isRasterizable(layer)));
 
 export const decideControlPixelEdit = ({
   hasSourceContent,

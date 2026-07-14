@@ -55,6 +55,7 @@ vi.mock('@workbench/canvas-engine/render/adjustedSurfaceCache', async (importOri
         delete: (layerId: string) => {
           adjustedSurfaceCacheDeletes.push(layerId);
           if (adjustedSurfaceCacheDeleteFaults.has(layerId)) {
+            adjustedSurfaceCacheDeleteFaults.delete(layerId);
             throw new Error('adjusted surface cache delete failed');
           }
           cache.delete(layerId);
@@ -491,6 +492,12 @@ const flushMicrotasks = (): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, 0);
   });
+
+const drainMicrotasksUntil = async (predicate: () => boolean, maxTicks = 100): Promise<void> => {
+  for (let tick = 0; tick < maxTicks && !predicate(); tick += 1) {
+    await Promise.resolve();
+  }
+};
 
 afterEach(() => {
   adjustedSurfaceCacheDeleteFaults.clear();
@@ -2087,9 +2094,18 @@ type ControlPaintHarnessOverrides = Partial<Omit<CanvasControlLayerContract, 'so
   source: CanvasControlLayerContract['source'];
 };
 
+interface ControlPaintHarnessOptions {
+  bitmapStoreFactory?: (deps: {
+    backend: StubRasterBackend;
+    projectId: string;
+    store: EngineStore;
+  }) => ReturnType<typeof createSpyBitmapStore>;
+  pixelWrites?: { enabled: boolean };
+}
+
 const createControlPaintHarness = (
   overrides: ControlPaintHarnessOverrides,
-  selectionPixelWrites?: { enabled: boolean }
+  options: ControlPaintHarnessOptions = {}
 ) => {
   const raf = createControllableRaf();
   vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
@@ -2129,13 +2145,11 @@ const createControlPaintHarness = (
   };
   const { projectId, store } = createReducerBackedStore(document);
   const baseBackend = createTestStubRasterBackend();
+  const pixelWrites = options.pixelWrites ?? { enabled: true };
   const backend: StubRasterBackend = {
     ...baseBackend,
     createSurface: (width, height) => {
       const surface = baseBackend.createSurface(width, height);
-      if (!selectionPixelWrites) {
-        return surface;
-      }
       const originalCtx = surface.ctx;
       const ctx = new Proxy(originalCtx, {
         get(target, property, receiver) {
@@ -2145,7 +2159,7 @@ const createControlPaintHarness = (
           }
           return (...args: unknown[]) => {
             const imageData = Reflect.apply(value, target, args) as ImageData;
-            if (selectionPixelWrites.enabled && imageData.data.length > 0) {
+            if (pixelWrites.enabled && imageData.data.length > 0) {
               const drawCount = surface.callLog.filter((entry) => entry.op === 'drawImage').length;
               imageData.data[0] = drawCount % 256;
             }
@@ -2157,7 +2171,7 @@ const createControlPaintHarness = (
       return surface;
     },
   };
-  const bitmapStore = createSpyBitmapStore();
+  const bitmapStore = options.bitmapStoreFactory?.({ backend, projectId, store }) ?? createSpyBitmapStore();
   const engine = createCanvasEngine({
     backend,
     bitmapStore,
@@ -2174,7 +2188,9 @@ const createControlPaintHarness = (
   return {
     backend,
     bitmapStore,
+    document,
     engine,
+    layer,
     overlay,
     publishInitialCache: async () => {
       raf.flush();
@@ -2184,6 +2200,7 @@ const createControlPaintHarness = (
     },
     raf,
     screen,
+    store,
     strokes,
   };
 };
@@ -2191,7 +2208,7 @@ const createControlPaintHarness = (
 const createControlSelectionHarness = (overrides: ControlPaintHarnessOverrides) => {
   const selectionPixelWrites = { enabled: true };
   return {
-    ...createControlPaintHarness(overrides, selectionPixelWrites),
+    ...createControlPaintHarness(overrides, { pixelWrites: selectionPixelWrites }),
     setSelectionPixelWrites: (enabled: boolean) => {
       selectionPixelWrites.enabled = enabled;
     },
@@ -2216,6 +2233,59 @@ const createSpyBitmapStore = (): BitmapStore & {
     reset: vi.fn<() => void>(),
     suspendLayer: vi.fn(() => releaseSuspendedLayer),
   };
+};
+
+const createRealControlPersistenceHarness = async (
+  uploadImage: (blob: Blob) => Promise<{ height: number; imageName: string; width: number }>
+) => {
+  let placed: { offset: { x: number; y: number }; surface: RasterSurface } | null = null;
+  const encodeSurface = vi.fn(() => Promise.resolve(new Blob(['control-pixels'], { type: 'image/png' })));
+  const h = createControlPaintHarness(
+    { source: { bitmap: { height: 10, imageName: 'control-paint', width: 10 }, type: 'paint' } },
+    {
+      bitmapStoreFactory: ({ projectId, store }) => {
+        const real = createBitmapStore({
+          debounceMs: 1500,
+          dispatch: store.dispatch,
+          encodeSurface,
+          getLayerSource: (layerId) => {
+            const layer = store
+              .getState()
+              .projects.find((project) => project.id === projectId)
+              ?.canvas.document.layers.find((candidate) => candidate.id === layerId);
+            return layer?.type === 'control' ? layer.source : null;
+          },
+          getLayerSurface: () => placed,
+          hashBlob: (blob) => blob.text(),
+          maxUploadAttempts: 1,
+          retryDelaysMs: [],
+          sleep: () => Promise.resolve(),
+          uploadImage,
+        });
+        const releaseSuspendedLayer = vi.fn();
+        return {
+          ...real,
+          markLayerDirty: vi.fn(real.markLayerDirty),
+          releaseSuspendedLayer,
+          reset: vi.fn(real.reset),
+          suspendLayer: vi.fn((layerId: string) => {
+            const release = real.suspendLayer(layerId);
+            return () => {
+              releaseSuspendedLayer();
+              release();
+            };
+          }),
+        };
+      },
+    }
+  );
+  await h.publishInitialCache();
+  const exported = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+  if (exported.status !== 'ok') {
+    throw new Error(`expected ready direct control cache, got ${exported.status}`);
+  }
+  placed = { offset: { x: exported.rect.x, y: exported.rect.y }, surface: exported.surface };
+  return { ...h, encodeSurface };
 };
 
 /** A fake canvas that also lets a test fire pointer events at the engine's listeners. */
@@ -2289,14 +2359,198 @@ describe('engine-owned control pixel editing', () => {
     expect(h.strokes).toHaveLength(1);
     expect(h.strokes[0]!.layerId).toBe('control');
     expect(h.bitmapStore.markLayerDirty).toHaveBeenCalledWith('control');
-    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledWith('control');
+    expect(h.bitmapStore.markLayerDirty.mock.invocationCallOrder[0]).toBeLessThan(
+      h.bitmapStore.releaseSuspendedLayer.mock.invocationCallOrder[0]!
+    );
     expect(h.engine.stores.canUndo.get()).toBe(true);
     h.engine.dispose();
+  });
+
+  it('restores the exact direct cache after a cancelled stroke grows it and permits a subsequent edit', async () => {
+    const h = createControlPaintHarness({
+      source: { bitmap: { height: 10, imageName: 'control-paint', width: 10 }, type: 'paint' },
+    });
+    await h.publishInitialCache();
+    const before = await snapshotLayerCache(h.engine, 'control');
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(80, 80));
+    h.overlay.fire('pointermove', pointerAt(90, 90));
+    h.overlay.fire('pointercancel', pointerAt(90, 90, { buttons: 0 }));
+
+    const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(before.surface);
+      expect(restored.rect).toEqual(before.rect);
+      expect(restored.guard.cacheVersion).toBe(before.version);
+      const finalWrite = (restored.surface as StubRasterSurface).callLog
+        .filter((entry) => entry.op === 'putImageData')
+        .at(-1);
+      expect(finalWrite?.args[0]).toMatchObject({ height: before.rect.height, width: before.rect.width });
+    }
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.strokes).toHaveLength(0);
+
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledTimes(2);
+    h.overlay.fire('pointercancel', pointerAt(20, 20, { buttons: 0 }));
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledTimes(2);
+    h.engine.dispose();
+  });
+
+  it.each(['brush', 'eraser'] as const)(
+    'treats a byte-identical direct %s stroke as an exact rollback',
+    async (tool) => {
+      const h = createControlPaintHarness(
+        { source: { bitmap: { height: 10, imageName: 'control-paint', width: 10 }, type: 'paint' } },
+        { pixelWrites: { enabled: false } }
+      );
+      await h.publishInitialCache();
+      const before = await snapshotLayerCache(h.engine, 'control');
+      h.engine.setTool(tool);
+      h.overlay.fire('pointerdown', pointerAt(5, 5));
+      h.overlay.fire('pointermove', pointerAt(8, 8));
+      h.overlay.fire('pointerup', pointerAt(8, 8, { buttons: 0 }));
+
+      const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+      expect(restored.status).toBe('ok');
+      if (restored.status === 'ok') {
+        expect(restored.surface).toBe(before.surface);
+        expect(restored.rect).toEqual(before.rect);
+        expect(restored.guard.cacheVersion).toBe(before.version);
+      }
+      expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+      expect(h.engine.stores.canUndo.get()).toBe(false);
+      expect(h.strokes).toHaveLength(0);
+      h.engine.dispose();
+    }
+  );
+
+  it('keeps a pending direct-control upload suspended through cancel, then resumes the preserved dirty work', async () => {
+    const uploadImage = vi.fn(() => Promise.resolve({ height: 10, imageName: 'resumed-control', width: 10 }));
+    const h = await createRealControlPersistenceHarness(uploadImage);
+    vi.useFakeTimers();
+    try {
+      h.bitmapStore.markLayerDirty('control');
+      h.engine.setTool('brush');
+      h.overlay.fire('pointerdown', pointerAt(20, 20));
+      h.overlay.fire('pointermove', pointerAt(30, 30));
+      const barrier = h.bitmapStore.flushPendingUploads();
+      let settled = false;
+      void barrier.then(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(settled).toBe(false);
+      expect(h.encodeSurface).not.toHaveBeenCalled();
+      expect(uploadImage).not.toHaveBeenCalled();
+
+      h.overlay.fire('pointercancel', pointerAt(30, 30, { buttons: 0 }));
+      await drainMicrotasksUntil(() => settled);
+
+      expect(settled).toBe(true);
+      expect(h.encodeSurface).toHaveBeenCalledOnce();
+      expect(uploadImage).toHaveBeenCalledOnce();
+      expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+      expect(h.engine.stores.canUndo.get()).toBe(false);
+      expect(h.strokes).toHaveLength(0);
+      h.engine.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('invalidates an in-flight direct-control upload on begin and releases the barrier after cancel', async () => {
+    const uploads = [
+      createDeferred<{ height: number; imageName: string; width: number }>(),
+      createDeferred<{ height: number; imageName: string; width: number }>(),
+    ];
+    let uploadIndex = 0;
+    const uploadImage = vi.fn(() => uploads[uploadIndex++]!.promise);
+    const h = await createRealControlPersistenceHarness(uploadImage);
+    h.bitmapStore.markLayerDirty('control');
+    const barrier = h.bitmapStore.flushPendingUploads();
+    for (let tick = 0; tick < 50 && uploadImage.mock.calls.length < 1; tick += 1) {
+      await Promise.resolve();
+    }
+    expect(uploadImage).toHaveBeenCalledOnce();
+
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(30, 30));
+    let settled = false;
+    void barrier.then(() => {
+      settled = true;
+    });
+    uploads[0]!.resolve({ height: 10, imageName: 'obsolete-control', width: 10 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
+    expect(uploadImage).toHaveBeenCalledOnce();
+
+    h.overlay.fire('pointercancel', pointerAt(30, 30, { buttons: 0 }));
+    for (let tick = 0; tick < 50 && uploadImage.mock.calls.length < 2; tick += 1) {
+      await Promise.resolve();
+    }
+    expect(uploadImage).toHaveBeenCalledTimes(2);
+    uploads[1]!.resolve({ height: 10, imageName: 'resumed-control', width: 10 });
+    await drainMicrotasksUntil(() => settled);
+
+    expect(settled).toBe(true);
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.strokes).toHaveLength(0);
+    h.engine.dispose();
+  });
+
+  it.each([
+    ['image control', { source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' } }],
+    [
+      'transformed empty control',
+      {
+        source: { bitmap: null, type: 'paint' },
+        transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 7, y: 11 },
+      },
+    ],
+  ] as const)('treats byte-identical brush and eraser strokes on a %s as rollback', async (_scenario, overrides) => {
+    for (const tool of ['brush', 'eraser'] as const) {
+      const h = createControlPaintHarness(overrides, { pixelWrites: { enabled: false } });
+      if (overrides.source.type === 'image') {
+        await h.publishInitialCache();
+      }
+      const beforeDocument = structuredClone(h.engine.getDocument());
+      const beforeCache = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+      h.engine.setTool(tool);
+      h.overlay.fire('pointerdown', pointerAt(5, 5));
+      h.overlay.fire('pointermove', pointerAt(8, 8));
+      h.overlay.fire('pointerup', pointerAt(8, 8, { buttons: 0 }));
+
+      expect(h.engine.getDocument()).toEqual(beforeDocument);
+      const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
+      expect(restored.status).toBe(beforeCache.status);
+      if (restored.status === 'ok' && beforeCache.status === 'ok') {
+        expect(restored.surface).toBe(beforeCache.surface);
+        expect(restored.rect).toEqual(beforeCache.rect);
+        expect(restored.guard.cacheVersion).toBe(beforeCache.guard.cacheVersion);
+      }
+      expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+      expect(h.engine.stores.canUndo.get()).toBe(false);
+      expect(h.strokes).toHaveLength(0);
+      h.engine.dispose();
+    }
   });
 
   it('restores a direct control stroke when image-patch history preparation fails', async () => {
     const h = createControlPaintHarness({ source: { bitmap: null, type: 'paint' } });
     const before = structuredClone(h.engine.getDocument());
+    const beforeExport = await h.engine.exportLayerPixels('control', { includeDisabled: true });
     h.engine.setTool('brush');
     h.overlay.fire('pointerdown', pointerAt(20, 20));
     h.overlay.fire('pointermove', pointerAt(40, 40));
@@ -2309,15 +2563,10 @@ describe('engine-owned control pixel editing', () => {
     expect(h.engine.getDocument()).toEqual(before);
     expect(h.engine.stores.canUndo.get()).toBe(false);
     expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
     expect(h.strokes).toHaveLength(0);
     const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
-    expect(restored.status).toBe('ok');
-    if (restored.status === 'ok') {
-      const finalPixelWrite = (restored.surface as StubRasterSurface).callLog
-        .filter((entry) => entry.op === 'putImageData')
-        .at(-1);
-      expect(finalPixelWrite?.args[0]).toBe(historyPreparationFaults.imagePatchBefore);
-    }
+    expect(restored.status).toBe(beforeExport.status);
     h.engine.dispose();
   });
 
@@ -2499,6 +2748,99 @@ describe('engine-owned control pixel editing', () => {
     expect(h.engine.stores.canUndo.get()).toBe(false);
     expect(h.engine.stores.canRedo.get()).toBe(false);
     h.engine.dispose();
+  });
+
+  it('finishes document-replacement cleanup after materialized gesture rollback throws', async () => {
+    const h = createControlPaintHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 },
+    });
+    await h.publishInitialCache();
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(8, 8));
+    h.overlay.fire('pointermove', pointerAt(12, 12));
+    adjustedSurfaceCacheDeleteFaults.add('control');
+    const replacement = { ...h.document, width: h.document.width + 1 };
+
+    expect(() => h.store.dispatch({ document: replacement, type: 'replaceCanvasDocument' })).toThrow(
+      'adjusted surface cache delete failed'
+    );
+
+    expect(h.engine.getDocument()).toEqual(replacement);
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.reset).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.strokes).toHaveLength(0);
+    h.engine.dispose();
+  });
+
+  it('finishes affected-layer removal cleanup after direct gesture rollback throws', async () => {
+    const h = createControlPaintHarness({
+      source: { bitmap: { height: 10, imageName: 'control-paint', width: 10 }, type: 'paint' },
+    });
+    await h.publishInitialCache();
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(8, 8));
+    h.overlay.fire('pointermove', pointerAt(12, 12));
+    adjustedSurfaceCacheDeleteFaults.add('control');
+
+    expect(() => h.store.dispatch({ ids: ['control'], type: 'removeCanvasLayers' })).toThrow(
+      'adjusted surface cache delete failed'
+    );
+
+    expect(h.engine.getDocument()!.layers).toHaveLength(0);
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.discardLayer).toHaveBeenCalledWith('control');
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.strokes).toHaveLength(0);
+    h.engine.dispose();
+  });
+
+  it('finishes active-project cleanup after materialized gesture rollback throws', async () => {
+    const h = createControlPaintHarness({
+      source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' },
+    });
+    await h.publishInitialCache();
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(8, 8));
+    h.overlay.fire('pointermove', pointerAt(12, 12));
+    adjustedSurfaceCacheDeleteFaults.add('control');
+
+    expect(() => h.store.dispatch({ type: 'createProject' })).toThrow('adjusted surface cache delete failed');
+
+    expect(h.store.getState().activeProjectId).not.toBe(h.store.getState().projects[0]!.id);
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    expect(h.strokes).toHaveLength(0);
+
+    h.store.dispatch({ projectId: h.store.getState().projects[0]!.id, type: 'switchProject' });
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledTimes(2);
+    h.overlay.fire('pointercancel', pointerAt(20, 20, { buttons: 0 }));
+    h.engine.dispose();
+  });
+
+  it('finishes disposal after direct gesture rollback throws and remains idempotent', async () => {
+    const h = createControlPaintHarness({
+      source: { bitmap: { height: 10, imageName: 'control-paint', width: 10 }, type: 'paint' },
+    });
+    await h.publishInitialCache();
+    h.engine.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(8, 8));
+    h.overlay.fire('pointermove', pointerAt(12, 12));
+    adjustedSurfaceCacheDeleteFaults.add('control');
+
+    expect(() => h.engine.dispose()).toThrow('adjusted surface cache delete failed');
+
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.dispose).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.strokes).toHaveLength(0);
+    expect(() => h.engine.dispose()).not.toThrow();
+    expect(h.bitmapStore.dispose).toHaveBeenCalledOnce();
   });
 });
 
@@ -12539,7 +12881,8 @@ describe('engine selection: fill / erase', () => {
     expect(h.engine.getDocument()).toEqual(beforeDocument);
     expect(h.engine.stores.canUndo.get()).toBe(false);
     expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
-    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
     expect(h.engine.stores.thumbnailVersion.get('control')).toBe(beforeThumbnailVersion);
     const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
     expect(restored.status).toBe('ok');
@@ -12572,7 +12915,8 @@ describe('engine selection: fill / erase', () => {
     expect(h.engine.getDocument()).toEqual(beforeDocument);
     expect(h.engine.stores.canUndo.get()).toBe(false);
     expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
-    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledOnce();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
     expect(h.engine.stores.thumbnailVersion.get('control')).toBe(beforeThumbnailVersion);
     const restored = await h.engine.exportLayerPixels('control', { includeDisabled: true });
     expect(restored.status).toBe(beforeExport.status);
@@ -12679,14 +13023,14 @@ describe('engine selection: fill / erase', () => {
     const beforeDocument = structuredClone(h.engine.getDocument());
     const beforeCache = await snapshotLayerCache(h.engine, 'control');
     const originalCtx = beforeCache.surface.ctx;
-    let capturedBefore: ImageData | null = null;
+    const capturedReads: ImageData[] = [];
     const failingCtx = new Proxy(originalCtx, {
       get(target, property, receiver) {
         const value = Reflect.get(target, property, receiver);
         if (property === 'getImageData' && typeof value === 'function') {
           return (...args: unknown[]) => {
             const result = Reflect.apply(value, target, args) as ImageData;
-            capturedBefore = result;
+            capturedReads.push(result);
             return result;
           };
         }
@@ -12712,9 +13056,11 @@ describe('engine selection: fill / erase', () => {
     expect(h.engine.getDocument()).toEqual(beforeDocument);
     expect(h.engine.stores.canUndo.get()).toBe(false);
     expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(capturedReads[0]).toMatchObject({ height: 10, width: 10 });
+    expect(capturedReads.at(-1)).toMatchObject({ height: 5, width: 5 });
     expect(
       (beforeCache.surface as StubRasterSurface).callLog.filter((entry) => entry.op === 'putImageData').at(-1)?.args[0]
-    ).toBe(capturedBefore);
+    ).toBe(capturedReads[0]);
 
     Object.defineProperty(beforeCache.surface, 'ctx', { configurable: true, value: originalCtx });
     h.engine.fillSelection();

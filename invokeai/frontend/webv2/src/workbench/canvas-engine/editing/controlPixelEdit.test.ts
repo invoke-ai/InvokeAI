@@ -1,6 +1,6 @@
 import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/types';
 
-import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { createTestStubRasterBackend, type StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -90,7 +90,35 @@ describe('isLayerPixelEditEligible', () => {
 
   it.each([
     ['raster paint', rasterPaint, true],
-    ['control', control(), true],
+    ['paint control', control(), true],
+    [
+      'image control',
+      control({ source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' } }),
+      true,
+    ],
+    [
+      'rectangle control',
+      control({
+        source: { fill: '#fff', height: 10, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
+      }),
+      true,
+    ],
+    [
+      'polygon control',
+      control({
+        source: {
+          fill: '#fff',
+          height: 10,
+          kind: 'polygon',
+          points: [],
+          stroke: null,
+          strokeWidth: 0,
+          type: 'shape',
+          width: 10,
+        },
+      }),
+      false,
+    ],
     [
       'raster image',
       { ...rasterPaint, source: { image: { height: 10, imageName: 'i', width: 10 }, type: 'image' } },
@@ -122,18 +150,30 @@ describe('buildMaterializedControlLayer', () => {
 });
 
 describe('bakeControlPixelEditSurface', () => {
-  it('bakes source pixels through the transform into document-space bounds', () => {
+  it('bakes offset source pixels through the complete translated, rotated, and scaled transform', () => {
     const backend = createTestStubRasterBackend();
     const source = backend.createSurface(10, 5);
+    const sourceRect = { height: 5, width: 10, x: 5, y: -4 };
     const baked = bakeControlPixelEditSurface({
       backend,
       source,
-      sourceRect: { height: 5, width: 10, x: 0, y: 0 },
-      transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 7, y: 11 },
+      sourceRect,
+      transform: { rotation: Math.PI / 2, scaleX: 2, scaleY: 3, x: 7, y: 11 },
     });
 
-    expect(baked.rect).toEqual({ height: 15, width: 20, x: 7, y: 11 });
-    expect(baked.surface.width).toBe(20);
-    expect(baked.surface.height).toBe(15);
+    expect(baked.rect).toEqual({ height: 20, width: 15, x: 4, y: 21 });
+    expect(baked.surface.width).toBe(15);
+    expect(baked.surface.height).toBe(20);
+    expect((baked.surface as StubRasterSurface).callLog).toEqual([
+      { args: [1, 0, 0, 1, 0, 0], op: 'setTransform' },
+      { args: [0, 0, 15, 20], op: 'clearRect' },
+      { args: ['imageSmoothingEnabled', true], op: 'set' },
+      {
+        args: [2 * Math.cos(Math.PI / 2), 2, -3, 3 * Math.cos(Math.PI / 2), 3, -10],
+        op: 'setTransform',
+      },
+      { args: [source.canvas, sourceRect.x, sourceRect.y], op: 'drawImage' },
+      { args: [1, 0, 0, 1, 0, 0], op: 'setTransform' },
+    ]);
   });
 });

@@ -332,6 +332,29 @@ const isImageDataEqual = (left: ImageData, right: ImageData): boolean => {
   return true;
 };
 
+/** Runs every teardown step, then rethrows the first failure after cleanup is terminal. */
+const createCleanupAccumulator = (): { run: (step: () => void) => void; throwIfFailed: () => void } => {
+  let firstError: unknown;
+  let hasFailed = false;
+  return {
+    run: (step) => {
+      try {
+        step();
+      } catch (error) {
+        if (!hasFailed) {
+          firstError = error;
+          hasFailed = true;
+        }
+      }
+    },
+    throwIfFailed: () => {
+      if (hasFailed) {
+        throw firstError instanceof Error ? firstError : new Error(String(firstError));
+      }
+    },
+  };
+};
+
 /** Structural equality for JSON-safe canvas contracts (including synthetic mask paint sources). */
 const isDeeplyEqual = (left: unknown, right: unknown): boolean => {
   if (Object.is(left, right)) {
@@ -2482,14 +2505,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       scheduler.invalidate(stagedPreview && !stagedPreview.placement ? { all: true } : { overlay: true });
     },
     onDocumentReplaced: () => {
-      pipeline.cancelActiveGesture();
-      cancelOpenControlPixelEdit();
-      canvasOperations.invalidateDocument(projectId);
-      cancelSelectObjectSession();
+      const cleanup = createCleanupAccumulator();
+      cleanup.run(() => pipeline.cancelActiveGesture());
+      cleanup.run(cancelOpenControlPixelEdit);
+      cleanup.run(() => canvasOperations.invalidateDocument(projectId));
+      cleanup.run(cancelSelectObjectSession);
       const previousImageNames = [...mirroredLayerImageNames.values()];
       rasterDocumentGeneration += 1;
-      cancelAllLayerRasterizations();
-      stores.thumbnailStatus.clear();
+      cleanup.run(cancelAllLayerRasterizations);
+      cleanup.run(() => stores.thumbnailStatus.clear());
       // A wholesale document swap — project switch, dims/background change, or a
       // snapshot restore that changes dims — invalidates the pixel history: its
       // entries reference layers/pixels that no longer describe the live document.
@@ -2500,26 +2524,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       // pipeline clears `gestureActive` and runs the tool's `onPointerCancel`, so
       // the tool drops its own transient state.
       // Defensive: a non-bbox active tool won't have cleared a lingering preview.
-      stores.bboxPreview.set(null);
-      history.clear();
-      endNudgeBurst();
+      cleanup.run(() => stores.bboxPreview.set(null));
+      cleanup.run(() => history.clear());
+      cleanup.run(endNudgeBurst);
       // A transform session (which outlives individual gestures) belongs to the
       // outgoing document; tear it down alongside its preview override.
-      stores.transformSession.set(null);
-      transformOverrides.clear();
+      cleanup.run(() => stores.transformSession.set(null));
+      cleanup.run(() => transformOverrides.clear());
       // A text-edit session likewise belongs to the outgoing document; drop it.
-      stores.textEditSession.set(null);
+      cleanup.run(() => stores.textEditSession.set(null));
       // A staged preview belongs to the outgoing document's bbox/candidates; a
       // wholesale swap (project switch, snapshot restore) invalidates it.
-      clearStagedPreview();
+      cleanup.run(clearStagedPreview);
       // Per-layer control-filter previews likewise belong to the outgoing
       // document — a swap can reuse a layer id with different content, so
       // pruning only "missing" ids isn't enough; drop them all.
-      clearAllFilterPreviews();
+      cleanup.run(clearAllFilterPreviews);
       // The selection is document-scoped interaction state: a swap drops it (and
       // any in-progress lasso preview), stopping the ants loop via onChange.
-      selection.clear();
-      stores.lassoPreview.set(null);
+      cleanup.run(() => selection.clear());
+      cleanup.run(() => stores.lassoPreview.set(null));
       const doc = mirror.getDocument();
       const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
       mirroredLayerImageNames.clear();
@@ -2535,9 +2559,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       const trackedIds = Array.from(trackedImageNames.keys());
       for (const layerId of trackedIds) {
         if (!present.has(layerId)) {
-          dropLayer(layerId);
+          cleanup.run(() => dropLayer(layerId));
         } else {
-          untrackLayerImage(layerId);
+          cleanup.run(() => untrackLayerImage(layerId));
         }
       }
       // A wholesale replacement can reuse a layer id with a DIFFERENT source, so
@@ -2546,32 +2570,34 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       // reference happened to change — to force a re-rasterize from the new
       // source; a diff can't be trusted across a full swap.
       for (const layerId of present) {
-        invalidateLayerCache(layerId);
+        cleanup.run(() => invalidateLayerCache(layerId));
       }
       for (const imageName of previousImageNames) {
-        releaseBitmapIfUnreferenced(imageName);
+        cleanup.run(() => releaseBitmapIfUnreferenced(imageName));
       }
       // Persistence bookkeeping (the self-echo `lastApplied` map and pending
       // debounced flushes) described the OLD document. Drop it so a reused layer
       // id can't have its next legit persistence dispatch suppressed as a stale
       // self-echo.
-      bitmapStore.reset();
-      scheduler.invalidate({ all: true });
+      cleanup.run(() => bitmapStore.reset());
+      cleanup.run(() => scheduler.invalidate({ all: true }));
+      cleanup.throwIfFailed();
     },
     onLayerOrderChanged: () => {
       scheduler.invalidate({ all: true });
     },
     onLayersChanged: (ids, sourceChangedIds) => {
+      const cleanup = createCleanupAccumulator();
       if (openControlPixelEdit && ids.includes(openControlPixelEdit.layerId)) {
-        pipeline.cancelActiveGesture();
-        cancelOpenControlPixelEdit();
+        cleanup.run(() => pipeline.cancelActiveGesture());
+        cleanup.run(cancelOpenControlPixelEdit);
       }
       const doc = mirror.getDocument();
       for (const id of sourceChangedIds) {
-        canvasOperations.invalidateSource(projectId, id);
+        cleanup.run(() => canvasOperations.invalidateSource(projectId, id));
       }
       for (const id of ids) {
-        canvasOperations.invalidateLayer(projectId, id);
+        cleanup.run(() => canvasOperations.invalidateLayer(projectId, id));
       }
       const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
       const sourceChanged = new Set(sourceChangedIds);
@@ -2598,10 +2624,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         const layer = doc?.layers.find((candidate) => candidate.id === id);
         if (!present.has(id)) {
           thumbnailDisplayKeys.delete(id);
-          dropLayer(id);
+          cleanup.run(() => dropLayer(id));
           const previousImageName = previousImageNames.get(id);
           if (previousImageName) {
-            releaseBitmapIfUnreferenced(previousImageName);
+            cleanup.run(() => releaseBitmapIfUnreferenced(previousImageName));
           }
           // A control-filter preview (session + decoded surface) belongs to a
           // specific layer; a layer removed out from under an in-flight or
@@ -2609,20 +2635,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           // that removes it) must have its preview dropped and its decode
           // token bumped, or a late-resolving decode — or a later undo that
           // restores this same id — would repopulate a stale preview.
-          clearFilterPreview(id);
+          cleanup.run(() => clearFilterPreview(id));
           if (session && session.layerId === id) {
-            cancelTransform();
+            cleanup.run(cancelTransform);
           }
           // An edit-mode text session whose layer was deleted out from under it
           // (layers panel, or undo of the add) is torn down the same way.
           if (textSession && textSession.layerId === id) {
-            cancelTextEdit();
+            cleanup.run(cancelTextEdit);
           }
           continue;
         }
         const preview = filterPreviews.get(id);
         if (preview && !isLayerExportGuardCurrent(preview.guard)) {
-          clearFilterPreview(id);
+          cleanup.run(() => clearFilterPreview(id));
         }
         if (!sourceChanged.has(id)) {
           if (layer) {
@@ -2657,18 +2683,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         if (layer) {
           thumbnailDisplayKeys.set(id, getLayerThumbnailDisplayKey(layer));
         }
-        untrackLayerImage(id);
+        cleanup.run(() => untrackLayerImage(id));
         const previousImageName = previousImageNames.get(id);
         if (previousImageName) {
-          releaseBitmapIfUnreferenced(previousImageName);
+          cleanup.run(() => releaseBitmapIfUnreferenced(previousImageName));
         }
         const source = getLayerSourceById(id);
         if (bitmapStore.isSelfEcho(id, source)) {
           continue;
         }
-        invalidateLayerCache(id);
+        cleanup.run(() => invalidateLayerCache(id));
       }
-      scheduler.invalidate({ layers: ids });
+      cleanup.run(() => scheduler.invalidate({ layers: ids }));
+      cleanup.throwIfFailed();
     },
     onStagingChanged: () => scheduler.invalidate({ overlay: true }),
   });
@@ -2688,20 +2715,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
   const unsubscribeProjectPreviewLifecycle = store.subscribe(() => {
     const activeProjectId = store.getState().activeProjectId;
     if (lastActiveProjectId === projectId && activeProjectId !== projectId) {
-      pipeline.cancelActiveGesture();
-      cancelOpenControlPixelEdit();
-      canvasOperations.invalidateProject(projectId);
-      cancelSelectObjectSession();
+      const cleanup = createCleanupAccumulator();
+      cleanup.run(() => pipeline.cancelActiveGesture());
+      cleanup.run(cancelOpenControlPixelEdit);
+      cleanup.run(() => canvasOperations.invalidateProject(projectId));
+      cleanup.run(cancelSelectObjectSession);
       rasterDocumentGeneration += 1;
-      cancelAllLayerRasterizations();
-      stores.thumbnailStatus.clear();
+      cleanup.run(cancelAllLayerRasterizations);
+      cleanup.run(() => stores.thumbnailStatus.clear());
       const ids = new Set<string>(guardedFilterPreviewTokens.keys());
       for (const layerId of filterPreviews.keys()) {
         ids.add(layerId);
       }
       for (const layerId of ids) {
-        clearFilterPreview(layerId);
+        cleanup.run(() => clearFilterPreview(layerId));
       }
+      lastActiveProjectId = activeProjectId;
+      cleanup.throwIfFailed();
+      return;
     }
     lastActiveProjectId = activeProjectId;
   });
@@ -4086,6 +4117,32 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
 
     if (decision.status === 'direct') {
+      const originalEntry = layerCache.get(layerId);
+      let originalPixels: ImageData | null = null;
+      if (originalEntry && !isEmpty(originalEntry.rect)) {
+        try {
+          originalPixels = originalEntry.surface.ctx.getImageData(
+            0,
+            0,
+            originalEntry.rect.width,
+            originalEntry.rect.height
+          );
+        } catch {
+          return null;
+        }
+      }
+      const originalCache = originalEntry
+        ? {
+            hasPublishedPixels: originalEntry.hasPublishedPixels,
+            lastUsed: originalEntry.lastUsed,
+            pixels: originalPixels,
+            rect: { ...originalEntry.rect },
+            stale: originalEntry.stale,
+            surface: originalEntry.surface,
+            version: originalEntry.version,
+          }
+        : null;
+      const releasePersistence = bitmapStore.suspendLayer(layerId);
       let closed = false;
       let owner: { cancel: () => void; layerId: string };
       const close = (): boolean => {
@@ -4096,16 +4153,50 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         openControlPixelEdit = null;
         return true;
       };
-      const restorePatch = (patch: PixelEditPatch): void => {
-        const entry = layerCache.get(layerId);
-        if (entry) {
-          entry.surface.ctx.putImageData(patch.before, patch.rect.x - entry.rect.x, patch.rect.y - entry.rect.y);
-          adjustedSurfaceCache.delete(layerId);
-          scheduler.invalidate({ layers: [layerId] });
+      const restoreOriginal = (): void => {
+        try {
+          if (!originalCache) {
+            layerCache.delete(layerId);
+          } else {
+            originalCache.surface.resize(originalCache.rect.width, originalCache.rect.height);
+            if (originalCache.pixels) {
+              originalCache.surface.ctx.putImageData(originalCache.pixels, 0, 0);
+            }
+            const current = layerCache.get(layerId) ?? layerCache.getOrCreateRect(layerId, originalCache.rect);
+            current.hasPublishedPixels = originalCache.hasPublishedPixels;
+            current.lastUsed = originalCache.lastUsed;
+            current.rect = { ...originalCache.rect };
+            current.stale = originalCache.stale;
+            current.surface = originalCache.surface;
+            current.version = originalCache.version;
+          }
+        } finally {
+          try {
+            adjustedSurfaceCache.delete(layerId);
+          } finally {
+            scheduler.invalidate({ layers: [layerId] });
+          }
         }
+      };
+      const restoreAndRelease = (): void => {
+        try {
+          restoreOriginal();
+        } finally {
+          releasePersistence();
+        }
+      };
+      const cancel = (): void => {
+        if (!close()) {
+          return;
+        }
+        restoreAndRelease();
       };
       const commitPatch = (label: string, patch: PixelEditPatch): boolean => {
         if (closed || openControlPixelEdit !== owner) {
+          return false;
+        }
+        if (isImageDataEqual(patch.before, patch.after)) {
+          cancel();
           return false;
         }
         const currentDocument = mirror.getDocument();
@@ -4117,8 +4208,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
           currentDocument?.selectedLayerId !== layerId ||
           currentLayer !== layer
         ) {
-          close();
-          restorePatch(patch);
+          cancel();
           return false;
         }
         close();
@@ -4135,21 +4225,23 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
             });
           }
         } catch (error) {
-          restorePatch(patch);
+          restoreAndRelease();
           throw error;
         }
         endNudgeBurst();
-        if (historyEntry) {
-          history.push(historyEntry);
+        try {
+          if (historyEntry) {
+            history.push(historyEntry);
+          }
+          notifyLayerPainted(layerId);
+          bitmapStore.markLayerDirty(layerId);
+        } finally {
+          releasePersistence();
         }
-        notifyLayerPainted(layerId);
-        bitmapStore.markLayerDirty(layerId);
         return true;
       };
       const transaction: ControlPixelEditTransaction = {
-        cancel: () => {
-          close();
-        },
+        cancel,
         commitPatch: (label, patch) => {
           commitPatch(label, patch);
         },
@@ -4174,7 +4266,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         },
         layerId,
       };
-      owner = { cancel: transaction.cancel, layerId };
+      owner = { cancel, layerId };
       openControlPixelEdit = owner;
       return transaction;
     }
@@ -4352,8 +4444,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     };
     const transaction: ControlPixelEditTransaction = {
       cancel,
-      commitPatch: (label) => commit(label),
-      commitStroke: (event) => commit(event.tool === 'eraser' ? 'Eraser stroke' : 'Brush stroke', event),
+      commitPatch: (label, patch) => {
+        if (isImageDataEqual(patch.before, patch.after)) {
+          cancel();
+          return;
+        }
+        commit(label);
+      },
+      commitStroke: (event) => {
+        if (isImageDataEqual(event.beforeImageData, event.afterImageData)) {
+          cancel();
+          return;
+        }
+        commit(event.tool === 'eraser' ? 'Eraser stroke' : 'Brush stroke', event);
+      },
       layerId,
     };
     owner = { cancel, layerId };
@@ -6902,46 +7006,48 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return;
     }
     disposed = true;
-    pipeline.cancelActiveGesture();
-    cancelOpenControlPixelEdit();
-    clearOwnedFilterSession();
-    clearOwnedSelectObjectSession();
-    canvasOperations.dispose();
-    cancelAllLayerRasterizations();
-    detach();
+    const cleanup = createCleanupAccumulator();
+    cleanup.run(() => pipeline.cancelActiveGesture());
+    cleanup.run(cancelOpenControlPixelEdit);
+    cleanup.run(clearOwnedFilterSession);
+    cleanup.run(clearOwnedSelectObjectSession);
+    cleanup.run(() => canvasOperations.dispose());
+    cleanup.run(cancelAllLayerRasterizations);
+    cleanup.run(detach);
     // Drop any open text-edit session (its layer belongs to a document this
     // engine no longer serves).
-    stores.textEditSession.set(null);
+    cleanup.run(() => stores.textEditSession.set(null));
     // Drop any guarded filter previews outright — the engine is going away, so
     // there's no render loop left to invalidate for them.
-    filterPreviews.clear();
-    filterPreviewTokens.clear();
-    guardedFilterPreviewTokens.clear();
-    antsAnimator.stop();
-    selection.dispose();
-    activeTool()?.onDeactivate?.(toolContext);
-    unsubscribeViewport();
-    unsubscribeBrushOptions();
-    unsubscribeEraserOptions();
-    unsubscribeCheckerboard();
-    unsubscribeCheckerColors();
-    unsubscribeShowGrid();
-    unsubscribeBboxGrid();
-    unsubscribeShowBbox();
-    unsubscribeBboxOverlay();
-    unsubscribeRuleOfThirds();
-    unsubscribeHistory();
-    unsubscribeProjectPreviewLifecycle();
-    unsubscribeDocumentEditingLock();
-    history.clear();
-    bitmapStore.dispose();
-    mirror.dispose();
-    scheduler.dispose();
-    layerCache.dispose();
-    adjustedSurfaceCache.dispose();
-    trackedImageNames.clear();
-    stores.thumbnailStatus.clear();
-    strokeListeners.clear();
+    cleanup.run(() => filterPreviews.clear());
+    cleanup.run(() => filterPreviewTokens.clear());
+    cleanup.run(() => guardedFilterPreviewTokens.clear());
+    cleanup.run(() => antsAnimator.stop());
+    cleanup.run(() => selection.dispose());
+    cleanup.run(() => activeTool()?.onDeactivate?.(toolContext));
+    cleanup.run(unsubscribeViewport);
+    cleanup.run(unsubscribeBrushOptions);
+    cleanup.run(unsubscribeEraserOptions);
+    cleanup.run(unsubscribeCheckerboard);
+    cleanup.run(unsubscribeCheckerColors);
+    cleanup.run(unsubscribeShowGrid);
+    cleanup.run(unsubscribeBboxGrid);
+    cleanup.run(unsubscribeShowBbox);
+    cleanup.run(unsubscribeBboxOverlay);
+    cleanup.run(unsubscribeRuleOfThirds);
+    cleanup.run(unsubscribeHistory);
+    cleanup.run(unsubscribeProjectPreviewLifecycle);
+    cleanup.run(unsubscribeDocumentEditingLock);
+    cleanup.run(() => history.clear());
+    cleanup.run(() => bitmapStore.dispose());
+    cleanup.run(() => mirror.dispose());
+    cleanup.run(() => scheduler.dispose());
+    cleanup.run(() => layerCache.dispose());
+    cleanup.run(() => adjustedSurfaceCache.dispose());
+    cleanup.run(() => trackedImageNames.clear());
+    cleanup.run(() => stores.thumbnailStatus.clear());
+    cleanup.run(() => strokeListeners.clear());
+    cleanup.throwIfFailed();
   };
 
   const onStrokeCommitted = (listener: (event: StrokeCommittedEvent) => void): (() => void) => {
