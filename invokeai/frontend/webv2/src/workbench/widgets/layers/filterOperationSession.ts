@@ -13,6 +13,9 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 import type { LayerFilterResult } from './layerFilterRunner';
 
+/** Delay between the last draft edit and the automatic preview run. */
+export const FILTER_AUTO_PROCESS_DEBOUNCE_MS = 400;
+
 export interface LayerFilterSettings {
   type: string;
   settings: Record<string, unknown>;
@@ -28,6 +31,7 @@ export interface FilterOperationPreview {
 }
 
 export interface FilterOperationSessionState {
+  autoProcess: boolean;
   draft: LayerFilterSettings;
   error: string | null;
   initialFilter: LayerFilterSettings | null;
@@ -57,6 +61,7 @@ export interface FilterOperationSessionDeps {
   ): Promise<'shown' | 'missing' | 'stale'>;
   clearPreview(): void;
   isGuardCurrent(guard: LayerExportGuard): boolean;
+  isDraftValid(draft: LayerFilterSettings): boolean;
   makeDurable(imageName: string): Promise<void>;
   canCommit(): boolean;
   commit(options: {
@@ -74,6 +79,7 @@ export interface FilterOperationSession {
   getSnapshot(): FilterOperationSessionState;
   subscribe(listener: () => void): () => void;
   updateDraft(draft: LayerFilterSettings): void;
+  setAutoProcess(value: boolean): void;
   process(): Promise<CanvasOperationRunResult>;
   interruptProcessing(): void;
   reset(settings: Record<string, unknown>): void;
@@ -111,6 +117,7 @@ export const createFilterOperationSession = (
   const initialFilter = cloneFilter(options.initialFilter);
   const fallback = options.initialDraft ?? { settings: {}, type: 'canny_edge_detection' };
   let state: FilterOperationSessionState = {
+    autoProcess: true,
     draft: cloneFilter(initialFilter) ?? fallback,
     error: null,
     initialFilter,
@@ -124,6 +131,23 @@ export const createFilterOperationSession = (
   let commitController: AbortController | null = null;
   let commitToken = 0;
   const listeners = new Set<() => void>();
+  let autoProcessTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearAutoProcess = (): void => {
+    if (autoProcessTimer !== null) {
+      clearTimeout(autoProcessTimer);
+      autoProcessTimer = null;
+    }
+  };
+  const scheduleAutoProcess = (): void => {
+    clearAutoProcess();
+    if (!state.autoProcess || !deps.isDraftValid(state.draft)) {
+      return;
+    }
+    autoProcessTimer = setTimeout(() => {
+      autoProcessTimer = null;
+      void process();
+    }, FILTER_AUTO_PROCESS_DEBOUNCE_MS);
+  };
 
   const publish = (next: FilterOperationSessionState): void => {
     if (disposed) {
@@ -157,6 +181,7 @@ export const createFilterOperationSession = (
     if (disposed) {
       return 'stale';
     }
+    clearAutoProcess();
     const requestDraft = structuredClone(state.draft);
     publish({ ...state, error: null, preview: null, status: 'processing' });
     const result = await operation.run(
@@ -225,6 +250,7 @@ export const createFilterOperationSession = (
     if (!deps.canCommit()) {
       return 'blocked';
     }
+    clearAutoProcess();
     cancelCommit();
     const token = commitToken;
     const controller = new AbortController();
@@ -284,6 +310,7 @@ export const createFilterOperationSession = (
     if (disposed) {
       return;
     }
+    clearAutoProcess();
     cancelCommit();
     operation.cancel();
     publish({ ...state, error: null, preview: null, status: 'ready' });
@@ -302,6 +329,7 @@ export const createFilterOperationSession = (
       if (disposed) {
         return;
       }
+      clearAutoProcess();
       cancelCommit();
       operation.cancel();
       disposed = true;
@@ -312,6 +340,7 @@ export const createFilterOperationSession = (
       if (disposed || state.status !== 'processing') {
         return;
       }
+      clearAutoProcess();
       operation.interruptProcessing();
       publish({ ...state, error: null, preview: null, status: 'ready' });
     },
@@ -329,6 +358,20 @@ export const createFilterOperationSession = (
         preview: null,
         status: 'ready',
       });
+      scheduleAutoProcess();
+    },
+    setAutoProcess: (value) => {
+      if (disposed || state.autoProcess === value) {
+        return;
+      }
+      publish({ ...state, autoProcess: value });
+      if (!value) {
+        clearAutoProcess();
+        return;
+      }
+      if (!state.preview) {
+        scheduleAutoProcess();
+      }
     },
     subscribe: (listener) => {
       if (!disposed) {
@@ -343,6 +386,7 @@ export const createFilterOperationSession = (
       cancelCommit();
       operation.reset();
       publish({ ...state, draft: structuredClone(draft), error: null, preview: null, status: 'ready' });
+      scheduleAutoProcess();
     },
   };
 };

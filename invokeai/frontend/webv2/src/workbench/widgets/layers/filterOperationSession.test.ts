@@ -3,11 +3,11 @@ import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { createCanvasOperationController } from '@workbench/canvas-engine/canvasOperationController';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { FilterOperationSessionDeps } from './filterOperationSession';
 
-import { createFilterOperationSession } from './filterOperationSession';
+import { createFilterOperationSession, FILTER_AUTO_PROCESS_DEBOUNCE_MS } from './filterOperationSession';
 
 const layer: CanvasRasterLayerContractV2 = {
   blendMode: 'normal',
@@ -50,6 +50,7 @@ const createDeps = (overrides: Partial<FilterOperationSessionDeps> = {}): Filter
   commit: vi.fn(() => Promise.resolve({ layerId: layer.id, status: 'committed' as const })),
   controller: createCanvasOperationController({ isGuardCurrent: () => true }),
   exportPixels: vi.fn(() => Promise.resolve(exported)),
+  isDraftValid: vi.fn(() => true),
   isGuardCurrent: vi.fn(() => true),
   makeDurable: vi.fn(() => Promise.resolve()),
   publishPreview: vi.fn(() => Promise.resolve('shown' as const)),
@@ -70,6 +71,7 @@ describe('createFilterOperationSession', () => {
 
     expect(session).not.toBeNull();
     expect(session!.getSnapshot()).toMatchObject({
+      autoProcess: true,
       draft: { settings: { radius: 2 }, type: 'canny_edge_detection' },
       initialFilter: { settings: { radius: 2 }, type: 'canny_edge_detection' },
       layerId: layer.id,
@@ -82,6 +84,7 @@ describe('createFilterOperationSession', () => {
     expect(session!.getSnapshot().draft).toEqual({ settings: { radius: 9 }, type: 'content_shuffle' });
     expect(session!.getSnapshot().initialFilter).toEqual(layer.filter);
     expect(session!.getSnapshot().layerName).toBe('Portrait');
+    session!.dispose();
   });
 
   it('publishes only the newest guarded process result', async () => {
@@ -271,4 +274,95 @@ describe('createFilterOperationSession', () => {
       expect(deps.controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
     }
   );
+});
+
+describe('auto-process', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const flushScheduledRun = async (deps: FilterOperationSessionDeps, times: number) => {
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(deps.runFilter).toHaveBeenCalledTimes(times));
+  };
+
+  it('debounces draft updates into a single process run with the latest settings', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    session.updateDraft({ settings: { radius: 4 }, type: 'img_blur' });
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS - 100);
+    expect(deps.runFilter).not.toHaveBeenCalled();
+    session.updateDraft({ settings: { radius: 6 }, type: 'img_blur' });
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS);
+    await flushScheduledRun(deps, 1);
+    expect(deps.runFilter).toHaveBeenCalledWith(
+      expect.objectContaining({ filterType: 'img_blur', settings: { radius: 6 } })
+    );
+    await vi.waitFor(() => expect(session.getSnapshot().preview?.imageName).toBe('filtered'));
+    session.dispose();
+  });
+
+  it('never schedules for an invalid draft', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps({ isDraftValid: vi.fn(() => false) });
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    session.updateDraft({ settings: { model: null }, type: 'spandrel_filter' });
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
+    expect(deps.runFilter).not.toHaveBeenCalled();
+    session.dispose();
+  });
+
+  it('setAutoProcess(false) cancels the pending run and blocks future scheduling', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    session.updateDraft({ settings: { radius: 4 }, type: 'img_blur' });
+    session.setAutoProcess(false);
+    expect(session.getSnapshot().autoProcess).toBe(false);
+    session.updateDraft({ settings: { radius: 6 }, type: 'img_blur' });
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
+    expect(deps.runFilter).not.toHaveBeenCalled();
+    session.dispose();
+  });
+
+  it('setAutoProcess(true) schedules a run when no preview exists yet', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    session.setAutoProcess(false);
+    session.setAutoProcess(true);
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS);
+    await flushScheduledRun(deps, 1);
+    session.dispose();
+  });
+
+  it('cancel clears the pending auto-run', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    session.updateDraft({ settings: { radius: 4 }, type: 'img_blur' });
+    session.cancel();
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
+    expect(deps.runFilter).not.toHaveBeenCalled();
+    session.dispose();
+  });
+
+  it('a manual process supersedes the pending debounced run', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    session.updateDraft({ settings: { radius: 4 }, type: 'img_blur' });
+    await session.process();
+    expect(deps.runFilter).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
+    expect(deps.runFilter).toHaveBeenCalledTimes(1);
+    session.dispose();
+  });
 });
