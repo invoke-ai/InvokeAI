@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { FilterPanelHeading, getFilterActionEligibility, getFilterSaveTargetEligibility } from './FilterOptions';
 
 const state = (patch: Partial<FilterOperationSessionState> = {}): FilterOperationSessionState => ({
+  autoProcess: true,
   draft: { settings: {}, type: 'canny_edge_detection' },
   error: null,
   initialFilter: null,
