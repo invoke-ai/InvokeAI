@@ -207,6 +207,10 @@ class BaseInvocation(ABC, BaseModel):
         """Invoke with provided context and return outputs."""
         pass
 
+    def get_event_invocation(self) -> "BaseInvocation":
+        """Returns the invocation representation included in execution events."""
+        return self
+
     def invoke_internal(self, context: InvocationContext, services: "InvocationServices") -> BaseInvocationOutput:
         """
         Internal invoke method, calls `invoke()` after some prep.

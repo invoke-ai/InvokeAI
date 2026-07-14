@@ -282,7 +282,6 @@ class _IfBranchScheduler:
 
     def is_deferred_by_unresolved_if(self, exec_node_id: str) -> bool:
         source_node_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
-        iteration_path = self._state._get_iteration_path(exec_node_id)
 
         for source_if_id, source_if_node in self._state.graph.nodes.items():
             if not isinstance(source_if_node, IfInvocation):
@@ -292,6 +291,7 @@ class _IfBranchScheduler:
             if source_node_id not in branches["true_input"] and source_node_id not in branches["false_input"]:
                 continue
 
+            iteration_path = self._state._get_iteration_path(exec_node_id)
             if self._has_unresolved_matching_if(source_if_id, iteration_path):
                 return True
         return False
@@ -346,6 +346,34 @@ class _ExecutionMaterializer:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
+    def _get_known_iteration_path(
+        self,
+        iteration_index: int,
+        iteration_node_map: list[tuple[str, str]],
+    ) -> Optional[tuple[int, ...]]:
+        parent_paths: list[tuple[int, ...]] = []
+        registry = self._state._prepared_registry()
+        for _, prepared_id in iteration_node_map:
+            parent_path = registry.get_iteration_path(prepared_id)
+            if parent_path is None:
+                return None
+            if parent_path:
+                parent_paths.append(parent_path)
+
+        # Materialized iteration boundaries use non-negative indexes; ordinary execution nodes use -1. Keeping this
+        # generic allows other scheduler-managed loop nodes to reuse the same path cache.
+        if iteration_index >= 0:
+            if len(parent_paths) > 1:
+                return None
+            parent_path = parent_paths[0] if parent_paths else ()
+            return (*parent_path, iteration_index)
+
+        if not parent_paths:
+            return ()
+        if len(parent_paths) == 1:
+            return parent_paths[0]
+        return None
+
     def _get_iterator_iteration_count(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> int:
         input_collection_edge = next(iter(self._state.graph._get_input_edges(node_id, COLLECTION_FIELD)))
         input_collection_prepared_node_id = next(
@@ -391,21 +419,28 @@ class _ExecutionMaterializer:
         if isinstance(new_node, IterateInvocation):
             new_node.index = iteration_index
 
+        # Scheduler-managed iteration boundaries and collectors are cheaper to execute than to hash, especially when
+        # their inputs contain large collections. Loop body nodes retain their normal cache behavior.
+        if iteration_index >= 0 or isinstance(new_node, CollectInvocation):
+            new_node.use_cache = False
+
         self._state.execution_graph.add_node(new_node)
         self._state._register_prepared_exec_node(new_node.id, node_id)
         return new_node
 
-    def _attach_execution_edges(self, exec_node_id: str, new_edges: list[Edge]) -> None:
-        for edge in new_edges:
-            self._state.execution_graph.add_edge(
-                Edge(
-                    source=edge.source,
-                    destination=EdgeConnection(node_id=exec_node_id, field=edge.destination.field),
-                )
+    def _attach_execution_edges(self, exec_node_id: str, new_edges: list[Edge]) -> list[Edge]:
+        attached_edges = [
+            Edge(
+                source=edge.source,
+                destination=EdgeConnection(node_id=exec_node_id, field=edge.destination.field),
             )
+            for edge in new_edges
+        ]
+        self._state.execution_graph._extend_edges_unchecked(attached_edges)
+        return attached_edges
 
-    def _initialize_execution_node(self, exec_node_id: str) -> None:
-        inputs = self._state.execution_graph._get_input_edges(exec_node_id)
+    def _initialize_execution_node(self, exec_node_id: str, input_edges: Optional[list[Edge]] = None) -> None:
+        inputs = input_edges if input_edges is not None else self._state.execution_graph._get_input_edges(exec_node_id)
         unmet = sum(1 for edge in inputs if edge.source.node_id not in self._state.executed)
         self._state.indegree[exec_node_id] = unmet
         self._state._try_resolve_if_node(exec_node_id)
@@ -530,7 +565,10 @@ class _ExecutionMaterializer:
         if not iterator_nodes:
             return self._get_parent_iteration_mappings_without_iterators(parent_node_ids)
 
-        iterator_nodes_prepared = [list(self._state.source_prepared_mapping[node_id]) for node_id in iterator_nodes]
+        iterator_nodes_prepared = [
+            sorted(self._state.source_prepared_mapping[node_id], key=self._state._get_iteration_path)
+            for node_id in iterator_nodes
+        ]
         iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
 
         execution_graph = self._state.execution_graph.nx_graph_flat()
@@ -564,10 +602,13 @@ class _ExecutionMaterializer:
         new_nodes: list[str] = []
         for iteration_index in iteration_indexes:
             new_node = self._create_execution_node_copy(node, node_id, iteration_index)
-            if iteration_path is not None:
-                self._state._prepared_registry().set_iteration_path(new_node.id, iteration_path)
-            self._attach_execution_edges(new_node.id, new_edges)
-            self._initialize_execution_node(new_node.id)
+            new_node_iteration_path = iteration_path
+            if new_node_iteration_path is None:
+                new_node_iteration_path = self._get_known_iteration_path(iteration_index, iteration_node_map)
+            if new_node_iteration_path is not None:
+                self._state._prepared_registry().set_iteration_path(new_node.id, new_node_iteration_path)
+            attached_edges = self._attach_execution_edges(new_node.id, new_edges)
+            self._initialize_execution_node(new_node.id, attached_edges)
             new_nodes.append(new_node.id)
 
         return new_nodes
@@ -733,6 +774,9 @@ class _ExecutionScheduler:
 
     def _insert_ready_node(self, queue: Deque[str], exec_node_id: str) -> None:
         exec_node_path = self._state._get_iteration_path(exec_node_id)
+        if not queue or self._state._get_iteration_path(queue[-1]) <= exec_node_path:
+            queue.append(exec_node_id)
+            return
         for i, existing in enumerate(queue):
             if self._state._get_iteration_path(existing) > exec_node_path:
                 queue.insert(i, exec_node_id)
@@ -743,6 +787,9 @@ class _ExecutionScheduler:
         self._state._set_prepared_exec_state(exec_node_id, "executed")
         self._state.executed.add(exec_node_id)
         self._state.results[exec_node_id] = output
+        node = self._state.execution_graph.nodes[exec_node_id]
+        if isinstance(node, IterateInvocation):
+            node.collection = []
 
     def _mark_source_node_complete(self, exec_node_id: str) -> None:
         registry = self._state._prepared_registry()
@@ -950,6 +997,14 @@ class _ExecutionRuntime:
     def _prepare_collect_inputs(self, node: "CollectInvocation", input_edges: list[Edge]) -> None:
         node.collection = self._build_collect_collection(input_edges)
 
+    def _prepare_iterate_inputs(self, node: "IterateInvocation", input_edges: list[Edge]) -> None:
+        for edge in input_edges:
+            if edge.destination.field != COLLECTION_FIELD:
+                continue
+            source_output = self._state.results[edge.source.node_id]
+            object.__setattr__(node, COLLECTION_FIELD, getattr(source_output, edge.source.field))
+            return
+
     def _prepare_if_inputs(self, node: IfInvocation, input_edges: list[Edge]) -> None:
         selected_field = self._state._resolved_if_exec_branches.get(node.id)
         allowed_fields = {"condition", selected_field} if selected_field is not None else {"condition"}
@@ -973,6 +1028,10 @@ class _ExecutionRuntime:
 
     def prepare_inputs(self, node: BaseInvocation) -> None:
         input_edges = self._state.execution_graph._get_input_edges(node.id)
+
+        if isinstance(node, IterateInvocation):
+            self._prepare_iterate_inputs(node, input_edges)
+            return
 
         if isinstance(node, CollectInvocation):
             self._prepare_collect_inputs(node, input_edges)
@@ -1198,7 +1257,7 @@ class IterateInvocationOutput(BaseInvocationOutput):
 
 
 # TODO: Fill this out and move to invocations
-@invocation("iterate", version="1.1.0")
+@invocation("iterate", version="1.1.0", use_cache=False)
 class IterateInvocation(BaseInvocation):
     """Iterates over a list of items"""
 
@@ -1211,6 +1270,11 @@ class IterateInvocation(BaseInvocation):
         """Produces the outputs as values"""
         return IterateInvocationOutput(item=self.collection[self.index], index=self.index, total=len(self.collection))
 
+    def get_event_invocation(self) -> "IterateInvocation":
+        event_invocation = self.model_copy()
+        event_invocation.collection = []
+        return event_invocation
+
 
 @invocation_output("collect_output")
 class CollectInvocationOutput(BaseInvocationOutput):
@@ -1219,7 +1283,7 @@ class CollectInvocationOutput(BaseInvocationOutput):
     )
 
 
-@invocation("collect", version="1.1.0")
+@invocation("collect", version="1.1.0", use_cache=False)
 class CollectInvocation(BaseInvocation):
     """Collects values into a collection"""
 
@@ -1240,6 +1304,11 @@ class CollectInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> CollectInvocationOutput:
         """Invoke with provided services and return outputs."""
         return CollectInvocationOutput(collection=copy.copy(self.collection))
+
+    def get_event_invocation(self) -> "CollectInvocation":
+        event_invocation = self.model_copy()
+        event_invocation.collection = []
+        return event_invocation
 
 
 class AnyInvocation(BaseInvocation):
@@ -1337,6 +1406,15 @@ class Graph(BaseModel):
             self.edges.append(edge)
         else:
             raise InvalidEdgeError()
+
+    def _extend_edges_unchecked(self, edges: Iterable[Edge]) -> None:
+        """Adds trusted runtime edges without author-time graph validation.
+
+        This is only for execution edges derived from an already-validated source graph. Runtime materialization
+        preserves the source graph's direction and field connections, so repeating cycle, uniqueness, and type checks
+        for every expanded edge is redundant and prohibitively expensive for large iterator collections.
+        """
+        self.edges.extend(edges)
 
     def delete_edge(self, edge: Edge) -> None:
         """Deletes an edge from a graph"""

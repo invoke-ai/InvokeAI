@@ -63,7 +63,7 @@ class EventServiceBase:
 
     def emit_invocation_started(self, queue_item: "SessionQueueItem", invocation: "BaseInvocation") -> None:
         """Emitted when an invocation is started"""
-        self.dispatch(InvocationStartedEvent.build(queue_item, invocation))
+        self.dispatch(InvocationStartedEvent.build(queue_item, invocation.get_event_invocation()))
 
     def emit_invocation_progress(
         self,
@@ -74,13 +74,15 @@ class EventServiceBase:
         image: "ProgressImage | None" = None,
     ) -> None:
         """Emitted at periodically during an invocation"""
-        self.dispatch(InvocationProgressEvent.build(queue_item, invocation, message, percentage, image))
+        self.dispatch(
+            InvocationProgressEvent.build(queue_item, invocation.get_event_invocation(), message, percentage, image)
+        )
 
     def emit_invocation_complete(
         self, queue_item: "SessionQueueItem", invocation: "BaseInvocation", output: "BaseInvocationOutput"
     ) -> None:
         """Emitted when an invocation is complete"""
-        self.dispatch(InvocationCompleteEvent.build(queue_item, invocation, output))
+        self.dispatch(InvocationCompleteEvent.build(queue_item, invocation.get_event_invocation(), output))
 
     def emit_invocation_error(
         self,
@@ -91,7 +93,15 @@ class EventServiceBase:
         error_traceback: str,
     ) -> None:
         """Emitted when an invocation encounters an error"""
-        self.dispatch(InvocationErrorEvent.build(queue_item, invocation, error_type, error_message, error_traceback))
+        self.dispatch(
+            InvocationErrorEvent.build(
+                queue_item,
+                invocation.get_event_invocation(),
+                error_type,
+                error_message,
+                error_traceback,
+            )
+        )
 
     # endregion
 

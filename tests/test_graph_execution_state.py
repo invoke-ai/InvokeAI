@@ -29,6 +29,7 @@ from tests.test_nodes import (
     AnyTypeTestInvocationOutput,
     PromptCollectionTestInvocation,
     PromptTestInvocation,
+    TestEventService,
     TextToImageTestInvocation,
     create_edge,
 )
@@ -433,6 +434,153 @@ def test_graph_state_expands_iterator():
     results = {g.results[n].value for n in prepared_add_nodes}
     expected = {1, 11, 21}
     assert results == expected
+
+
+def test_graph_state_materialization_does_not_revalidate_execution_edges(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+
+    validate_edge_calls = 0
+    original_validate_edge = Graph._validate_edge
+
+    def track_validate_edge(self: Graph, edge):
+        nonlocal validate_edge_calls
+        validate_edge_calls += 1
+        return original_validate_edge(self, edge)
+
+    monkeypatch.setattr(Graph, "_validate_edge", track_validate_edge)
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    assert validate_edge_calls == 0
+    state.execution_graph.validate_self()
+
+
+def test_iterator_and_collector_do_not_use_invocation_cache_by_default():
+    assert IterateInvocation().use_cache is False
+    assert CollectInvocation().use_cache is False
+
+
+def test_materialized_control_nodes_disable_invocation_cache():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate", use_cache=True))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect", use_cache=True))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+    state = GraphExecutionState(graph=graph)
+
+    execute_all_nodes(state)
+
+    for source_node_id in ("iterate", "collect"):
+        for prepared_node_id in state.source_prepared_mapping[source_node_id]:
+            assert state.execution_graph.get_node(prepared_node_id).use_cache is False
+
+
+def test_iterator_and_collector_event_invocations_omit_collections():
+    iterator = IterateInvocation(collection=[1, 2, 3], index=1)
+    collector = CollectInvocation(collection=[1, 2, 3])
+
+    iterator_event_invocation = iterator.get_event_invocation()
+    collector_event_invocation = collector.get_event_invocation()
+
+    assert iterator_event_invocation is not iterator
+    assert iterator_event_invocation.collection == []
+    assert iterator_event_invocation.index == iterator.index
+    assert iterator.collection == [1, 2, 3]
+
+    assert collector_event_invocation is not collector
+    assert collector_event_invocation.collection == []
+    assert collector.collection == [1, 2, 3]
+
+
+def test_invocation_event_service_uses_compact_control_node_representation():
+    iterator = IterateInvocation(collection=[1, 2, 3], index=1)
+    queue_item = Mock(
+        queue_id="default",
+        item_id=1,
+        batch_id="batch",
+        origin="workflows",
+        destination=None,
+        user_id="system",
+        session_id="session",
+        session=Mock(prepared_source_mapping={iterator.id: "source"}),
+    )
+    events = TestEventService()
+
+    events.emit_invocation_started(queue_item, iterator)
+
+    assert len(events.events) == 1
+    event = events.events[0]
+    assert isinstance(event.invocation, IterateInvocation)
+    assert event.invocation.collection == []
+    assert iterator.collection == [1, 2, 3]
+
+
+def test_if_scheduler_does_not_resolve_iteration_path_when_graph_has_no_if(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="source", prompt="test"))
+    state = GraphExecutionState(graph=graph)
+    prepared_node = PromptTestInvocation(id="prepared", prompt="test")
+    state.execution_graph.add_node(prepared_node)
+    state._register_prepared_exec_node(prepared_node.id, "source")
+
+    def fail_get_iteration_path(self: GraphExecutionState, exec_node_id: str):
+        raise AssertionError(f"Unexpected iteration path lookup for {exec_node_id}")
+
+    monkeypatch.setattr(GraphExecutionState, "_get_iteration_path", fail_get_iteration_path)
+
+    assert state._if_scheduler().is_deferred_by_unresolved_if(prepared_node.id) is False
+
+
+def test_materializer_caches_iteration_paths_for_single_parent_chain(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+    state = GraphExecutionState(graph=graph)
+
+    def fail_build_iteration_path(exec_node_id: str, source_node_id: str):
+        raise AssertionError(f"Unexpected graph traversal for {exec_node_id} from {source_node_id}")
+
+    monkeypatch.setattr(state._runtime(), "_build_iteration_path", fail_build_iteration_path)
+
+    execute_all_nodes(state)
+
+
+def test_iterator_reuses_collection_input_until_completed():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    state = GraphExecutionState(graph=graph)
+
+    range_node, range_output = invoke_next(state)
+    assert range_node is not None
+    assert range_output is not None
+
+    iterate_node = state.next()
+    assert isinstance(iterate_node, IterateInvocation)
+    assert iterate_node.collection is range_output.collection
+
+    iterate_output = iterate_node.invoke(Mock(InvocationContext))
+    state.complete(iterate_node.id, iterate_output)
+
+    assert iterate_output.item == 0
+    assert iterate_node.collection == []
 
 
 def test_graph_state_collects():
