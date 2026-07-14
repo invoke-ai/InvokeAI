@@ -22,6 +22,7 @@ import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { FILTER_AUTO_PROCESS_DEBOUNCE_MS } from '@workbench/widgets/layers/filterOperationSession';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
 import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -9941,6 +9942,75 @@ describe('guarded filter previews', () => {
   const filterBitmapBackend = (width = 10, height = 10): StubRasterBackend => ({
     ...createTestStubRasterBackend(),
     createImageBitmap: () => Promise.resolve({ close: () => undefined, height, width } as unknown as ImageBitmap),
+  });
+
+  it('auto-processes a debounced preview after a filter draft update', async () => {
+    const layer = guardableLayer('auto-filter');
+    const { store } = createReactiveStore({ ...emptyDoc(), layers: [layer] });
+    const runGraph = vi.fn(() =>
+      Promise.resolve({ height: 10, imageName: 'auto.png', origin: 'test', output: {}, width: 10 })
+    );
+    const engine = createCanvasEngine({
+      backend: filterBitmapBackend(),
+      filterDeps: { runGraph, uploadIntermediate: () => Promise.resolve({ imageName: 'input.png' }) },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels(layer.id)).status).toBe('ok');
+    expect(engine.startFilterOperation(layer.id)).toBe('started');
+    expect(engine.stores.filterSession.get()).toMatchObject({ autoProcess: true, status: 'ready' });
+
+    engine.updateFilterOperation({
+      settings: { high_threshold: 210, low_threshold: 90 },
+      type: 'canny_edge_detection',
+    });
+    expect(runGraph).not.toHaveBeenCalled();
+    await vi.waitFor(
+      () =>
+        expect(engine.stores.filterSession.get()).toMatchObject({
+          preview: { imageName: 'auto.png' },
+          status: 'ready',
+        }),
+      { timeout: 3000 }
+    );
+    expect(runGraph).toHaveBeenCalledOnce();
+    engine.dispose();
+  });
+
+  it('setFilterOperationAutoProcess toggles the session and stops auto-runs', async () => {
+    const layer = guardableLayer('auto-filter-toggle');
+    const { store } = createReactiveStore({ ...emptyDoc(), layers: [layer] });
+    const runGraph = vi.fn(() =>
+      Promise.resolve({ height: 10, imageName: 'auto.png', origin: 'test', output: {}, width: 10 })
+    );
+    const engine = createCanvasEngine({
+      backend: filterBitmapBackend(),
+      filterDeps: { runGraph, uploadIntermediate: () => Promise.resolve({ imageName: 'input.png' }) },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect((await engine.exportLayerPixels(layer.id)).status).toBe('ok');
+
+    expect(engine.setFilterOperationAutoProcess(false)).toBe('stale');
+
+    expect(engine.startFilterOperation(layer.id)).toBe('started');
+    expect(engine.setFilterOperationAutoProcess(false)).toBe('updated');
+    expect(engine.stores.filterSession.get()).toMatchObject({ autoProcess: false });
+
+    engine.updateFilterOperation({
+      settings: { high_threshold: 210, low_threshold: 90 },
+      type: 'canny_edge_detection',
+    });
+    await new Promise((resolve) => {
+      setTimeout(resolve, FILTER_AUTO_PROCESS_DEBOUNCE_MS + 200);
+    });
+    expect(runGraph).not.toHaveBeenCalled();
+
+    engine.setInteractionLocked(true);
+    expect(engine.setFilterOperationAutoProcess(true)).toBe('blocked');
+    engine.dispose();
   });
 
   it.each(['apply', 'raster'] as const)(

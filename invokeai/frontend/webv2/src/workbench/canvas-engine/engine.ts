@@ -119,6 +119,7 @@ import {
   buildFilterDefaults,
   DEFAULT_CONTROL_FILTER_TYPE,
   getFilterDefinition,
+  isFilterConfigValid,
 } from '@workbench/generation/canvas/filterGraphs';
 import { createFilterOperationSession } from '@workbench/widgets/layers/filterOperationSession';
 import { LayerFilterOutputDimensionError, runLayerFilter } from '@workbench/widgets/layers/layerFilterRunner';
@@ -491,6 +492,7 @@ export interface CanvasEngine {
   /** Starts one engine-owned guarded filter operation for a raster or control layer. */
   startFilterOperation(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
   updateFilterOperation(draft: LayerFilterSettings): CanvasOperationMutationResult;
+  setFilterOperationAutoProcess(value: boolean): CanvasOperationMutationResult;
   processFilterOperation(): Promise<CanvasOperationActionResult>;
   resetFilterOperation(settings: Record<string, unknown>): CanvasOperationMutationResult;
   commitFilterOperation(
@@ -3581,6 +3583,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
         },
         controller: canvasOperations,
         exportPixels: () => rasterizeLayerPixels(layer.id, { applyAdjustments: true, includeDisabled: true }),
+        isDraftValid: (draft) => isFilterConfigValid(draft.type, draft.settings),
         isGuardCurrent: isLayerExportGuardCurrent,
         makeDurable: (imageName) => filterMakeDurable(imageName),
         publishPreview: (imageName, rect, previewGuard, filterType) =>
@@ -3632,6 +3635,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
       return 'stale';
     }
     filterSession.updateDraft(draft);
+    return 'updated';
+  };
+  const setFilterOperationAutoProcess = (value: boolean): CanvasOperationMutationResult => {
+    if (interactionLocked) {
+      return 'blocked';
+    }
+    if (!filterSession) {
+      return 'stale';
+    }
+    filterSession.setAutoProcess(value);
     return 'updated';
   };
   const processFilterOperation = async (): Promise<CanvasOperationActionResult> => {
@@ -7193,6 +7206,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     startSelectObject,
     startFilterOperation,
     updateFilterOperation,
+    setFilterOperationAutoProcess,
     updateSelectObjectSession,
     openTextCreate,
     openTextEdit,
