@@ -365,4 +365,36 @@ describe('auto-process', () => {
     expect(deps.runFilter).toHaveBeenCalledTimes(1);
     session.dispose();
   });
+
+  it('interruptProcessing clears the pending auto-run', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    session.updateDraft({ settings: { radius: 4 }, type: 'img_blur' });
+    expect(session.getSnapshot().status).toBe('ready');
+    session.interruptProcessing();
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
+    expect(deps.runFilter).not.toHaveBeenCalled();
+    session.dispose();
+  });
+
+  it('setAutoProcess(true) does not reschedule when a preview exists', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    session.updateDraft({ settings: { radius: 4 }, type: 'img_blur' });
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS);
+    await flushScheduledRun(deps, 1);
+    await vi.waitFor(() => expect(session.getSnapshot().preview?.imageName).toBe('filtered'));
+
+    session.setAutoProcess(false);
+    session.setAutoProcess(true);
+    await new Promise((resolve) => {
+      setTimeout(resolve, FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
+    });
+    expect(deps.runFilter).toHaveBeenCalledTimes(1);
+    session.dispose();
+  });
 });

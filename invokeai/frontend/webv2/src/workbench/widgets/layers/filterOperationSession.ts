@@ -337,10 +337,13 @@ export const createFilterOperationSession = (
     },
     getSnapshot: () => state,
     interruptProcessing: () => {
-      if (disposed || state.status !== 'processing') {
+      if (disposed) {
         return;
       }
       clearAutoProcess();
+      if (state.status !== 'processing') {
+        return;
+      }
       operation.interruptProcessing();
       publish({ ...state, error: null, preview: null, status: 'ready' });
     },
@@ -369,7 +372,7 @@ export const createFilterOperationSession = (
         clearAutoProcess();
         return;
       }
-      if (!state.preview) {
+      if (!state.preview && state.status !== 'processing' && state.status !== 'committing') {
         scheduleAutoProcess();
       }
     },
