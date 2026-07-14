@@ -7,16 +7,22 @@ describe('getLayerFilterControlPolicy', () => {
     expect(getLayerFilterControlPolicy('property')).toEqual({
       controlMinH: undefined,
       controlSize: 'xs',
+      fieldOrientation: 'vertical',
       fieldW: undefined,
       modelSize: 'xs',
       positioning: { placement: 'bottom-end', sameWidth: false },
+      showFilterLabel: true,
+      showNumberStepper: true,
     });
     expect(getLayerFilterControlPolicy('operation')).toEqual({
       controlMinH: undefined,
       controlSize: 'xs',
-      fieldW: { enum: '9rem', filter: '11rem', model: '14rem', number: '13rem', string: '9rem' },
+      fieldOrientation: 'horizontal',
+      fieldW: { enum: '13rem', filter: '11rem', model: '16rem', number: '17rem', string: '13rem' },
       modelSize: 'xs',
       positioning: { placement: 'top-end', sameWidth: false },
+      showFilterLabel: false,
+      showNumberStepper: false,
     });
   });
 });

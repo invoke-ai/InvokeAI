@@ -113,7 +113,7 @@ export const FilterOptionsBar = ({
           </Text>
         </Tooltip>
         <CanvasFloatingBarDivider />
-        <Flex align="end" flexWrap="wrap" gap="2" minW="0">
+        <Flex align="center" flexWrap="wrap" gap="2" minW="0">
           <LayerFilterControls
             disabled={!eligibility.canEdit}
             filterType={session.draft.type}
@@ -141,6 +141,7 @@ export const FilterOptionsBar = ({
           errorDetail={null}
           errorText={session.error}
           isBusy={isBusy}
+          minW="0"
           statusText={t(getFilterStatusTranslationKey(session.status))}
           technicalDetailsLabel={t('widgets.layers.selectObject.technicalDetails')}
         />

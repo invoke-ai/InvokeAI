@@ -21,12 +21,14 @@ export const OperationStatusSlot = ({
   errorDetail,
   errorText,
   isBusy,
+  minW = '8rem',
   statusText,
   technicalDetailsLabel,
 }: {
   errorDetail: string | null;
   errorText: string | null;
   isBusy: boolean;
+  minW?: string;
   statusText: string;
   technicalDetailsLabel: string;
 }) => {
@@ -39,7 +41,7 @@ export const OperationStatusSlot = ({
       fontSize="xs"
       gap="1"
       maxW="16rem"
-      minW="8rem"
+      minW={minW}
     >
       {errorText ? (
         <>

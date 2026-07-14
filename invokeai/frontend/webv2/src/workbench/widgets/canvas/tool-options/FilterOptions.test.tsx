@@ -184,6 +184,40 @@ describe('FilterOptionsBar', () => {
     expect(markup.indexOf('aria-label="Save As"')).toBeLessThan(markup.indexOf('>Cancel<'));
   });
 
+  it('server-renders disabled action buttons while processing', () => {
+    const engine = {
+      cancelFilterOperation: vi.fn(),
+      commitFilterOperation: vi.fn(),
+      processFilterOperation: vi.fn(),
+      resetFilterOperation: vi.fn(),
+      setFilterOperationAutoProcess: vi.fn(),
+      updateFilterOperation: vi.fn(),
+    };
+    const markup = renderToStaticMarkup(
+      createElement(
+        ChakraProvider,
+        { value: system } as ComponentProps<typeof ChakraProvider>,
+        createElement(
+          I18nextProvider,
+          { i18n: testI18n },
+          createElement(FilterOptionsBar, {
+            engine: engine as never,
+            session: state({ status: 'processing' }),
+          })
+        )
+      )
+    );
+
+    const processIdx = markup.indexOf('>Process<');
+    const processButtonTag = markup.slice(markup.lastIndexOf('<button', processIdx), processIdx);
+    expect(processButtonTag).toContain('disabled=""');
+    expect(processButtonTag).toContain('data-loading=""');
+
+    const autoIdx = markup.indexOf('>Auto<');
+    const autoButtonTag = markup.slice(markup.lastIndexOf('<button', autoIdx), autoIdx);
+    expect(autoButtonTag).toContain('disabled=""');
+  });
+
   it('marks the Auto chip pressed state from the session', () => {
     const render = (autoProcess: boolean) =>
       renderToStaticMarkup(

@@ -7,7 +7,7 @@ import type { FilterParamSpec } from '@workbench/generation/canvas/filterGraphs'
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 import type { ChangeEvent } from 'react';
 
-import { createListCollection, HStack, Input, NumberInput, Switch, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, Input, NumberInput, Switch, Text } from '@chakra-ui/react';
 import { Field, Select, Slider } from '@workbench/components/ui';
 import {
   CONTROL_FILTERS,
@@ -40,16 +40,22 @@ export const getLayerFilterControlPolicy = (variant: LayerFilterControlsVariant)
     ? ({
         controlMinH: undefined,
         controlSize: 'xs',
-        fieldW: { enum: '9rem', filter: '11rem', model: '14rem', number: '13rem', string: '9rem' },
+        fieldOrientation: 'horizontal',
+        fieldW: { enum: '13rem', filter: '11rem', model: '16rem', number: '17rem', string: '13rem' },
         modelSize: 'xs',
         positioning: SELECT_POSITIONING_UP,
+        showFilterLabel: false,
+        showNumberStepper: false,
       } as const)
     : ({
         controlMinH: undefined,
         controlSize: 'xs',
+        fieldOrientation: 'vertical',
         fieldW: undefined,
         modelSize: 'xs',
         positioning: SELECT_POSITIONING_DOWN,
+        showFilterLabel: true,
+        showNumberStepper: true,
       } as const);
 
 export const LayerFilterControls = ({
@@ -75,6 +81,7 @@ export const LayerFilterControls = ({
   );
   const filterValue = useMemo(() => [filterType], [filterType]);
   const policy = getLayerFilterControlPolicy(variant);
+  const filterFieldW = policy.fieldW?.filter;
   const filterTriggerProps = useMemo(
     () => ({ autoFocus: focusFilter, minH: policy.controlMinH }),
     [focusFilter, policy.controlMinH]
@@ -94,21 +101,31 @@ export const LayerFilterControls = ({
     [onSettingsChange, settings]
   );
 
+  const filterSelect = (
+    <Select
+      aria-label={t('widgets.layers.control.filter')}
+      collection={filterCollection}
+      disabled={disabled}
+      positioning={policy.positioning}
+      size={policy.controlSize}
+      triggerProps={filterTriggerProps}
+      value={filterValue}
+      valueText={t(`widgets.layers.control.filters.${filterType}`, filterType)}
+      onValueChange={handleFilterTypeChange}
+    />
+  );
+
   return (
     <>
-      <Field label={t('widgets.layers.control.filter')} w={policy.fieldW?.filter}>
-        <Select
-          aria-label={t('widgets.layers.control.filter')}
-          collection={filterCollection}
-          disabled={disabled}
-          positioning={policy.positioning}
-          size={policy.controlSize}
-          triggerProps={filterTriggerProps}
-          value={filterValue}
-          valueText={t(`widgets.layers.control.filters.${filterType}`, filterType)}
-          onValueChange={handleFilterTypeChange}
-        />
-      </Field>
+      {policy.showFilterLabel ? (
+        <Field label={t('widgets.layers.control.filter')} w={filterFieldW}>
+          {filterSelect}
+        </Field>
+      ) : (
+        <Box flexShrink="0" w={filterFieldW}>
+          {filterSelect}
+        </Box>
+      )}
       {definition?.params.map((param) => (
         <FilterParamField
           key={param.key}
@@ -230,7 +247,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
 
   if (param.kind === 'enum' && enumCollection) {
     return (
-      <Field label={label} w={policy.fieldW?.enum}>
+      <Field label={label} orientation={policy.fieldOrientation} w={policy.fieldW?.enum}>
         <Select
           aria-label={label}
           collection={enumCollection}
@@ -249,7 +266,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
   if (param.kind === 'model') {
     const model = isSpandrelModelIdentifier(value) ? (value as { key: string }) : null;
     return (
-      <Field label={label} required w={policy.fieldW?.model}>
+      <Field label={label} orientation={policy.fieldOrientation} required w={policy.fieldW?.model}>
         <ModelSelect
           disabled={disabled}
           invalid={!model}
@@ -265,7 +282,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
 
   if (param.kind === 'string') {
     return (
-      <Field label={label} w={policy.fieldW?.string}>
+      <Field label={label} orientation={policy.fieldOrientation} w={policy.fieldW?.string}>
         <Input
           disabled={disabled}
           minH={policy.controlMinH}
@@ -282,7 +299,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
   }
 
   return (
-    <Field label={label} w={policy.fieldW?.number}>
+    <Field label={label} orientation={policy.fieldOrientation} w={policy.fieldW?.number}>
       <HStack gap="2">
         <Slider
           aria-label={labelAria}
@@ -305,10 +322,10 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
           size={policy.controlSize}
           step={numberBounds.step}
           value={String(numberCurrent)}
-          w="20"
+          w={policy.showNumberStepper ? '20' : '14'}
           onValueChange={handleNumberInput}
         >
-          <NumberInput.Control />
+          {policy.showNumberStepper ? <NumberInput.Control /> : null}
           <NumberInput.Input aria-label={label} />
         </NumberInput.Root>
       </HStack>
