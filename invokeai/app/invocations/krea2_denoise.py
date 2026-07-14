@@ -292,6 +292,14 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Position ids: text tokens at origin, image tokens carry their grid coords.
         text_seq_len = pos_prompt_embeds.shape[1]
         position_ids = prepare_position_ids(text_seq_len, grid_height, grid_width, device)
+        # The negative prompt can tokenize to a different length than the positive prompt, so it needs its
+        # own position ids. Reusing the positive ids would leave the rotary embedding (text + image tokens)
+        # a different length than the uncond query sequence and crash in the transformer's apply_rotary_emb.
+        neg_position_ids = (
+            prepare_position_ids(neg_prompt_embeds.shape[1], grid_height, grid_width, device)
+            if neg_prompt_embeds is not None
+            else None
+        )
 
         # Inpaint extension operates in 4D, so unpack/repack around each merge.
         inpaint_mask = self._prep_inpaint_mask(context, noise)
@@ -367,7 +375,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         encoder_hidden_states=neg_prompt_embeds,
                         encoder_attention_mask=neg_prompt_mask,
                         timestep=timestep,
-                        position_ids=position_ids,
+                        position_ids=neg_position_ids,
                         return_dict=False,
                     )[0]
                     noise_pred = noise_pred_uncond + cfg_scale[step_idx] * (noise_pred_cond - noise_pred_uncond)

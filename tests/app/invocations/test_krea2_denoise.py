@@ -251,3 +251,49 @@ def test_run_diffusion_reaches_masked_denoising_merge(monkeypatch, tmp_path) -> 
     assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
     assert len(merge_sigmas) == 2
     assert transformer.conditioning_values == [1.0, 1.0]
+
+
+def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypatch, tmp_path) -> None:
+    # Regression: the positive and negative prompts can tokenize to different lengths. The rotary position
+    # ids (text tokens + image grid) must match *each pass's own* text length. Reusing the positive prompt's
+    # position ids for the uncond pass leaves the rotary embedding a different length than the negative
+    # query sequence, which crashes in the real transformer's apply_rotary_emb.
+    _patch_runtime(monkeypatch)
+
+    image_seq_len = 1  # width=height=16 -> 2x2 latent -> a single 2x2 patch
+
+    class _PositionIdChecker:
+        def __call__(self, *, hidden_states, encoder_hidden_states, position_ids, **_kwargs):
+            text_len = encoder_hidden_states.shape[1]
+            pos_len = position_ids.shape[0]
+            # The invariant the real Krea2Transformer2DModel enforces: rotary length == text + image tokens.
+            assert pos_len == text_len + image_seq_len, (
+                f"position_ids length {pos_len} must equal text length {text_len} + image tokens {image_seq_len}"
+            )
+            return (torch.zeros_like(hidden_states),)
+
+    transformer = _PositionIdChecker()
+
+    # Positive prompt is longer than the negative prompt (3 vs. 2 text tokens).
+    conditionings = {
+        "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 3, 12, 8))]),
+        "negative": ConditioningFieldData(
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, 2, 12, 8))]
+        ),
+    }
+    config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Turbo)
+    context = SimpleNamespace(
+        models=SimpleNamespace(
+            load=lambda _identifier: _TransformerInfo(transformer),
+            get_config=lambda _identifier: config,
+            get_absolute_path=lambda _config: tmp_path,
+        ),
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda _name: None),
+        util=SimpleNamespace(sd_step_callback=lambda *_args: None),
+    )
+
+    # cfg_scale > 1 so both the cond (positive) and uncond (negative) passes run each step. Without the fix,
+    # the uncond pass receives the positive prompt's position ids and the checker above fails.
+    latents = _runtime_invocation(cfg_scale=2.0)._run_diffusion(context)
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
