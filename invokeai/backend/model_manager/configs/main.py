@@ -206,12 +206,20 @@ def _get_krea2_variant_from_name(name: str) -> Krea2VariantType:
     """Guess the Krea-2 variant from a single-file/GGUF filename.
 
     Turbo and Raw (Base) share the identical transformer architecture, so a single-file checkpoint
-    cannot be distinguished from its weights. Filenames containing "raw" or "base" (e.g.
-    "Krea-2-Raw", "krea2_base_q4") indicate the undistilled Base model; everything else defaults to
-    the distilled Turbo. The user can override the variant in the model manager.
+    cannot be distinguished from its weights. Filenames with a "raw"/"base" token (e.g. "Krea-2-Raw",
+    "krea2_base_q4") indicate the undistilled Base model; everything else defaults to the distilled
+    Turbo. The user can override the variant in the model manager.
     """
     lowered = name.lower()
-    if "raw" in lowered or "base" in lowered:
+    # "turbo" is a strong positive signal for the distilled checkpoint and wins outright, so a Turbo file
+    # whose name merely *contains* "base"/"raw" as a substring (e.g. "baseline", "database", "raw_export")
+    # is not misread as Base.
+    if "turbo" in lowered:
+        return Krea2VariantType.Turbo
+    # Otherwise match "raw"/"base" only as a whole token delimited by non-alphanumeric separators
+    # ("-", "_", ".") - not as an arbitrary substring.
+    tokens = re.split(r"[^a-z0-9]+", lowered)
+    if "raw" in tokens or "base" in tokens:
         return Krea2VariantType.Base
     return Krea2VariantType.Turbo
 

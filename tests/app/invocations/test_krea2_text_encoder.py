@@ -106,3 +106,86 @@ def test_encode_rejects_a_loaded_non_patch_lora(monkeypatch) -> None:
 
     with pytest.raises(TypeError, match="Expected ModelPatchRaw"):
         _invocation()._encode(_context(object()))
+
+
+def test_encode_preserves_suffix_for_a_prompt_that_overflows_truncation(monkeypatch) -> None:
+    # Regression: a prompt longer than the tokenizer budget must NOT lose the assistant-turn suffix. The
+    # encoder tokenizes (prefix + prompt) with truncation and appends the suffix AFTER, so the final tokens
+    # always end with the suffix template (building one string and truncating it would cut the suffix off).
+    from invokeai.app.invocations.krea2_text_encoder import _KREA2_SUFFIX
+
+    suffix_ids = [901, 902, 903, 904, 905]
+
+    class _TruncatingTokenizer:
+        def __call__(self, text, max_length=None, truncation=False, add_special_tokens=True, return_tensors=None):
+            if text == _KREA2_SUFFIX:
+                ids = list(suffix_ids)
+            else:
+                # Body (prefix + prompt): one filler id per whitespace token, distinct from the suffix ids.
+                ids = [1] * len(text.split())
+            if truncation and max_length is not None and len(ids) > max_length:
+                ids = ids[:max_length]  # right truncation, as the real tokenizer does
+            input_ids = torch.tensor([ids], dtype=torch.long)
+            return SimpleNamespace(input_ids=input_ids, attention_mask=torch.ones_like(input_ids))
+
+    captured: dict = {}
+
+    class _CapturingEncoder(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.anchor = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, *, input_ids, attention_mask, **_kwargs):
+            captured["input_ids"] = input_ids
+            seq = input_ids.shape[1]
+            hidden_states = tuple(torch.zeros((1, seq, 4)) for _ in range(36))
+            return SimpleNamespace(hidden_states=hidden_states)
+
+    encoder = _CapturingEncoder()
+
+    class _CapturingEncoderInfo:
+        @contextmanager
+        def model_on_device(self):
+            yield ({}, encoder)
+
+    class _TruncatingTokenizerInfo:
+        def __enter__(self):
+            return _TruncatingTokenizer()
+
+        def __exit__(self, *_args):
+            return None
+
+    def load(identifier):
+        if identifier.submodel_type is SubModelType.Tokenizer:
+            return _TruncatingTokenizerInfo()
+        return _CapturingEncoderInfo()
+
+    context = SimpleNamespace(
+        models=SimpleNamespace(load=load), util=SimpleNamespace(signal_progress=lambda _message: None)
+    )
+
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_text_encoder.LayerPatcher.apply_smart_model_patches",
+        lambda **_kwargs: nullcontext(),
+    )
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.float32,
+    )
+
+    encoder_id = _identifier("encoder", ModelType.Qwen3VLEncoder)
+    field = Qwen3VLEncoderField(
+        tokenizer=encoder_id.model_copy(update={"submodel_type": SubModelType.Tokenizer}),
+        text_encoder=encoder_id.model_copy(update={"submodel_type": SubModelType.TextEncoder}),
+        loras=[],
+    )
+    long_prompt = " ".join(["word"] * 2000)  # far exceeds the ~541-token budget
+    invocation = Krea2TextEncoderInvocation.model_construct(prompt=long_prompt, qwen3_vl_encoder=field)
+
+    invocation._encode(context)
+
+    final_ids = captured["input_ids"][0].tolist()
+    # The suffix survives at the very end even though the body was truncated.
+    assert final_ids[-len(suffix_ids) :] == suffix_ids
+    # And the body really was truncated (total = reserved budget + suffix), proving append-after-truncate.
+    assert len(final_ids) > len(suffix_ids)

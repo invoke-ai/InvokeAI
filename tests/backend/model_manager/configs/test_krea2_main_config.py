@@ -51,6 +51,13 @@ class TestKrea2VariantFromName:
             ("krea2_turbo-Q3_K_M.gguf", Krea2VariantType.Turbo),
             ("Krea-2-Turbo-Q4_K_M.gguf", Krea2VariantType.Turbo),
             ("some-random-name.safetensors", Krea2VariantType.Turbo),  # default
+            # "turbo" wins outright, so a Turbo file whose name merely contains "base"/"raw" as a
+            # substring is not misread as Base.
+            ("krea2_turbo_baseline_q4.gguf", Krea2VariantType.Turbo),
+            ("krea2-turbo-raw-export.safetensors", Krea2VariantType.Turbo),
+            # "base"/"raw" only match as whole tokens, not arbitrary substrings.
+            ("krea2_database_model.safetensors", Krea2VariantType.Turbo),
+            ("krea2_baseline_q8.gguf", Krea2VariantType.Turbo),
         ],
     )
     def test_variant_from_name(self, name: str, expected: Krea2VariantType) -> None:

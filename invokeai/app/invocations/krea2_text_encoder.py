@@ -77,9 +77,13 @@ class Krea2TextEncoderInvocation(BaseInvocation):
         tokenizer_info = context.models.load(self.qwen3_vl_encoder.tokenizer)
         text_encoder_info = context.models.load(self.qwen3_vl_encoder.text_encoder)
 
-        text = _KREA2_PREFIX + self.prompt + _KREA2_SUFFIX
-        # diffusers caps the tokenizer length at max_sequence_length + start_idx - num_suffix_tokens.
-        max_length = KREA2_MAX_SEQ_LEN + KREA2_START_IDX - KREA2_NUM_SUFFIX_TOKENS
+        # diffusers tokenizes (prefix + prompt) and the assistant-turn suffix separately, then
+        # concatenates - so the suffix always survives truncation. Building one string and truncating it
+        # (right-truncation) drops the suffix for long (>~500-token) prompts, corrupting the trained token
+        # layout that the fixed prefix-drop (KREA2_START_IDX) and suffix accounting depend on.
+        body_text = _KREA2_PREFIX + self.prompt
+        # Reserve room for the suffix (diffusers: max_sequence_length + start_idx - num_suffix_tokens).
+        body_max_length = KREA2_MAX_SEQ_LEN + KREA2_START_IDX - KREA2_NUM_SUFFIX_TOKENS
 
         context.util.signal_progress("Running Qwen3-VL text encoder")
 
@@ -100,14 +104,19 @@ class Krea2TextEncoderInvocation(BaseInvocation):
                 )
             )
 
-            model_inputs = tokenizer(
-                text,
-                max_length=max_length,
+            body_inputs = tokenizer(
+                body_text,
+                max_length=body_max_length,
                 truncation=True,
                 return_tensors="pt",
             )
-            input_ids = model_inputs.input_ids.to(device=device)
-            attention_mask = model_inputs.attention_mask.to(device=device)
+            # Append the suffix AFTER truncation so it can never be cut. add_special_tokens=False keeps it
+            # to exactly the assistant-turn tokens (no extra BOS), matching the reference token layout.
+            suffix_inputs = tokenizer(_KREA2_SUFFIX, add_special_tokens=False, return_tensors="pt")
+            input_ids = torch.cat([body_inputs.input_ids, suffix_inputs.input_ids], dim=1).to(device=device)
+            attention_mask = torch.cat([body_inputs.attention_mask, suffix_inputs.attention_mask], dim=1).to(
+                device=device
+            )
 
             outputs = text_encoder(
                 input_ids=input_ids,

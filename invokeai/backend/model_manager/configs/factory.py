@@ -430,7 +430,10 @@ class ModelConfigFactory:
                 if not config_path.exists():
                     continue
                 try:
-                    config = json.loads(config_path.read_text())
+                    # Model config.json files are UTF-8; read explicitly so a non-ASCII value does not
+                    # raise UnicodeDecodeError under a cp1252 (Windows) locale and get mis-treated as
+                    # "unrecognized", which would wrongly reject a valid model directory.
+                    config = json.loads(config_path.read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     continue
                 if config_name == "model_index.json":

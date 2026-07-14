@@ -31,3 +31,15 @@ def test_large_directory_with_model_index_is_accepted(tmp_path: Path) -> None:
     _fill_directory(tmp_path)
 
     ModelConfigFactory._validate_path_looks_like_model(tmp_path)
+
+
+def test_directory_with_utf8_non_ascii_config_is_accepted(tmp_path: Path) -> None:
+    # config.json files are UTF-8. Reading them with the platform default encoding (cp1252 on Windows)
+    # raises UnicodeDecodeError on non-ASCII bytes, which gets swallowed as "unrecognized" and wrongly
+    # rejects a valid model directory. The config must be read explicitly as UTF-8.
+    (tmp_path / "config.json").write_text(
+        json.dumps({"architectures": ["Qwen3VLModel"], "description": "café — ünïcödé 模型"}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    ModelConfigFactory._validate_path_looks_like_model(tmp_path)

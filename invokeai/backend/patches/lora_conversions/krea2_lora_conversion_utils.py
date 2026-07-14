@@ -57,7 +57,7 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
     )
 
     for layer_key, layer_dict in grouped_state_dict.items():
-        values = _get_lora_layer_values(layer_dict, alpha)
+        values = _get_lora_layer_values(layer_key, layer_dict, alpha)
 
         is_text_encoder = False
         clean_key = layer_key
@@ -82,9 +82,16 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
     return ModelPatchRaw(layers=layers)
 
 
-def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | None) -> dict[str, torch.Tensor]:
+def _get_lora_layer_values(
+    layer_key: str, layer_dict: dict[str, torch.Tensor], alpha: float | None
+) -> dict[str, torch.Tensor]:
     """Convert PEFT (lora_A/lora_B) layer values to internal (lora_down/lora_up) format."""
     if "lora_A.weight" in layer_dict:
+        if "lora_B.weight" not in layer_dict:
+            raise ValueError(
+                f"Malformed Krea-2 LoRA: layer '{layer_key}' has lora_A.weight but no matching lora_B.weight. "
+                "The LoRA file is incomplete or corrupt."
+            )
         values = {
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],

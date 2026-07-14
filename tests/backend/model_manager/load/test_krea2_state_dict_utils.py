@@ -232,4 +232,18 @@ class TestRejectIncompleteLoad:
         model.load_state_dict({"weight": torch.zeros(4, 4)}, strict=False, assign=True)
         with pytest.raises(RuntimeError, match="bias") as exc_info:
             _reject_incomplete_load(model, what="Krea-2 single-file checkpoint")
-        assert "1 parameter(s)" in str(exc_info.value)
+        assert "1 tensor(s)" in str(exc_info.value)
+
+    def test_raises_for_a_persistent_buffer_left_on_meta(self) -> None:
+        # Buffers land on the meta device too; a native/GGUF checkpoint that omits a persistent buffer
+        # must be rejected. The parameter here is fully materialized, so a parameters-only guard would
+        # wrongly pass - only the buffer check catches it.
+        class _ModuleWithMetaBuffer(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.zeros(2, 2))
+                self.register_buffer("cached_stat", torch.empty(4, device="meta"))
+
+        model = _ModuleWithMetaBuffer()
+        with pytest.raises(RuntimeError, match="cached_stat"):
+            _reject_incomplete_load(model, what="Krea-2 GGUF checkpoint")

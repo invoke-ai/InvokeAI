@@ -47,17 +47,21 @@ def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
 
 
 def _has_qwen_vl_visual_tower(state_dict: dict[str | int, Any]) -> bool:
-    """Check if state dict bundles a Qwen2.5-VL / Qwen2-VL vision tower.
+    """Check if state dict bundles a Qwen-VL vision tower (Qwen2-VL / Qwen2.5-VL / Qwen3-VL).
 
-    Qwen-VL encoders ship the visual tower (`visual.blocks.*`, `visual.patch_embed.*`)
-    alongside the language model, whereas a text-only Qwen3 encoder never does. A Qwen-VL
-    file otherwise satisfies the Qwen3 key heuristic (it has `model.layers.*` /
-    `model.embed_tokens.weight` too), so without this check it matches *both* the Qwen3 and
-    the QwenVLEncoder configs and the tiebreak can misroute it to Qwen3. We use it to keep
-    the two mutually exclusive.
+    VL encoders ship a visual tower alongside the language model, whereas a text-only Qwen3 encoder
+    never does. A VL file otherwise satisfies the Qwen3 key heuristic (it has ``model.layers.*`` /
+    ``model.embed_tokens.weight`` too), so without this check it matches *both* the text-only Qwen3
+    config and the VL config and the tiebreak can misroute it. We use it to keep them mutually exclusive.
+
+    The predicate deliberately mirrors ``_is_qwen3_vl_encoder_state_dict`` (qwen3_vl_encoder.py) so both
+    sides agree on what counts as a visual tower - crucially including the nested ``model.visual.*``
+    layout that ComfyUI single-file Qwen3-VL checkpoints use. Matching only bare ``visual.blocks.*``
+    missed that layout, letting a single-file Qwen3-VL 4B encoder match both configs and get misrouted to
+    the text-only Qwen3 type - silently breaking the single-file/GGUF Krea-2 encoder install path.
     """
     for key in state_dict.keys():
-        if isinstance(key, str) and (key.startswith("visual.blocks.") or key.startswith("visual.patch_embed.")):
+        if isinstance(key, str) and (key.startswith(("visual.", "model.visual.")) or ".visual." in key):
             return True
     return False
 

@@ -452,17 +452,25 @@ def _remap_qwen3vl_singlefile_keys(sd: dict[str, Any]) -> dict[str, Any]:
 
 
 def _reject_incomplete_load(model: Any, *, what: str) -> None:
-    """Raise if a ``load_state_dict(strict=False)`` left required parameters on the meta device.
+    """Raise if a ``load_state_dict(strict=False)`` left required tensors on the meta device.
 
     ``strict=False`` is used to tolerate benign extra/renamed keys, but it also silently accepts a
     checkpoint that omits required weights — those tensors stay on the meta device and only fail much
-    later during inference. Reject such loads here, naming the offending parameters, so an incomplete,
+    later during inference. Reject such loads here, naming the offending tensors, so an incomplete,
     misidentified, or differently-converted checkpoint fails at load time with an actionable message.
+
+    Both parameters *and persistent buffers* are checked: ``accelerate.init_empty_weights()`` places
+    buffers on the meta device too, so a native/GGUF checkpoint that omits a persistent buffer would
+    slip past a parameters-only guard and fail mid-inference instead of at load time.
     """
-    still_meta = [name for name, p in model.named_parameters() if getattr(p, "is_meta", False)]
+    still_meta = [
+        name
+        for name, tensor in (*model.named_parameters(), *model.named_buffers())
+        if getattr(tensor, "is_meta", False)
+    ]
     if still_meta:
         raise RuntimeError(
-            f"{what} is incomplete: {len(still_meta)} parameter(s) were not provided by the checkpoint "
+            f"{what} is incomplete: {len(still_meta)} tensor(s) were not provided by the checkpoint "
             f"and remain uninitialized (meta device). First few: {still_meta[:8]}. The file is likely "
             "incomplete, misidentified, or uses a key layout that needs conversion."
         )
