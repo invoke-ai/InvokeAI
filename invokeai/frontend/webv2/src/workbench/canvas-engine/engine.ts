@@ -3682,10 +3682,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     filterMakeDurable = makeImageDurable;
     const result = await session.commit(target);
     if (canvasOperations.getSnapshot().status === 'idle' && filterSession === session) {
-      filterSession = null;
-      filterUnsubscribe?.();
-      filterUnsubscribe = null;
-      stores.filterSession.set(null);
+      clearOwnedFilterSession();
     }
     return result;
   };
