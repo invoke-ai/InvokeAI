@@ -16492,7 +16492,7 @@
             "ui_type": "IsIntermediate"
           },
           "use_cache": {
-            "default": true,
+            "default": false,
             "description": "Whether or not to use the cache",
             "field_kind": "node_attribute",
             "title": "Use Cache",
@@ -43479,7 +43479,7 @@
             "ui_type": "IsIntermediate"
           },
           "use_cache": {
-            "default": true,
+            "default": false,
             "description": "Whether or not to use the cache",
             "field_kind": "node_attribute",
             "title": "Use Cache",
