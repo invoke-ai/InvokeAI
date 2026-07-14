@@ -328,7 +328,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const styleValue = useMemo(() => [fill.style], [fill.style]);
 
   return (
-    <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md" onKeyDown={stopKeyboardPropagation}>
+    <Stack gap="2" onKeyDown={stopKeyboardPropagation}>
       <Field label={t('widgets.layers.regionalGuidance.positivePrompt')}>
         <PromptTextarea
           {...PROMPT_ATTENTION_TARGET_PROPS}

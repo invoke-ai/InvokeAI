@@ -5058,13 +5058,12 @@ describe('extract masked canvas area', () => {
   });
 });
 
-// ---- mergeVisibleRasterLayers: whole-fold pre-flight + interleave-safe fold ----
+// ---- mergeVisibleRasterLayers: guarded non-destructive composite ----
 
 /**
- * An EngineStore backed by the REAL workbench reducer, so the fold's own
- * dispatches (reorder + mergeCanvasLayersDown) actually advance the document the
- * mirror re-reads between steps — the no-op mock store cannot exercise a
- * multi-step fold.
+ * An EngineStore backed by the REAL workbench reducer, so the operation's
+ * prepared stack mutation advances the document and mirror atomically — the
+ * no-op mock store cannot exercise that transaction.
  */
 const createReducerBackedStore = (
   document: CanvasDocumentContractV2,
@@ -5709,8 +5708,18 @@ describe('mergeVisibleRasterLayers', () => {
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
     const { projectId, store } = createReducerBackedStore(doc);
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const backend: StubRasterBackend = {
+      ...base,
+      createSurface: (width, height) => {
+        const surface = base.createSurface(width, height);
+        surfaces.push(surface);
+        return surface;
+      },
+    };
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend,
       imageResolver: () => Promise.resolve(new Blob()),
       projectId,
       store,
@@ -5718,42 +5727,151 @@ describe('mergeVisibleRasterLayers', () => {
     const screen = createFakeCanvas();
     const overlay = createFakeCanvas();
     engine.surface.attach(screen.element, overlay.element);
-    return { engine, raf, store };
+    return { engine, raf, store, surfaces };
   };
 
-  it('refuses the WHOLE fold before any pixel work while a participant cache is not ready', async () => {
+  it('waits for contributor rasterization before applying one atomic insertion', async () => {
     const { engine, raf } = setup(interleavedDoc());
-    // No frame has run yet: both paint bitmaps are undecoded (no ready caches).
-    expect(engine.layers.mergeVisibleRasterLayers()).toBe('not-ready');
-    // Nothing happened — no reorder, no merge, no partial fold.
+    const pending = engine.layers.mergeVisibleRasterLayers();
     expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(['upper', 'mid-mask', 'below']);
 
-    // Once the decodes land, the SAME call succeeds.
     raf.flush();
     await flushMicrotasks();
     raf.flush();
-    expect(engine.layers.mergeVisibleRasterLayers()).toBe('merged');
-    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(['mid-mask', 'below']);
+    expect(await pending).toBe('merged');
+    expect(
+      engine.document
+        .getDocument()!
+        .layers.slice(1)
+        .map((layer) => layer.id)
+    ).toEqual(['upper', 'mid-mask', 'below']);
 
     engine.lifecycle.dispose();
   });
 
-  it('folds visible rasters across an interleaved mask (reorder + merge), then reports nothing left', async () => {
+  it('creates a selected raster at index zero and preserves every source layer', async () => {
     const { engine, raf } = setup(interleavedDoc());
     raf.flush();
     await flushMicrotasks();
     raf.flush();
 
-    expect(engine.layers.mergeVisibleRasterLayers()).toBe('merged');
+    expect(await engine.layers.mergeVisibleRasterLayers()).toBe('merged');
 
-    // The upper raster merged INTO the lower one across the mask; the mask
-    // survives untouched and the merged layer keeps the lower id + raster type.
     const layers = engine.document.getDocument()!.layers;
-    expect(layers.map((layer) => layer.id)).toEqual(['mid-mask', 'below']);
-    expect(layers.map((layer) => layer.type)).toEqual(['inpaint_mask', 'raster']);
+    expect(layers).toHaveLength(4);
+    expect(layers[0]).toMatchObject({
+      blendMode: 'normal',
+      isEnabled: true,
+      isLocked: false,
+      name: 'upper merged',
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    expect(layers.slice(1).map((layer) => layer.id)).toEqual(['upper', 'mid-mask', 'below']);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(layers[0]!.id);
 
-    // Re-running has nothing to do (one raster left).
-    expect(engine.layers.mergeVisibleRasterLayers()).toBe('nothing');
+    engine.lifecycle.dispose();
+  });
+
+  it('includes locked parametric rasters, excludes hidden rasters, and composites bottom-to-top', async () => {
+    const doc = twoPaintDoc();
+    const upper: CanvasRasterLayerContractV2 = {
+      ...(doc.layers[0] as CanvasRasterLayerContractV2),
+      isLocked: true,
+    };
+    const below: CanvasRasterLayerContractV2 = {
+      ...(doc.layers[1] as CanvasRasterLayerContractV2),
+      source: {
+        angle: 0,
+        height: 60,
+        kind: 'linear',
+        stops: [
+          { color: '#000000', offset: 0 },
+          { color: '#ffffff', offset: 1 },
+        ],
+        type: 'gradient',
+        width: 60,
+      },
+    };
+    const hidden: CanvasRasterLayerContractV2 = {
+      ...(doc.layers[1] as CanvasRasterLayerContractV2),
+      id: 'hidden',
+      isEnabled: false,
+      name: 'hidden',
+      source: { bitmap: { height: 500, imageName: 'hidden-bmp', width: 500 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: -1000, y: -1000 },
+    };
+    const sourceLayers = [upper, maskLayer('mid-mask'), hidden, below];
+    const { engine, raf, surfaces } = setup({ ...doc, layers: sourceLayers });
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    expect(await engine.layers.mergeVisibleRasterLayers()).toBe('merged');
+    const merged = engine.document.getDocument()!.layers[0]!;
+    expect(merged).toMatchObject({ source: { offset: { x: 10, y: 20 }, type: 'paint' }, type: 'raster' });
+    expect(engine.document.getDocument()!.layers.slice(1)).toEqual(sourceLayers);
+
+    const composite = surfaces.find(
+      (surface) =>
+        surface.width === 60 &&
+        surface.height === 60 &&
+        surface.callLog.some(
+          (entry) => entry.op === 'set' && entry.args[0] === 'globalCompositeOperation' && entry.args[1] === 'multiply'
+        )
+    );
+    expect(composite).toBeDefined();
+    expect(
+      composite?.callLog
+        .filter((entry) => entry.op === 'drawImage')
+        .map((entry) => (entry.args[0] as { width: number }).width)
+    ).toEqual([60, 40]);
+    expect(
+      composite?.callLog
+        .filter((entry) => entry.op === 'set' && entry.args[0] === 'globalAlpha')
+        .map((entry) => entry.args[1])
+    ).toEqual([1, 0.5, 1]);
+
+    engine.lifecycle.dispose();
+  });
+
+  it('creates another composite layer when invoked repeatedly', async () => {
+    const { engine, raf } = setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    expect(await engine.layers.mergeVisibleRasterLayers()).toBe('merged');
+    const firstId = engine.document.getDocument()!.layers[0]!.id;
+    expect(await engine.layers.mergeVisibleRasterLayers()).toBe('merged');
+    const layers = engine.document.getDocument()!.layers;
+    expect(layers).toHaveLength(5);
+    expect(layers[0]!.id).not.toBe(firstId);
+    expect(layers[1]!.id).toBe(firstId);
+    expect(layers.slice(2).map((layer) => layer.id)).toEqual(['upper', 'mid-mask', 'below']);
+
+    engine.lifecycle.dispose();
+  });
+
+  it('undoes and redoes only the generated layer', async () => {
+    const { engine, raf } = setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const before = engine.document.getDocument()!;
+
+    expect(await engine.layers.mergeVisibleRasterLayers()).toBe('merged');
+    const merged = engine.document.getDocument()!.layers[0]!;
+
+    engine.history.undo();
+    expect(engine.document.getDocument()!.layers).toEqual(before.layers);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(before.selectedLayerId);
+
+    engine.history.redo();
+    expect(engine.document.getDocument()!.layers[0]).toEqual(merged);
+    expect(engine.document.getDocument()!.layers.slice(1)).toEqual(before.layers);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(merged.id);
 
     engine.lifecycle.dispose();
   });
@@ -5773,7 +5891,7 @@ describe('mergeVisibleRasterLayers', () => {
       identity: { kind: 'filter', layerId: 'upper', projectId: engine.projectId },
     });
 
-    expect(engine.layers.mergeVisibleRasterLayers()).toBe('nothing');
+    expect(await engine.layers.mergeVisibleRasterLayers()).toBe('busy');
     expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(['upper', 'mid-mask', 'below']);
     expect(getCanvasOperations(engine).controller.getSnapshot()).toMatchObject({
       identity: { kind: 'filter' },
@@ -5781,11 +5899,11 @@ describe('mergeVisibleRasterLayers', () => {
     });
 
     session?.cancel();
-    expect(engine.layers.mergeVisibleRasterLayers()).toBe('merged');
+    expect(await engine.layers.mergeVisibleRasterLayers()).toBe('merged');
     engine.lifecycle.dispose();
   });
 
-  it('folds an all-empty run trivially instead of stalling on a half-merged stack (F4)', async () => {
+  it('returns nothing for empty raster layers and preserves them', async () => {
     const base = twoPaintDoc();
     const doc: CanvasDocumentContractV2 = {
       ...base,
@@ -5800,11 +5918,8 @@ describe('mergeVisibleRasterLayers', () => {
     raf.flush();
 
     expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(['upper', 'below']);
-    // The topmost (only) run is two empty rasters: the fold trivially collapses them
-    // into one empty layer rather than reporting a silent no-op.
-    expect(engine.layers.mergeVisibleRasterLayers()).toBe('merged');
-    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(['below']);
-    expect(engine.layers.mergeVisibleRasterLayers()).toBe('nothing');
+    expect(await engine.layers.mergeVisibleRasterLayers()).toBe('nothing');
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(['upper', 'below']);
 
     engine.lifecycle.dispose();
   });

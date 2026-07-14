@@ -199,10 +199,13 @@ const GroupActions = ({
   const addLayer = useAddLayer();
   const projectName = useActiveProjectName();
   const allVisible = isGroupAllVisible(groupLayers);
-  // Enablement uses the SAME planner the engine op executes (`planMergeVisibleRuns`
-  // over the GLOBAL array — run-splitting depends on interleaved non-participants),
-  // so the button is enabled exactly when clicking it will merge something.
-  const canMerge = !editingLocked && !!engine && groupKey === 'raster' && canMergeVisibleRasters(layers);
+  // Enablement and execution share the same contributor selector and the
+  // engine's live-content predicate, so empty paint layers do not enable an op.
+  const canMerge =
+    !editingLocked &&
+    !!engine &&
+    groupKey === 'raster' &&
+    canMergeVisibleRasters(layers, engine.exports.hasExportableLayerContent);
   const canExport = !!engine && groupKey === 'raster' && canExportRasterPsd(layers);
 
   const handleNew = useCallback(() => addLayer(groupAddItemId(groupKey)), [addLayer, groupKey]);
@@ -219,14 +222,14 @@ const GroupActions = ({
   }, [dispatch, engine, groupLayers, t]);
 
   const handleMergeVisible = useCallback(() => {
-    // The engine folds ALL visible mergeable rasters (reorder + merge per step)
-    // and pre-flights every participant before touching pixels; 'not-ready'
-    // means a cache is still decoding — nothing was merged, so tell the user
-    // instead of silently half-working. Engine pixel work: not undoable,
-    // mirroring the per-row "merge down".
-    if (engine?.layers.mergeVisibleRasterLayers() === 'not-ready') {
-      toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
+    if (!engine) {
+      return;
     }
+    void engine.layers.mergeVisibleRasterLayers().then((result) => {
+      if (result === 'not-ready') {
+        toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
+      }
+    });
   }, [engine, t]);
 
   const handleExportPsd = useCallback(() => {

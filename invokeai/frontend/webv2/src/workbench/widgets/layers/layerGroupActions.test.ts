@@ -117,5 +117,5 @@ describe('planGroupVisibilityToggle', () => {
   });
 });
 
-// Merge-visible enablement + fold planning is tested where it lives:
-// `canvas-engine/document/mergeVisible.test.ts` (the planner the engine op runs).
+// Merge-visible contributor selection is tested where it lives:
+// `canvas-engine/document/mergeVisible.test.ts` (the selector the engine op runs).

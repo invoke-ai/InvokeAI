@@ -87,6 +87,6 @@ export const planGroupVisibilityToggle = (
   };
 };
 
-// Merge-visible enablement + fold planning lives in the engine's document layer
-// (`@workbench/canvas-engine/document/mergeVisible`) — the SAME planner the engine
-// op executes, so the button and the fold can never disagree.
+// Merge-visible contributor selection lives in the engine's document layer
+// (`@workbench/canvas-engine/document/mergeVisible`) so button enablement and
+// execution use the same legacy-parity eligibility rules.

@@ -174,12 +174,12 @@ export interface FilterPreviewInput {
 }
 
 /**
- * Result of {@link CanvasEngineLayerCapability.mergeVisibleRasterLayers}: `'merged'` when the
- * fold ran, `'not-ready'` when a participant's cache is still decoding/stale (the
- * whole op was refused — surface feedback), `'nothing'` when there was nothing to
- * merge.
+ * Result of {@link CanvasEngineLayerCapability.mergeVisibleRasterLayers}: `'merged'` when a new
+ * composite layer was inserted, `'not-ready'` when a contributor could not be
+ * rasterized consistently, `'busy'` when another edit owns the document, and
+ * `'nothing'` when fewer than two visible rasters have content.
  */
-export type MergeVisibleResult = 'merged' | 'not-ready' | 'nothing';
+export type MergeVisibleResult = 'merged' | 'not-ready' | 'busy' | 'nothing';
 
 export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclude';
 export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty';
@@ -317,7 +317,7 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   copyLayerToRaster(layerId: string): Promise<string | null>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
   mergeLayerDown(upperLayerId: string): boolean;
-  mergeVisibleRasterLayers(): MergeVisibleResult;
+  mergeVisibleRasterLayers(): Promise<MergeVisibleResult>;
   nudgeSelectedLayer(dx: number, dy: number): void;
   openTextCreate(docPoint: Vec2): void;
   openTextEdit(layerId: string): void;
@@ -2454,7 +2454,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     layerController.extractMaskedArea.extract(maskLayerId);
 
   const mergeLayerDown = (upperLayerId: string): boolean => layerController.merge.mergeDown(upperLayerId);
-  const mergeVisibleRasterLayers = (): MergeVisibleResult => layerController.merge.mergeVisible();
+  const mergeVisibleRasterLayers = (): Promise<MergeVisibleResult> => layerController.merge.mergeVisible();
 
   /**
    * Rasterizes a layer to its cache for PSD export and returns the surface + its
@@ -2773,14 +2773,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     merge: {
       backend,
       canEdit: () => canEditDocument(),
+      capturePermit: () => captureDocumentEditPermit(),
+      createLayerId,
       dispatch: (action) => store.dispatch(action),
+      dispatchPrepared: dispatchPreparedMutation,
       endBurst: () => endNudgeBurst(),
+      exportBaked: (layerId) => exportBakedLayerPixels(layerId),
       getDocument: () => mirror.getDocument(),
+      getReducerDocument,
+      hasExportableContent: hasExportableLayerContent,
+      history,
+      installPrepared: (prepared) =>
+        installGeneratedPaintCache(prepared as ReturnType<LayerCacheStore['prepareReplacement']>),
       isCacheReady: isLayerCacheReadyForOp,
       isGestureActive: () => pipeline.isGestureActive(),
+      isGuardCurrent: isLayerExportGuardCurrent,
+      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
+      preparePixels: prepareGeneratedPaintCache,
     },
     rasterize: {
       backend,
