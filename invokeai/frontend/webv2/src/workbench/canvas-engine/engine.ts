@@ -3681,7 +3681,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngine => {
     }
     filterMakeDurable = makeImageDurable;
     const result = await session.commit(target);
-    if (canvasOperations.getSnapshot().status === 'idle' && filterSession === session) {
+    if (result === 'committed' && filterSession === session) {
       clearOwnedFilterSession();
     }
     return result;

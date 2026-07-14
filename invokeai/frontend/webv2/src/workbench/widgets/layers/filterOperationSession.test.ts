@@ -167,7 +167,7 @@ describe('createFilterOperationSession', () => {
   });
 
   it.each(['apply', 'raster', 'control'] as const)(
-    'promotes, commits to %s, and exits after success',
+    'promotes, commits to %s, and leaves the operation for its owner to end',
     async (target) => {
       const calls: string[] = [];
       const deps = createDeps({
@@ -193,6 +193,9 @@ describe('createFilterOperationSession', () => {
           target,
         })
       );
+      expect(session.getSnapshot()).toMatchObject({ error: null, preview: null, status: 'ready' });
+      expect(deps.controller.getSnapshot()).toMatchObject({ identity: { kind: 'filter' }, status: 'active' });
+      session.dispose();
       expect(deps.controller.getSnapshot()).toEqual({ status: 'idle' });
     }
   );

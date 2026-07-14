@@ -10013,6 +10013,33 @@ describe('guarded filter previews', () => {
     engine.dispose();
   });
 
+  it('clears the session and ends the operation after a committed filter commit', async () => {
+    const source = guardableLayer('commit-clear');
+    const document = { ...emptyDoc(), layers: [source], selectedLayerId: source.id };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: filterBitmapBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      filterDeps: {
+        runGraph: () => Promise.resolve({ height: 10, imageName: 'out.png', origin: 'test', output: {}, width: 10 }),
+        uploadIntermediate: () => Promise.resolve({ imageName: 'input.png' }),
+      },
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    expect((await engine.exportLayerPixels(source.id)).status).toBe('ok');
+    expect(engine.startFilterOperation(source.id)).toBe('started');
+    await expect(engine.processFilterOperation()).resolves.toBe('completed');
+
+    await expect(engine.commitFilterOperation('apply', () => Promise.resolve())).resolves.toBe('committed');
+
+    expect(engine.stores.filterSession.get()).toBeNull();
+    expect(engine.canvasOperations.getSnapshot()).toEqual({ status: 'idle' });
+    expect(engine.startFilterOperation(source.id)).toBe('started');
+    engine.dispose();
+  });
+
   it.each(['apply', 'raster'] as const)(
     'rejects a decoded dimension mismatch for canny %s without scaling, then retries successfully',
     async (target) => {

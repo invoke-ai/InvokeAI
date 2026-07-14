@@ -83,6 +83,7 @@ export interface FilterOperationSession {
   process(): Promise<CanvasOperationRunResult>;
   interruptProcessing(): void;
   reset(settings: Record<string, unknown>): void;
+  /** On 'committed' the canvas operation stays active; the owner must dispose the session to end it. */
   commit(target: FilterCommitTarget): Promise<'committed' | 'blocked' | 'stale'>;
   blockCommit(): void;
   cancel(): void;
@@ -281,7 +282,8 @@ export const createFilterOperationSession = (
         target,
       });
       if (result.status === 'committed') {
-        operation.cancel();
+        // The operation stays active: the owner ends it by disposing the
+        // session, keeping teardown out of this call stack.
         publish({ ...state, error: null, preview: null, status: 'ready' });
         return 'committed';
       }
