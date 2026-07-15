@@ -136,8 +136,9 @@ class WanTransformerField(BaseModel):
     )
     loras_low_noise: List[LoRAField] = Field(
         default_factory=list,
-        description="Optional separate LoRAs for the low-noise expert (Wan 2.2 A14B). "
-        "If empty and transformer_low_noise is set, the primary 'loras' list is reused.",
+        description="LoRAs to apply to the low-noise expert (Wan 2.2 A14B). The Wan LoRA loader "
+        "routes 'both'- and 'low'-targeted LoRAs here; if empty, no LoRAs are applied to the "
+        "low-noise expert (a 'high'-targeted LoRA must not leak onto it).",
     )
     boundary_ratio: float = Field(
         default=0.875,

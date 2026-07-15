@@ -73,6 +73,13 @@ class WanLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 if latents.ndim == 4:
                     latents = latents.unsqueeze(2)
 
+                if latents.shape[1] != vae.config.z_dim:
+                    raise ValueError(
+                        f"Latent channel mismatch: these latents have {latents.shape[1]} channels but the "
+                        f"selected VAE expects {vae.config.z_dim}. A14B models need the 16-channel Wan 2.1 "
+                        "VAE; TI2V-5B needs the 48-channel Wan 2.2 VAE."
+                    )
+
                 # Denormalise from denoiser space back to raw VAE space.
                 latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents)
                 latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents)

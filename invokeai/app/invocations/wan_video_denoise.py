@@ -162,8 +162,8 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         spatial_scale = get_spatial_scale_factor(variant)
 
         # Reuse the image denoise's scheduler construction so we pick up whatever
-        # scheduler the variant ships with (FlowMatchEulerDiscreteScheduler,
-        # UniPCMultistepScheduler, etc.).
+        # scheduler the variant ships with (UniPCMultistepScheduler with the
+        # variant's flow_shift, or whatever an on-disk config specifies).
         scheduler_builder = WanDenoiseInvocation._build_scheduler  # bound on instance below
         # Bind a minimal instance to call _build_scheduler — it only reads
         # self.transformer, which is shape-compatible.
@@ -281,8 +281,10 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         num_train_timesteps = int(scheduler.config.num_train_timesteps)
         boundary_timestep = self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
 
+        # No fallback between the LoRA lists — see the matching comment in
+        # wan_denoise: an empty low list means "no LoRAs on the low expert".
         high_loras = self.transformer.loras
-        low_loras = self.transformer.loras_low_noise or self.transformer.loras
+        low_loras = self.transformer.loras_low_noise
         high_config = context.models.get_config(high_model)
         high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
         low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False

@@ -398,10 +398,11 @@ class TestWanDenoiseDualExpert:
         assert len(low.timesteps_seen) == 0
 
     def test_full_low_noise_when_boundary_at_max(self, fake_model_root) -> None:
-        """boundary_ratio=1.0 → boundary_timestep=1000 → almost all steps go to low-noise expert.
+        """boundary_ratio=1.0 → boundary_timestep=1000 → every step goes to the low-noise expert.
 
-        With FlowMatchEuler the first timestep is exactly 1000 so the high-noise
-        expert handles it (>= boundary), and every subsequent timestep is < 1000.
+        The UniPC flow schedule's first timestep is slightly below 1000 (flow sigmas
+        don't start exactly at 1.0), so with the boundary at the maximum no timestep
+        satisfies ``t >= 1000`` and the high-noise expert is never invoked.
         """
         high = _ZeroTransformer(label="high")
         low = _ZeroTransformer(label="low")
@@ -427,10 +428,9 @@ class TestWanDenoiseDualExpert:
 
         inv._run_diffusion(ctx)
 
-        # First step is t==1000 → high. All later steps are < 1000 → low.
-        assert len(high.timesteps_seen) == 1
-        assert high.timesteps_seen[0] == 1000.0
-        assert len(low.timesteps_seen) == 3
+        # All steps are < 1000 → low expert handles the whole schedule.
+        assert len(high.timesteps_seen) == 0
+        assert len(low.timesteps_seen) == 4
 
     def test_cfg_with_dual_experts_doubles_calls_per_step(self, fake_model_root) -> None:
         """With negative conditioning + cfg_scale != 1, every step runs the active expert twice."""
@@ -762,6 +762,67 @@ class TestWanDenoiseInpaint:
         assert torch.isfinite(out).all()
 
 
+class TestLoRAExpertWiring:
+    def test_high_only_loras_do_not_leak_to_low_expert(self, fake_model_root) -> None:
+        """A LoRA routed only to the primary (high-noise) list must not be applied to
+        the low-noise expert (PR #9163 review): the old ``loras_low_noise or loras``
+        fallback silently reused the primary list for the low expert, so an
+        expert-tagged LoRA (e.g. a Lightning high-noise distill) was misapplied and
+        high-only targeting was impossible."""
+        from unittest.mock import patch
+
+        from invokeai.app.invocations.model import LoRAField
+        from invokeai.app.invocations.wan_denoise import _ExpertSwapper  # noqa: F401 (documents the patch target)
+
+        captured: dict = {}
+
+        class _RecordingSwapper:
+            HIGH = "high"
+            LOW = "low"
+
+            def __init__(self, **kwargs) -> None:
+                captured.update(kwargs)
+                self._model = _ZeroTransformer(label="either")
+
+            def get(self, label: str) -> nn.Module:
+                return self._model
+
+            def close(self) -> None:
+                pass
+
+        field = _wan_transformer_field(dual=True)
+        field.loras.append(
+            LoRAField(
+                lora={"key": "l", "hash": "h", "name": "lightning-high", "base": "wan", "type": "lora"},
+                weight=1.0,
+            )
+        )
+        assert field.loras_low_noise == []
+
+        ctx = _build_context(
+            _ZeroTransformer(label="high"),
+            transformer_low=_ZeroTransformer(label="low"),
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        inv = _make_invocation(
+            transformer_field=field,
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=64,
+            height=64,
+            steps=2,
+            guidance_scale=1.0,
+        )
+        with patch("invokeai.app.invocations.wan_denoise._ExpertSwapper", _RecordingSwapper):
+            inv._run_diffusion(ctx)
+
+        assert captured["high_lora_factory"] is not None
+        assert captured["low_lora_factory"] is None
+
+
 class TestDefaultSchedulerForVariant:
     """``_default_scheduler_for_variant`` returns the right class + config when no
     on-disk ``scheduler/`` directory exists (the standalone GGUF / single-file case).
@@ -781,10 +842,19 @@ class TestDefaultSchedulerForVariant:
         assert s.config.use_flow_sigmas is True
         assert s.config.solver_type == "bh2"
 
-    def test_a14b_variants_return_flow_match_euler(self) -> None:
-        from diffusers import FlowMatchEulerDiscreteScheduler
+    def test_a14b_variants_return_unipc_with_flow_shift_3(self) -> None:
+        """Both A14B reference repos (Wan-AI/Wan2.2-{T2V,I2V}-A14B-Diffusers) ship
+        UniPCMultistepScheduler with flow_shift=3.0 — NOT FlowMatchEuler (PR #9163
+        review): an unshifted Euler fallback silently degrades every A14B GGUF render
+        and skews how many steps land above the MoE expert boundary."""
+        from diffusers import UniPCMultistepScheduler
 
         from invokeai.app.invocations.wan_denoise import _default_scheduler_for_variant
 
         for v in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B):
-            assert isinstance(_default_scheduler_for_variant(v), FlowMatchEulerDiscreteScheduler)
+            s = _default_scheduler_for_variant(v)
+            assert isinstance(s, UniPCMultistepScheduler)
+            assert s.config.flow_shift == 3.0
+            assert s.config.prediction_type == "flow_prediction"
+            assert s.config.use_flow_sigmas is True
+            assert s.config.solver_type == "bh2"

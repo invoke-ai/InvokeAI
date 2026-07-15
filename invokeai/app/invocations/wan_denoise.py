@@ -90,24 +90,22 @@ def _default_scheduler_for_variant(variant: WanVariantType):
     verbatim from each variant's ``scheduler/scheduler_config.json`` in the
     matching ``Wan-AI/Wan2.2-*-Diffusers`` repo.
     """
-    from diffusers import FlowMatchEulerDiscreteScheduler, UniPCMultistepScheduler
+    from diffusers import UniPCMultistepScheduler
 
-    if variant == WanVariantType.TI2V_5B:
-        # Wan-AI/Wan2.2-TI2V-5B-Diffusers/scheduler/scheduler_config.json. The
-        # combination of flow_prediction + use_flow_sigmas + flow_shift=5.0 is
-        # what differentiates this from a generic UniPC schedule; without it
-        # samples drift on this model.
-        return UniPCMultistepScheduler(
-            num_train_timesteps=1000,
-            solver_order=2,
-            prediction_type="flow_prediction",
-            flow_shift=5.0,
-            use_flow_sigmas=True,
-            solver_type="bh2",
-            final_sigmas_type="zero",
-        )
-    # A14B variants ship FlowMatchEulerDiscreteScheduler at default settings.
-    return FlowMatchEulerDiscreteScheduler()
+    # Both Wan 2.2 families ship UniPCMultistepScheduler with flow_prediction +
+    # use_flow_sigmas; only the exponential flow_shift differs (5.0 for TI2V-5B,
+    # 3.0 for the A14B pair). Without these settings samples drift — an unshifted
+    # schedule also skews how many A14B steps land above the MoE expert boundary.
+    flow_shift = 5.0 if variant == WanVariantType.TI2V_5B else 3.0
+    return UniPCMultistepScheduler(
+        num_train_timesteps=1000,
+        solver_order=2,
+        prediction_type="flow_prediction",
+        flow_shift=flow_shift,
+        use_flow_sigmas=True,
+        solver_type="bh2",
+        final_sigmas_type="zero",
+    )
 
 
 class _ExpertSwapper:
@@ -272,9 +270,9 @@ class _ExpertSwapper:
 class WanDenoiseInvocation(BaseInvocation):
     """Run the denoising process with a Wan 2.2 model.
 
-    Drives a flow-matching Euler schedule via Diffusers'
-    ``FlowMatchEulerDiscreteScheduler``. CFG is supported when negative
-    conditioning is provided and ``guidance_scale != 1.0``.
+    Drives the flow-matching schedule the model ships with (UniPC with flow
+    sigmas for the Wan 2.2 reference repos; see ``_build_scheduler``). CFG is
+    supported when negative conditioning is provided and ``guidance_scale != 1.0``.
 
     For Wan 2.2 A14B the high-noise expert handles timesteps at and above
     ``boundary_ratio * num_train_timesteps``; the low-noise expert handles
@@ -503,12 +501,16 @@ class WanDenoiseInvocation(BaseInvocation):
         boundary_timestep = self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
 
         # LoRA wiring. The high-noise expert uses ``transformer.loras``; the
-        # low-noise expert uses ``transformer.loras_low_noise``, falling back
-        # to the primary list if empty (matches the WanTransformerField semantics).
+        # low-noise expert uses ``transformer.loras_low_noise``. No fallback
+        # between the lists: the Wan LoRA loader routes untagged LoRAs to both
+        # and expert-tagged LoRAs to exactly one, so an empty low list means
+        # "no LoRAs on the low expert" — reusing the primary list here would
+        # silently apply high-expert-only LoRAs (e.g. Lightning high-noise
+        # distills) to the wrong expert.
         # Quantized (GGUF) experts force sidecar patching so GGMLTensor weights
         # aren't touched directly.
         high_loras = self.transformer.loras
-        low_loras = self.transformer.loras_low_noise or self.transformer.loras
+        low_loras = self.transformer.loras_low_noise
         high_config = context.models.get_config(high_model)
         high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
         low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
@@ -603,42 +605,38 @@ class WanDenoiseInvocation(BaseInvocation):
     def _build_scheduler(self, context: InvocationContext, device: torch.device):
         """Construct the scheduler matching the model's on-disk ``scheduler_config.json``.
 
-        Wan model variants ship different schedulers — e.g. TI2V-5B uses
-        ``UniPCMultistepScheduler`` with ``flow_shift=5.0``, while the
-        standard A14B reference uses ``FlowMatchEulerDiscreteScheduler``.
-        We dispatch on ``_class_name`` so the noise schedule matches what the
-        model was trained against. When no on-disk config is available
-        (standalone GGUF / single-file installs that don't ship a
-        ``scheduler/`` directory), fall back to a variant-aware default —
-        TI2V-5B gets its UniPC scheduler with the right flow params instead
-        of the generic FlowMatchEuler, which otherwise produces drifty
-        samples for that model.
+        All Wan 2.2 variants ship ``UniPCMultistepScheduler`` with flow-matching
+        settings, but with different exponential shifts (TI2V-5B: ``flow_shift=5.0``,
+        A14B: ``3.0``) — and future variants may differ further, so when a
+        ``scheduler/`` directory exists we dispatch on its ``_class_name`` and load
+        it verbatim. When no on-disk config is available (standalone GGUF /
+        single-file installs don't ship one) — or the config is unreadable — fall
+        back to the variant-aware default so the noise schedule still matches what
+        the model was trained against.
         """
         import json
 
         import diffusers
-        from diffusers import FlowMatchEulerDiscreteScheduler
 
         scheduler_dir = _scheduler_path_for_transformer(context, self.transformer)
-        if scheduler_dir is None:
+        scheduler_cls = None
+        if scheduler_dir is not None:
+            # Read the on-disk class name and instantiate that class. Diffusers'
+            # SchedulerMixin.from_pretrained does class dispatch internally, but
+            # only when called from the abstract base; calling a concrete subclass
+            # silently builds the wrong type. Resolve it explicitly.
+            config_path = scheduler_dir / "scheduler_config.json"
+            try:
+                with config_path.open("r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                class_name = cfg.get("_class_name")
+                scheduler_cls = getattr(diffusers, class_name, None) if class_name else None
+            except (OSError, json.JSONDecodeError):
+                scheduler_cls = None
+
+        if scheduler_dir is None or scheduler_cls is None:
             variant = _resolve_variant(context, self.transformer)
             return _default_scheduler_for_variant(variant)
-
-        # Read the on-disk class name and instantiate that class. Diffusers'
-        # SchedulerMixin.from_pretrained does class dispatch internally, but
-        # only when called from the abstract base; calling a concrete subclass
-        # silently builds the wrong type. Resolve it explicitly.
-        config_path = scheduler_dir / "scheduler_config.json"
-        try:
-            with config_path.open("r", encoding="utf-8") as f:
-                cfg = json.load(f)
-            class_name = cfg.get("_class_name")
-            scheduler_cls = getattr(diffusers, class_name, None) if class_name else None
-        except (OSError, json.JSONDecodeError):
-            scheduler_cls = None
-
-        if scheduler_cls is None:
-            scheduler_cls = FlowMatchEulerDiscreteScheduler
 
         return scheduler_cls.from_pretrained(str(scheduler_dir), local_files_only=True)
 
