@@ -1326,12 +1326,16 @@ async def get_stats() -> Optional[CacheStats]:
 
     aggregate = CacheStats()
     for stats in stats_list:
+        # Per-cache event counters: sum across caches.
         aggregate.hits += stats.hits
         aggregate.misses += stats.misses
-        aggregate.high_watermark += stats.high_watermark
         aggregate.in_cache += stats.in_cache
         aggregate.cleared += stats.cleared
-        aggregate.cache_size += stats.cache_size
+        # cache_size and high_watermark are already system-wide values: every per-device cache
+        # shares one global RamBudget, so each reports the same global capacity and observes the
+        # same global usage. Summing them would over-report an N-GPU system ~N times; take the max.
+        aggregate.high_watermark = max(aggregate.high_watermark, stats.high_watermark)
+        aggregate.cache_size = max(aggregate.cache_size, stats.cache_size)
         aggregate.loaded_model_sizes.update(stats.loaded_model_sizes)
     return aggregate
 

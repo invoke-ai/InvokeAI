@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     GB,
     MIN_RAM_CACHE_BYTES,
@@ -165,6 +166,35 @@ def test_headroom_clamps_summed_multi_gpu_budget():
     clamped = min(summed, headroom)
     assert clamped == headroom < summed
     assert clamped == 46 * GB
+
+
+def test_cache_stats_reflect_shared_global_budget(mock_logger):
+    """Two distinct caches attached to the same RamBudget report system-wide stats: each cache's
+    cache_size is the SAME single global limit, and each high_watermark observes the SAME global
+    usage. An aggregator must therefore take the max of these fields — summing them would report
+    an N-GPU system's capacity and high-water usage N times too large."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 10), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.stats = CacheStats()
+        cache_b.stats = CacheStats()
+        # Each per-device cache reports the shared global capacity, not a per-device slice.
+        assert cache_a.stats.cache_size == budget.max_bytes
+        assert cache_b.stats.cache_size == budget.max_bytes
+
+        cache_a.put("m", DummyModule())
+        cache_b.put("m", DummyModule())
+        cache_a.get("m")
+        cache_b.get("m")
+        # Both watermarks sample the same deduplicated global usage (S, counted once), so the true
+        # system high watermark is their max — not their sum.
+        assert cache_a.stats.high_watermark == S
+        assert cache_b.stats.high_watermark == S
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
 
 
 def test_eviction_cannot_free_ram_held_by_another_device(mock_logger):

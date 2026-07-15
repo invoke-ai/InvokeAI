@@ -120,6 +120,50 @@ def test_invalidate_forgets_key_and_submodels():
     assert store.refcount("other") == 1
 
 
+def test_invalidated_entry_counts_against_budget_until_released():
+    """Invalidation must not undercount RAM: a retired canonical still referenced by a locked
+    cached model stays resident, so if a replacement is registered before the holder releases,
+    BOTH copies must be counted — otherwise the budget admits models past `max_cache_ram_gb`."""
+    store = SharedCpuWeightsStore()
+    old = _state_dict()
+    store.acquire("k", old)  # 420 bytes, held by a (conceptually locked) cached model
+    assert store.total_bytes_in_use() == 420
+
+    # A load-affecting setting change invalidates the key while the holder is still using it.
+    assert store.invalidate("k") == 1
+    assert "k" not in store
+    # The retired tensors are still resident and must still be counted.
+    assert store.total_bytes_in_use() == 420
+    assert store.retired_bytes() == 420
+
+    # Another device rebuilds the model under the same key: both copies are resident.
+    new = _state_dict()
+    store.acquire("k", new)
+    assert store.total_bytes_in_use() == 840
+
+    # The stale holder finally unlocks and releases its retired reference: only now does the
+    # retired copy stop counting.
+    store.release("k", old)
+    assert store.retired_bytes() == 0
+    assert store.total_bytes_in_use() == 420
+    assert store.refcount("k") == 1
+
+
+def test_invalidated_entry_with_multiple_holders_counts_until_last_release():
+    store = SharedCpuWeightsStore()
+    old = _state_dict()
+    store.acquire("k", old)
+    store.acquire("k", old)  # two devices hold the same canonical
+    store.invalidate("k")
+
+    store.release("k", old)
+    # One holder remains: the retired copy is still resident.
+    assert store.total_bytes_in_use() == 420
+
+    store.release("k", old)
+    assert store.total_bytes_in_use() == 0
+
+
 def test_release_with_identity_mismatch_is_noop():
     """A holder of an invalidated canonical must not decrement a NEW canonical registered under
     the same key after the invalidation — that would free weights still aliased by live models."""

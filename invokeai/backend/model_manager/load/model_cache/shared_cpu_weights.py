@@ -51,6 +51,12 @@ class SharedCpuWeightsStore:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._entries: dict[str, _SharedWeightsEntry] = {}
+        # Entries forgotten by `invalidate()` while still referenced by live cached models (e.g. a
+        # locked, stale-marked cache entry mid-generation). They can no longer be acquired or peeked,
+        # but their tensors are still resident, so `total_bytes_in_use()` keeps counting them until
+        # every holder calls `release()`. Matched by state-dict identity, not key: a replacement
+        # canonical may exist under the same key at the same time.
+        self._retired: list[_SharedWeightsEntry] = []
         # Whether to capture per-model meta-weight shells for cross-device adoption. Only useful with
         # more than one device cache, so the model manager disables it in single-device setups to
         # avoid the (small) per-first-load clone cost. See ModelLoader._build_meta_shell.
@@ -116,17 +122,26 @@ class SharedCpuWeightsStore:
         current canonical. This protects against a holder of an `invalidate()`d entry releasing
         after a new canonical has been registered under the same key: without the identity check,
         that stale release would decrement the new entry's refcount and could free weights still
-        aliased by live cached models.
+        aliased by live cached models. Such a release instead matches the retired entry (by
+        state-dict identity), decrementing it so its bytes stop being counted once the last holder
+        lets go.
         """
         with self._lock:
             entry = self._entries.get(key)
-            if entry is None:
+            if entry is not None and (state_dict is None or entry.state_dict is state_dict):
+                entry.refcount -= 1
+                if entry.refcount <= 0:
+                    del self._entries[key]
                 return
-            if state_dict is not None and entry.state_dict is not state_dict:
-                return
-            entry.refcount -= 1
-            if entry.refcount <= 0:
-                del self._entries[key]
+            # Not the live canonical for `key` — it may be a retired (invalidated) entry whose
+            # tensors are still being counted against the RAM budget.
+            if state_dict is not None:
+                for i, retired in enumerate(self._retired):
+                    if retired.state_dict is state_dict:
+                        retired.refcount -= 1
+                        if retired.refcount <= 0:
+                            del self._retired[i]
+                        return
 
     def invalidate(self, model_key: str) -> int:
         """Forget the canonical entries (and shells) for `model_key` and all of its submodels, so no
@@ -135,15 +150,19 @@ class SharedCpuWeightsStore:
         Used when a load-affecting model setting changes: the canonical weights were built under the
         old settings and must not be re-adopted by any device's next load, even while a locked (in
         use, marked-stale) cache entry still aliases them. The forgotten tensors stay alive through
-        the cached models that hold them and are garbage-collected as those are evicted; their later
-        `release()` calls become identity-mismatched no-ops (see `release()`). Until then,
-        `total_bytes_in_use()` no longer counts the retired weights.
+        the cached models that hold them and are garbage-collected as those are evicted. Entries
+        that are still referenced are moved to a retired list so `total_bytes_in_use()` keeps
+        counting them — if a replacement is registered before the stale holders unlock, both copies
+        really are resident, and the RAM budget must see both. Each holder's later `release()`
+        matches the retired entry by state-dict identity and frees its accounting (see `release()`).
         """
         prefix = f"{model_key}:"
         with self._lock:
             doomed = [key for key in self._entries if key == model_key or key.startswith(prefix)]
             for key in doomed:
-                del self._entries[key]
+                entry = self._entries.pop(key)
+                if entry.refcount > 0:
+                    self._retired.append(entry)
             return len(doomed)
 
     # -- Introspection / accounting (also used by tests) ----------------------------------------
@@ -159,13 +178,21 @@ class SharedCpuWeightsStore:
             return entry.refcount if entry is not None else 0
 
     def total_bytes_in_use(self) -> int:
-        """Return the total size (in bytes) of all canonical state dicts currently held.
+        """Return the total size (in bytes) of all canonical state dicts currently held, including
+        retired (invalidated but still referenced) entries whose tensors remain resident.
 
         This counts each shared model's weights exactly once, regardless of how many devices alias
         it — i.e. the true RAM footprint of cached weights, not the per-device double-count.
         """
         with self._lock:
-            return sum(entry.total_bytes for entry in self._entries.values())
+            return sum(entry.total_bytes for entry in self._entries.values()) + sum(
+                entry.total_bytes for entry in self._retired
+            )
+
+    def retired_bytes(self) -> int:
+        """Return the total size (in bytes) of retired (invalidated but still referenced) entries."""
+        with self._lock:
+            return sum(entry.total_bytes for entry in self._retired)
 
     def keys(self) -> list[str]:
         with self._lock:

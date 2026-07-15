@@ -204,14 +204,18 @@ def _make_stats_services(ram_caches: dict) -> Any:
 
 def test_get_stats_aggregates_per_device_caches(monkeypatch: Any, client: TestClient) -> None:
     """In multi-GPU mode there is one cache per device; the stats endpoint must not report only
-    the API thread's default cache."""
+    the API thread's default cache. All per-device caches share one global RamBudget, so each
+    cache's cache_size is the SAME global capacity and its high_watermark observes the SAME global
+    usage — the aggregate must not multiply those system-wide values by the number of caches."""
     from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 
     class _Cache:
         def __init__(self, stats: CacheStats | None) -> None:
             self.stats = stats
 
-    stats_0 = CacheStats(hits=3, misses=1, in_cache=2, cleared=1, cache_size=100, high_watermark=80)
+    # Both caches report the shared global capacity (200). Their high watermarks sample the same
+    # global usage at different moments, so the true system high watermark is the max (120).
+    stats_0 = CacheStats(hits=3, misses=1, in_cache=2, cleared=1, cache_size=200, high_watermark=80)
     stats_0.loaded_model_sizes = {"m1": 50}
     stats_1 = CacheStats(hits=5, misses=2, in_cache=1, cleared=0, cache_size=200, high_watermark=120)
     stats_1.loaded_model_sizes = {"m2": 70}
@@ -228,8 +232,8 @@ def test_get_stats_aggregates_per_device_caches(monkeypatch: Any, client: TestCl
     assert payload["misses"] == 3
     assert payload["in_cache"] == 3
     assert payload["cleared"] == 1
-    assert payload["cache_size"] == 300
-    assert payload["high_watermark"] == 200
+    assert payload["cache_size"] == 200
+    assert payload["high_watermark"] == 120
     assert payload["loaded_model_sizes"] == {"m1": 50, "m2": 70}
 
 

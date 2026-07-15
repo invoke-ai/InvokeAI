@@ -309,6 +309,23 @@ def test_update_runtime_config_rejects_unavailable_generation_device(
     assert get_config().generation_devices == devices_before
 
 
+def test_update_runtime_config_rejects_unavailable_mps_device(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """'mps' passes the string-pattern validator, but on a system without MPS (e.g. Linux, or an
+    unsupported macOS build) it must be rejected with a 422 before anything is persisted — same as
+    a nonexistent CUDA device."""
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr(app_info.torch.backends.mps, "is_available", lambda: False)
+    devices_before = get_config().generation_devices
+
+    response = client.patch("/api/v1/app/runtime_config", json={"generation_devices": ["mps"]})
+
+    assert response.status_code == 422
+    assert "MPS is not available" in response.json()["detail"]
+    assert get_config().generation_devices == devices_before
+
+
 def test_get_generation_device_options_lists_devices(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient
 ) -> None:

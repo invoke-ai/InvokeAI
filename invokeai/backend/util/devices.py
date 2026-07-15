@@ -223,6 +223,8 @@ class TorchDevice:
                         f"generation_devices requested '{device_str}', but only {torch.cuda.device_count()} "
                         f"CUDA device(s) are available (valid indices 0-{torch.cuda.device_count() - 1})."
                     )
+            elif device.type == "mps" and not torch.backends.mps.is_available():
+                raise ValueError(f"generation_devices requested '{device_str}', but MPS is not available.")
             if str(device) not in seen:
                 seen.add(str(device))
                 devices.append(device)

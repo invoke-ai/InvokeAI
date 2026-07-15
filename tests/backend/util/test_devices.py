@@ -309,3 +309,16 @@ def test_get_generation_devices_accepts_in_range_cuda(mock_avail, mock_count):
 def test_get_generation_devices_rejects_cuda_when_unavailable(mock_avail):
     with pytest.raises(ValueError, match="no CUDA"):
         TorchDevice.get_generation_devices(["cuda:0"])
+
+
+@patch("torch.backends.mps.is_available", return_value=False)
+def test_get_generation_devices_rejects_mps_when_unavailable(mock_mps):
+    # e.g. Linux, or an unsupported macOS build — fail fast instead of starting a worker and cache
+    # pinned to a device that only errors at the first tensor operation.
+    with pytest.raises(ValueError, match="MPS is not available"):
+        TorchDevice.get_generation_devices(["mps"])
+
+
+@patch("torch.backends.mps.is_available", return_value=True)
+def test_get_generation_devices_accepts_mps_when_available(mock_mps):
+    assert [str(d) for d in TorchDevice.get_generation_devices(["mps"])] == ["mps"]
