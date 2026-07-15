@@ -68,6 +68,27 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   const completedInvocationKeysByItemId = new Map<number, Set<string>>();
   const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeysByItemId);
+
+  /**
+   * In multiuser mode, admins are subscribed to the "admin" socket room and therefore receive
+   * invocation and queue item events for *every* user, carrying that user's real user_id. Those
+   * events describe another user's session and must not drive this client's local state: the
+   * workflow execution coordinator, node execution states, canvas workflow integration processing,
+   * completed-invocation bookkeeping, or $lastProgressEvent. The check must happen here, at the
+   * listener, because the coordinator records the event before any downstream handler runs.
+   *
+   * Only gate this when we actually know who is logged in. In single-user mode there is no
+   * authenticated user (selectCurrentUser is null) and every event is the local user's own, so we
+   * fall through and preserve the original behavior.
+   */
+  const isForAnotherUser = (data: { user_id?: string | null }): boolean => {
+    const currentUser = selectCurrentUser(getState());
+    if (!currentUser) {
+      return false;
+    }
+    return data.user_id !== currentUser.user_id;
+  };
+
   const workflowExecutionCoordinator = createWorkflowExecutionCoordinator({
     clearCanvasWorkflowIntegrationProcessing: () => dispatch(canvasWorkflowIntegrationProcessingCompleted()),
     completedInvocationKeysByItemId,
@@ -180,12 +201,20 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_started', (data) => {
+    if (isForAnotherUser(data)) {
+      log.trace({ data } as JsonObject, `Ignoring invocation_started for another user (${data.user_id})`);
+      return;
+    }
     const { invocation_source_id, invocation } = data;
     log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
     workflowExecutionCoordinator.onInvocationStarted(data);
   });
 
   socket.on('invocation_progress', (data) => {
+    if (isForAnotherUser(data)) {
+      log.trace({ data } as JsonObject, `Ignoring invocation_progress for another user (${data.user_id})`);
+      return;
+    }
     if (!workflowExecutionCoordinator.onInvocationProgress(data)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
@@ -207,12 +236,20 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_error', (data) => {
+    if (isForAnotherUser(data)) {
+      log.trace({ data } as JsonObject, `Ignoring invocation_error for another user (${data.user_id})`);
+      return;
+    }
     const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
     workflowExecutionCoordinator.onInvocationError(data);
   });
 
   socket.on('invocation_complete', (data) => {
+    if (isForAnotherUser(data)) {
+      log.trace({ data } as JsonObject, `Ignoring invocation_complete for another user (${data.user_id})`);
+      return;
+    }
     workflowExecutionCoordinator.onInvocationComplete(data);
   });
 
@@ -426,13 +463,20 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
-    // Sanitized companion event sent to non-owner queue subscribers in multiuser mode. The
-    // backend sets user_id="redacted" and clears identifiers/error fields. We must not run
-    // payload-driven cache mutations or per-session side effects (node state reset, progress
-    // clear, completion bookkeeping) — those belong to the owner. Just invalidate queue tags
-    // so the non-owner's queue list and badge counts refetch with sanitized data.
-    if (data.user_id === 'redacted') {
-      log.trace({ data }, `Sanitized queue_item_status_changed for item ${data.item_id}`);
+    // Two kinds of non-owner event land here in multiuser mode:
+    //
+    // 1. The sanitized companion the backend broadcasts to other queue subscribers, with
+    //    user_id="redacted" and identifiers/error fields cleared.
+    // 2. Another user's *full* event, received by admins via the "admin" room (the backend skips
+    //    owner and admin sids when broadcasting the sanitized companion, so admins only ever get
+    //    the full one).
+    //
+    // In neither case may we run payload-driven cache mutations or per-session side effects — node
+    // state reset, progress clear, completion bookkeeping, workflow reconciliation, or the failure
+    // toast — those belong to the owner. Just invalidate queue tags so the non-owner's queue list
+    // and badge counts refetch.
+    if (data.user_id === 'redacted' || isForAnotherUser(data)) {
+      log.trace({ data }, `Non-owner queue_item_status_changed for item ${data.item_id}`);
       const tags: ApiTagDescription[] = [
         'SessionQueueStatus',
         'SessionQueueItemIdList',
