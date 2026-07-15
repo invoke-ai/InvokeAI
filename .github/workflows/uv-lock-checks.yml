@@ -1,6 +1,9 @@
 # Check the `uv` lockfile for consistency with `pyproject.toml`.
 #
 # If this check fails, you should run `uv lock` to update the lockfile.
+#
+# Also checks that dependencies resolve for linux/aarch64, which no test job
+# exercises. This is resolution-only and needs no ARM hardware.
 
 name: 'uv lock checks'
 
@@ -65,4 +68,17 @@ jobs:
       - name: check lockfile
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
         run: uv lock --locked # this will exit with 1 if the lockfile is not consistent with pyproject.toml
+        shell: bash
+
+      - name: check aarch64 resolution
+        if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
+        # On linux/aarch64, torch/torchvision must fall back to PyPI (the PyTorch WHL
+        # indexes have no aarch64 torchvision wheels); the platform markers in
+        # pyproject.toml that make this work are easy to silently break with a
+        # dependency bump. Resolve each torch extra for aarch64 to catch that.
+        # manylinux_2_28 matches the glibc floor of the torch/onnxruntime aarch64 wheels.
+        run: |
+          for extra in cpu cuda rocm; do
+            uv pip compile pyproject.toml --extra $extra --python-platform aarch64-manylinux_2_28 --python-version 3.12 > /dev/null
+          done
         shell: bash
