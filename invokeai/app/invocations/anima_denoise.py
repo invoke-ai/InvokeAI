@@ -381,6 +381,33 @@ class AnimaDenoiseInvocation(BaseInvocation):
             generator=torch.Generator(device=rand_device).manual_seed(seed),
         ).to(device=device, dtype=dtype)
 
+    @staticmethod
+    def _compute_img_token_grid(height: int, width: int, patch_size: int = 2) -> tuple[int, int]:
+        """Compute the (height, width) of the image token grid for regional prompting.
+
+        Anima uses 8x VAE compression and a 2x DiT patch size (16x total). The mask's
+        token grid must match the token grid the transformer actually produces.
+
+        Ceiling division mirrors the transformer's MiniTrainDIT._pad_to_patch_size, which
+        pads the latent H/W up to a multiple of patch_size BEFORE patchifying. An odd latent
+        dimension (e.g. 1080 // 8 = 135) is padded up (135 -> 136 -> 68 tokens); floor
+        division here would size the mask for one fewer token row/column than the transformer
+        produces, causing a cross-attention mask shape mismatch during regional prompting.
+
+        Args:
+            height: Image height in pixels.
+            width: Image width in pixels.
+            patch_size: DiT spatial patch size (patch_spatial).
+
+        Returns:
+            Tuple of (img_token_height, img_token_width).
+        """
+        latent_height = height // ANIMA_LATENT_SCALE_FACTOR
+        latent_width = width // ANIMA_LATENT_SCALE_FACTOR
+        img_token_height = math.ceil(latent_height / patch_size)
+        img_token_width = math.ceil(latent_width / patch_size)
+        return img_token_height, img_token_width
+
     def _get_sigmas(self, num_steps: int) -> list[float]:
         """Generate sigma schedule with fixed shift=3.0.
 
@@ -523,19 +550,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
         transformer_info = context.models.load(self.transformer.transformer)
 
         # Compute image token grid dimensions for regional prompting
-        # Anima: 8x VAE compression, 2x patch size → 16x total
-        #
-        # Use ceiling division to mirror the transformer's MiniTrainDIT._pad_to_patch_size,
-        # which pads the latent H/W up to a multiple of patch_spatial BEFORE patchifying.
-        # An odd latent dimension (e.g. 1080 // 8 = 135) is padded up (135 -> 136 -> 68
-        # tokens), so floor division here would build a mask sized for one fewer token row
-        # or column than the transformer actually produces, causing a cross-attention mask
-        # shape mismatch during regional prompting.
-        patch_size = 2
-        latent_height = self.height // ANIMA_LATENT_SCALE_FACTOR
-        latent_width = self.width // ANIMA_LATENT_SCALE_FACTOR
-        img_token_height = math.ceil(latent_height / patch_size)
-        img_token_width = math.ceil(latent_width / patch_size)
+        img_token_height, img_token_width = self._compute_img_token_grid(self.height, self.width)
         img_seq_len = img_token_height * img_token_width
 
         # Load positive conditioning with optional regional masks
