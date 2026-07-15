@@ -5994,8 +5994,13 @@
       "head": {
         "tags": ["videos"],
         "summary": "Get Video Full",
-        "description": "Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.\n\nLike the image equivalent, this endpoint is intentionally unauthenticated because browsers\nload videos via <video src> tags which cannot send Bearer tokens. Video names are UUIDs,\nproviding security through unguessability.",
+        "description": "Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.\n\nBrowser media requests authenticate with the path-scoped HttpOnly cookie set at login.",
         "operationId": "get_video_full_head",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "video_name",
@@ -6007,6 +6012,22 @@
               "title": "Video Name"
             },
             "description": "The name of video file to get"
+          },
+          {
+            "name": "invokeai_media_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invokeai Media Token"
+            }
           }
         ],
         "responses": {
@@ -6034,8 +6055,13 @@
       "get": {
         "tags": ["videos"],
         "summary": "Get Video Full",
-        "description": "Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.\n\nLike the image equivalent, this endpoint is intentionally unauthenticated because browsers\nload videos via <video src> tags which cannot send Bearer tokens. Video names are UUIDs,\nproviding security through unguessability.",
+        "description": "Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.\n\nBrowser media requests authenticate with the path-scoped HttpOnly cookie set at login.",
         "operationId": "get_video_full",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "video_name",
@@ -6047,6 +6073,22 @@
               "title": "Video Name"
             },
             "description": "The name of video file to get"
+          },
+          {
+            "name": "invokeai_media_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invokeai Media Token"
+            }
           }
         ],
         "responses": {
@@ -6082,8 +6124,13 @@
       "get": {
         "tags": ["videos"],
         "summary": "Get Video Thumbnail",
-        "description": "Returns the first-frame WebP thumbnail of a video. Unauthenticated; UUIDs provide unguessability.",
+        "description": "Returns the first-frame WebP thumbnail of an authorized video.",
         "operationId": "get_video_thumbnail",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "video_name",
@@ -6095,6 +6142,22 @@
               "title": "Video Name"
             },
             "description": "The name of thumbnail file to get"
+          },
+          {
+            "name": "invokeai_media_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invokeai Media Token"
+            }
           }
         ],
         "responses": {
