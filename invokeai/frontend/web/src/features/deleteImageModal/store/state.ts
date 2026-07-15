@@ -80,7 +80,7 @@ const deleteImagesWithDialog = async (image_names: string[], store: AppStore): P
   });
 };
 
-const handleDeletions = async (image_names: string[], store: AppStore) => {
+export const handleDeletions = async (image_names: string[], store: AppStore) => {
   try {
     const { dispatch, getState } = store;
     const state = getState();
@@ -93,20 +93,32 @@ const handleDeletions = async (image_names: string[], store: AppStore) => {
     const lastSelectedIndex =
       lastSelected && image_names.includes(lastSelected) ? galleryItemNames.indexOf(lastSelected) : -1;
 
-    await dispatch(imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })).unwrap();
+    const result = await dispatch(
+      imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })
+    ).unwrap();
+    // Only the images the server confirmed deleted count: a partial failure means the
+    // survivor still exists, so the selection must not jump away from it and it remains
+    // a valid replacement candidate. Mirrors deleteVideoModal/store/state.ts.
+    const deletedNames = new Set(result.deleted_images);
 
-    if (intersection(state.gallery.selection, image_names).length > 0) {
-      // Advance to a still-living neighbour (prev > next) so the Viewer keeps a real
-      // selection. May pick a video — the polymorphic list intentionally allows that.
-      const replacement =
-        lastSelectedIndex >= 0
-          ? pickSelectionAfterDelete(galleryItemNames, lastSelectedIndex, new Set(image_names))
-          : null;
-      dispatch(imageSelected(replacement));
+    if (intersection(getState().gallery.selection, [...deletedNames]).length > 0) {
+      if (lastSelected && !deletedNames.has(lastSelected)) {
+        // The displayed item survived — either it wasn't part of this deletion (e.g. a
+        // video displayed while images were deleted, or a hover-delete of another item)
+        // or its own delete failed. Keep viewing it and just prune the deleted items
+        // from the multi-selection.
+        dispatch(imageSelected(lastSelected));
+      } else {
+        // Advance to a still-living neighbour (prev > next) so the Viewer keeps a real
+        // selection. May pick a video — the polymorphic list intentionally allows that.
+        const replacement =
+          lastSelectedIndex >= 0 ? pickSelectionAfterDelete(galleryItemNames, lastSelectedIndex, deletedNames) : null;
+        dispatch(imageSelected(replacement));
+      }
     }
 
     // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
-    for (const image_name of image_names) {
+    for (const image_name of deletedNames) {
       deleteNodesImages(state, dispatch, image_name);
       deleteControlLayerImages(state, dispatch, image_name);
       deleteReferenceImages(state, dispatch, image_name);
