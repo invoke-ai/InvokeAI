@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ImageMetadataHandlers, MetadataUtils } from './parsing';
+import { ImageMetadataHandlers, MetadataUtils, parseMetadataHandler } from './parsing';
 
 const createMockStore = () => ({
   dispatch: vi.fn(),
@@ -13,6 +13,17 @@ const createMockStore = () => ({
 const createStore = () => createMockStore() as any;
 
 describe('Qwen metadata parsing', () => {
+  it('normalizes synchronous parser throws into rejected promises', async () => {
+    const store = createStore();
+    let result: Promise<unknown> | undefined;
+
+    expect(() => {
+      result = parseMetadataHandler({}, ImageMetadataHandlers.RefinerSteps, store);
+    }).not.toThrow();
+
+    await expect(result).rejects.toThrow();
+  });
+
   it('does not report missing Qwen metadata keys as available', async () => {
     const store = createStore();
 
@@ -28,6 +39,23 @@ describe('Qwen metadata parsing', () => {
     });
 
     // Handlers reject when keys are absent, so hasMetadata should be false
+    expect(hasMetadata).toBe(false);
+  });
+
+  it('does not report metadata as available when require some and all handlers reject', async () => {
+    const store = createStore();
+
+    const hasMetadata = await MetadataUtils.hasMetadataByHandlers({
+      metadata: {},
+      handlers: [
+        ImageMetadataHandlers.QwenImageComponentSource,
+        ImageMetadataHandlers.QwenImageQuantization,
+        ImageMetadataHandlers.QwenImageShift,
+      ],
+      store,
+      require: 'some',
+    });
+
     expect(hasMetadata).toBe(false);
   });
 

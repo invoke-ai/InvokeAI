@@ -30,6 +30,7 @@ ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
+SESSION_QUEUE_MODE = Literal["FIFO", "round_robin"]
 IMAGE_SUBFOLDER_STRATEGY = Literal["flat", "date", "type", "hash"]
 CONFIG_SCHEMA_VERSION = "4.0.3"
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
@@ -71,8 +72,8 @@ class InvokeAIAppConfig(BaseSettings):
         allow_credentials: Allow CORS credentials.
         allow_methods: Methods allowed for CORS.
         allow_headers: Headers allowed for CORS.
-        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.
-        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
+        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
@@ -114,6 +115,7 @@ class InvokeAIAppConfig(BaseSettings):
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
+        session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
         clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
         max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
         allow_nodes: List of nodes to allow. Omit to allow all.
@@ -153,8 +155,8 @@ class InvokeAIAppConfig(BaseSettings):
     allow_credentials:             bool = Field(default=True,               description="Allow CORS credentials.")
     allow_methods:            list[str] = Field(default=["*"],              description="Methods allowed for CORS.")
     allow_headers:            list[str] = Field(default=["*"],              description="Headers allowed for CORS.")
-    ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.")
-    ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.")
+    ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
+    ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
 
     # MISC FEATURES
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
@@ -214,6 +216,7 @@ class InvokeAIAppConfig(BaseSettings):
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
+    session_queue_mode: SESSION_QUEUE_MODE = Field(default="round_robin",   description="Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.")
     clear_queue_on_startup:        bool = Field(default=False,              description="Empties session queue on startup. If true, disables `max_queue_history`.")
     max_queue_history:      Optional[int] = Field(default=None, ge=0,        description="Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.")
 

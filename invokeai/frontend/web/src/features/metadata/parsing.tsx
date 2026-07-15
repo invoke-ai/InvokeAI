@@ -9,7 +9,6 @@ import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'fea
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   animaQwen3EncoderModelSelected,
-  animaT5EncoderModelSelected,
   animaVaeModelSelected,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
@@ -241,16 +240,30 @@ export type UnrecallableMetadataHandler<T> = {
   ValueComponent: ComponentType<UnrecallableMetadataValueProps<T>>;
 };
 
+export const parseMetadataHandler = <T,>(
+  metadata: unknown,
+  handler: { parse: (metadata: unknown, store: AppStore) => Promise<T> },
+  store: AppStore
+): Promise<T> => {
+  return Promise.resolve().then(() => handler.parse(metadata, store));
+};
+
 const isSingleMetadataHandler = (
   handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
 ): handler is SingleMetadataHandler<any> => {
   return SingleMetadataKey in handler && handler[SingleMetadataKey] === true;
 };
 
-const isCollectionMetadataHandler = (
+export const isCollectionMetadataHandler = (
   handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
 ): handler is CollectionMetadataHandler<any[]> => {
   return CollectionMetadataKey in handler && handler[CollectionMetadataKey] === true;
+};
+
+export const isUnrecallableMetadataHandler = (
+  handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
+): handler is UnrecallableMetadataHandler<any> => {
+  return UnrecallableMetadataKey in handler && handler[UnrecallableMetadataKey] === true;
 };
 
 //#region Created By
@@ -1184,29 +1197,6 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion AnimaQwen3EncoderModel
 
-//#region AnimaT5EncoderModel
-const AnimaT5EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
-  [SingleMetadataKey]: true,
-  type: 'AnimaT5EncoderModel',
-  parse: async (metadata, store) => {
-    const raw = getProperty(metadata, 't5_encoder');
-    const parsed = await parseModelIdentifier(raw, store, 't5_encoder');
-    assert(parsed.type === 't5_encoder');
-    const base = selectBase(store.getState());
-    assert(base === 'anima', 'AnimaT5EncoderModel handler only works with Anima models');
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(animaT5EncoderModelSelected(value));
-  },
-  i18nKey: 'metadata.t5Encoder',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
-    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
-  ),
-};
-//#endregion AnimaT5EncoderModel
-
 //#region KleinVAEModel
 const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
@@ -1654,7 +1644,6 @@ export const ImageMetadataHandlers = {
   ZImageQwen3SourceModel,
   AnimaVAEModel,
   AnimaQwen3EncoderModel,
-  AnimaT5EncoderModel,
   KleinVAEModel,
   KleinQwen3EncoderModel,
   ZImageSeedVarianceEnabled,
@@ -1720,7 +1709,7 @@ const recallByHandler = async (arg: {
   let didRecall = false;
 
   try {
-    const value = await handler.parse(metadata, store);
+    const value = await parseMetadataHandler(metadata, handler, store);
     handler.recall(value, store);
     didRecall = true;
   } catch {
@@ -1769,7 +1758,7 @@ const recallByHandlers = async (arg: {
 
   for (const handler of sortedHandlers) {
     try {
-      const value = await handler.parse(metadata, store);
+      const value = await parseMetadataHandler(metadata, handler, store);
       handler.recall(value, store);
       recalled.set(handler, value);
     } catch {
@@ -1817,7 +1806,7 @@ const hasMetadataByHandlers = async (arg: {
   const { metadata, handlers, store, require } = arg;
   for (const handler of handlers) {
     try {
-      await handler.parse(metadata, store);
+      await parseMetadataHandler(metadata, handler, store);
       if (require === 'some') {
         return true;
       }
@@ -1827,7 +1816,7 @@ const hasMetadataByHandlers = async (arg: {
       }
     }
   }
-  return true;
+  return require === 'all';
 };
 
 const recallImageDimensions = async (metadata: unknown, store: AppStore) => {
@@ -1877,21 +1866,26 @@ export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMeta
     error: null,
   }));
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void parseMetadataHandler(metadata, handler, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   const recall = useCallback(
     (value: T) => {
@@ -1907,21 +1901,26 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
   const store = useAppStore();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void parseMetadataHandler(metadata, handler, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   const recallAll = useCallback(
     (values: T) => {
@@ -1944,21 +1943,26 @@ export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: Unre
   const store = useAppStore();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void parseMetadataHandler(metadata, handler, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   return { data };
 }
