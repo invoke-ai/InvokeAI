@@ -15,6 +15,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_loaders.krea2 import (
+    KREA2_TRANSFORMER_CONFIG,
     _convert_krea2_native_to_diffusers,
     _dequantize_scaled_fp8,
     _is_native_krea2_format,
@@ -259,3 +260,69 @@ class TestRejectIncompleteLoad:
         model = _ModuleWithMetaBuffer()
         with pytest.raises(RuntimeError, match="cached_stat"):
             _reject_incomplete_load(model, what="Krea-2 GGUF checkpoint")
+
+
+def _native_key_for_scale_shift_table(diffusers_key: str) -> str:
+    """Inverse of the converter's ``.mod.lin``/``last.modulation.lin`` -> ``.scale_shift_table`` mapping.
+
+    Only the modulation tables are reshaped by ``_convert_krea2_native_to_diffusers`` (every other
+    conversion is a pure, shape-preserving rename), so these are the only keys whose converted shape can
+    silently disagree with the real ``Krea2Transformer2DModel`` module dims.
+    """
+    stem = diffusers_key[: -len(".scale_shift_table")]
+    if stem == "final_layer":
+        return "last.modulation.lin"
+    if stem.startswith("transformer_blocks."):
+        return "blocks." + stem[len("transformer_blocks.") :] + ".mod.lin"
+    if stem.startswith("text_fusion."):
+        return "txtfusion." + stem[len("text_fusion.") :] + ".mod.lin"
+    raise AssertionError(f"unmapped scale_shift_table key: {diffusers_key}")
+
+
+class TestConvertedShapesMatchRealKrea2Transformer:
+    """Validate the native->diffusers converter against the REAL ``Krea2Transformer2DModel`` module.
+
+    The loader boundary tests use a tiny stub transformer, so they cannot detect a converted tensor whose
+    shape disagrees with the real module: ``load_state_dict(assign=True)`` installs whatever shape the
+    converter produced (no shape check) and ``_reject_incomplete_load`` only inspects the meta device, not
+    shapes, so a wrong-shaped tensor survives load and fails only at inference. The concrete instance is
+    ``last.modulation.lin`` -> ``final_layer.scale_shift_table``: the real table is ``(2, hidden)`` and the
+    flat native vector must be reshaped, not merely renamed.
+    """
+
+    def test_scale_shift_tables_match_real_module_dims(self) -> None:
+        pytest.importorskip("diffusers")
+        from diffusers import Krea2Transformer2DModel
+
+        with accelerate.init_empty_weights():
+            model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
+
+        # Meta-device state dict still carries real shapes for every parameter/buffer.
+        expected = {name: tuple(t.shape) for name, t in model.state_dict().items()}
+        table_keys = [name for name in expected if name.endswith(".scale_shift_table")]
+        assert table_keys, "real Krea2Transformer2DModel exposes no scale_shift_table params"
+        assert "final_layer.scale_shift_table" in table_keys
+        assert any(k.startswith("transformer_blocks.") for k in table_keys)
+
+        # Build a native state dict covering every modulation-table site, sized (as a flat vector) from the
+        # real module dims, then convert and assert the reshaped result matches the real parameter shape.
+        native_sd = {}
+        for name in table_keys:
+            rows, hidden = expected[name]
+            native_sd[_native_key_for_scale_shift_table(name)] = torch.arange(rows * hidden, dtype=torch.float32)
+
+        out = _convert_krea2_native_to_diffusers(native_sd)
+
+        for name in table_keys:
+            assert name in out, f"converter did not produce {name}"
+            assert tuple(out[name].shape) == expected[name], (
+                f"{name}: converted shape {tuple(out[name].shape)} != real module shape {expected[name]}"
+            )
+
+        # The two named layouts from the review: final layer AdaLN table is (2, hidden); every per-block
+        # (transformer + text-fusion) table is (6, hidden). A regression that dropped the reshape would leave
+        # these 1-D and this would fail.
+        assert expected["final_layer.scale_shift_table"][0] == 2
+        for name in table_keys:
+            if name.startswith(("transformer_blocks.", "text_fusion.")):
+                assert expected[name][0] == 6, f"{name} expected 6 modulation rows, got {expected[name]}"
