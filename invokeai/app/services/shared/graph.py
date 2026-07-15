@@ -158,14 +158,17 @@ class _PreparedExecRegistry:
         self,
         prepared_source_mapping: dict[str, str],
         source_prepared_mapping: dict[str, set[str]],
+        prepared_iteration_paths: dict[str, tuple[int, ...]],
         metadata: dict[str, _PreparedExecNodeMetadata],
     ) -> None:
         self._prepared_source_mapping = prepared_source_mapping
         self._source_prepared_mapping = source_prepared_mapping
+        self._prepared_iteration_paths = prepared_iteration_paths
         self._metadata = metadata
 
     def register(self, exec_node_id: str, source_node_id: str) -> None:
         self._prepared_source_mapping[exec_node_id] = source_node_id
+        self._prepared_iteration_paths.pop(exec_node_id, None)
         self._metadata[exec_node_id] = _PreparedExecNodeMetadata(source_node_id=source_node_id)
         if source_node_id not in self._source_prepared_mapping:
             self._source_prepared_mapping[source_node_id] = set()
@@ -192,9 +195,15 @@ class _PreparedExecRegistry:
 
     def get_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
         metadata = self._metadata.get(exec_node_id)
-        return metadata.iteration_path if metadata is not None else None
+        if metadata is not None and metadata.iteration_path is not None:
+            return metadata.iteration_path
+        iteration_path = self._prepared_iteration_paths.get(exec_node_id)
+        if iteration_path is not None:
+            self.get_metadata(exec_node_id).iteration_path = iteration_path
+        return iteration_path
 
     def set_iteration_path(self, exec_node_id: str, iteration_path: tuple[int, ...]) -> None:
+        self._prepared_iteration_paths[exec_node_id] = iteration_path
         self.get_metadata(exec_node_id).iteration_path = iteration_path
 
 
@@ -994,12 +1003,7 @@ class _ExecutionRuntime:
         self._state = state
 
     def _get_cached_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
-        registry = self._state._prepared_registry()
-        metadata_iteration_path = registry.get_iteration_path(exec_node_id)
-        if metadata_iteration_path is not None:
-            return metadata_iteration_path
-
-        return self._state._iteration_path_cache.get(exec_node_id)
+        return self._state._prepared_registry().get_iteration_path(exec_node_id)
 
     def _get_iteration_source_node_id(self, exec_node_id: str) -> Optional[str]:
         if exec_node_id not in self._state.prepared_source_mapping:
@@ -1046,7 +1050,6 @@ class _ExecutionRuntime:
         return tuple(path)
 
     def _cache_iteration_path(self, exec_node_id: str, iteration_path: tuple[int, ...]) -> tuple[int, ...]:
-        self._state._iteration_path_cache[exec_node_id] = iteration_path
         self._state._prepared_registry().set_iteration_path(exec_node_id, iteration_path)
         return iteration_path
 
@@ -2315,6 +2318,10 @@ class GraphExecutionState(BaseModel):
         description="The map of original graph nodes to prepared nodes",
         default_factory=dict,
     )
+    prepared_iteration_paths: dict[str, tuple[int, ...]] = Field(
+        description="The iteration coordinates of each prepared execution node",
+        default_factory=dict,
+    )
     # Ready queues grouped by node class name (internal only)
     _ready_queues: dict[str, Deque[str]] = PrivateAttr(default_factory=dict)
     _ready_node_ids: set[str] = PrivateAttr(default_factory=set)
@@ -2323,7 +2330,6 @@ class GraphExecutionState(BaseModel):
     # Optional priority; others follow in name order
     ready_order: list[str] = Field(default_factory=list)
     indegree: dict[str, int] = Field(default_factory=dict, description="Remaining unmet input count for exec nodes")
-    _iteration_path_cache: dict[str, tuple[int, ...]] = PrivateAttr(default_factory=dict)
     _if_branch_exclusive_sources: dict[str, dict[str, set[str]]] = PrivateAttr(default_factory=dict)
     _resolved_if_exec_branches: dict[str, str] = PrivateAttr(default_factory=dict)
     _prepared_exec_metadata: dict[str, _PreparedExecNodeMetadata] = PrivateAttr(default_factory=dict)
@@ -2341,6 +2347,7 @@ class GraphExecutionState(BaseModel):
             self._prepared_exec_registry = _PreparedExecRegistry(
                 prepared_source_mapping=self.prepared_source_mapping,
                 source_prepared_mapping=self.source_prepared_mapping,
+                prepared_iteration_paths=self.prepared_iteration_paths,
                 metadata=self._prepared_exec_metadata,
             )
         return self._prepared_exec_registry
@@ -2414,7 +2421,6 @@ class GraphExecutionState(BaseModel):
         self._ready_queues = {}
         self._ready_node_ids = set()
         self._active_class = None
-        self._iteration_path_cache = {}
         self._if_branch_exclusive_sources = {}
         self._resolved_if_exec_branches = {}
         self._prepared_exec_metadata = {}
@@ -2429,7 +2435,10 @@ class GraphExecutionState(BaseModel):
         for exec_node_id, source_node_id in self.prepared_source_mapping.items():
             metadata = registry.get_metadata(exec_node_id)
             metadata.source_node_id = source_node_id
-            metadata.iteration_path = self._get_iteration_path(exec_node_id)
+            iteration_path = registry.get_iteration_path(exec_node_id)
+            if iteration_path is None:
+                iteration_path = self._get_iteration_path(exec_node_id)
+            metadata.iteration_path = iteration_path
             if exec_node_id in self.executed:
                 metadata.state = "executed" if exec_node_id in self.results else "skipped"
             elif self.indegree.get(exec_node_id) == 0:

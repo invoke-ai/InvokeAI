@@ -12683,6 +12683,13 @@ export type components = {
             source_prepared_mapping: {
                 [key: string]: string[];
             };
+            /**
+             * Prepared Iteration Paths
+             * @description The iteration coordinates of each prepared execution node
+             */
+            prepared_iteration_paths?: {
+                [key: string]: number[];
+            };
             /** Ready Order */
             ready_order?: string[];
             /**

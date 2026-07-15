@@ -89,8 +89,8 @@ class SessionQueueBase(ABC):
         acting_user_id is independent of user_id and controls only current-item redaction:
         when set, the returned status omits item_id/session_id/batch_id unless the
         currently-running item belongs to acting_user_id. The redaction is decided from the
-        same get_current() snapshot used to embed those identifiers, so it cannot race against
-        a concurrent state change.
+        same database snapshot used to embed those identifiers, so it cannot race against a
+        concurrent state change.
         """
         pass
 
@@ -107,17 +107,17 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def complete_queue_item(self, item_id: int) -> SessionQueueItem:
+    def complete_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         """Completes a session queue item"""
         pass
 
     @abstractmethod
-    def suspend_queue_item(self, item_id: int) -> SessionQueueItem:
+    def suspend_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         """Suspends a session queue item while waiting on a child workflow execution."""
         pass
 
     @abstractmethod
-    def resume_queue_item(self, item_id: int) -> SessionQueueItem:
+    def resume_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         """Resumes a suspended session queue item by returning it to pending state."""
         pass
 
@@ -219,6 +219,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         """Sets the session for a session queue item. Use this to update the session state."""
+        pass
+
+    @abstractmethod
+    def save_queue_item_session(self, item_id: int, session: GraphExecutionState) -> None:
+        """Persists a queue item's session without loading and returning the full queue item."""
         pass
 
     @abstractmethod

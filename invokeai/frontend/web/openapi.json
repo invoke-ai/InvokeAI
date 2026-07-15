@@ -30430,6 +30430,17 @@
             "title": "Source Prepared Mapping",
             "description": "The map of original graph nodes to prepared nodes"
           },
+          "prepared_iteration_paths": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Prepared Iteration Paths",
+            "description": "The iteration coordinates of each prepared execution node"
+          },
           "ready_order": {
             "items": {
               "type": "string"

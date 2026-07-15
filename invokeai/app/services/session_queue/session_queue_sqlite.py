@@ -307,7 +307,9 @@ class SqliteSessionQueue(SessionQueueBase):
         if result is None:
             return None
         queue_item = SessionQueueItem.queue_item_from_dict(dict(result))
-        queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress")
+        queue_item = self._set_queue_item_status(
+            item_id=queue_item.item_id, status="in_progress", queue_item=queue_item
+        )
         return queue_item
 
     def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:
@@ -364,7 +366,12 @@ class SqliteSessionQueue(SessionQueueBase):
         error_type: Optional[str] = None,
         error_message: Optional[str] = None,
         error_traceback: Optional[str] = None,
+        queue_item: Optional[SessionQueueItem] = None,
     ) -> SessionQueueItem:
+        if queue_item is not None and queue_item.item_id != item_id:
+            raise ValueError(f"Queue item {queue_item.item_id} does not match requested item {item_id}")
+
+        updated_status_row: sqlite3.Row | None = None
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
@@ -373,32 +380,53 @@ class SqliteSessionQueue(SessionQueueBase):
                 (item_id,),
             )
             row = cursor.fetchone()
-        if row is None:
-            raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
-        current_status = row[0]
+            if row is None:
+                raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
+            current_status = row[0]
 
-        # Only update if not already finished (completed, failed or canceled)
-        if current_status in ("completed", "failed", "canceled"):
+            # Only update if not already finished (completed, failed or canceled).
+            if current_status not in ("completed", "failed", "canceled"):
+                cursor.execute(
+                    """--sql
+                    UPDATE session_queue
+                    SET status = ?, status_sequence = COALESCE(status_sequence, 0) + 1, error_type = ?, error_message = ?, error_traceback = ?
+                    WHERE item_id = ?
+                    """,
+                    (status, error_type, error_message, error_traceback, item_id),
+                )
+                cursor.execute(
+                    """--sql
+                    SELECT
+                        status,
+                        status_sequence,
+                        error_type,
+                        error_message,
+                        error_traceback,
+                        created_at,
+                        updated_at,
+                        started_at,
+                        completed_at
+                    FROM session_queue
+                    WHERE item_id = ?
+                    """,
+                    (item_id,),
+                )
+                updated_status_row = cast(sqlite3.Row, cursor.fetchone())
+
+        if updated_status_row is None:
             return self.get_queue_item(item_id)
 
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                UPDATE session_queue
-                SET status = ?, status_sequence = COALESCE(status_sequence, 0) + 1, error_type = ?, error_message = ?, error_traceback = ?
-                WHERE item_id = ?
-                """,
-                (status, error_type, error_message, error_traceback, item_id),
-            )
-
-        queue_item = self.get_queue_item(item_id)
+        if queue_item is None:
+            queue_item = self.get_queue_item(item_id)
+        else:
+            for field_name in updated_status_row.keys():
+                setattr(queue_item, field_name, updated_status_row[field_name])
         batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
         # The QueueItemStatusChangedEvent ships to user:{queue_item.user_id} and admin rooms.
         # acting_user_id ensures the embedded current-item identifiers are redacted when the
         # in-progress item belongs to someone else, while leaving aggregate counts global.
-        # Doing this inside get_queue_status guarantees the redaction decision and the
-        # embedded identifiers come from the same get_current() snapshot — eliminating the
-        # race where a second read could find None and skip scrubbing stale identifiers.
+        # Doing this inside get_queue_status guarantees the redaction decision and embedded
+        # identifiers come from the same lightweight metadata snapshot.
         queue_status = self.get_queue_status(queue_id=queue_item.queue_id, acting_user_id=queue_item.user_id)
 
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
@@ -594,16 +622,16 @@ class SqliteSessionQueue(SessionQueueBase):
             self.cancel_queue_item(item_id)
         self.delete_queue_items_by_id(chain_item_ids)
 
-    def complete_queue_item(self, item_id: int) -> SessionQueueItem:
-        queue_item = self._set_queue_item_status(item_id=item_id, status="completed")
+    def complete_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
+        queue_item = self._set_queue_item_status(item_id=item_id, status="completed", queue_item=queue_item)
         return queue_item
 
-    def suspend_queue_item(self, item_id: int) -> SessionQueueItem:
-        queue_item = self._set_queue_item_status(item_id=item_id, status="waiting")
+    def suspend_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
+        queue_item = self._set_queue_item_status(item_id=item_id, status="waiting", queue_item=queue_item)
         return queue_item
 
-    def resume_queue_item(self, item_id: int) -> SessionQueueItem:
-        queue_item = self._set_queue_item_status(item_id=item_id, status="pending")
+    def resume_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
+        queue_item = self._set_queue_item_status(item_id=item_id, status="pending", queue_item=queue_item)
         return queue_item
 
     def fail_queue_item(
@@ -898,11 +926,10 @@ class SqliteSessionQueue(SessionQueueBase):
             raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
         return SessionQueueItem.queue_item_from_dict(dict(result))
 
-    def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
+    def save_queue_item_session(self, item_id: int, session: GraphExecutionState) -> None:
         with self._db.transaction() as cursor:
             # Use exclude_none so we don't end up with a bunch of nulls in the graph - this can cause validation errors
-            # when the graph is loaded. Graph execution occurs purely in memory - the session saved here is not referenced
-            # during execution.
+            # when the graph is loaded. Persisted sessions are used to resume execution across queue boundaries.
             session_json = session.model_dump_json(warnings=False, exclude_none=True)
             cursor.execute(
                 """--sql
@@ -912,6 +939,11 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 (session_json, item_id),
             )
+            if cursor.rowcount == 0:
+                raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
+
+    def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
+        self.save_queue_item_session(item_id, session)
         return self.get_queue_item(item_id)
 
     def enqueue_workflow_call_child(
@@ -1175,7 +1207,17 @@ class SqliteSessionQueue(SessionQueueBase):
                 )
                 user_counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
-        current_item = self.get_current(queue_id=queue_id)
+            cursor.execute(
+                """--sql
+                SELECT item_id, session_id, batch_id, user_id
+                FROM session_queue
+                WHERE queue_id = ? AND status = 'in_progress'
+                LIMIT 1
+                """,
+                (queue_id,),
+            )
+            current_item = cast(Union[sqlite3.Row, None], cursor.fetchone())
+
         total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 
@@ -1193,15 +1235,19 @@ class SqliteSessionQueue(SessionQueueBase):
         # user_id (API path) when deciding the redaction owner; either being None means an
         # admin/global caller who may see the current item.
         owner_user_id = user_id if acting_user_id is None else acting_user_id
-        show_current_item = current_item is not None and (
-            owner_user_id is None or current_item.user_id == owner_user_id
-        )
+        current_item_id = None
+        current_session_id = None
+        current_batch_id = None
+        if current_item is not None and (owner_user_id is None or current_item["user_id"] == owner_user_id):
+            current_item_id = current_item["item_id"]
+            current_session_id = current_item["session_id"]
+            current_batch_id = current_item["batch_id"]
 
         return SessionQueueStatus(
             queue_id=queue_id,
-            item_id=current_item.item_id if show_current_item else None,
-            session_id=current_item.session_id if show_current_item else None,
-            batch_id=current_item.batch_id if show_current_item else None,
+            item_id=current_item_id,
+            session_id=current_session_id,
+            batch_id=current_batch_id,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
             waiting=counts.get("waiting", 0),

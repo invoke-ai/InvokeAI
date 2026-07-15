@@ -839,6 +839,62 @@ def test_graph_state_resumes_partially_executed_session_after_json_round_trip():
     assert resumed.results[prepared_collect_id].collection == [2, 3, 4, 5]
 
 
+def test_graph_state_round_trip_reuses_persisted_iteration_paths(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=24, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    for _ in range(8):
+        invocation, output = invoke_next(state)
+        assert invocation is not None
+        assert output is not None
+
+    raw = state.model_dump_json(warnings=False, exclude_none=True)
+    runtime_type = type(state._runtime())
+
+    def fail_build_iteration_path(self, exec_node_id: str, source_node_id: str):
+        raise AssertionError(f"Unexpected graph traversal for {exec_node_id} from {source_node_id}")
+
+    monkeypatch.setattr(runtime_type, "_build_iteration_path", fail_build_iteration_path)
+
+    resumed = TypeAdapter(GraphExecutionState).validate_json(raw, strict=False)
+
+    assert all(
+        resumed._get_iteration_path(exec_node_id) is not None for exec_node_id in resumed.prepared_source_mapping
+    )
+
+
+def test_graph_state_round_trip_rebuilds_iteration_paths_for_legacy_session():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=4, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+
+    state = GraphExecutionState(graph=graph)
+    for _ in range(3):
+        invocation, output = invoke_next(state)
+        assert invocation is not None
+        assert output is not None
+
+    legacy_payload = state.model_dump(mode="json", warnings=False, exclude_none=True)
+    legacy_payload.pop("prepared_iteration_paths")
+
+    resumed = TypeAdapter(GraphExecutionState).validate_python(legacy_payload, strict=False)
+
+    assert all(
+        resumed._get_iteration_path(exec_node_id) is not None for exec_node_id in resumed.prepared_source_mapping
+    )
+    assert execute_all_nodes(resumed)
+
+
 def test_if_graph_state_resumes_resolved_branch_after_json_round_trip():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=True))
