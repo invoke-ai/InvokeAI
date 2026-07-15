@@ -53,6 +53,11 @@ class WanDiffusersModel(GenericDiffusersLoader):
         if submodel_type is None:
             raise Exception("A submodel type must be provided when loading Wan main pipelines.")
 
+        if submodel_type is SubModelType.VAE:
+            from invokeai.backend.wan.rocm_causal_conv3d import patch_wan_causal_conv3d_for_rocm
+
+            patch_wan_causal_conv3d_for_rocm()
+
         model_path = Path(config.path)
         load_class = self.get_hf_load_class(model_path, submodel_type)
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None

@@ -164,6 +164,9 @@ class VAELoader(GenericDiffusersLoader):
         if isinstance(config, VAE_Checkpoint_Anima_Config):
             from diffusers.models.autoencoders import AutoencoderKLWan
 
+            from invokeai.backend.wan.rocm_causal_conv3d import patch_wan_causal_conv3d_for_rocm
+
+            patch_wan_causal_conv3d_for_rocm()
             return AutoencoderKLWan.from_single_file(
                 config.path,
                 torch_dtype=self._torch_dtype,
@@ -203,6 +206,9 @@ class VAELoader(GenericDiffusersLoader):
         from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
         from safetensors.torch import load_file
 
+        from invokeai.backend.wan.rocm_causal_conv3d import patch_wan_causal_conv3d_for_rocm
+
+        patch_wan_causal_conv3d_for_rocm()
         sd = load_file(config.path)
 
         if self._torch_dtype is not None:
@@ -237,6 +243,9 @@ class VAELoader(GenericDiffusersLoader):
         import torch
         from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
 
+        from invokeai.backend.wan.rocm_causal_conv3d import patch_wan_causal_conv3d_for_rocm
+
+        patch_wan_causal_conv3d_for_rocm()
         return AutoencoderKLWan.from_pretrained(
             config.path,
             torch_dtype=torch.bfloat16,
