@@ -113,9 +113,9 @@ class EventServiceBase:
         """Emitted when a list of queue items are retried"""
         self.dispatch(QueueItemsRetriedEvent.build(retry_result, user_ids, retried_item_ids_by_user))
 
-    def emit_queue_cleared(self, queue_id: str) -> None:
-        """Emitted when a queue is cleared"""
-        self.dispatch(QueueClearedEvent.build(queue_id))
+    def emit_queue_cleared(self, queue_id: str, user_id: str | None = None) -> None:
+        """Emitted when a queue is cleared. `user_id` scopes the clear to one user's items; None means all."""
+        self.dispatch(QueueClearedEvent.build(queue_id, user_id))
 
     def emit_recall_parameters_updated(self, queue_id: str, user_id: str, parameters: dict) -> None:
         """Emitted when recall parameters are updated"""

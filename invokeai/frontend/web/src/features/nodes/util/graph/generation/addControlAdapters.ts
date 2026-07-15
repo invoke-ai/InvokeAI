@@ -281,3 +281,77 @@ const addZImageControlToGraph = (
 
   g.addEdge(zImageControl, 'control', denoise, 'control');
 };
+
+type AddAnimaLLLiteControlArg = {
+  manager: CanvasManager;
+  entities: CanvasControlLayerState[];
+  g: Graph;
+  rect: Rect;
+  collect: Invocation<'collect'>;
+  model: MainModelConfig;
+};
+
+type AddAnimaLLLiteControlResult = {
+  addedAnimaLLLiteControls: number;
+};
+
+export const addAnimaLLLiteControl = async ({
+  manager,
+  entities,
+  g,
+  rect,
+  collect,
+  model,
+}: AddAnimaLLLiteControlArg): Promise<AddAnimaLLLiteControlResult> => {
+  const validControlLayers = entities
+    .filter((entity) => entity.isEnabled)
+    .filter((entity) => entity.controlAdapter.type === 'anima_lllite')
+    .filter((entity) => getControlLayerWarnings(entity, model, entities).length === 0);
+
+  const result: AddAnimaLLLiteControlResult = {
+    addedAnimaLLLiteControls: 0,
+  };
+
+  for (const layer of validControlLayers) {
+    const getImageDTOResult = await withResultAsync(() => {
+      const adapter = manager.adapters.controlLayers.get(layer.id);
+      assert(adapter, 'Adapter not found');
+      return adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [] }, bg: 'black' });
+    });
+    if (getImageDTOResult.isErr()) {
+      log.warn({ error: serializeError(getImageDTOResult.error) }, 'Error rasterizing Anima control layer');
+      continue;
+    }
+
+    const imageDTO = getImageDTOResult.value;
+    addAnimaLLLiteControlToGraph(g, layer, imageDTO, collect);
+    result.addedAnimaLLLiteControls++;
+  }
+
+  return result;
+};
+
+const addAnimaLLLiteControlToGraph = (
+  g: Graph,
+  layer: CanvasControlLayerState,
+  imageDTO: ImageDTO,
+  collect: Invocation<'collect'>
+) => {
+  const { id, controlAdapter } = layer;
+  assert(controlAdapter.type === 'anima_lllite');
+  const { model, weight, beginEndStepPct } = controlAdapter;
+  assert(model !== null);
+  const { image_name } = imageDTO;
+
+  const animaLLLite = g.addNode({
+    id: `anima_lllite_${id}`,
+    type: 'anima_lllite',
+    control_model: model,
+    weight,
+    begin_step_percent: beginEndStepPct[0],
+    end_step_percent: beginEndStepPct[1],
+    image: { image_name },
+  });
+
+  g.addEdge(animaLLLite, 'control', collect, 'item');
+};
