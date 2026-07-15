@@ -345,6 +345,19 @@ class _ExecutionMaterializer:
 
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
+        self._iteration_axes_by_source: dict[str, tuple[str, ...]] = {}
+
+    def _get_iteration_axes(self, source_node_id: str) -> tuple[str, ...]:
+        cached = self._iteration_axes_by_source.get(source_node_id)
+        if cached is not None:
+            return cached
+
+        axes = self._state._runtime()._get_ordered_iterator_sources(source_node_id)
+        if isinstance(self._state.graph.get_node(source_node_id), IterateInvocation):
+            axes.append(source_node_id)
+        result = tuple(axes)
+        self._iteration_axes_by_source[source_node_id] = result
+        return result
 
     def _get_known_iteration_path(
         self,
@@ -352,26 +365,31 @@ class _ExecutionMaterializer:
         iteration_node_map: list[tuple[str, str]],
     ) -> Optional[tuple[int, ...]]:
         parent_paths: list[tuple[int, ...]] = []
+        parent_iteration_axes: list[tuple[str, ...]] = []
         registry = self._state._prepared_registry()
-        for _, prepared_id in iteration_node_map:
+        for source_node_id, prepared_id in iteration_node_map:
             parent_path = registry.get_iteration_path(prepared_id)
             if parent_path is None:
                 return None
             if parent_path:
                 parent_paths.append(parent_path)
+                parent_iteration_axes.append(self._get_iteration_axes(source_node_id))
+
+        unique_parent_paths = set(parent_paths)
+        paths_share_iteration_axes = len(set(parent_iteration_axes)) <= 1
 
         # Materialized iteration boundaries use non-negative indexes; ordinary execution nodes use -1. Keeping this
         # generic allows other scheduler-managed loop nodes to reuse the same path cache.
         if iteration_index >= 0:
-            if len(parent_paths) > 1:
+            if len(unique_parent_paths) > 1 or not paths_share_iteration_axes:
                 return None
-            parent_path = parent_paths[0] if parent_paths else ()
+            parent_path = next(iter(unique_parent_paths), ())
             return (*parent_path, iteration_index)
 
-        if not parent_paths:
+        if not unique_parent_paths:
             return ()
-        if len(parent_paths) == 1:
-            return parent_paths[0]
+        if len(unique_parent_paths) == 1 and paths_share_iteration_axes:
+            return next(iter(unique_parent_paths))
         return None
 
     def _get_iterator_iteration_count(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> int:
@@ -558,32 +576,92 @@ class _ExecutionMaterializer:
                 mappings.append(mapping)
         return mappings
 
-    def _get_parent_iteration_mappings(self, next_node_id: str, graph: nx.DiGraph) -> list[list[tuple[str, str]]]:
+    def _index_prepared_nodes_by_iteration_path(self, prepared_nodes: set[str]) -> dict[tuple[int, ...], list[str]]:
+        prepared_nodes_by_iteration_path: dict[tuple[int, ...], list[str]] = {}
+        for prepared_id in prepared_nodes:
+            iteration_path = self._state._get_iteration_path(prepared_id)
+            prepared_nodes_by_iteration_path.setdefault(iteration_path, []).append(prepared_id)
+        return prepared_nodes_by_iteration_path
+
+    def _get_target_iteration_path(
+        self, source_node_id: str, graph: nx.DiGraph, prepared_iterator_nodes: tuple[str, ...]
+    ) -> Optional[tuple[int, ...]]:
+        parent_iterators = self._get_parent_iterator_exec_nodes(source_node_id, graph, list(prepared_iterator_nodes))
+        parent_paths = [self._state._get_iteration_path(prepared_id) for prepared_id, _ in parent_iterators]
+        if not parent_paths:
+            return ()
+
+        target_path = max(parent_paths, key=len)
+        if all(target_path[: len(parent_path)] == parent_path for parent_path in parent_paths):
+            return target_path
+        return None
+
+    def _get_indexed_iteration_node(
+        self,
+        source_node_id: str,
+        graph: nx.DiGraph,
+        prepared_iterator_nodes: tuple[str, ...],
+        prepared_nodes_by_iteration_path: dict[tuple[int, ...], list[str]],
+    ) -> Optional[str]:
+        target_path = self._get_target_iteration_path(source_node_id, graph, prepared_iterator_nodes)
+        if target_path is None:
+            return None
+
+        for path_length in range(len(target_path), -1, -1):
+            candidates = prepared_nodes_by_iteration_path.get(target_path[:path_length], [])
+            if len(candidates) == 1:
+                return candidates[0]
+            if len(candidates) > 1:
+                return None
+        return None
+
+    def _get_parent_iteration_mappings(self, next_node_id: str, graph: nx.DiGraph) -> Iterable[list[tuple[str, str]]]:
         parent_node_ids = [source_id for source_id, _ in graph.in_edges(next_node_id)]
         iterator_graph = self.iterator_graph(graph)
         iterator_nodes = self.get_node_iterators(next_node_id, iterator_graph)
         if not iterator_nodes:
-            return self._get_parent_iteration_mappings_without_iterators(parent_node_ids)
+            return iter(self._get_parent_iteration_mappings_without_iterators(parent_node_ids))
 
         iterator_nodes_prepared = [
             sorted(self._state.source_prepared_mapping[node_id], key=self._state._get_iteration_path)
             for node_id in iterator_nodes
         ]
-        iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
+        prepared_nodes_by_source = {
+            node_id: self._get_prepared_nodes_for_source(node_id) for node_id in parent_node_ids
+        }
+        prepared_nodes_by_source_and_path = {
+            node_id: self._index_prepared_nodes_by_iteration_path(prepared_nodes)
+            for node_id, prepared_nodes in prepared_nodes_by_source.items()
+        }
 
-        execution_graph = self._state.execution_graph.nx_graph_flat()
-        prepared_parent_mappings = [
-            [
-                (node_id, self.get_iteration_node(node_id, graph, execution_graph, prepared_iterators))
-                for node_id in parent_node_ids
-            ]
-            for prepared_iterators in iterator_node_prepared_combinations
-        ]
-        return [
-            mapping
-            for mapping in prepared_parent_mappings
-            if all(prepared_id is not None for _, prepared_id in mapping)
-        ]
+        def iter_mappings() -> Iterable[list[tuple[str, str]]]:
+            execution_graph: Optional[nx.DiGraph] = None
+            for prepared_iterators in itertools.product(*iterator_nodes_prepared):
+                mapping: list[tuple[str, str]] = []
+                for node_id in parent_node_ids:
+                    prepared_id = self._get_indexed_iteration_node(
+                        node_id,
+                        graph,
+                        prepared_iterators,
+                        prepared_nodes_by_source_and_path[node_id],
+                    )
+                    if prepared_id is None:
+                        if execution_graph is None:
+                            execution_graph = self._state.execution_graph.nx_graph_flat()
+                        prepared_id = self.get_iteration_node(
+                            node_id,
+                            graph,
+                            execution_graph,
+                            list(prepared_iterators),
+                            prepared_nodes_by_source[node_id],
+                        )
+                    if prepared_id is None:
+                        break
+                    mapping.append((node_id, prepared_id))
+                if len(mapping) == len(parent_node_ids):
+                    yield mapping
+
+        return iter(iter_mappings())
 
     def create_execution_node(
         self,
@@ -662,7 +740,7 @@ class _ExecutionMaterializer:
         parent_iterators: list[tuple[str, str]],
         execution_graph: nx.DiGraph,
     ) -> Optional[str]:
-        prepared_iterator = next((node_id for node_id in prepared_nodes if node_id in prepared_iterator_nodes), None)
+        prepared_iterator = next((node_id for node_id in prepared_iterator_nodes if node_id in prepared_nodes), None)
         if prepared_iterator is None:
             return None
         if self._matches_parent_iterators(prepared_iterator, parent_iterators, execution_graph):
@@ -687,8 +765,10 @@ class _ExecutionMaterializer:
         graph: nx.DiGraph,
         execution_graph: nx.DiGraph,
         prepared_iterator_nodes: list[str],
+        prepared_nodes: Optional[set[str]] = None,
     ) -> Optional[str]:
-        prepared_nodes = self._get_prepared_nodes_for_source(source_node_id)
+        if prepared_nodes is None:
+            prepared_nodes = self._get_prepared_nodes_for_source(source_node_id)
         if len(prepared_nodes) == 1 and not prepared_iterator_nodes:
             return next(iter(prepared_nodes))
 
@@ -788,7 +868,7 @@ class _ExecutionScheduler:
         self._state.executed.add(exec_node_id)
         self._state.results[exec_node_id] = output
         node = self._state.execution_graph.nodes[exec_node_id]
-        if isinstance(node, IterateInvocation):
+        if isinstance(node, (IterateInvocation, CollectInvocation)):
             node.collection = []
 
     def _mark_source_node_complete(self, exec_node_id: str) -> None:
@@ -827,6 +907,7 @@ class _ExecutionScheduler:
                 q.remove(exec_node_id)
             except ValueError:
                 continue
+        self._state._ready_node_ids.discard(exec_node_id)
 
     def enqueue_if_ready(self, exec_node_id: str) -> None:
         """Push exec_node_id to its class queue if unmet inputs == 0."""
@@ -834,10 +915,11 @@ class _ExecutionScheduler:
         if self._should_skip_ready_enqueue(exec_node_id):
             return
         queue = self._get_ready_queue(exec_node_id)
-        if exec_node_id in queue:
+        if exec_node_id in self._state._ready_node_ids:
             return
         self._state._set_prepared_exec_state(exec_node_id, "ready")
         self._insert_ready_node(queue, exec_node_id)
+        self._state._ready_node_ids.add(exec_node_id)
 
     def get_next_node(self) -> Optional[BaseInvocation]:
         """Gets the next ready node: FIFO within class, drain class before switching."""
@@ -846,6 +928,7 @@ class _ExecutionScheduler:
                 q = self._state._ready_queues.get(self._state._active_class)
                 while q:
                     exec_node_id = q.popleft()
+                    self._state._ready_node_ids.discard(exec_node_id)
                     if exec_node_id not in self._state.executed:
                         return self._state.execution_graph.nodes[exec_node_id]
                 self._state._active_class = None
@@ -877,6 +960,11 @@ class _ExecutionScheduler:
         self._record_completed_node(exec_node_id, output)
         self._mark_source_node_complete(exec_node_id)
         self._release_downstream_nodes(exec_node_id)
+        if len(self._state.executed_history) == len(self._state.graph.nodes):
+            self._state.execution_graph._invalidate_edge_indexes()
+            self._state._ready_queues = {}
+            self._state._ready_node_ids = set()
+            self._state._active_class = None
 
 
 class _ExecutionRuntime:
@@ -1364,6 +1452,40 @@ class Graph(BaseModel):
         description="The connections between nodes and their fields in this graph",
         default_factory=list,
     )
+    _input_edges_by_node: Optional[dict[str, list[Edge]]] = PrivateAttr(default=None)
+    _output_edges_by_node: Optional[dict[str, list[Edge]]] = PrivateAttr(default=None)
+
+    def _invalidate_edge_indexes(self) -> None:
+        self._input_edges_by_node = None
+        self._output_edges_by_node = None
+
+    def _ensure_edge_indexes(self) -> None:
+        if self._input_edges_by_node is not None and self._output_edges_by_node is not None:
+            return
+
+        input_edges_by_node: dict[str, list[Edge]] = {}
+        output_edges_by_node: dict[str, list[Edge]] = {}
+        for edge in self.edges:
+            input_edges_by_node.setdefault(edge.destination.node_id, []).append(edge)
+            output_edges_by_node.setdefault(edge.source.node_id, []).append(edge)
+        self._input_edges_by_node = input_edges_by_node
+        self._output_edges_by_node = output_edges_by_node
+
+    def _add_edge_to_indexes(self, edge: Edge) -> None:
+        if self._input_edges_by_node is not None:
+            self._input_edges_by_node.setdefault(edge.destination.node_id, []).append(edge)
+        if self._output_edges_by_node is not None:
+            self._output_edges_by_node.setdefault(edge.source.node_id, []).append(edge)
+
+    def _remove_edge_from_indexes(self, edge: Edge) -> None:
+        if self._input_edges_by_node is not None:
+            input_edges = self._input_edges_by_node.get(edge.destination.node_id)
+            if input_edges is not None:
+                input_edges.remove(edge)
+        if self._output_edges_by_node is not None:
+            output_edges = self._output_edges_by_node.get(edge.source.node_id)
+            if output_edges is not None:
+                output_edges.remove(edge)
 
     def add_node(self, node: BaseInvocation) -> None:
         """Adds a node to a graph
@@ -1404,6 +1526,7 @@ class Graph(BaseModel):
         self._validate_edge(edge)
         if edge not in self.edges:
             self.edges.append(edge)
+            self._add_edge_to_indexes(edge)
         else:
             raise InvalidEdgeError()
 
@@ -1414,13 +1537,17 @@ class Graph(BaseModel):
         preserves the source graph's direction and field connections, so repeating cycle, uniqueness, and type checks
         for every expanded edge is redundant and prohibitively expensive for large iterator collections.
         """
-        self.edges.extend(edges)
+        new_edges = list(edges)
+        self.edges.extend(new_edges)
+        for edge in new_edges:
+            self._add_edge_to_indexes(edge)
 
     def delete_edge(self, edge: Edge) -> None:
         """Deletes an edge from a graph"""
 
         try:
             self.edges.remove(edge)
+            self._remove_edge_from_indexes(edge)
         except ValueError:
             pass
 
@@ -1670,10 +1797,12 @@ class Graph(BaseModel):
     def _get_input_edges(self, node_id: str, field: Optional[str] = None) -> list[Edge]:
         """Gets all input edges for a node. If field is provided, only edges to that field are returned."""
 
-        edges = [e for e in self.edges if e.destination.node_id == node_id]
+        self._ensure_edge_indexes()
+        assert self._input_edges_by_node is not None
+        edges = self._input_edges_by_node.get(node_id, [])
 
         if field is None:
-            return edges
+            return list(edges)
 
         filtered_edges = [e for e in edges if e.destination.field == field]
 
@@ -1681,10 +1810,12 @@ class Graph(BaseModel):
 
     def _get_output_edges(self, node_id: str, field: Optional[str] = None) -> list[Edge]:
         """Gets all output edges for a node. If field is provided, only edges from that field are returned."""
-        edges = [e for e in self.edges if e.source.node_id == node_id]
+        self._ensure_edge_indexes()
+        assert self._output_edges_by_node is not None
+        edges = self._output_edges_by_node.get(node_id, [])
 
         if field is None:
-            return edges
+            return list(edges)
 
         filtered_edges = [e for e in edges if e.source.field == field]
 
@@ -2043,6 +2174,7 @@ class GraphExecutionState(BaseModel):
     )
     # Ready queues grouped by node class name (internal only)
     _ready_queues: dict[str, Deque[str]] = PrivateAttr(default_factory=dict)
+    _ready_node_ids: set[str] = PrivateAttr(default_factory=set)
     # Current class being drained; stays until its queue empties
     _active_class: Optional[str] = PrivateAttr(default=None)
     # Optional priority; others follow in name order
@@ -2137,6 +2269,7 @@ class GraphExecutionState(BaseModel):
 
     def _reset_runtime_caches(self) -> None:
         self._ready_queues = {}
+        self._ready_node_ids = set()
         self._active_class = None
         self._iteration_path_cache = {}
         self._if_branch_exclusive_sources = {}
