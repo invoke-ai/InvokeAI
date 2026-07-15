@@ -1176,7 +1176,7 @@ requires-dist = [
     { name = "sentencepiece", specifier = "==0.2.0" },
     { name = "snakeviz", marker = "extra == 'dev'" },
     { name = "spandrel" },
-    { name = "torch", marker = "sys_platform != 'darwin'", specifier = ">=2.7.0,<3.0" },
+    { name = "torch", marker = "sys_platform != 'darwin'", specifier = ">=2.7.0,<2.12" },
     { name = "torch", marker = "sys_platform == 'darwin'", specifier = ">=2.7.0,<2.8.0" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'rocm'", specifier = "==2.10.0+rocm7.1", index = "https://download.pytorch.org/whl/rocm7.1", conflict = { package = "invokeai", extra = "rocm" } },
     { name = "torch", marker = "extra == 'cpu'", specifier = "==2.7.1+cpu", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "invokeai", extra = "cpu" } },
@@ -3710,10 +3710,10 @@ name = "torch"
 version = "2.7.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and sys_platform == 'darwin'",
-    "python_full_version < '3.12' and sys_platform == 'darwin'",
     "(python_full_version >= '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'win32')",
     "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform == 'win32')",
+    "python_full_version >= '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
 ]
 dependencies = [
     { name = "filelock", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda' and extra != 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda') or (sys_platform == 'win32' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda' and extra != 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
@@ -3862,10 +3862,10 @@ name = "torchvision"
 version = "0.22.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and sys_platform == 'darwin'",
-    "python_full_version < '3.12' and sys_platform == 'darwin'",
     "(python_full_version >= '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'win32')",
     "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform == 'win32')",
+    "python_full_version >= '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
 ]
 dependencies = [
     { name = "numpy", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda' and extra != 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda') or (sys_platform == 'win32' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda' and extra != 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
