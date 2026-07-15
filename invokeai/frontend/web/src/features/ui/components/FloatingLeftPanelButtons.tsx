@@ -5,6 +5,7 @@ import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/compone
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
+import { useUserHasActiveQueueItems } from 'features/queue/hooks/useUserHasActiveQueueItems';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,6 @@ import {
   PiXBold,
   PiXCircle,
 } from 'react-icons/pi';
-import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { useAutoAddBoard } from 'services/api/hooks/useAutoAddBoard';
 import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 
@@ -95,18 +95,9 @@ InvokeIconButton.displayName = 'InvokeIconButton';
 const InvokeIconButtonIcon = memo(() => {
   const shift = useShiftModifier();
   const queue = useInvoke();
-  const { isProcessing } = useGetQueueStatusQuery(undefined, {
-    selectFromResult: ({ data }) => {
-      if (!data) {
-        return { isProcessing: false };
-      }
-      // The spinner reflects the user's own activity. In multiuser mode the global
-      // in_progress count includes other users' generations, so prefer the per-user count.
-      return { isProcessing: (data.queue.user_in_progress ?? data.queue.in_progress) > 0 };
-    },
-  });
+  const hasActiveQueueItems = useUserHasActiveQueueItems();
 
-  if (!queue.isDisabled && isProcessing) {
+  if (!queue.isDisabled && hasActiveQueueItems) {
     return <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />;
   }
 
