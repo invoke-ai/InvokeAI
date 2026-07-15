@@ -524,11 +524,18 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         # Compute image token grid dimensions for regional prompting
         # Anima: 8x VAE compression, 2x patch size → 16x total
+        #
+        # Use ceiling division to mirror the transformer's MiniTrainDIT._pad_to_patch_size,
+        # which pads the latent H/W up to a multiple of patch_spatial BEFORE patchifying.
+        # An odd latent dimension (e.g. 1080 // 8 = 135) is padded up (135 -> 136 -> 68
+        # tokens), so floor division here would build a mask sized for one fewer token row
+        # or column than the transformer actually produces, causing a cross-attention mask
+        # shape mismatch during regional prompting.
         patch_size = 2
         latent_height = self.height // ANIMA_LATENT_SCALE_FACTOR
         latent_width = self.width // ANIMA_LATENT_SCALE_FACTOR
-        img_token_height = latent_height // patch_size
-        img_token_width = latent_width // patch_size
+        img_token_height = math.ceil(latent_height / patch_size)
+        img_token_width = math.ceil(latent_width / patch_size)
         img_seq_len = img_token_height * img_token_width
 
         # Load positive conditioning with optional regional masks
