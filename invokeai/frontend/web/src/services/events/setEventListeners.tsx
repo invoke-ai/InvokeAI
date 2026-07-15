@@ -4,6 +4,7 @@ import { socketConnected } from 'app/store/middleware/listenerMiddleware/listene
 import type { AppStore } from 'app/store/store';
 import { parseify } from 'common/util/serialize';
 import { isNil, round } from 'es-toolkit/compat';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
@@ -77,6 +78,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     clearCanvasWorkflowIntegrationProcessing: () => dispatch(canvasWorkflowIntegrationProcessingCompleted()),
     completedInvocationKeysByItemId,
     getAllNodeExecutionStates: () => $nodeExecutionStates.get(),
+    getCurrentUserId: () => selectCurrentUser(getState())?.user_id ?? null,
     getNodeExecutionState: (nodeId) => $nodeExecutionStates.get()[nodeId],
     logReconciliationError: (error, itemId) => {
       log.debug({ error: parseify(error) }, `Unable to reconcile workflow queue item ${itemId}`);
@@ -550,7 +552,19 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
-    clearAllProgressEvents();
+    // Clearing the queue deletes the in-progress item without emitting a per-item terminal status
+    // event, so the progress bars must be reset here — and the coordinator must mark the deleted
+    // tracked items terminal so a trailing invocation_progress event cannot repopulate the bar.
+    // The coordinator scopes a user-scoped clear (multiuser mode) to that user's items — on an
+    // admin client that may be a subset of the tracked items; on another user's client it is
+    // none of them — and reports whether the clear applied to any tracked item, so the progress
+    // bars are only reset when the clear could have deleted the items behind them. Per-item bars
+    // for items the clear did not delete repopulate on their next invocation_progress event. The
+    // queue tags below always need refreshing.
+    if (workflowExecutionCoordinator.onQueueCleared(data)) {
+      $lastProgressEvent.set(null);
+      clearAllProgressEvents();
+    }
     dispatch(
       queueApi.util.invalidateTags([
         'SessionQueueStatus',

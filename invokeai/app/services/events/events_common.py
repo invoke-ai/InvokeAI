@@ -343,9 +343,14 @@ class QueueClearedEvent(QueueEventBase):
 
     __event_name__ = "queue_cleared"
 
+    user_id: str | None = Field(
+        default=None,
+        description="The ID of the user whose queue items were cleared, or None if all users' items were cleared",
+    )
+
     @classmethod
-    def build(cls, queue_id: str) -> "QueueClearedEvent":
-        return cls(queue_id=queue_id)
+    def build(cls, queue_id: str, user_id: str | None = None) -> "QueueClearedEvent":
+        return cls(queue_id=queue_id, user_id=user_id)
 
 
 class WorkflowEventBase(EventBase):
