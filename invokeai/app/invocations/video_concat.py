@@ -17,7 +17,6 @@ from collections import deque
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, Literal, Optional
 
-import imageio.v2 as iio2
 import numpy as np
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
@@ -30,6 +29,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.video_encoding import make_mp4_writer
 from invokeai.app.util.video_thumbnails import iter_video_frames, probe_video
 
 TransitionMode = Literal["cut", "crossfade", "fade_through_black"]
@@ -127,6 +127,13 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"{sorted(widths)}. Re-render at a single resolution before concatenating."
             )
         width, height, _, first_fps = probes[0]
+        # libx264 + yuv420p needs even dimensions; we encode with macro_block_size=1 to
+        # preserve the source dimensions exactly, so reject odd sources with a clear error.
+        if width % 2 or height % 2:
+            raise ValueError(
+                f"Input videos are {width}x{height}; H.264 encoding requires even dimensions. "
+                "Re-encode or crop the sources to even width and height first."
+            )
         self._validate_transition_memory(width, height)
         output_fps = float(self.fps) if self.fps is not None else (first_fps or 16.0)
 
@@ -138,7 +145,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         try:
             # Frames stream from the decoders straight into the encoder; only the
             # transition windows are buffered. See _iter_joined_frames.
-            writer = iio2.get_writer(str(tmp_path), format="FFMPEG", mode="I", fps=output_fps, codec="libx264")
+            writer = make_mp4_writer(tmp_path, output_fps)
             num_frames = 0
             try:
                 clip_iters = [iter_video_frames(p, is_canceled=context.util.is_canceled) for p in paths]

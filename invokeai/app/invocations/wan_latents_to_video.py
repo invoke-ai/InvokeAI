@@ -14,7 +14,6 @@ import tempfile
 from pathlib import Path
 from typing import Callable, Protocol
 
-import imageio.v2 as iio2
 import numpy as np
 import torch
 from diffusers.models.autoencoders import AutoencoderKLWan
@@ -33,6 +32,7 @@ from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.video_encoding import make_mp4_writer
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -85,6 +85,12 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         with vae_info.model_on_device() as (_, vae):
             assert isinstance(vae, AutoencoderKLWan)
+            if latents.shape[1] != vae.config.z_dim:
+                raise ValueError(
+                    f"Latent channel mismatch: these latents have {latents.shape[1]} channels but the "
+                    f"selected VAE expects {vae.config.z_dim}. A14B models need the 16-channel Wan 2.1 VAE; "
+                    "TI2V-5B needs the 48-channel Wan 2.2 VAE."
+                )
             _, _, t_lat, h_lat, w_lat = latents.shape
             t_pixel = (t_lat - 1) * 4 + 1
             context.logger.info(
@@ -126,10 +132,8 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         num_frames = frames.shape[0]
         duration = num_frames / float(self.fps)
 
-        # Encode to a temporary MP4 via imageio's FFMPEG plugin (backed by the
-        # bundled imageio-ffmpeg binary). libx264 + yuv420p is the default for
-        # this plugin, which is what we want for broadly-compatible browser
-        # playback — no need to override.
+        # Encode to a temporary MP4 (libx264 + yuv420p, exact frame dimensions —
+        # see make_mp4_writer for why macro_block_size matters).
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_wan_video_", suffix=".mp4", delete=False)
         tmp.close()
         tmp_path = Path(tmp.name)
@@ -138,7 +142,7 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"Encoding MP4: {num_frames} frames @ {self.fps} fps ({duration:.2f}s) at {width}x{height} via libx264"
             )
             context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {self.fps} fps)")
-            writer = iio2.get_writer(str(tmp_path), format="FFMPEG", mode="I", codec="libx264", fps=self.fps)
+            writer = make_mp4_writer(tmp_path, self.fps)
             try:
                 _write_video_frames(writer, frames, context.util.is_canceled)
             finally:

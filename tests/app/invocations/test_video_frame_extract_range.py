@@ -99,7 +99,7 @@ def test_invocation_only_saves_complete_requested_range(written: int, should_rai
     with (
         patch("invokeai.app.invocations.video_frame_extract_range.probe_video", return_value=(32, 32, 0.625, 8.0)),
         patch("invokeai.app.invocations.video_frame_extract_range.decoder_frame_count", return_value=5),
-        patch("invokeai.app.invocations.video_frame_extract_range.iio2.get_writer", return_value=MagicMock()),
+        patch("invokeai.app.invocations.video_frame_extract_range.make_mp4_writer", return_value=MagicMock()),
         patch("invokeai.app.invocations.video_frame_extract_range._write_frame_range", return_value=written),
         patch("invokeai.app.invocations.video_frame_extract_range.VideoOutput.build", return_value=base_output),
     ):

@@ -12,7 +12,6 @@ from itertools import islice
 from pathlib import Path
 from typing import Callable, Iterator, Optional, Protocol
 
-import imageio.v2 as iio2
 import numpy as np
 
 from invokeai.app.invocations.baseinvocation import (
@@ -33,11 +32,25 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.video_encoding import make_mp4_writer
 from invokeai.app.util.video_thumbnails import decoder_frame_count, iter_video_frames, probe_video
 
 
 class _FrameWriter(Protocol):
     def append_data(self, frame: np.ndarray) -> None: ...
+
+
+def _validate_even_dimensions(width: int, height: int, video_name: str) -> None:
+    """Raises if the source dimensions can't be encoded as-is with libx264 + yuv420p.
+
+    We encode with ``macro_block_size=1`` to preserve the source dimensions exactly
+    (imageio's default of 16 silently rescales), which requires even width and height.
+    """
+    if width % 2 or height % 2:
+        raise ValueError(
+            f"Video {video_name} is {width}x{height}; H.264 encoding requires even dimensions. "
+            "Re-encode or crop the source to even width and height first."
+        )
 
 
 def _write_frame_range(
@@ -161,6 +174,10 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         else:
             output_fps = 16.0
 
+        # libx264 + yuv420p needs even dimensions. Reject odd sources up front with a
+        # clear message instead of surfacing an opaque ffmpeg error mid-encode.
+        _validate_even_dimensions(width, height, self.video.video_name)
+
         context.util.signal_progress(f"Transcoding frames {start}-{end} of {n_frames} @ {output_fps:.2f} fps")
 
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".mp4", delete=False)
@@ -169,7 +186,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         try:
             # imageio's iter_index isn't exposed by iio.imiter, so we enumerate and skip.
             # Frames stream straight from the decoder into the encoder; see _write_frame_range.
-            writer = iio2.get_writer(str(tmp_path), format="FFMPEG", mode="I", fps=output_fps, codec="libx264")
+            writer = make_mp4_writer(tmp_path, output_fps)
             try:
                 num_frames = _write_frame_range(
                     iter_video_frames(video_path, is_canceled=context.util.is_canceled),
