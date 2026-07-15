@@ -18,7 +18,15 @@
 export const deriveDeploymentBaseUrl = (moduleUrl: string, fallbackOrigin: string): string => {
   try {
     const url = new URL(moduleUrl);
-    const assetsIdx = url.pathname.indexOf('/assets/');
+    // If the bundle is served from a different origin than the page (e.g. CDN-hosted assets in
+    // `package` mode), sub-path detection on that foreign origin is meaningless - API/websocket/locale
+    // requests must target the app origin, not the asset origin. Fall back to the app origin.
+    if (typeof window !== 'undefined' && url.origin !== window.location.origin) {
+      return fallbackOrigin;
+    }
+    // `lastIndexOf` rather than `indexOf` in case the deployment prefix itself contains an `/assets/`
+    // segment (e.g. `/foo/assets/bar/`); Vite emits a single flat `assets/` dir at the deploy root.
+    const assetsIdx = url.pathname.lastIndexOf('/assets/');
     const prefix = assetsIdx >= 0 ? url.pathname.slice(0, assetsIdx) : '';
     return `${url.origin}${prefix}`;
   } catch {

@@ -32,6 +32,9 @@ LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 IMAGE_SUBFOLDER_STRATEGY = Literal["flat", "date", "type", "hash"]
 CONFIG_SCHEMA_VERSION = "4.0.3"
+# Path prefixes owned by real routes/mounts. A `base_url` starting with one of these would collide
+# with routing and silently brick the server, so it is rejected during validation.
+RESERVED_BASE_URL_PREFIXES = {"api", "ws", "static", "docs", "redoc", "openapi.json", "locales", "assets"}
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_alibabacloud_api_key",
     "external_alibabacloud_base_url",
@@ -267,12 +270,20 @@ class InvokeAIAppConfig(BaseSettings):
         """Normalize the reverse-proxy base path: ensure a single leading slash, no trailing slash.
 
         Empty values and a bare `/` normalize to `None` (feature disabled).
+
+        Reject base paths whose first segment collides with a real route prefix (`/api`, `/ws`, ...):
+        such a value silently bricks the server in both proxy styles (the sub-path rewrite and
+        Starlette's own `root_path` stripping fight over the same prefix), with no hint at the cause,
+        so we fail fast instead.
         """
         if v is None:
             return None
         v = v.strip().strip("/")
         if not v:
             return None
+        first_segment = v.split("/")[0]
+        if first_segment in RESERVED_BASE_URL_PREFIXES:
+            raise ValueError(f"base_url must not start with reserved path segment '/{first_segment}'")
         return f"/{v}"
 
     def update_config(self, config: dict[str, Any] | InvokeAIAppConfig, clobber: bool = True) -> None:
