@@ -5,7 +5,22 @@ import itertools
 import weakref
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Deque, Iterable, Literal, Optional, Type, TypeVar, Union, get_args, get_origin
+from functools import wraps
+from typing import (
+    Any,
+    Callable,
+    Concatenate,
+    Deque,
+    Iterable,
+    Literal,
+    Optional,
+    ParamSpec,
+    Type,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
 import networkx as nx
 from pydantic import (
@@ -1447,6 +1462,25 @@ class AnyInvocationOutput(BaseInvocationOutput):
         return {"oneOf": oneOf}
 
 
+_EdgeListMutationParams = ParamSpec("_EdgeListMutationParams")
+_EdgeListMutationResult = TypeVar("_EdgeListMutationResult")
+
+
+def _invalidates_edge_indexes(
+    method: Callable[Concatenate["_EdgeList", _EdgeListMutationParams], _EdgeListMutationResult],
+) -> Callable[Concatenate["_EdgeList", _EdgeListMutationParams], _EdgeListMutationResult]:
+    @wraps(method)
+    def wrapped(
+        self: "_EdgeList", *args: _EdgeListMutationParams.args, **kwargs: _EdgeListMutationParams.kwargs
+    ) -> _EdgeListMutationResult:
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self._invalidate_indexes()
+
+    return wrapped
+
+
 class _EdgeList(list[Edge]):
     """A graph-owned edge list that invalidates adjacency indexes after direct mutation."""
 
@@ -1463,77 +1497,53 @@ class _EdgeList(list[Edge]):
     def __getstate__(self) -> dict[str, Any]:
         return {}
 
+    @_invalidates_edge_indexes
     def append(self, edge: Edge) -> None:
-        try:
-            super().append(edge)
-        finally:
-            self._invalidate_indexes()
+        super().append(edge)
 
+    @_invalidates_edge_indexes
     def extend(self, edges: Iterable[Edge]) -> None:
-        try:
-            super().extend(edges)
-        finally:
-            self._invalidate_indexes()
+        super().extend(edges)
 
+    @_invalidates_edge_indexes
     def insert(self, index: int, edge: Edge) -> None:
-        try:
-            super().insert(index, edge)
-        finally:
-            self._invalidate_indexes()
+        super().insert(index, edge)
 
+    @_invalidates_edge_indexes
     def __setitem__(self, index: Any, value: Any) -> None:
-        try:
-            super().__setitem__(index, value)
-        finally:
-            self._invalidate_indexes()
+        super().__setitem__(index, value)
 
+    @_invalidates_edge_indexes
     def __delitem__(self, index: Any) -> None:
-        try:
-            super().__delitem__(index)
-        finally:
-            self._invalidate_indexes()
+        super().__delitem__(index)
 
+    @_invalidates_edge_indexes
     def __iadd__(self, edges: Iterable[Edge]):
-        try:
-            return super().__iadd__(edges)
-        finally:
-            self._invalidate_indexes()
+        return super().__iadd__(edges)
 
+    @_invalidates_edge_indexes
     def __imul__(self, value: int):
-        try:
-            return super().__imul__(value)
-        finally:
-            self._invalidate_indexes()
+        return super().__imul__(value)
 
+    @_invalidates_edge_indexes
     def clear(self) -> None:
-        try:
-            super().clear()
-        finally:
-            self._invalidate_indexes()
+        super().clear()
 
+    @_invalidates_edge_indexes
     def pop(self, index: int = -1) -> Edge:
-        try:
-            return super().pop(index)
-        finally:
-            self._invalidate_indexes()
+        return super().pop(index)
 
+    @_invalidates_edge_indexes
     def remove(self, edge: Edge) -> None:
-        try:
-            super().remove(edge)
-        finally:
-            self._invalidate_indexes()
+        super().remove(edge)
 
+    @_invalidates_edge_indexes
     def reverse(self) -> None:
-        try:
-            super().reverse()
-        finally:
-            self._invalidate_indexes()
+        super().reverse()
 
+    @_invalidates_edge_indexes
     def sort(self, *, key=None, reverse: bool = False) -> None:
-        try:
-            super().sort(key=key, reverse=reverse)
-        finally:
-            self._invalidate_indexes()
+        super().sort(key=key, reverse=reverse)
 
 
 class Graph(BaseModel):
