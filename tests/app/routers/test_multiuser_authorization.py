@@ -2000,7 +2000,10 @@ class TestWebSocketAuth:
         assert event.queue_id == "default"
 
     def test_queue_items_retried_routed_privately(self, socketio: Any) -> None:
-        """Verify that queue_items_retried is emitted only to owner/admin rooms."""
+        """The FULL queue_items_retried event, which carries owners' item ids, must reach only the
+        owner/admin rooms. A sanitized companion carrying no ids is broadcast to the queue room so
+        other users' badge totals refresh — see test_queue_items_retried_broadcasts_sanitized_companion.
+        """
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -2022,7 +2025,61 @@ class TestWebSocketAuth:
         assert "user:owner-123" in rooms_emitted_to
         assert "user:owner-456" in rooms_emitted_to
         assert "admin" in rooms_emitted_to
-        assert "default" not in rooms_emitted_to
+
+        # CRITICAL: nothing identifying may reach the queue room. The only emit there is the
+        # sanitized companion, which must not name any owner or any retried item.
+        queue_room_payloads = [c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        assert len(queue_room_payloads) == 1
+        assert queue_room_payloads[0]["retried_item_ids"] == []
+        assert queue_room_payloads[0]["user_ids"] == []
+        assert queue_room_payloads[0]["retried_item_ids_by_user"] == {}
+
+    def test_queue_items_retried_broadcasts_sanitized_companion(self, socketio: Any) -> None:
+        """Retried items are re-enqueued and raise the queue's global total, but retrying emits no
+        per-item queue_item_status_changed. A sanitized companion must therefore reach every other
+        subscriber so their badge total refetches, while owners and admins — who already got the
+        full event — are skipped.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        event = QueueItemsRetriedEvent.build(
+            RetryItemsResult(queue_id="default", retried_item_ids=[10, 20]),
+            user_ids=["owner-123", "owner-456"],
+            retried_item_ids_by_user={"owner-123": [10], "owner-456": [20]},
+        )
+
+        # A retry batch can span several owners — every one of them must be skipped, not just the first.
+        socketio._socket_users["sid-owner-123"] = {"user_id": "owner-123", "is_admin": False}
+        socketio._socket_users["sid-owner-456"] = {"user_id": "owner-456", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
+
+        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        assert len(queue_emits) == 1, "expected exactly one sanitized emit to the queue room"
+        payload = queue_emits[0].kwargs["data"]
+        skip_sid = queue_emits[0].kwargs["skip_sid"]
+
+        # Non-sensitive: the queue_id is all a non-owner needs to refetch its redacted status.
+        assert payload["queue_id"] == "default"
+        assert payload["retried_item_ids"] == []
+        assert payload["user_ids"] == []
+        assert payload["retried_item_ids_by_user"] == {}
+
+        # Both owners and the admin already received the full event and must not get a second copy.
+        assert "sid-owner-123" in skip_sid
+        assert "sid-owner-456" in skip_sid
+        assert "sid-admin" in skip_sid
+        # The unrelated user is the whole point — they must receive it.
+        assert "sid-other" not in skip_sid
 
     def test_queue_items_retried_payload_is_filtered_per_owner_room(self, socketio: Any) -> None:
         """Each owner room should only receive retry payload for that owner."""
