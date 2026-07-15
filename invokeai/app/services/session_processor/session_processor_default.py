@@ -33,7 +33,7 @@ from invokeai.app.services.session_processor.workflow_call_runtime import (
     WorkflowCallQueueLifecycle,
 )
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemNotFoundError
-from invokeai.app.services.shared.graph import NodeInputError
+from invokeai.app.services.shared.graph import CollectInvocation, IterateInvocation, NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
 
@@ -141,10 +141,19 @@ class DefaultSessionRunner(SessionRunnerBase):
 
                 # Invoke the node
                 output = invocation.invoke_internal(context=context, services=self._services)
+                control_collection = None
+                if self._on_after_run_node_callbacks and isinstance(invocation, (IterateInvocation, CollectInvocation)):
+                    control_collection = invocation.collection
                 # Save output and history
                 queue_item.session.complete(invocation.id, output)
 
-                self._on_after_run_node(invocation, queue_item, output)
+                if control_collection is not None:
+                    invocation.collection = control_collection
+                try:
+                    self._on_after_run_node(invocation, queue_item, output)
+                finally:
+                    if control_collection is not None:
+                        invocation.collection = []
 
         except CanceledException:
             # A CanceledException is raised during the denoising step callback if the cancel event is set. We don't need

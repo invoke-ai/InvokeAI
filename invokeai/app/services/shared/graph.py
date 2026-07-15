@@ -2,6 +2,7 @@
 
 import copy
 import itertools
+import weakref
 from collections import deque
 from dataclasses import dataclass
 from typing import Any, Deque, Iterable, Literal, Optional, Type, TypeVar, Union, get_args, get_origin
@@ -47,6 +48,8 @@ COLLECTION_FIELD = "collection"
 
 
 class EdgeConnection(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     node_id: str = Field(description="The id of the node for this edge connection")
     field: str = Field(description="The field for this connection")
 
@@ -62,6 +65,8 @@ class EdgeConnection(BaseModel):
 
 
 class Edge(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     source: EdgeConnection = Field(description="The connection for the edge's from node and field")
     destination: EdgeConnection = Field(description="The connection for the edge's to node and field")
 
@@ -1442,6 +1447,95 @@ class AnyInvocationOutput(BaseInvocationOutput):
         return {"oneOf": oneOf}
 
 
+class _EdgeList(list[Edge]):
+    """A graph-owned edge list that invalidates adjacency indexes after direct mutation."""
+
+    def __init__(self, edges: Iterable[Edge], owner: "Graph") -> None:
+        super().__init__(edges)
+        self._owner_ref = weakref.ref(owner)
+
+    def _invalidate_indexes(self) -> None:
+        owner_ref = getattr(self, "_owner_ref", None)
+        owner = owner_ref() if owner_ref is not None else None
+        if owner is not None:
+            owner._invalidate_edge_indexes()
+
+    def __getstate__(self) -> dict[str, Any]:
+        return {}
+
+    def append(self, edge: Edge) -> None:
+        try:
+            super().append(edge)
+        finally:
+            self._invalidate_indexes()
+
+    def extend(self, edges: Iterable[Edge]) -> None:
+        try:
+            super().extend(edges)
+        finally:
+            self._invalidate_indexes()
+
+    def insert(self, index: int, edge: Edge) -> None:
+        try:
+            super().insert(index, edge)
+        finally:
+            self._invalidate_indexes()
+
+    def __setitem__(self, index: Any, value: Any) -> None:
+        try:
+            super().__setitem__(index, value)
+        finally:
+            self._invalidate_indexes()
+
+    def __delitem__(self, index: Any) -> None:
+        try:
+            super().__delitem__(index)
+        finally:
+            self._invalidate_indexes()
+
+    def __iadd__(self, edges: Iterable[Edge]):
+        try:
+            return super().__iadd__(edges)
+        finally:
+            self._invalidate_indexes()
+
+    def __imul__(self, value: int):
+        try:
+            return super().__imul__(value)
+        finally:
+            self._invalidate_indexes()
+
+    def clear(self) -> None:
+        try:
+            super().clear()
+        finally:
+            self._invalidate_indexes()
+
+    def pop(self, index: int = -1) -> Edge:
+        try:
+            return super().pop(index)
+        finally:
+            self._invalidate_indexes()
+
+    def remove(self, edge: Edge) -> None:
+        try:
+            super().remove(edge)
+        finally:
+            self._invalidate_indexes()
+
+    def reverse(self) -> None:
+        try:
+            super().reverse()
+        finally:
+            self._invalidate_indexes()
+
+    def sort(self, *, key=None, reverse: bool = False) -> None:
+        try:
+            super().sort(key=key, reverse=reverse)
+        finally:
+            self._invalidate_indexes()
+
+
 class Graph(BaseModel):
     """A validated invocation graph made of nodes and typed edges."""
 
@@ -1454,6 +1548,45 @@ class Graph(BaseModel):
     )
     _input_edges_by_node: Optional[dict[str, list[Edge]]] = PrivateAttr(default=None)
     _output_edges_by_node: Optional[dict[str, list[Edge]]] = PrivateAttr(default=None)
+
+    def _rebind_edge_list(self) -> None:
+        object.__setattr__(self, "edges", _EdgeList(self.edges, self))
+        self._invalidate_edge_indexes()
+
+    def model_post_init(self, __context: Any) -> None:
+        self._rebind_edge_list()
+
+    def model_copy(self, *, update: Optional[dict[str, Any]] = None, deep: bool = False) -> "Graph":
+        copied = super().model_copy(update=update, deep=deep)
+        copied._rebind_edge_list()
+        return copied
+
+    def __copy__(self) -> "Graph":
+        copied = super().__copy__()
+        copied._rebind_edge_list()
+        return copied
+
+    def __deepcopy__(self, memo: Optional[dict[int, Any]] = None) -> "Graph":
+        copied = super().__deepcopy__(memo)
+        copied._rebind_edge_list()
+        return copied
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        super().__setstate__(state)
+        self._rebind_edge_list()
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "edges":
+            value = _EdgeList(value, self)
+            super().__setattr__(name, value)
+            self._invalidate_edge_indexes()
+            return
+        super().__setattr__(name, value)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Graph):
+            return NotImplemented
+        return self.id == other.id and self.nodes == other.nodes and self.edges == other.edges
 
     def _invalidate_edge_indexes(self) -> None:
         self._input_edges_by_node = None
@@ -1525,7 +1658,7 @@ class Graph(BaseModel):
 
         self._validate_edge(edge)
         if edge not in self.edges:
-            self.edges.append(edge)
+            list.append(self.edges, edge)
             self._add_edge_to_indexes(edge)
         else:
             raise InvalidEdgeError()
@@ -1538,7 +1671,7 @@ class Graph(BaseModel):
         for every expanded edge is redundant and prohibitively expensive for large iterator collections.
         """
         new_edges = list(edges)
-        self.edges.extend(new_edges)
+        list.extend(self.edges, new_edges)
         for edge in new_edges:
             self._add_edge_to_indexes(edge)
 
@@ -1546,7 +1679,7 @@ class Graph(BaseModel):
         """Deletes an edge from a graph"""
 
         try:
-            self.edges.remove(edge)
+            list.remove(self.edges, edge)
             self._remove_edge_from_indexes(edge)
         except ValueError:
             pass
