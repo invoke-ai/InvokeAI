@@ -3,6 +3,7 @@ Test the model installer
 """
 
 import gc
+import json
 import platform
 import shutil
 import threading
@@ -35,6 +36,11 @@ from invokeai.app.services.model_install.model_install_common import (
     LocalModelSource,
     ModelInstallJob,
     URLModelSource,
+)
+from invokeai.app.services.model_install.model_install_default import (
+    INSTALL_MARKER_FILENAME,
+    INSTALL_MARKER_VERSION,
+    TMPDIR_PREFIX,
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
@@ -367,6 +373,81 @@ def test_import_waits_for_startup_restore(
         import_thread.join(timeout=5)
         assert imported.is_set()
         installer.wait_for_installs(timeout=5)
+    finally:
+        release_restore.set()
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restore_skips_source_queued_during_restore(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test for #9141: if a foreground thread queues a job for a source after
+    restore has parsed that source's install marker but before restore appends its own job,
+    restore must notice the active job and skip the source instead of enqueuing it twice."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}race"
+    tmpdir.mkdir(parents=True)
+    marker = {
+        "version": INSTALL_MARKER_VERSION,
+        "source": str(source),
+        "access_token": None,
+        "config_in": {},
+        "status": InstallStatus.DOWNLOADING.value,
+        "updated_at": "",
+        "files": [],
+    }
+    with open(tmpdir / INSTALL_MARKER_FILENAME, "wt", encoding="utf-8") as f:
+        json.dump(marker, f)
+
+    marker_observed = threading.Event()
+    release_restore = threading.Event()
+    real_guess_source = installer._guess_source
+
+    def _pausing_guess_source(source_str: str):
+        result = real_guess_source(source_str)
+        marker_observed.set()
+        assert release_restore.wait(timeout=10)
+        return result
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer, "_guess_source", _pausing_guess_source)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    try:
+        installer.start()
+        assert marker_observed.wait(timeout=10)
+
+        # Restore is now paused between parsing the marker and its locked duplicate
+        # check. Queue an active job for the same source, as a concurrent
+        # import_model call would.
+        foreground_job = ModelInstallJob(
+            id=installer._next_id(),
+            source=source,
+            config_in=ModelRecordChanges(),
+            local_path=tmpdir,
+        )
+        with installer._lock:
+            installer._install_jobs.append(foreground_job)
+
+        release_restore.set()
+        installer._wait_for_restore_complete()
+
+        jobs_for_source = [job for job in installer._install_jobs if str(job.source) == str(source)]
+        assert jobs_for_source == [foreground_job]
+        assert resumed == []
     finally:
         release_restore.set()
         installer.stop()
