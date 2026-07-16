@@ -69,3 +69,30 @@ def test_theme_query_redirect_keeps_prefix(preserve: bool):
     resp = client.get("/?__theme=dark")
     assert resp.status_code == 307
     assert resp.headers["location"] == f"{BASE_PATH}/"
+
+
+@pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+def test_socketio_handshake_works_both_styles(preserve: bool, monkeypatch: pytest.MonkeyPatch):
+    """socket.io must keep working under a sub-path deployment.
+
+    Regression guard: engine.io is not root_path-aware and matches the raw `scope["path"]`
+    (which Starlette keeps as the full public path once `root_path` is set) against its
+    configured `socketio_path`. `SocketIO` must therefore fold `base_url` into the path, or
+    every handshake 404s and the UI loses all real-time updates behind the proxy.
+    """
+    from invokeai.app.api import sockets as sockets_module
+    from invokeai.app.services.config.config_default import InvokeAIAppConfig
+
+    monkeypatch.setattr(sockets_module, "get_config", lambda: InvokeAIAppConfig(base_url=BASE_PATH))
+
+    app = FastAPI()
+    sockets_module.SocketIO(app)
+    wrapped = SubPathASGIMiddleware(app, BASE_PATH)
+    root = f"http://testserver{BASE_PATH}" if preserve else "http://testserver"
+    client = TestClient(wrapped, base_url=root)
+
+    resp = client.get("/ws/socket.io/?EIO=4&transport=polling&t=abc")
+    assert resp.status_code == 200
+    # engine.io's open packet is a `0` followed by a JSON blob carrying the session id.
+    assert resp.text.startswith("0{")
+    assert '"sid"' in resp.text
