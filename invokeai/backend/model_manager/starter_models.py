@@ -1574,6 +1574,30 @@ anima_base = StarterModel(
 )
 # endregion
 
+# region Ideogram 4
+# Self-contained diffusers pipelines (both transformers + Qwen3-VL text encoder + VAE in one folder), so
+# no separate dependencies. Gated, non-commercial license: the license must be accepted on the
+# HuggingFace model page and a HuggingFace token configured before the download will succeed — same as
+# FLUX.1 dev.
+ideogram_4_nf4 = StarterModel(
+    name="Ideogram 4 (nf4)",
+    base=BaseModelType.Ideogram4,
+    source="ideogram-ai/ideogram-4-nf4",
+    description="Ideogram 4 text-to-image in nf4-quantized Diffusers format (CUDA only). Structured JSON "
+    "prompting with regional layout control. Non-commercial license — accept it on HuggingFace first. ~16GB",
+    type=ModelType.Main,
+)
+
+ideogram_4_fp8 = StarterModel(
+    name="Ideogram 4 (fp8)",
+    base=BaseModelType.Ideogram4,
+    source="ideogram-ai/ideogram-4-fp8",
+    description="Ideogram 4 text-to-image in fp8-quantized Diffusers format (runs on any device, higher "
+    "memory use). Non-commercial license — accept it on HuggingFace first. ~26GB",
+    type=ModelType.Main,
+)
+# endregion
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
@@ -1584,6 +1608,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux_dev,
     sd35_medium,
     sd35_large,
+    ideogram_4_nf4,
+    ideogram_4_fp8,
     cyberrealistic_sd1,
     rev_animated_sd1,
     dreamshaper_8_sd1,
@@ -1799,6 +1825,11 @@ anima_bundle: list[StarterModel] = [
     anima_vae,
 ]
 
+# nf4 is the recommended 24GB CUDA path; the fp8 build is offered separately for non-CUDA / more VRAM.
+ideogram_bundle: list[StarterModel] = [
+    ideogram_4_nf4,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
@@ -1807,6 +1838,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
+    BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

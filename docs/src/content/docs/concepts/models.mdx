@@ -51,6 +51,38 @@ In this situation, you may need to provide some additional information to identi
 
 [set up in the config file]: ../../configuration/invokeai-yaml
 
+## Ideogram 4
+
+Ideogram 4 is an open-weight text-to-image model with a distinctive **structured JSON prompt**: instead of a single sentence, the model is trained to read an overall scene description plus a list of regions, each with a bounding box and its own text. Invoke assembles this JSON for you.
+
+### Installing Ideogram 4
+
+The weights are gated on HuggingFace under a **non-commercial license**. Open the model page, accept the terms, and make sure your HuggingFace token is [set up in the config file] before installing. Two builds are available:
+
+- [`ideogram-ai/ideogram-4-nf4`](https://huggingface.co/ideogram-ai/ideogram-4-nf4) — nf4 quantized, **CUDA only**, fits in 24 GB VRAM. Recommended for NVIDIA GPUs.
+- [`ideogram-ai/ideogram-4-fp8`](https://huggingface.co/ideogram-ai/ideogram-4-fp8) — fp8 quantized, runs on **any device**, with higher memory use.
+
+Paste either repo ID into the Model Manager's HuggingFace / URL field to install.
+
+### Prompting Ideogram 4
+
+When an Ideogram 4 model is selected, Invoke builds the structured JSON prompt automatically:
+
+- The **positive prompt** becomes the overall scene description.
+- Each enabled **Regional Guidance** layer on the Canvas contributes one element: its drawn box becomes the region's bounding box and its prompt becomes that region's description. Draw a box where you want something and describe it there.
+- To drive the model directly, paste a **raw JSON** object into the prompt box — anything starting with `{` is passed through unchanged.
+
+The exact JSON that was encoded is stored in the image metadata as **Structured Caption**, and can be recalled straight back into the prompt box from the metadata viewer.
+
+:::note[No negative prompt]
+Ideogram 4 does not use a negative prompt — it has a dedicated unconditional branch instead, so the negative prompt box has no effect.
+:::
+
+### Generation settings
+
+- **Sampler Preset** — the primary quality/speed control. `Quality (48 steps)`, `Default (20 steps)`, and `Turbo (12 steps)` each bundle a step count, a guidance schedule, and the schedule shift.
+- **Advanced** overrides (all optional, leave on *Auto* to use the preset's values): **Steps**, **Guidance Scale**, **Schedule Shift (mu)**, and a **Color Palette** that biases the generated colors.
+
 ## Editing model metadata
 
 Every model has an editable **Source URL** field alongside its name and description. Use it to record where a model came from — for example a Civitai or HuggingFace page — independent of how it was originally installed. The URL is editable from the model's **Edit** view and appears as a clickable link in the model header once set. Models without a URL simply hide the field.

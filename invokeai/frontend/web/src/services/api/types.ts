@@ -466,8 +466,14 @@ const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainMo
   return config.type === 'main' && config.base === 'flux2' && config.name.toLowerCase().includes('9b');
 };
 
+const isIdeogram4MainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'ideogram-4';
+};
+
 export const isNonCommercialMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return isFluxDevMainModelConfig(config) || isFlux2Klein9BMainModelConfig(config);
+  return (
+    isFluxDevMainModelConfig(config) || isFlux2Klein9BMainModelConfig(config) || isIdeogram4MainModelConfig(config)
+  );
 };
 
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

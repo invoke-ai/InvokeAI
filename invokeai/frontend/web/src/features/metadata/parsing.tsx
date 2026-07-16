@@ -893,9 +893,10 @@ const ZImageShift: SingleMetadataHandler<number | null> = {
   },
   i18nKey: 'metadata.zImageShift',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
-    <MetadataPrimitiveValue value={value ?? 'Auto'} />
-  ),
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
 };
 //#endregion ZImageShift
 
@@ -947,9 +948,10 @@ const Ideogram4Steps: SingleMetadataHandler<number | null> = {
   },
   i18nKey: 'parameters.steps',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
-    <MetadataPrimitiveValue value={value ?? 'Auto'} />
-  ),
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
 };
 //#endregion Ideogram4Steps
 
@@ -975,9 +977,10 @@ const Ideogram4GuidanceScale: SingleMetadataHandler<number | null> = {
   },
   i18nKey: 'parameters.guidance',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
-    <MetadataPrimitiveValue value={value ?? 'Auto'} />
-  ),
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
 };
 //#endregion Ideogram4GuidanceScale
 
@@ -1003,9 +1006,10 @@ const Ideogram4Mu: SingleMetadataHandler<number | null> = {
   },
   i18nKey: 'parameters.shift',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
-    <MetadataPrimitiveValue value={value ?? 'Auto'} />
-  ),
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
 };
 //#endregion Ideogram4Mu
 
@@ -1033,6 +1037,33 @@ const Ideogram4ColorPalette: SingleMetadataHandler<string[]> = {
   ),
 };
 //#endregion Ideogram4ColorPalette
+
+//#region Ideogram4Caption
+// For regional/structured prompts the value actually encoded by the model is this assembled JSON
+// caption, while `positive_prompt` holds the raw overall description (via the graph's decoy node).
+// Recalling it into the positive prompt round-trips: the graph builder detects a leading `{` and passes
+// the JSON through unchanged.
+const Ideogram4Caption: SingleMetadataHandler<string> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Caption',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_caption');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    return Promise.resolve(z.string().parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(positivePromptChanged(value));
+  },
+  i18nKey: 'parameters.ideogram4Caption',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Ideogram4Caption
 
 //#region RefinerModel
 const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
@@ -1802,6 +1833,7 @@ export const ImageMetadataHandlers = {
   Ideogram4GuidanceScale,
   Ideogram4Mu,
   Ideogram4ColorPalette,
+  Ideogram4Caption,
   LoRAs,
   CanvasLayers,
   RefImages,

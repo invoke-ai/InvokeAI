@@ -1629,6 +1629,7 @@
         "aspect": "Aspect",
         "samplerPreset": "Sampler Preset",
         "colorPalette": "Color Palette",
+        "ideogram4Caption": "Structured Caption",
         "duration": "Duration",
         "lockAspectRatio": "Lock Aspect Ratio",
         "swapDimensions": "Swap Dimensions",
@@ -2445,7 +2446,7 @@
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
-                "This model is licensed for non-commercial use only. FLUX.1 [dev] models use the FLUX.1 [dev] Non-Commercial License, and FLUX.2 Klein 9B uses the FLUX.2 Non-Commercial License."
+                "This model is licensed for non-commercial use only. FLUX.1 [dev] models use the FLUX.1 [dev] Non-Commercial License, FLUX.2 Klein 9B uses the FLUX.2 Non-Commercial License, and Ideogram 4 uses the Ideogram 4 Non-Commercial License."
             ]
         },
         "optimizedDenoising": {

@@ -131,6 +131,11 @@ class Ideogram4DiffusersModel(ModelLoader):
         import accelerate
         from transformers import AutoConfig, AutoModel
 
+        from invokeai.backend.ideogram4.quantized_loading import (
+            FP8_TEXT_ENCODER_CONFIG_FLAG,
+            load_fp8_state_dict,
+            swap_linears_to_fp8,
+        )
         from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 
         encoder_path = model_path / "text_encoder"
@@ -138,18 +143,11 @@ class Ideogram4DiffusersModel(ModelLoader):
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         raw_cfg = json.loads((encoder_path / "config.json").read_text(encoding="utf-8"))
-        if raw_cfg.get("ideogram_fp8_weight_only", False):
-            # The fp8 text encoder uses Ideogram's custom weight-only fp8 layout; supporting it
-            # requires the vendored _load_fp8_text_encoder path. Deferred (nf4 is the 24 GB path).
-            raise NotImplementedError(
-                "Ideogram 4 fp8 text encoder loading is not yet implemented; use the nf4 build."
-            )
 
-        # Build the bare architecture from config, then quantize with InvokeAI's InvokeLinearNF4 and
-        # load the prequantized weights. We must NOT use transformers' native bitsandbytes loading
-        # (from_pretrained with a quantization_config) because the resulting bnb Linear4bit layers are
-        # not compatible with InvokeAI's partial-loading model cache. This mirrors how the FLUX T5 bnb
-        # encoder is loaded.
+        # Build the bare architecture from config, then load the prequantized weights ourselves. We must
+        # NOT use transformers' native bitsandbytes loading (from_pretrained with a quantization_config)
+        # because the resulting bnb Linear4bit layers are not compatible with InvokeAI's partial-loading
+        # model cache. This mirrors how the FLUX T5 bnb encoder is loaded.
         cfg = AutoConfig.from_pretrained(encoder_path, local_files_only=True)
         # Drop the quantization_config so from_config builds a plain (unquantized) architecture.
         if hasattr(cfg, "quantization_config"):
@@ -158,12 +156,26 @@ class Ideogram4DiffusersModel(ModelLoader):
         sd = _load_local_state_dict(encoder_path, "model")
         self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
 
+        if raw_cfg.get(FP8_TEXT_ENCODER_CONFIG_FLAG, False):
+            # Weight-only fp8 (e4m3): build the empty architecture, swap the quantized Linears for
+            # Fp8Linear (gated on a saved per-row scale), then load. Mirrors the transformer fp8 branch;
+            # runs on any device. strict=False tolerates the tied embed weights transformers resolves
+            # itself; unexpected keys still raise. assign=True fills the meta params directly.
+            with accelerate.init_empty_weights():
+                model: torch.nn.Module = AutoModel.from_config(cfg)
+                swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
+            load_fp8_state_dict(
+                model, sd, device=torch.device("cpu"), dtype=compute_dtype, assign=True, strict=False
+            )
+            model.eval()
+            return model
+
         is_bnb_nf4 = "quantization_config" in raw_cfg and bool(
             raw_cfg["quantization_config"].get("load_in_4bit")
         )
 
         with accelerate.init_empty_weights():
-            model: torch.nn.Module = AutoModel.from_config(cfg)
+            model = AutoModel.from_config(cfg)
             if is_bnb_nf4:
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=compute_dtype)
 
