@@ -65,14 +65,12 @@ export const LaunchpadTopBar = () => {
         <Text fontSize="sm" fontWeight="700">
           Invoke
         </Text>
-        {search.project ? (
-          <Button asChild colorPalette="accent" size="sm" variant="solid">
-            <Link search={projectSearch} to="/app">
-              <ArrowLeftIcon />
-              {t('launchpad.backToProject')}
-            </Link>
-          </Button>
-        ) : null}
+        <Button asChild colorPalette="accent" size="sm" variant="solid">
+          <Link search={projectSearch} to="/app">
+            <ArrowLeftIcon />
+            {t('launchpad.backToProject')}
+          </Link>
+        </Button>
       </HStack>
       <HStack gap="2">
         <ConnectionChip />
