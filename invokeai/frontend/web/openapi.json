@@ -805,6 +805,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1129,6 +1132,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1451,6 +1457,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -1825,6 +1834,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -2223,6 +2235,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -3441,6 +3456,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -11741,6 +11759,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
           },
           {
@@ -12276,6 +12297,7 @@
           "flux2",
           "cogview4",
           "z-image",
+          "ideogram-4",
           "external",
           "qwen-image",
           "anima",
@@ -19440,6 +19462,7 @@
                   "z_image_img2img",
                   "z_image_inpaint",
                   "z_image_outpaint",
+                  "ideogram4_txt2img",
                   "qwen_image_txt2img",
                   "qwen_image_img2img",
                   "qwen_image_inpaint",
@@ -29508,6 +29531,18 @@
                   "$ref": "#/components/schemas/IdealSizeInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4TextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/IfInvocation"
                 },
                 {
@@ -30163,6 +30198,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/IdealSizeOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/IfInvocationOutput"
@@ -32350,6 +32391,506 @@
         "required": ["output_meta", "width", "height", "type", "type"],
         "title": "IdealSizeOutput",
         "type": "object"
+      },
+      "Ideogram4ConditioningField": {
+        "description": "An Ideogram 4 conditioning tensor primitive value",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "Ideogram4ConditioningField",
+        "type": "object"
+      },
+      "Ideogram4ConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output an Ideogram 4 text conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/Ideogram4ConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ideogram4_conditioning_output",
+            "default": "ideogram4_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "Ideogram4ConditioningOutput",
+        "type": "object"
+      },
+      "Ideogram4DenoiseInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Runs the Ideogram 4 dual-branch flow-matching denoising loop (text-to-image).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ideogram4ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "sampler_preset": {
+            "default": "V4_QUALITY_48",
+            "description": "Sampler preset (steps + guidance schedule + schedule mean/std).",
+            "enum": ["V4_QUALITY_48", "V4_DEFAULT_20", "V4_TURBO_12"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "V4_QUALITY_48",
+            "orig_required": false,
+            "title": "Sampler Preset",
+            "type": "string"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override the preset's step count. Leave empty to use the preset.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Steps"
+          },
+          "guidance_scale": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override the main guidance weight (the preset's polish tail is preserved). Empty = use the preset.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Guidance Scale"
+          },
+          "mu": {
+            "anyOf": [
+              {
+                "maximum": 4.0,
+                "minimum": -4.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override the logit-normal schedule mean (resolution-adjusted internally). Empty = use the preset.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Mu"
+          },
+          "type": {
+            "const": "ideogram4_denoise",
+            "default": "ideogram4_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "ideogram4"],
+        "title": "Denoise - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "Ideogram4LatentsToImageInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decodes Ideogram 4 packed latents to an image with the FLUX.2-style VAE.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "type": {
+            "const": "ideogram4_l2i",
+            "default": "ideogram4_l2i",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "l2i", "ideogram4"],
+        "title": "Latents to Image - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "Ideogram4ModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads an Ideogram 4 model, outputting its submodels.\n\nIdeogram 4 is distributed as a single bundled diffusers folder, so the transformer\n(both branches), the Qwen3-VL text encoder + tokenizer, and the VAE are all loaded\nfrom the one selected model.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Ideogram 4 model to load.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Model",
+            "ui_model_base": ["ideogram-4"],
+            "ui_model_type": ["main"]
+          },
+          "type": {
+            "const": "ideogram4_model_loader",
+            "default": "ideogram4_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "ideogram4"],
+        "title": "Main Model - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
+        }
+      },
+      "Ideogram4ModelLoaderOutput": {
+        "class": "output",
+        "description": "Ideogram 4 model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "qwen3_encoder": {
+            "$ref": "#/components/schemas/Qwen3EncoderField",
+            "description": "Qwen3 tokenizer and text encoder",
+            "field_kind": "output",
+            "title": "Qwen3-VL Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ideogram4_model_loader_output",
+            "default": "ideogram4_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "type", "type"],
+        "title": "Ideogram4ModelLoaderOutput",
+        "type": "object"
+      },
+      "Ideogram4TextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a prompt for Ideogram 4 using the Qwen3-VL encoder.\n\nThe prompt is normally a structured JSON caption (see the Ideogram 4 prompting guide);\nplain text also works but yields lower-quality results.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt to encode. A structured JSON caption is recommended.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "qwen3_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3 tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3-VL Encoder"
+          },
+          "type": {
+            "const": "ideogram4_text_encoder",
+            "default": "ideogram4_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "ideogram4"],
+        "title": "Prompt - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
+        }
       },
       "IfInvocation": {
         "category": "math",
@@ -37210,6 +37751,18 @@
                 "$ref": "#/components/schemas/IdealSizeInvocation"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4TextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/IfInvocation"
               },
               {
@@ -37824,6 +38377,12 @@
                 "$ref": "#/components/schemas/IdealSizeOutput"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/IfInvocationOutput"
               },
               {
@@ -38364,6 +38923,18 @@
               },
               {
                 "$ref": "#/components/schemas/IdealSizeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/IfInvocation"
@@ -39181,6 +39752,18 @@
           "ideal_size": {
             "$ref": "#/components/schemas/IdealSizeOutput"
           },
+          "ideogram4_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "ideogram4_l2i": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
+          "ideogram4_model_loader": {
+            "$ref": "#/components/schemas/Ideogram4ModelLoaderOutput"
+          },
+          "ideogram4_text_encoder": {
+            "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
+          },
           "if": {
             "$ref": "#/components/schemas/IfInvocationOutput"
           },
@@ -39773,6 +40356,10 @@
           "heuristic_resize",
           "i2l",
           "ideal_size",
+          "ideogram4_denoise",
+          "ideogram4_l2i",
+          "ideogram4_model_loader",
+          "ideogram4_text_encoder",
           "if",
           "image",
           "image_batch",
@@ -40296,6 +40883,18 @@
               },
               {
                 "$ref": "#/components/schemas/IdealSizeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/IfInvocation"
@@ -41198,6 +41797,18 @@
               },
               {
                 "$ref": "#/components/schemas/IdealSizeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/IfInvocation"
@@ -50187,6 +50798,163 @@
         "title": "Main_Diffusers_Flux2_Config",
         "description": "Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."
       },
+      "Main_Diffusers_Ideogram4_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "ideogram-4",
+            "title": "Base",
+            "default": "ideogram-4"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base"
+        ],
+        "title": "Main_Diffusers_Ideogram4_Config",
+        "description": "Model config for Ideogram 4 diffusers models (nf4 / fp8 quantized).\n\nThe on-disk layout is a diffusers pipeline folder bundling two transformers\n(transformer/ + unconditional_transformer/), a Qwen3-VL text_encoder/ + tokenizer/,\nand a FLUX.2-style vae/. Quantization (nf4 vs fp8) lives inside the component folders\nand is detected by the loader, not here."
+      },
       "Main_Diffusers_QwenImage_Config": {
         "properties": {
           "key": {
@@ -55815,6 +56583,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -56390,6 +57161,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                   },
                   {
@@ -56850,6 +57624,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -57158,6 +57935,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -57917,6 +58697,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
