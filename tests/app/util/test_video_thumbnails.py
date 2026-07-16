@@ -176,8 +176,10 @@ class TestStreamedDecoderIsBounded:
         script = "import os, sys, time; os.close(sys.stdout.fileno()); time.sleep(600)"
         monkeypatch.setattr(video_thumbnails, "_worker_command", lambda *args: [sys.executable, "-c", script])
 
+        # The timeout must outlast worker spawn (slow on Windows CI) so the closed-stream EOF
+        # is seen before the inactivity deadline; the proc.wait branch still caps the test at ~1s.
         with pytest.raises(TimeoutError, match="decoder worker"):
-            next(iter_video_frames(target, timeout=0.2))
+            next(iter_video_frames(target, timeout=10))
 
 
 def test_timeout_kills_worker_descendants(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
