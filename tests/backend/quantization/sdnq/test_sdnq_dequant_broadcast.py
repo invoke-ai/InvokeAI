@@ -22,7 +22,11 @@ def test_uint4_per_group_accepts_2d_scale_and_zero_point():
         packed, scale_3d, zp_3d, torch.Size([out_features, in_features]), group_size, dtype=torch.float32
     )
     got = dequantize_uint4_per_group(
-        packed, scale_3d.squeeze(-1), zp_3d.squeeze(-1), torch.Size([out_features, in_features]), group_size,
+        packed,
+        scale_3d.squeeze(-1),
+        zp_3d.squeeze(-1),
+        torch.Size([out_features, in_features]),
+        group_size,
         dtype=torch.float32,
     )
 
@@ -42,7 +46,11 @@ def test_int5_per_group_accepts_2d_scale_and_zero_point():
         packed, scale_3d, zp_3d, torch.Size([out_features, in_features]), group_size, dtype=torch.float32
     )
     got = dequantize_int5_per_group(
-        packed, scale_3d.squeeze(-1), zp_3d.squeeze(-1), torch.Size([out_features, in_features]), group_size,
+        packed,
+        scale_3d.squeeze(-1),
+        zp_3d.squeeze(-1),
+        torch.Size([out_features, in_features]),
+        group_size,
         dtype=torch.float32,
     )
 
