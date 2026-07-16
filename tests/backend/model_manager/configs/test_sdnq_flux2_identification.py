@@ -3,19 +3,16 @@
 A single-file SDNQ FLUX.2 transformer must identify as ``Main_SDNQ_Flux2_Config`` (base=flux2),
 not as ``Main_SDNQ_FLUX_Config`` (base=flux) and not as unknown.
 
-The real shipped layout is *bare diffusers* (``transformer_blocks.*`` / ``context_embedder.*``):
-SDNQ tooling quantizes diffusers state dicts, and the single-file SDNQ FLUX.2 loader
-(``Flux2SDNQCheckpointModel._load_from_singlefile``) reads exactly those bare keys with no
-BFL→diffusers conversion — it explicitly does not support BFL-layout checkpoints. But the shared
-``_has_main_keys`` helper only knows the BFL / ComfyUI prefixes (``double_blocks.``,
-``model.diffusion_model.``), so ``Main_SDNQ_Flux2_Config`` would reject the real bare-diffusers
-checkpoint as "not a main model" unless it also accepts the bare diffusers transformer keys.
+The only supported single-file layout is *bare diffusers* (``transformer_blocks.*`` /
+``context_embedder.*``): SDNQ tooling quantizes diffusers state dicts, and the single-file SDNQ
+FLUX.2 loader (``Flux2SDNQCheckpointModel._load_from_singlefile``) reads exactly those bare keys with
+no BFL→diffusers conversion and no ``model.diffusion_model.`` prefix stripping. ``Main_SDNQ_Flux2_Config``
+therefore accepts only the bare diffusers layout and must REJECT a BFL / ComfyUI
+(``model.diffusion_model.double_blocks.*``) checkpoint — otherwise identification would classify a
+checkpoint the loader then fails to load with missing/unexpected keys.
 
-The *prefixed* (BFL / ComfyUI ``model.diffusion_model.*``) layout is not a real single-file SDNQ
-artifact, but it is still tested as a defensive guard: such a state dict looks like a generic main
-model, and ``Main_SDNQ_FLUX_Config`` — which only checks for generic main keys plus SDNQ keys —
-would otherwise accept it as FLUX.1 and hand it to the wrong (FLUX.1) loader. It must reject FLUX.2
-state dicts instead.
+``Main_SDNQ_FLUX_Config`` (base=flux) must also reject FLUX.2 state dicts in either layout, so an
+ambiguous checkpoint is never handed to the FLUX.1 loader.
 """
 
 from pathlib import Path
@@ -76,18 +73,25 @@ def _prefixed_flux2_sdnq_state_dict() -> dict:
 @patch("invokeai.backend.model_manager.configs.main.raise_if_not_file")
 @patch("invokeai.backend.model_manager.configs.main.raise_for_override_fields")
 class TestSDNQFlux2Identification:
-    @pytest.mark.parametrize(
-        "state_dict_factory",
-        [_bare_flux2_sdnq_state_dict, _prefixed_flux2_sdnq_state_dict],
-        ids=["bare-diffusers", "prefixed"],
-    )
-    def test_identifies_as_flux2(self, _rfo, _rif, state_dict_factory):
-        """Both prefixed and bare diffusers SDNQ FLUX.2 checkpoints identify as base=flux2."""
+    def test_bare_diffusers_identifies_as_flux2(self, _rfo, _rif):
+        """A bare diffusers-layout SDNQ FLUX.2 checkpoint (the layout the loader supports) identifies
+        as base=flux2."""
         from invokeai.backend.model_manager.configs.main import Main_SDNQ_Flux2_Config
 
-        mod = _make_mock_mod("flux-2-klein-4b-sdnq.safetensors", state_dict_factory())
+        mod = _make_mock_mod("flux-2-klein-4b-sdnq.safetensors", _bare_flux2_sdnq_state_dict())
         config = Main_SDNQ_Flux2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
         assert config.base is BaseModelType.Flux2
+
+    def test_prefixed_bfl_layout_is_rejected(self, _rfo, _rif):
+        """A BFL / ComfyUI (model.diffusion_model.double_blocks.*) SDNQ FLUX.2 checkpoint must NOT be
+        accepted: the single-file SDNQ FLUX.2 loader only consumes the bare diffusers layout (no BFL
+        prefix stripping / conversion), so identification must reject it rather than classify a
+        checkpoint the loader then fails to load."""
+        from invokeai.backend.model_manager.configs.main import Main_SDNQ_Flux2_Config
+
+        mod = _make_mock_mod("flux-2-klein-4b-sdnq.safetensors", _prefixed_flux2_sdnq_state_dict())
+        with pytest.raises(NotAMatchError):
+            Main_SDNQ_Flux2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
 
     @pytest.mark.parametrize(
         "state_dict_factory",

@@ -73,15 +73,28 @@ def apply_to_quantized_tensor(func, args, kwargs):
     if new_data.dtype != sdnq_tensor.quantized_data.dtype:
         raise ValueError("Operation changed the dtype of SDNQTensor unexpectedly.")
 
+    # Realign the auxiliary payloads (scale / zero_point / svd) to the new data's device so the whole
+    # wrapper lives on one device. `_to_copy` implements SDNQTensor.to(device); without this a
+    # "GPU-resident" SDNQ parameter would keep its scale/zero_point/svd tensors in system RAM,
+    # forcing a host->device copy of all of them (both SVD matrices included) on every dequantization
+    # of every quantized layer, on every inference step. We only move the device and preserve each
+    # tensor's own dtype (a dtype change to the packed data is already rejected above).
+    target_device = new_data.device
+
+    def _align(t: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+        if isinstance(t, torch.Tensor) and t.device != target_device:
+            return t.to(device=target_device)
+        return t
+
     return SDNQTensor(
         data=new_data,
         quantization_type=sdnq_tensor._quantization_type,
         tensor_shape=sdnq_tensor.tensor_shape,
         compute_dtype=sdnq_tensor.compute_dtype,
-        scale=sdnq_tensor._scale,
-        zero_point=sdnq_tensor._zero_point,
-        svd_up=sdnq_tensor._svd_up,
-        svd_down=sdnq_tensor._svd_down,
+        scale=_align(sdnq_tensor._scale),
+        zero_point=_align(sdnq_tensor._zero_point),
+        svd_up=_align(sdnq_tensor._svd_up),
+        svd_down=_align(sdnq_tensor._svd_down),
         group_size=sdnq_tensor._group_size,
     )
 
@@ -260,6 +273,22 @@ class SDNQTensor(torch.Tensor):
     def has_svd(self) -> bool:
         """Whether this tensor has SVD correction components."""
         return self._svd_up is not None and self._svd_down is not None
+
+    def sdnq_storage_nbytes(self) -> int:
+        """Actual in-memory storage of this quantized tensor, in bytes.
+
+        Generic size accounting (calc_tensor_size) uses the wrapper's advertised (dequantized) shape
+        together with the packed uint8 dtype: for uint4 that double-counts the weight (one byte per
+        unpacked element instead of one per two), for int5 it counts one byte per element instead of
+        five per eight, and the scale / zero_point / svd payloads are omitted entirely. This returns
+        the real storage — the packed data plus every auxiliary tensor — so cache eviction and
+        partial-load budgets operate on true sizes.
+        """
+        total = self.quantized_data.nelement() * self.quantized_data.element_size()
+        for aux in (self._scale, self._zero_point, self._svd_up, self._svd_down):
+            if isinstance(aux, torch.Tensor):
+                total += aux.nelement() * aux.element_size()
+        return total
 
     def requires_grad_(self, mode: bool = True) -> torch.Tensor:
         """SDNQTensor is only for inference, not training. This is a no-op."""

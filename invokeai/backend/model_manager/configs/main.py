@@ -22,7 +22,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
     state_dict_has_any_keys_exact,
 )
-from invokeai.backend.model_manager.configs.qwen3_encoder import _QWEN3_ENCODER_ARCHITECTURES
+from invokeai.backend.model_manager.configs.qwen3_encoder import _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -1607,15 +1607,16 @@ class Main_SDNQ_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
     @classmethod
     def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
         state_dict = mod.load_state_dict()
-        # Accept both layouts a FLUX.2 SDNQ single-file checkpoint can use:
-        # - BFL / ComfyUI checkpoint layout (double_blocks., model.diffusion_model., ...), which
-        #   the shared _has_main_keys() helper recognizes; and
-        # - the bare diffusers layout (transformer_blocks., context_embedder.), which the FLUX.2
-        #   single-file loader consumes but _has_main_keys() does not know about. Without this a
-        #   bare-diffusers FLUX.2 SDNQ checkpoint would be rejected here and never identified.
-        if _has_main_keys(state_dict) or _has_flux2_diffusers_transformer_keys(state_dict):
+        # Only the bare diffusers layout (transformer_blocks. / context_embedder.) is accepted: the
+        # single-file SDNQ FLUX.2 loader consumes those keys directly and neither strips the
+        # model.diffusion_model. prefix nor converts BFL double_blocks. keys. Accepting a BFL /
+        # ComfyUI checkpoint here (via _has_main_keys) would classify a checkpoint the loader then
+        # fails to load with missing/unexpected keys, so we reject it during identification instead.
+        if _has_flux2_diffusers_transformer_keys(state_dict):
             return
-        raise NotAMatchError("state dict does not look like a main model")
+        raise NotAMatchError(
+            "state dict is not in the bare diffusers layout the single-file SDNQ FLUX.2 loader supports"
+        )
 
     @classmethod
     def _validate_is_flux2(cls, mod: ModelOnDisk) -> None:
@@ -1683,13 +1684,12 @@ class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 # (incl. Qwen3) use the Qwen2 tokenizer classes, in slow and fast variants.
 _QWEN_TOKENIZER_CLASS_NAMES = {"Qwen2Tokenizer", "Qwen2TokenizerFast"}
 
-# Text-encoder class names the SDNQ pipeline loaders can actually instantiate. The FLUX.2 / Z-Image
-# SDNQ pipeline loaders build a text-only Qwen3ForCausalLM for the discovered text_encoder/ folder,
-# so they cannot load a Qwen-VL model: Qwen2VLForConditionalGeneration ships a visual tower and is a
-# multimodal encoder (handled by the QwenVLEncoder config), not a text encoder. Recording it as a
-# self-contained TextEncoder would mark the pipeline complete even though the loader would fail on
-# the visual-tower weights — so we intentionally narrow it out of the accepted encoder architectures.
-_SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES = _QWEN3_ENCODER_ARCHITECTURES - {"Qwen2VLForConditionalGeneration"}
+# Text-encoder class names the SDNQ pipeline loaders can actually instantiate. They build a text-only
+# Qwen3ForCausalLM for the discovered text_encoder/ folder, so they can only load a Qwen3 model — not
+# a Qwen2 causal LM (missing Qwen3 q/k-norm params) and not the multimodal Qwen2VLForConditionalGeneration
+# (visual tower). Recording any of those as a self-contained TextEncoder would mark the pipeline
+# complete even though the loader would fail, so discovery narrows to the loadable Qwen3 set.
+_SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES = _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 
 
 class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):

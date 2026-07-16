@@ -214,6 +214,15 @@ def dequantize_uint4_per_group(
     if zero_point.device != device:
         zero_point = zero_point.to(device)
 
+    # Per-group scale/zero_point may be stored as [out_features, num_groups, 1] or, without the
+    # trailing singleton, as [out_features, num_groups]. The grouped weight below is 3D
+    # ([out_features, num_groups, group_size]); a 2D scale would right-align (group_size vs
+    # num_groups) and fail broadcasting, so normalize 2D params with a trailing singleton dim.
+    if scale.dim() == 2:
+        scale = scale.unsqueeze(-1)
+    if zero_point.dim() == 2:
+        zero_point = zero_point.unsqueeze(-1)
+
     # Unpack uint4 values
     unpacked = unpack_uint4(packed_weight, original_shape)
 
@@ -273,6 +282,14 @@ def dequantize_int5_per_group(
         scale = scale.to(device)
     if zero_point is not None and zero_point.device != device:
         zero_point = zero_point.to(device)
+
+    # Normalize [out_features, num_groups] scale/zero_point to [out_features, num_groups, 1] so they
+    # broadcast against the 3D grouped weight below (a 2D param would right-align group_size against
+    # num_groups and fail broadcasting).
+    if scale.dim() == 2:
+        scale = scale.unsqueeze(-1)
+    if zero_point is not None and zero_point.dim() == 2:
+        zero_point = zero_point.unsqueeze(-1)
 
     unpacked = unpack_uint5(packed_weight, original_shape)
     # Sign-extend: SDNQ stores signed int5 (-16..15) in unsigned 5-bit (0..31) by adding 16

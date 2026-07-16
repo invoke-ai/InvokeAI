@@ -187,13 +187,20 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError("state dict looks like GGUF quantized")
 
 
-# Transformers architectures the Qwen3 encoder loader can consume. Kept in one place so the
-# unquantized and SDNQ folder configs accept exactly the same set of compatible class names.
+# Transformers architectures the unquantized Qwen3 encoder config accepts.
 _QWEN3_ENCODER_ARCHITECTURES = {
     "Qwen2VLForConditionalGeneration",
     "Qwen2ForCausalLM",
     "Qwen3ForCausalLM",
 }
+
+# Architectures the SDNQ Qwen encoder loaders can actually instantiate. Both the standalone
+# Qwen3EncoderSDNQLoader and the FLUX.2 / Z-Image pipeline loaders reconstruct a text-only
+# Qwen3Config + Qwen3ForCausalLM from the state dict, so they can only load a Qwen3 model: a Qwen2
+# state dict lacks Qwen3-specific parameters (q/k normalization), and a Qwen-VL state dict also
+# carries visual-tower weights. Accepting those classes during identification produces folders the
+# loader's strict incomplete-load guard would reject, so the SDNQ paths must narrow to this set.
+_SDNQ_LOADABLE_QWEN_ARCHITECTURES = {"Qwen3ForCausalLM"}
 
 
 class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
@@ -473,10 +480,12 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
 
     @classmethod
     def _validate_is_qwen3_encoder(cls, mod: ModelOnDisk) -> None:
-        # Strongest signal: a transformers-style config.json naming a compatible Qwen architecture.
-        # Accept exactly the same class names as the unquantized Qwen3Encoder_Qwen3Encoder_Config
-        # (Qwen2VLForConditionalGeneration / Qwen2ForCausalLM / Qwen3ForCausalLM) so a compatible
-        # encoder is not rejected here just because it is SDNQ-quantized.
+        # Strongest signal: a transformers-style config.json naming the architecture. The SDNQ
+        # encoder loader can only build Qwen3ForCausalLM, so we accept only that class here. Crucially,
+        # when a config.json declares a *different* architecture (e.g. Qwen2ForCausalLM or the
+        # multimodal Qwen2VLForConditionalGeneration), we reject rather than falling through to the
+        # key heuristic: the loader would fail on the missing Qwen3 params / extra visual-tower
+        # weights, so identification must not accept a folder it cannot load.
         for cfg_path in (mod.path / "config.json", mod.path / "text_encoder" / "config.json"):
             if not cfg_path.exists():
                 continue
@@ -489,15 +498,20 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
             class_name = cfg.get("_class_name")
             if isinstance(class_name, str):
                 names.add(class_name)
-            if names & _QWEN3_ENCODER_ARCHITECTURES:
+            if not names:
+                continue
+            if names & _SDNQ_LOADABLE_QWEN_ARCHITECTURES:
                 return
+            raise NotAMatchError(
+                f"architecture {sorted(names)} is not loadable by the SDNQ Qwen3 encoder loader "
+                "(only Qwen3ForCausalLM is supported)"
+            )
 
-        # Fallback for folders without a usable config.json: check for Qwen3-specific state-dict
-        # keys (model.layers. / model.embed_tokens.weight). An SDNQ transformer/VAE folder has
-        # transformer_blocks. / decoder. keys instead and is correctly rejected here. Loading the
-        # state dict can raise for sharded folders (multiple weight files), so treat that as "no
-        # usable signal" rather than letting it abort identification — the config-class check above
-        # already covers sharded folders that declare a compatible architecture.
+        # Fallback for folders without a usable config.json architecture: check for Qwen3-specific
+        # state-dict keys (model.layers. / model.embed_tokens.weight). An SDNQ transformer/VAE folder
+        # has transformer_blocks. / decoder. keys instead and is correctly rejected. Loading the state
+        # dict can raise for sharded folders (multiple weight files), so treat that as "no usable
+        # signal" rather than letting it abort identification.
         try:
             state_dict = mod.load_state_dict()
         except Exception:

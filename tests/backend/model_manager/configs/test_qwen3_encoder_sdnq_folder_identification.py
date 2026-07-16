@@ -171,12 +171,17 @@ class TestQwen3EncoderSDNQFolderIdentification:
         result = ModelConfigFactory.from_model_on_disk(root, allow_unknown=True)
         assert not isinstance(result.config, Qwen3Encoder_SDNQ_Folder_Config)
 
-    def test_sharded_qwen2_causal_lm_encoder_is_accepted(self, tmp_path: Path):
-        """A sharded SDNQ encoder declaring Qwen2ForCausalLM (a class the unquantized config accepts)
-        must resolve to the SDNQ folder config, not fail identification on the multi-shard load."""
+    def test_sdnq_qwen2_causal_lm_encoder_is_rejected(self, tmp_path: Path):
+        """A folder declaring Qwen2ForCausalLM must NOT resolve to the SDNQ folder config: the SDNQ
+        encoder loader only builds Qwen3ForCausalLM, so accepting Qwen2 would produce a folder the
+        loader's strict incomplete-load guard rejects (missing Qwen3 q/k-norm params)."""
         root = _make_sdnq_sharded_qwen2_encoder_folder(tmp_path / "sdnq-qwen2-sharded")
+        mod = ModelOnDisk(root)
+        with pytest.raises(NotAMatchError):
+            Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
         result = ModelConfigFactory.from_model_on_disk(root, allow_unknown=True)
-        assert isinstance(result.config, Qwen3Encoder_SDNQ_Folder_Config)
+        assert not isinstance(result.config, Qwen3Encoder_SDNQ_Folder_Config)
 
     def test_factory_resolves_sdnq_qwen3_folder_deterministically(self, tmp_path: Path):
         """With the plain config rejecting SDNQ, the factory resolves the folder unambiguously to

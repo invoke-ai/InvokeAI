@@ -92,7 +92,7 @@ You will most likely see SDNQ-specific quality issues at:
 - **Very high CFG values** (> 8) on Klein 4B dynamic — the 4-bit attention saturates faster than bfloat16.
 - **Long generations with heavy LoRA stacks** — cumulative quantization noise becomes visible after dozens of steps.
 
-If you need higher quality and have the VRAM, the static `Disty0/FLUX.2-dev-SDNQ-uint4-svd-r32` (FLUX.2 dev, 12 B params) is the most faithful SDNQ option.
+If you need higher quality and have the VRAM, the static `Disty0/FLUX.2-klein-9B-SDNQ-uint4-svd-r32` (FLUX.2 Klein 9B) is the most faithful SDNQ option InvokeAI currently supports. Only the FLUX.2 Klein 4B / 9B variants are supported — FLUX.2 dev is not yet implemented, so FLUX.2-dev SDNQ exports cannot be installed correctly.
 
 ## Comparison with other quantization formats
 

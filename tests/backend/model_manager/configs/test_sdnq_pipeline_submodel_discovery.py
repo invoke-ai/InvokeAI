@@ -37,9 +37,11 @@ _REQUIRED_FIELDS = {
     "key": "test-key",
 }
 
-# Text-only Qwen causal-LM classes the pipeline loader can instantiate. Qwen2VLForConditionalGeneration
-# is intentionally excluded (multimodal, not loadable as text-only Qwen3ForCausalLM).
-_ENCODER_CLASSES = ["Qwen2ForCausalLM", "Qwen3ForCausalLM"]
+# Only Qwen3ForCausalLM is loadable by the pipeline loader (it builds a text-only Qwen3ForCausalLM).
+# Qwen2ForCausalLM (missing Qwen3 q/k-norm params) and the multimodal Qwen2VLForConditionalGeneration
+# (visual tower) are not loadable and must not be recorded as self-contained TextEncoders.
+_ENCODER_CLASSES = ["Qwen3ForCausalLM"]
+_UNLOADABLE_ENCODER_CLASSES = ["Qwen2ForCausalLM", "Qwen2VLForConditionalGeneration"]
 
 
 def _write_sdnq_transformer(root: Path, transformer_config: dict) -> None:
@@ -142,29 +144,31 @@ def test_zimage_sdnq_pipeline_records_compatible_encoder_and_fast_tokenizer(tmp_
     _assert_complete_pipeline(config)
 
 
-def _assert_qwen_vl_pipeline_not_self_contained(config) -> None:
-    # The VAE and Tokenizer are still recorded, but the multimodal Qwen-VL text encoder is NOT — so
-    # the pipeline is not self-contained and readiness/invocation must require an explicit text-only
-    # Qwen source instead of selecting the main model (which the loader could not load).
+def _assert_pipeline_not_self_contained(config) -> None:
+    # The VAE and Tokenizer are still recorded, but the unloadable text encoder is NOT — so the
+    # pipeline is not self-contained and readiness/invocation must require an explicit text-only Qwen3
+    # source instead of selecting the main model (which the loader could not load).
     assert config.submodels is not None
     assert SubModelType.TextEncoder not in config.submodels
     assert SubModelType.VAE in config.submodels
     assert not is_self_contained_sdnq_pipeline(config)
 
 
-def test_flux2_sdnq_pipeline_with_qwen_vl_encoder_is_not_self_contained(tmp_path: Path):
-    root = _make_flux2_pipeline(tmp_path / "flux2-vl", "Qwen2VLForConditionalGeneration")
+@pytest.mark.parametrize("encoder_class", _UNLOADABLE_ENCODER_CLASSES)
+def test_flux2_sdnq_pipeline_with_unloadable_encoder_is_not_self_contained(tmp_path: Path, encoder_class: str):
+    root = _make_flux2_pipeline(tmp_path / "flux2-unloadable", encoder_class)
     _write_qwen_vl_text_encoder(root)
     config = Main_SDNQ_Diffusers_Flux2_Config.from_model_on_disk(
         _mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()}
     )
-    _assert_qwen_vl_pipeline_not_self_contained(config)
+    _assert_pipeline_not_self_contained(config)
 
 
-def test_zimage_sdnq_pipeline_with_qwen_vl_encoder_is_not_self_contained(tmp_path: Path):
-    root = _make_zimage_pipeline(tmp_path / "zimage-vl", "Qwen2VLForConditionalGeneration")
+@pytest.mark.parametrize("encoder_class", _UNLOADABLE_ENCODER_CLASSES)
+def test_zimage_sdnq_pipeline_with_unloadable_encoder_is_not_self_contained(tmp_path: Path, encoder_class: str):
+    root = _make_zimage_pipeline(tmp_path / "zimage-unloadable", encoder_class)
     _write_qwen_vl_text_encoder(root)
     config = Main_SDNQ_Diffusers_ZImage_Config.from_model_on_disk(
         _mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()}
     )
-    _assert_qwen_vl_pipeline_not_self_contained(config)
+    _assert_pipeline_not_self_contained(config)
