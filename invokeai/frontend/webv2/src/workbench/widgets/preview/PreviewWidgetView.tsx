@@ -1,7 +1,7 @@
 /* eslint-disable react/react-compiler */
 import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
-import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
 import { useProgressImage, type ProgressImageSnapshot } from '@workbench/backend/progressImageStore';
 import { Button } from '@workbench/components/ui';
 import {
@@ -44,6 +44,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { PreviewCompare } from './PreviewCompare';
+import { getPreviewComparisonMode, type PreviewComparisonMode } from './previewSettings';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
 
@@ -131,11 +132,20 @@ const previewGridCss = {
   backgroundSize: '24px 24px',
 } as const;
 
+const getFittedFrameCss = (width: number, height: number): SystemStyleObject => ({
+  aspectRatio: `${width} / ${height}`,
+  height: 'auto',
+  maxHeight: '100%',
+  maxWidth: '100%',
+  width: `min(100cqw, calc(100cqh * ${width / height}))`,
+});
+
 const selectGenerateRecallValues = createGenerateFormValuesSelector();
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const { t } = useTranslation();
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
+  const previewValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'preview'));
   const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
   const { antialiasProgressImages, showProgressImagesInViewer } = useActiveProjectSelector(
     (project) => project.settings
@@ -144,6 +154,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const dispatch = useWorkbenchDispatch();
   const selectedImage = useMemo(() => getSelectedImage(galleryValues), [galleryValues]);
   const compareImage = getGalleryCompareImage(galleryValues);
+  const comparisonMode = getPreviewComparisonMode(previewValues);
   const recentImages = Array.isArray(galleryValues.recentImages) ? galleryValues.recentImages : null;
   const localImages = useMemo(() => getGalleryImages({ recentImages }), [recentImages]);
   const imageBoardId = selectedImage ? getImageBoardId(selectedImage) : 'none';
@@ -352,6 +363,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
     }
   }, [compareImage, dispatch, selectedImage]);
+  const setComparisonMode = useCallback(
+    (comparisonMode: PreviewComparisonMode) =>
+      dispatch({ type: 'patchWidgetValues', values: { comparisonMode }, widgetId: 'preview' }),
+    [dispatch]
+  );
   const openImageContextMenu = useCallback(
     (x: number, y: number) => {
       if (contextMenuImage) {
@@ -404,8 +420,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             <PreviewCompare
               baseImage={selectedImage}
               compareImage={compareImage}
+              mode={comparisonMode}
               runtime={runtime}
               onExit={exitCompare}
+              onModeChange={setComparisonMode}
               onSwap={swapCompareImages}
             />
           ) : (
@@ -503,23 +521,21 @@ const SelectedImagePreview = ({
   const imageStyle = useMemo<CSSProperties>(
     () => ({
       display: 'block',
-      height: '100%',
+      height: 'auto',
       imageRendering: isProgressImage && !shouldAntialiasProgressImage ? 'pixelated' : 'auto',
-      inset: 0,
-      objectFit: 'contain',
-      position: 'absolute',
       width: '100%',
     }),
     [isProgressImage, shouldAntialiasProgressImage]
   );
 
   return (
-    <Stack gap="3" h="full" minH="0" tabIndex={0} w="full" onKeyDown={handleKeyDown}>
+    <Stack gap="3" h="full" minH="0" outline="none" tabIndex={0} w="full" onKeyDown={handleKeyDown}>
       <Flex
         align="center"
         borderWidth="1px"
         borderColor="border.subtle"
         color="fg.grid"
+        containerType="size"
         css={previewGridCss}
         flex="1"
         justify="center"
@@ -530,21 +546,25 @@ const SelectedImagePreview = ({
         w="full"
       >
         <Box
-          aspectRatio={previewWidth / previewHeight}
           bg="transparent"
           borderWidth="1px"
           borderColor={isProgressImage ? 'accent.solid' : 'border.emphasized'}
           boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-          h={isCompact ? 'auto' : 'full'}
-          maxH={isCompact ? undefined : 'full'}
-          maxW="full"
+          css={getFittedFrameCss(previewWidth, previewHeight)}
           overflow="hidden"
           position="relative"
           rounded="lg"
-          w={isCompact ? 'full' : 'auto'}
           onContextMenu={handleContextMenu}
         >
-          {previewImage ? <img alt={previewImage.alt} src={previewImage.src} style={imageStyle} /> : null}
+          {previewImage ? (
+            <img
+              alt={previewImage.alt}
+              height={previewHeight}
+              src={previewImage.src}
+              style={imageStyle}
+              width={previewWidth}
+            />
+          ) : null}
           {isProgressImage ? (
             <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
               {t('common.generating')}
@@ -620,6 +640,7 @@ const EmptyPreview = ({
       align="center"
       backgroundColor="bg.inset"
       color="fg.grid"
+      containerType="size"
       css={previewGridCss}
       h="full"
       justify="center"
@@ -627,12 +648,10 @@ const EmptyPreview = ({
     >
       {previewImage ? (
         <Box
-          aspectRatio={(previewImage.width ?? 1) / (previewImage.height ?? 1)}
           borderColor="accent.solid"
           borderWidth="1px"
           boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-          maxH="full"
-          maxW="full"
+          css={getFittedFrameCss(previewImage.width ?? 1, previewImage.height ?? 1)}
           overflow="hidden"
           position="relative"
           rounded="lg"
@@ -640,14 +659,15 @@ const EmptyPreview = ({
           <img
             alt={previewImage.alt}
             draggable={false}
+            height={previewImage.height}
             src={previewImage.src}
             style={{
               display: 'block',
-              height: '100%',
+              height: 'auto',
               imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
-              objectFit: 'contain',
               width: '100%',
             }}
+            width={previewImage.width}
           />
           <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
             {t('common.generating')}

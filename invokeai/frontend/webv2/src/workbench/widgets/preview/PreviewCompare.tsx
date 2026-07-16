@@ -1,8 +1,8 @@
 import type { GeneratedImageContract, WidgetRuntimeApi } from '@workbench/types';
 
-import { Badge, Box, Flex, HStack, Stack } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, SegmentGroup, Stack, type SystemStyleObject } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
-import { ArrowLeftRightIcon, Columns2Icon, XIcon } from 'lucide-react';
+import { ArrowLeftRightIcon, XIcon } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -10,23 +10,49 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
+  type FocusEvent,
   type PointerEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type CompareMode = 'slider' | 'side-by-side';
+import type { PreviewComparisonMode } from './previewSettings';
 
-const COMPARE_IMAGE_STYLE: CSSProperties = {
+const COMPARISON_MODES: { labelKey: string; value: PreviewComparisonMode }[] = [
+  { labelKey: 'widgets.preview.slider', value: 'slider' },
+  { labelKey: 'widgets.preview.sideBySide', value: 'side-by-side' },
+  { labelKey: 'widgets.preview.hover', value: 'hover' },
+];
+
+export const getNextPreviewComparisonMode = (mode: PreviewComparisonMode): PreviewComparisonMode => {
+  const index = COMPARISON_MODES.findIndex((item) => item.value === mode);
+
+  return COMPARISON_MODES[(index + 1) % COMPARISON_MODES.length]?.value ?? 'slider';
+};
+
+const getFittedFrameCss = (width: number, height: number): SystemStyleObject => ({
+  aspectRatio: `${width} / ${height}`,
+  height: 'auto',
+  maxHeight: '100%',
+  maxWidth: '100%',
+  width: `min(100cqw, calc(100cqh * ${width / height}))`,
+});
+
+const BASE_IMAGE_STYLE = {
   display: 'block',
-  height: '100%',
-  inset: 0,
-  objectFit: 'contain',
+  height: 'auto',
   pointerEvents: 'none',
-  position: 'absolute',
   userSelect: 'none',
   width: '100%',
-};
+} as const;
+
+const OVERLAY_IMAGE_STYLE = {
+  display: 'block',
+  height: '100%',
+  objectFit: 'contain',
+  pointerEvents: 'none',
+  userSelect: 'none',
+  width: '100%',
+} as const;
 
 const previewGridCss = {
   backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
@@ -37,29 +63,29 @@ const previewGridCss = {
 
 const sliderTouchStyle = { touchAction: 'none' } as const;
 
-/**
- * Two-image comparison: a draggable slider that reveals the compare image over
- * the selected one, or a side-by-side split.
- */
+/** Three-mode, project-persisted comparison surface. */
 export const PreviewCompare = ({
   baseImage,
   compareImage,
+  mode,
   onExit,
+  onModeChange,
   onSwap,
   runtime,
 }: {
   baseImage: GeneratedImageContract;
   compareImage: GeneratedImageContract;
+  mode: PreviewComparisonMode;
   onExit: () => void;
+  onModeChange: (mode: PreviewComparisonMode) => void;
   onSwap: () => void;
   runtime: WidgetRuntimeApi;
 }) => {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<CompareMode>('slider');
   const [dividerPercent, setDividerPercent] = useState(50);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
-  const nextMode = useEffectEvent(() => setMode((current) => (current === 'slider' ? 'side-by-side' : 'slider')));
+  const nextMode = useEffectEvent(() => onModeChange(getNextPreviewComparisonMode(mode)));
   const nextComparisonModeLabel = t('widgets.preview.commands.nextComparisonMode');
 
   useEffect(() => {
@@ -119,7 +145,14 @@ export const PreviewCompare = ({
 
     isDraggingRef.current = false;
   }, []);
-  const toggleMode = useCallback(() => setMode((current) => (current === 'slider' ? 'side-by-side' : 'slider')), []);
+  const handleModeChange = useCallback(
+    (details: { value: string | null }) => {
+      if (details.value === 'slider' || details.value === 'side-by-side' || details.value === 'hover') {
+        onModeChange(details.value);
+      }
+    },
+    [onModeChange]
+  );
   const clipStyle = useMemo(() => ({ clipPath: `inset(0 ${100 - dividerPercent}% 0 0)` }), [dividerPercent]);
 
   return (
@@ -130,6 +163,7 @@ export const PreviewCompare = ({
         borderWidth="1px"
         borderColor="border.subtle"
         color="fg.grid"
+        containerType="size"
         css={previewGridCss}
         flex="1"
         justify="center"
@@ -142,26 +176,36 @@ export const PreviewCompare = ({
         {mode === 'slider' ? (
           <Box
             ref={containerRef}
-            bg="transparent"
+            borderColor="border.emphasized"
+            borderWidth="1px"
             cursor="ew-resize"
-            h="full"
+            css={getFittedFrameCss(baseImage.width, baseImage.height)}
             overflow="hidden"
             position="relative"
+            rounded="lg"
             style={sliderTouchStyle}
-            w="full"
+            onLostPointerCapture={endDrag}
+            onPointerCancel={endDrag}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-            onLostPointerCapture={endDrag}
           >
-            <img alt={baseImage.imageName} draggable={false} src={baseImage.imageUrl} style={COMPARE_IMAGE_STYLE} />
+            <img
+              alt={baseImage.imageName}
+              draggable={false}
+              height={baseImage.height}
+              src={baseImage.imageUrl}
+              style={BASE_IMAGE_STYLE}
+              width={baseImage.width}
+            />
             <Box bg="transparent" inset="0" pointerEvents="none" position="absolute" style={clipStyle}>
               <img
                 alt={compareImage.imageName}
                 draggable={false}
+                height={compareImage.height}
                 src={compareImage.imageUrl}
-                style={COMPARE_IMAGE_STYLE}
+                style={OVERLAY_IMAGE_STYLE}
+                width={compareImage.width}
               />
             </Box>
             <Box
@@ -174,13 +218,10 @@ export const PreviewCompare = ({
               transform="translateX(-50%)"
               w="2px"
             />
-            <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-              {t('widgets.preview.compare')}
-            </Badge>
-            <Badge pointerEvents="none" position="absolute" right="2" size="xs" top="2" variant="solid">
-              {t('widgets.preview.viewing')}
-            </Badge>
+            <ComparisonBadges compareLabel={t('widgets.preview.compare')} viewingLabel={t('widgets.preview.viewing')} />
           </Box>
+        ) : mode === 'hover' ? (
+          <HoverCompareFrame baseImage={baseImage} compareImage={compareImage} />
         ) : (
           <HStack gap="2" h="full" minH="0" w="full">
             <CompareSidePane image={compareImage} label={t('widgets.preview.compare')} />
@@ -189,10 +230,15 @@ export const PreviewCompare = ({
         )}
       </Flex>
       <HStack flexShrink={0} gap="1" justify="center">
-        <Button size="2xs" variant="outline" onClick={toggleMode}>
-          <Columns2Icon />
-          {mode === 'slider' ? t('widgets.preview.sideBySide') : t('widgets.preview.slider')}
-        </Button>
+        <SegmentGroup.Root size="xs" value={mode} onValueChange={handleModeChange}>
+          <SegmentGroup.Indicator />
+          {COMPARISON_MODES.map((item) => (
+            <SegmentGroup.Item key={item.value} value={item.value}>
+              <SegmentGroup.ItemHiddenInput />
+              <SegmentGroup.ItemText>{t(item.labelKey)}</SegmentGroup.ItemText>
+            </SegmentGroup.Item>
+          ))}
+        </SegmentGroup.Root>
         <Button size="2xs" variant="outline" onClick={onSwap}>
           <ArrowLeftRightIcon />
           {t('common.swap')}
@@ -206,11 +252,161 @@ export const PreviewCompare = ({
   );
 };
 
-const CompareSidePane = ({ image, label }: { image: GeneratedImageContract; label: string }) => (
-  <Box bg="transparent" flex="1" h="full" minW="0" overflow="hidden" position="relative">
-    <img alt={image.imageName} draggable={false} src={image.imageUrl} style={COMPARE_IMAGE_STYLE} />
+const HoverCompareFrame = ({
+  baseImage,
+  compareImage,
+}: {
+  baseImage: GeneratedImageContract;
+  compareImage: GeneratedImageContract;
+}) => {
+  const { t } = useTranslation();
+  const [isRevealed, setIsRevealed] = useState(false);
+  const interactionRef = useRef({ focused: false, hovered: false, pressed: false });
+  const syncRevealed = useCallback(() => {
+    const interaction = interactionRef.current;
+
+    setIsRevealed(interaction.focused || interaction.hovered || interaction.pressed);
+  }, []);
+  const handleFocus = useCallback(
+    (_event: FocusEvent<HTMLDivElement>) => {
+      interactionRef.current.focused = true;
+      syncRevealed();
+    },
+    [syncRevealed]
+  );
+  const handleBlur = useCallback(
+    (_event: FocusEvent<HTMLDivElement>) => {
+      interactionRef.current.focused = false;
+      syncRevealed();
+    },
+    [syncRevealed]
+  );
+  const handlePointerEnter = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === 'mouse') {
+        interactionRef.current.hovered = true;
+        syncRevealed();
+      }
+    },
+    [syncRevealed]
+  );
+  const handlePointerLeave = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === 'mouse') {
+        interactionRef.current.hovered = false;
+        syncRevealed();
+      }
+    },
+    [syncRevealed]
+  );
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType !== 'mouse') {
+        event.preventDefault();
+        interactionRef.current.pressed = true;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        syncRevealed();
+      }
+    },
+    [syncRevealed]
+  );
+  const handlePointerEnd = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType !== 'mouse') {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        interactionRef.current.pressed = false;
+        syncRevealed();
+      }
+    },
+    [syncRevealed]
+  );
+
+  return (
+    <Box
+      aria-label={t('widgets.preview.hoverComparisonAriaLabel')}
+      borderColor="border.emphasized"
+      borderWidth="1px"
+      css={getFittedFrameCss(baseImage.width, baseImage.height)}
+      cursor="pointer"
+      overflow="hidden"
+      position="relative"
+      rounded="lg"
+      tabIndex={0}
+      touchAction="none"
+      onBlur={handleBlur}
+      onFocus={handleFocus}
+      onLostPointerCapture={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onPointerDown={handlePointerDown}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+      onPointerUp={handlePointerEnd}
+    >
+      <img
+        alt={baseImage.imageName}
+        draggable={false}
+        height={baseImage.height}
+        src={baseImage.imageUrl}
+        style={BASE_IMAGE_STYLE}
+        width={baseImage.width}
+      />
+      <Box
+        inset="0"
+        opacity={isRevealed ? 1 : 0}
+        pointerEvents="none"
+        position="absolute"
+        transitionDuration="var(--wb-motion-duration-fast)"
+        transitionProperty="opacity"
+        transitionTimingFunction="ease"
+      >
+        <img
+          alt={compareImage.imageName}
+          draggable={false}
+          height={compareImage.height}
+          src={compareImage.imageUrl}
+          style={OVERLAY_IMAGE_STYLE}
+          width={compareImage.width}
+        />
+      </Box>
+      <ComparisonBadges compareLabel={t('widgets.preview.compare')} viewingLabel={t('widgets.preview.viewing')} />
+    </Box>
+  );
+};
+
+const ComparisonBadges = ({ compareLabel, viewingLabel }: { compareLabel: string; viewingLabel: string }) => (
+  <>
     <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-      {label}
+      {compareLabel}
     </Badge>
-  </Box>
+    <Badge pointerEvents="none" position="absolute" right="2" size="xs" top="2" variant="solid">
+      {viewingLabel}
+    </Badge>
+  </>
+);
+
+const CompareSidePane = ({ image, label }: { image: GeneratedImageContract; label: string }) => (
+  <Flex align="center" containerType="size" flex="1" h="full" justify="center" minW="0" overflow="hidden">
+    <Box
+      borderColor="border.emphasized"
+      borderWidth="1px"
+      css={getFittedFrameCss(image.width, image.height)}
+      overflow="hidden"
+      position="relative"
+      rounded="lg"
+    >
+      <img
+        alt={image.imageName}
+        draggable={false}
+        height={image.height}
+        src={image.imageUrl}
+        style={BASE_IMAGE_STYLE}
+        width={image.width}
+      />
+      <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
+        {label}
+      </Badge>
+    </Box>
+  </Flex>
 );
