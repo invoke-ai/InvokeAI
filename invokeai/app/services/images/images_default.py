@@ -291,7 +291,7 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem deleting image record and file")
             raise e
 
-    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None):
+    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> list[str]:
         try:
             # When ``user_id`` is set the lookup filters to images owned by that user so the
             # cascade doesn't destroy other users' contributions to a public/shared board.
@@ -301,15 +301,20 @@ class ImageService(ImageServiceABC):
                 is_intermediate=None,
                 user_id=user_id,
             )
+            deleted_image_names: list[str] = []
             for image_name in image_names:
                 try:
                     record = self.__invoker.services.image_records.get(image_name)
                     self.__invoker.services.image_files.delete(image_name, image_subfolder=record.image_subfolder)
-                except Exception:
-                    pass
-            self.__invoker.services.image_records.delete_many(image_names)
-            for image_name in image_names:
+                    deleted_image_names.append(image_name)
+                except Exception as e:
+                    self.__invoker.services.logger.error(
+                        f"Failed to delete image file {image_name}; keeping record: {str(e)}"
+                    )
+            self.__invoker.services.image_records.delete_many(deleted_image_names)
+            for image_name in deleted_image_names:
                 self._on_deleted(image_name)
+            return deleted_image_names
         except ImageRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete image records")
             raise

@@ -1,7 +1,8 @@
 """Tests for multiuser boards functionality."""
 
+from contextlib import nullcontext
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import status
@@ -94,6 +95,7 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     # cascade calls ``delete_images_on_board`` on it, which fails without an initialized
     # invoker. Stub it so the multiuser router tests can assert the cascade args.
     mock_invoker.services.images = MagicMock()
+    mock_invoker.services.images.delete_images_on_board.return_value = []
 
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
@@ -760,6 +762,39 @@ def test_delete_board_with_partial_video_file_delete_failure_reports_only_actual
     assert "stuck.mp4" not in body["deleted_videos"]
 
 
+@pytest.mark.parametrize("failure_phase", ["videos", "board"])
+def test_delete_board_reports_partial_cascade_completion(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, failure_phase: str
+):
+    create = client.post(
+        "/api/v1/boards/?board_name=Partial+Cascade+Failure",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+    mock_invoker.services.images.delete_images_on_board.return_value = ["deleted.png"]
+    mock_invoker.services.videos.delete_videos_on_board.return_value = ["deleted.mp4"]
+    if failure_phase == "videos":
+        mock_invoker.services.videos.delete_videos_on_board.side_effect = RuntimeError("video delete failed")
+
+    board_delete_patch = (
+        patch.object(mock_invoker.services.boards, "delete", side_effect=RuntimeError("board delete failed"))
+        if failure_phase == "board"
+        else nullcontext()
+    )
+    with board_delete_patch:
+        response = client.delete(
+            f"/api/v1/boards/{board_id}?include_images=true",
+            headers={"Authorization": f"Bearer {user1_token}"},
+        )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    detail = response.json()["detail"]
+    assert detail["deleted_images"] == ["deleted.png"]
+    assert detail["deleted_videos"] == ([] if failure_phase == "videos" else ["deleted.mp4"])
+    assert detail["board_deleted"] is False
+
+
 def test_delete_board_with_include_images_filters_cascade_by_user(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ):
@@ -788,15 +823,12 @@ def test_delete_board_with_include_images_filters_cascade_by_user(
     # The router must pass the current user's id through to the cascade so the SQL filter
     # narrows the lookup + delete to that user's rows only. Admins skip the filter (pass
     # ``user_id=None``); this test exercises the non-admin path.
-    images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
-    assert images_call.kwargs.get("user_id") is not None
-
     delete_images_call = mock_invoker.services.images.delete_images_on_board.call_args
     delete_videos_call = mock_invoker.services.videos.delete_videos_on_board.call_args
     assert delete_images_call.kwargs.get("user_id") is not None
     assert delete_videos_call.kwargs.get("user_id") is not None
-    # Sanity: the three cascade calls must all share the same user_id (the requester).
-    requester_id = images_call.kwargs["user_id"]
+    # Both cascade calls must share the same user_id (the requester).
+    requester_id = delete_images_call.kwargs["user_id"]
     assert delete_images_call.kwargs["user_id"] == requester_id
     assert delete_videos_call.kwargs["user_id"] == requester_id
 
@@ -820,9 +852,6 @@ def test_delete_board_with_include_images_admin_skips_user_filter(
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert response.status_code == status.HTTP_200_OK
-
-    images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
-    assert images_call.kwargs.get("user_id") is None
 
     delete_images_call = mock_invoker.services.images.delete_images_on_board.call_args
     delete_videos_call = mock_invoker.services.videos.delete_videos_on_board.call_args

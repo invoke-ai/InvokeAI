@@ -345,8 +345,13 @@ class VideoService(VideoServiceABC):
             try:
                 self.__invoker.services.video_records.delete_many(deleted_video_names)
             except Exception:
-                for _, token in staged_deletes:
-                    self.__invoker.services.video_files.rollback_delete(token)
+                for video_name, token in staged_deletes:
+                    try:
+                        self.__invoker.services.video_files.rollback_delete(token)
+                    except Exception as rollback_error:
+                        self.__invoker.services.logger.error(
+                            f"Failed to restore staged video files for {video_name}: {rollback_error}"
+                        )
                 raise
             for _, token in staged_deletes:
                 try:

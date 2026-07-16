@@ -1573,6 +1573,8 @@ class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base
             raise NotAMatchError("state dict does not look like GGUF quantized")
         if not _has_wan_keys(sd):
             raise NotAMatchError("state dict does not look like a Wan transformer")
+        if "wan21" in "".join(character for character in mod.path.stem.lower() if character.isalnum()):
+            raise NotAMatchError("Wan 2.1 GGUF models are not supported by the Wan 2.2 loader")
 
         explicit_variant = override_fields.pop("variant", None)
         variant = explicit_variant or _detect_wan_gguf_variant(sd)

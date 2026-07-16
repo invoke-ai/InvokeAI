@@ -137,6 +137,48 @@ class TestStreamedDecoderIsBounded:
         with pytest.raises(CanceledException):
             next(iter_video_frames(target, timeout=5, is_canceled=canceled.is_set))
 
+    def test_midstream_worker_failure_includes_stderr(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        target = tmp_path / "failed.mp4"
+        target.write_bytes(b"unused")
+        script = (
+            "import io, struct, sys, numpy as np; "
+            "record = io.BytesIO(); "
+            "np.save(record, np.zeros((2, 2, 3), dtype=np.uint8), allow_pickle=False); "
+            "payload = record.getvalue(); "
+            "sys.stdout.buffer.write(struct.pack('>Q', len(payload)) + payload); "
+            "sys.stdout.buffer.flush(); "
+            "print('decoder exploded', file=sys.stderr); "
+            "raise SystemExit(3)"
+        )
+        monkeypatch.setattr(video_thumbnails, "_worker_command", lambda *args: [sys.executable, "-c", script])
+
+        frames = iter_video_frames(target)
+        assert next(frames).shape == (2, 2, 3)
+        with pytest.raises(ValueError, match="decoder exploded"):
+            next(frames)
+
+    def test_worker_stderr_capture_is_bounded(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        target = tmp_path / "noisy.mp4"
+        target.write_bytes(b"unused")
+        script = "import sys; sys.stderr.write('x' * 100000); raise SystemExit(3)"
+        monkeypatch.setattr(video_thumbnails, "_worker_command", lambda *args: [sys.executable, "-c", script])
+
+        with pytest.raises(ValueError) as error:
+            next(iter_video_frames(target))
+
+        assert len(str(error.value)) < video_thumbnails.MAX_DECODE_STDERR_BYTES + 500
+
+    def test_closed_stream_from_live_worker_does_not_leak_timeout_expired(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        target = tmp_path / "stalled.mp4"
+        target.write_bytes(b"unused")
+        script = "import os, sys, time; os.close(sys.stdout.fileno()); time.sleep(600)"
+        monkeypatch.setattr(video_thumbnails, "_worker_command", lambda *args: [sys.executable, "-c", script])
+
+        with pytest.raises(TimeoutError, match="decoder worker"):
+            next(iter_video_frames(target, timeout=0.2))
+
 
 def test_timeout_kills_worker_descendants(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     child_pid_path = tmp_path / "child.pid"

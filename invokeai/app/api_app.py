@@ -100,14 +100,22 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
         # genuine user activity. GET requests are often background fetches (RTK Query
         # cache revalidation, refetch-on-focus, etc.) and should not reset the
         # inactivity timer.
-        if response.status_code < 400 and request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        if (
+            response.status_code < 400
+            and request.method in ("POST", "PUT", "PATCH", "DELETE")
+            and request.url.path not in ("/api/v1/auth/logout", "/api/v1/auth/media-cookie")
+        ):
             auth_header = request.headers.get("authorization", "")
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
                 try:
                     from datetime import timedelta
 
-                    from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL, TOKEN_EXPIRATION_REMEMBER_ME
+                    from invokeai.app.api.routers.auth import (
+                        TOKEN_EXPIRATION_NORMAL,
+                        TOKEN_EXPIRATION_REMEMBER_ME,
+                        _set_media_cookie,
+                    )
                     from invokeai.app.services.auth.token_service import create_access_token, verify_token
 
                     token_data = verify_token(token)
@@ -122,6 +130,7 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
 
                         new_token = create_access_token(token_data, expires_delta)
                         response.headers["X-Refreshed-Token"] = new_token
+                        _set_media_cookie(request, response, new_token, int(expires_delta.total_seconds()))
                 except Exception:
                     pass  # Don't fail the request if token refresh fails
 

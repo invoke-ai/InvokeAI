@@ -8,12 +8,12 @@ from fastapi import Body, HTTPException, Query, Request, Response, UploadFile
 from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import _assert_board_read_access
-from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -202,6 +202,12 @@ async def upload_video(
     ),
 ) -> VideoDTO:
     """Uploads a video for the current user."""
+    if metadata is not None:
+        try:
+            MetadataFieldValidator.validate_json(metadata)
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail="Metadata must be a JSON object") from e
+
     # Check board access for uploads to a specific board.
     if board_id is not None:
         from invokeai.app.services.board_records.board_records_common import BoardVisibility

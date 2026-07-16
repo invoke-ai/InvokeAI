@@ -170,6 +170,24 @@ class TestExpertFilenameHeuristic:
 
 
 class TestProbe:
+    @pytest.mark.parametrize(
+        "filename,state_dict",
+        [
+            ("Wan2.1-T2V-14B-Q4_K_M.gguf", _wan_a14b_state_dict()),
+            ("Wan2.1-I2V-14B-Q4_K_M.gguf", _wan_i2v_a14b_state_dict()),
+        ],
+    )
+    def test_rejects_wan_2_1(self, filename: str, state_dict: dict) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / filename
+            path.touch()
+
+            with pytest.raises(NotAMatchError, match="Wan 2.1"):
+                Main_GGUF_Wan_Config.from_model_on_disk(
+                    _make_mod(path, state_dict),
+                    _build_overrides(path, "unsupported Wan 2.1"),
+                )
+
     def test_a14b_high_noise_filename(self):
         with TemporaryDirectory() as tmp:
             f = Path(tmp) / "wan2.2-t2v-a14b-high_noise-Q4_K_M.gguf"

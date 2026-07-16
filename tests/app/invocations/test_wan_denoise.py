@@ -22,6 +22,7 @@ import torch.nn as nn
 from invokeai.app.invocations.fields import WanConditioningField, WanRefImageConditioningField
 from invokeai.app.invocations.model import WanTransformerField
 from invokeai.app.invocations.wan_denoise import WanDenoiseInvocation
+from invokeai.app.invocations.wan_video_denoise import WanVideoDenoiseInvocation
 from invokeai.backend.model_manager.taxonomy import WanVariantType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
@@ -282,6 +283,52 @@ class TestWanDenoiseShapes:
         inv._run_diffusion(ctx)
         # 3 steps × 2 (cond + uncond) = 6 forward calls.
         assert len(transformer.calls) == 6
+
+    def test_ti2v_image_rejects_dimensions_not_divisible_by_32(self, fake_model_root: Path) -> None:
+        context = _build_context(
+            _ZeroTransformer(),
+            variant=WanVariantType.TI2V_5B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        invocation = _make_invocation(
+            transformer_field=_wan_transformer_field(),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=48,
+            height=64,
+            steps=2,
+            guidance_scale=1.0,
+        )
+
+        with pytest.raises(ValueError, match="multiples of 32"):
+            invocation._run_diffusion(context)
+
+    def test_ti2v_video_without_reference_rejects_dimensions_not_divisible_by_32(self, fake_model_root: Path) -> None:
+        context = _build_context(
+            _ZeroTransformer(),
+            variant=WanVariantType.TI2V_5B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        invocation = WanVideoDenoiseInvocation(
+            id="test",
+            transformer=_wan_transformer_field(),
+            positive_conditioning=WanConditioningField(conditioning_name="pos"),
+            negative_conditioning=None,
+            ref_image=None,
+            width=48,
+            height=64,
+            num_frames=5,
+            steps=2,
+            guidance_scale=1.0,
+            seed=42,
+        )
+
+        with pytest.raises(ValueError, match="multiples of 32"):
+            invocation._run_diffusion(context)
 
     def test_zero_velocity_preserves_initial_noise(self, fake_model_root) -> None:
         """A zero-output transformer means the flow-match step never updates latents."""

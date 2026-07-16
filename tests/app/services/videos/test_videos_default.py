@@ -114,6 +114,22 @@ class TestDeleteVideosOnBoardContract:
         invoker.services.video_records.delete_many.assert_called_once_with(["v.mp4"])
         invoker.services.logger.error.assert_called()
 
+    def test_all_staged_files_are_rolled_back_when_record_delete_fails(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = ["a.mp4", "b.mp4"]
+        invoker.services.video_records.get.side_effect = [_make_record("a.mp4"), _make_record("b.mp4")]
+        invoker.services.video_files.stage_delete.side_effect = ["token-a", "token-b"]
+        invoker.services.video_records.delete_many.side_effect = RuntimeError("database unavailable")
+        invoker.services.video_files.rollback_delete.side_effect = [OSError("first rollback failed"), None]
+
+        with pytest.raises(RuntimeError, match="database unavailable"):
+            video_service.delete_videos_on_board("board-1")
+
+        assert [call.args[0] for call in invoker.services.video_files.rollback_delete.call_args_list] == [
+            "token-a",
+            "token-b",
+        ]
+
 
 class TestDeleteAtomicity:
     def test_single_delete_rolls_files_back_when_record_delete_fails(self, video_service: VideoService):

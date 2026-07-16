@@ -36,6 +36,7 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 # decodes, not to police slow ones.
 VIDEO_DECODE_TIMEOUT_SECONDS = 30.0
 MAX_DECODED_FRAME_RECORD_BYTES = 256 * 1024 * 1024
+MAX_DECODE_STDERR_BYTES = 16 * 1024
 
 _WORKER_PATH = Path(__file__).parent / "video_decode_worker.py"
 
@@ -126,14 +127,24 @@ def iter_video_frames(
         "stream",
         str(video_path),
         stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
     )
-    if proc.stdout is None:
+    if proc.stdout is None or proc.stderr is None:
         _terminate_process_tree(proc)
         raise RuntimeError("Unable to open video decoder output stream")
 
     results: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
     stopped = threading.Event()
+    stderr_tail = bytearray()
+
+    def read_stderr() -> str:
+        return bytes(stderr_tail).decode(errors="replace").strip()
+
+    def drain_stderr() -> None:
+        while chunk := proc.stderr.read(4096):
+            stderr_tail.extend(chunk)
+            if len(stderr_tail) > MAX_DECODE_STDERR_BYTES:
+                del stderr_tail[:-MAX_DECODE_STDERR_BYTES]
 
     def read_exactly(size: int) -> bytes:
         chunks: list[bytes] = []
@@ -168,7 +179,9 @@ def iter_video_frames(
             put_result(("done", error))
 
     reader = threading.Thread(target=read_frames, name="video-frame-reader", daemon=True)
+    stderr_reader = threading.Thread(target=drain_stderr, name="video-stderr-reader", daemon=True)
     reader.start()
+    stderr_reader.start()
     deadline = time.monotonic() + timeout
     try:
         while True:
@@ -187,9 +200,19 @@ def iter_video_frames(
                 yield value
                 deadline = time.monotonic() + timeout
                 continue
-            return_code = proc.wait(timeout=1)
+            try:
+                return_code = proc.wait(timeout=min(1, timeout))
+            except subprocess.TimeoutExpired as error:
+                _terminate_process_tree(proc)
+                stderr_reader.join(timeout=1)
+                detail = read_stderr()
+                message = f"Timed out waiting for video decoder worker for {video_path}"
+                raise TimeoutError(f"{message}: {detail}" if detail else message) from error
             if return_code != 0:
-                raise ValueError(f"Unable to decode video at {video_path}") from value
+                stderr_reader.join(timeout=1)
+                detail = read_stderr()
+                message = f"Unable to decode video at {video_path}"
+                raise ValueError(f"{message}: {detail}" if detail else message) from value
             return
     finally:
         stopped.set()
@@ -198,6 +221,8 @@ def iter_video_frames(
         proc.stdout.close()
         proc.wait()
         reader.join(timeout=1)
+        stderr_reader.join(timeout=1)
+        proc.stderr.close()
 
 
 def extract_video_frame(

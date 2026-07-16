@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
@@ -36,6 +36,16 @@ def _create_test_app() -> FastAPI:
 
     @test_app.delete("/test")
     async def delete_endpoint():
+        return {"ok": True}
+
+    @test_app.post("/api/v1/auth/logout")
+    async def logout_endpoint(response: Response):
+        response.delete_cookie("invokeai_media_token", path="/api/v1")
+        return {"ok": True}
+
+    @test_app.post("/api/v1/auth/media-cookie")
+    async def media_cookie_endpoint(request: Request, response: Response):
+        response.set_cookie("invokeai_media_token", request.headers["authorization"][7:], path="/api/v1")
         return {"ok": True}
 
     return test_app
@@ -75,6 +85,33 @@ class TestSlidingWindowTokenMiddleware:
         response = client.get("/test", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         assert "X-Refreshed-Token" not in response.headers
+        assert "set-cookie" not in response.headers
+
+    def test_mutating_request_refreshes_media_cookie_to_same_token(self):
+        app = _create_test_app()
+        client = TestClient(app)
+        token = _make_token(expires_delta=timedelta(minutes=5))
+
+        response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
+
+        refreshed_token = response.headers["X-Refreshed-Token"]
+        assert response.cookies.get("invokeai_media_token") == refreshed_token
+        assert "Path=/api/v1" in response.headers["set-cookie"]
+
+    @pytest.mark.parametrize("path", ["/api/v1/auth/logout", "/api/v1/auth/media-cookie"])
+    def test_cookie_management_endpoints_do_not_refresh_token(self, path: str):
+        app = _create_test_app()
+        client = TestClient(app)
+        token = _make_token(expires_delta=timedelta(minutes=5))
+
+        response = client.post(path, headers={"Authorization": f"Bearer {token}"})
+
+        assert "X-Refreshed-Token" not in response.headers
+        if path.endswith("logout"):
+            assert response.cookies.get("invokeai_media_token") is None
+            assert 'invokeai_media_token=""' in response.headers["set-cookie"]
+        else:
+            assert response.cookies.get("invokeai_media_token") == token
 
     def test_unauthenticated_request_does_not_return_refreshed_token(self):
         """Requests without a token do NOT return X-Refreshed-Token."""

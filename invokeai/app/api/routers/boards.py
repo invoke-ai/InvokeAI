@@ -131,17 +131,15 @@ async def delete_board(
     # contributions so that contributions from other users to a public/shared board
     # are preserved (they cascade to "uncategorized" via FK on board_videos / board_images).
     cascade_user_id: Optional[str] = None if current_user.is_admin else current_user.user_id
+    deleted_images: list[str] = []
+    deleted_videos: list[str] = []
 
     try:
         if include_images is True:
             assert_image_move_maintenance_inactive()
-            deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
-                board_id=board_id,
-                categories=None,
-                is_intermediate=None,
-                user_id=cascade_user_id,
+            deleted_images = ApiDependencies.invoker.services.images.delete_images_on_board(
+                board_id=board_id, user_id=cascade_user_id
             )
-            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id, user_id=cascade_user_id)
             # Use the service-returned list as the authoritative ``deleted_videos``.
             # delete_videos_on_board now preserves DB records when the underlying file
             # delete fails (so the API doesn't lie about a file that is still orphaned
@@ -182,6 +180,16 @@ async def delete_board(
     except HTTPException:
         raise
     except Exception:
+        if include_images is True:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "message": "Failed to delete board after partially deleting media",
+                    "deleted_images": deleted_images,
+                    "deleted_videos": deleted_videos,
+                    "board_deleted": False,
+                },
+            )
         raise HTTPException(status_code=500, detail="Failed to delete board")
 
 

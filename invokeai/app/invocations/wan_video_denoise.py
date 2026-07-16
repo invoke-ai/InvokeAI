@@ -31,6 +31,7 @@ from invokeai.app.invocations.wan_denoise import (
     WanDenoiseInvocation,
     _ExpertSwapper,
     _resolve_variant,
+    _validate_spatial_dimensions,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
@@ -159,6 +160,7 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
         variant = _resolve_variant(context, self.transformer)
+        _validate_spatial_dimensions(variant, self.width, self.height)
         spatial_scale = get_spatial_scale_factor(variant)
 
         # Reuse the image denoise's scheduler construction so we pick up whatever
@@ -211,12 +213,6 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                     f"Reference-image num_frames ({self.ref_image.num_frames}) must match denoise "
                     f"num_frames ({self.num_frames}). Re-run the Reference Image - Wan 2.2 node with "
                     f"num_frames={self.num_frames}."
-                )
-            if variant == WanVariantType.TI2V_5B and (self.width % 32 or self.height % 32):
-                raise ValueError(
-                    f"TI2V-5B I2V requires width and height to be multiples of 32 "
-                    f"(got {self.width}x{self.height}). Wan 2.2-VAE 16x spatial * "
-                    f"transformer patch_size 2 = pixel dims must divide by 32."
                 )
             ref_condition = context.tensors.load(self.ref_image.condition_tensor_name).to(
                 device=device, dtype=inference_dtype

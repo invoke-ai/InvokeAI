@@ -1,6 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { Flex, Image } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
@@ -26,6 +26,7 @@ import { galleryItemContainerSX } from './galleryItemContainerSX';
 import { GalleryItemPlayBadge } from './GalleryItemPlayBadge';
 import { GalleryItemSizeBadge } from './GalleryItemSizeBadge';
 import { GalleryItemVideoStarIconButton } from './GalleryItemVideoStarIconButton';
+import { GalleryVideoThumbnail } from './GalleryVideoThumbnail';
 
 interface Props {
   videoDTO: VideoDTO;
@@ -160,14 +161,7 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
       onDoubleClick={onDoubleClick}
       data-selected={isSelected}
     >
-      <Image
-        pointerEvents="none"
-        src={videoDTO.thumbnail_url}
-        objectFit="contain"
-        maxW="full"
-        maxH="full"
-        borderRadius="base"
-      />
+      <GalleryVideoThumbnail thumbnailUrl={videoDTO.thumbnail_url} videoUrl={videoDTO.video_url} />
       <GalleryItemPlayBadge />
       {(isHovered || alwaysShowSizeBadge) && (
         <GalleryItemSizeBadge

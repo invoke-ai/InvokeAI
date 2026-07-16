@@ -70,6 +70,14 @@ def _resolve_variant(context: InvocationContext, transformer_field: WanTransform
     return variant
 
 
+def _validate_spatial_dimensions(variant: WanVariantType, width: int, height: int) -> None:
+    if variant == WanVariantType.TI2V_5B and (width % 32 or height % 32):
+        raise ValueError(
+            f"TI2V-5B requires width and height to be multiples of 32 (got {width}x{height}). "
+            "Wan 2.2-VAE 16x spatial * transformer patch_size 2 = pixel dims must divide by 32."
+        )
+
+
 def _scheduler_path_for_transformer(context: InvocationContext, transformer_field: WanTransformerField) -> Path | None:
     """Return the on-disk ``scheduler/`` directory for the main model, or None."""
     config = context.models.get_config(transformer_field.transformer)
@@ -355,6 +363,7 @@ class WanDenoiseInvocation(BaseInvocation):
         inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
         variant = _resolve_variant(context, self.transformer)
+        _validate_spatial_dimensions(variant, self.width, self.height)
         spatial_scale = get_spatial_scale_factor(variant)
 
         scheduler = self._build_scheduler(context, device)

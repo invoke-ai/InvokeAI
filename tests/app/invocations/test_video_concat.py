@@ -184,6 +184,17 @@ class TestResourceBounds:
         assert v._estimate_transition_memory(width=512, height=512) < MAX_TRANSITION_MEMORY_BYTES
         v._validate_transition_memory(width=512, height=512)
 
+    def test_consumed_crossfade_windows_are_released_before_buffering_the_next_tail(self) -> None:
+        v = _invocation("crossfade", 4)
+        joined = v._iter_joined_frames([iter(_clip(200, 12)), iter(_clip(100, 12)), iter(_clip(50, 12))])
+
+        for _ in range(13):
+            next(joined)
+
+        assert joined.gi_frame is not None
+        assert joined.gi_frame.f_locals["a_tail"] == []
+        assert joined.gi_frame.f_locals["b_head"] == []
+
     def test_cancellation_stops_join(self) -> None:
         v = _invocation("cut", 0)
         with pytest.raises(CanceledException):

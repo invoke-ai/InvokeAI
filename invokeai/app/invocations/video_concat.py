@@ -236,6 +236,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             head_want = 0 if i == 0 else head_need
             tail_keep = 0 if i == len(clips) - 1 else tail_need
             b_head: list[np.ndarray] = []
+            head_complete = head_want == 0
             tail_buf: deque[np.ndarray] = deque()
             n_frames = 0
             for frame in clip:
@@ -245,10 +246,13 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                 n_frames += 1
                 # The clip's first head_want frames are consumed into the boundary blend
                 # with the previous clip's tail rather than emitted directly.
-                if len(b_head) < head_want:
+                if not head_complete:
                     b_head.append(frame)
                     if len(b_head) == head_want and blend is not None:
                         yield from blend(a_tail, b_head)
+                        a_tail = []
+                        b_head = []
+                        head_complete = True
                     continue
                 # Hold back the last tail_keep frames seen so far; anything older is
                 # guaranteed not to be part of the next boundary and can be emitted.

@@ -24,6 +24,7 @@ from invokeai.app.api.routers.videos import _is_mp4_file
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.users.users_common import UserCreateRequest
+from invokeai.app.services.videos.videos_common import VideoDTO
 
 
 class MockApiDependencies(ApiDependencies):
@@ -399,6 +400,66 @@ def test_upload_video_rejects_non_mp4_container_with_spoofed_mime(
 
     assert response.status_code == status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
     mock_invoker.services.videos.create.assert_not_called()
+
+
+def _uploaded_video_dto() -> VideoDTO:
+    return VideoDTO.model_validate(
+        {
+            "video_name": "uploaded.mp4",
+            "video_origin": "external",
+            "video_category": "general",
+            "width": 64,
+            "height": 64,
+            "duration": 1.0,
+            "fps": 8.0,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "is_intermediate": False,
+            "starred": False,
+            "has_workflow": False,
+            "video_subfolder": "",
+            "video_url": "/api/v1/videos/i/uploaded.mp4/full",
+            "thumbnail_url": "/api/v1/videos/i/uploaded.mp4/thumbnail",
+        }
+    )
+
+
+@pytest.mark.parametrize("metadata", ["not json", '["not", "an", "object"]'])
+def test_upload_video_rejects_malformed_metadata_before_create(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, metadata: str
+):
+    mock_invoker.services.videos.create.return_value = _uploaded_video_dto()
+    mp4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 12
+
+    with patch("invokeai.app.api.routers.videos.probe_video", return_value=(64, 64, 1.0, 8.0)):
+        response = client.post(
+            "/api/v1/videos/upload",
+            params={"video_category": "general", "is_intermediate": False},
+            files={"file": ("video.mp4", mp4, "video/mp4")},
+            data={"metadata": metadata},
+            headers={"Authorization": f"Bearer {user1_token}"},
+        )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    mock_invoker.services.videos.create.assert_not_called()
+
+
+def test_upload_video_accepts_object_metadata(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    mock_invoker.services.videos.create.return_value = _uploaded_video_dto()
+    mp4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 12
+    metadata = '{"seed": 123}'
+
+    with patch("invokeai.app.api.routers.videos.probe_video", return_value=(64, 64, 1.0, 8.0)):
+        response = client.post(
+            "/api/v1/videos/upload",
+            params={"video_category": "general", "is_intermediate": False},
+            files={"file": ("video.mp4", mp4, "video/mp4")},
+            data={"metadata": metadata},
+            headers={"Authorization": f"Bearer {user1_token}"},
+        )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert mock_invoker.services.videos.create.call_args.kwargs["metadata"] == metadata
 
 
 def test_mp4_validation_allows_boxes_before_file_type(tmp_path: Path) -> None:

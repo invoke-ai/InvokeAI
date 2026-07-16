@@ -148,7 +148,7 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None):
+    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> list[str]:
         """Deletes all images on a board.
 
         When ``user_id`` is provided, only images owned by that user are deleted (other users'

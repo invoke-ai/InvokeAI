@@ -15,7 +15,7 @@ from invokeai.app.invocations.model import (
     WanTransformerField,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType, WanVariantType
 
 
 @invocation_output("wan_model_loader_output")
@@ -118,6 +118,7 @@ class WanModelLoaderInvocation(BaseInvocation):
         main_format = main_config.format
         main_is_diffusers = main_format == ModelFormat.Diffusers
         main_is_gguf = main_format == ModelFormat.GGUFQuantized
+        main_variant = getattr(main_config, "variant", None)
 
         # Resolve transformer + dual-expert wiring + boundary_ratio.
         #
@@ -130,7 +131,7 @@ class WanModelLoaderInvocation(BaseInvocation):
         # We swap so the *high*-noise expert is always the primary if needed.
         # boundary_ratio falls back to 0.875 unless a Diffusers component_source
         # provides a recorded value.
-        boundary_ratio = 0.875
+        boundary_ratio = 0.9 if main_variant == WanVariantType.I2V_A14B else 0.875
         transformer_low_noise: Optional[ModelIdentifierField] = None
 
         if main_is_diffusers:
@@ -154,6 +155,11 @@ class WanModelLoaderInvocation(BaseInvocation):
                 low_id = self.transformer_low_noise_model.model_copy(update={"submodel_type": SubModelType.Transformer})
                 low_expert = getattr(low_config, "expert", "none")
 
+                if getattr(low_config, "variant", None) != main_variant:
+                    raise ValueError("The high-noise and low-noise GGUF models must use the same Wan variant.")
+                if main_variant == WanVariantType.TI2V_5B or {primary_expert, low_expert} != {"high", "low"}:
+                    raise ValueError("A Wan A14B GGUF expert pair must contain one high and one low expert.")
+
                 # Make sure 'transformer' is the high-noise expert and
                 # 'transformer_low_noise' is the low-noise expert. If the user
                 # accidentally swapped them, swap back.
@@ -165,10 +171,12 @@ class WanModelLoaderInvocation(BaseInvocation):
                     transformer_low_noise = low_id
             else:
                 transformer = primary_id
+                if main_variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B) and primary_expert != "high":
+                    raise ValueError("An unpaired Wan A14B GGUF model must be the high-noise expert.")
                 # A14B without a paired low-noise GGUF will produce degraded
                 # quality (only the high-noise expert runs). Warn but don't
                 # abort — TI2V-5B GGUFs are single-expert and totally fine.
-                if getattr(main_config, "variant", None) and main_config.variant.value == "t2v_a14b":
+                if main_variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B):
                     context.logger.warning(
                         "A14B GGUF main was provided without a paired 'Transformer (Low Noise)'. "
                         "Only the high-noise expert will run; image quality will be reduced."
