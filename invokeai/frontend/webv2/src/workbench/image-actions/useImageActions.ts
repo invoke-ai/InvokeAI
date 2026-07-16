@@ -30,6 +30,7 @@ import { useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useEffect, useMemo, type Dispatch } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 import {
   EMPTY_IMAGE_RECALL_CAPABILITIES,
@@ -287,11 +288,11 @@ export const useImageActions = ({
             openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
           }
         } catch (error: unknown) {
-          dispatch({
-            kind: 'error',
-            message: toErrorMessage(error),
-            title: t('widgets.canvas.import.failed'),
-            type: 'recordNotice',
+          recordCanvasImportError({
+            dispatch,
+            error,
+            localizedMessage: t('widgets.canvas.import.failed'),
+            projectId,
           });
         }
       },

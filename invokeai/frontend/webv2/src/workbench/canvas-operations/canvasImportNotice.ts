@@ -9,7 +9,7 @@ export interface CanvasImportNotice {
     | 'widgets.canvas.import.staleDocument'
     | 'widgets.canvas.import.staleProject'
     | 'widgets.canvas.import.success';
-  options?: { count: number } | { failedCount: number; successCount: number };
+  options?: { count: number } | { count: number; failedCount: number; successCount: number };
 }
 
 const assertNever = (value: never): never => {
@@ -22,7 +22,11 @@ export const getCanvasImportNotice = (result: ImportGalleryImagesResult): Canvas
       if (result.failedImageNames.length > 0) {
         return {
           kind: 'info',
-          options: { failedCount: result.failedImageNames.length, successCount: result.layerIds.length },
+          options: {
+            count: result.layerIds.length,
+            failedCount: result.failedImageNames.length,
+            successCount: result.layerIds.length,
+          },
           titleKey: 'widgets.canvas.import.partial',
         };
       }

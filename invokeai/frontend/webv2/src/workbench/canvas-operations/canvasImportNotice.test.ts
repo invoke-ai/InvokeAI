@@ -13,7 +13,7 @@ describe('getCanvasImportNotice', () => {
     });
   });
 
-  it('maps a partial import to one aggregate notice', () => {
+  it('maps one successful partial import with the exact pluralization interpolation', () => {
     expect(
       getCanvasImportNotice({
         failedImageNames: ['failed-1.png', 'failed-2.png'],
@@ -22,7 +22,21 @@ describe('getCanvasImportNotice', () => {
       })
     ).toEqual({
       kind: 'info',
-      options: { failedCount: 2, successCount: 1 },
+      options: { count: 1, failedCount: 2, successCount: 1 },
+      titleKey: 'widgets.canvas.import.partial',
+    });
+  });
+
+  it('maps multiple successful partial imports with the exact pluralization interpolation', () => {
+    expect(
+      getCanvasImportNotice({
+        failedImageNames: ['failed.png'],
+        layerIds: ['layer-1', 'layer-2'],
+        status: 'imported',
+      })
+    ).toEqual({
+      kind: 'info',
+      options: { count: 2, failedCount: 1, successCount: 2 },
       titleKey: 'widgets.canvas.import.partial',
     });
   });
