@@ -92,6 +92,31 @@
         ]
       }
     },
+    "/api/v1/auth/media-cookie": {
+      "post": {
+        "tags": ["authentication"],
+        "summary": "Refresh Media Cookie",
+        "description": "Re-issue the media cookie from a valid Bearer token.\n\nThe media cookie is normally set at login, but a session can hold a valid JWT\nwithout it \u2014 the session may predate the cookie's introduction, or the cookie\nmay have been cleared while the JWT (in client storage) survived. Media\nelements can't send Authorization headers, so such sessions silently fail to\nload videos (black player) while every other API call works. The frontend\ncalls this on app load so an existing session self-heals without re-login.\n\nThe cookie's lifetime is clamped to the presented token's remaining validity \u2014\nit is the same JWT, so a longer-lived cookie would just yield 401s after\nexpiry anyway.\n\nReturns:\n    MediaCookieResponse indicating the cookie was set. In single-user mode the\n    media routes don't require authentication, so this is a successful no-op.\n\nRaises:\n    HTTPException: 401 if the Bearer token is missing, invalid, or expired, or\n    the user no longer exists or is inactive.",
+        "operationId": "refresh_media_cookie_api_v1_auth_media_cookie_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaCookieResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/me": {
       "get": {
         "tags": ["authentication"],
@@ -55750,6 +55775,19 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "MediaCookieResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the media cookie was set (always true in single-user mode)"
+          }
+        },
+        "type": "object",
+        "required": ["success"],
+        "title": "MediaCookieResponse",
+        "description": "Response from refreshing the media cookie."
+      },
       "MediaPipeFaceDetectionInvocation": {
         "category": "controlnet_preprocessors",
         "class": "invocation",
@@ -77423,7 +77461,7 @@
         "category": "image",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Run the denoising process with a Wan 2.2 model.\n\nDrives a flow-matching Euler schedule via Diffusers'\n``FlowMatchEulerDiscreteScheduler``. CFG is supported when negative\nconditioning is provided and ``guidance_scale != 1.0``.\n\nFor Wan 2.2 A14B the high-noise expert handles timesteps at and above\n``boundary_ratio * num_train_timesteps``; the low-noise expert handles\ntimesteps below. Both experts share the model cache; only the active one is\nGPU-resident at any time.",
+        "description": "Run the denoising process with a Wan 2.2 model.\n\nDrives the flow-matching schedule the model ships with (UniPC with flow\nsigmas for the Wan 2.2 reference repos; see ``_build_scheduler``). CFG is\nsupported when negative conditioning is provided and ``guidance_scale != 1.0``.\n\nFor Wan 2.2 A14B the high-noise expert handles timesteps at and above\n``boundary_ratio * num_train_timesteps``; the low-noise expert handles\ntimesteps below. Both experts share the model cache; only the active one is\nGPU-resident at any time.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -79045,7 +79083,7 @@
             "type": "array"
           },
           "loras_low_noise": {
-            "description": "Optional separate LoRAs for the low-noise expert (Wan 2.2 A14B). If empty and transformer_low_noise is set, the primary 'loras' list is reused.",
+            "description": "LoRAs to apply to the low-noise expert (Wan 2.2 A14B). The Wan LoRA loader routes 'both'- and 'low'-targeted LoRAs here; if empty, no LoRAs are applied to the low-noise expert (a 'high'-targeted LoRA must not leak onto it).",
             "items": {
               "$ref": "#/components/schemas/LoRAField"
             },

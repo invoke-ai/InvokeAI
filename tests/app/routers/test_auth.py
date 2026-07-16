@@ -357,3 +357,84 @@ def test_admin_user_token_has_admin_flag(monkeypatch: Any, mock_invoker: Invoker
     assert response.status_code == 200
     json_response = response.json()
     assert json_response["user"]["is_admin"] is True
+
+
+class TestRefreshMediaCookie:
+    """POST /api/v1/auth/media-cookie — self-healing for sessions that hold a valid
+    JWT but no media cookie (session predates the cookie, or the cookie was cleared).
+    Without it, every API call works but <video> requests 401 and the player renders
+    black (PR #9163 functional testing)."""
+
+    def _login(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient, email: str) -> str:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        setup_test_user(mock_invoker, email, "TestPass123")
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "TestPass123", "remember_me": False},
+        )
+        assert response.status_code == 200
+        return response.json()["token"]
+
+    def test_reissues_cookie_from_bearer_token(
+        self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        token = self._login(monkeypatch, mock_invoker, client, "mediacookie@example.com")
+
+        # Simulate the stale-session state: valid JWT in hand, no cookie in the jar.
+        client.cookies.clear()
+
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert response.cookies.get("invokeai_media_token") == token
+        set_cookie = response.headers["set-cookie"]
+        assert "HttpOnly" in set_cookie
+        assert "Path=/api/v1/videos" in set_cookie
+        # Cookie must not outlive the token: max-age is clamped to the remaining
+        # validity (1-day login here, minus the instants since).
+        max_age = int(set_cookie.split("Max-Age=")[1].split(";")[0])
+        assert 0 < max_age <= 24 * 3600
+
+    def test_requires_bearer_token(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        client.cookies.clear()
+        response = client.post("/api/v1/auth/media-cookie")
+        assert response.status_code == 401
+
+    def test_rejects_invalid_token(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": "Bearer not-a-jwt"})
+        assert response.status_code == 401
+        assert response.cookies.get("invokeai_media_token") is None
+
+    def test_rejects_deactivated_user(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+        """A still-valid token for a since-deactivated user must not mint a cookie —
+        the cookie grants media access, so it needs the same live-user check as
+        get_current_user."""
+        from invokeai.app.services.users.users_common import UserUpdateRequest
+
+        token = self._login(monkeypatch, mock_invoker, client, "deactivated@example.com")
+        user = mock_invoker.services.users.get_by_email("deactivated@example.com")
+        mock_invoker.services.users.update(user.user_id, UserUpdateRequest(is_active=False))
+        client.cookies.clear()
+
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 401
+        assert response.cookies.get("invokeai_media_token") is None
+
+    def test_single_user_mode_is_a_successful_noop(
+        self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        """In single-user mode media routes don't require auth; the frontend may
+        still call this on load, so it must succeed without setting a cookie."""
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        mock_invoker.services.configuration.multiuser = False
+        client.cookies.clear()
+
+        response = client.post("/api/v1/auth/media-cookie")
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert response.cookies.get("invokeai_media_token") is None

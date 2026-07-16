@@ -85,6 +85,45 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/media-cookie": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Media Cookie
+         * @description Re-issue the media cookie from a valid Bearer token.
+         *
+         *     The media cookie is normally set at login, but a session can hold a valid JWT
+         *     without it — the session may predate the cookie's introduction, or the cookie
+         *     may have been cleared while the JWT (in client storage) survived. Media
+         *     elements can't send Authorization headers, so such sessions silently fail to
+         *     load videos (black player) while every other API call works. The frontend
+         *     calls this on app load so an existing session self-heals without re-login.
+         *
+         *     The cookie's lifetime is clamped to the presented token's remaining validity —
+         *     it is the same JWT, so a longer-lived cookie would just yield 401s after
+         *     expiry anyway.
+         *
+         *     Returns:
+         *         MediaCookieResponse indicating the cookie was set. In single-user mode the
+         *         media routes don't require authentication, so this is a successful no-op.
+         *
+         *     Raises:
+         *         HTTPException: 401 if the Bearer token is missing, invalid, or expired, or
+         *         the user no longer exists or is inactive.
+         */
+        post: operations["refresh_media_cookie_api_v1_auth_media_cookie_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -23310,6 +23349,17 @@ export type components = {
             type: "tensor_mask_to_image";
         };
         /**
+         * MediaCookieResponse
+         * @description Response from refreshing the media cookie.
+         */
+        MediaCookieResponse: {
+            /**
+             * Success
+             * @description Whether the media cookie was set (always true in single-user mode)
+             */
+            success: boolean;
+        };
+        /**
          * MediaPipe Face Detection
          * @description Detects faces using MediaPipe.
          */
@@ -34060,9 +34110,9 @@ export type components = {
          * Denoise - Wan 2.2
          * @description Run the denoising process with a Wan 2.2 model.
          *
-         *     Drives a flow-matching Euler schedule via Diffusers'
-         *     ``FlowMatchEulerDiscreteScheduler``. CFG is supported when negative
-         *     conditioning is provided and ``guidance_scale != 1.0``.
+         *     Drives the flow-matching schedule the model ships with (UniPC with flow
+         *     sigmas for the Wan 2.2 reference repos; see ``_build_scheduler``). CFG is
+         *     supported when negative conditioning is provided and ``guidance_scale != 1.0``.
          *
          *     For Wan 2.2 A14B the high-noise expert handles timesteps at and above
          *     ``boundary_ratio * num_train_timesteps``; the low-noise expert handles
@@ -35007,7 +35057,7 @@ export type components = {
             loras?: components["schemas"]["LoRAField"][];
             /**
              * Loras Low Noise
-             * @description Optional separate LoRAs for the low-noise expert (Wan 2.2 A14B). If empty and transformer_low_noise is set, the primary 'loras' list is reused.
+             * @description LoRAs to apply to the low-noise expert (Wan 2.2 A14B). The Wan LoRA loader routes 'both'- and 'low'-targeted LoRAs here; if empty, no LoRAs are applied to the low-noise expert (a 'high'-targeted LoRA must not leak onto it).
              */
             loras_low_noise?: components["schemas"]["LoRAField"][];
             /**
@@ -36837,6 +36887,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+        };
+    };
+    refresh_media_cookie_api_v1_auth_media_cookie_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaCookieResponse"];
                 };
             };
         };
