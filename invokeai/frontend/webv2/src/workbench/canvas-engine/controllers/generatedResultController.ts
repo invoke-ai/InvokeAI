@@ -10,8 +10,8 @@ import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/ren
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasImageRef, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createControlLayer, nextControlLayerName } from '@workbench/canvas-engine/document/layerFactories';
 
@@ -26,7 +26,7 @@ export interface GeneratedResultControllerOptions<Permit, Owner = symbol> {
   ) => Promise<DecodeImageResult>;
   readonly discardPersisted: (layerId: string) => void;
   readonly dispatchPrepared: (
-    action: WorkbenchAction,
+    action: CanvasProjectMutation,
     reducerAccepted: () => boolean,
     mirrorAccepted: () => boolean
   ) => void;

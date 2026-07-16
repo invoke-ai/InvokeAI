@@ -1,11 +1,12 @@
 import type { Rect } from '@workbench/canvas-engine/types';
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { Project, WidgetViewProps } from '@workbench/types';
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
 import { Box, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { createNewCanvasStateV2 } from '@workbench/canvasMigration';
 import { ConfirmDialog, IconButton, MenuContent, Tooltip } from '@workbench/components/ui';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useModifierHeld } from '@workbench/useModifierHeld';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
@@ -41,6 +42,8 @@ import { computeFitBboxToLayers, computeFitBboxToMasks } from './fitBbox';
 import { useCanvasEngine } from './useCanvasEngine';
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';
 
+type CanvasHeaderEngine = Pick<CanvasEngineHandle, 'diagnostics' | 'history' | 'layers' | 'stores' | 'viewport'>;
+
 const ZOOM_OPTIONS = zoomMenuOptions();
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
@@ -73,11 +76,11 @@ const CanvasHeaderActionsInner = ({
   engine,
   runtime,
 }: {
-  engine: CanvasEngine;
+  engine: CanvasHeaderEngine;
   runtime: WidgetViewProps['runtime'];
 }) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const dispatch = useCanvasProjectMutationDispatch();
   const zoom = useCanvasZoom(engine);
   const canUndo = useCanvasCanUndo(engine);
   const canRedo = useCanvasCanRedo(engine);
@@ -299,7 +302,7 @@ const HeaderDivider = () => <Box bg="border.subtle" flexShrink={0} h="4" mx="1" 
  * actions (matching legacy `CanvasSettingsPopover`). `closeOnSelect={false}` keeps
  * it open while toggling. Settings persist per-project and never enter undo history.
  */
-const CanvasSettingsMenu = ({ editingLocked, engine }: { editingLocked: boolean; engine: CanvasEngine }) => {
+const CanvasSettingsMenu = ({ editingLocked, engine }: { editingLocked: boolean; engine: CanvasHeaderEngine }) => {
   const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const settings = useActiveProjectSelector(selectCanvasSettings, canvasSettingsEqual);

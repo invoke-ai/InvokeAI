@@ -8,34 +8,37 @@
  * with fakes. Zero React, zero import-time side effects.
  */
 
+import type { DecodedBitmapLease } from '@workbench/canvas-engine/render/decodedBitmapPool';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { CanvasImageRef } from '@workbench/types';
 
+import { createDecodedBitmapPool } from '@workbench/canvas-engine/render/decodedBitmapPool';
+
 import type { RasterizeDeps, RasterizeResult } from './types';
 
-/** Decodes and caches a bitmap for the given image reference, reusing the store cache. */
-export const resolveBitmap = async (image: CanvasImageRef, deps: RasterizeDeps): Promise<ImageBitmap> => {
+/** Acquires a short-lived decoded bitmap lease, coalescing concurrent decodes by image name. */
+export const resolveBitmap = async (image: CanvasImageRef, deps: RasterizeDeps): Promise<DecodedBitmapLease> => {
   deps.signal?.throwIfAborted();
-  const cached = deps.store.getBitmap(image.imageName);
-  if (cached) {
-    return cached;
-  }
-  const blob = await deps.resolver(image.imageName, deps.signal);
-  deps.signal?.throwIfAborted();
-  const bitmap = await deps.backend.createImageBitmap(blob);
+  const pool = deps.bitmapPool ?? createDecodedBitmapPool();
+  const lease = await pool.acquire(
+    image.imageName,
+    async (decodeSignal) => {
+      const blob = await deps.resolver(image.imageName, decodeSignal);
+      decodeSignal?.throwIfAborted();
+      const bitmap = await deps.backend.createImageBitmap(blob);
+      if (decodeSignal?.aborted) {
+        bitmap.close();
+        decodeSignal.throwIfAborted();
+      }
+      return bitmap;
+    },
+    deps.signal
+  );
   if (deps.signal?.aborted) {
-    bitmap.close();
+    lease.release();
     deps.signal.throwIfAborted();
   }
-  // Another concurrent decode may have populated the cache while we awaited;
-  // prefer the already-cached bitmap and close ours to avoid a leak.
-  const raced = deps.store.getBitmap(image.imageName);
-  if (raced) {
-    bitmap.close();
-    return raced;
-  }
-  deps.store.setBitmap(image.imageName, bitmap);
-  return bitmap;
+  return lease;
 };
 
 /** Draws a bitmap onto a surface sized to `width`x`height`, reusing `target` if given. */
@@ -61,8 +64,12 @@ export const rasterizeImageSource = async (
   deps: RasterizeDeps,
   target?: RasterSurface
 ): Promise<RasterizeResult> => {
-  const bitmap = await resolveBitmap(source.image, deps);
-  const { height, width } = source.image;
-  const surface = blitBitmap(bitmap, width, height, deps, target);
-  return { rect: { height, width, x: 0, y: 0 }, surface };
+  const lease = await resolveBitmap(source.image, deps);
+  try {
+    const { height, width } = source.image;
+    const surface = blitBitmap(lease.bitmap, width, height, deps, target);
+    return { rect: { height, width, x: 0, y: 0 }, surface };
+  } finally {
+    lease.release();
+  }
 };

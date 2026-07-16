@@ -1,11 +1,11 @@
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { createDocumentPatchEntry, DOCUMENT_PATCH_DEFAULT_BYTES } from './documentPatch';
 
-const forward: WorkbenchAction = { direction: 1, type: 'cycleStagedImage' };
-const inverse: WorkbenchAction = { direction: -1, type: 'cycleStagedImage' };
+const forward: CanvasProjectMutation = { direction: 1, type: 'cycleStagedImage' };
+const inverse: CanvasProjectMutation = { direction: -1, type: 'cycleStagedImage' };
 
 describe('createDocumentPatchEntry', () => {
   it('dispatches inverse on undo and forward on redo', () => {

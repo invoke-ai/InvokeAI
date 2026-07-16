@@ -31,6 +31,7 @@ const guard: LayerExportGuard = {
 const surface = createTestStubRasterBackend().createSurface(10, 10);
 const exported: ExportLayerPixelsResult = {
   guard,
+  release: vi.fn(),
   rect: { height: 10, width: 10, x: 3, y: 4 },
   status: 'ok',
   surface,

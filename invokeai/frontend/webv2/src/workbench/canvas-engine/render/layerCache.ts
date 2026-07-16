@@ -7,10 +7,6 @@
  * a hidden layer's cache can be dropped to stay under a memory budget and
  * rebuilt on demand when it becomes visible again.
  *
- * The store also owns a decoded-`ImageBitmap` cache keyed by image name (used
- * by the image/paint rasterizers) and closes those bitmaps when they are
- * replaced or the store is disposed.
- *
  * All surface allocation flows through the injected {@link RasterBackend}
  * seam, so the store runs unchanged in node tests. Zero React, zero
  * import-time side effects.
@@ -67,6 +63,8 @@ export interface LayerCacheStoreOptions {
 
 /** The imperative store returned by {@link createLayerCacheStore}. */
 export interface LayerCacheStore {
+  /** Returns an entry without changing LRU order. */
+  peek(layerId: string): LayerCacheEntry | undefined;
   /** Returns the existing cache entry for a layer, or `undefined`. Touches LRU order. */
   get(layerId: string): LayerCacheEntry | undefined;
   /**
@@ -113,13 +111,7 @@ export interface LayerCacheStore {
    * `budgetBytes`. Visible layers are never evicted. Returns the evicted ids.
    */
   evictHidden(visibleIds: Iterable<string>, budgetBytes?: number): string[];
-  /** Looks up a decoded bitmap by image name. */
-  getBitmap(imageName: string): ImageBitmap | undefined;
-  /** Stores a decoded bitmap, closing any previous bitmap held under the same name. */
-  setBitmap(imageName: string, bitmap: ImageBitmap): void;
-  /** Drops (and closes) a decoded bitmap by image name. */
-  deleteBitmap(imageName: string): void;
-  /** Releases every cached bitmap. Cache surfaces are GC'd with the store. */
+  /** Releases every cache entry. Cache surfaces are GC'd with the store. */
   dispose(): void;
 }
 
@@ -131,7 +123,6 @@ export const createLayerCacheStore = (
   options: LayerCacheStoreOptions = {}
 ): LayerCacheStore => {
   const entries = new Map<string, LayerCacheEntry>();
-  const bitmaps = new Map<string, ImageBitmap>();
   // Per-id version FLOOR: the highest version each layer id has ever reached,
   // retained across delete/recreate (delete, LRU eviction). A recreated entry
   // (undo→redo, transform bake, merge, evict→re-show) starts ABOVE this floor
@@ -175,6 +166,8 @@ export const createLayerCacheStore = (
     }
     return entry;
   };
+
+  const peek = (layerId: string): LayerCacheEntry | undefined => entries.get(layerId);
 
   const getOrCreate = (layerId: string, width: number, height: number): LayerCacheEntry => {
     const existing = entries.get(layerId);
@@ -399,48 +392,24 @@ export const createLayerCacheStore = (
     return evicted;
   };
 
-  const getBitmap = (imageName: string): ImageBitmap | undefined => bitmaps.get(imageName);
-
-  const setBitmap = (imageName: string, bitmap: ImageBitmap): void => {
-    const previous = bitmaps.get(imageName);
-    if (previous && previous !== bitmap) {
-      previous.close();
-    }
-    bitmaps.set(imageName, bitmap);
-  };
-
-  const deleteBitmap = (imageName: string): void => {
-    const previous = bitmaps.get(imageName);
-    if (previous) {
-      previous.close();
-      bitmaps.delete(imageName);
-    }
-  };
-
   const dispose = (): void => {
-    for (const bitmap of bitmaps.values()) {
-      bitmap.close();
-    }
-    bitmaps.clear();
     entries.clear();
   };
 
   return {
     byteSize,
     delete: del,
-    deleteBitmap,
     dispose,
     evictHidden,
     get,
-    getBitmap,
     getOrCreate,
     getOrCreateRect,
     growToRect,
     installReplacement,
     invalidate,
+    peek,
     prepareReplacement,
     publishPixels,
-    setBitmap,
     version,
   };
 };

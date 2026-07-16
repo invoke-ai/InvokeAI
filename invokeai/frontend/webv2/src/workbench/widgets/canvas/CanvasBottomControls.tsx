@@ -1,4 +1,3 @@
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
 import type { ReactNode } from 'react';
@@ -8,7 +7,7 @@ import { clearLayerPropertiesRequest } from '@workbench/widgets/layers/layerProp
 import { useCallback } from 'react';
 
 import { CanvasOperationBar } from './tool-options/CanvasOperationBar';
-import { ToolOptionsBar } from './tool-options/ToolOptionsBar';
+import { ToolOptionsBar, type CanvasToolOptionsEngine } from './tool-options/ToolOptionsBar';
 
 export const resolveBottomControlSlots = ({
   isExternalInteractionLocked,
@@ -50,7 +49,7 @@ export const CanvasBottomControls = ({
 }: {
   documentHeight: number | null;
   documentWidth: number | null;
-  engine: CanvasEngine | null;
+  engine: CanvasToolOptionsEngine | null;
   isExternalInteractionLocked: boolean;
   operation: CanvasOperationState | null;
 }) => {

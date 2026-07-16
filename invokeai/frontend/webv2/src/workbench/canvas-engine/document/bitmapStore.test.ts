@@ -1,7 +1,7 @@
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,7 +63,7 @@ const createHarness = (options: HarnessOptions = {}) => {
       (_blob: Blob): Promise<CanvasImageUploadResult> =>
         Promise.resolve({ height: 10, imageName: `img-${uploadSeq++}`, width: 10 })
     );
-  const dispatch = vi.fn<(action: WorkbenchAction) => void>();
+  const dispatch = vi.fn((_action: CanvasProjectMutation) => true);
 
   const store = createBitmapStore({
     debounceMs: 1500,
@@ -195,8 +195,10 @@ describe('createBitmapStore', () => {
 
   it('routes the swap through dispatchBitmap when provided (mask persistence seam), not the default dispatch', async () => {
     const surface = createTestStubRasterBackend().createSurface(10, 10);
-    const dispatch = vi.fn<(action: WorkbenchAction) => void>();
-    const dispatchBitmap = vi.fn<(layerId: string, bitmap: CanvasImageRef, offset: { x: number; y: number }) => void>();
+    const dispatch = vi.fn((_action: CanvasProjectMutation) => true);
+    const dispatchBitmap = vi.fn(
+      (_layerId: string, _bitmap: CanvasImageRef, _offset: { x: number; y: number }) => true
+    );
     const store = createBitmapStore({
       debounceMs: 1500,
       dispatch,
@@ -222,6 +224,154 @@ describe('createBitmapStore', () => {
       y: 8,
     });
     expect(dispatch).not.toHaveBeenCalled();
+    store.dispose();
+  });
+
+  it('retains dirty pixels when the intended layer rejects the persisted bitmap', async () => {
+    const surface = createTestStubRasterBackend().createSurface(10, 10);
+    const dispatchBitmap = vi.fn(() => false);
+    const store = createBitmapStore({
+      debounceMs: 1500,
+      dispatch: vi.fn(),
+      dispatchBitmap,
+      encodeSurface: () => Promise.resolve(new Blob(['pixels'], { type: 'image/png' })),
+      getLayerSource: () => ({ bitmap: null, type: 'paint' }),
+      getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
+      hashBlob: (blob) => blob.text(),
+      uploadImage: () => Promise.resolve({ height: 10, imageName: 'rejected-img', width: 10 }),
+    });
+
+    store.markLayerDirty(LAYER);
+    await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+    expect(dispatchBitmap).toHaveBeenCalledTimes(2);
+    store.dispose();
+  });
+
+  it('retains dirty pixels when a legacy dispatcher returns no acceptance signal', async () => {
+    const surface = createTestStubRasterBackend().createSurface(10, 10);
+    const dispatchBitmap = vi.fn(() => undefined) as unknown as (
+      layerId: string,
+      bitmap: CanvasImageRef,
+      offset: { x: number; y: number }
+    ) => boolean;
+    const store = createBitmapStore({
+      debounceMs: 1500,
+      dispatch: vi.fn(() => true),
+      dispatchBitmap,
+      encodeSurface: () => Promise.resolve(new Blob(['pixels'], { type: 'image/png' })),
+      getLayerSource: () => ({ bitmap: null, type: 'paint' }),
+      getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
+      hashBlob: (blob) => blob.text(),
+      uploadImage: () => Promise.resolve({ height: 10, imageName: 'missing-acceptance-img', width: 10 }),
+    });
+
+    store.markLayerDirty(LAYER);
+    await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+    expect(dispatchBitmap).toHaveBeenCalledTimes(2);
+    store.dispose();
+  });
+
+  it.each(['dispatch', 'dispatchBitmap'] as const)(
+    'retains dirty pixels when %s throws before the intended bitmap lands',
+    async (dispatchSeam) => {
+      const surface = createTestStubRasterBackend().createSurface(10, 10);
+      let shouldThrow = true;
+      const throwingDispatch = vi.fn(() => {
+        if (shouldThrow) {
+          throw new Error('subscriber failed before commit');
+        }
+        return true;
+      });
+      const onError = vi.fn();
+      const store = createBitmapStore({
+        debounceMs: 1500,
+        dispatch: dispatchSeam === 'dispatch' ? throwingDispatch : vi.fn(() => true),
+        dispatchBitmap: dispatchSeam === 'dispatchBitmap' ? throwingDispatch : undefined,
+        encodeSurface: () => Promise.resolve(new Blob(['pixels'], { type: 'image/png' })),
+        getLayerSource: () => ({ bitmap: null, type: 'paint' }),
+        getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
+        hashBlob: (blob) => blob.text(),
+        onError,
+        uploadImage: () => Promise.resolve({ height: 10, imageName: 'retry-after-throw.png', width: 10 }),
+      });
+
+      store.markLayerDirty(LAYER);
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(throwingDispatch).toHaveBeenCalledOnce();
+      expect(onError).toHaveBeenCalledOnce();
+      expect(
+        store.isSelfEcho(LAYER, {
+          bitmap: { height: 10, imageName: 'retry-after-throw.png', width: 10 },
+          type: 'paint',
+        })
+      ).toBe(false);
+
+      shouldThrow = false;
+      await store.flushPendingUploads();
+
+      expect(throwingDispatch).toHaveBeenCalledTimes(2);
+      store.dispose();
+    }
+  );
+
+  it('accepts a thrown dispatch when authoritative state proves the intended bitmap landed', async () => {
+    const surface = createTestStubRasterBackend().createSurface(10, 10);
+    let source: CanvasLayerSourceContract | null = { bitmap: null, type: 'paint' };
+    const dispatchBitmap = vi.fn((_layerId: string, bitmap: CanvasImageRef, offset: { x: number; y: number }) => {
+      source = { bitmap, offset, type: 'paint' };
+      throw new Error('subscriber failed after commit');
+    });
+    const onError = vi.fn();
+    const store = createBitmapStore({
+      debounceMs: 1500,
+      dispatch: vi.fn(() => true),
+      dispatchBitmap,
+      encodeSurface: () => Promise.resolve(new Blob(['pixels'], { type: 'image/png' })),
+      getLayerSource: () => source,
+      getLayerSurface: () => ({ offset: { x: 7, y: 8 }, surface }),
+      hashBlob: (blob) => blob.text(),
+      onError,
+      uploadImage: () => Promise.resolve({ height: 10, imageName: 'landed-before-throw.png', width: 10 }),
+    });
+
+    store.markLayerDirty(LAYER);
+    await expect(store.flushPendingUploads()).resolves.toBeUndefined();
+    await expect(store.flushPendingUploads()).resolves.toBeUndefined();
+
+    expect(dispatchBitmap).toHaveBeenCalledOnce();
+    expect(onError).not.toHaveBeenCalled();
+    expect(store.isSelfEcho(LAYER, source)).toBe(true);
+    store.dispose();
+  });
+
+  it('drops dirty pixels when rejection confirms that the intended layer was deleted', async () => {
+    const surface = createTestStubRasterBackend().createSurface(10, 10);
+    let source: CanvasLayerSourceContract | null = { bitmap: null, type: 'paint' };
+    const dispatchBitmap = vi.fn(() => {
+      source = null;
+      return false;
+    });
+    const store = createBitmapStore({
+      debounceMs: 1500,
+      dispatch: vi.fn(),
+      dispatchBitmap,
+      encodeSurface: () => Promise.resolve(new Blob(['pixels'], { type: 'image/png' })),
+      getLayerSource: () => source,
+      getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
+      hashBlob: (blob) => blob.text(),
+      uploadImage: () => Promise.resolve({ height: 10, imageName: 'orphan-img', width: 10 }),
+    });
+
+    store.markLayerDirty(LAYER);
+    await store.flushPendingUploads();
+    await store.flushPendingUploads();
+
+    expect(dispatchBitmap).toHaveBeenCalledTimes(1);
     store.dispose();
   });
 
@@ -307,7 +457,7 @@ describe('createBitmapStore', () => {
     });
     const onError = vi.fn();
     const surface = createTestStubRasterBackend().createSurface(10, 10);
-    const dispatch = vi.fn<(action: WorkbenchAction) => void>();
+    const dispatch = vi.fn((_action: CanvasProjectMutation) => true);
     const store = createBitmapStore({
       debounceMs: 1500,
       dispatch,
@@ -323,7 +473,7 @@ describe('createBitmapStore', () => {
     });
 
     store.markLayerDirty(LAYER);
-    await store.flushPendingUploads();
+    await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
 
     // Retried up to the attempt cap, then gave up without dispatching.
     expect(uploadImage).toHaveBeenCalledTimes(2);
@@ -547,11 +697,11 @@ describe('createBitmapStore', () => {
     h.store.dispose();
   });
 
-  it('a persistently failing layer does not spin the barrier: it resolves after one bounded attempt, and the layer stays dirty for a later retry', async () => {
+  it('a persistently failing layer does not spin the barrier: it rejects after one bounded attempt and stays dirty', async () => {
     const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
     const onError = vi.fn();
     const surface = createTestStubRasterBackend().createSurface(10, 10);
-    const dispatch = vi.fn<(action: WorkbenchAction) => void>();
+    const dispatch = vi.fn((_action: CanvasProjectMutation) => true);
     const store = createBitmapStore({
       debounceMs: 1500,
       dispatch,
@@ -567,7 +717,7 @@ describe('createBitmapStore', () => {
     });
 
     store.markLayerDirty(LAYER);
-    await store.flushPendingUploads();
+    await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
 
     // The internal retry cap (maxUploadAttempts) bounds a single flush's own
     // attempts. The barrier must not loop back and re-attempt a layer whose
@@ -591,7 +741,7 @@ describe('createBitmapStore', () => {
     await vi.advanceTimersByTimeAsync(1500);
     await h.store.flushPendingUploads();
 
-    const applied = h.dispatch.mock.calls[0][0] as Extract<WorkbenchAction, { type: 'updateCanvasLayerSource' }>;
+    const applied = h.dispatch.mock.calls[0][0] as Extract<CanvasProjectMutation, { type: 'updateCanvasLayerSource' }>;
     const appliedSource = applied.source;
 
     // The dispatch's own round-trip is a self-echo → the engine skips re-raster.
@@ -620,7 +770,7 @@ describe('createBitmapStore', () => {
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     expect(h.uploadImage).toHaveBeenCalledTimes(1);
 
-    const applied = h.dispatch.mock.calls[0][0] as Extract<WorkbenchAction, { type: 'updateCanvasLayerSource' }>;
+    const applied = h.dispatch.mock.calls[0][0] as Extract<CanvasProjectMutation, { type: 'updateCanvasLayerSource' }>;
     expect(h.store.isSelfEcho(LAYER, applied.source)).toBe(true);
 
     // A wholesale document replacement drops the outgoing document's self-echo

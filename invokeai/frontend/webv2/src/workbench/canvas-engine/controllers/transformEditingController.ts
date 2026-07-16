@@ -4,8 +4,8 @@ import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2 } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { isRenderableLayer } from '@workbench/canvas-engine/document/sources';
 import { createDocumentPatchEntry } from '@workbench/canvas-engine/history/documentPatch';
@@ -21,7 +21,7 @@ export interface TransformEditingControllerOptions {
   readonly setOverride: (layerId: string, transform: LayerTransform | null) => void;
   readonly replaceCache: (layerId: string, rect: Rect, surface: RasterSurface) => void;
   readonly restoreCache: (layerId: string, rect: Rect, pixels: ImageData) => void;
-  readonly dispatch: (action: WorkbenchAction) => void;
+  readonly dispatch: (action: CanvasProjectMutation) => void;
   readonly pushHistory: (entry: HistoryEntry) => void;
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
@@ -140,12 +140,12 @@ export class TransformEditingController {
       this.deps.endBurst();
       this.deps.setOverride(session.layerId, null);
       this.deps.session.set(null);
-      const forward: WorkbenchAction = {
+      const forward: CanvasProjectMutation = {
         id: session.layerId,
         patch: { transform: session.transform },
         type: 'updateCanvasLayer',
       };
-      const inverse: WorkbenchAction = {
+      const inverse: CanvasProjectMutation = {
         id: session.layerId,
         patch: { transform: session.startTransform },
         type: 'updateCanvasLayer',

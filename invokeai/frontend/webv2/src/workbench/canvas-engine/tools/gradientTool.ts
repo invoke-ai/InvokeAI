@@ -24,8 +24,8 @@
  */
 
 import type { Vec2 } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasLayerSourceContract, CanvasRasterLayerContractV2 } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import type { Tool, ToolContext } from './tool';
 
@@ -129,12 +129,12 @@ export const createGradientTool = (): Tool => {
           clearPreview(ctx);
           return;
         }
-        const forward: WorkbenchAction = {
+        const forward: CanvasProjectMutation = {
           id: selected.id,
           source: { ...old, angle },
           type: 'updateCanvasLayerSource',
         };
-        const inverse: WorkbenchAction = { id: selected.id, source: old, type: 'updateCanvasLayerSource' };
+        const inverse: CanvasProjectMutation = { id: selected.id, source: old, type: 'updateCanvasLayerSource' };
         ctx.commitStructural('Edit gradient', forward, inverse);
         clearPreview(ctx);
         return;
@@ -165,8 +165,8 @@ export const createGradientTool = (): Tool => {
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: doc.bbox.x, y: doc.bbox.y },
         type: 'raster',
       };
-      const forward: WorkbenchAction = { index: 0, layer, type: 'addCanvasLayer' };
-      const inverse: WorkbenchAction = { ids: [layerId], type: 'removeCanvasLayers' };
+      const forward: CanvasProjectMutation = { index: 0, layer, type: 'addCanvasLayer' };
+      const inverse: CanvasProjectMutation = { ids: [layerId], type: 'removeCanvasLayers' };
       ctx.commitStructural('Add gradient', forward, inverse);
       clearPreview(ctx);
     },

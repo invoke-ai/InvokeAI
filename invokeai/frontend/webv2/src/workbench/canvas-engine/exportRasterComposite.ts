@@ -14,11 +14,20 @@ export type RasterCompositeExportRequest = { bounds: 'content' } | { bounds: 're
 
 export type RasterCompositeExportResult =
   | { status: 'ok'; blob: Blob; rect: Rect }
-  | { status: 'empty' | 'stale' | 'not-ready' };
+  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
 
 export interface RasterCompositeExportSnapshot {
+  contentEpoch: number;
   document: CanvasDocumentContractV2 | null;
   documentGeneration: number;
+  lifecycleGeneration: number;
+}
+
+export class RasterCompositeOverBudgetError extends Error {
+  constructor() {
+    super('Raster composite allocation is over budget.');
+    this.name = 'RasterCompositeOverBudgetError';
+  }
 }
 
 export interface ExportRasterCompositeDeps extends RenderRasterCompositeDeps {
@@ -27,6 +36,12 @@ export interface ExportRasterCompositeDeps extends RenderRasterCompositeDeps {
   };
   captureSnapshot(): RasterCompositeExportSnapshot;
   isSnapshotCurrent(snapshot: RasterCompositeExportSnapshot): boolean;
+  reserve?(
+    bytes: number
+  ):
+    | { status: 'ok'; lease: { release(): void } }
+    | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
+  pin?(layerIds: readonly string[]): { release(): void };
 }
 
 export const exportRasterComposite = async (
@@ -49,19 +64,38 @@ export const exportRasterComposite = async (
     return { status: 'empty' };
   }
 
-  let surface: RasterSurface;
+  // Each adjusted layer needs both a temporary surface and a same-sized
+  // ImageData buffer in addition to the final composite surface.
+  const surfaceCount = 1 + entry.layers.filter((layer) => layer.adjustments !== undefined).length * 2;
+  const reservation = deps.reserve?.(rect.width * rect.height * 4 * surfaceCount);
+  if (reservation?.status === 'over-budget') {
+    return { status: 'over-budget' };
+  }
+  const pinLease = deps.pin?.(entry.layers.map((layer) => layer.id));
+
   try {
-    surface = await renderRasterComposite(entry, deps);
-  } catch (error) {
+    let surface: RasterSurface;
+    try {
+      surface = await renderRasterComposite(entry, deps);
+    } catch (error) {
+      if (error instanceof RasterCompositeOverBudgetError) {
+        return { status: 'over-budget' };
+      }
+      if (!deps.isSnapshotCurrent(snapshot)) {
+        return { status: 'stale' };
+      }
+      throw error;
+    }
     if (!deps.isSnapshotCurrent(snapshot)) {
       return { status: 'stale' };
     }
-    throw error;
-  }
-  if (!deps.isSnapshotCurrent(snapshot)) {
-    return { status: 'stale' };
-  }
 
-  const blob = await deps.backend.encodeSurface(surface, 'image/png');
-  return deps.isSnapshotCurrent(snapshot) ? { status: 'ok', blob, rect } : { status: 'stale' };
+    const blob = await deps.backend.encodeSurface(surface, 'image/png');
+    return deps.isSnapshotCurrent(snapshot) ? { status: 'ok', blob, rect } : { status: 'stale' };
+  } finally {
+    pinLease?.release();
+    if (reservation?.status === 'ok') {
+      reservation.lease.release();
+    }
+  }
 };

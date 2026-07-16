@@ -1,4 +1,4 @@
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
 /** Narrow UI view of application-owned filter and Select Object coordination. */
-export type CanvasOperationUIEngine = CanvasEngine;
+export type CanvasOperationUIEngine = Pick<CanvasEngineHandle, 'projectId' | 'stores'>;

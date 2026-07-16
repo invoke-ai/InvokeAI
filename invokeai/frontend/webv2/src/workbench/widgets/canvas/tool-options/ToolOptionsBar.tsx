@@ -1,6 +1,6 @@
 import type { ToolId } from '@workbench/canvas-engine/types';
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { ComponentType } from 'react';
 
 import { HStack, Text } from '@chakra-ui/react';
@@ -21,9 +21,14 @@ import { ShapeOptions } from './ShapeOptions';
 import { TextOptions } from './TextOptions';
 import { TransformOptions } from './TransformOptions';
 
+export type CanvasToolOptionsEngine = Pick<
+  CanvasEngineHandle,
+  'document' | 'layers' | 'projectId' | 'selection' | 'stores' | 'tools' | 'viewport'
+>;
+
 /** Props every per-tool options component receives — just the shared engine handle. */
 export interface ToolOptionsComponentProps {
-  engine: CanvasEngine;
+  engine: CanvasToolOptionsEngine;
 }
 
 /**
@@ -70,7 +75,7 @@ export const ToolOptionsBar = ({
 }: {
   documentHeight: number | null;
   documentWidth: number | null;
-  engine: CanvasEngine;
+  engine: CanvasToolOptionsEngine;
 }) => {
   const activeTool = useCanvasActiveTool(engine);
   const operation = useCanvasOperation(engine);

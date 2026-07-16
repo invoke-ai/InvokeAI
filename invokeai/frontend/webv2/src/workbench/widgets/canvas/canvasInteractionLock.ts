@@ -22,6 +22,7 @@ export const isCanvasStagingActive = ({
 
 export interface CanvasInteractionCapabilities {
   areOperationActionsEnabled: boolean;
+  canAcceptStagedImage: boolean;
   isDocumentEditingLocked: boolean;
   isOperationChromeVisible: boolean;
   isRegularToolOptionsVisible: boolean;
@@ -29,10 +30,14 @@ export interface CanvasInteractionCapabilities {
 }
 
 export const getCanvasInteractionCapabilities = ({
+  hasCanvasEngine,
+  hasSelectedCandidate,
   hasStagingSlots,
   isCanvasGenerationInFlight,
   operationKind,
 }: {
+  hasCanvasEngine: boolean;
+  hasSelectedCandidate: boolean;
   hasStagingSlots: boolean;
   isCanvasGenerationInFlight: boolean;
   operationKind: 'filter' | 'select-object' | null;
@@ -44,6 +49,7 @@ export const getCanvasInteractionCapabilities = ({
   const isDocumentEditingLocked = operationKind !== null;
   return {
     areOperationActionsEnabled: isDocumentEditingLocked && !isSurfaceInteractionLocked,
+    canAcceptStagedImage: hasCanvasEngine && hasSelectedCandidate && !isDocumentEditingLocked,
     isDocumentEditingLocked,
     isOperationChromeVisible: isDocumentEditingLocked,
     isRegularToolOptionsVisible: !isDocumentEditingLocked && !isSurfaceInteractionLocked,

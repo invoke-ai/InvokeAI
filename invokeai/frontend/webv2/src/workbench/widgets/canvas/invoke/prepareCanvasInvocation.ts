@@ -25,9 +25,11 @@
  */
 
 import type {
+  CanvasDocumentSnapshot,
   CanvasDocumentCapability,
   CanvasExportCapability,
   CanvasLifecycleCapability,
+  CaptureRasterSnapshotResult,
 } from '@workbench/canvas-engine/api';
 import type {
   CompositeDedupeCache,
@@ -78,7 +80,7 @@ import { DEFAULT_CANVAS_COMPOSITING } from '@workbench/widgets/canvas/invoke/can
 export const CANVAS_INVOKE_ERROR_TITLE = 'Canvas generation failed';
 
 /** Engine-backed executor deps, minus the caller-owned dedupe cache. */
-type CompositeExecutorDeps = Omit<ExecuteCompositePlanDeps, 'dedupe'>;
+type CompositeExecutorDeps = Omit<ExecuteCompositePlanDeps, 'dedupe' | 'getLayerSurface'>;
 
 /** Injected dependencies for the React-free orchestrator. */
 export interface RunCanvasInvocationDeps {
@@ -90,8 +92,16 @@ export interface RunCanvasInvocationDeps {
    * snapshot's destination, so a Canvas source can target the Gallery.
    */
   destination: ResultDestination;
-  /** The live mirrored canvas document (`document.bbox` is the generation frame). */
-  getDocument: () => CanvasDocumentContractV2 | null;
+  /** Captures the exact post-flush canvas contract used by immutable invocation transactions. */
+  captureDocumentSnapshot: () => CanvasDocumentSnapshot | null;
+  /** Detaches every layer surface required by the transaction's complete composite plan. */
+  captureRasterSnapshot: (
+    snapshot: CanvasDocumentSnapshot,
+    layerIds: readonly string[],
+    options: { signal: AbortSignal }
+  ) => Promise<CaptureRasterSnapshotResult>;
+  /** Cancels cache preparation and detachment for this invocation transaction. */
+  signal: AbortSignal;
   /** Paint-bitmap persistence barrier, awaited before compositing. */
   flushPendingUploads: () => Promise<void>;
   /** Engine-backed composite executor deps (backend + rasterize-or-throw + uploader). */
@@ -330,13 +340,8 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
   }
   inFlight.add(projectId);
 
+  let rasterSnapshot: Extract<CaptureRasterSnapshotResult, { status: 'ok' }>['snapshot'] | null = null;
   try {
-    const document = deps.getDocument();
-    if (!document) {
-      recordNotice(dispatch, 'error', 'The canvas has no active document to generate from.');
-      return;
-    }
-
     const values = normalizeGenerateWidgetValues(deps.generateValues);
     if (!values) {
       recordNotice(dispatch, 'error', 'Select a supported model before invoking the canvas.');
@@ -359,20 +364,61 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     // built from the persisted refs (silent cache misses otherwise) and so the
     // empty-paint-layer filter (see `planComposites`) sees the real `bitmap`.
     // The bbox can also move during a slow flush; take it from the fresh snapshot.
-    const postFlushDocument = deps.getDocument();
-    if (!postFlushDocument) {
+    const documentSnapshot = deps.captureDocumentSnapshot();
+    if (!documentSnapshot) {
       recordNotice(dispatch, 'error', 'The canvas has no active document to generate from.');
       return;
     }
+    const postFlushDocument = documentSnapshot.canvas.document;
     const bbox = postFlushDocument.bbox;
 
     const plan = planComposites(postFlushDocument, bbox);
+    const controlPlan = planControlComposites(postFlushDocument, bbox);
+    const regionalPlan = planRegionalMaskComposites(postFlushDocument, bbox);
+
+    const requiredLayerIds = new Set<string>();
+    for (const entry of [
+      ...plan.entries,
+      ...controlPlan.map((item) => item.entry),
+      ...regionalPlan.map((item) => item.entry),
+    ]) {
+      for (const layer of entry.layers) {
+        requiredLayerIds.add(layer.id);
+      }
+      for (const layer of entry.maskLayers ?? []) {
+        requiredLayerIds.add(layer.id);
+      }
+    }
+    const capture = await deps.captureRasterSnapshot(documentSnapshot, [...requiredLayerIds], { signal: deps.signal });
+    if (capture.status !== 'ok') {
+      recordNotice(
+        dispatch,
+        'error',
+        capture.status === 'stale'
+          ? 'The canvas changed while generation was being prepared. Please invoke again.'
+          : `The canvas could not be captured for generation (${capture.status}).`
+      );
+      return;
+    }
+    rasterSnapshot = capture.snapshot;
+    const canvasSnapshot = rasterSnapshot.canvas;
+    const getLayerSurface = (layerId: string) => {
+      const detached = rasterSnapshot?.layerSurfaces.get(layerId);
+      if (!detached) {
+        return Promise.reject(new Error(`Canvas raster snapshot is missing layer ${layerId}.`));
+      }
+      return Promise.resolve(detached);
+    };
+    const transactionDedupe: CompositeDedupeCache = {
+      byHash: new Map(deps.dedupe.byHash),
+      byKey: new Map(deps.dedupe.byKey),
+    };
     // Bounds-only pre-pass (pure geometry, no upload): content that does not
     // overlap the bbox is txt2img no matter the coverage. Also naturally skips a
     // zero-area bbox (rectsIntersect is false), which validation rejects anyway.
     const contentBounds = computeCompositeContentBounds(plan);
 
-    const executorDeps = { ...deps.executorDeps, dedupe: deps.dedupe };
+    const executorDeps = { ...deps.executorDeps, dedupe: transactionDedupe, getLayerSurface };
 
     let mode: CanvasCompileMode = 'txt2img';
     let compositeImageName: string | null = null;
@@ -442,12 +488,20 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
         values: settings,
       },
       graph: compiled.graph,
+      canvas: canvasSnapshot,
       projectId,
       type: 'submitCanvasInvocationSnapshot',
     });
+    for (const [key, value] of transactionDedupe.byHash) {
+      deps.dedupe.byHash.set(key, value);
+    }
+    for (const [key, value] of transactionDedupe.byKey) {
+      deps.dedupe.byKey.set(key, value);
+    }
   } catch (error) {
     recordNotice(dispatch, 'error', error instanceof Error ? error.message : String(error));
   } finally {
+    rasterSnapshot?.release();
     inFlight.delete(projectId);
   }
 };
@@ -512,6 +566,7 @@ export interface PrepareCanvasInvocationArgs {
   models?: readonly ModelConfig[];
   projectSettings: Pick<ProjectSettings, 'useCpuNoise'>;
   strength: number;
+  signal?: AbortSignal;
   /**
    * Persisted compositing settings, already defaulted + clamped by the caller
    * (`readCanvasCompositingSettings`). Falls back to legacy defaults when omitted.
@@ -537,13 +592,16 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     destination: args.destination,
     dispatch: args.dispatch,
     executorDeps: engine.exports.getCompositeExecutorDeps(),
+    captureDocumentSnapshot: () => engine.document.captureSnapshot(),
+    captureRasterSnapshot: (snapshot, layerIds, options) =>
+      engine.exports.captureRasterSnapshot(snapshot, layerIds, options),
     flushPendingUploads: () => engine.lifecycle.flushPendingUploads(),
     generateValues: args.generateValues,
-    getDocument: () => engine.document.getDocument(),
     inFlight: inFlightProjects,
     models: args.models,
     projectId: args.projectId,
     projectSettings: args.projectSettings,
+    signal: args.signal ?? new AbortController().signal,
     strength: args.strength,
   });
 };

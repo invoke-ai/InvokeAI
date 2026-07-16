@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { CanvasProjectMutation } from './canvasProjectMutations';
 import type { MainModelConfig } from './generation/types';
 import type { WorkbenchState } from './types';
 import type { WorkbenchAction } from './workbenchState';
@@ -9,6 +10,10 @@ import { getProjectWidgetValues } from './widgetState';
 import { createWorkbenchStore } from './workbenchStore';
 
 const bbox = (width: number, height: number, x = 0, y = 0) => ({ height, width, x, y });
+
+const dispatchCanvas = (store: ReturnType<typeof createWorkbenchStore>, mutation: CanvasProjectMutation): void => {
+  store.dispatch({ mutation, projectId: store.getState().activeProjectId, type: 'applyCanvasProjectMutation' });
+};
 
 const snapshot = (bboxW: number, bboxH: number, dimsW: number, dimsH: number): CanvasDimsSnapshot => ({
   bboxHeight: bboxH,
@@ -236,7 +241,7 @@ describe('createCanvasDimsSync (wiring)', () => {
   it('patches the generate dims when the bbox changes, without looping', () => {
     const { getSyncDispatches, store, sync } = setupCanvasStore();
 
-    store.dispatch({ bbox: { height: 768, width: 512, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    dispatchCanvas(store, { bbox: { height: 768, width: 512, x: 0, y: 0 }, type: 'setCanvasBbox' });
 
     const { values } = getActiveGenerate(store.getState());
     expect(values.width).toBe(512);
@@ -256,7 +261,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     const { store, sync } = setupCanvasStore();
 
     // Drag the bbox to a non-square 4:3 frame; dims should follow.
-    store.dispatch({ bbox: { height: 768, width: 1024, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    dispatchCanvas(store, { bbox: { height: 768, width: 1024, x: 0, y: 0 }, type: 'setCanvasBbox' });
     const { values } = getActiveGenerate(store.getState());
     expect(values.aspectRatioId).toBe('4:3');
     expect(values.aspectRatioValue).toBeCloseTo(1024 / 768);
@@ -281,7 +286,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     const { getSyncDispatches, store, sync } = setupCanvasStore();
 
     // Move the frame first so the resize must preserve the top-left position.
-    store.dispatch({ bbox: { height: 1024, width: 1024, x: 32, y: 48 }, type: 'setCanvasBbox' });
+    dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 32, y: 48 }, type: 'setCanvasBbox' });
     const before = getSyncDispatches();
 
     store.dispatch({ type: 'patchGenerateSettings', values: { width: 512 } });
@@ -296,7 +301,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     const { getSyncDispatches, store, sync } = setupCanvasStore();
 
     // Move the frame first so the resize must preserve the top-left position.
-    store.dispatch({ bbox: { height: 1024, width: 1024, x: 32, y: 48 }, type: 'setCanvasBbox' });
+    dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 32, y: 48 }, type: 'setCanvasBbox' });
     const before = getSyncDispatches();
 
     // 501 is not a multiple of the sdxl grid (8): dims -> bbox must snap it,
@@ -315,7 +320,7 @@ describe('createCanvasDimsSync (wiring)', () => {
   it('ignores a position-only bbox move', () => {
     const { getSyncDispatches, store, sync } = setupCanvasStore();
 
-    store.dispatch({ bbox: { height: 1024, width: 1024, x: 100, y: 200 }, type: 'setCanvasBbox' });
+    dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 100, y: 200 }, type: 'setCanvasBbox' });
 
     const { values } = getActiveGenerate(store.getState());
     expect(values.width).toBe(1024);
@@ -343,7 +348,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     };
     const sync = createCanvasDimsSync(countingStore);
 
-    store.dispatch({ bbox: { height: 512, width: 512, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    dispatchCanvas(store, { bbox: { height: 512, width: 512, x: 0, y: 0 }, type: 'setCanvasBbox' });
 
     const { values } = getActiveGenerate(store.getState());
     // Generate dims untouched: non-canvas behavior is exactly as today.
@@ -360,7 +365,7 @@ describe('createCanvasDimsSync (wiring)', () => {
       type: 'patchGenerateSettings',
       values: { height: 1024, model, modelKey: model.key, width: 1024 },
     });
-    store.dispatch({ bbox: { height: 640, width: 896, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    dispatchCanvas(store, { bbox: { height: 640, width: 896, x: 0, y: 0 }, type: 'setCanvasBbox' });
 
     const sync = createCanvasDimsSync(store);
     // Switching into canvas mode should let the bbox win and drive the dims.

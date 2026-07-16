@@ -162,6 +162,7 @@ const FAILURE_KEYS: Record<Exclude<RunLayerWorkflowResult['status'], 'completed'
   locked: 'widgets.layers.runWorkflow.locked',
   missing: 'widgets.layers.runWorkflow.missing',
   'not-ready': 'widgets.layers.runWorkflow.notReady',
+  'over-budget': 'widgets.layers.runWorkflow.notReady',
   stale: 'widgets.layers.runWorkflow.stale',
   unsupported: 'widgets.layers.runWorkflow.unsupported',
 };

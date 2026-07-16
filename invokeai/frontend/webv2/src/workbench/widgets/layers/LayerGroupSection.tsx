@@ -1,7 +1,7 @@
 import type { DragEndEvent } from '@dnd-kit/core';
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { LucideIcon } from 'lucide-react';
 import type { Dispatch } from 'react';
 
@@ -23,16 +23,19 @@ import { groupAddItemId } from './addLayerMenu';
 import { LAYER_KEYBOARD_SENSOR_OPTIONS } from './layerDndConfig';
 import { canExportRasterPsd, getGroupActions, isGroupAllVisible, planGroupVisibilityToggle } from './layerGroupActions';
 import { reorderWithinGroup } from './layerGroups';
-import { LayerListItem } from './LayerListItem';
+import { LayerListItem, type LayerListItemEngine } from './LayerListItem';
 import { applyStructural } from './layerOps';
+import { getPsdExportNoticeKey } from './psdExportNotice';
 import { useAddLayer } from './useAddLayer';
+
+type LayerGroupEngine = LayerListItemEngine & Pick<CanvasEngineHandle, 'exports' | 'layers' | 'stores'>;
 
 const DND_MODIFIERS = [restrictToVerticalAxis, restrictToParentElement];
 const POINTER_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } } as const;
 
 interface LayerGroupSectionProps {
-  dispatch: Dispatch<WorkbenchAction>;
-  engine: CanvasEngine | null;
+  dispatch: Dispatch<CanvasProjectMutation>;
+  engine: LayerGroupEngine | null;
   groupKey: LayerGroupKey;
   groupLayers: readonly CanvasLayerContract[];
   isCollapsed: boolean;
@@ -188,9 +191,9 @@ const GroupActions = ({
   groupLayers,
   layers,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
+  dispatch: Dispatch<CanvasProjectMutation>;
   editingLocked: boolean;
-  engine: CanvasEngine | null;
+  engine: LayerGroupEngine | null;
   groupKey: LayerGroupKey;
   groupLayers: readonly CanvasLayerContract[];
   layers: readonly CanvasLayerContract[];
@@ -232,22 +235,22 @@ const GroupActions = ({
     });
   }, [engine, t]);
 
-  const handleExportPsd = useCallback(() => {
+  const handleExportPsd = useCallback(async () => {
     if (!engine) {
       return;
     }
     // Read-only: no dispatch, no history. The engine lazily loads `ag-psd`,
     // bakes the raster layers, and triggers the download. Surface the refusal
     // cases (still-loading caches / oversized bounds / nothing to export).
-    void engine.exports.exportRasterLayersToPsd(projectName).then((result) => {
-      if (result === 'not-ready') {
-        toaster.create({ title: t('widgets.layers.groupActions.exportNotReady'), type: 'warning' });
-      } else if (result === 'too-large') {
-        toaster.create({ title: t('widgets.layers.groupActions.exportTooLarge'), type: 'warning' });
-      } else if (result === 'nothing') {
-        toaster.create({ title: t('widgets.layers.groupActions.exportNothing'), type: 'warning' });
+    try {
+      const result = await engine.exports.exportRasterLayersToPsd(projectName);
+      const noticeKey = getPsdExportNoticeKey(result);
+      if (noticeKey) {
+        toaster.create({ title: t(noticeKey), type: 'warning' });
       }
-    });
+    } catch {
+      toaster.create({ title: t('widgets.layers.groupActions.exportFailed'), type: 'error' });
+    }
   }, [engine, projectName, t]);
 
   const actions = getGroupActions(groupKey);

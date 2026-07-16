@@ -28,9 +28,13 @@ export const rasterizePaintSource = async (
   if (source.bitmap) {
     const { height, width } = source.bitmap;
     const offset = source.offset ?? { x: 0, y: 0 };
-    const bitmap = await resolveBitmap(source.bitmap, deps);
-    const surface = blitBitmap(bitmap, width, height, deps, target);
-    return { rect: { height, width, x: offset.x, y: offset.y }, surface };
+    const lease = await resolveBitmap(source.bitmap, deps);
+    try {
+      const surface = blitBitmap(lease.bitmap, width, height, deps, target);
+      return { rect: { height, width, x: offset.x, y: offset.y }, surface };
+    } finally {
+      lease.release();
+    }
   }
 
   // No bitmap yet: an empty (zero-rect) layer. Collapse any reused target to 0×0

@@ -51,6 +51,21 @@ const getExpectedImageCount = (item: QueueItem): number => {
   );
 };
 
+/** Collision-safe candidate value identity used with the selected slot index for guarded acceptance. */
+export const getCanvasStagingCandidateFingerprint = (candidate: CanvasStagingCandidateContract): string =>
+  JSON.stringify([
+    candidate.sourceQueueItemId,
+    candidate.sourceBackendItemId ?? null,
+    candidate.imageName,
+    candidate.width,
+    candidate.height,
+    candidate.placement.x,
+    candidate.placement.y,
+    candidate.placement.width,
+    candidate.placement.height,
+    candidate.placement.opacity,
+  ]);
+
 const compareQueueItemsByExecutionOrder = (left: QueueItem, right: QueueItem): number => {
   const leftBackendItemId = left.backendItemIds?.[0];
   const rightBackendItemId = right.backendItemIds?.[0];
@@ -78,7 +93,7 @@ const getQueueItemsInExecutionOrder = (queueItems: readonly QueueItem[]): QueueI
 const createCandidateSlot = (candidate: CanvasStagingCandidateContract, itemIndex?: number): CanvasCandidateSlot => ({
   candidate,
   height: candidate.height,
-  id: `candidate:${candidate.sourceQueueItemId}:${candidate.imageName}`,
+  id: `candidate:${getCanvasStagingCandidateFingerprint(candidate)}`,
   imageName: candidate.imageName,
   ...(itemIndex === undefined ? {} : { itemIndex }),
   kind: 'candidate',

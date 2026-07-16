@@ -2,8 +2,8 @@ import type { History } from '@workbench/canvas-engine/history/history';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
 import { roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
@@ -16,7 +16,7 @@ export interface RasterizeLayerControllerOptions {
   readonly history: History;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly rasterizeDeps: (document: CanvasDocumentContractV2) => RasterizeDeps;
-  readonly dispatch: (action: WorkbenchAction) => void;
+  readonly dispatch: (action: CanvasProjectMutation) => void;
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
   readonly endBurst: () => void;

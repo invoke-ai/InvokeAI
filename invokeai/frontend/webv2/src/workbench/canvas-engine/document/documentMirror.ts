@@ -38,15 +38,10 @@
 
 import type { CanvasDocumentContractV2, CanvasStagingAreaContractV2, CanvasStateContractV2 } from '@workbench/types';
 
-/** The minimal slice of a project the mirror reads. */
-interface MirrorProject {
-  id: string;
-  canvas: CanvasStateContractV2;
-}
-
 /** The minimal store shape the mirror depends on (a superset of `WorkbenchStore`). */
 export interface DocumentMirrorStore {
-  getState(): { projects: readonly MirrorProject[] };
+  getCanvasState?(): CanvasStateContractV2 | null;
+  getState?(): { projects: readonly { id: string; canvas: CanvasStateContractV2 }[] };
   subscribe(listener: () => void): () => void;
 }
 
@@ -172,11 +167,19 @@ const layerOrderChanged = (
  */
 export const createDocumentMirror = (
   store: DocumentMirrorStore,
-  projectId: string,
-  callbacks: DocumentMirrorCallbacks
+  projectIdOrCallbacks: string | DocumentMirrorCallbacks,
+  maybeCallbacks?: DocumentMirrorCallbacks
 ): DocumentMirror => {
+  const projectId = typeof projectIdOrCallbacks === 'string' ? projectIdOrCallbacks : null;
+  const callbacks = typeof projectIdOrCallbacks === 'string' ? maybeCallbacks : projectIdOrCallbacks;
+  if (!callbacks) {
+    throw new Error('DocumentMirror callbacks are required.');
+  }
   const selectCanvas = (): CanvasStateContractV2 | null =>
-    store.getState().projects.find((project) => project.id === projectId)?.canvas ?? null;
+    store.getCanvasState?.() ??
+    (projectId === null
+      ? null
+      : (store.getState?.().projects.find((project) => project.id === projectId)?.canvas ?? null));
 
   let lastDoc: CanvasDocumentContractV2 | null = selectCanvas()?.document ?? null;
   let lastRevision: number = selectCanvas()?.documentRevision ?? 0;

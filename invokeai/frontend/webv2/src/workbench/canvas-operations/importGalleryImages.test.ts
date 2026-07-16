@@ -1,5 +1,6 @@
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { uploadCanvasImage } from '@workbench/canvas-operations/backend/canvasImages';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { GalleryImage } from '@workbench/gallery/api';
 import type { GenerateWidgetValues } from '@workbench/generation/types';
 import type { CanvasLayerContract, Project, WorkbenchState } from '@workbench/types';
@@ -108,11 +109,12 @@ const engine = (
   commitStructural: CanvasEngine['layers']['commitStructural'] = vi.fn(() => true)
 ): CanvasEngine => ({ layers: { canCommitStructural, commitStructural }, projectId }) as unknown as CanvasEngine;
 
-const getForwardLayers = (action: WorkbenchAction): readonly CanvasLayerContract[] => {
-  if (action.type !== 'applyCanvasLayerStackMutation' || !action.add) {
+const getForwardLayers = (action: WorkbenchAction | CanvasProjectMutation): readonly CanvasLayerContract[] => {
+  const mutation = action.type === 'applyCanvasProjectMutation' ? action.mutation : action;
+  if (mutation.type !== 'applyCanvasLayerStackMutation' || !mutation.add) {
     throw new Error('Expected add stack mutation');
   }
-  return action.add.layers;
+  return mutation.add.layers;
 };
 
 const expectedLayer = (
@@ -211,13 +213,11 @@ describe('importGalleryImagesToCanvas', () => {
     expect(forward).toMatchObject({
       add: { index: 0 },
       enabledUpdates: [],
-      projectId: project.id,
       selectedLayerId: layers[1]!.id,
       type: 'applyCanvasLayerStackMutation',
     });
     expect(inverse).toEqual({
       enabledUpdates: [],
-      projectId: project.id,
       removeIds: layers.map((layer) => layer.id),
       selectedLayerId: 'previous',
       type: 'applyCanvasLayerStackMutation',
@@ -291,9 +291,12 @@ describe('importGalleryImagesToCanvas', () => {
       { height: 1024, imageName: 'resized-square.png', width: 1024 },
     ]);
     expect(forward).toMatchObject({
+      mutation: {
+        selectedLayerId: layers[1]!.id,
+        type: 'applyCanvasLayerStackMutation',
+      },
       projectId: project.id,
-      selectedLayerId: layers[1]!.id,
-      type: 'applyCanvasLayerStackMutation',
+      type: 'applyCanvasProjectMutation',
     });
   });
 
@@ -340,9 +343,9 @@ describe('importGalleryImagesToCanvas', () => {
     const uploadImage = vi.fn<typeof uploadCanvasImage>(() =>
       Promise.resolve({ height: 512, imageName: 'resized', width: 512 })
     );
-    const commitStructural = vi.fn<(_label: string, _forward: WorkbenchAction, _inverse: WorkbenchAction) => boolean>(
-      () => false
-    );
+    const commitStructural = vi.fn<
+      (_label: string, _forward: CanvasProjectMutation, _inverse: CanvasProjectMutation) => boolean
+    >(() => false);
     const result = await importGalleryImagesToCanvas({
       destination: 'control-resized',
       dispatch: vi.fn(),
@@ -363,7 +366,6 @@ describe('importGalleryImagesToCanvas', () => {
     const layers = getForwardLayers(forward);
     expect(inverse).toEqual({
       enabledUpdates: [],
-      projectId: project.id,
       removeIds: layers.map((layer) => layer.id),
       selectedLayerId: 'previous',
       type: 'applyCanvasLayerStackMutation',

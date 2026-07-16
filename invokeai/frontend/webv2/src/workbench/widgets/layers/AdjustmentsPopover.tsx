@@ -6,7 +6,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { DEFAULT_ADJUSTMENTS, buildCurveLut } from '@workbench/canvas-engine/render/adjustments';
 import { Button, Field, Select, Slider } from '@workbench/components/ui';
-import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -80,7 +80,7 @@ type ScalarKey = 'brightness' | 'contrast' | 'saturation';
 
 const AdjustmentsControls = ({ adjustments, engine, layer }: AdjustmentsControlsProps) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const dispatch = useCanvasProjectMutationDispatch();
 
   const patchLive = useCallback(
     (next: CanvasAdjustmentsContract) => {

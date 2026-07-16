@@ -11,6 +11,7 @@ import { canvasApplicationPort } from '@workbench/canvas-operations/applicationP
 import type { CanvasOperationCapability } from './api';
 
 export interface CanvasEngineOptions extends Omit<CoreCanvasEngineOptions, 'uploadImage' | 'getMainModelBase'> {
+  getMainModelBase?: () => string | null;
   selectObjectDeps?: {
     uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
     runGraph(options: {
@@ -32,9 +33,9 @@ export interface CanvasEngineOptions extends Omit<CoreCanvasEngineOptions, 'uplo
 export type CanvasOperationsCapability = CanvasOperationCapability;
 export type CanvasEngine = CoreCanvasEngine;
 
-const operationsByEngine = new WeakMap<CanvasEngine, CanvasOperationCapability>();
+const operationsByEngine = new WeakMap<object, CanvasOperationCapability>();
 
-export const getCanvasOperations = (engine: CanvasEngine): CanvasOperationCapability => {
+export const getCanvasOperations = (engine: object): CanvasOperationCapability => {
   const operations = operationsByEngine.get(engine);
   if (!operations) {
     throw new Error('Canvas application operations are unavailable for this engine.');
@@ -47,7 +48,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   const { filterDeps, selectObjectDeps, ...coreOptions } = options;
   const composition = createCanvasEngineCore({
     ...coreOptions,
-    getMainModelBase: () => canvasApplicationPort.getSelectedModelBase(options.store.getState(), options.projectId),
+    getMainModelBase: options.getMainModelBase,
     uploadImage: (blob) => canvasApplicationPort.uploadImage(blob),
   });
   const { applicationHost: host } = composition;

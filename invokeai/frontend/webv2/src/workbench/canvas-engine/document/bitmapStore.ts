@@ -48,8 +48,8 @@
 
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 /** Default idle window before a dirty layer is flushed. */
 export const DEFAULT_DEBOUNCE_MS = 1500;
@@ -59,6 +59,16 @@ export const DEFAULT_MAX_UPLOAD_ATTEMPTS = 3;
 export const DEFAULT_RETRY_DELAYS_MS = [250, 1000] as const;
 /** Default cap on the hash→image dedupe map. */
 export const DEFAULT_DEDUPE_CAP = 64;
+
+export class BitmapPersistenceError extends Error {
+  readonly layerIds: readonly string[];
+
+  constructor(layerIds: readonly string[]) {
+    super(`Canvas pixel persistence failed for ${layerIds.length} layer${layerIds.length === 1 ? '' : 's'}.`);
+    this.name = 'BitmapPersistenceError';
+    this.layerIds = [...layerIds];
+  }
+}
 
 /** Injectable timer seam (defaults to the global timers). */
 export interface BitmapStoreTimers {
@@ -86,12 +96,18 @@ export interface BitmapStoreDeps {
    * dispatch stale paint pixels over a now-parametric layer.
    */
   getLayerSource(layerId: string): CanvasLayerSourceContract | null;
+  /**
+   * Reads a layer source from reducer-owned project state, bypassing subscriber-
+   * refreshed mirrors. Used only to verify whether a dispatch that threw after
+   * reducer commit nevertheless landed exactly as intended.
+   */
+  getAuthoritativeLayerSource?(layerId: string): CanvasLayerSourceContract | null;
   /** Encodes a surface to an image `Blob` (PNG). Usually `backend.encodeSurface`. */
   encodeSurface(surface: RasterSurface): Promise<Blob>;
   /** Uploads a bitmap blob, resolving to its server image name and dimensions. */
   uploadImage(blob: Blob): Promise<CanvasImageUploadResult>;
   /** Dispatches to the reducer (the single swap-on-success `updateCanvasLayerSource`). */
-  dispatch(action: WorkbenchAction): void;
+  dispatch(action: CanvasProjectMutation): boolean;
   /**
    * Applies the persisted bitmap ref + offset to the layer's document contract,
    * as the single swap-on-success dispatch. Lets the engine pick the right
@@ -100,7 +116,7 @@ export interface BitmapStoreDeps {
    * while the store stays type-agnostic. Absent ⇒ the default paint-source
    * dispatch (used by the store's own tests, which only exercise paint layers).
    */
-  dispatchBitmap?(layerId: string, bitmap: CanvasImageRef, offset: { x: number; y: number }): void;
+  dispatchBitmap?(layerId: string, bitmap: CanvasImageRef, offset: { x: number; y: number }): boolean;
   /** Content-hashes a blob (defaults to SHA-256 hex via `crypto.subtle`). */
   hashBlob?(blob: Blob): Promise<string>;
   /** Idle debounce window in ms (default {@link DEFAULT_DEBOUNCE_MS}). */
@@ -115,7 +131,7 @@ export interface BitmapStoreDeps {
   timers?: BitmapStoreTimers;
   /** Injectable delay used for retry backoff (default: `timers.setTimeout`). */
   sleep?(ms: number): Promise<void>;
-  /** Reports a persistent flush/upload failure (default: `console.warn`). */
+  /** Reports a persistent flush/upload failure. Omitted callbacks leave the failure unreported. */
   onError?(error: unknown, layerId: string): void;
 }
 
@@ -184,14 +200,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       new Promise((resolve) => {
         timers.setTimeout(resolve, ms);
       }));
-  const reportError = (error: unknown, layerId: string): void => {
-    if (deps.onError) {
-      deps.onError(error, layerId);
-    } else {
-      // eslint-disable-next-line no-console
-      console.warn(`bitmapStore: failed to persist layer "${layerId}"`, error);
-    }
-  };
+  const reportError = (error: unknown, layerId: string): void => deps.onError?.(error, layerId);
 
   /** Layers awaiting a flush (either debounced or re-dirtied during a flush). */
   const dirty = new Set<string>();
@@ -451,14 +460,44 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     // Record BEFORE dispatching: `dispatch` may notify the mirror synchronously,
     // so `isSelfEcho` must already see the applied name when the engine reacts.
     lastApplied.set(layerId, result.imageName);
-    if (deps.dispatchBitmap) {
-      deps.dispatchBitmap(layerId, bitmap, { x: offset.x, y: offset.y });
-    } else {
-      deps.dispatch({
-        id: layerId,
-        source: { bitmap, offset: { x: offset.x, y: offset.y }, type: 'paint' },
-        type: 'updateCanvasLayerSource',
-      });
+    let accepted: boolean;
+    try {
+      accepted = deps.dispatchBitmap
+        ? deps.dispatchBitmap(layerId, bitmap, { x: offset.x, y: offset.y })
+        : deps.dispatch({
+            id: layerId,
+            source: { bitmap, offset: { x: offset.x, y: offset.y }, type: 'paint' },
+            type: 'updateCanvasLayerSource',
+          });
+    } catch (error) {
+      const authoritativeSource = (deps.getAuthoritativeLayerSource ?? deps.getLayerSource)(layerId);
+      const authoritativeOffset =
+        authoritativeSource?.type === 'paint' && authoritativeSource.bitmap
+          ? (authoritativeSource.offset ?? { x: 0, y: 0 })
+          : null;
+      const didLand =
+        authoritativeSource?.type === 'paint' &&
+        authoritativeSource.bitmap?.imageName === bitmap.imageName &&
+        authoritativeSource.bitmap.width === bitmap.width &&
+        authoritativeSource.bitmap.height === bitmap.height &&
+        authoritativeSource.bitmap.contentHash === bitmap.contentHash &&
+        authoritativeOffset?.x === offset.x &&
+        authoritativeOffset.y === offset.y;
+      if (didLand) {
+        return;
+      }
+      lastApplied.delete(layerId);
+      if (authoritativeSource !== null) {
+        requeueFailure(error);
+      }
+      return;
+    }
+    if (accepted !== true) {
+      lastApplied.delete(layerId);
+      if (deps.getLayerSource(layerId) !== null) {
+        dirty.add(layerId);
+        dirtyReason.set(layerId, 'failure');
+      }
     }
   };
 
@@ -579,6 +618,12 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
           await waitForSuspensionChange();
           continue;
         }
+        const failedLayerIds = Array.from(failedThisBarrier).filter(
+          (layerId) => dirty.has(layerId) && dirtyReason.get(layerId) === 'failure'
+        );
+        if (failedLayerIds.length > 0) {
+          throw new BitmapPersistenceError(failedLayerIds);
+        }
         return;
       }
       await Promise.all(ops);
@@ -588,6 +633,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
         }
       }
     }
+    throw new Error('Canvas pixel persistence barrier exceeded its iteration limit.');
   };
 
   const isSelfEcho = (layerId: string, source: CanvasLayerSourceContract | null): boolean => {

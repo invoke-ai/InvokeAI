@@ -6,8 +6,8 @@ import type {
   ToolContext,
 } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasControlLayerContract, CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
@@ -115,7 +115,7 @@ interface Harness {
   ctx: ToolContext;
   backend: StubRasterBackend;
   layers: LayerCacheStore;
-  dispatched: WorkbenchAction[];
+  dispatched: CanvasProjectMutation[];
   strokes: StrokeCommittedEvent[];
   painted: string[];
   createdIds: string[];
@@ -128,7 +128,7 @@ const createHarness = (
   const backend = createTestStubRasterBackend();
   const layers = createLayerCacheStore(backend);
   const stores = createEngineStores();
-  const dispatched: WorkbenchAction[] = [];
+  const dispatched: CanvasProjectMutation[] = [];
   const strokes: StrokeCommittedEvent[] = [];
   const painted: string[] = [];
   const createdIds: string[] = [];

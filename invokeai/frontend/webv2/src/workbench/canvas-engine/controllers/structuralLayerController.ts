@@ -1,12 +1,12 @@
 import type { History } from '@workbench/canvas-engine/history/history';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2 } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createDocumentPatchEntry } from '@workbench/canvas-engine/history/documentPatch';
 
 export interface StructuralLayerControllerOptions {
   readonly history: History;
-  readonly dispatch: (action: WorkbenchAction) => void;
+  readonly dispatch: (action: CanvasProjectMutation) => void;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
@@ -39,7 +39,7 @@ export class StructuralLayerController {
     return !this.disposed && this.deps.canEdit() && !this.deps.isGestureActive();
   }
 
-  commit(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): boolean {
+  commit(label: string, forward: CanvasProjectMutation, inverse: CanvasProjectMutation): boolean {
     if (!this.canCommit()) {
       return false;
     }
@@ -49,7 +49,7 @@ export class StructuralLayerController {
     return true;
   }
 
-  preview(action: WorkbenchAction): boolean {
+  preview(action: CanvasProjectMutation): boolean {
     if (this.disposed || !this.deps.canEdit() || this.deps.isGestureActive()) {
       return false;
     }
@@ -70,12 +70,12 @@ export class StructuralLayerController {
     const now = this.now();
     const coalesce = !!this.burst && this.burst.layerId === layer.id && now < this.burst.expiresAt;
     const origin = coalesce && this.burst ? this.burst.origin : { x: layer.transform.x, y: layer.transform.y };
-    const forward: WorkbenchAction = {
+    const forward: CanvasProjectMutation = {
       id: layer.id,
       patch: { transform: next },
       type: 'updateCanvasLayer',
     };
-    const inverse: WorkbenchAction = {
+    const inverse: CanvasProjectMutation = {
       id: layer.id,
       patch: { transform: origin },
       type: 'updateCanvasLayer',

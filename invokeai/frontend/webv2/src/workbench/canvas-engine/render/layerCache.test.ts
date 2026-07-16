@@ -5,11 +5,6 @@ import type { StubRasterSurface } from './raster.testStub';
 import { createLayerCacheStore, DEFAULT_CACHE_BUDGET_BYTES } from './layerCache';
 import { createTestStubRasterBackend } from './raster.testStub';
 
-const makeBitmap = () => {
-  const close = vi.fn();
-  return { bitmap: { close, height: 1, width: 1 } as unknown as ImageBitmap, close };
-};
-
 describe('createLayerCacheStore', () => {
   it('notifies version changes for pixel publication, invalidation, replacement, growth, and deletion', () => {
     const backend = createTestStubRasterBackend();
@@ -205,32 +200,11 @@ describe('createLayerCacheStore', () => {
     expect(store.get('visible')).toBeDefined();
   });
 
-  it('caches bitmaps by name and closes the previous bitmap when replaced', () => {
+  it('dispose clears caches', () => {
     const store = createLayerCacheStore(createTestStubRasterBackend());
-    const first = makeBitmap();
-    const second = makeBitmap();
-
-    store.setBitmap('img', first.bitmap);
-    expect(store.getBitmap('img')).toBe(first.bitmap);
-
-    store.setBitmap('img', second.bitmap);
-    expect(first.close).toHaveBeenCalledTimes(1);
-    expect(store.getBitmap('img')).toBe(second.bitmap);
-
-    store.deleteBitmap('img');
-    expect(second.close).toHaveBeenCalledTimes(1);
-    expect(store.getBitmap('img')).toBeUndefined();
-  });
-
-  it('dispose closes every cached bitmap and clears caches', () => {
-    const store = createLayerCacheStore(createTestStubRasterBackend());
-    const bm = makeBitmap();
-    store.setBitmap('img', bm.bitmap);
     store.getOrCreate('a', 10, 10);
 
     store.dispose();
-    expect(bm.close).toHaveBeenCalledTimes(1);
-    expect(store.getBitmap('img')).toBeUndefined();
     expect(store.byteSize()).toBe(0);
   });
 });

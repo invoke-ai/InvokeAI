@@ -271,6 +271,8 @@ const defaultDownload = (data: ArrayBuffer, fileName: string): void => {
 export interface ExecutePsdExportDeps {
   /** Surface factory (usually the engine's `RasterBackend`). */
   backend: { createSurface(width: number, height: number): RasterSurface };
+  /** Cancels before the next background allocation or side effect. */
+  signal?: AbortSignal;
   /**
    * Ensures a layer's cache is rasterized and returns its surface plus the
    * content `rect` (layer-local origin/size) those pixels occupy. The engine
@@ -292,6 +294,12 @@ const setTransform = (ctx: Ctx, m: Mat2d): void => {
   ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
 };
 
+const throwIfAborted = (signal?: AbortSignal): void => {
+  if (signal?.aborted) {
+    throw new DOMException('PSD export was aborted.', 'AbortError');
+  }
+};
+
 /**
  * Bakes one planned layer's pixels into a world-AABB-sized surface: draws the
  * layer's cache through its transform (offset into the AABB), then bakes any
@@ -304,6 +312,7 @@ const bakeLayer = async (
   read: (surface: RasterSurface, rect: Rect) => ImageData,
   write: (surface: RasterSurface, imageData: ImageData, x: number, y: number) => void
 ): Promise<{ surface: RasterSurface; imageData: ImageData }> => {
+  throwIfAborted(deps.signal);
   const { worldRect } = planLayer;
   const width = worldRect.width;
   const height = worldRect.height;
@@ -313,6 +322,7 @@ const bakeLayer = async (
   ctx.clearRect(0, 0, width, height);
 
   const { rect, surface: cache } = await deps.getLayerSurface(planLayer.id);
+  throwIfAborted(deps.signal);
   // local→world then shift into AABB-local (translation only affects e/f).
   const local = layerMatrix(planLayer.transform);
   setTransform(ctx, { ...local, e: local.e - worldRect.x, f: local.f - worldRect.y });
@@ -355,6 +365,7 @@ export const executePsdExport = async (
   const baked: { planLayer: PsdPlanLayer; surface: RasterSurface }[] = [];
 
   for (const planLayer of plan.layers) {
+    throwIfAborted(deps.signal);
     const { imageData, surface } = await bakeLayer(planLayer, deps, read, write);
     baked.push({ planLayer, surface });
     children.push({
@@ -372,6 +383,7 @@ export const executePsdExport = async (
 
   // Flatten the enabled layers (bottom-to-top = plan order) into the merged
   // composite the PSD carries as its full-document preview.
+  throwIfAborted(deps.signal);
   const composite = deps.backend.createSurface(plan.width, plan.height);
   const cctx = composite.ctx;
   setTransform(cctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
@@ -394,6 +406,8 @@ export const executePsdExport = async (
     width: plan.width,
   };
 
+  throwIfAborted(deps.signal);
   const bytes = await writePsdFn(psd);
+  throwIfAborted(deps.signal);
   download(bytes, fileName);
 };

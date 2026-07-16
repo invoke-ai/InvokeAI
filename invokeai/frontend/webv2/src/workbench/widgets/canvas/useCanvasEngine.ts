@@ -15,12 +15,16 @@
  */
 
 import type { ImageResolver } from '@workbench/canvas-engine/render/rasterizers';
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 
+import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
 import { getOrCreateEngine, releaseEngine } from '@workbench/canvas-operations/engineRegistry';
+import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import { getImageFullUrl } from '@workbench/gallery/api';
 import { useActiveProjectId, useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useEffect, useState } from 'react';
+
+/** Registry-owned application engine handle; consumers narrow this to the capabilities they use. */
+export type CanvasEngineHandle = ReturnType<typeof getOrCreateEngine>;
 
 /** Fetches a persisted image asset to a `Blob` for the engine's rasterizers. */
 const createImageResolver = (): ImageResolver => async (imageName, signal) => {
@@ -32,13 +36,18 @@ const createImageResolver = (): ImageResolver => async (imageName, signal) => {
 };
 
 /** Acquires (and releases) the active project's canvas engine. */
-export const useCanvasEngine = (): CanvasEngine | null => {
+export const useCanvasEngine = (): CanvasEngineHandle | null => {
   const store = useWorkbenchStore();
   const projectId = useActiveProjectId();
-  const [engine, setEngine] = useState<CanvasEngine | null>(null);
+  const [engine, setEngine] = useState<CanvasEngineHandle | null>(null);
 
   useEffect(() => {
-    const acquired = getOrCreateEngine(projectId, { imageResolver: createImageResolver(), store });
+    const acquired = getOrCreateEngine(projectId, {
+      getMainModelBase: () => canvasApplicationPort.getSelectedModelBase(store.getState(), projectId),
+      imageResolver: createImageResolver(),
+      mutationPort: createCanvasProjectMutationPort(store, projectId),
+      reportError: (report) => store.dispatch({ ...report, type: 'recordError' }),
+    });
     // Surfacing an effect-acquired external resource is the one legitimate
     // synchronous setState-in-effect: acquire/release must live in the effect
     // (balanced ref-count, StrictMode-safe via the registry's grace period),

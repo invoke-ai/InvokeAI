@@ -16,8 +16,9 @@ import { isControlKindSupportedForBase } from '@workbench/generation/canvas/addC
 import { resolveDefaultFilterForModel } from '@workbench/generation/canvas/controlRecommendations';
 import { getControlValidationReason } from '@workbench/generation/canvas/controlValidation';
 import { useModelsSelector } from '@workbench/models/modelsStore';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -73,7 +74,7 @@ interface ControlLayerSettingsProps {
  */
 export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const dispatch = useCanvasProjectMutationDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;

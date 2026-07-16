@@ -1,5 +1,6 @@
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { nextLayerName } from '@workbench/workbenchState';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,7 +29,7 @@ import { useSelectedModelBase } from './useSelectedModelBase';
 export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
-  const dispatch = useWorkbenchDispatch();
+  const dispatch = useCanvasProjectMutationDispatch();
   const base = useSelectedModelBase();
   const layerNames = useActiveProjectSelector(
     (project) => project.canvas.document.layers.map((layer) => layer.name),

@@ -1,6 +1,7 @@
 import { Flex, Icon, Stack, Text } from '@chakra-ui/react';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { LayersIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +23,7 @@ import { LayersPanelHeader } from './LayersPanelHeader';
 export const LayersWidgetView = () => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
-  const dispatch = useWorkbenchDispatch();
+  const dispatch = useCanvasProjectMutationDispatch();
   const propertiesRequest = useCurrentLayerPropertiesRequest();
   const { layers, selectedLayerId } = useActiveProjectSelector(
     (project) => ({

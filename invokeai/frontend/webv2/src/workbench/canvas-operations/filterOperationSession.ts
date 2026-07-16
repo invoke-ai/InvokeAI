@@ -175,34 +175,38 @@ export const createFilterOperationSession = (
         if (exported.status !== 'ok') {
           throw new Error(`The filter source is ${exported.status}.`);
         }
-        if (!sameGuard(exported.guard, guard) || !deps.isGuardCurrent(guard)) {
-          throw new DOMException('The filter source became stale.', 'AbortError');
+        try {
+          if (!sameGuard(exported.guard, guard) || !deps.isGuardCurrent(guard)) {
+            throw new DOMException('The filter source became stale.', 'AbortError');
+          }
+          const filtered = await deps.runFilter({
+            filterType: requestDraft.type,
+            input: { rect: exported.rect, surface: exported.surface },
+            settings: requestDraft.settings,
+            signal,
+          });
+          if (signal.aborted || !deps.isGuardCurrent(guard)) {
+            throw new DOMException('The filter request was superseded.', 'AbortError');
+          }
+          const rect = { height: filtered.height, width: filtered.width, ...filtered.origin };
+          const shown = await deps.publishPreview(filtered.imageName, rect, guard, requestDraft.type);
+          if (signal.aborted || !deps.isGuardCurrent(guard)) {
+            throw new DOMException('The filter request was superseded.', 'AbortError');
+          }
+          if (shown !== 'shown') {
+            throw new DOMException('The filter source became stale.', 'AbortError');
+          }
+          return {
+            guard,
+            height: filtered.height,
+            imageName: filtered.imageName,
+            origin: filtered.origin,
+            rect,
+            width: filtered.width,
+          } satisfies FilterOperationPreview;
+        } finally {
+          exported.release();
         }
-        const filtered = await deps.runFilter({
-          filterType: requestDraft.type,
-          input: { rect: exported.rect, surface: exported.surface },
-          settings: requestDraft.settings,
-          signal,
-        });
-        if (signal.aborted || !deps.isGuardCurrent(guard)) {
-          throw new DOMException('The filter request was superseded.', 'AbortError');
-        }
-        const rect = { height: filtered.height, width: filtered.width, ...filtered.origin };
-        const shown = await deps.publishPreview(filtered.imageName, rect, guard, requestDraft.type);
-        if (signal.aborted || !deps.isGuardCurrent(guard)) {
-          throw new DOMException('The filter request was superseded.', 'AbortError');
-        }
-        if (shown !== 'shown') {
-          throw new DOMException('The filter source became stale.', 'AbortError');
-        }
-        return {
-          guard,
-          height: filtered.height,
-          imageName: filtered.imageName,
-          origin: filtered.origin,
-          rect,
-          width: filtered.width,
-        } satisfies FilterOperationPreview;
       },
       (preview) => {
         publish({ ...state, error: null, preview, status: 'ready' });

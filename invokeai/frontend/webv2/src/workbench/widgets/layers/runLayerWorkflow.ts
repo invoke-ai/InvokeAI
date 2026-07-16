@@ -31,7 +31,17 @@ export type LayerWorkflowFailureStage =
 export type RunLayerWorkflowResult =
   | { status: 'completed'; imageName: string }
   | {
-      status: 'aborted' | 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'locked' | 'stale' | 'busy';
+      status:
+        | 'aborted'
+        | 'missing'
+        | 'disabled'
+        | 'unsupported'
+        | 'empty'
+        | 'not-ready'
+        | 'over-budget'
+        | 'locked'
+        | 'stale'
+        | 'busy';
     }
   | { status: 'failed'; message: string; stage: LayerWorkflowFailureStage };
 

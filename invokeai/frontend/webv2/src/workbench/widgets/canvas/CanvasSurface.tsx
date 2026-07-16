@@ -1,11 +1,13 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the container ref callback is intentionally re-created when `engine` changes, so a project switch detaches the old engine and attaches the new one. */
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { shouldFocusCanvasSurface } from '@workbench/widgets/canvas/surfaceFocus';
 import { TextEditPortal } from '@workbench/widgets/canvas/TextEditPortal';
 import { useRef } from 'react';
+
+export type CanvasSurfaceEngine = Pick<CanvasEngineHandle, 'document' | 'layers' | 'stores' | 'surface' | 'viewport'>;
 
 /**
  * Give the canvas widget hotkey focus on a pointerdown on the surface, so tool
@@ -49,7 +51,7 @@ const focusCanvasSurface = (event: ReactPointerEvent<HTMLDivElement>) => {
  * is owned entirely by the engine via the overlay, so this component never
  * re-renders on interaction.
  */
-export const CanvasSurface = ({ engine }: { engine: CanvasEngine }) => {
+export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
   const screenRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
 

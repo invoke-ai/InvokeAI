@@ -8,16 +8,58 @@
  */
 
 import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
-import type { CanvasDocumentContractV2, CanvasStateContractV2, WorkbenchState } from '@workbench/types';
+import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
+import type { CanvasDocumentContractV2, CanvasStateContractV2, Project, WorkbenchState } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
+import {
+  applyCanvasProjectMutation,
+  isCanvasProjectMutation,
+  type CanvasProjectMutation,
+} from '@workbench/canvasProjectMutations';
+
+type EngineTestAction = WorkbenchAction | CanvasProjectMutation;
+
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
-import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import {
+  createCanvasEngine as createApplicationCanvasEngine,
+  type CanvasEngineOptions,
+} from '@workbench/canvas-operations/createCanvasEngine';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { EngineStore } from './engine';
 import type { StrokeCommittedEvent } from './tools/tool';
+
+interface EngineStore {
+  dispatch(action: EngineTestAction): void;
+  getState(): WorkbenchState;
+  subscribe(listener: () => void): () => void;
+}
+
+const createMutationPort = (store: EngineStore, projectId: string): CanvasProjectMutationPort => ({
+  dispatch: (mutation) => {
+    const before = store.getState().projects.find((project) => project.id === projectId)?.canvas ?? null;
+    if (!before) {
+      return false;
+    }
+    store.dispatch(mutation);
+    return store.getState().projects.find((project) => project.id === projectId)?.canvas !== before;
+  },
+  getCanvasState: () => store.getState().projects.find((project) => project.id === projectId)?.canvas ?? null,
+  subscribe: store.subscribe,
+});
+
+const createCanvasEngine = ({
+  projectId,
+  store,
+  ...options
+}: Omit<CanvasEngineOptions, 'mutationPort' | 'reportError'> & { store: EngineStore }) =>
+  createApplicationCanvasEngine({
+    ...options,
+    mutationPort: createMutationPort(store, projectId),
+    projectId,
+    reportError: () => undefined,
+  });
 
 vi.mock('@workbench/canvas-operations/backend/canvasImages', () => ({
   CanvasImageUploadError: class extends Error {},
@@ -68,7 +110,18 @@ const createReactiveStore = (document: CanvasDocumentContractV2) => {
     projects: [{ canvas: makeCanvas(document), id: 'p1' }],
   } as unknown as WorkbenchState;
   const listeners = new Set<() => void>();
-  const dispatch = vi.fn<(action: WorkbenchAction) => void>();
+  const dispatch = vi.fn((action: EngineTestAction) => {
+    if (isCanvasProjectMutation(action)) {
+      const project = state.projects[0] as unknown as Project;
+      state = {
+        ...state,
+        projects: [applyCanvasProjectMutation(project, action)],
+      } as WorkbenchState;
+    }
+    for (const listener of listeners) {
+      listener();
+    }
+  });
   return {
     dispatch,
     setDocument: (next: CanvasDocumentContractV2, revision = 0) => {
@@ -87,17 +140,24 @@ const createReactiveStore = (document: CanvasDocumentContractV2) => {
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-    } as unknown as EngineStore,
+    } as EngineStore,
   };
 };
 
 const createReducerBackedStore = (document: CanvasDocumentContractV2) => {
   let state = createInitialWorkbenchState();
   const projectId = state.activeProjectId;
-  state = workbenchReducer(state, { document, type: 'replaceCanvasDocument' });
+  state = workbenchReducer(state, {
+    mutation: { document, type: 'replaceCanvasDocument' },
+    projectId,
+    type: 'applyCanvasProjectMutation',
+  });
   const listeners = new Set<() => void>();
-  const dispatch = vi.fn((action: WorkbenchAction) => {
-    state = workbenchReducer(state, action);
+  const dispatch = vi.fn((action: EngineTestAction) => {
+    state = workbenchReducer(
+      state,
+      isCanvasProjectMutation(action) ? { mutation: action, projectId, type: 'applyCanvasProjectMutation' } : action
+    );
     for (const listener of listeners) {
       listener();
     }
@@ -269,7 +329,7 @@ describe('inpaint mask painting', () => {
     const configDispatch = dispatch.mock.calls
       .map((c) => c[0])
       .find(
-        (a): a is Extract<WorkbenchAction, { type: 'updateCanvasLayerConfig' }> =>
+        (a): a is Extract<EngineTestAction, { type: 'updateCanvasLayerConfig' }> =>
           a.type === 'updateCanvasLayerConfig' && a.id === 'mask1'
       );
     expect(configDispatch).toBeDefined();

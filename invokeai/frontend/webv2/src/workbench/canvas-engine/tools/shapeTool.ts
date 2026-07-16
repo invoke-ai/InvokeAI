@@ -21,8 +21,8 @@
  */
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasRasterLayerContractV2 } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import type { Tool, ToolContext } from './tool';
 
@@ -150,8 +150,8 @@ export const createShapeTool = (): Tool => {
         type: 'raster',
       };
 
-      const forward: WorkbenchAction = { index: 0, layer, type: 'addCanvasLayer' };
-      const inverse: WorkbenchAction = { ids: [layerId], type: 'removeCanvasLayers' };
+      const forward: CanvasProjectMutation = { index: 0, layer, type: 'addCanvasLayer' };
+      const inverse: CanvasProjectMutation = { ids: [layerId], type: 'removeCanvasLayers' };
       ctx.commitStructural('Add shape', forward, inverse);
       clearPreview(ctx);
     },

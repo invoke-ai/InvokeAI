@@ -1,4 +1,8 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type {
+  CanvasDocumentCapability,
+  CanvasExportCapability,
+  CanvasLifecycleCapability,
+} from '@workbench/canvas-engine/api';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { Project } from '@workbench/types';
 
@@ -14,7 +18,13 @@ export type CanvasGallerySaveRegion = 'canvas' | 'bbox';
 
 export type SaveCanvasToGalleryResult =
   | { status: 'saved'; imageName: string }
-  | { status: 'empty' | 'stale' | 'not-ready' };
+  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
+
+type CanvasGallerySaveEngine = {
+  readonly document: CanvasDocumentCapability;
+  readonly exports: Pick<CanvasExportCapability, 'exportRasterComposite'>;
+  readonly lifecycle: Pick<CanvasLifecycleCapability, 'flushPendingUploads'>;
+};
 
 const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, unknown> => {
   const generateValues = normalizeGenerateWidgetValues(getProjectWidgetValues(project, 'generate'));
@@ -42,7 +52,7 @@ const getCanvasSaveBoardId = (project: Project): string | undefined => {
 };
 
 export const saveCanvasToGallery = async (options: {
-  engine: CanvasEngine;
+  engine: CanvasGallerySaveEngine;
   region: CanvasGallerySaveRegion;
   project: Project;
   uploadImage?: typeof uploadCanvasImage;

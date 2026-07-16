@@ -10,6 +10,7 @@ import { useDndMonitor, useDroppable } from '@dnd-kit/core';
 import { Button, ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
 import { getGalleryImagesByNames, uploadGalleryImage } from '@workbench/gallery/api';
 import { useModelsSelector } from '@workbench/models/modelsStore';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
 import { PROMPT_ATTENTION_TARGET_PROPS } from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
 import { PromptTextarea } from '@workbench/widgets/generate/promptFields/PromptTextarea';
@@ -81,7 +82,8 @@ interface RegionalGuidanceSettingsProps {
  */
 export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSettingsProps) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const dispatch = useCanvasProjectMutationDispatch();
+  const workbenchDispatch = useWorkbenchDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const base = useSelectedModelBase();
   const showSyntaxHighlighting = useActiveProjectSelector((project) => project.settings.showPromptSyntaxHighlighting);
@@ -258,9 +260,9 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       try {
         const uploaded = await uploadGalleryImage(file, 'none');
         setReferenceImageAsset(refId, uploaded);
-        dispatch({ type: 'touchGalleryImagesRefresh' });
+        workbenchDispatch({ type: 'touchGalleryImagesRefresh' });
       } catch (error) {
-        dispatch({
+        workbenchDispatch({
           area: 'regional-guidance',
           message: error instanceof Error ? error.message : String(error),
           namespace: 'generation',
@@ -268,7 +270,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         });
       }
     },
-    [dispatch, setReferenceImageAsset]
+    [setReferenceImageAsset, workbenchDispatch]
   );
 
   // A single monitor routes gallery-image drops to the region's ref slot the drop

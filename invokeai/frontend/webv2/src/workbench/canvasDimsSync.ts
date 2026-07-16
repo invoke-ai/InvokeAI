@@ -239,7 +239,11 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
         };
         isSyncing = true;
         try {
-          store.dispatch({ bbox: result.bbox, type: 'setCanvasBbox' });
+          store.dispatch({
+            mutation: { bbox: result.bbox, type: 'setCanvasBbox' },
+            projectId: project.id,
+            type: 'applyCanvasProjectMutation',
+          });
         } finally {
           isSyncing = false;
         }

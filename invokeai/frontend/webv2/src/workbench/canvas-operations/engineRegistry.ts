@@ -73,6 +73,24 @@ export const createEngineRegistry = (
     }
   };
 
+  const scheduleDisposal = (projectId: string, entry: RegistryEntry, generation: number): void => {
+    entry.disposeHandle = timers.setTimeout(() => {
+      entry.disposeHandle = null;
+      void entry.cooldown?.then((result) => {
+        if (entry.refCount !== 0 || entry.generation !== generation || entries.get(projectId) !== entry) {
+          return;
+        }
+        if (result === 'dirty') {
+          entry.cooldown = entry.engine.lifecycle.beginCooldown();
+          scheduleDisposal(projectId, entry, generation);
+          return;
+        }
+        entries.delete(projectId);
+        entry.engine.lifecycle.dispose();
+      });
+    }, gracePeriodMs);
+  };
+
   return {
     getEngine: (projectId) => entries.get(projectId)?.engine,
     getOrCreateEngine: (projectId, deps) => {
@@ -82,6 +100,7 @@ export const createEngineRegistry = (
         existing.generation += 1;
         existing.refCount += 1;
         existing.engine.lifecycle.activate();
+        existing.cooldown = null;
         return existing.engine;
       }
       const engine = createCanvasEngine({ projectId, ...deps });
@@ -100,16 +119,7 @@ export const createEngineRegistry = (
       entry.generation += 1;
       const generation = entry.generation;
       entry.cooldown = entry.engine.lifecycle.beginCooldown();
-      entry.disposeHandle = timers.setTimeout(() => {
-        entry.disposeHandle = null;
-        void entry.cooldown?.then(() => {
-          if (entry.refCount !== 0 || entry.generation !== generation || entries.get(projectId) !== entry) {
-            return;
-          }
-          entries.delete(projectId);
-          entry.engine.lifecycle.dispose();
-        });
-      }, gracePeriodMs);
+      scheduleDisposal(projectId, entry, generation);
     },
   };
 };

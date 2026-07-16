@@ -1,4 +1,5 @@
-import type { CanvasEngine } from '@workbench/canvas-engine/engine';
+import type { CanvasLayerCapability } from '@workbench/canvas-engine/api';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { GalleryImage } from '@workbench/gallery/api';
 import type { CanvasImageRef, CanvasLayerContract, Project, WorkbenchState } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
@@ -211,10 +212,12 @@ const resizeImages = async (
   };
 };
 
+type GalleryImportEngine = { readonly projectId: string; readonly layers: CanvasLayerCapability };
+
 export const importGalleryImagesToCanvas = async (options: {
   destination: GalleryCanvasImportDestination;
   dispatch: Dispatch<WorkbenchAction>;
-  engine: CanvasEngine | null;
+  engine: GalleryImportEngine | null;
   getState: () => WorkbenchState;
   images: readonly GalleryImage[];
   project: Project;
@@ -261,16 +264,14 @@ export const importGalleryImagesToCanvas = async (options: {
 
     const layers = buildLayers(layerImages, destination, project);
     const previousSelectedLayerId = capturedDocument.selectedLayerId;
-    const forward: WorkbenchAction = {
+    const forward: CanvasProjectMutation = {
       add: { index: 0, layers },
       enabledUpdates: [],
-      projectId: project.id,
       selectedLayerId: layers.at(-1)?.id ?? previousSelectedLayerId,
       type: 'applyCanvasLayerStackMutation',
     };
-    const inverse: WorkbenchAction = {
+    const inverse: CanvasProjectMutation = {
       enabledUpdates: [],
-      projectId: project.id,
       removeIds: layers.map((layer) => layer.id),
       selectedLayerId: previousSelectedLayerId,
       type: 'applyCanvasLayerStackMutation',
@@ -290,7 +291,7 @@ export const importGalleryImagesToCanvas = async (options: {
         return { status: 'blocked' };
       }
     } else {
-      dispatch(forward);
+      dispatch({ mutation: forward, projectId: project.id, type: 'applyCanvasProjectMutation' });
     }
     return { failedImageNames, layerIds: layers.map((layer) => layer.id), status: 'imported' };
   } finally {

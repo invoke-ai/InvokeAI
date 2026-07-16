@@ -1,8 +1,8 @@
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2 } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { describe, expect, it, vi } from 'vitest';
@@ -35,12 +35,12 @@ const pointer = (x: number, y: number, opts: { shift?: boolean; buttons?: number
 
 interface StructuralCommit {
   label: string;
-  forward: WorkbenchAction;
-  inverse: WorkbenchAction;
+  forward: CanvasProjectMutation;
+  inverse: CanvasProjectMutation;
 }
 
 const createHarness = (doc: CanvasDocumentContractV2) => {
-  const dispatched: WorkbenchAction[] = [];
+  const dispatched: CanvasProjectMutation[] = [];
   const commits: StructuralCommit[] = [];
   const stores = createEngineStores();
   let idCounter = 0;

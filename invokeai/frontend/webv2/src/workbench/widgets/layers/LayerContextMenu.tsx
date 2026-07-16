@@ -1,8 +1,8 @@
 import type { BooleanRasterOperation } from '@workbench/canvas-engine/engine';
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { GenerateReferenceImage } from '@workbench/generation/types';
 import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasMaskContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, Dispatch, ReactNode } from 'react';
 
@@ -15,7 +15,7 @@ import { uploadGalleryImage } from '@workbench/gallery/api';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import { useCanvasDocumentEditingLocked, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
   ArrowUpDownIcon,
@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { Fragment, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+export type LayerContextMenuEngine = Pick<CanvasEngineHandle, 'exports' | 'layers' | 'projectId' | 'stores' | 'tools'>;
 
 import type {
   LayerContextMenuItem,
@@ -106,15 +108,26 @@ const assertNever = (value: never): never => {
   throw new Error(`Unhandled layer action result: ${String(value)}`);
 };
 
-type LayerActionErrorStatus = 'busy' | 'disabled' | 'empty' | 'locked' | 'missing' | 'not-ready' | 'unsupported';
+type LayerActionErrorStatus =
+  | 'aborted'
+  | 'busy'
+  | 'disabled'
+  | 'empty'
+  | 'locked'
+  | 'missing'
+  | 'not-ready'
+  | 'over-budget'
+  | 'unsupported';
 
 const LAYER_ACTION_ERROR_KEYS: Record<LayerActionErrorStatus, string> = {
+  aborted: 'widgets.layers.actions.notReady',
   busy: 'widgets.layers.actions.busy',
   disabled: 'widgets.layers.actions.disabled',
   empty: 'widgets.layers.actions.empty',
   locked: 'widgets.layers.actions.locked',
   missing: 'widgets.layers.actions.missing',
   'not-ready': 'widgets.layers.actions.notReady',
+  'over-budget': 'widgets.layers.actions.notReady',
   unsupported: 'widgets.layers.actions.unsupported',
 };
 
@@ -127,8 +140,8 @@ const hasPureExportableLayerContent = (layer: CanvasLayerContract, document: Can
 };
 
 interface LayerMenuProps {
-  dispatch: Dispatch<WorkbenchAction>;
-  engine: CanvasEngine | null;
+  dispatch: Dispatch<CanvasProjectMutation>;
+  engine: LayerContextMenuEngine | null;
   index: number;
   layer: CanvasLayerContract;
   layers: readonly CanvasLayerContract[];
@@ -189,6 +202,7 @@ const LayerMenu = ({
   showGroupLabels,
 }: LayerMenuProps) => {
   const { t } = useTranslation();
+  const workbenchDispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const base = useSelectedModelBase();
   const workflowAvailability = useLayerWorkflowAvailability();
@@ -475,6 +489,7 @@ const LayerMenu = ({
       case 'locked':
       case 'empty':
       case 'not-ready':
+      case 'over-budget':
         throw makeStatusError(result.status);
       case 'busy':
         throw new Error(t('widgets.layers.actions.cropBusy'));
@@ -499,10 +514,10 @@ const LayerMenu = ({
 
   const handleOpenProperties = useCallback(
     (section: LayerPropertiesSection) => {
-      dispatch({ region: 'right', type: 'openRegionWidget', widgetId: 'layers' });
+      workbenchDispatch({ region: 'right', type: 'openRegionWidget', widgetId: 'layers' });
       requestLayerProperties(layer.id, section);
     },
-    [dispatch, layer.id]
+    [layer.id, workbenchDispatch]
   );
 
   const handleBooleanRaster = useCallback(
@@ -764,8 +779,8 @@ const LayerMenu = ({
 };
 
 interface LayerRowMenuProps {
-  dispatch: Dispatch<WorkbenchAction>;
-  engine: CanvasEngine | null;
+  dispatch: Dispatch<CanvasProjectMutation>;
+  engine: LayerContextMenuEngine | null;
   index: number;
   layer: CanvasLayerContract;
   layers: readonly CanvasLayerContract[];
@@ -806,8 +821,8 @@ export const CanvasLayerContextMenu = ({
   onClose,
 }: {
   beforeDangerItems?: ReactNode;
-  dispatch: Dispatch<WorkbenchAction>;
-  engine: CanvasEngine | null;
+  dispatch: Dispatch<CanvasProjectMutation>;
+  engine: LayerContextMenuEngine | null;
   layers: readonly CanvasLayerContract[];
   target: CanvasLayerContextMenuTarget | null;
   showGroupLabels?: boolean;

@@ -197,6 +197,30 @@ describe('executeCompositePlan — mode geometry', () => {
 });
 
 describe('executeCompositePlan — upload + dedupe', () => {
+  it('reserves the composite surface and coverage buffer until execution settles', async () => {
+    const harness = makeHarness(() => uniformImageData(100, 100, 255));
+    const release = vi.fn();
+    const reserve = vi.fn(() => ({ lease: { release }, status: 'ok' as const }));
+    harness.deps.reserve = reserve;
+    const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
+
+    await executeCompositePlan(plan, harness.deps);
+
+    expect(reserve).toHaveBeenCalledWith(80_000);
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('refuses a composite before allocating when its reservation is over budget', async () => {
+    const harness = makeHarness(() => uniformImageData(100, 100, 255));
+    harness.deps.reserve = () => ({ availableBytes: 0, requestedBytes: 80_000, status: 'over-budget' });
+    const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
+
+    await expect(executeCompositePlan(plan, harness.deps)).rejects.toThrow(
+      'The canvas composite exceeds the available raster memory budget'
+    );
+    expect(harness.createdTargets).toHaveLength(0);
+  });
+
   it('encodes and uploads once, returning the uploaded image name', async () => {
     const harness = makeHarness(() => uniformImageData(100, 100, 255));
     const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);

@@ -2,8 +2,8 @@ import type { History } from '@workbench/canvas-engine/history/history';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasImageRef, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { getSourceContentRect, isMaskLayer } from '@workbench/canvas-engine/document/sources';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
@@ -22,7 +22,7 @@ export interface MaskLayerControllerOptions {
   readonly endBurst: () => void;
   readonly discardPersisted: (layerId: string) => void;
   readonly markDirty: (layerId: string) => void;
-  readonly dispatch: (action: WorkbenchAction) => void;
+  readonly dispatch: (action: CanvasProjectMutation) => void;
   readonly deleteDerived: (layerId: string) => void;
   readonly notifyPainted: (layerId: string) => void;
   readonly restoreCache: (layerId: string, rect: Rect, pixels: ImageData) => void;

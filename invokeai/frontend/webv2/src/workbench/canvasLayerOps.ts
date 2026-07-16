@@ -10,13 +10,13 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasProjectMutation } from './canvasProjectMutations';
 import type { CanvasLayerContract } from './types';
-import type { WorkbenchAction } from './workbenchState';
 
 /** A forward/inverse reducer-action pair for one reversible structural edit. */
 export interface StructuralActions {
-  forward: WorkbenchAction;
-  inverse: WorkbenchAction;
+  forward: CanvasProjectMutation;
+  inverse: CanvasProjectMutation;
 }
 
 /** Mints a fresh layer id (matches the engine's / layers panel's id shape). */

@@ -6,6 +6,7 @@
  * cycle. Zero React, zero side effects.
  */
 
+import type { DecodedBitmapPool } from '@workbench/canvas-engine/render/decodedBitmapPool';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -39,6 +40,8 @@ export interface RasterizeDeps {
   signal?: AbortSignal;
   /** Holds the decoded-bitmap cache (keyed by image name). */
   store: LayerCacheStore;
+  /** Coalesces concurrent decodes and owns decoded pixels only for the duration of a rasterization. */
+  bitmapPool?: DecodedBitmapPool;
   /**
    * Document pixel size. Layers are content-sized, so this only backs the
    * legacy default for gradients that predate the explicit extent field (they

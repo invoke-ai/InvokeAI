@@ -1,6 +1,6 @@
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch, KeyboardEvent, MouseEvent } from 'react';
 
 import { Badge, Box, HStack, Input, Stack, Text } from '@chakra-ui/react';
@@ -11,11 +11,18 @@ import { LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CanvasLayerContextMenu, type CanvasLayerContextMenuTarget, LayerContextMenu } from './LayerContextMenu';
+import {
+  CanvasLayerContextMenu,
+  type CanvasLayerContextMenuTarget,
+  LayerContextMenu,
+  type LayerContextMenuEngine,
+} from './LayerContextMenu';
 import { createLayerMenuTargetFromContextEvent } from './layerMenuState';
 import { applyStructural } from './layerOps';
-import { LayerPropertiesPopover } from './LayerPropertiesPopover';
+import { LayerPropertiesPopover, type LayerPropertiesEngine } from './LayerPropertiesPopover';
 import { LayerThumbnail } from './LayerThumbnail';
+
+export type LayerListItemEngine = LayerContextMenuEngine & LayerPropertiesEngine & Pick<CanvasEngineHandle, 'previews'>;
 
 /** i18n key for a layer's short type/source badge. */
 const layerBadgeKey = (layer: CanvasLayerContract): string => {
@@ -26,9 +33,9 @@ const layerBadgeKey = (layer: CanvasLayerContract): string => {
 };
 
 interface LayerListItemProps {
-  dispatch: Dispatch<WorkbenchAction>;
+  dispatch: Dispatch<CanvasProjectMutation>;
   editingLocked: boolean;
-  engine: CanvasEngine | null;
+  engine: LayerListItemEngine | null;
   index: number;
   isSelected: boolean;
   layer: CanvasLayerContract;

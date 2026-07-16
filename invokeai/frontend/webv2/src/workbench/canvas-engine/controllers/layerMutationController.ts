@@ -2,8 +2,8 @@ import type { History } from '@workbench/canvas-engine/history/history';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 export type CapturedLayerCache = { pixels: RasterSurface; rect: Rect } | null | 'not-ready';
 
@@ -12,7 +12,7 @@ export interface LayerMutationControllerOptions {
   readonly captureCache: (layer: CanvasLayerContract, document: CanvasDocumentContractV2) => CapturedLayerCache;
   readonly discardPersisted: (layerId: string) => void;
   readonly dispatchPrepared: (
-    action: WorkbenchAction,
+    action: CanvasProjectMutation,
     reducerAccepted: () => boolean,
     mirrorAccepted: () => boolean
   ) => void;

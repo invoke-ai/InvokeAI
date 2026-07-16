@@ -4,7 +4,7 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 
 import { createListCollection, HStack, Stack } from '@chakra-ui/react';
 import { Button, ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
-import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -41,7 +41,7 @@ interface InpaintMaskSettingsProps {
  */
 export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const dispatch = useCanvasProjectMutationDispatch();
   const fillBeforeRef = useRef<CanvasMaskFillContract | null>(null);
   const noiseBeforeRef = useRef<number | null>(null);
   const denoiseBeforeRef = useRef<number | null>(null);

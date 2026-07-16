@@ -6,6 +6,7 @@ import { createEmptyCanvasStateV2 } from './canvasMigration';
 import {
   getCancelableCanvasStagingQueueItemId,
   getCanvasQueuePlaceholderSlots,
+  getCanvasStagingCandidateFingerprint,
   getCanvasStagingSlots,
 } from './canvasStagingView';
 
@@ -160,7 +161,7 @@ describe('canvas staging view', () => {
       {
         candidate: staged,
         height: 768,
-        id: 'candidate:q-ready:ready.png',
+        id: `candidate:${getCanvasStagingCandidateFingerprint(staged)}`,
         imageName: 'ready.png',
         kind: 'candidate',
         queueItemId: 'q-ready',

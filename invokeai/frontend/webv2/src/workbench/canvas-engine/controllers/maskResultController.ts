@@ -1,8 +1,8 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/api';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasImageRef } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import {
   createInpaintMaskFromImage,
@@ -29,7 +29,7 @@ export interface MaskResultControllerOptions<Owner = symbol> {
   readonly canEdit: (owner?: Owner) => boolean;
   readonly createLayerId: () => string;
   readonly dispatchPrepared: (
-    action: WorkbenchAction,
+    action: CanvasProjectMutation,
     reducerAccepted: () => boolean,
     mirrorAccepted: () => boolean
   ) => void;

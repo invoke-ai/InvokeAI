@@ -1,7 +1,7 @@
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -70,19 +70,19 @@ const pointer = (x: number, y: number, opts: { shift?: boolean; buttons?: number
 
 interface StructuralCommit {
   label: string;
-  forward: WorkbenchAction;
-  inverse: WorkbenchAction;
+  forward: CanvasProjectMutation;
+  inverse: CanvasProjectMutation;
 }
 
 interface Harness {
   ctx: ToolContext;
-  dispatched: WorkbenchAction[];
+  dispatched: CanvasProjectMutation[];
   commits: StructuralCommit[];
   overrides: { layerId: string; override: { x: number; y: number } | null }[];
 }
 
 const createHarness = (doc: CanvasDocumentContractV2): Harness => {
-  const dispatched: WorkbenchAction[] = [];
+  const dispatched: CanvasProjectMutation[] = [];
   const commits: StructuralCommit[] = [];
   const overrides: { layerId: string; override: { x: number; y: number } | null }[] = [];
   const ctx: ToolContext = {

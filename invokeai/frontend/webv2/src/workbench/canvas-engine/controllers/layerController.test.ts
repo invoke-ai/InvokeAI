@@ -1,4 +1,4 @@
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -154,8 +154,8 @@ describe('LayerController', () => {
     preparePixels: vi.fn(),
   };
   it('exposes only declared layer and preview ports', async () => {
-    const forward: WorkbenchAction = { id: 'layer', type: 'setCanvasSelectedLayer' };
-    const inverse: WorkbenchAction = { id: null, type: 'setCanvasSelectedLayer' };
+    const forward: CanvasProjectMutation = { id: 'layer', type: 'setCanvasSelectedLayer' };
+    const inverse: CanvasProjectMutation = { id: null, type: 'setCanvasSelectedLayer' };
     const deps = {
       commitGeneratedImageResult: vi.fn(() => Promise.resolve({ layerId: 'copy', status: 'committed' as const })),
       mask,
@@ -193,8 +193,8 @@ describe('LayerController', () => {
     controller.dispose();
     controller.dispose();
 
-    expect(controller.layers.applyStructuralPreview({} as WorkbenchAction)).toBe(false);
-    controller.layers.commitStructural('late', {} as WorkbenchAction, {} as WorkbenchAction);
+    expect(controller.layers.applyStructuralPreview({} as CanvasProjectMutation)).toBe(false);
+    controller.layers.commitStructural('late', {} as CanvasProjectMutation, {} as CanvasProjectMutation);
     expect(controller.previews.drawLayerThumbnail('layer', {} as HTMLCanvasElement, 96)).toBe(false);
   });
 });

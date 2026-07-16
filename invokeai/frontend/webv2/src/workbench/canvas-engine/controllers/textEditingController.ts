@@ -1,7 +1,7 @@
 import type { TextEditSession, TextSource, TextToolOptions } from '@workbench/canvas-engine/engineStores';
 import type { Vec2 } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 export interface TextEditingControllerOptions {
   readonly session: {
@@ -13,7 +13,7 @@ export interface TextEditingControllerOptions {
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
   readonly createLayerId: () => string;
-  readonly commitStructural: (label: string, forward: WorkbenchAction, inverse: WorkbenchAction) => void;
+  readonly commitStructural: (label: string, forward: CanvasProjectMutation, inverse: CanvasProjectMutation) => void;
   readonly invalidate: (payload: { layers?: string[]; overlay?: true }) => void;
 }
 

@@ -5,13 +5,13 @@ import type { History } from '@workbench/canvas-engine/history/history';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type {
   CanvasDocumentContractV2,
   CanvasImageRef,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
 } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { createControlLayer } from '@workbench/canvas-engine/document/layerFactories';
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
@@ -51,7 +51,7 @@ export interface FilterResultControllerOptions<Permit, Owner = symbol> {
   ) => Promise<DecodeImageResult>;
   readonly discardPersisted: (layerId: string) => void;
   readonly dispatchPrepared: (
-    action: WorkbenchAction,
+    action: CanvasProjectMutation,
     reducerAccepted: () => boolean,
     mirrorAccepted: () => boolean
   ) => void;

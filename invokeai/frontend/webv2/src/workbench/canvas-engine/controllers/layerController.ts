@@ -14,7 +14,7 @@ import { ThumbnailController, type ThumbnailControllerOptions } from './thumbnai
 
 export type LayerControllerDeps = Omit<
   CanvasLayerCapability,
-  'applyStructuralPreview' | 'canCommitStructural' | 'commitStructural' | 'invertMask'
+  'applyStructuralPreview' | 'canCommitStructural' | 'commitStagedImage' | 'commitStructural' | 'invertMask'
 > &
   Omit<CanvasPreviewCapability, 'drawLayerThumbnail' | 'requestLayerThumbnail'> & {
     mask: MaskLayerControllerOptions;
@@ -30,7 +30,7 @@ export type LayerControllerDeps = Omit<
 
 /** Public layer-operation boundary. Implementations are injected by the composition root. */
 export class LayerController {
-  readonly layers: CanvasLayerCapability;
+  readonly layers: Omit<CanvasLayerCapability, 'commitStagedImage'>;
   readonly previews: CanvasPreviewCapability;
   readonly mask: MaskLayerController;
   readonly thumbnail: ThumbnailController;

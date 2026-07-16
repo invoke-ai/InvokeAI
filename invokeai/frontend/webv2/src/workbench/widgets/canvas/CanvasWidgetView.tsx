@@ -17,6 +17,7 @@ import {
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -85,6 +86,7 @@ const REORDER_KINDS: Record<string, LayerReorderKind> = {
 export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
+  const canvasDispatch = useCanvasProjectMutationDispatch();
   const store = useWorkbenchStore();
   const engine = useCanvasEngine();
   const canvas = useActiveProjectSelector((project) => project.canvas);
@@ -117,7 +119,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     }
     event.preventDefault();
     if (resolution.target?.layerId) {
-      dispatch({ id: resolution.target.layerId, type: 'setCanvasSelectedLayer' });
+      canvasDispatch({ id: resolution.target.layerId, type: 'setCanvasSelectedLayer' });
     }
     setContextMenuTarget(resolution.target);
   };
@@ -181,6 +183,8 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       item.snapshot.canvas.documentRevision === canvas.documentRevision
   );
   const interactionCapabilities = getCanvasInteractionCapabilities({
+    hasCanvasEngine: engine !== null,
+    hasSelectedCandidate: selectedCandidate !== undefined,
     hasStagingSlots,
     isCanvasGenerationInFlight,
     operationKind: operation?.status === 'active' ? operation.identity.kind : null,
@@ -278,17 +282,17 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     const selectedLayer = selectedIndex >= 0 ? layers[selectedIndex] : undefined;
 
     if ((commandId === 'canvas.prevEntity' || commandId === 'canvas.nudgeLeft') && hasStagingSlots) {
-      dispatch({ direction: -1, type: 'cycleStagedImage' });
+      canvasDispatch({ direction: -1, type: 'cycleStagedImage' });
       return;
     }
 
     if ((commandId === 'canvas.nextEntity' || commandId === 'canvas.nudgeRight') && hasStagingSlots) {
-      dispatch({ direction: 1, type: 'cycleStagedImage' });
+      canvasDispatch({ direction: 1, type: 'cycleStagedImage' });
       return;
     }
 
     if (commandId === 'canvas.deleteSelected' && selectedCandidate) {
-      dispatch({ type: 'discardSelectedStagedImage' });
+      canvasDispatch({ type: 'discardSelectedStagedImage' });
       return;
     }
 
@@ -474,7 +478,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
             <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
             <CanvasLayerContextMenu
               beforeDangerItems={saveToGallerySubmenu}
-              dispatch={dispatch}
+              dispatch={canvasDispatch}
               engine={engine}
               layers={document.layers}
               showGroupLabels
@@ -502,6 +506,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 antialiasProgressImages={antialiasProgressImages}
                 areThumbnailsVisible={stagingArea.areThumbnailsVisible}
                 autoSwitchMode={stagingArea.autoSwitchMode}
+                canAccept={interactionCapabilities.canAcceptStagedImage}
                 hasMultipleSlots={hasMultipleStagingSlots}
                 isGenerating={isCanvasGenerationInFlight}
                 isVisible={stagingArea.isVisible}
@@ -509,15 +514,22 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 selectedImageIndex={stagingArea.selectedImageIndex}
                 selectedSlot={selectedSlot}
                 slots={stagingSlots}
-                onAccept={() => dispatch({ type: 'acceptStagedImage' })}
+                onAccept={() => {
+                  if (selectedSlot?.kind === 'candidate') {
+                    engine?.layers.commitStagedImage({
+                      candidate: selectedSlot.candidate,
+                      selectedImageIndex: stagingArea.selectedImageIndex,
+                    });
+                  }
+                }}
                 onCancelQueueItem={(queueItemId) => dispatch({ queueItemId, type: 'cancelQueueItem' })}
-                onCycle={(direction) => dispatch({ direction, type: 'cycleStagedImage' })}
-                onDiscardAll={() => dispatch({ type: 'discardAllStagedImages' })}
-                onDiscardSelected={() => dispatch({ type: 'discardSelectedStagedImage' })}
-                onSelectImage={(imageIndex) => dispatch({ imageIndex, type: 'setStagedImageIndex' })}
-                onSetAutoSwitch={(mode) => dispatch({ mode, type: 'setCanvasStagingAutoSwitch' })}
-                onToggleThumbnails={() => dispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' })}
-                onToggleVisibility={() => dispatch({ type: 'toggleCanvasStagingVisibility' })}
+                onCycle={(direction) => canvasDispatch({ direction, type: 'cycleStagedImage' })}
+                onDiscardAll={() => canvasDispatch({ type: 'discardAllStagedImages' })}
+                onDiscardSelected={() => canvasDispatch({ type: 'discardSelectedStagedImage' })}
+                onSelectImage={(imageIndex) => canvasDispatch({ imageIndex, type: 'setStagedImageIndex' })}
+                onSetAutoSwitch={(mode) => canvasDispatch({ mode, type: 'setCanvasStagingAutoSwitch' })}
+                onToggleThumbnails={() => canvasDispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' })}
+                onToggleVisibility={() => canvasDispatch({ type: 'toggleCanvasStagingVisibility' })}
               />
             </CanvasBottomOverlay.Staging>
           ) : null}

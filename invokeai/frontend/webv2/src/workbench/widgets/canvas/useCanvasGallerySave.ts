@@ -1,4 +1,4 @@
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
 import { saveCanvasToGallery, type CanvasGallerySaveRegion } from '@workbench/canvas-operations/saveCanvasToGallery';
 import { useNotify } from '@workbench/useNotify';
@@ -8,8 +8,10 @@ import { useTranslation } from 'react-i18next';
 
 import { getCanvasGallerySaveErrorAction, withMatchingCanvasProject } from './canvasGallerySaveState';
 
+type CanvasGallerySaveEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'lifecycle' | 'projectId'>;
+
 export const useCanvasGallerySave = (
-  engine: CanvasEngine | null
+  engine: CanvasGallerySaveEngine | null
 ): { isSaving: boolean; save: (region: CanvasGallerySaveRegion) => Promise<void> } => {
   const { t } = useTranslation();
   const notify = useNotify();

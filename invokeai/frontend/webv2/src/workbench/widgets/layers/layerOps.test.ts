@@ -1,5 +1,5 @@
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -172,8 +172,8 @@ describe('canMergeLayerDown', () => {
 });
 
 describe('applyStructural', () => {
-  const forward: WorkbenchAction = { ids: ['a'], type: 'removeCanvasLayers' };
-  const inverse: WorkbenchAction = { index: 0, layer: paintLayer('a'), type: 'addCanvasLayer' };
+  const forward: CanvasProjectMutation = { ids: ['a'], type: 'removeCanvasLayers' };
+  const inverse: CanvasProjectMutation = { index: 0, layer: paintLayer('a'), type: 'addCanvasLayer' };
 
   it('routes through the engine history when an engine is attached', () => {
     const commitStructural = vi.fn();

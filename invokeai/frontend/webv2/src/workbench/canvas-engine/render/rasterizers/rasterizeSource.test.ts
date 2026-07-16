@@ -1,6 +1,7 @@
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/types';
 
+import { createDecodedBitmapPool } from '@workbench/canvas-engine/render/decodedBitmapPool';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
@@ -28,13 +29,14 @@ const createSpyBackend = () => {
 
 const makeDeps = (resolver: ImageResolver, backend: RasterBackend): RasterizeDeps => ({
   backend,
+  bitmapPool: createDecodedBitmapPool(),
   documentSize: { height: 200, width: 300 },
   resolver,
   store: createLayerCacheStore(backend),
 });
 
 describe('rasterizeSource — image', () => {
-  it('forwards the rasterization abort signal to the image resolver', async () => {
+  it('gives the shared image resolver a cancellable pool-owned signal', async () => {
     const { backend } = createSpyBackend();
     const controller = new AbortController();
     const resolver = vi.fn<ImageResolver>(() => Promise.resolve(new Blob()));
@@ -42,7 +44,9 @@ describe('rasterizeSource — image', () => {
 
     await rasterizeSource({ image: imageRef('signaled'), type: 'image' }, deps);
 
-    expect(resolver).toHaveBeenCalledWith('signaled', controller.signal);
+    const resolverSignal = resolver.mock.calls[0]?.[1];
+    expect(resolverSignal).toBeInstanceOf(AbortSignal);
+    expect(resolverSignal).not.toBe(controller.signal);
   });
 
   it('closes a decoded bitmap instead of caching it when cancellation lands during decode', async () => {
@@ -63,28 +67,55 @@ describe('rasterizeSource — image', () => {
 
     await expect(rasterized).rejects.toBe(controller.signal.reason);
     expect(bitmap.close).toHaveBeenCalledTimes(1);
-    expect(deps.store.getBitmap('cancelled-decode')).toBeUndefined();
+    expect(deps.bitmapPool?.byteSize()).toBe(0);
   });
 
-  it('decodes via the resolver + backend and caches the bitmap per image name', async () => {
+  it('decodes via the resolver + backend and coalesces concurrent callers', async () => {
     const { backend, createImageBitmap } = createSpyBackend();
     const resolver = vi.fn<ImageResolver>(() => Promise.resolve(new Blob()));
     const deps = makeDeps(resolver, backend);
     const source: CanvasLayerSourceContract = { image: imageRef('cat'), type: 'image' };
 
-    const resultA = await rasterizeSource(source, deps);
-    const resultB = await rasterizeSource(source, deps);
+    const [resultA, resultB] = await Promise.all([rasterizeSource(source, deps), rasterizeSource(source, deps)]);
 
-    // Second call reuses the cached bitmap: no extra resolve/decode.
+    // Both active rasterizations share one decode; the final release closes it.
     expect(resolver).toHaveBeenCalledTimes(1);
     expect(createImageBitmap).toHaveBeenCalledTimes(1);
-    expect(deps.store.getBitmap('cat')).toBeDefined();
+    expect(deps.bitmapPool?.byteSize()).toBe(0);
 
     // Surface sized to the image ref; content rect at the origin.
     expect(resultA.surface.width).toBe(32);
     expect(resultA.surface.height).toBe(16);
     expect(resultA.rect).toEqual({ height: 16, width: 32, x: 0, y: 0 });
     expect(resultB.surface.width).toBe(32);
+  });
+
+  it('keeps a shared decode alive when the first of two consumers aborts', async () => {
+    const { backend, createImageBitmap } = createSpyBackend();
+    let resolveBlob!: (blob: Blob) => void;
+    const resolver = vi.fn<ImageResolver>(
+      (_imageName, signal) =>
+        new Promise<Blob>((resolve, reject) => {
+          resolveBlob = resolve;
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+        })
+    );
+    const shared = makeDeps(resolver, backend);
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+    const source: CanvasLayerSourceContract = { image: imageRef('shared'), type: 'image' };
+
+    const first = rasterizeSource(source, { ...shared, signal: firstController.signal });
+    const second = rasterizeSource(source, { ...shared, signal: secondController.signal });
+    await Promise.resolve();
+    firstController.abort();
+    resolveBlob(new Blob());
+
+    await expect(first).rejects.toBe(firstController.signal.reason);
+    await expect(second).resolves.toMatchObject({ rect: { height: 16, width: 32, x: 0, y: 0 } });
+    expect(resolver).toHaveBeenCalledTimes(1);
+    expect(createImageBitmap).toHaveBeenCalledTimes(1);
+    expect(shared.bitmapPool?.byteSize()).toBe(0);
   });
 
   it('draws the decoded bitmap onto the surface', async () => {

@@ -2,12 +2,12 @@ import type { LayerExportGuard } from '@workbench/canvas-engine/api';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 type ExportResult =
-  | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' };
+  | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
 
 export interface CopyLayerControllerOptions {
   readonly history: History;
@@ -23,7 +23,7 @@ export interface CopyLayerControllerOptions {
   readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => unknown;
   readonly installPrepared: (prepared: unknown) => void;
   readonly dispatchPrepared: (
-    action: WorkbenchAction,
+    action: CanvasProjectMutation,
     expectedReducer: () => boolean,
     expectedMirror: () => boolean
   ) => void;
@@ -46,69 +46,76 @@ export class CopyLayerController {
       return null;
     }
     const baked = await this.deps.exportBaked(layerId);
-    if (!this.deps.isPermitCurrent(permit) || baked.status !== 'ok') {
+    if (baked.status !== 'ok') {
       return null;
     }
-    if (this.deps.isGestureActive() || !this.deps.isGuardCurrent(baked.guard) || baked.guard.layer !== sourceLayer) {
-      return null;
-    }
-    const liveDocument = this.deps.getDocument();
-    const sourceIndex = liveDocument?.layers.findIndex((layer) => layer.id === layerId) ?? -1;
-    if (!liveDocument || liveDocument.layers[sourceIndex] !== sourceLayer || sourceIndex < 0) {
-      return null;
-    }
-    const newId = this.deps.createLayerId();
-    const layer: CanvasLayerContract = {
-      blendMode: 'normal',
-      id: newId,
-      isEnabled: true,
-      isLocked: false,
-      name: `${sourceLayer.name} copy`,
-      opacity: 1,
-      source: { bitmap: null, offset: { x: baked.rect.x, y: baked.rect.y }, type: 'paint' },
-      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-      type: 'raster',
-    };
-    const selectedLayerId = liveDocument.selectedLayerId;
-    const apply = (): void => {
-      const prepared = this.deps.preparePixels(newId, baked.rect, baked.surface);
-      this.deps.dispatchPrepared(
-        {
-          add: { index: sourceIndex, layers: [layer] },
-          enabledUpdates: [],
-          selectedLayerId: newId,
-          type: 'applyCanvasLayerStackMutation',
-        },
-        () =>
-          this.deps.getReducerDocument()?.selectedLayerId === newId &&
-          this.deps.getReducerDocument()?.layers.some((candidate) => candidate === layer) === true,
-        () =>
-          this.deps.getDocument()?.selectedLayerId === newId &&
-          this.deps.getDocument()?.layers.some((candidate) => candidate === layer) === true
-      );
-      this.deps.installPrepared(prepared);
-    };
-    if (!this.deps.isPermitCurrent(permit)) {
-      return null;
-    }
-    apply();
-    this.deps.history.push({
-      bytes: baked.rect.width * baked.rect.height * 4 + 256,
-      label: 'Copy layer to raster',
-      redo: apply,
-      replayFailureAtomic: true,
-      undo: () =>
+    try {
+      if (!this.deps.isPermitCurrent(permit)) {
+        return null;
+      }
+      if (this.deps.isGestureActive() || !this.deps.isGuardCurrent(baked.guard) || baked.guard.layer !== sourceLayer) {
+        return null;
+      }
+      const liveDocument = this.deps.getDocument();
+      const sourceIndex = liveDocument?.layers.findIndex((layer) => layer.id === layerId) ?? -1;
+      if (!liveDocument || liveDocument.layers[sourceIndex] !== sourceLayer || sourceIndex < 0) {
+        return null;
+      }
+      const newId = this.deps.createLayerId();
+      const layer: CanvasLayerContract = {
+        blendMode: 'normal',
+        id: newId,
+        isEnabled: true,
+        isLocked: false,
+        name: `${sourceLayer.name} copy`,
+        opacity: 1,
+        source: { bitmap: null, offset: { x: baked.rect.x, y: baked.rect.y }, type: 'paint' },
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'raster',
+      };
+      const selectedLayerId = liveDocument.selectedLayerId;
+      const apply = (): void => {
+        const prepared = this.deps.preparePixels(newId, baked.rect, baked.surface);
         this.deps.dispatchPrepared(
-          { enabledUpdates: [], removeIds: [newId], selectedLayerId, type: 'applyCanvasLayerStackMutation' },
+          {
+            add: { index: sourceIndex, layers: [layer] },
+            enabledUpdates: [],
+            selectedLayerId: newId,
+            type: 'applyCanvasLayerStackMutation',
+          },
           () =>
-            this.deps.getReducerDocument()?.selectedLayerId === selectedLayerId &&
-            this.deps.getReducerDocument()?.layers.some((candidate) => candidate.id === newId) === false,
+            this.deps.getReducerDocument()?.selectedLayerId === newId &&
+            this.deps.getReducerDocument()?.layers.some((candidate) => candidate === layer) === true,
           () =>
-            this.deps.getDocument()?.selectedLayerId === selectedLayerId &&
-            this.deps.getDocument()?.layers.some((candidate) => candidate.id === newId) === false
-        ),
-    });
-    return newId;
+            this.deps.getDocument()?.selectedLayerId === newId &&
+            this.deps.getDocument()?.layers.some((candidate) => candidate === layer) === true
+        );
+        this.deps.installPrepared(prepared);
+      };
+      if (!this.deps.isPermitCurrent(permit)) {
+        return null;
+      }
+      apply();
+      this.deps.history.push({
+        bytes: baked.rect.width * baked.rect.height * 4 + 256,
+        label: 'Copy layer to raster',
+        redo: apply,
+        replayFailureAtomic: true,
+        undo: () =>
+          this.deps.dispatchPrepared(
+            { enabledUpdates: [], removeIds: [newId], selectedLayerId, type: 'applyCanvasLayerStackMutation' },
+            () =>
+              this.deps.getReducerDocument()?.selectedLayerId === selectedLayerId &&
+              this.deps.getReducerDocument()?.layers.some((candidate) => candidate.id === newId) === false,
+            () =>
+              this.deps.getDocument()?.selectedLayerId === selectedLayerId &&
+              this.deps.getDocument()?.layers.some((candidate) => candidate.id === newId) === false
+          ),
+      });
+      return newId;
+    } finally {
+      baked.release();
+    }
   }
 
   dispose(): void {

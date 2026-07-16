@@ -3,7 +3,7 @@
  * dispatched to undo/redo a document-shape change.
  *
  * Unlike a pixel {@link createImagePatchEntry | image patch}, a document patch
- * carries no bitmaps — just two {@link WorkbenchAction}s. Undo dispatches the
+ * carries no bitmaps — just two {@link CanvasProjectMutation}s. Undo dispatches the
  * `inverse`, redo dispatches the `forward`. It exists so structural canvas edits
  * (add/remove/reorder layer, rename, …) can live on the same engine-owned undo
  * stack as paint edits. Phase 3's layers-panel operations lean on this; P2.1 uses
@@ -15,7 +15,7 @@
  * Zero React, zero DOM, zero import-time side effects.
  */
 
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 import type { HistoryEntry } from './history';
 
@@ -26,11 +26,11 @@ export const DOCUMENT_PATCH_DEFAULT_BYTES = 256;
 export interface CreateDocumentPatchEntryOptions {
   label: string;
   /** The action that performs the change (dispatched on redo). */
-  forward: WorkbenchAction;
+  forward: CanvasProjectMutation;
   /** The action that reverses the change (dispatched on undo). */
-  inverse: WorkbenchAction;
+  inverse: CanvasProjectMutation;
   /** The reducer bridge. */
-  dispatch(action: WorkbenchAction): void;
+  dispatch(action: CanvasProjectMutation): void;
   /** Approximate retained size (default {@link DOCUMENT_PATCH_DEFAULT_BYTES}). */
   bytes?: number;
 }

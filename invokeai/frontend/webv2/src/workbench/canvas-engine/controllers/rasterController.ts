@@ -13,22 +13,26 @@ export type DecodeImageResult =
   | { status: 'aborted' | 'stale' };
 
 export interface RasterizationJob {
+  abortedByCaller?: boolean;
   controller: AbortController;
   version: number;
   documentGeneration: number;
   source: CanvasLayerSourceContract;
-  promise: Promise<'published' | 'stale' | 'error'>;
+  promise: Promise<'published' | 'stale' | 'error' | 'aborted'>;
 }
 
 import {
   createAdjustedSurfaceCache,
   type AdjustedSurfaceCache,
 } from '@workbench/canvas-engine/render/adjustedSurfaceCache';
+import { createDecodedBitmapPool, type DecodedBitmapPool } from '@workbench/canvas-engine/render/decodedBitmapPool';
 import {
   createDerivedSurfaceCache,
   type DerivedSurfaceCache,
 } from '@workbench/canvas-engine/render/derivedSurfaceCache';
-import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import { createLayerCacheStore, DEFAULT_CACHE_BUDGET_BYTES } from '@workbench/canvas-engine/render/layerCache';
+
+import { RasterMemoryBudgetController } from './rasterMemoryBudgetController';
 
 export interface RasterControllerOptions {
   readonly backend: RasterBackend;
@@ -43,6 +47,8 @@ export class RasterController {
   readonly layers: LayerCacheStore;
   readonly derived: DerivedSurfaceCache;
   readonly adjustments: AdjustedSurfaceCache;
+  readonly memory: RasterMemoryBudgetController;
+  readonly bitmaps: DecodedBitmapPool;
   private readonly jobs = new Map<string, RasterizationJob>();
   private readonly activeJobs = new Set<RasterizationJob>();
   private readonly trackedImages = new Map<string, string>();
@@ -57,6 +63,8 @@ export class RasterController {
 
   constructor(options: RasterControllerOptions) {
     this.backend = options.backend;
+    this.memory = new RasterMemoryBudgetController({ budgetBytes: DEFAULT_CACHE_BUDGET_BYTES });
+    this.bitmaps = createDecodedBitmapPool({ onBytesChange: (bytes) => this.memory.setDecodedBytes(bytes) });
     this.layers = createLayerCacheStore(options.backend, { onVersionChange: options.onVersionChange });
     this.getDocument = options.getDocument ?? (() => null);
     this.getLayerImageName = options.getLayerImageName ?? (() => null);
@@ -239,13 +247,9 @@ export class RasterController {
   }
 
   releaseBitmapIfUnreferenced(imageName: string): void {
-    if (this.getDocument()?.layers.some((layer) => this.getLayerImageName(layer) === imageName)) {
-      return;
-    }
-    if (this.hasTrackedImage(imageName) || this.hasActiveSourceImage(imageName)) {
-      return;
-    }
-    this.layers.deleteBitmap(imageName);
+    // Decoded bitmaps are lease-owned and close automatically after the final
+    // rasterizer releases them. Retained for callers that also update tracking.
+    void imageName;
   }
 
   untrackLayerImage(layerId: string): void {
@@ -287,6 +291,8 @@ export class RasterController {
     this.clearMirroredImages();
     this.clearThumbnailKeys();
     this.layers.dispose();
+    this.bitmaps.dispose();
     this.adjustments.dispose();
+    this.memory.dispose();
   }
 }

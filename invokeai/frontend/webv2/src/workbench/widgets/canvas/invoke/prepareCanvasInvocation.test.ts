@@ -1,3 +1,4 @@
+import type { CanvasRasterSnapshot } from '@workbench/canvas-engine/api';
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -12,6 +13,7 @@ import type {
   CanvasControlLayerContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
+  CanvasStateContractV2,
   WorkbenchState,
 } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
@@ -84,6 +86,8 @@ interface Harness {
   uploadImage: ReturnType<typeof vi.fn>;
   flushPendingUploads: ReturnType<typeof vi.fn>;
   events: string[];
+  surfaceIds: string[];
+  releaseRasterSnapshot: ReturnType<typeof vi.fn>;
   submittedGraphs: () => Extract<WorkbenchAction, { type: 'submitCanvasInvocationSnapshot' }>[];
   notices: () => { message?: string }[];
 }
@@ -105,6 +109,7 @@ interface HarnessOptions {
 const makeHarness = (options: HarnessOptions = {}): Harness => {
   const stub = createTestStubRasterBackend();
   const events: string[] = [];
+  const surfaceIds: string[] = [];
   const model = options.model ?? sd1Model;
   const alpha = options.alpha ?? 255;
 
@@ -116,6 +121,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
   const layerSurfaces = new Map<string, RasterSurface>();
   const getLayerSurface = (layerId: string): Promise<{ surface: RasterSurface; rect: Rect }> => {
     events.push('getLayerSurface');
+    surfaceIds.push(layerId);
     let surface = layerSurfaces.get(layerId);
     if (!surface) {
       surface = stub.createSurface(64, 64);
@@ -151,26 +157,58 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
   );
 
   const dispatch = options.dispatch ?? vi.fn((_action: WorkbenchAction) => {});
+  const releaseRasterSnapshot = vi.fn();
+
+  const makeCanvas = (document: CanvasDocumentContractV2): CanvasStateContractV2 => ({
+    document: structuredClone(document),
+    documentRevision: 0,
+    snapshots: [],
+    stagingArea: {
+      areThumbnailsVisible: true,
+      autoSwitchMode: 'off',
+      isVisible: false,
+      pendingImageIds: [],
+      pendingImages: [],
+      selectedImageIndex: 0,
+    },
+    version: 2,
+  });
 
   const deps: RunCanvasInvocationDeps = {
+    captureDocumentSnapshot: () => ({
+      canvas: makeCanvas(options.document ?? makeDoc([rasterLayer('layer-a')])),
+      documentGeneration: 0,
+    }),
+    captureRasterSnapshot: async (documentSnapshot, layerIds) => {
+      const layerSurfaces = new Map<string, { surface: RasterSurface; rect: Rect }>();
+      for (const layerId of layerIds) {
+        layerSurfaces.set(layerId, await getLayerSurface(layerId));
+      }
+      const snapshot: CanvasRasterSnapshot = {
+        ...documentSnapshot,
+        emptyLayerIds: new Set<string>(),
+        layerSurfaces,
+        release: releaseRasterSnapshot,
+      };
+      return { snapshot, status: 'ok' };
+    },
     compositing: DEFAULT_CANVAS_COMPOSITING,
     dedupe: createCompositeDedupeCache(),
     destination: options.destination ?? 'canvas',
     dispatch,
     executorDeps: {
       backend,
-      getLayerSurface,
       hashBlob: (blob: Blob) => blob.text(),
       readImageData: (_surface, rect) => uniformImageData(rect.width, rect.height, alpha),
       uploadImage: uploadImage as (blob: Blob) => Promise<CanvasImageUploadResult>,
     },
     flushPendingUploads: flushPendingUploads as () => Promise<void>,
     generateValues: generateValuesFor(model),
-    getDocument: () => options.document ?? makeDoc([rasterLayer('layer-a')]),
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
     projectId: options.projectId ?? 'project-1',
     projectSettings: { useCpuNoise: true },
+    signal: new AbortController().signal,
     strength: options.strength ?? 0.75,
   };
 
@@ -179,7 +217,17 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
   const notices = () =>
     dispatch.mock.calls.map(([action]) => action).filter((action) => action.type === 'recordNotice');
 
-  return { deps, dispatch, events, flushPendingUploads, notices, submittedGraphs, uploadImage };
+  return {
+    deps,
+    dispatch,
+    events,
+    flushPendingUploads,
+    notices,
+    releaseRasterSnapshot,
+    submittedGraphs,
+    surfaceIds,
+    uploadImage,
+  };
 };
 
 const controlLayer = (
@@ -313,6 +361,20 @@ describe('runCanvasInvocation', () => {
     expect(harness.events.indexOf('flush')).toBeLessThan(harness.events.indexOf('upload'));
   });
 
+  it('aborts with a visible notice when pending paint persistence fails', async () => {
+    const harness = makeHarness({
+      flushPendingUploads: () => Promise.reject(new Error('Canvas pixel persistence failed for 1 layer.')),
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toEqual([
+      expect.objectContaining({ message: 'Canvas pixel persistence failed for 1 layer.' }),
+    ]);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+  });
+
   it('plans from the POST-flush document (re-reads getDocument after the flush barrier)', async () => {
     // The flush dispatches `updateCanvasLayerSource` for just-persisted paint
     // layers, so the pre-flush snapshot references stale/empty sources. The
@@ -332,20 +394,195 @@ describe('runCanvasInvocation', () => {
         }),
     });
     // Return the stale doc until the flush resolves, the fresh doc afterwards.
-    harness.deps.getDocument = () => (flushed ? postDoc : preDoc);
-    const surfaceIds: string[] = [];
-    const inner = harness.deps.executorDeps.getLayerSurface;
-    harness.deps.executorDeps.getLayerSurface = (layerId: string) => {
-      surfaceIds.push(layerId);
-      return inner(layerId);
-    };
+    harness.deps.captureDocumentSnapshot = () => ({
+      canvas: {
+        document: structuredClone(flushed ? postDoc : preDoc),
+        documentRevision: 0,
+        snapshots: [],
+        stagingArea: {
+          areThumbnailsVisible: true,
+          autoSwitchMode: 'off',
+          isVisible: false,
+          pendingImageIds: [],
+          pendingImages: [],
+          selectedImageIndex: 0,
+        },
+        version: 2,
+      },
+      documentGeneration: 0,
+    });
 
     await runCanvasInvocation(harness.deps);
 
     // The composite rasterized the post-flush layer, never the stale pre-flush one.
-    expect(surfaceIds).toContain('post');
-    expect(surfaceIds).not.toContain('pre');
+    expect(harness.surfaceIds).toContain('post');
+    expect(harness.surfaceIds).not.toContain('pre');
   });
+
+  it('does not submit or publish dedupe entries when the document becomes stale during raster detachment', async () => {
+    const harness = makeHarness();
+    const snapshot = {
+      canvas: {
+        document: makeDoc([rasterLayer('layer-a')]),
+        documentRevision: 0,
+        snapshots: [],
+        stagingArea: {
+          areThumbnailsVisible: true,
+          autoSwitchMode: 'off' as const,
+          isVisible: false,
+          pendingImageIds: [],
+          pendingImages: [],
+          selectedImageIndex: 0,
+        },
+        version: 2 as const,
+      },
+      documentGeneration: 0,
+    };
+    Object.assign(harness.deps, {
+      captureDocumentSnapshot: vi.fn(() => snapshot),
+      captureRasterSnapshot: vi.fn(() => Promise.resolve({ status: 'stale' as const })),
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toHaveLength(1);
+    expect(harness.deps.dedupe.byKey).toHaveLength(0);
+    expect(harness.deps.dedupe.byHash).toHaveLength(0);
+  });
+
+  it.each(['aborted', 'not-ready', 'over-budget'] as const)(
+    'does not submit when raster capture returns the typed %s outcome',
+    async (status) => {
+      const harness = makeHarness();
+      harness.deps.captureRasterSnapshot = vi.fn(() => Promise.resolve({ status }));
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()).toHaveLength(1);
+      expect(harness.deps.dedupe.byKey).toHaveLength(0);
+      expect(harness.deps.dedupe.byHash).toHaveLength(0);
+    }
+  );
+
+  it('passes the orchestration AbortSignal into raster snapshot capture', async () => {
+    const harness = makeHarness();
+    const controller = new AbortController();
+    const captureRasterSnapshot = vi.fn(() => Promise.resolve({ status: 'aborted' as const }));
+    Object.assign(harness.deps, { captureRasterSnapshot, signal: controller.signal });
+    controller.abort(new DOMException('invoke cancelled', 'AbortError'));
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(captureRasterSnapshot).toHaveBeenCalledWith(
+      expect.any(Object),
+      ['layer-a'],
+      expect.objectContaining({ signal: controller.signal })
+    );
+    expect(harness.submittedGraphs()).toHaveLength(0);
+  });
+
+  it('uses the frozen canvas and detached pixels after edits at composite, upload, and queue-dispatch boundaries', async () => {
+    let liveDocument = makeDoc([rasterLayer('frozen-layer')], 96);
+    liveDocument.bbox = { height: 64, width: 64, x: 7, y: 11 };
+    const dispatch = vi.fn((_action: WorkbenchAction) => {
+      liveDocument = { ...liveDocument, bbox: { height: 96, width: 96, x: 303, y: 404 } };
+    });
+    const harness = makeHarness({ dispatch, document: liveDocument });
+    harness.deps.captureDocumentSnapshot = () => ({
+      canvas: {
+        document: structuredClone(liveDocument),
+        documentRevision: 4,
+        snapshots: [],
+        stagingArea: {
+          areThumbnailsVisible: true,
+          autoSwitchMode: 'off',
+          isVisible: false,
+          pendingImageIds: [],
+          pendingImages: [],
+          selectedImageIndex: 0,
+        },
+        version: 2,
+      },
+      documentGeneration: 9,
+    });
+    const captureRasterSnapshot = harness.deps.captureRasterSnapshot;
+    harness.deps.captureRasterSnapshot = async (snapshot, layerIds) => {
+      const result = await captureRasterSnapshot(snapshot, layerIds, { signal: harness.deps.signal });
+      // The transaction is fully detached at this boundary. Subsequent edits
+      // must not alter any composite/upload/compile/dispatch input.
+      liveDocument = {
+        ...liveDocument,
+        bbox: { height: 64, width: 64, x: 101, y: 202 },
+        layers: [rasterLayer('replacement-layer')],
+      };
+      return result;
+    };
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.surfaceIds).toEqual(['frozen-layer']);
+    expect(harness.notices()).toEqual([]);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+    expect(harness.submittedGraphs()[0]?.canvas.document.bbox).toEqual({ height: 64, width: 64, x: 7, y: 11 });
+    expect(harness.submittedGraphs()[0]?.canvas.document.layers[0]?.id).toBe('frozen-layer');
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+    expect(harness.deps.dedupe.byKey.size).toBeGreaterThan(0);
+  });
+
+  it.each(['coverage-scan', 'encode', 'upload'] as const)(
+    'keeps the frozen transaction when the live bbox changes at the %s boundary',
+    async (boundary) => {
+      let liveDocument = makeDoc([rasterLayer('layer-a')]);
+      const harness = makeHarness({ document: liveDocument });
+      harness.deps.captureDocumentSnapshot = () => ({
+        canvas: {
+          document: structuredClone(liveDocument),
+          documentRevision: 2,
+          snapshots: [],
+          stagingArea: {
+            areThumbnailsVisible: true,
+            autoSwitchMode: 'off',
+            isVisible: false,
+            pendingImageIds: [],
+            pendingImages: [],
+            selectedImageIndex: 0,
+          },
+          version: 2,
+        },
+        documentGeneration: 3,
+      });
+      const editLiveBbox = (): void => {
+        liveDocument = { ...liveDocument, bbox: { height: 64, width: 64, x: 88, y: 99 } };
+      };
+      if (boundary === 'coverage-scan') {
+        const readImageData = harness.deps.executorDeps.readImageData!;
+        harness.deps.executorDeps.readImageData = (...args) => {
+          editLiveBbox();
+          return readImageData(...args);
+        };
+      } else if (boundary === 'encode') {
+        const encodeSurface = harness.deps.executorDeps.backend.encodeSurface;
+        harness.deps.executorDeps.backend.encodeSurface = (...args) => {
+          editLiveBbox();
+          return encodeSurface(...args);
+        };
+      } else {
+        const uploadImage = harness.deps.executorDeps.uploadImage;
+        harness.deps.executorDeps.uploadImage = (...args) => {
+          editLiveBbox();
+          return uploadImage(...args);
+        };
+      }
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.submittedGraphs()).toHaveLength(1);
+      expect(harness.submittedGraphs()[0]?.canvas.document.bbox).toEqual({ height: 64, width: 64, x: 0, y: 0 });
+      expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('records a notice and dispatches no snapshot when the graph fails validation', async () => {
     // External image generators are rejected by the graph compiler.
@@ -357,6 +594,9 @@ describe('runCanvasInvocation', () => {
     const notices = harness.notices();
     expect(notices).toHaveLength(1);
     expect(notices[0]?.message).toContain('does not support canvas generation');
+    expect(harness.deps.dedupe.byKey).toHaveLength(0);
+    expect(harness.deps.dedupe.byHash).toHaveLength(0);
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it('records a notice and dispatches no snapshot when the composite upload fails', async () => {
@@ -369,6 +609,9 @@ describe('runCanvasInvocation', () => {
     const notices = harness.notices();
     expect(notices).toHaveLength(1);
     expect(notices[0]?.message).toBe('upload exploded');
+    expect(harness.deps.dedupe.byKey).toHaveLength(0);
+    expect(harness.deps.dedupe.byHash).toHaveLength(0);
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it('blocks invocation with the shared reason code when a nonempty control layer has no model', async () => {
@@ -416,6 +659,7 @@ describe('runCanvasInvocation', () => {
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(1);
     expect(harness.notices()).toHaveLength(0);
+    expect(harness.surfaceIds).toEqual([]);
   });
 
   it('blocks the second enabled nonempty Control LoRA', async () => {
@@ -496,6 +740,7 @@ describe('runCanvasInvocation', () => {
       end_step_percent: 0.85,
       type: 'z_image_control',
     });
+    expect(harness.surfaceIds).toEqual(['z-layer']);
   });
 
   it('blocks a second enabled nonempty Z-Image control', async () => {
@@ -648,7 +893,7 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
     expect((nodes.create_gradient_mask?.mask as { image_name?: string } | undefined)?.image_name).toBeDefined();
     expect(harness.notices()).toHaveLength(0);
     // The mask layer was rasterized for the grayscale composite.
-    expect(harness.events.filter((e) => e === 'getLayerSurface')).not.toHaveLength(0);
+    expect(harness.surfaceIds).toEqual(['base', 'mask']);
   });
 
   it('dispatches an outpaint graph when content only partially covers the bbox', async () => {

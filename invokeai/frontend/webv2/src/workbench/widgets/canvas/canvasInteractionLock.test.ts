@@ -55,6 +55,7 @@ describe('canvas interaction lock', () => {
     {
       expected: {
         areOperationActionsEnabled: false,
+        canAcceptStagedImage: false,
         isDocumentEditingLocked: false,
         isOperationChromeVisible: false,
         isRegularToolOptionsVisible: true,
@@ -67,6 +68,7 @@ describe('canvas interaction lock', () => {
     {
       expected: {
         areOperationActionsEnabled: true,
+        canAcceptStagedImage: false,
         isDocumentEditingLocked: true,
         isOperationChromeVisible: true,
         isRegularToolOptionsVisible: false,
@@ -79,6 +81,7 @@ describe('canvas interaction lock', () => {
     {
       expected: {
         areOperationActionsEnabled: true,
+        canAcceptStagedImage: false,
         isDocumentEditingLocked: true,
         isOperationChromeVisible: true,
         isRegularToolOptionsVisible: false,
@@ -91,6 +94,7 @@ describe('canvas interaction lock', () => {
     {
       expected: {
         areOperationActionsEnabled: false,
+        canAcceptStagedImage: true,
         isDocumentEditingLocked: false,
         isOperationChromeVisible: false,
         isRegularToolOptionsVisible: false,
@@ -103,6 +107,7 @@ describe('canvas interaction lock', () => {
     {
       expected: {
         areOperationActionsEnabled: false,
+        canAcceptStagedImage: false,
         isDocumentEditingLocked: false,
         isOperationChromeVisible: false,
         isRegularToolOptionsVisible: false,
@@ -115,6 +120,7 @@ describe('canvas interaction lock', () => {
     {
       expected: {
         areOperationActionsEnabled: false,
+        canAcceptStagedImage: false,
         isDocumentEditingLocked: true,
         isOperationChromeVisible: true,
         isRegularToolOptionsVisible: false,
@@ -127,6 +133,7 @@ describe('canvas interaction lock', () => {
     {
       expected: {
         areOperationActionsEnabled: false,
+        canAcceptStagedImage: false,
         isDocumentEditingLocked: true,
         isOperationChromeVisible: true,
         isRegularToolOptionsVisible: false,
@@ -141,6 +148,8 @@ describe('canvas interaction lock', () => {
     ({ expected, generation, operationKind, staged }) => {
       expect(
         getCanvasInteractionCapabilities({
+          hasCanvasEngine: true,
+          hasSelectedCandidate: staged,
           hasStagingSlots: staged,
           isCanvasGenerationInFlight: generation,
           operationKind,

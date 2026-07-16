@@ -2,6 +2,7 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasDocumentContractV2, CanvasImageRef, CanvasLayerContract } from '@workbench/types';
 
+import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,14 @@ import type { ExportRasterCompositeDeps, RasterCompositeExportSnapshot } from '.
 import { exportRasterComposite } from './exportRasterComposite';
 
 const imageRef = (imageName: string, width = 64, height = 32): CanvasImageRef => ({ height, imageName, width });
+
+const createDeferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+};
 
 const rasterLayer = (id: string): CanvasLayerContract => ({
   blendMode: 'normal',
@@ -49,7 +58,12 @@ const makeDoc = (layers: CanvasLayerContract[]): CanvasDocumentContractV2 => ({
 
 const makeDeps = (document: CanvasDocumentContractV2) => {
   const stub = createTestStubRasterBackend();
-  const snapshot: RasterCompositeExportSnapshot = { document, documentGeneration: 1 };
+  const snapshot: RasterCompositeExportSnapshot = {
+    contentEpoch: 1,
+    document,
+    documentGeneration: 1,
+    lifecycleGeneration: 1,
+  };
   const encodeSurface = vi.fn((surface: RasterSurface, type?: string) => stub.encodeSurface(surface, type));
   const deps: ExportRasterCompositeDeps = {
     backend: {
@@ -102,6 +116,70 @@ describe('exportRasterComposite', () => {
     await expect(
       exportRasterComposite({ bounds: 'rect', rect: { x: 0, y: 0, width: 0, height: 32 } }, deps)
     ).resolves.toEqual({ status: 'empty' });
+  });
+
+  it('returns over-budget before allocating a background composite', async () => {
+    const { deps, encodeSurface } = makeDeps(makeDoc([rasterLayer('raster')]));
+    deps.reserve = vi.fn(() => ({ availableBytes: 1_000, requestedBytes: 8_192, status: 'over-budget' as const }));
+
+    await expect(exportRasterComposite({ bounds: 'content' }, deps)).resolves.toEqual({ status: 'over-budget' });
+    expect(deps.getLayerSurface).not.toHaveBeenCalled();
+    expect(encodeSurface).not.toHaveBeenCalled();
+  });
+
+  it('releases the reservation and cache pins after export', async () => {
+    const { deps } = makeDeps(makeDoc([rasterLayer('raster')]));
+    const releaseReservation = vi.fn();
+    const releasePins = vi.fn();
+    deps.reserve = vi.fn(() => ({ lease: { release: releaseReservation }, status: 'ok' as const }));
+    deps.pin = vi.fn(() => ({ release: releasePins }));
+
+    await expect(exportRasterComposite({ bounds: 'content' }, deps)).resolves.toMatchObject({ status: 'ok' });
+    expect(deps.pin).toHaveBeenCalledWith(['raster']);
+    expect(releasePins).toHaveBeenCalledOnce();
+    expect(releaseReservation).toHaveBeenCalledOnce();
+  });
+
+  it('keeps its reservation and cache pins while rendering across generation release', async () => {
+    const { deps } = makeDeps(makeDoc([rasterLayer('raster')]));
+    const memory = new RasterMemoryBudgetController({ budgetBytes: 100_000 });
+    const layerSurface = createDeferred<{ rect: Rect; surface: RasterSurface }>();
+    deps.getLayerSurface = vi.fn(() => layerSurface.promise);
+    deps.reserve = (bytes) => memory.reserveOperation(bytes, { purpose: 'background-snapshot' });
+    deps.pin = (layerIds) => {
+      const leases = layerIds.map((layerId) => memory.pinOperation(layerId));
+      return { release: () => leases.forEach((lease) => lease.release()) };
+    };
+
+    const exported = exportRasterComposite({ bounds: 'content' }, deps);
+    await vi.waitFor(() => expect(memory.snapshot().reservedBytes).toBeGreaterThan(0));
+    memory.releaseGeneration(1);
+
+    expect(memory.snapshot().reservedBytes).toBeGreaterThan(0);
+    expect(memory.isPinned('raster')).toBe(true);
+
+    const backend = createTestStubRasterBackend();
+    layerSurface.resolve({
+      rect: { height: 32, width: 64, x: 0, y: 0 },
+      surface: backend.createSurface(64, 32),
+    });
+    await expect(exported).resolves.toMatchObject({ status: 'ok' });
+    expect(memory.snapshot().reservedBytes).toBe(0);
+    expect(memory.isPinned('raster')).toBe(false);
+  });
+
+  it('reserves both the temporary surface and ImageData for an adjusted layer', async () => {
+    const layer = rasterLayer('raster');
+    if (layer.type !== 'raster') {
+      throw new Error('Expected raster layer');
+    }
+    const { deps } = makeDeps(makeDoc([{ ...layer, adjustments: { brightness: 0.1, contrast: 0, saturation: 0 } }]));
+    const reserve = vi.fn(() => ({ lease: { release: vi.fn() }, status: 'ok' as const }));
+    deps.reserve = reserve;
+
+    await expect(exportRasterComposite({ bounds: 'content' }, deps)).resolves.toMatchObject({ status: 'ok' });
+
+    expect(reserve).toHaveBeenCalledWith(24_576);
   });
 
   it('discards an encoded blob if the document changes during export', async () => {

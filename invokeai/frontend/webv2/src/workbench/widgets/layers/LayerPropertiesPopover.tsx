@@ -1,6 +1,6 @@
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch } from 'react';
 
 import { Box, Popover, Portal, Stack, Switch, Text } from '@chakra-ui/react';
@@ -26,13 +26,18 @@ import { clearLayerPropertiesRequest, useLayerPropertiesRequest } from './layerP
 import { RasterLayerFilterSection } from './RasterLayerFilterSection';
 import { RegionalGuidanceSettings } from './RegionalGuidanceSettings';
 
+export type LayerPropertiesEngine = Pick<
+  CanvasEngineHandle,
+  'document' | 'exports' | 'layers' | 'projectId' | 'stores'
+>;
+
 const POPOVER_POSITIONING = { placement: 'left-start' } as const;
 
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
 interface LayerPropertiesPopoverProps {
-  dispatch: Dispatch<WorkbenchAction>;
-  engine: CanvasEngine | null;
+  dispatch: Dispatch<CanvasProjectMutation>;
+  engine: LayerPropertiesEngine | null;
   layer: CanvasLayerContract;
 }
 
@@ -152,9 +157,9 @@ const LayerTypeSettings = ({
   layer,
   onOperationStarted,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
+  dispatch: Dispatch<CanvasProjectMutation>;
   documentRevision: number;
-  engine: CanvasEngine | null;
+  engine: LayerPropertiesEngine | null;
   layer: CanvasLayerContract;
   onOperationStarted(): void;
 }) => {
@@ -187,8 +192,8 @@ const RasterLayerSettings = ({
   layer,
   onOperationStarted,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
-  engine: CanvasEngine | null;
+  dispatch: Dispatch<CanvasProjectMutation>;
+  engine: LayerPropertiesEngine | null;
   layer: Extract<CanvasLayerContract, { type: 'raster' }>;
   onOperationStarted(): void;
 }) => {

@@ -3,13 +3,14 @@ import type {
   SelectValueChangeDetails,
   SliderValueChangeDetails,
 } from '@chakra-ui/react';
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasBlendMode, CanvasLayerContract, CanvasMaskFillContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch } from 'react';
 
 import { Box, createListCollection, Flex, HStack, NumberInput, Stack } from '@chakra-ui/react';
 import { ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import {
   CANVAS_DENOISING_STRENGTH_KEY,
@@ -28,6 +29,8 @@ import { useTranslation } from 'react-i18next';
 
 import { DenoisingStrengthWave } from './DenoisingStrengthWave';
 import { applyStructural, applyStructuralPreview, CANVAS_BLEND_MODES } from './layerOps';
+
+type LayersPanelHeaderEngine = Pick<CanvasEngineHandle, 'layers' | 'stores'>;
 
 const STRENGTH_DEBOUNCE_MS = 250;
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
@@ -69,7 +72,7 @@ export const isLayerEditingDisabled = (layer: CanvasLayerContract | null, editin
  */
 export const LayersPanelHeader = () => {
   const engine = useCanvasEngine();
-  const dispatch = useWorkbenchDispatch();
+  const dispatch = useCanvasProjectMutationDispatch();
   const layer = useActiveProjectSelector(selectSelectedLayer, isSameSelection);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
 
@@ -99,9 +102,9 @@ const BlendModeControl = ({
   engine,
   layer,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
+  dispatch: Dispatch<CanvasProjectMutation>;
   editingLocked: boolean;
-  engine: CanvasEngine | null;
+  engine: LayersPanelHeaderEngine | null;
   layer: CanvasLayerContract | null;
 }) => {
   const { t } = useTranslation();
@@ -157,9 +160,9 @@ const OpacityRow = ({
   engine,
   layer,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
+  dispatch: Dispatch<CanvasProjectMutation>;
   editingLocked: boolean;
-  engine: CanvasEngine | null;
+  engine: LayersPanelHeaderEngine | null;
   layer: CanvasLayerContract | null;
 }) => {
   const { t } = useTranslation();
@@ -281,9 +284,9 @@ const MaskFillSwatch = ({
   engine,
   layer,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
+  dispatch: Dispatch<CanvasProjectMutation>;
   disabled: boolean;
-  engine: CanvasEngine | null;
+  engine: LayersPanelHeaderEngine | null;
   layer: MaskLayer;
 }) => {
   const { t } = useTranslation();

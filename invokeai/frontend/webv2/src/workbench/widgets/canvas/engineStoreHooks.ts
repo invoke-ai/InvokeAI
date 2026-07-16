@@ -23,7 +23,6 @@ import type {
   LayerThumbnailStatus,
 } from '@workbench/canvas-engine/engineStores';
 import type { ToolId } from '@workbench/canvas-engine/types';
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
 import type { FilterOperationSessionState, SamSessionSnapshot } from '@workbench/canvas-operations/operationTypes';
 
@@ -78,7 +77,7 @@ export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =
 
 const IDLE_CANVAS_OPERATION: CanvasOperationState = { status: 'idle' };
 
-export const useCanvasOperation = (engine: CanvasEngine | null): CanvasOperationState => {
+export const useCanvasOperation = (engine: object | null): CanvasOperationState => {
   const subscribe = useCallback(
     (listener: () => void) => (engine ? getCanvasOperations(engine).controller.subscribe(listener) : () => undefined),
     [engine]
@@ -90,10 +89,10 @@ export const useCanvasOperation = (engine: CanvasEngine | null): CanvasOperation
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
-export const useSamSession = (engine: CanvasEngine): SamSessionSnapshot | null =>
+export const useSamSession = (engine: object): SamSessionSnapshot | null =>
   useScalarStore(getCanvasOperations(engine).stores.samSession);
 
-export const useFilterSession = (engine: CanvasEngine): FilterOperationSessionState | null =>
+export const useFilterSession = (engine: object): FilterOperationSessionState | null =>
   useScalarStore(getCanvasOperations(engine).stores.filterSession);
 
 /** Whether the engine-owned canvas history has an entry to undo (enables the header undo button). */

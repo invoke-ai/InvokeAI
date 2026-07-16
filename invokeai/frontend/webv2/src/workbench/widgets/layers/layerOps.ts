@@ -7,6 +7,7 @@
 
 import type { CanvasLayerCapability } from '@workbench/canvas-engine/api';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { GenerateReferenceImage } from '@workbench/generation/types';
 import type {
   CanvasBlendMode,
@@ -22,7 +23,6 @@ import type {
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
 
 export type CanvasStructuralEngine = { readonly layers: CanvasLayerCapability };
@@ -656,10 +656,10 @@ export const canMergeLayerDown = (
  */
 export const applyStructural = (
   engine: CanvasStructuralEngine | null,
-  dispatch: Dispatch<WorkbenchAction>,
+  dispatch: Dispatch<CanvasProjectMutation>,
   label: string,
-  forward: WorkbenchAction,
-  inverse: WorkbenchAction
+  forward: CanvasProjectMutation,
+  inverse: CanvasProjectMutation
 ): void => {
   if (engine) {
     engine.layers.commitStructural(label, forward, inverse);
@@ -671,8 +671,8 @@ export const applyStructural = (
 /** Applies a guarded live edit without recording history until the interaction ends. */
 export const applyStructuralPreview = (
   engine: CanvasStructuralEngine | null,
-  dispatch: Dispatch<WorkbenchAction>,
-  action: WorkbenchAction
+  dispatch: Dispatch<CanvasProjectMutation>,
+  action: CanvasProjectMutation
 ): boolean => {
   if (engine) {
     return engine.layers.applyStructuralPreview(action);

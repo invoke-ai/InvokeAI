@@ -50,6 +50,7 @@ interface StagingBarProps {
   antialiasProgressImages: boolean;
   areThumbnailsVisible: boolean;
   autoSwitchMode: AutoSwitchMode;
+  canAccept: boolean;
   hasMultipleSlots: boolean;
   isGenerating: boolean;
   isVisible: boolean;
@@ -81,6 +82,7 @@ export const StagingBar = ({
   antialiasProgressImages,
   areThumbnailsVisible,
   autoSwitchMode,
+  canAccept,
   hasMultipleSlots,
   isGenerating,
   isVisible,
@@ -267,7 +269,7 @@ export const StagingBar = ({
                   {t('common.discardAll')}
                 </Button>
 
-                <Button size="xs" onClick={onAccept}>
+                <Button disabled={!canAccept} size="xs" onClick={onAccept}>
                   <CheckIcon />
                   {t('widgets.canvas.acceptToLayer')}
                 </Button>

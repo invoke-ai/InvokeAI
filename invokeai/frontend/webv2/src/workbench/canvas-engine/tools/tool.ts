@@ -24,8 +24,8 @@ import type { SelectionCommit } from '@workbench/canvas-engine/selection/selecti
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
 
 /**
  * Emitted once per completed brush/eraser gesture. Persistence (Task P2.2) and
@@ -90,13 +90,13 @@ export interface ToolContext {
   /** Requests a re-render for the given flags. */
   invalidate(payload: InvalidatePayload): void;
   /** Reducer bridge. Painting tools use it for the single gesture-start `addCanvasLayer`. */
-  dispatch(action: WorkbenchAction): void;
+  dispatch(action: CanvasProjectMutation): void;
   /**
    * Records a structural document edit on the engine-owned canvas history:
    * dispatches `forward` now, and an undo dispatches `inverse` / a redo
    * re-dispatches `forward`. The move tool commits a layer nudge through this.
    */
-  commitStructural(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): void;
+  commitStructural(label: string, forward: CanvasProjectMutation, inverse: CanvasProjectMutation): void;
   /**
    * Sets (or clears with `null`) a transient per-layer transform override the
    * compositor and overlay read at render time — a live drag preview that never

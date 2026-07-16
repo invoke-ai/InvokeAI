@@ -107,9 +107,37 @@ export interface ExecuteCompositePlanDeps {
   hashBlob?(blob: Blob): Promise<string>;
   /** Reads a surface region's pixels for the coverage scan (default `getImageData`). */
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
+  /** Reserves transient raster bytes for the complete composite operation. */
+  reserve?(
+    bytes: number
+  ):
+    | { status: 'ok'; lease: { release(): void } }
+    | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   /** Writes pixels back to a surface (default `putImageData`; injectable for tests). */
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
 }
+
+export class CompositeOverBudgetError extends Error {
+  constructor() {
+    super('The canvas composite exceeds the available raster memory budget.');
+    this.name = 'CompositeOverBudgetError';
+  }
+}
+
+const reserveComposite = (
+  entry: CompositeEntry,
+  deps: ExecuteCompositePlanDeps,
+  layerCount: number
+): { release(): void } => {
+  const pixels = Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height);
+  // Final/accumulator surface + final scan ImageData, plus one temporary
+  // surface and one ImageData buffer for every adjusted/mask layer.
+  const reservation = deps.reserve?.(pixels * 4 * (2 + layerCount * 2));
+  if (reservation?.status === 'over-budget') {
+    throw new CompositeOverBudgetError();
+  }
+  return reservation?.status === 'ok' ? reservation.lease : { release: () => undefined };
+};
 
 /** The base composite's upload identity + hash. */
 export interface CompositeEntryResult {
@@ -195,41 +223,50 @@ const executeRasterEntry = async (
     };
   }
 
-  const surface = await renderRasterComposite(entry, deps);
-  const bboxFullyCovered = isFullyOpaque(
-    readImageData(surface, { height: surface.height, width: surface.width, x: 0, y: 0 })
+  const reservation = reserveComposite(
+    entry,
+    deps,
+    entry.layers.filter((layer) => layer.adjustments !== undefined).length
   );
+  try {
+    const surface = await renderRasterComposite(entry, deps);
+    const bboxFullyCovered = isFullyOpaque(
+      readImageData(surface, { height: surface.height, width: surface.width, x: 0, y: 0 })
+    );
 
-  const blob = await deps.backend.encodeSurface(surface);
-  const pixelHash = await hashBlob(blob);
+    const blob = await deps.backend.encodeSurface(surface);
+    const pixelHash = await hashBlob(blob);
 
-  // Content-hash dedupe: identical pixels (even under a different key) reuse the
-  // already-uploaded image — no second upload.
-  let upload = deps.dedupe.byHash.get(pixelHash);
-  let reusedUpload = true;
-  if (!upload) {
-    upload = await deps.uploadImage(blob);
-    deps.dedupe.byHash.set(pixelHash, upload);
-    reusedUpload = false;
+    // Content-hash dedupe: identical pixels (even under a different key) reuse the
+    // already-uploaded image — no second upload.
+    let upload = deps.dedupe.byHash.get(pixelHash);
+    let reusedUpload = true;
+    if (!upload) {
+      upload = await deps.uploadImage(blob);
+      deps.dedupe.byHash.set(pixelHash, upload);
+      reusedUpload = false;
+    }
+
+    deps.dedupe.byKey.set(entry.key, {
+      bboxFullyCovered,
+      height: upload.height,
+      imageName: upload.imageName,
+      pixelHash,
+      width: upload.width,
+    });
+
+    return {
+      bboxFullyCovered,
+      height: upload.height,
+      imageName: upload.imageName,
+      key: entry.key,
+      pixelHash,
+      reusedUpload,
+      width: upload.width,
+    };
+  } finally {
+    reservation.release();
   }
-
-  deps.dedupe.byKey.set(entry.key, {
-    bboxFullyCovered,
-    height: upload.height,
-    imageName: upload.imageName,
-    pixelHash,
-    width: upload.width,
-  });
-
-  return {
-    bboxFullyCovered,
-    height: upload.height,
-    imageName: upload.imageName,
-    key: entry.key,
-    pixelHash,
-    reusedUpload,
-    width: upload.width,
-  };
 };
 
 /**
@@ -412,38 +449,43 @@ export const executeMaskComposite = async (
     };
   }
 
-  const surface = await compositeMaskEntry(entry, deps, writeImageData, readImageData);
-  const hasContent = hasNonWhitePixel(
-    readImageData(surface, { height: surface.height, width: surface.width, x: 0, y: 0 })
-  );
+  const reservation = reserveComposite(entry, deps, entry.maskLayers?.length ?? 0);
+  try {
+    const surface = await compositeMaskEntry(entry, deps, writeImageData, readImageData);
+    const hasContent = hasNonWhitePixel(
+      readImageData(surface, { height: surface.height, width: surface.width, x: 0, y: 0 })
+    );
 
-  const blob = await deps.backend.encodeSurface(surface);
-  const pixelHash = await hashBlob(blob);
+    const blob = await deps.backend.encodeSurface(surface);
+    const pixelHash = await hashBlob(blob);
 
-  let upload = deps.dedupe.byHash.get(pixelHash);
-  let reusedUpload = true;
-  if (!upload) {
-    upload = await deps.uploadImage(blob);
-    deps.dedupe.byHash.set(pixelHash, upload);
-    reusedUpload = false;
+    let upload = deps.dedupe.byHash.get(pixelHash);
+    let reusedUpload = true;
+    if (!upload) {
+      upload = await deps.uploadImage(blob);
+      deps.dedupe.byHash.set(pixelHash, upload);
+      reusedUpload = false;
+    }
+
+    // Reuse the `bboxFullyCovered` slot to persist `hasContent` for this key.
+    deps.dedupe.byKey.set(entry.key, {
+      bboxFullyCovered: hasContent,
+      height: upload.height,
+      imageName: upload.imageName,
+      pixelHash,
+      width: upload.width,
+    });
+
+    return {
+      hasContent,
+      height: upload.height,
+      imageName: upload.imageName,
+      key: entry.key,
+      pixelHash,
+      reusedUpload,
+      width: upload.width,
+    };
+  } finally {
+    reservation.release();
   }
-
-  // Reuse the `bboxFullyCovered` slot to persist `hasContent` for this key.
-  deps.dedupe.byKey.set(entry.key, {
-    bboxFullyCovered: hasContent,
-    height: upload.height,
-    imageName: upload.imageName,
-    pixelHash,
-    width: upload.width,
-  });
-
-  return {
-    hasContent,
-    height: upload.height,
-    imageName: upload.imageName,
-    key: entry.key,
-    pixelHash,
-    reusedUpload,
-    width: upload.width,
-  };
 };

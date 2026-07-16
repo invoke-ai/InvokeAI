@@ -1,5 +1,5 @@
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { Project, WorkbenchState } from '@workbench/types';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
 
@@ -11,6 +11,8 @@ import {
 import { getGalleryImagesByNames } from '@workbench/gallery/api';
 
 import { orderCanvasImageDropImages } from './canvasImageDnd';
+
+type CanvasImageDropEngine = Pick<CanvasEngineHandle, 'layers' | 'projectId'>;
 
 export const executeCanvasImageDropImport = async ({
   destination,
@@ -24,7 +26,7 @@ export const executeCanvasImageDropImport = async ({
 }: {
   destination: GalleryCanvasImportDestination;
   dispatch: Dispatch<WorkbenchAction>;
-  engine: CanvasEngine | null;
+  engine: CanvasImageDropEngine | null;
   getGalleryImages?: typeof getGalleryImagesByNames;
   getState: () => WorkbenchState;
   imageNames: readonly string[];

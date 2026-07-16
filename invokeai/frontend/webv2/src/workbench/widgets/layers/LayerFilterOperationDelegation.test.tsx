@@ -40,8 +40,10 @@ vi.mock('@workbench/models/modelsStore', () => ({
   useModelsSelector: (selector: (snapshot: { models: never[] }) => unknown) => selector({ models: [] }),
 }));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => 'project',
   useActiveProjectSelector: () => null,
   useWorkbenchDispatch: () => dispatch,
+  useWorkbenchStore: () => ({ dispatch, getState: vi.fn() }),
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

@@ -3,7 +3,7 @@ import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/types';
 
-import { renderableSourceOf } from '@workbench/canvas-engine/document/sources';
+import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { renderControlTransparency } from '@workbench/canvas-engine/render/controlTransparency';
 import { colorizeMask } from '@workbench/canvas-engine/render/maskFill';
@@ -25,6 +25,12 @@ export interface ThumbnailControllerOptions {
   ) => Promise<'published' | 'stale' | 'error'>;
   readonly setStatus: (layerId: string, status: 'loading' | 'ready' | 'error' | null) => void;
   readonly reportError: (layerId: string, error: unknown) => void;
+  readonly reserve?: (
+    bytes: number
+  ) =>
+    | { status: 'ok'; lease: { release(): void } }
+    | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
+  readonly pin?: (layerId: string) => { release(): void };
 }
 
 /** Owns bounded thumbnail rendering and lazy rasterization status. */
@@ -47,41 +53,53 @@ export class ThumbnailController {
     if (width === 0 || height === 0 || !context) {
       return false;
     }
-    target.width = width;
-    target.height = height;
-    context.clearRect(0, 0, width, height);
-    const thumbnail = this.deps.backend.createSurface(width, height);
-    thumbnail.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    thumbnail.ctx.clearRect(0, 0, width, height);
-    thumbnail.ctx.globalAlpha = 1;
-    thumbnail.ctx.globalCompositeOperation = 'source-over';
-    thumbnail.ctx.drawImage(entry.surface.canvas, 0, 0, width, height);
-    const checker = context.createPattern(this.deps.getCheckerboard().canvas as CanvasImageSource, 'repeat');
-    if (checker) {
-      context.fillStyle = checker;
-      context.fillRect(0, 0, width, height);
+    const reservation = this.deps.reserve?.(width * height * 12);
+    if (reservation?.status === 'over-budget') {
+      return false;
     }
-    let display = thumbnail;
-    if (layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments)) {
-      const pixels = thumbnail.ctx.getImageData(0, 0, width, height);
-      applyAdjustments(pixels, layer.adjustments);
-      thumbnail.ctx.putImageData(pixels, 0, 0);
-    } else if (layer.type === 'control' && layer.withTransparencyEffect) {
-      display = renderControlTransparency(this.deps.backend, thumbnail, width, height);
-    } else if (layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') {
-      const { fill } = layer.mask;
-      display = colorizeMask(
-        this.deps.backend,
-        thumbnail,
-        width,
-        height,
-        fill,
-        this.deps.getMaskPattern(fill.style, fill.color)
-      );
+    const pinLease = this.deps.pin?.(layerId);
+    try {
+      target.width = width;
+      target.height = height;
+      context.clearRect(0, 0, width, height);
+      const thumbnail = this.deps.backend.createSurface(width, height);
+      thumbnail.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      thumbnail.ctx.clearRect(0, 0, width, height);
+      thumbnail.ctx.globalAlpha = 1;
+      thumbnail.ctx.globalCompositeOperation = 'source-over';
+      thumbnail.ctx.drawImage(entry.surface.canvas, 0, 0, width, height);
+      const checker = context.createPattern(this.deps.getCheckerboard().canvas as CanvasImageSource, 'repeat');
+      if (checker) {
+        context.fillStyle = checker;
+        context.fillRect(0, 0, width, height);
+      }
+      let display = thumbnail;
+      if (layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments)) {
+        const pixels = thumbnail.ctx.getImageData(0, 0, width, height);
+        applyAdjustments(pixels, layer.adjustments);
+        thumbnail.ctx.putImageData(pixels, 0, 0);
+      } else if (layer.type === 'control' && layer.withTransparencyEffect) {
+        display = renderControlTransparency(this.deps.backend, thumbnail, width, height);
+      } else if (layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') {
+        const { fill } = layer.mask;
+        display = colorizeMask(
+          this.deps.backend,
+          thumbnail,
+          width,
+          height,
+          fill,
+          this.deps.getMaskPattern(fill.style, fill.color)
+        );
+      }
+      context.globalAlpha = layer.opacity;
+      context.drawImage(display.canvas as CanvasImageSource, 0, 0);
+      return true;
+    } finally {
+      pinLease?.release();
+      if (reservation?.status === 'ok') {
+        reservation.lease.release();
+      }
     }
-    context.globalAlpha = layer.opacity;
-    context.drawImage(display.canvas as CanvasImageSource, 0, 0);
-    return true;
   }
 
   async request(layerId: string): Promise<LayerThumbnailRequestResult> {
@@ -105,6 +123,13 @@ export class ThumbnailController {
       this.deps.setStatus(layerId, 'ready');
       return 'ready';
     }
+    const rect = getSourceContentRect(layer, document);
+    const reservation = this.deps.reserve?.(rect.width * rect.height * 8);
+    if (reservation?.status === 'over-budget') {
+      this.deps.setStatus(layerId, null);
+      return 'over-budget';
+    }
+    const pinLease = this.deps.pin?.(layerId);
     this.deps.setStatus(layerId, 'loading');
     try {
       const result = await this.deps.rasterize(layer, document);
@@ -113,6 +138,11 @@ export class ThumbnailController {
       this.deps.setStatus(layerId, 'error');
       this.deps.reportError(layerId, error);
       return 'error';
+    } finally {
+      pinLease?.release();
+      if (reservation?.status === 'ok') {
+        reservation.lease.release();
+      }
     }
   }
 

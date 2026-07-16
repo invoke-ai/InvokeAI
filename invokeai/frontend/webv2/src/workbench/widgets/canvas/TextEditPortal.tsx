@@ -1,10 +1,12 @@
 import type { TextEditSession } from '@workbench/canvas-engine/engineStores';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop -- the editable's style object is derived from the live session/viewport and intentionally recomputed each render. */
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { useTextEditSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCallback, useSyncExternalStore } from 'react';
+
+type TextEditEngine = Pick<CanvasEngineHandle, 'layers' | 'stores' | 'viewport'>;
 
 /**
  * The text-editing portal: a positioned `contenteditable` div, rendered over the
@@ -31,7 +33,7 @@ import { useCallback, useSyncExternalStore } from 'react';
  */
 
 /** Re-renders on any viewport (pan/zoom) change via a value-stable snapshot string. */
-const useViewportTick = (engine: CanvasEngine): string => {
+const useViewportTick = (engine: TextEditEngine): string => {
   const viewport = engine.viewport.getViewport();
   const subscribe = useCallback((onChange: () => void) => viewport.subscribe(onChange), [viewport]);
   const getSnapshot = useCallback(() => {
@@ -59,7 +61,7 @@ const placeCaretAtEnd = (el: HTMLElement): void => {
 };
 
 interface TextEditableProps {
-  engine: CanvasEngine;
+  engine: TextEditEngine;
   session: TextEditSession;
 }
 
@@ -167,7 +169,7 @@ const TextEditable = ({ engine, session }: TextEditableProps) => {
 };
 
 /** Renders the editable for the active session, or nothing. */
-export const TextEditPortal = ({ engine }: { engine: CanvasEngine }) => {
+export const TextEditPortal = ({ engine }: { engine: TextEditEngine }) => {
   const session = useTextEditSession(engine);
   if (!session) {
     return null;
