@@ -410,7 +410,7 @@ const InputFieldRow = ({
             <Text
               color={isInvalid ? 'fg.error' : isConnected ? 'fg.muted' : 'fg'}
               fontSize="2xs"
-              lineHeight="1"
+              lineHeight="shorter"
               minW="0"
               truncate
             >
@@ -522,7 +522,7 @@ const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; templat
                 color="fg.muted"
                 display="inline-block"
                 fontSize="2xs"
-                lineHeight="1"
+                lineHeight="shorter"
                 maxW="full"
                 textAlign="end"
                 truncate
