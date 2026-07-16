@@ -24,6 +24,7 @@ const tagTypes = [
   'ImageList',
   'ImageMetadata',
   'ImageWorkflow',
+  'ImageMoveStatus',
   'ImageCollectionCounts',
   'ImageCollection',
   'ImageMetadataFromFile',

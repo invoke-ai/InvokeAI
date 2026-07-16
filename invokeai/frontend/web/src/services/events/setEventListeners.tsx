@@ -4,6 +4,7 @@ import { socketConnected } from 'app/store/middleware/listenerMiddleware/listene
 import type { AppStore } from 'app/store/store';
 import { parseify } from 'common/util/serialize';
 import { isNil, round } from 'es-toolkit/compat';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
@@ -26,6 +27,8 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getControlLayerState, getReferenceImageState } from 'features/controlLayers/store/util';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
+import { fieldValueReset } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast, toastApi } from 'features/toast/toast';
@@ -38,6 +41,7 @@ import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
+import { getUpdatedQueueStatusOnQueueItemStatusChanged } from 'services/events/queueStatusEvents';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import { createWorkflowExecutionCoordinator } from 'services/events/workflowExecutionCoordinator';
 import type { Socket } from 'socket.io-client';
@@ -68,6 +72,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     clearCanvasWorkflowIntegrationProcessing: () => dispatch(canvasWorkflowIntegrationProcessingCompleted()),
     completedInvocationKeysByItemId,
     getAllNodeExecutionStates: () => $nodeExecutionStates.get(),
+    getCurrentUserId: () => selectCurrentUser(getState())?.user_id ?? null,
     getNodeExecutionState: (nodeId) => $nodeExecutionStates.get()[nodeId],
     logReconciliationError: (error, itemId) => {
       log.debug({ error: parseify(error) }, `Unable to reconcile workflow queue item ${itemId}`);
@@ -113,6 +118,65 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     $lastProgressEvent.set(null);
     $loadingModelsCount.set(0);
     setIsConnected(false);
+  });
+
+  const invalidateWorkflowLibrary = () => {
+    dispatch(
+      api.util.invalidateTags([
+        { type: 'Workflow', id: LIST_TAG },
+        'WorkflowTags',
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
+      ])
+    );
+  };
+
+  const clearSavedWorkflowSelection = (workflowId: string) => {
+    const nodes = selectNodesSlice(getState()).nodes;
+
+    for (const node of nodes) {
+      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflow') {
+        continue;
+      }
+
+      if (node.data.inputs.workflow_id?.value !== workflowId) {
+        continue;
+      }
+
+      dispatch(
+        fieldValueReset({
+          nodeId: node.id,
+          fieldName: 'workflow_id',
+          value: '',
+        })
+      );
+    }
+  };
+
+  socket.on('workflow_created', (data) => {
+    log.debug({ data }, 'Workflow created');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_updated', (data) => {
+    log.debug({ data }, 'Workflow updated');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_deleted', (data) => {
+    log.debug({ data }, 'Workflow deleted');
+    invalidateWorkflowLibrary();
+    clearSavedWorkflowSelection(data.workflow_id);
+  });
+
+  socket.on('workflow_access_revoked', (data) => {
+    log.debug({ data }, 'Workflow access revoked');
+    invalidateWorkflowLibrary();
+    const currentUser = getState().auth.user;
+    if (currentUser?.is_admin || currentUser?.user_id === data.user_id) {
+      return;
+    }
+    clearSavedWorkflowSelection(data.workflow_id);
   });
 
   socket.on('invocation_started', (data) => {
@@ -362,6 +426,24 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
+    // Sanitized companion event sent to non-owner queue subscribers in multiuser mode. The
+    // backend sets user_id="redacted" and clears identifiers/error fields. We must not run
+    // payload-driven cache mutations or per-session side effects (node state reset, progress
+    // clear, completion bookkeeping) — those belong to the owner. Just invalidate queue tags
+    // so the non-owner's queue list and badge counts refetch with sanitized data.
+    if (data.user_id === 'redacted') {
+      log.trace({ data }, `Sanitized queue_item_status_changed for item ${data.item_id}`);
+      const tags: ApiTagDescription[] = [
+        'SessionQueueStatus',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: data.item_id },
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ];
+      dispatch(queueApi.util.invalidateTags(tags));
+      return;
+    }
+
     if (!workflowExecutionCoordinator.onQueueItemStatusChanged(data)) {
       return;
     }
@@ -416,6 +498,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         })
       );
     }
+    dispatch(
+      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) =>
+        getUpdatedQueueStatusOnQueueItemStatusChanged(draft, data)
+      )
+    );
 
     // Invalidate caches for things we cannot easily update
     // Invalidate SessionQueueStatus to refetch with user-specific counts
@@ -453,6 +540,17 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
+    // Clearing the queue deletes the in-progress item without emitting a per-item terminal status
+    // event, so the progress bar must be reset here — and the coordinator must mark the deleted
+    // tracked items terminal so a trailing invocation_progress event cannot repopulate the bar.
+    // The coordinator scopes a user-scoped clear (multiuser mode) to that user's items — on an
+    // admin client that may be a subset of the tracked items; on another user's client it is
+    // none of them — and reports whether the clear applied to any tracked item, so the progress
+    // bar is only reset when the clear could have deleted the item behind it. The queue tags
+    // below always need refreshing.
+    if (workflowExecutionCoordinator.onQueueCleared(data)) {
+      $lastProgressEvent.set(null);
+    }
     dispatch(
       queueApi.util.invalidateTags([
         'SessionQueueStatus',

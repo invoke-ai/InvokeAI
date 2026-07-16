@@ -53,6 +53,8 @@ def build_migration_14() -> Migration:
     - Create the table used to store style presets.
     """
     migration_14 = Migration(
+        id="migration_14",
+        depends_on="migration_13",
         from_version=13,
         to_version=14,
         callback=Migration14Callback(),
