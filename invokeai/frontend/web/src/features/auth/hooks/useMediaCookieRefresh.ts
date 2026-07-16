@@ -1,5 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsAuthenticated } from 'features/auth/store/authSlice';
+import { notifyMediaCookieRefreshed } from 'features/auth/store/mediaCookieRefresh';
 import { useEffect, useRef } from 'react';
 import { useRefreshMediaCookieMutation } from 'services/api/endpoints/auth';
 
@@ -28,6 +29,9 @@ export const useMediaCookieRefresh = () => {
       return;
     }
     hasRefreshed.current = true;
-    refreshMediaCookie();
+    void refreshMediaCookie()
+      .unwrap()
+      .then(notifyMediaCookieRefreshed)
+      .catch(() => undefined);
   }, [isAuthenticated, refreshMediaCookie]);
 };

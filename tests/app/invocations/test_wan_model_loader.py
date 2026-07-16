@@ -31,13 +31,20 @@ def _config(
     )
 
 
-def _invoke(main_config: SimpleNamespace, low_config: SimpleNamespace | None = None):
+def _invoke(
+    main_config: SimpleNamespace,
+    low_config: SimpleNamespace | None = None,
+    component_config: SimpleNamespace | None = None,
+):
     main = _model("main")
     low = _model("low") if low_config is not None else None
     context = MagicMock()
     configs = {"main": main_config}
     if low_config is not None:
         configs["low"] = low_config
+    component = _model("component") if component_config is not None else None
+    if component_config is not None:
+        configs["component"] = component_config
     context.models.get_config.side_effect = lambda model: configs[model.key]
     invocation = WanModelLoaderInvocation(
         id="test",
@@ -45,6 +52,7 @@ def _invoke(main_config: SimpleNamespace, low_config: SimpleNamespace | None = N
         transformer_low_noise_model=low,
         vae_model=_model("vae"),
         wan_t5_encoder_model=_model("t5"),
+        component_source=component,
     )
     return invocation.invoke(context)
 
@@ -115,6 +123,28 @@ def test_diffusers_i2v_loader_uses_variant_boundary_default_when_metadata_missin
             format=ModelFormat.Diffusers,
             has_dual_expert=True,
         )
+    )
+
+    assert output.transformer.boundary_ratio == 0.9
+
+
+def test_gguf_loader_uses_matching_component_source_boundary() -> None:
+    output = _invoke(
+        _config("main", WanVariantType.I2V_A14B, "high"),
+        component_config=_config(
+            "component", WanVariantType.I2V_A14B, "none", format=ModelFormat.Diffusers, boundary_ratio=0.91
+        ),
+    )
+
+    assert output.transformer.boundary_ratio == 0.91
+
+
+def test_gguf_loader_ignores_mismatched_component_source_boundary() -> None:
+    output = _invoke(
+        _config("main", WanVariantType.I2V_A14B, "high"),
+        component_config=_config(
+            "component", WanVariantType.T2V_A14B, "none", format=ModelFormat.Diffusers, boundary_ratio=0.875
+        ),
     )
 
     assert output.transformer.boundary_ratio == 0.9

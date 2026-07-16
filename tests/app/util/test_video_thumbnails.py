@@ -12,10 +12,13 @@ fail within a bounded interval; the happy-path tests run the real worker against
 synthetic MP4 so the subprocess plumbing is actually validated end to end.
 """
 
+import io
+import subprocess
 import sys
 import time
 from pathlib import Path
 from threading import Event
+from unittest.mock import MagicMock
 
 import imageio.v3 as iio
 import numpy as np
@@ -173,13 +176,22 @@ class TestStreamedDecoderIsBounded:
     ) -> None:
         target = tmp_path / "stalled.mp4"
         target.write_bytes(b"unused")
-        script = "import os, sys, time; os.close(sys.stdout.fileno()); time.sleep(600)"
-        monkeypatch.setattr(video_thumbnails, "_worker_command", lambda *args: [sys.executable, "-c", script])
+        proc = MagicMock()
+        proc.stdout = io.BytesIO()
+        proc.stderr = io.BytesIO()
+        proc.poll.return_value = None
 
-        # The timeout must outlast worker spawn (slow on Windows CI) so the closed-stream EOF
-        # is seen before the inactivity deadline; the proc.wait branch still caps the test at ~1s.
+        def wait(timeout: float | None = None) -> int:
+            if timeout is not None:
+                raise subprocess.TimeoutExpired("decoder-worker", timeout)
+            return -9
+
+        proc.wait.side_effect = wait
+        monkeypatch.setattr(video_thumbnails, "_spawn_worker", lambda *args, **kwargs: proc)
+        monkeypatch.setattr(video_thumbnails, "_terminate_process_tree", lambda worker: None)
+
         with pytest.raises(TimeoutError, match="decoder worker"):
-            next(iter_video_frames(target, timeout=10))
+            next(iter_video_frames(target, timeout=0.2))
 
 
 def test_timeout_kills_worker_descendants(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

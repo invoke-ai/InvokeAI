@@ -8,6 +8,7 @@ import pytest
 from PIL import Image
 
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.util.thumbnails import get_thumbnail_name
 
 
@@ -252,3 +253,61 @@ class TestSaveDeleteRoundTrip:
         assert flat_path.exists()
         assert nested_path.exists()
         assert flat_path.parent != nested_path.parent
+
+    def test_staged_delete_can_be_rolled_back(self, disk_storage: DiskImageFileStorage):
+        image_name = "rollback.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        image_path = disk_storage.get_path(image_name)
+        thumbnail_path = disk_storage.get_path(image_name, thumbnail=True)
+
+        token = disk_storage.stage_delete(image_name)
+
+        assert not image_path.exists()
+        assert not thumbnail_path.exists()
+
+        disk_storage.rollback_delete(token)
+
+        assert image_path.exists()
+        assert thumbnail_path.exists()
+
+    def test_staged_delete_can_be_committed(self, disk_storage: DiskImageFileStorage, tmp_path: Path):
+        image_name = "commit.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+
+        token = disk_storage.stage_delete(image_name)
+        disk_storage.commit_delete(token)
+
+        assert not list(tmp_path.glob(".delete_*"))
+
+    def test_invalid_staged_delete_does_not_create_staging_directory(
+        self, disk_storage: DiskImageFileStorage, tmp_path: Path
+    ):
+        with pytest.raises(ValueError, match="Invalid image name"):
+            disk_storage.stage_delete("../invalid.png")
+
+        assert not list(tmp_path.glob(".delete_*"))
+
+    def test_startup_restores_staged_files_when_record_exists(self, disk_storage: DiskImageFileStorage):
+        image_name = "recover.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        image_path = disk_storage.get_path(image_name)
+        disk_storage.stage_delete(image_name)
+
+        invoker = MagicMock()
+        invoker.services.image_records.get.return_value = object()
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert image_path.exists()
+
+    def test_startup_purges_staged_files_when_record_was_deleted(self, disk_storage: DiskImageFileStorage):
+        image_name = "purge.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        disk_storage.stage_delete(image_name)
+
+        invoker = MagicMock()
+        invoker.services.image_records.get.side_effect = ImageRecordNotFoundException
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))

@@ -16,6 +16,7 @@ from invokeai.backend.model_manager.configs.main import (
     _has_wan_keys,
     _is_native_wan_layout,
 )
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
@@ -87,11 +88,24 @@ def _build_overrides(model_path: Path, name: str) -> dict:
     }
 
 
-def _make_mod(path: Path, sd: dict) -> MagicMock:
+def _make_mod(path: Path, sd: dict, metadata: dict[str, str] | None = None) -> MagicMock:
     mod = MagicMock()
     mod.path = path
     mod.load_state_dict.return_value = sd
+    mod.metadata.return_value = metadata or {}
     return mod
+
+
+def test_model_on_disk_reads_gguf_name_metadata(tmp_path: Path) -> None:
+    path = tmp_path / "renamed.gguf"
+    writer = gguf.GGUFWriter(path, "wan")
+    writer.add_name("Wan2.2 T2V A14B")
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+
+    assert ModelOnDisk(path).metadata()["general.name"] == "Wan2.2 T2V A14B"
 
 
 class TestKeyFingerprint:
@@ -188,6 +202,40 @@ class TestProbe:
                     _build_overrides(path, "unsupported Wan 2.1"),
                 )
 
+    def test_rejects_ambiguous_a14b_filename(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "renamed-high_noise-Q4_K_M.gguf"
+            path.touch()
+
+            with pytest.raises(NotAMatchError, match="Wan 2.2"):
+                Main_GGUF_Wan_Config.from_model_on_disk(
+                    _make_mod(path, _wan_a14b_state_dict()),
+                    _build_overrides(path, "ambiguous Wan A14B"),
+                )
+
+    def test_accepts_renamed_wan_2_2_from_gguf_metadata(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "renamed-high_noise-Q4_K_M.gguf"
+            path.touch()
+
+            config = Main_GGUF_Wan_Config.from_model_on_disk(
+                _make_mod(path, _wan_a14b_state_dict(), {"general.name": "Wan2.2 T2V A14B"}),
+                _build_overrides(path, "renamed Wan 2.2"),
+            )
+
+            assert config.variant == WanVariantType.T2V_A14B
+
+    def test_rejects_wan_2_1_metadata_despite_wan_2_2_filename(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Wan2.2-T2V-A14B-high_noise-Q4_K_M.gguf"
+            path.touch()
+
+            with pytest.raises(NotAMatchError, match="Wan 2.1"):
+                Main_GGUF_Wan_Config.from_model_on_disk(
+                    _make_mod(path, _wan_a14b_state_dict(), {"general.name": "Wan2.1 T2V 14B"}),
+                    _build_overrides(path, "misnamed Wan 2.1"),
+                )
+
     def test_a14b_high_noise_filename(self):
         with TemporaryDirectory() as tmp:
             f = Path(tmp) / "wan2.2-t2v-a14b-high_noise-Q4_K_M.gguf"
@@ -266,7 +314,7 @@ class TestProbe:
 
     def test_explicit_expert_override(self):
         with TemporaryDirectory() as tmp:
-            f = Path(tmp) / "wan-a14b-flagship.gguf"
+            f = Path(tmp) / "wan2.2-a14b-flagship.gguf"
             f.touch()
             overrides = _build_overrides(f, "user-tagged")
             overrides["expert"] = "low"

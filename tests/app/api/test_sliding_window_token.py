@@ -48,6 +48,11 @@ def _create_test_app() -> FastAPI:
         response.set_cookie("invokeai_media_token", request.headers["authorization"][7:], path="/api/v1")
         return {"ok": True}
 
+    @test_app.post("/api/v1/auth/login")
+    async def login_endpoint(response: Response):
+        response.set_cookie("invokeai_media_token", "login-user-token", path="/api/v1")
+        return {"token": "login-user-token"}
+
     return test_app
 
 
@@ -112,6 +117,17 @@ class TestSlidingWindowTokenMiddleware:
             assert 'invokeai_media_token=""' in response.headers["set-cookie"]
         else:
             assert response.cookies.get("invokeai_media_token") == token
+
+    def test_login_response_is_not_overwritten_by_existing_bearer_token(self):
+        app = _create_test_app()
+        client = TestClient(app)
+        existing_token = _make_token(expires_delta=timedelta(minutes=5))
+
+        response = client.post("/api/v1/auth/login", headers={"Authorization": f"Bearer {existing_token}"})
+
+        assert "X-Refreshed-Token" not in response.headers
+        assert response.cookies.get("invokeai_media_token") == "login-user-token"
+        assert len(response.headers.get_list("set-cookie")) == 1
 
     def test_unauthenticated_request_does_not_return_refreshed_token(self):
         """Requests without a token do NOT return X-Refreshed-Token."""

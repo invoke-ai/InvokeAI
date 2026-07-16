@@ -1573,13 +1573,19 @@ class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base
             raise NotAMatchError("state dict does not look like GGUF quantized")
         if not _has_wan_keys(sd):
             raise NotAMatchError("state dict does not look like a Wan transformer")
-        if "wan21" in "".join(character for character in mod.path.stem.lower() if character.isalnum()):
+        gguf_name = mod.metadata().get("general.name", "")
+        normalized_identity = "".join(
+            character for character in f"{mod.path.stem} {gguf_name}".lower() if character.isalnum()
+        )
+        if "wan21" in normalized_identity:
             raise NotAMatchError("Wan 2.1 GGUF models are not supported by the Wan 2.2 loader")
 
         explicit_variant = override_fields.pop("variant", None)
         variant = explicit_variant or _detect_wan_gguf_variant(sd)
         if variant is None:
             raise NotAMatchError("could not determine Wan variant from state dict")
+        if variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B) and "wan22" not in normalized_identity:
+            raise NotAMatchError("Wan A14B GGUF filename or metadata must identify the model as Wan 2.2")
 
         explicit_expert = override_fields.pop("expert", None)
         expert = explicit_expert or _detect_wan_gguf_expert(mod.path.stem)

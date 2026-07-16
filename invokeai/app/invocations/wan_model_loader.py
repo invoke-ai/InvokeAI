@@ -187,7 +187,11 @@ class WanModelLoaderInvocation(BaseInvocation):
             if self.component_source is not None:
                 src_cfg = context.models.get_config(self.component_source)
                 src_boundary = getattr(src_cfg, "boundary_ratio", None)
-                if src_boundary is not None:
+                if (
+                    src_cfg.format == ModelFormat.Diffusers
+                    and getattr(src_cfg, "variant", None) == main_variant
+                    and src_boundary is not None
+                ):
                     boundary_ratio = float(src_boundary)
         else:
             raise ValueError(

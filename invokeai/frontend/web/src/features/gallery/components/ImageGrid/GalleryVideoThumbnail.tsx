@@ -1,4 +1,5 @@
 import { Box, Image } from '@invoke-ai/ui-library';
+import { useMediaCookieRefreshVersion } from 'features/auth/store/mediaCookieRefresh';
 import { memo, useCallback, useState } from 'react';
 
 type Props = {
@@ -6,14 +7,32 @@ type Props = {
   videoUrl: string;
 };
 
-export const getVideoThumbnailMode = (thumbnailUrl: string, failedThumbnailUrl: string | null): 'image' | 'video' =>
-  thumbnailUrl === failedThumbnailUrl ? 'video' : 'image';
+type FailedThumbnail = {
+  url: string;
+  mediaCookieVersion: number;
+};
+
+export const getVideoThumbnailMode = (
+  thumbnailUrl: string,
+  failedThumbnail: FailedThumbnail | null,
+  mediaCookieVersion: number
+): 'image' | 'video' =>
+  thumbnailUrl === failedThumbnail?.url && mediaCookieVersion === failedThumbnail.mediaCookieVersion
+    ? 'video'
+    : 'image';
+
+export const getVideoThumbnailKey = (thumbnailUrl: string, mediaCookieVersion: number) =>
+  `${mediaCookieVersion}:${thumbnailUrl}`;
 
 export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) => {
-  const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | null>(null);
-  const onError = useCallback(() => setFailedThumbnailUrl(thumbnailUrl), [thumbnailUrl]);
+  const mediaCookieVersion = useMediaCookieRefreshVersion();
+  const [failedThumbnail, setFailedThumbnail] = useState<FailedThumbnail | null>(null);
+  const onError = useCallback(
+    () => setFailedThumbnail({ url: thumbnailUrl, mediaCookieVersion }),
+    [mediaCookieVersion, thumbnailUrl]
+  );
 
-  if (getVideoThumbnailMode(thumbnailUrl, failedThumbnailUrl) === 'video') {
+  if (getVideoThumbnailMode(thumbnailUrl, failedThumbnail, mediaCookieVersion) === 'video') {
     return (
       <Box
         as="video"
@@ -32,6 +51,7 @@ export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) =>
 
   return (
     <Image
+      key={getVideoThumbnailKey(thumbnailUrl, mediaCookieVersion)}
       pointerEvents="none"
       src={thumbnailUrl}
       onError={onError}

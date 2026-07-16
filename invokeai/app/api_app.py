@@ -103,7 +103,7 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
         if (
             response.status_code < 400
             and request.method in ("POST", "PUT", "PATCH", "DELETE")
-            and request.url.path not in ("/api/v1/auth/logout", "/api/v1/auth/media-cookie")
+            and request.url.path not in ("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/media-cookie")
         ):
             auth_header = request.headers.get("authorization", "")
             if auth_header.startswith("Bearer "):
