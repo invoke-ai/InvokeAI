@@ -30,33 +30,19 @@ import type {
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasLayerSourceContract,
-  CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/types';
 
-import { adjustmentsKey, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import { adjustmentsKey } from '@workbench/canvas-engine/render/adjustments';
+import {
+  getBaseRasterContentBounds,
+  getCompositeLayerBounds,
+  planBaseRasterComposite,
+} from '@workbench/canvas-engine/render/rasterComposite';
 
 import type { CompositeEntry, CompositeLayerRef, CompositeMaskLayerRef, CompositePlan, Rect } from './types';
 
 import { DEFAULT_MASK_DENOISE_LIMIT } from './types';
-
-/** True when a layer is an enabled raster layer with rasterizable, non-empty pixels. */
-const isBaseRasterLayer = (layer: CanvasLayerContract): layer is CanvasRasterLayerContractV2 => {
-  if (!layer.isEnabled || layer.type !== 'raster') {
-    return false;
-  }
-  if (layer.source.type === 'image') {
-    return true;
-  }
-  // A paint layer only contributes once it holds pixels. An empty (`bitmap:
-  // null`) paint layer — e.g. an auto-created layer left blank after the stroke
-  // was undone — carries no pixels; including it would force a doc-sized
-  // transparent rect into the composite, so its full-bbox coverage plus scanned
-  // transparency reads as `outpaint` (unsupported) instead of `txt2img`. The
-  // orchestrator flushes pending paint uploads before planning, so a bitmap
-  // still `null` here really is empty rather than merely unpersisted.
-  return layer.source.type === 'paint' && layer.source.bitmap !== null;
-};
 
 /** A stable string identifying a source's pixels (its asset name, or an empty sentinel). */
 const sourceRefOf = (source: CanvasLayerSourceContract): string => {
@@ -66,51 +52,8 @@ const sourceRefOf = (source: CanvasLayerSourceContract): string => {
     case 'paint':
       return source.bitmap ? `paint:${source.bitmap.imageName}` : 'paint:empty';
     default:
-      // Only image/paint layers reach the planner (filtered by isBaseRasterLayer).
       return `${source.type}:unsupported`;
   }
-};
-
-/** The native (unscaled) content rect of a base-raster layer's source (layer-local). */
-const contentRectOf = (
-  layer: CanvasRasterLayerContractV2,
-  doc: CanvasDocumentContractV2
-): { width: number; height: number; x: number; y: number } => {
-  const { source } = layer;
-  if (source.type === 'image') {
-    return { height: source.image.height, width: source.image.width, x: 0, y: 0 };
-  }
-  // Paint layers are content-sized: the persisted bitmap dims at its offset. Only
-  // paint layers WITH a bitmap reach here (empty paint is filtered upstream), but
-  // default defensively to the document rect when absent.
-  if (source.type === 'paint' && source.bitmap) {
-    const offset = source.offset ?? { x: 0, y: 0 };
-    return { height: source.bitmap.height, width: source.bitmap.width, x: offset.x, y: offset.y };
-  }
-  return { height: doc.height, width: doc.width, x: 0, y: 0 };
-};
-
-/** Projects a document layer into its frozen composite contribution. */
-const toLayerRef = (layer: CanvasRasterLayerContractV2, doc: CanvasDocumentContractV2): CompositeLayerRef => {
-  const rect = contentRectOf(layer, doc);
-  const hasAdjustments = !isIdentityAdjustments(layer.adjustments);
-  return {
-    blendMode: layer.blendMode,
-    contentOffset: { x: rect.x, y: rect.y },
-    contentSize: { height: rect.height, width: rect.width },
-    id: layer.id,
-    opacity: layer.opacity,
-    sourceRef: sourceRefOf(layer.source),
-    // Bake non-destructive adjustments into the generated pixels (and the key).
-    ...(hasAdjustments && layer.adjustments ? { adjustments: layer.adjustments } : {}),
-    transform: {
-      rotation: layer.transform.rotation,
-      scaleX: layer.transform.scaleX,
-      scaleY: layer.transform.scaleY,
-      x: layer.transform.x,
-      y: layer.transform.y,
-    },
-  };
 };
 
 /** Serializes a rect into a compact, deterministic key fragment. */
@@ -136,9 +79,7 @@ const layerKey = (ref: CompositeLayerRef): string => {
   ].join(':');
 };
 
-/** Derives the stable identity key for a base-raster entry. */
-const deriveKey = (kind: string, bbox: Rect, layers: CompositeLayerRef[]): string =>
-  `${kind}|${rectKey(bbox)}|${layers.map(layerKey).join('|')}`;
+export { getBaseRasterContentBounds, getCompositeLayerBounds, planBaseRasterComposite };
 
 /** True when a layer is an enabled inpaint mask with persisted (non-empty) alpha. */
 const isActiveInpaintMaskLayer = (layer: CanvasLayerContract): layer is CanvasInpaintMaskLayerContract =>
@@ -197,16 +138,7 @@ const deriveMaskKey = (kind: string, bbox: Rect, layers: CompositeMaskLayerRef[]
  *   must NOT be treated as noise 0).
  */
 export const planComposites = (document: CanvasDocumentContractV2, bbox: Rect): CompositePlan => {
-  const layers = document.layers.filter(isBaseRasterLayer).map((layer) => toLayerRef(layer, document));
-
-  const baseEntry: CompositeEntry = {
-    bbox,
-    key: deriveKey('base-raster', bbox, layers),
-    kind: 'base-raster',
-    layers,
-  };
-
-  const entries: CompositeEntry[] = [baseEntry];
+  const entries: CompositeEntry[] = [planBaseRasterComposite(document, bbox)];
 
   const maskLayers = document.layers.filter(isActiveInpaintMaskLayer);
 

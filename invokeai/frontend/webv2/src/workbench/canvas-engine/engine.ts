@@ -103,6 +103,11 @@ import { RenderController } from '@workbench/canvas-engine/controllers/renderCon
 import { StructuralLayerController } from '@workbench/canvas-engine/controllers/structuralLayerController';
 import { createCanvasDiagnostics, type CanvasDiagnosticsSnapshot } from '@workbench/canvas-engine/diagnostics';
 import { createEngineStores, type EngineStores, type TextToolOptions } from '@workbench/canvas-engine/engineStores';
+import {
+  exportRasterComposite as exportRasterCompositeWithDeps,
+  type RasterCompositeExportRequest,
+  type RasterCompositeExportSnapshot,
+} from '@workbench/canvas-engine/exportRasterComposite';
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
@@ -2664,6 +2669,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getLayerSurface: getLayerSurfaceForExport,
     uploadImage: (blob) => opts.uploadImage(blob),
   });
+  const exportRasterComposite = (request: RasterCompositeExportRequest) =>
+    exportRasterCompositeWithDeps(request, {
+      backend,
+      captureSnapshot: (): RasterCompositeExportSnapshot => ({
+        document: mirror.getDocument(),
+        documentGeneration: rasterController.getDocumentGeneration(),
+      }),
+      getLayerSurface: getLayerSurfaceForExport,
+      isSnapshotCurrent: (snapshot) =>
+        !disposed &&
+        store.getState().activeProjectId === projectId &&
+        snapshot.document === mirror.getDocument() &&
+        snapshot.documentGeneration === rasterController.getDocumentGeneration(),
+    });
   const surface: CanvasSurfaceCapability = { attach, detach, resize };
   const viewportCapability: CanvasViewportCapability = { fitToView, getViewport, setBboxGrid };
   const historyCapability: CanvasHistoryCapability = { clearHistory, redo, undo };
@@ -2847,6 +2866,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     exportBakedLayerBlob,
     exportBakedLayerPixels,
     exportLayerPixels: rasterizeLayerPixels,
+    exportRasterComposite,
     exportRasterLayersToPsd,
     extractMaskedArea,
     getCompositeExecutorDeps,

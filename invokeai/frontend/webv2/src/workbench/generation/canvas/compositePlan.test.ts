@@ -11,7 +11,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { Rect } from './types';
 
-import { planComposites, planControlComposites, planRegionalMaskComposites } from './compositePlan';
+import {
+  getBaseRasterContentBounds,
+  planComposites,
+  planControlComposites,
+  planRegionalMaskComposites,
+} from './compositePlan';
 
 const imageRef = (imageName: string, width = 64, height = 48): CanvasImageRef => ({ height, imageName, width });
 
@@ -356,6 +361,25 @@ describe('planComposites — control-layer exclusion', () => {
   it('emits no control-layer entries from planComposites (they live in planControlComposites)', () => {
     const plan = planComposites(makeDoc([controlLayer('c')]), BBOX);
     expect(plan.entries.some((entry) => entry.kind === 'control-layer')).toBe(false);
+  });
+});
+
+describe('getBaseRasterContentBounds', () => {
+  it('returns rounded transformed bounds for enabled raster content only', () => {
+    const document = makeDoc([
+      rasterLayer('enabled', {
+        source: { image: imageRef('source', 100, 50), type: 'image' },
+        transform: { rotation: 0, scaleX: 2, scaleY: 1, x: -10.25, y: 20.5 },
+      }),
+      { ...controlLayer('control'), isEnabled: true },
+      { ...rasterLayer('disabled'), isEnabled: false },
+    ]);
+
+    expect(getBaseRasterContentBounds(document)).toEqual({ x: -11, y: 20, width: 201, height: 51 });
+  });
+
+  it('returns null when no enabled raster layer has content', () => {
+    expect(getBaseRasterContentBounds(makeDoc([controlLayer('control')]))).toBeNull();
   });
 });
 

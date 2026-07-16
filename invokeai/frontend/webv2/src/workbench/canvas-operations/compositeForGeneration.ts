@@ -28,17 +28,11 @@
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
-import type {
-  CompositeEntry,
-  CompositeLayerRef,
-  CompositeMaskLayerRef,
-  CompositePlan,
-} from '@workbench/generation/canvas/types';
+import type { CompositeEntry, CompositeMaskLayerRef, CompositePlan } from '@workbench/generation/canvas/types';
 
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-import { transformBounds, union } from '@workbench/canvas-engine/math/rect';
-import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
-import { blendToComposite } from '@workbench/canvas-engine/render/compositor';
+import { renderRasterComposite } from '@workbench/canvas-engine/render/rasterComposite';
+import { getCompositeLayerBounds } from '@workbench/generation/canvas/compositePlan';
 
 type Ctx = RasterSurface['ctx'];
 
@@ -148,15 +142,6 @@ const setTransform = (ctx: Ctx, m: Mat2d): void => {
   ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
 };
 
-/** The layer's local→document transform matrix. */
-const layerMatrix = (ref: CompositeLayerRef): Mat2d =>
-  fromTRS(
-    { x: ref.transform.x, y: ref.transform.y },
-    ref.transform.rotation,
-    ref.transform.scaleX,
-    ref.transform.scaleY
-  );
-
 /**
  * Union of a plan's base-raster content bounds in document space, or `null`
  * when the plan has no enabled raster content. Pure geometry (no pixels, no
@@ -165,23 +150,7 @@ const layerMatrix = (ref: CompositeLayerRef): Mat2d =>
  */
 export const computeCompositeContentBounds = (plan: CompositePlan): Rect | null => {
   const entry = plan.entries.find((e) => e.kind === 'base-raster');
-  return entry ? computeContentBounds(entry.layers) : null;
-};
-
-/** Union of the entry's layer bounds in document space, or `null` when empty. */
-const computeContentBounds = (layers: CompositeLayerRef[]): Rect | null => {
-  let bounds: Rect | null = null;
-  for (const ref of layers) {
-    const nativeRect: Rect = {
-      height: ref.contentSize.height,
-      width: ref.contentSize.width,
-      x: ref.contentOffset.x,
-      y: ref.contentOffset.y,
-    };
-    const layerBounds = transformBounds(layerMatrix(ref), nativeRect);
-    bounds = bounds === null ? layerBounds : union(bounds, layerBounds);
-  }
-  return bounds;
+  return entry ? getCompositeLayerBounds(entry.layers) : null;
 };
 
 /** True when every pixel of `imageData` is fully opaque (alpha === 255). Empty → false. */
@@ -196,62 +165,6 @@ const isFullyOpaque = (imageData: ImageData): boolean => {
     }
   }
   return true;
-};
-
-/** Composites an entry's layers, in z-order, onto a fresh bbox-sized surface. */
-const compositeEntry = async (entry: CompositeEntry, deps: ExecuteCompositePlanDeps): Promise<RasterSurface> => {
-  const { bbox } = entry;
-  const width = Math.max(0, bbox.width);
-  const height = Math.max(0, bbox.height);
-  const surface = deps.backend.createSurface(width, height);
-  const ctx = surface.ctx;
-  const readImageData = deps.readImageData ?? defaultReadImageData;
-  const writeImageData = deps.writeImageData ?? defaultWriteImageData;
-
-  setTransform(ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-  ctx.clearRect(0, 0, surface.width, surface.height);
-
-  const view = bboxView(bbox);
-  // Layers are stored top-first (index 0 = top-most); draw bottom→top.
-  for (let i = entry.layers.length - 1; i >= 0; i--) {
-    const ref = entry.layers[i];
-    if (!ref) {
-      continue;
-    }
-    const layerSurface = await deps.getLayerSurface(ref.id);
-    if (ref.adjustments) {
-      // Bake non-destructive adjustments so the generated image matches what the
-      // user sees: render this layer alone into a bbox temp, apply the LUTs, then
-      // composite the adjusted temp with the layer's opacity/blend.
-      const temp = deps.backend.createSurface(width, height);
-      const tempCtx = temp.ctx;
-      setTransform(tempCtx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-      tempCtx.clearRect(0, 0, width, height);
-      setTransform(tempCtx, multiply(view, layerMatrix(ref)));
-      tempCtx.drawImage(layerSurface.surface.canvas, layerSurface.rect.x, layerSurface.rect.y);
-      const fullRect: Rect = { height, width, x: 0, y: 0 };
-      const pixels = readImageData(temp, fullRect);
-      applyAdjustments(pixels, ref.adjustments);
-      writeImageData(temp, pixels, 0, 0);
-      ctx.save();
-      setTransform(ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-      ctx.globalAlpha = ref.opacity;
-      ctx.globalCompositeOperation = blendToComposite(ref.blendMode);
-      ctx.drawImage(temp.canvas, 0, 0);
-      ctx.restore();
-      continue;
-    }
-    ctx.save();
-    ctx.globalAlpha = ref.opacity;
-    ctx.globalCompositeOperation = blendToComposite(ref.blendMode);
-    setTransform(ctx, multiply(view, layerMatrix(ref)));
-    // Draw the cache at its layer-local content origin (content-sized paint
-    // layers place their pixels off-zero).
-    ctx.drawImage(layerSurface.surface.canvas, layerSurface.rect.x, layerSurface.rect.y);
-    ctx.restore();
-  }
-
-  return surface;
 };
 
 /**
@@ -282,7 +195,7 @@ const executeRasterEntry = async (
     };
   }
 
-  const surface = await compositeEntry(entry, deps);
+  const surface = await renderRasterComposite(entry, deps);
   const bboxFullyCovered = isFullyOpaque(
     readImageData(surface, { height: surface.height, width: surface.width, x: 0, y: 0 })
   );
@@ -333,7 +246,7 @@ export const executeCompositePlan = async (
     throw new Error('executeCompositePlan: plan has no base-raster entry');
   }
 
-  const contentBounds = computeContentBounds(entry.layers);
+  const contentBounds = getCompositeLayerBounds(entry.layers);
   const { bboxFullyCovered, ...base } = await executeRasterEntry(entry, deps);
 
   return { base, bboxFullyCovered, contentBounds };

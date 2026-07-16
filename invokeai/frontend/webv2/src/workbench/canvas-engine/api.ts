@@ -3,6 +3,7 @@ import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import type { CanvasEditGate } from './editGate';
 import type { EngineStores } from './engineStores';
+import type { RasterCompositeExportRequest, RasterCompositeExportResult } from './exportRasterComposite';
 import type { RasterSurface } from './render/raster';
 import type { Rect, ToolId, Vec2 } from './types';
 import type { Viewport } from './viewport';
@@ -59,10 +60,17 @@ export interface CanvasPreviewCapability {
 export interface CanvasExportCapability {
   captureLayerExportGuard(layerId: string): LayerExportGuard | null;
   exportBakedLayerBlob(layerId: string, options?: ExportBakedLayerPixelsOptions): Promise<ExportBakedLayerBlobResult>;
+  exportRasterComposite(request: RasterCompositeExportRequest): Promise<RasterCompositeExportResult>;
   getCompositeExecutorDeps(): CanvasCompositeExecutorDeps;
   hasExportableLayerContent(layerId: string): boolean;
   isLayerExportGuardCurrent(guard: LayerExportGuard): boolean;
 }
+
+export type {
+  RasterCompositeExportRequest,
+  RasterCompositeExportResult,
+  RasterCompositeExportSnapshot,
+} from './exportRasterComposite';
 
 export interface ExportLayerPixelsOptions {
   includeDisabled?: boolean;
