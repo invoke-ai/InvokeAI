@@ -117,8 +117,9 @@ export type ReplaceSelectionFromImageResult =
 
 export interface CanvasLayerCapability {
   applyStructuralPreview(action: WorkbenchAction): boolean;
+  canCommitStructural(): boolean;
   commitGeneratedImageResult(options: CommitGeneratedImageOptions): Promise<CommitGeneratedImageResult>;
-  commitStructural(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): void;
+  commitStructural(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): boolean;
   invertMask(layerId: string): boolean;
 }
 

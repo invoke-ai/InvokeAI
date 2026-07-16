@@ -50,7 +50,12 @@ export class LayerMutationController {
     const apply = (): void => {
       const prepared = captured ? o.preparePixels(layer.id, captured.rect, captured.pixels) : null;
       o.dispatchPrepared(
-        { add: { index, layer }, enabledUpdates: [], selectedLayerId: layer.id, type: 'applyCanvasLayerStackMutation' },
+        {
+          add: { index, layers: [layer] },
+          enabledUpdates: [],
+          selectedLayerId: layer.id,
+          type: 'applyCanvasLayerStackMutation',
+        },
         () =>
           o.getReducerDocument()?.selectedLayerId === layer.id &&
           o.getReducerDocument()?.layers.some((candidate) => candidate === layer) === true,

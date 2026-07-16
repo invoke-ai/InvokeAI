@@ -6,6 +6,75 @@ import { describe, expect, it, vi } from 'vitest';
 import { StructuralLayerController } from './structuralLayerController';
 
 describe('StructuralLayerController', () => {
+  it('reports whether a structural commit is currently allowed and committed', () => {
+    const dispatch = vi.fn();
+    const history = createHistory();
+    const controller = new StructuralLayerController({
+      canEdit: () => true,
+      dispatch,
+      getDocument: () => null,
+      history,
+      isGestureActive: () => false,
+    });
+    const forward = { id: 'layer', type: 'setCanvasSelectedLayer' } as const;
+    const inverse = { id: null, type: 'setCanvasSelectedLayer' } as const;
+
+    expect(controller.canCommit()).toBe(true);
+    expect(controller.commit('Select layer', forward, inverse)).toBe(true);
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(history.canUndo()).toBe(true);
+  });
+
+  it.each([
+    { canEdit: false, gestureActive: false, reason: 'editing is disallowed' },
+    { canEdit: true, gestureActive: true, reason: 'a gesture is active' },
+  ])('reports and refuses a structural commit when $reason', ({ canEdit, gestureActive }) => {
+    const dispatch = vi.fn();
+    const history = createHistory();
+    const controller = new StructuralLayerController({
+      canEdit: () => canEdit,
+      dispatch,
+      getDocument: () => null,
+      history,
+      isGestureActive: () => gestureActive,
+    });
+
+    expect(controller.canCommit()).toBe(false);
+    expect(
+      controller.commit(
+        'Select layer',
+        { id: 'layer', type: 'setCanvasSelectedLayer' },
+        { id: null, type: 'setCanvasSelectedLayer' }
+      )
+    ).toBe(false);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('reports and refuses structural commits after disposal', () => {
+    const dispatch = vi.fn();
+    const history = createHistory();
+    const controller = new StructuralLayerController({
+      canEdit: () => true,
+      dispatch,
+      getDocument: () => null,
+      history,
+      isGestureActive: () => false,
+    });
+
+    controller.dispose();
+
+    expect(controller.canCommit()).toBe(false);
+    expect(
+      controller.commit(
+        'Select layer',
+        { id: 'layer', type: 'setCanvasSelectedLayer' },
+        { id: null, type: 'setCanvasSelectedLayer' }
+      )
+    ).toBe(false);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   it('owns guarded structural history and coalesces rapid nudges', () => {
     let now = 0;
     const dispatch = vi.fn();

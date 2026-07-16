@@ -74,7 +74,7 @@ export class CopyLayerController {
       const prepared = this.deps.preparePixels(newId, baked.rect, baked.surface);
       this.deps.dispatchPrepared(
         {
-          add: { index: sourceIndex, layer },
+          add: { index: sourceIndex, layers: [layer] },
           enabledUpdates: [],
           selectedLayerId: newId,
           type: 'applyCanvasLayerStackMutation',

@@ -613,7 +613,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isGestureActive: () => pipeline.isGestureActive(),
   });
   const endNudgeBurst = (): void => structuralController.endBurst();
-  const commitStructural = (label: string, forward: WorkbenchAction, inverse: WorkbenchAction): void =>
+  const commitStructural = (label: string, forward: WorkbenchAction, inverse: WorkbenchAction): boolean =>
     structuralController.commit(label, forward, inverse);
   const nudgeSelectedLayer = (dx: number, dy: number): void => structuralController.nudge(dx, dy);
 

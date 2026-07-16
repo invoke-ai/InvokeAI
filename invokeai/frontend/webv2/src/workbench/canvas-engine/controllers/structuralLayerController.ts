@@ -35,13 +35,18 @@ export class StructuralLayerController {
     this.burst = null;
   }
 
-  commit(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): void {
-    if (this.disposed || !this.deps.canEdit() || this.deps.isGestureActive()) {
-      return;
+  canCommit(): boolean {
+    return !this.disposed && this.deps.canEdit() && !this.deps.isGestureActive();
+  }
+
+  commit(label: string, forward: WorkbenchAction, inverse: WorkbenchAction): boolean {
+    if (!this.canCommit()) {
+      return false;
     }
     this.endBurst();
     this.deps.dispatch(forward);
     this.deps.history.push(createDocumentPatchEntry({ dispatch: this.deps.dispatch, forward, inverse, label }));
+    return true;
   }
 
   preview(action: WorkbenchAction): boolean {

@@ -215,7 +215,7 @@ export class MergeLayerController {
       const prepared = this.deps.preparePixels(resultId, rect, pixels);
       this.deps.dispatchPrepared(
         {
-          add: { index: 0, layer: resultLayer },
+          add: { index: 0, layers: [resultLayer] },
           enabledUpdates: [],
           selectedLayerId: resultId,
           type: 'applyCanvasLayerStackMutation',

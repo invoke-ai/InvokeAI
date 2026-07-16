@@ -1875,7 +1875,7 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     const unrelatedBefore = getCanvas(initial).document.layers[0];
 
     const applied = workbenchReducer(initial, {
-      add: { index: 1, layer: result },
+      add: { index: 1, layers: [result] },
       enabledUpdates: [
         { id: upper.id, isEnabled: false },
         { id: below.id, isEnabled: false },
@@ -1913,6 +1913,45 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getCanvas(reverted).document.layers[0]).toBe(unrelatedBefore);
   });
 
+  it('inserts a batch in order and selects the exact requested layer', () => {
+    const existing = createRasterLayer('existing');
+    const layerA = createRasterLayer('a');
+    const layerB = createRasterLayer('b');
+    const initial = withCanvasLayers(createInitialWorkbenchState(), [existing]);
+
+    const next = workbenchReducer(initial, {
+      add: { index: 0, layers: [layerA, layerB] },
+      enabledUpdates: [],
+      selectedLayerId: layerB.id,
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getCanvas(next).document.layers).toEqual([layerA, layerB, existing]);
+    expect(getCanvas(next).document.selectedLayerId).toBe(layerB.id);
+  });
+
+  it('targets a non-active project without changing the active project', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('first-existing')]);
+    const firstProjectId = state.activeProjectId;
+    state = workbenchReducer(state, { type: 'createProject' });
+    const secondProjectId = state.activeProjectId;
+    const secondProjectBefore = getProject(state, secondProjectId);
+    const layerA = createRasterLayer('a');
+    const layerB = createRasterLayer('b');
+
+    const next = workbenchReducer(state, {
+      add: { index: 0, layers: [layerA, layerB] },
+      enabledUpdates: [],
+      projectId: firstProjectId,
+      selectedLayerId: layerB.id,
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getProject(next, firstProjectId).canvas.document.layers.slice(0, 2)).toEqual([layerA, layerB]);
+    expect(getProject(next, firstProjectId).canvas.document.selectedLayerId).toBe(layerB.id);
+    expect(getProject(next, secondProjectId)).toBe(secondProjectBefore);
+  });
+
   it('rejects an invalid layer stack mutation without applying any valid fields', () => {
     const initial = workbenchReducer(
       withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]),
@@ -1920,7 +1959,7 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     );
     const invalidActions = [
       {
-        add: { index: 0, layer: createRasterLayer('a') },
+        add: { index: 0, layers: [createRasterLayer('a')] },
         enabledUpdates: [{ id: 'b', isEnabled: false }],
         selectedLayerId: 'b',
         type: 'applyCanvasLayerStackMutation',
@@ -1948,10 +1987,16 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
         type: 'applyCanvasLayerStackMutation',
       },
       {
-        add: { index: 0, layer: createRasterLayer('c') },
+        add: { index: 0, layers: [createRasterLayer('c')] },
         enabledUpdates: [],
         removeIds: ['a'],
         selectedLayerId: 'b',
+        type: 'applyCanvasLayerStackMutation',
+      },
+      {
+        add: { index: 0, layers: [createRasterLayer('c'), createRasterLayer('c')] },
+        enabledUpdates: [{ id: 'b', isEnabled: false }],
+        selectedLayerId: 'c',
         type: 'applyCanvasLayerStackMutation',
       },
     ] satisfies WorkbenchAction[];

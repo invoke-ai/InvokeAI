@@ -1710,12 +1710,13 @@ describe('createCanvasEngine', () => {
       .find((action) => action.type === 'applyCanvasLayerStackMutation');
     expect(mutation).toBeDefined();
     const added = mutation?.type === 'applyCanvasLayerStackMutation' ? mutation.add : undefined;
-    if (added?.layer.type === 'raster') {
+    const addedLayer = added?.layers[0];
+    if (added && addedLayer?.type === 'raster') {
       expect(added.index).toBe(1);
-      expect(added.layer.id).toBe(newId);
-      expect(added.layer.name).toBe('a copy');
-      expect(added.layer.source).toEqual({ bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' });
-      expect(added.layer.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
+      expect(addedLayer.id).toBe(newId);
+      expect(addedLayer.name).toBe('a copy');
+      expect(addedLayer.source).toEqual({ bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' });
+      expect(addedLayer.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
     } else {
       throw new Error('expected atomic layer-stack mutation with raster copy');
     }
@@ -3320,7 +3321,8 @@ describe('commitStructural', () => {
       store,
     });
 
-    engine.layers.commitStructural('Select layer', forward, inverse);
+    expect(engine.layers.canCommitStructural()).toBe(true);
+    expect(engine.layers.commitStructural('Select layer', forward, inverse)).toBe(true);
     // Forward dispatched once; the edit is now undoable but not redoable.
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenNthCalledWith(1, forward);
@@ -3340,6 +3342,8 @@ describe('commitStructural', () => {
     expect(engine.stores.canRedo.get()).toBe(false);
 
     engine.lifecycle.dispose();
+    expect(engine.layers.canCommitStructural()).toBe(false);
+    expect(engine.layers.commitStructural('Select layer', forward, inverse)).toBe(false);
   });
 });
 
@@ -12083,13 +12087,15 @@ describe('gesture guard: nudge / commitStructural mid-stroke', () => {
     const forward: WorkbenchAction = { id: 'x', type: 'setCanvasSelectedLayer' };
     const inverse: WorkbenchAction = { id: null, type: 'setCanvasSelectedLayer' };
 
-    engine.layers.commitStructural('Select', forward, inverse);
+    expect(engine.layers.canCommitStructural()).toBe(false);
+    expect(engine.layers.commitStructural('Select', forward, inverse)).toBe(false);
     // Nothing dispatched, nothing recorded on history mid-gesture.
     expect(dispatch.mock.calls.some((call) => call[0] === forward)).toBe(false);
     expect(engine.stores.canUndo.get()).toBe(false);
 
     overlay.fire('pointerup', pointerAt(30, 30, { buttons: 0 }));
-    engine.layers.commitStructural('Select', forward, inverse);
+    expect(engine.layers.canCommitStructural()).toBe(true);
+    expect(engine.layers.commitStructural('Select', forward, inverse)).toBe(true);
     expect(dispatch.mock.calls.some((call) => call[0] === forward)).toBe(true);
     expect(engine.stores.canUndo.get()).toBe(true);
 

@@ -153,7 +153,7 @@ export class BooleanMergeController {
       const prepared = this.deps.preparePixels(resultId, resultRect, pixels);
       this.deps.dispatchPrepared(
         {
-          add: { index: liveIndex, layer: resultLayer },
+          add: { index: liveIndex, layers: [resultLayer] },
           enabledUpdates: disabled,
           selectedLayerId: resultId,
           type: 'applyCanvasLayerStackMutation',

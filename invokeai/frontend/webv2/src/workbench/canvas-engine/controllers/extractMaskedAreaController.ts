@@ -178,7 +178,7 @@ export class ExtractMaskedAreaController {
       const prepared = this.deps.preparePixels(resultId, rect, pixels);
       this.deps.dispatchPrepared(
         {
-          add: { index: maskIndex, layer },
+          add: { index: maskIndex, layers: [layer] },
           enabledUpdates: [],
           selectedLayerId: resultId,
           type: 'applyCanvasLayerStackMutation',

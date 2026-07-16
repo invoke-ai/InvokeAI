@@ -248,7 +248,8 @@ type WorkbenchAction =
   | { type: 'addCanvasLayer'; layer: CanvasLayerContract; index?: number }
   | {
       type: 'applyCanvasLayerStackMutation';
-      add?: { index: number; layer: CanvasLayerContract };
+      projectId?: string;
+      add?: { index: number; layers: readonly CanvasLayerContract[] };
       removeIds?: readonly string[];
       enabledUpdates: readonly { id: string; isEnabled: boolean }[];
       selectedLayerId: string | null;
@@ -830,7 +831,7 @@ const applyCanvasLayerStackMutationToDocument = (
   action: Extract<WorkbenchAction, { type: 'applyCanvasLayerStackMutation' }>
 ): CanvasDocumentContractV2 => {
   const currentIds = new Set(document.layers.map((layer) => layer.id));
-  if (action.add && ((action.removeIds?.length ?? 0) > 0 || currentIds.has(action.add.layer.id))) {
+  if (action.add && (action.removeIds?.length ?? 0) > 0) {
     return document;
   }
 
@@ -844,7 +845,12 @@ const applyCanvasLayerStackMutationToDocument = (
     projectedIds.delete(id);
   }
   if (action.add) {
-    projectedIds.add(action.add.layer.id);
+    for (const layer of action.add.layers) {
+      if (projectedIds.has(layer.id)) {
+        return document;
+      }
+      projectedIds.add(layer.id);
+    }
   }
   if (
     action.enabledUpdates.some((update) => !projectedIds.has(update.id)) ||
@@ -857,8 +863,10 @@ const applyCanvasLayerStackMutationToDocument = (
   let changed = false;
   if (action.add) {
     const insertIndex = Math.min(Math.max(0, Math.round(action.add.index)), layers.length);
-    layers = [...layers.slice(0, insertIndex), action.add.layer, ...layers.slice(insertIndex)];
-    changed = true;
+    if (action.add.layers.length > 0) {
+      layers = [...layers.slice(0, insertIndex), ...action.add.layers, ...layers.slice(insertIndex)];
+      changed = true;
+    }
   }
   if (removeIds.size > 0) {
     layers = layers.filter((layer) => !removeIds.has(layer.id));
@@ -3245,9 +3253,11 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       );
     }
     case 'applyCanvasLayerStackMutation': {
-      return updateActiveProject(state, (project) =>
-        updateCanvasDocument(project, (document) => applyCanvasLayerStackMutationToDocument(document, action))
-      );
+      const update = (project: Project): Project =>
+        updateCanvasDocument(project, (document) => applyCanvasLayerStackMutationToDocument(document, action));
+      return action.projectId !== undefined
+        ? updateProjectById(state, action.projectId, update)
+        : updateActiveProject(state, update);
     }
     case 'removeCanvasLayers': {
       return updateActiveProject(state, (project) =>
