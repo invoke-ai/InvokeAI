@@ -336,7 +336,6 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           {...PROMPT_ATTENTION_TARGET_PROPS}
           aria-label={t('widgets.layers.regionalGuidance.positivePrompt')}
           defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
-          maxHeightPx={180}
           minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
           placeholder={t('widgets.layers.regionalGuidance.positivePromptPlaceholder')}
           resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.positivePrompt')}
@@ -353,7 +352,6 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
             {...PROMPT_ATTENTION_TARGET_PROPS}
             aria-label={t('widgets.layers.regionalGuidance.negativePrompt')}
             defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
-            maxHeightPx={180}
             minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
             placeholder={t('widgets.layers.regionalGuidance.negativePromptPlaceholder')}
             resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.negativePrompt')}

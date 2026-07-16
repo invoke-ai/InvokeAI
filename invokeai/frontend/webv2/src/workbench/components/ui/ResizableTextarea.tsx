@@ -15,7 +15,11 @@ type TextareaProps = ComponentProps<typeof Textarea>;
 const DEFAULT_STEP_PX = 12;
 const DEFAULT_LARGE_STEP_PX = 48;
 
-const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max?: number): number => {
+  const minClamped = Math.max(value, min);
+
+  return max === undefined ? minClamped : Math.min(minClamped, max);
+};
 
 const resizeHandleAfter = {
   bg: 'border.emphasized',
@@ -50,7 +54,7 @@ export interface ResizableTextareaProps extends Omit<
 export const ResizableTextarea = ({
   defaultHeightPx,
   largeStepPx = DEFAULT_LARGE_STEP_PX,
-  maxHeightPx = 420,
+  maxHeightPx,
   minHeightPx,
   onResizeEnd,
   resizeHandleAriaLabel,
@@ -111,7 +115,9 @@ export const ResizableTextarea = ({
           : event.key === 'ArrowUp'
             ? -step
             : event.key === 'End'
-              ? maxHeightPx - displayHeightPx
+              ? maxHeightPx === undefined
+                ? undefined
+                : maxHeightPx - displayHeightPx
               : event.key === 'Home'
                 ? minHeightPx - displayHeightPx
                 : undefined;
