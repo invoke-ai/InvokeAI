@@ -974,6 +974,11 @@
       "import": {
         "blocked": "Finish the current canvas operation before adding images.",
         "control": "Control Layer",
+        "dropControl": "Add as Control Layer",
+        "dropInpaintMask": "Add as Inpaint Mask",
+        "dropRaster": "Add as Raster Layer",
+        "dropRegionalReference": "Add as Regional Reference Image",
+        "dropResizedControl": "Add as Resized Control Layer",
         "empty": "No gallery images were available to add.",
         "failed": "Couldn't add images to canvas",
         "inpaintMask": "Inpaint Mask",

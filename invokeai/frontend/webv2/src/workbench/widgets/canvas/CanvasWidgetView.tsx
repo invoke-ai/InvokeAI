@@ -3,7 +3,9 @@ import type { WidgetViewProps } from '@workbench/types';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
+import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
+import { getCanvasImportNotice } from '@workbench/canvas-operations/canvasImportNotice';
 import {
   createLayerId,
   deleteLayerActions,
@@ -13,11 +15,12 @@ import {
   reorderLayerActions,
 } from '@workbench/canvasLayerOps';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
+import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,6 +33,8 @@ import {
   type CanvasContextMenuTarget,
 } from './canvasContextMenu';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
+import { resolveCanvasImageDrop } from './canvasImageDnd';
+import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
 import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
 import {
@@ -42,6 +47,7 @@ import { CanvasSurface } from './CanvasSurface';
 import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
 import { resolveCheckerColors } from './checkerColors';
 import { useCanvasOperation } from './engineStoreHooks';
+import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
 import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
@@ -79,6 +85,7 @@ const REORDER_KINDS: Record<string, LayerReorderKind> = {
 export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
+  const store = useWorkbenchStore();
   const engine = useCanvasEngine();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
@@ -179,6 +186,47 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     operationKind: operation?.status === 'active' ? operation.identity.kind : null,
   });
   const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
+
+  const handleCanvasImageDrop = useCallback(
+    (event: DragEndEvent) => {
+      const resolution = resolveCanvasImageDrop(event.active.data.current, event.over?.data.current);
+      if (!resolution) {
+        return;
+      }
+
+      // Capture the destination project and mounted engine before any network
+      // work so a project switch cannot retarget this import mid-flight.
+      const project = store.getSnapshot().activeProject;
+      const mountedEngine = engine;
+
+      const execute = async (): Promise<void> => {
+        try {
+          const result = await executeCanvasImageDropImport({
+            destination: resolution.destination,
+            dispatch,
+            engine: mountedEngine,
+            getState: store.getState,
+            imageNames: resolution.imageNames,
+            project,
+          });
+          const notice = getCanvasImportNotice(result);
+          dispatch({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}), type: 'recordNotice' });
+        } catch (error: unknown) {
+          recordCanvasImportError({
+            dispatch,
+            error,
+            localizedMessage: t('widgets.canvas.import.failed'),
+            projectId: project.id,
+          });
+        }
+      };
+
+      void execute();
+    },
+    [dispatch, engine, store, t]
+  );
+
+  useDndMonitor({ onDragEnd: handleCanvasImageDrop });
 
   useLayoutEffect(() => {
     engine?.tools.setInteractionLocked(isInteractionLocked);
@@ -417,6 +465,10 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   return (
     <Box aria-label={t('widgets.canvas.surface')} bg="bg.inset" h="full" overflow="hidden" position="relative" w="full">
       <CanvasSurfaceContextLayout surface={canvasSurface} onContextMenu={handleSurfaceContextMenu}>
+        <CanvasImageDropOverlay
+          isDocumentEditingLocked={interactionCapabilities.isDocumentEditingLocked}
+          isInteractionLocked={isInteractionLocked}
+        />
         {engine ? (
           <>
             <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />

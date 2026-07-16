@@ -1,4 +1,7 @@
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
+import type { GalleryImage } from '@workbench/gallery/api';
+
+import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
 
 export interface CanvasImageDropData {
   kind: 'canvas-image-target';
@@ -12,6 +15,36 @@ export const getCanvasImageDropData = (destination: CanvasImageDropData['destina
   destination,
   kind: 'canvas-image-target',
 });
+
+export const getCanvasImageDropId = (destination: CanvasImageDropData['destination']): string =>
+  `canvas-image-target:${destination}`;
+
+export interface CanvasImageDropResolution {
+  destination: CanvasImageDropData['destination'];
+  imageNames: string[];
+}
+
+export const resolveCanvasImageDrop = (activeData: unknown, overData: unknown): CanvasImageDropResolution | null => {
+  if (!isGalleryImageDragData(activeData) || !isCanvasImageDropData(overData)) {
+    return null;
+  }
+
+  return {
+    destination: overData.destination,
+    imageNames: activeData.images.map((image) => image.imageName),
+  };
+};
+
+export const orderCanvasImageDropImages = (
+  imageNames: readonly string[],
+  images: readonly GalleryImage[]
+): GalleryImage[] => {
+  const imagesByName = new Map(images.map((image) => [image.imageName, image]));
+  return imageNames.flatMap((imageName) => {
+    const image = imagesByName.get(imageName);
+    return image ? [image] : [];
+  });
+};
 
 const canvasImageDropDestinations = {
   control: true,
