@@ -4,9 +4,9 @@
  * This module is pure data: it names the generation mode a canvas invoke maps
  * to and the shape of a *composite plan* — a pixel-free description of what the
  * executor must composite and upload before a graph can be built. It has no
- * runtime dependency on the canvas engine (types are structural), so the
- * planner (`compositePlan.ts`) and mode detector (`canvasMode.ts`) stay pure,
- * node-testable, data-in/data-out functions.
+ * runtime dependency on the canvas engine (shared engine vocabulary is imported
+ * type-only), so the planner (`compositePlan.ts`) and mode detector
+ * (`canvasMode.ts`) stay pure, node-testable, data-in/data-out functions.
  *
  * The plan is deliberately open-ended: Phase 4.2 only emits the single
  * `base-raster` composite, but later phases add `control-layer`,
@@ -14,19 +14,19 @@
  * structure — each a {@link CompositeEntry} with its own stable identity key.
  */
 
-import type { GenerateModelConfig, GenerateSettings } from '@workbench/generation/types';
 import type {
-  BackendGraphContract,
-  CanvasAdjustmentsContract,
-  CanvasBlendMode,
-  GraphContract,
-  ProjectSettings,
-  ResultDestination,
-} from '@workbench/types';
+  CompositeEntry as RasterCompositeEntry,
+  CompositeLayerRef,
+} from '@workbench/canvas-engine/render/rasterComposite';
+import type { Rect } from '@workbench/canvas-engine/types';
+import type { GenerateModelConfig, GenerateSettings } from '@workbench/generation/types';
+import type { BackendGraphContract, GraphContract, ProjectSettings, ResultDestination } from '@workbench/types';
 import type { CanvasCompositingSettings } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 
 import type { ControlLayerGraphInput } from './addControlLayers';
 import type { RegionalGuidanceInput } from './addRegionalGuidance';
+
+export type { CompositeLayerRef, Rect };
 
 /** The legacy-parity generation modes a canvas invoke resolves to. */
 export type CanvasGenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
@@ -39,60 +39,6 @@ export type CanvasGenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint
  */
 export const DEFAULT_MASK_DENOISE_LIMIT = 1;
 
-/** An axis-aligned rectangle in document space (structurally the engine's `Rect`). */
-export interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/** A layer's 2D transform (translate / scale / rotate), mirrored from the contract. */
-export interface CompositeLayerTransform {
-  x: number;
-  y: number;
-  scaleX: number;
-  scaleY: number;
-  rotation: number;
-}
-
-/**
- * A single layer's contribution to a composite entry — the frozen, pixel-
- * determining projection of a document layer. The executor draws these in
- * z-order; the planner derives them from the live document.
- */
-export interface CompositeLayerRef {
-  /** The document layer id (used to fetch its rasterized cache surface). */
-  id: string;
-  /**
-   * A stable string identifying the layer's pixels: the resolved image name for
-   * image/paint bitmaps (or a sentinel for an empty paint layer). Changing the
-   * underlying asset changes this, and so changes the entry key.
-   */
-  sourceRef: string;
-  /** Native (unscaled) pixel size of the layer's source, used for content-bounds math. */
-  contentSize: { width: number; height: number };
-  /**
-   * Layer-local origin of the content (its cache surface's top-left) — non-zero
-   * for content-sized paint layers whose persisted bitmap sits at an `offset`.
-   * `{ x: 0, y: 0 }` for origin-anchored sources (image, legacy paint). The
-   * executor draws the layer's cache at this local origin (then through the
-   * transform), and content-bounds math projects the rect from here.
-   */
-  contentOffset: { x: number; y: number };
-  transform: CompositeLayerTransform;
-  opacity: number;
-  blendMode: CanvasBlendMode;
-  /**
-   * Non-destructive raster adjustments (brightness/contrast/saturation/curves) to
-   * bake into this layer's pixels before compositing, so the generated image uses
-   * the ADJUSTED pixels the user sees. Present only for raster layers with a
-   * non-identity adjustment; folded into the entry key so a changed adjustment
-   * re-composites/uploads. Absent ⇒ raw pixels.
-   */
-  adjustments?: CanvasAdjustmentsContract;
-}
-
 /** The kind of composite an entry describes. */
 export type CompositeEntryKind = 'base-raster' | 'inpaint-mask' | 'noise-mask' | 'control-layer' | 'regional-mask';
 
@@ -102,14 +48,10 @@ export type CompositeEntryKind = 'base-raster' | 'inpaint-mask' | 'noise-mask' |
  * inpaint), darken-compositing multiple masks over a white background, exactly
  * like the legacy `getGrayscaleMaskCompositeImageDTO`.
  */
-export interface CompositeMaskLayerRef {
-  /** The document layer id (used to fetch its rasterized mask alpha surface). */
-  id: string;
-  /** Stable pixel identity (the mask bitmap name, or an empty sentinel). */
-  sourceRef: string;
-  contentSize: { width: number; height: number };
-  contentOffset: { x: number; y: number };
-  transform: CompositeLayerTransform;
+export interface CompositeMaskLayerRef extends Pick<
+  CompositeLayerRef,
+  'id' | 'sourceRef' | 'contentSize' | 'contentOffset' | 'transform'
+> {
   /**
    * The per-layer attribute value in [0, 1] driving the grayscale gray value
    * (`255 - round(255 * attributeValue)` for masked pixels). For the
@@ -125,7 +67,7 @@ export interface CompositeMaskLayerRef {
  * bbox into a single uploadable image. `key` is a content-identity hash of
  * everything that determines the entry's pixels (see {@link CompositePlan}).
  */
-export interface CompositeEntry {
+export interface CompositeEntry extends RasterCompositeEntry {
   kind: CompositeEntryKind;
   /**
    * Stable identity key: same document + bbox → same key, so the executor can
@@ -133,10 +75,6 @@ export interface CompositeEntry {
    * changed between invokes.
    */
   key: string;
-  /** The bbox (document space) the entry is composited over and cropped to. */
-  bbox: Rect;
-  /** Contributing raster layers in document z-order (`base-raster` entries). */
-  layers: CompositeLayerRef[];
   /** Contributing mask layers, for grayscale mask entries (`inpaint-mask` / `noise-mask`). */
   maskLayers?: CompositeMaskLayerRef[];
   /**
