@@ -65,6 +65,20 @@ describe(getUpdatedQueueStatusOnQueueItemStatusChanged.name, () => {
       processor: current.processor,
     });
   });
+
+  it('retains the cached per-user counts, which event queue statuses never carry', () => {
+    // e.g. an admin with no generations of their own observing another user's event: the event's
+    // queue_status has null user counts, but the admin's own counts (0) must not be lost, else
+    // personal UI falls back to the global counts and reacts to the other user's activity.
+    const current = buildQueueStatus({ user_pending: 0, user_in_progress: 0 });
+    const event = buildQueueStatusChangedEvent();
+
+    const updated = getUpdatedQueueStatusOnQueueItemStatusChanged(current, event);
+
+    expect(updated.queue.user_pending).toBe(0);
+    expect(updated.queue.user_in_progress).toBe(0);
+    expect(updated.queue.completed).toBe(1);
+  });
 });
 
 describe(getQueueStatusWithObservedEvents.name, () => {
