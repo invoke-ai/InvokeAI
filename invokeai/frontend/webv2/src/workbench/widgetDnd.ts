@@ -80,7 +80,8 @@ export const isWidgetInstanceDragData = (data: unknown): data is WidgetInstanceD
   isRecord(data) &&
   data.kind === 'widget-instance' &&
   typeof data.instanceId === 'string' &&
-  isWidgetRegion(data.region);
+  isWidgetRegion(data.region) &&
+  typeof data.typeId === 'string';
 
 export const isWidgetRegionDropData = (data: unknown): data is WidgetRegionDropData =>
   isRecord(data) && data.kind === 'widget-region' && isWidgetRegion(data.region);
@@ -214,7 +215,13 @@ export const resolveWidgetDragEnd = (
 
 export const widgetCollisionDetection: CollisionDetection = (args) => {
   const activeData = args.active.data.current;
-  const pointerCollisions = pointerWithin(args);
+  const collisionArgs = isWidgetInstanceDragData(activeData)
+    ? args
+    : {
+        ...args,
+        droppableContainers: args.droppableContainers.filter((container) => !isWidgetDndData(container.data.current)),
+      };
+  const pointerCollisions = pointerWithin(collisionArgs);
 
   if (pointerCollisions.length > 0) {
     const widgetItemCollisions = pointerCollisions.filter((collision) => {
@@ -258,7 +265,7 @@ export const widgetCollisionDetection: CollisionDetection = (args) => {
     return pointerCollisions;
   }
 
-  return args.pointerCoordinates ? [] : closestCenter(args);
+  return args.pointerCoordinates ? [] : closestCenter(collisionArgs);
 };
 
 const getCollisionData = (args: Parameters<CollisionDetection>[0], id: unknown): unknown =>
