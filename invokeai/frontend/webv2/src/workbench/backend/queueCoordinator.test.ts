@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NodeExecutionSink } from './nodeExecutionStore';
 import type { QueueItemProgress, QueueItemProgressSink } from './progressStore';
 
-import { buildQueueItemOrigin, type QueueItemStatusChangedEvent } from './events';
+import { buildQueueItemOrigin, buildUtilityQueueItemOrigin, type QueueItemStatusChangedEvent } from './events';
 import { ApiError } from './http';
 import {
   createQueueCoordinator,
@@ -56,6 +56,7 @@ const createStatusEvent = (overrides: Partial<QueueItemStatusChangedEvent>): Que
   created_at: '2026-06-10T00:00:00Z',
   destination: 'gallery',
   error_message: null,
+  error_traceback: null,
   error_type: null,
   item_id: 1,
   origin: null,
@@ -244,6 +245,23 @@ describe('queueCoordinator', () => {
     expect(harness.api.getQueueItemResultImages).toHaveBeenCalledWith(2, 'local-1', '2026-06-10T00:00:00Z');
     expect(harness.callbacks.onBackendItemCancelled).toHaveBeenCalledWith('local-1', 1);
     expect(harness.callbacks.onBackendItemCancelled).toHaveBeenCalledWith('local-1', 3);
+  });
+
+  it('forwards result image extraction options when waiting for results', async () => {
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z', {
+      resultNodeIds: ['canvas_output'],
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+
+    await resultsPromise;
+
+    expect(harness.api.getQueueItemResultImages).toHaveBeenCalledWith(1, 'local-1', '2026-06-10T00:00:00Z', {
+      resultNodeIds: ['canvas_output'],
+    });
   });
 
   it('rejects with QueueItemCancelledError when every backend item in a batch is canceled', async () => {
@@ -564,6 +582,36 @@ describe('queueCoordinator', () => {
 
       expect(outcomes.size).toBe(0);
       expect(harness.api.listAllQueueItems).not.toHaveBeenCalled();
+    });
+
+    // Review fix (Task 38, finding 3): the prior "Risk-4" coverage only asserted
+    // the parse primitive (`parseQueueItemOrigin(utilityOrigin) === null`) in
+    // isolation. This drives the REAL `reconcile` path with a completed,
+    // result-carrying `webv2:util:<uuid>`-origin backend item mixed into a live
+    // `listAllQueueItems` response, proving the coordinator itself — not just the
+    // helper it calls — never adopts it into a project queue item (which is the
+    // only way a utility item's images could ever reach `routeQueueItemResults`
+    // and land in canvas staging or the gallery).
+    it('never adopts a completed, result-carrying utility-origin item into a project queue item', async () => {
+      harness.api.listAllQueueItems.mockResolvedValue([
+        createQueueItemDTO({
+          batch_id: 'util-batch',
+          item_id: 99,
+          origin: buildUtilityQueueItemOrigin('util-run-1'),
+          session: { results: { n1: { image: { image_name: 'util-result.png' }, type: 'image_output' } } },
+          status: 'completed',
+        }),
+      ]);
+
+      const outcomes = await harness.coordinator.reconcile([{ id: 'local-1', status: 'pending' }]);
+
+      // The utility item parses to no local queue item id, so it can never be
+      // bucketed under 'local-1' by origin: the pending project item finds no
+      // backend trace of its own and is asked to enqueue fresh — never
+      // "adopted" with the utility item's id, and never routed anywhere.
+      expect(outcomes.get('local-1')).toEqual({ kind: 'enqueue' });
+      expect(harness.api.getQueueItemResultImages).not.toHaveBeenCalled();
+      expect(harness.api.getQueueItem).not.toHaveBeenCalledWith(99);
     });
   });
 

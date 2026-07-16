@@ -11,6 +11,7 @@ import { Stack, Text } from '@chakra-ui/react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
+import { GenerateCanvasCompositingSection } from './GenerateCanvasCompositingSection';
 import { GenerateComponentsSection } from './GenerateComponentsSection';
 import { GenerateConceptsSection } from './GenerateConceptsSection';
 import {
@@ -253,6 +254,8 @@ export const GenerateSettingsForm = ({
         settings={draftSettings}
         onCommit={commit}
       />
+
+      <GenerateCanvasCompositingSection />
 
       <GenerateModelFields
         models={models}

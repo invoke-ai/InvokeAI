@@ -1,4 +1,5 @@
 export * from './Button';
+export * from './ColorPicker';
 export * from './ConfirmDialog';
 export * from './Field';
 export * from './JsonPreview';

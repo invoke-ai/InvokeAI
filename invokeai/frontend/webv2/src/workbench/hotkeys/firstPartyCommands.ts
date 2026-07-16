@@ -3,9 +3,11 @@ import { commandApi } from '@workbench/extensions/extensionApi';
 import { cancelCurrentQueueItem } from '@workbench/generation/api';
 import { executeImageRecall, getSelectedGalleryImage, type ImageRecallKind } from '@workbench/image-actions';
 import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
+import { submitResolvedInvocation } from '@workbench/invocationSubmit';
 import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { prepareCanvasInvocation } from '@workbench/widgets/canvas/invoke/prepareCanvasInvocation';
 import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import { focusPositivePrompt } from '@workbench/widgets/generate/promptFields';
 import { adjustFocusedPromptAttention } from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
@@ -87,11 +89,12 @@ export const useRegisterFirstPartyCommands = () => {
       return;
     }
 
-    dispatch({
-      backendSupportsCancellation: true,
+    submitResolvedInvocation({
+      dispatch,
       models: modelsRef.current,
+      prepareCanvasInvocation,
+      project: activeProject,
       route: resolvedRoute,
-      type: 'submitResolvedInvocationSnapshot',
     });
   });
 

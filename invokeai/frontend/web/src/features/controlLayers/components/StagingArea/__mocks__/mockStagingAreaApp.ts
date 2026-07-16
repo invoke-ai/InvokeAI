@@ -165,6 +165,7 @@ export const createMockQueueItemStatusChangedEvent = (
       status: 'completed',
       error_type: null,
       error_message: null,
+      error_traceback: null,
     } as S['QueueItemStatusChangedEvent'],
     overrides
   );

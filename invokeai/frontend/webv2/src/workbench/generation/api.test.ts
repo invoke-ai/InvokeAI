@@ -145,6 +145,49 @@ describe('getQueueItemResultImages', () => {
     mocks.apiFetchJson.mockReset();
   });
 
+  it('can restrict image extraction to explicit result node ids', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url === '/api/v1/queue/default/i/1') {
+        return Promise.resolve({
+          item_id: 1,
+          session: {
+            prepared_source_mapping: {
+              exec_canvas_l2i: 'canvas_l2i',
+              exec_canvas_output: 'canvas_output',
+              exec_create_gradient_mask: 'create_gradient_mask',
+              exec_expand_mask: 'expand_mask',
+            },
+            results: {
+              exec_canvas_l2i: { image: { image_name: 'decoded-patch.png' }, type: 'image_output' },
+              exec_canvas_output: { image: { image_name: 'final-composite.png' }, type: 'image_output' },
+              exec_create_gradient_mask: { image: { image_name: 'gradient-mask.png' }, type: 'image_output' },
+              exec_expand_mask: { image: { image_name: 'expanded-mask.png' }, type: 'image_output' },
+            },
+          },
+          status: 'completed',
+        });
+      }
+
+      const imageName = decodeURIComponent(url.replace('/api/v1/images/i/', ''));
+      return Promise.resolve({
+        height: 768,
+        image_name: imageName,
+        image_url: `/images/${imageName}`,
+        is_intermediate: true,
+        thumbnail_url: `/thumbs/${imageName}`,
+        width: 1024,
+      });
+    });
+
+    const { getQueueItemResultImages } = await import('./api');
+
+    const images = await getQueueItemResultImages(1, 'source-1', '2026-06-15T00:00:00.000Z', {
+      resultNodeIds: ['canvas_output'],
+    });
+
+    expect(images.map((image) => image.imageName)).toEqual(['final-composite.png']);
+  });
+
   it('extracts image names from image collection outputs', async () => {
     mocks.apiFetchJson.mockImplementation((url: string) => {
       if (url === '/api/v1/queue/default/i/1') {

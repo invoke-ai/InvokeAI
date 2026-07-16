@@ -1,0 +1,119 @@
+import type { ToolId } from '@workbench/canvas-engine/types';
+import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
+import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { ComponentType } from 'react';
+
+import { HStack, Text } from '@chakra-ui/react';
+import { BboxDetailsBar } from '@workbench/widgets/canvas/BboxDetailsBar';
+import { CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
+import { useCanvasActiveTool, useCanvasOperation, useCanvasZoom } from '@workbench/widgets/canvas/engineStoreHooks';
+import { formatZoomPercent } from '@workbench/widgets/canvas/zoomOptions';
+
+import { BboxOptions } from './BboxOptions';
+import { BrushOptions } from './BrushOptions';
+import { CanvasOperationBar } from './CanvasOperationBar';
+import { CanvasOptionsBar } from './CanvasOptionsBar';
+import { EraserOptions } from './EraserOptions';
+import { GradientOptions } from './GradientOptions';
+import { LassoOptions } from './LassoOptions';
+import { MoveOptions } from './MoveOptions';
+import { ShapeOptions } from './ShapeOptions';
+import { TextOptions } from './TextOptions';
+import { TransformOptions } from './TransformOptions';
+
+export type CanvasToolOptionsEngine = Pick<
+  CanvasEngineHandle,
+  'document' | 'layers' | 'projectId' | 'selection' | 'stores' | 'tools' | 'viewport'
+>;
+
+/** Props every per-tool options component receives — just the shared engine handle. */
+export interface ToolOptionsComponentProps {
+  engine: CanvasToolOptionsEngine;
+}
+
+/**
+ * Contextual options content per active tool. Tools without an entry here
+ * (view, and anything not yet implemented) render no controls — the bar still
+ * shows the document info on the right.
+ */
+export const TOOL_OPTIONS_COMPONENTS: Partial<Record<ToolId, ComponentType<ToolOptionsComponentProps>>> = {
+  bbox: BboxOptions,
+  brush: BrushOptions,
+  eraser: EraserOptions,
+  gradient: GradientOptions,
+  lasso: LassoOptions,
+  move: MoveOptions,
+  shape: ShapeOptions,
+  text: TextOptions,
+  transform: TransformOptions,
+};
+
+export const resolveCanvasOptionsContent = (
+  operation: Pick<CanvasOperationState, 'status'>,
+  activeTool: ToolId
+): 'operation' | ToolId | null => {
+  if (operation.status === 'active') {
+    return 'operation';
+  }
+  return TOOL_OPTIONS_COMPONENTS[activeTool] ? activeTool : null;
+};
+
+/**
+ * The canvas's floating tool-options bar (bottom-center over the surface):
+ * contextual controls for the active tool on the left, then the document
+ * dimensions / zoom read-out on the right (absorbed from the former floating HUD).
+ * Tool options read and write the engine's
+ * transient option stores directly (`useBrushOptions` / `useEraserOptions` +
+ * `engine.stores.*.set(...)`) — there is no React state mirror. Positioned by
+ * {@link CanvasWidgetView}; shares its look with the staging bar via
+ * {@link CanvasFloatingBar}.
+ */
+export const ToolOptionsBar = ({
+  documentHeight,
+  documentWidth,
+  engine,
+}: {
+  documentHeight: number | null;
+  documentWidth: number | null;
+  engine: CanvasToolOptionsEngine;
+}) => {
+  const activeTool = useCanvasActiveTool(engine);
+  const operation = useCanvasOperation(engine);
+  const zoom = useCanvasZoom(engine);
+  const content = resolveCanvasOptionsContent(operation, activeTool);
+  if (content === 'operation' && operation.status === 'active') {
+    return <CanvasOperationBar engine={engine} isExternalInteractionLocked={false} operation={operation} />;
+  }
+  const OptionsComponent = content && content !== 'operation' ? TOOL_OPTIONS_COMPONENTS[content] : undefined;
+  const hasDocument = documentWidth !== null && documentHeight !== null;
+  const hasBboxDetails = activeTool === 'bbox';
+  const hasToolControls = OptionsComponent !== undefined || hasBboxDetails;
+
+  return (
+    <CanvasOptionsBar>
+      {hasToolControls ? (
+        <HStack align="center" gap="3" minW="0" overflow="hidden">
+          {hasBboxDetails ? <BboxDetailsBar engine={engine} /> : null}
+          {hasBboxDetails && OptionsComponent ? <CanvasFloatingBarDivider /> : null}
+          {OptionsComponent ? <OptionsComponent engine={engine} /> : null}
+        </HStack>
+      ) : null}
+      {hasToolControls && hasDocument ? <CanvasFloatingBarDivider /> : null}
+      {hasDocument ? (
+        <HStack
+          align="center"
+          color="fg.muted"
+          flexShrink="0"
+          fontSize="2xs"
+          fontVariantNumeric="tabular-nums"
+          gap="2"
+          px="1"
+        >
+          <Text>
+            {documentWidth} × {documentHeight} @ {formatZoomPercent(zoom)}
+          </Text>
+        </HStack>
+      ) : null}
+    </CanvasOptionsBar>
+  );
+};

@@ -30,15 +30,26 @@ const createQueueItem = ({
   id,
   snapshot: {
     canvas: {
-      document: { height: 1024, layers: [], version: 1, width: 1024 },
+      document: {
+        background: 'transparent',
+        bbox: { height: 1024, width: 1024, x: 0, y: 0 },
+        height: 1024,
+        layers: [],
+        selectedLayerId: null,
+        version: 2,
+        width: 1024,
+      },
+      documentRevision: 0,
+      snapshots: [],
       stagingArea: {
         areThumbnailsVisible: false,
+        autoSwitchMode: 'off',
         isVisible: false,
         pendingImageIds: [],
         pendingImages: [],
         selectedImageIndex: 0,
       },
-      version: 1,
+      version: 2,
     },
     destination: 'gallery',
     graph: { edges: [], id: 'graph-1', label: 'Graph', nodes: [], updatedAt: submittedAt, version: 1 },

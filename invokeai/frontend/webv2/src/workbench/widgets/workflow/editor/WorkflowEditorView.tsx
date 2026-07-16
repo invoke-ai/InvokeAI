@@ -9,6 +9,7 @@ import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@workbench/graph-pr
 import '@xyflow/react/dist/style.css';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useModifierHeld } from '@workbench/useModifierHeld';
 import { useNotify } from '@workbench/useNotify';
 import { setAddNodeOpen } from '@workbench/widgets/workflow/workflowUiStore';
 import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
@@ -84,7 +85,6 @@ import {
 } from './selectionStore';
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
-import { useModifierHeld } from './useModifierHeld';
 import { WorkflowEdge } from './WorkflowEdge';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 

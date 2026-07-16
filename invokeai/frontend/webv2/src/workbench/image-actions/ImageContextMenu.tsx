@@ -1,4 +1,5 @@
 /* eslint-disable react/react-compiler */
+import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 import type { GalleryBoard, GalleryImage } from '@workbench/gallery/api';
 
 import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
@@ -29,6 +30,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { ImageActions } from './useImageActions';
 
@@ -56,6 +58,27 @@ const isUsableGalleryImage = (value: unknown): value is GalleryImage =>
   typeof (value as GalleryImage).imageName === 'string' &&
   typeof (value as GalleryImage).imageUrl === 'string' &&
   typeof (value as GalleryImage).thumbnailUrl === 'string';
+
+interface GalleryCanvasImportMenuItem {
+  destination: GalleryCanvasImportDestination;
+  label: string;
+  value: string;
+}
+
+const GALLERY_CANVAS_IMPORT_MENU_ITEMS = [
+  { destination: 'raster', label: 'widgets.canvas.import.raster' },
+  { destination: 'control', label: 'widgets.canvas.import.control' },
+  { destination: 'inpaint-mask', label: 'widgets.canvas.import.inpaintMask' },
+  { destination: 'regional-guidance', label: 'widgets.canvas.import.regionalGuidance' },
+  { destination: 'regional-reference', label: 'widgets.canvas.import.regionalReference' },
+  { destination: 'control-resized', label: 'widgets.canvas.import.resizedControl' },
+] as const satisfies readonly Omit<GalleryCanvasImportMenuItem, 'value'>[];
+
+export const getGalleryCanvasImportMenuItems = (isBulk: boolean): GalleryCanvasImportMenuItem[] =>
+  GALLERY_CANVAS_IMPORT_MENU_ITEMS.map((item) => ({
+    ...item,
+    value: `send-${isBulk ? 'images' : 'image'}-to-canvas-${item.destination}`,
+  }));
 
 export const getImageContextMenuImages = (target: ImageContextMenuTarget | null): GalleryImage[] => {
   if (!Array.isArray(target?.images)) {
@@ -240,6 +263,7 @@ const ImageContextMenuContent = ({
                   actions={actions}
                   boards={boards}
                   image={image}
+                  images={images}
                   isLoadingRecallCapabilities={isLoadingRecallCapabilities}
                   onRequestDeletion={requestDeletion}
                   recallCapabilities={recallCapabilities}
@@ -288,6 +312,7 @@ const SingleImageMenuItems = ({
   actions,
   boards,
   image,
+  images,
   isLoadingRecallCapabilities,
   onRequestDeletion,
   recallCapabilities,
@@ -295,6 +320,7 @@ const SingleImageMenuItems = ({
   actions: ImageActions;
   boards: GalleryBoard[];
   image: GalleryImage;
+  images: GalleryImage[];
   isLoadingRecallCapabilities: boolean;
   onRequestDeletion: (imageNames: string[]) => void;
   recallCapabilities: ImageRecallCapabilities;
@@ -385,10 +411,7 @@ const SingleImageMenuItems = ({
         onClick={handleSelectForCompare}
       />
       <Menu.Separator borderColor="border.subtle" />
-      <ContextSubMenu icon={FileImageIcon} label="New from Image">
-        <ContextMenuItem disabled icon={FileImageIcon} label="New Canvas from Image" value="new-canvas-from-image" />
-        <ContextMenuItem disabled icon={LayersIcon} label="New Layer from Image" value="new-layer-from-image" />
-      </ContextSubMenu>
+      <NewFromImageSubMenu actions={actions} images={images} isBulk={false} />
       <ChangeBoardSubMenu boards={boards} currentBoardId={image.boardId} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
@@ -498,6 +521,7 @@ const BulkMenuItems = ({
         value="download-selection"
         onClick={handleDownload}
       />
+      <NewFromImageSubMenu actions={actions} images={images} isBulk />
       <ChangeBoardSubMenu boards={boards} currentBoardId={null} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
@@ -509,6 +533,60 @@ const BulkMenuItems = ({
       />
     </>
   );
+};
+
+const NewFromImageSubMenu = ({
+  actions,
+  images,
+  isBulk,
+}: {
+  actions: ImageActions;
+  images: GalleryImage[];
+  isBulk: boolean;
+}) => (
+  <ContextSubMenu icon={FileImageIcon} label={isBulk ? 'New from Images' : 'New from Image'}>
+    <ContextMenuItem disabled icon={FileImageIcon} label="New Canvas from Image" value="new-canvas-from-image" />
+    <GalleryCanvasImportSubMenu actions={actions} images={images} isBulk={isBulk} />
+  </ContextSubMenu>
+);
+
+const GalleryCanvasImportSubMenu = ({
+  actions,
+  images,
+  isBulk,
+}: {
+  actions: ImageActions;
+  images: GalleryImage[];
+  isBulk: boolean;
+}) => {
+  const { t } = useTranslation();
+  const items = getGalleryCanvasImportMenuItems(isBulk);
+
+  return (
+    <ContextSubMenu icon={LayersIcon} label={t('widgets.canvas.import.newLayerFromImage')}>
+      {items.map((item) => (
+        <GalleryCanvasImportDestinationMenuItem key={item.destination} actions={actions} images={images} item={item} />
+      ))}
+    </ContextSubMenu>
+  );
+};
+
+const GalleryCanvasImportDestinationMenuItem = ({
+  actions,
+  images,
+  item,
+}: {
+  actions: ImageActions;
+  images: GalleryImage[];
+  item: GalleryCanvasImportMenuItem;
+}) => {
+  const { t } = useTranslation();
+  const handleClick = useCallback(
+    () => void actions.sendToCanvas(images, item.destination),
+    [actions, images, item.destination]
+  );
+
+  return <ContextMenuItem icon={LayersIcon} label={t(item.label)} value={item.value} onClick={handleClick} />;
 };
 
 const ChangeBoardSubMenu = ({

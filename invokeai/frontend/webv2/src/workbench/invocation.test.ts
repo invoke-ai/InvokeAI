@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type {
   ComponentModelConfig,
@@ -7,9 +7,11 @@ import type {
   MainModelConfig,
   VaeModelConfig,
 } from './generation/types';
+import type { InvocationRoute, WidgetId } from './types';
 
 import { getDefaultGenerateSettings } from './generation/baseGenerationPolicies';
-import { resolveInvocationRoute } from './invocation';
+import { getInvocationRouteInput, resolveInvocationRoute, resolveInvocationRouteInput } from './invocation';
+import { submitResolvedInvocation } from './invocationSubmit';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
 
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
@@ -119,5 +121,114 @@ describe('resolveInvocationRoute', () => {
 
     expect(route.sourceValid).toBe(false);
     expect(route.validationReasons).toContain("No invocation node registered for external provider 'future-provider'.");
+  });
+});
+
+describe('resolveInvocationRoute — canvas source', () => {
+  const canvasRoute: InvocationRoute = {
+    destination: 'canvas',
+    destinationLocked: false,
+    sourceId: 'canvas',
+    sourceLocked: false,
+  };
+
+  const validGenerateValues = createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae });
+
+  const canvasInputFor = (
+    overrides: {
+      generateValues?: typeof validGenerateValues;
+      mountedWidgetIds?: WidgetId[];
+      bbox?: { width: number; height: number };
+    } = {}
+  ) => {
+    const project = getActiveProject(overrides.generateValues ?? validGenerateValues);
+
+    return {
+      ...getInvocationRouteInput(project),
+      canvasBbox: overrides.bbox ?? { height: 512, width: 512 },
+      mountedWidgetIds: overrides.mountedWidgetIds ?? (['canvas', 'generate'] as WidgetId[]),
+    };
+  };
+
+  it('is a valid source when the widget is mounted, the model is valid, and the frame has area', () => {
+    const route = resolveInvocationRouteInput(canvasInputFor(), 'global', canvasRoute);
+
+    expect(route.sourceValid).toBe(true);
+    expect(route.validationReasons).toEqual([]);
+  });
+
+  it('invalidates a zero-area generation frame', () => {
+    const route = resolveInvocationRouteInput(
+      canvasInputFor({ bbox: { height: 0, width: 512 } }),
+      'global',
+      canvasRoute
+    );
+
+    expect(route.sourceValid).toBe(false);
+    expect(route.validationReasons).toContain('Canvas generation frame must have a positive area.');
+  });
+
+  it('reuses the generate model validation reasons', () => {
+    const route = resolveInvocationRouteInput(
+      canvasInputFor({ generateValues: createGenerateValues(animaModel, { vae: animaVae }) }),
+      'global',
+      canvasRoute
+    );
+
+    expect(route.sourceValid).toBe(false);
+    expect(route.validationReasons).toContain('Generate needs a Qwen3 Encoder for Anima models.');
+  });
+
+  it('invalidates when the canvas widget is not mounted', () => {
+    const route = resolveInvocationRouteInput(
+      canvasInputFor({ mountedWidgetIds: ['generate'] as WidgetId[] }),
+      'global',
+      canvasRoute
+    );
+
+    expect(route.sourceValid).toBe(false);
+    expect(route.validationReasons).toContain('The Canvas widget is not mounted in this project.');
+  });
+});
+
+describe('submitResolvedInvocation', () => {
+  const routeFor = (project: Parameters<typeof resolveInvocationRoute>[0], route: InvocationRoute) =>
+    resolveInvocationRoute(project, 'global', route);
+
+  it('routes a canvas source through prepareCanvasInvocation and does not dispatch a resolved snapshot', () => {
+    const project = getActiveProject(
+      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
+    );
+    const dispatch = vi.fn();
+    const prepareCanvasInvocation = vi.fn();
+    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'canvas' });
+
+    submitResolvedInvocation({ dispatch, models: undefined, prepareCanvasInvocation, project, route });
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(prepareCanvasInvocation).toHaveBeenCalledTimes(1);
+    // The resolved destination rides through so a Canvas source can target the Gallery.
+    expect(prepareCanvasInvocation.mock.calls[0]?.[0]).toMatchObject({
+      destination: 'gallery',
+      projectId: project.id,
+    });
+  });
+
+  it('dispatches submitResolvedInvocationSnapshot for a non-canvas source and never prepares the canvas', () => {
+    const project = getActiveProject(
+      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
+    );
+    const dispatch = vi.fn();
+    const prepareCanvasInvocation = vi.fn();
+    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
+
+    submitResolvedInvocation({ dispatch, models: undefined, prepareCanvasInvocation, project, route });
+
+    expect(prepareCanvasInvocation).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch.mock.calls[0]?.[0]).toMatchObject({
+      route: expect.objectContaining({ destination: 'gallery', sourceId: 'generate' }),
+      type: 'submitResolvedInvocationSnapshot',
+    });
   });
 });

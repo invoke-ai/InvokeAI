@@ -47,7 +47,6 @@ export const ToolbarButton = ({
       aria-label={label}
       aria-pressed={isActive}
       size="sm"
-      title={label}
       variant={isActive ? 'solid' : 'ghost'}
       {...buttonProps}
     >

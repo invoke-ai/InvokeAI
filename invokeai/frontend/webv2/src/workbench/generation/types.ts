@@ -195,6 +195,7 @@ export interface QueueItemDTO {
   error_type?: string | null;
   error_message?: string | null;
   session?: {
+    prepared_source_mapping?: Record<string, string>;
     results: Record<string, unknown>;
   };
 }

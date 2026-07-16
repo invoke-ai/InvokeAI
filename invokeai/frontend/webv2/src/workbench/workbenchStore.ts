@@ -4,7 +4,9 @@ import type { Project, WorkbenchState } from './types';
 
 import { recordDiagnosticEntry } from './diagnostics/logger';
 import { createExternalStore } from './externalStore';
-import { createInitialWorkbenchState, workbenchReducer, type WorkbenchAction } from './workbenchState';
+import { createInitialWorkbenchState, workbenchReducer, type WorkbenchReducerAction } from './workbenchState';
+
+type WorkbenchAction = WorkbenchReducerAction;
 
 export interface WorkbenchSnapshot {
   state: WorkbenchState;

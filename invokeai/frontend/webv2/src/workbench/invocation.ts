@@ -45,7 +45,7 @@ export const invocationSources: InvocationSourceMeta[] = [
   { id: 'generate', label: 'Generate', available: true },
   { id: 'workflow', label: 'Workflow', available: true },
   { id: 'upscale', label: 'Upscale', available: false },
-  { id: 'canvas', label: 'Canvas', available: false },
+  { id: 'canvas', label: 'Canvas', available: true },
 ];
 
 export const resultDestinations: ResultDestinationMeta[] = [
@@ -87,6 +87,8 @@ export interface InvocationRouteInput {
   mountedWidgetIds: readonly WidgetId[];
   projectGraph: ProjectGraphState;
   projectId: string;
+  /** The canvas generation frame (document space) — its area gates a canvas invoke. */
+  canvasBbox: { width: number; height: number };
 }
 
 const getMountedWidgetIds = (project: Project): WidgetId[] => {
@@ -106,6 +108,10 @@ const getMountedWidgetIds = (project: Project): WidgetId[] => {
 };
 
 export const getInvocationRouteInput = (project: Project): InvocationRouteInput => ({
+  canvasBbox: {
+    height: project.canvas.document.bbox.height,
+    width: project.canvas.document.bbox.width,
+  },
   generateValues: getProjectWidgetValues(project, 'generate'),
   invocation: project.invocation,
   mountedWidgetIds: getMountedWidgetIds(project),
@@ -118,6 +124,8 @@ export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right:
   left.invocation === right.invocation &&
   left.projectGraph === right.projectGraph &&
   left.generateValues === right.generateValues &&
+  left.canvasBbox.width === right.canvasBbox.width &&
+  left.canvasBbox.height === right.canvasBbox.height &&
   areArraysEqual(left.mountedWidgetIds, right.mountedWidgetIds);
 
 export const createInvocationRouteInputSelector = () =>
@@ -176,6 +184,17 @@ export const resolveInvocationRouteInput = (
 
   if (sourceId === 'generate') {
     validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models));
+  }
+
+  if (sourceId === 'canvas') {
+    // Canvas shares the generate model/prompt/steps, so reuse those reasons, then
+    // require a non-degenerate generation frame (a zero-area bbox has nothing to
+    // generate into and the graph compiler would reject it anyway).
+    validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models));
+
+    if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
+      validationReasons.push('Canvas generation frame must have a positive area.');
+    }
   }
 
   if (projectGraphReadiness && !projectGraphReadiness.canInvoke) {

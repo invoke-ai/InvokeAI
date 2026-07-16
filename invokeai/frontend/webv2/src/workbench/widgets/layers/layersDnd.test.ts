@@ -1,0 +1,35 @@
+import { describe, expect, it } from 'vitest';
+
+import { LAYER_KEYBOARD_SENSOR_OPTIONS } from './layerDndConfig';
+import { moveItem } from './layersDnd';
+
+describe('layer keyboard drag configuration', () => {
+  it('uses Enter alone to start and end, Escape to cancel, and never claims Space', () => {
+    expect(LAYER_KEYBOARD_SENSOR_OPTIONS.keyboardCodes).toEqual({
+      cancel: ['Escape'],
+      end: ['Enter'],
+      start: ['Enter'],
+    });
+    expect(Object.values(LAYER_KEYBOARD_SENSOR_OPTIONS.keyboardCodes).flat()).not.toContain('Space');
+  });
+});
+
+describe('moveItem', () => {
+  it('moves an item forward, shifting the rest', () => {
+    expect(moveItem(['a', 'b', 'c', 'd'], 0, 2)).toEqual(['b', 'c', 'a', 'd']);
+  });
+
+  it('moves an item backward, shifting the rest', () => {
+    expect(moveItem(['a', 'b', 'c', 'd'], 3, 1)).toEqual(['a', 'd', 'b', 'c']);
+  });
+
+  it('is a no-op (order preserved) when from equals to', () => {
+    expect(moveItem(['a', 'b', 'c'], 1, 1)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('does not mutate the input', () => {
+    const input = ['a', 'b', 'c'];
+    moveItem(input, 0, 2);
+    expect(input).toEqual(['a', 'b', 'c']);
+  });
+});

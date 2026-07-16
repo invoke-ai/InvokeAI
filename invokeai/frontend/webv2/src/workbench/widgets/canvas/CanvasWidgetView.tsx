@@ -1,65 +1,449 @@
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { WidgetViewProps } from '@workbench/types';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 
-import { Box, Flex } from '@chakra-ui/react';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useCallback, useEffect, useEffectEvent } from 'react';
+import { Box } from '@chakra-ui/react';
+import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
+import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
+import { getCanvasImportNotice } from '@workbench/canvas-operations/canvasImportNotice';
+import {
+  createLayerId,
+  deleteLayerActions,
+  duplicateLayerActions,
+  type LayerReorderKind,
+  reorderIdsForHotkey,
+  reorderLayerActions,
+} from '@workbench/canvasLayerOps';
+import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
+import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
+import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
+import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
+import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CanvasDocumentFrame, CanvasPlaneImage, EmptyCanvasFrame, ToolScrubber } from './CanvasDocumentFrame';
-import { CanvasStagingControls, EmptyStagingControls } from './CanvasStagingControls';
+import { gridSizeForModelBase } from './bboxGrid';
+import { CanvasBottomControls } from './CanvasBottomControls';
+import { CanvasBottomOverlay } from './CanvasBottomOverlay';
+import {
+  resolveCanvasContextMenu,
+  resolveCanvasContextMenuBranch,
+  type CanvasContextMenuTarget,
+} from './canvasContextMenu';
+import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
+import { resolveCanvasImageDrop } from './canvasImageDnd';
+import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
+import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
+import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
+import {
+  CANVAS_SETTINGS,
+  CANVAS_SHOW_PROGRESS_KEY,
+  canvasSettingsEqual,
+  resolveCanvasSettings,
+} from './canvasSettings';
+import { CanvasSurface } from './CanvasSurface';
+import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
+import { resolveCheckerColors } from './checkerColors';
+import { useCanvasOperation } from './engineStoreHooks';
+import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
+import { StagingBar } from './StagingBar';
+import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
+import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
+import { ToolStrip } from './ToolStrip';
+import { useCanvasEngine } from './useCanvasEngine';
+import { useCanvasGallerySave } from './useCanvasGallerySave';
 
+/** Command id → document-space nudge delta (shift variants are ×10). */
+const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
+  'canvas.nudgeDown': { dx: 0, dy: 1 },
+  'canvas.nudgeDownLarge': { dx: 0, dy: 10 },
+  'canvas.nudgeLeft': { dx: -1, dy: 0 },
+  'canvas.nudgeLeftLarge': { dx: -10, dy: 0 },
+  'canvas.nudgeRight': { dx: 1, dy: 0 },
+  'canvas.nudgeRightLarge': { dx: 10, dy: 0 },
+  'canvas.nudgeUp': { dx: 0, dy: -1 },
+  'canvas.nudgeUpLarge': { dx: 0, dy: -10 },
+};
+
+/** Command id → z-reorder direction (index 0 = top-most; "forward" moves toward 0). */
+const REORDER_KINDS: Record<string, LayerReorderKind> = {
+  'canvas.layerBackward': 'backward',
+  'canvas.layerForward': 'forward',
+  'canvas.layerToBack': 'back',
+  'canvas.layerToFront': 'front',
+};
+
+/**
+ * The canvas widget shell. The engine owns pixels and interaction and renders
+ * into {@link CanvasSurface}; this component only wires the reducer-backed
+ * chrome around it — command/hotkey registration, the settings-store feed, and
+ * the floating bottom chrome (tool options + staging). Zoom / fit / settings
+ * live in the widget header ({@link CanvasHeaderActions}).
+ */
 export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const { t } = useTranslation();
-  const canvas = useActiveProjectSelector((project) => project.canvas);
   const dispatch = useWorkbenchDispatch();
+  const canvasDispatch = useCanvasProjectMutationDispatch();
+  const store = useWorkbenchStore();
+  const engine = useCanvasEngine();
+  const canvas = useActiveProjectSelector((project) => project.canvas);
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
   const { document, stagingArea } = canvas;
-  const { layers } = document;
-  const selectedCandidate = stagingArea.pendingImages[stagingArea.selectedImageIndex];
-  const selectedImage = stagingArea.isVisible ? selectedCandidate : undefined;
-  const hasStagedCandidates = stagingArea.pendingImages.length > 0;
-  const hasMultipleCandidates = stagingArea.pendingImages.length > 1;
-  const renderedLayers = [...layers].reverse();
-  const hasCanvasContent = renderedLayers.length > 0 || Boolean(selectedImage);
+  const operation = useCanvasOperation(engine);
+  const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
+
+  // Right-click on the canvas surface: hit-test the layer under the cursor and
+  // open either the shared per-layer menu or the global empty-space menu at the
+  // pointer. Locked interaction skips the hit-test but keeps global save visible.
+  const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null);
+  const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
+  const handleSurfaceContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    // Keep the native menu inside inline editors (the text tool's contenteditable
+    // overlay), consistent with the surface-focus INLINE_EDIT_SELECTOR.
+    const rect = event.currentTarget.getBoundingClientRect();
+    const resolution = resolveCanvasContextMenu({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      hitTest: engine ? (point) => engine.tools.contextMenuLayerIdAt(point) : undefined,
+      isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
+      isInteractionLocked,
+      surfaceLeft: rect.left,
+      surfaceTop: rect.top,
+    });
+    if (!resolution.preventDefault) {
+      return;
+    }
+    event.preventDefault();
+    if (resolution.target?.layerId) {
+      canvasDispatch({ id: resolution.target.layerId, type: 'setCanvasSelectedLayer' });
+    }
+    setContextMenuTarget(resolution.target);
+  };
+
+  // The bbox tool snaps to a model-dependent grid; the engine is model-agnostic,
+  // so read the active generate model's base and feed the grid size in.
+  const modelBase = useActiveProjectSelector((project) => {
+    const values = getProjectWidgetValues(project, 'generate') as { model?: { base?: unknown } } | undefined;
+    return typeof values?.model?.base === 'string' ? values.model.base : null;
+  });
+  useEffect(() => {
+    engine?.viewport.setBboxGrid(gridSizeForModelBase(modelBase));
+  }, [engine, modelBase]);
+
+  // Canvas view settings (checkerboard / grid / invert-scroll) persist in the
+  // canvas widget's per-project values; the engine only reads its stores, so
+  // push the resolved values down whenever they change — same one-directional
+  // feed as the bbox grid above. The header settings menu writes the values.
+  const settings = useActiveProjectSelector(
+    (project) => resolveCanvasSettings(getProjectWidgetValues(project, 'canvas')),
+    canvasSettingsEqual
+  );
+  useEffect(() => {
+    if (!engine) {
+      return;
+    }
+    for (const setting of CANVAS_SETTINGS) {
+      // Only engine-backed settings feed a store; React-consumed ones (e.g.
+      // showProgressOnCanvas, read below) have no store and are skipped here.
+      if (setting.store) {
+        engine.stores[setting.store].set(settings[setting.key]);
+      }
+    }
+  }, [engine, settings]);
+
+  // The checkerboard fills the whole (unbounded) canvas, so its two square colors
+  // come from theme tokens rather than hardcoded greys. Resolve them from the live
+  // Chakra theme and feed them into the engine's checker-colors store; re-resolve
+  // whenever the theme (and thus color mode) changes. `themeId` flips
+  // `<html data-theme>` in ThemeController's layout effect, which runs before this
+  // passive effect in the same commit, so getComputedStyle reads the new theme.
+  const themeId = useWorkbenchSettingsSelector((snapshot) => snapshot.preferences.themeId);
+  useEffect(() => {
+    engine?.stores.checkerColors.set(resolveCheckerColors());
+  }, [engine, themeId]);
+
+  const stagingSlots = getCanvasStagingSlots(canvas, queueItems);
+  const selectedSlot = stagingSlots[stagingArea.selectedImageIndex];
+  const selectedCandidate = selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined;
+  const selectedPlaceholder = selectedSlot?.kind === 'placeholder' ? selectedSlot : null;
+  const hasStagingSlots = stagingSlots.length > 0;
+  const hasMultipleStagingSlots = stagingSlots.length > 1;
+  const isCanvasGenerationInFlight = queueItems.some(
+    (item) =>
+      item.snapshot.destination === 'canvas' &&
+      (item.status === 'pending' || item.status === 'running') &&
+      // Only this canvas SESSION's in-flight items: an item submitted before a
+      // wholesale swap (new canvas / snapshot restore) belongs to a document
+      // that no longer exists, so its denoise frames must not leak onto the
+      // fresh canvas (F2). `documentRevision` bumps only on those swaps.
+      item.snapshot.canvas.documentRevision === canvas.documentRevision
+  );
+  const interactionCapabilities = getCanvasInteractionCapabilities({
+    hasCanvasEngine: engine !== null,
+    hasSelectedCandidate: selectedCandidate !== undefined,
+    hasStagingSlots,
+    isCanvasGenerationInFlight,
+    operationKind: operation?.status === 'active' ? operation.identity.kind : null,
+  });
+  const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
+
+  const handleCanvasImageDrop = useCallback(
+    (event: DragEndEvent) => {
+      const resolution = resolveCanvasImageDrop(event.active.data.current, event.over?.data.current);
+      if (!resolution) {
+        return;
+      }
+
+      // Capture the destination project and mounted engine before any network
+      // work so a project switch cannot retarget this import mid-flight.
+      const project = store.getSnapshot().activeProject;
+      const mountedEngine = engine;
+
+      const execute = async (): Promise<void> => {
+        try {
+          const result = await executeCanvasImageDropImport({
+            destination: resolution.destination,
+            dispatch,
+            engine: mountedEngine,
+            getState: store.getState,
+            imageNames: resolution.imageNames,
+            project,
+          });
+          const notice = getCanvasImportNotice(result);
+          dispatch({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}), type: 'recordNotice' });
+        } catch (error: unknown) {
+          recordCanvasImportError({
+            dispatch,
+            error,
+            localizedMessage: t('widgets.canvas.import.failed'),
+            projectId: project.id,
+          });
+        }
+      };
+
+      void execute();
+    },
+    [dispatch, engine, store, t]
+  );
+
+  useDndMonitor({ onDragEnd: handleCanvasImageDrop });
+
+  useLayoutEffect(() => {
+    engine?.tools.setInteractionLocked(isInteractionLocked);
+    return () => engine?.tools.setInteractionLocked(false);
+  }, [engine, isInteractionLocked]);
+
+  // "Show progress on canvas" gates ONLY the selected placeholder's live denoise
+  // frame; a selected finished candidate still previews (that's staging, not progress).
+  const selectedPlaceholderProgressImage = useQueueItemProgressImage(
+    selectedPlaceholder?.queueItemId ?? '',
+    selectedPlaceholder?.itemIndex ?? 0
+  );
+  const progressImage = settings[CANVAS_SHOW_PROGRESS_KEY] ? selectedPlaceholderProgressImage : null;
+
+  // What the engine should draw as the staged preview: the live denoise-progress
+  // frame while generating, else the selected candidate, else nothing. The pure
+  // helper is unit-tested; the effect below drives the engine imperatively.
+  const previewSource = selectStagedPreviewSource({
+    bboxHeight: document.bbox.height,
+    bboxWidth: document.bbox.width,
+    isGenerationInFlight: selectedPlaceholder !== null,
+    isVisible: stagingArea.isVisible,
+    progressImage,
+    selectedImageName: selectedCandidate?.imageName ?? null,
+    selectedPlacement: selectedCandidate?.placement ?? null,
+  });
+  const previewKey = stagedPreviewKey(previewSource);
+
+  // Syncing an external imperative system (the engine's staged preview) with
+  // derived reducer/progress state is a genuine effect. `useEffectEvent` reads
+  // the latest source without making it a dependency, so the decoding
+  // `setStagedPreview` re-runs only when `previewKey` actually changes (which
+  // includes every new progress frame) — never on unrelated re-renders.
+  const applyStagedPreview = useEffectEvent(() => {
+    engine?.previews.setStagedPreview(previewSource);
+  });
+  useEffect(() => {
+    applyStagedPreview();
+  }, [engine, previewKey]);
+  // Clear the preview when the widget (or engine) goes away, so an accepted /
+  // discarded candidate never lingers over the canvas.
+  useEffect(() => {
+    return () => engine?.previews.setStagedPreview(null);
+  }, [engine]);
 
   const executeCanvasHotkey = useEffectEvent((commandId: string) => {
-    if (commandId === 'canvas.prevEntity' && hasStagedCandidates) {
-      dispatch({ direction: -1, type: 'cycleStagedImage' });
-    } else if (commandId === 'canvas.nextEntity' && hasStagedCandidates) {
-      dispatch({ direction: 1, type: 'cycleStagedImage' });
-    } else if (commandId === 'canvas.deleteSelected' && hasStagedCandidates) {
-      dispatch({ type: 'discardSelectedStagedImage' });
+    const { layers, selectedLayerId } = document;
+    const selectedIndex = selectedLayerId ? layers.findIndex((layer) => layer.id === selectedLayerId) : -1;
+    const selectedLayer = selectedIndex >= 0 ? layers[selectedIndex] : undefined;
+
+    if ((commandId === 'canvas.prevEntity' || commandId === 'canvas.nudgeLeft') && hasStagingSlots) {
+      canvasDispatch({ direction: -1, type: 'cycleStagedImage' });
+      return;
+    }
+
+    if ((commandId === 'canvas.nextEntity' || commandId === 'canvas.nudgeRight') && hasStagingSlots) {
+      canvasDispatch({ direction: 1, type: 'cycleStagedImage' });
+      return;
+    }
+
+    if (commandId === 'canvas.deleteSelected' && selectedCandidate) {
+      canvasDispatch({ type: 'discardSelectedStagedImage' });
+      return;
+    }
+
+    if (isInteractionLocked) {
+      if (commandId === 'canvas.tool.view') {
+        engine?.tools.setTool('view');
+      }
+      return;
+    }
+
+    // Arrow-key nudge: engine owns the bounds/lock logic (no-op with no/locked selection).
+    const nudge = NUDGE_DELTAS[commandId];
+    if (nudge) {
+      engine?.layers.nudgeSelectedLayer(nudge.dx, nudge.dy);
+      return;
+    }
+
+    // Layer z-reorder: same forward/inverse construction as the layers panel.
+    const reorderKind = REORDER_KINDS[commandId];
+    if (reorderKind) {
+      if (!engine || selectedIndex < 0) {
+        return;
+      }
+      const currentIds = layers.map((layer) => layer.id);
+      const nextIds = reorderIdsForHotkey(currentIds, selectedIndex, reorderKind);
+      if (!nextIds) {
+        return;
+      }
+      const { forward, inverse } = reorderLayerActions(currentIds, nextIds);
+      engine.layers.commitStructural(t('widgets.canvas.commands.reorderLayer'), forward, inverse);
+      return;
+    }
+
+    if (commandId === 'canvas.deleteSelected') {
+      // Staged images take priority; otherwise delete the selected layer (undoable).
+      if (engine && selectedLayer && selectedIndex >= 0) {
+        const { forward, inverse } = deleteLayerActions(selectedLayer, selectedIndex);
+        engine.layers.commitStructural(t('widgets.canvas.commands.deleteLayer'), forward, inverse);
+      }
+    } else if (commandId === 'canvas.resetSelected') {
+      if (engine && selectedLayer) {
+        engine.layers.clearMask(selectedLayer.id);
+      }
     } else if (commandId === 'canvas.undo') {
-      dispatch({ type: 'undoProjectChange' });
+      // Canvas undo/redo is engine-scoped: it drives the engine-owned pixel/
+      // structural history, NOT project-level (reducer) undo. When the canvas
+      // history is empty this is a no-op — it deliberately does not fall back to
+      // `undoProjectChange` (project undo keeps its own commands/hotkeys, e.g.
+      // the workflow editor's `workflows.undo`).
+      engine?.history.undo();
     } else if (commandId === 'canvas.redo') {
-      dispatch({ type: 'redoProjectChange' });
+      engine?.history.redo();
+    } else if (commandId === 'canvas.tool.view') {
+      engine?.tools.setTool('view');
+    } else if (commandId === 'canvas.tool.move') {
+      engine?.tools.setTool('move');
+    } else if (commandId === 'canvas.transformSelected') {
+      // Selecting the transform tool opens a session on the selected layer (if any
+      // eligible one); Apply/Cancel (enter/esc) are handled engine-side.
+      engine?.tools.setTool('transform');
+    } else if (commandId === 'canvas.tool.bbox') {
+      engine?.tools.setTool('bbox');
+    } else if (commandId === 'canvas.tool.brush') {
+      engine?.tools.setTool('brush');
+    } else if (commandId === 'canvas.tool.eraser') {
+      engine?.tools.setTool('eraser');
+    } else if (commandId === 'canvas.tool.lasso') {
+      engine?.tools.setTool('lasso');
+    } else if (commandId === 'canvas.tool.shape') {
+      engine?.tools.setTool('shape');
+    } else if (commandId === 'canvas.tool.text') {
+      engine?.tools.setTool('text');
+    } else if (commandId === 'canvas.tool.gradient') {
+      engine?.tools.setTool('gradient');
+    } else if (commandId === 'canvas.selectAll') {
+      engine?.selection.selectAll();
+    } else if (commandId === 'canvas.deselect') {
+      engine?.selection.deselect();
+    } else if (commandId === 'canvas.invertSelection') {
+      engine?.selection.invertSelection();
+    } else if (commandId === 'canvas.brushSizeDown') {
+      engine?.tools.stepBrushSize(-1);
+    } else if (commandId === 'canvas.brushSizeUp') {
+      engine?.tools.stepBrushSize(1);
+    } else if (commandId === 'canvas.duplicateLayer') {
+      if (engine && selectedLayer) {
+        const { forward, inverse } = duplicateLayerActions(selectedLayer.id, createLayerId());
+        engine.layers.commitStructural(t('widgets.canvas.commands.duplicateLayer'), forward, inverse);
+      }
+    } else if (commandId === 'canvas.mergeDown') {
+      // Gate on the SAME predicate the layers panel's context menu uses to
+      // enable/disable its "Merge Down" item (`canMergeLayerDown`), so the hotkey
+      // can never fire where the menu would refuse — e.g. a mask layer selected,
+      // or a mask directly below the selection. `engine.layers.mergeLayerDown` also
+      // guards this itself (defense in depth for callers other than this hotkey),
+      // but checking here keeps the two surfaces visibly in lockstep.
+      if (engine && selectedLayer && canMergeLayerDown(layers, selectedIndex, true)) {
+        engine.layers.mergeLayerDown(selectedLayer.id);
+      }
     }
   });
 
-  const handleAccept = useCallback(() => dispatch({ type: 'acceptStagedImage' }), [dispatch]);
-  const handleCycle = useCallback((direction: -1 | 1) => dispatch({ direction, type: 'cycleStagedImage' }), [dispatch]);
-  const handleDiscardAll = useCallback(() => dispatch({ type: 'discardAllStagedImages' }), [dispatch]);
-  const handleDiscardSelected = useCallback(() => dispatch({ type: 'discardSelectedStagedImage' }), [dispatch]);
-  const handleSelectImage = useCallback(
-    (imageIndex: number) => dispatch({ imageIndex, type: 'setStagedImageIndex' }),
-    [dispatch]
-  );
-  const handleToggleThumbnails = useCallback(
-    () => dispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' }),
-    [dispatch]
-  );
-  const handleToggleVisibility = useCallback(() => dispatch({ type: 'toggleCanvasStagingVisibility' }), [dispatch]);
-
   useEffect(() => {
     const hotkeys = [
-      ['canvas.prevEntity', t('widgets.canvas.commands.previousEntity'), ['alt+[', 'arrowleft']],
-      ['canvas.nextEntity', t('widgets.canvas.commands.nextEntity'), ['alt+]', 'arrowright']],
+      // Staging keeps `alt+[` / `alt+]`; bare left/right are registered as layer nudges,
+      // then intercepted above to cycle staging slots while any slot exists.
+      ['canvas.prevEntity', t('widgets.canvas.commands.previousEntity'), ['alt+[']],
+      ['canvas.nextEntity', t('widgets.canvas.commands.nextEntity'), ['alt+]']],
       ['canvas.deleteSelected', t('widgets.canvas.commands.deleteSelected'), ['delete', 'backspace']],
+      ['canvas.resetSelected', t('widgets.canvas.commands.resetSelected'), ['shift+c']],
       ['canvas.undo', t('widgets.canvas.commands.undo'), ['mod+z']],
       ['canvas.redo', t('widgets.canvas.commands.redo'), ['mod+shift+z', 'mod+y']],
+      // Tool selection and brush/eraser size step. `allowInEditable: false` below
+      // keeps these single-letter/bracket keys from firing while the user is
+      // typing in a prompt/text field elsewhere in the workbench.
+      ['canvas.tool.view', t('widgets.canvas.commands.selectViewTool'), ['h']],
+      ['canvas.tool.move', t('widgets.canvas.commands.selectMoveTool'), ['v']],
+      ['canvas.transformSelected', t('widgets.canvas.commands.selectTransformTool'), ['mod+t']],
+      ['canvas.tool.bbox', t('widgets.canvas.commands.selectBboxTool'), []],
+      ['canvas.tool.brush', t('widgets.canvas.commands.selectBrushTool'), ['b']],
+      ['canvas.tool.eraser', t('widgets.canvas.commands.selectEraserTool'), ['e']],
+      ['canvas.tool.lasso', t('widgets.canvas.commands.selectLassoTool'), ['l']],
+      ['canvas.tool.shape', t('widgets.canvas.commands.selectShapeTool'), ['r']],
+      ['canvas.tool.text', t('widgets.canvas.commands.selectTextTool'), ['t']],
+      ['canvas.tool.gradient', t('widgets.canvas.commands.selectGradientTool'), ['g']],
+      // Selection: select all / deselect / invert (engine-owned transient selection).
+      ['canvas.selectAll', t('widgets.canvas.commands.selectAll'), ['mod+a']],
+      ['canvas.deselect', t('widgets.canvas.commands.deselect'), ['mod+d']],
+      ['canvas.invertSelection', t('widgets.canvas.commands.invertSelection'), ['mod+shift+i']],
+      ['canvas.brushSizeDown', t('widgets.canvas.commands.decreaseBrushSize'), ['[']],
+      ['canvas.brushSizeUp', t('widgets.canvas.commands.increaseBrushSize'), [']']],
+      // Move the selected layer: arrows nudge 1px, shift+arrows 10px.
+      ['canvas.nudgeLeft', t('widgets.canvas.commands.nudgeLeft'), ['arrowleft']],
+      ['canvas.nudgeRight', t('widgets.canvas.commands.nudgeRight'), ['arrowright']],
+      ['canvas.nudgeUp', t('widgets.canvas.commands.nudgeUp'), ['arrowup']],
+      ['canvas.nudgeDown', t('widgets.canvas.commands.nudgeDown'), ['arrowdown']],
+      ['canvas.nudgeLeftLarge', t('widgets.canvas.commands.nudgeLeftLarge'), ['shift+arrowleft']],
+      ['canvas.nudgeRightLarge', t('widgets.canvas.commands.nudgeRightLarge'), ['shift+arrowright']],
+      ['canvas.nudgeUpLarge', t('widgets.canvas.commands.nudgeUpLarge'), ['shift+arrowup']],
+      ['canvas.nudgeDownLarge', t('widgets.canvas.commands.nudgeDownLarge'), ['shift+arrowdown']],
+      // Layer management.
+      ['canvas.duplicateLayer', t('widgets.canvas.commands.duplicateLayer'), ['mod+j']],
+      ['canvas.mergeDown', t('widgets.canvas.commands.mergeDown'), ['mod+e']],
+      ['canvas.layerForward', t('widgets.canvas.commands.layerForward'), ['mod+]']],
+      ['canvas.layerBackward', t('widgets.canvas.commands.layerBackward'), ['mod+[']],
+      ['canvas.layerToFront', t('widgets.canvas.commands.layerToFront'), ['mod+shift+]']],
+      ['canvas.layerToBack', t('widgets.canvas.commands.layerToBack'), ['mod+shift+[']],
     ] as const;
     const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeCanvasHotkey(id), id, title }),
-      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+      runtime.hotkeys.register({ allowInEditable: false, commandId: id, defaultKeys: [...defaultKeys], id, title }),
     ]);
 
     return () => {
@@ -67,67 +451,99 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     };
   }, [runtime.commands, runtime.hotkeys, t]);
 
+  const layerContextMenuTarget = useMemo(
+    () =>
+      contextMenuTarget?.layerId !== null && contextMenuTarget?.layerId !== undefined
+        ? { layerId: contextMenuTarget.layerId, x: contextMenuTarget.x, y: contextMenuTarget.y }
+        : null,
+    [contextMenuTarget]
+  );
+  const contextMenuBranch = resolveCanvasContextMenuBranch(contextMenuTarget, engine !== null);
+  const isSaveToGalleryDisabled = !engine || isSaving || isInteractionLocked;
+  const saveToGallerySubmenu = useMemo(
+    () => <CanvasSaveToGallerySubmenu disabled={isSaveToGalleryDisabled} onSave={saveToGallery} />,
+    [isSaveToGalleryDisabled, saveToGallery]
+  );
+  const canvasSurface = useMemo(() => (engine ? <CanvasSurface engine={engine} /> : null), [engine]);
+
   return (
-    <Box
-      aria-label={t('widgets.canvas.surface')}
-      bg="bg.inset"
-      h="full"
-      overflow="hidden"
-      position="relative"
-      tabIndex={0}
-      w="full"
-      bgImage="radial-gradient({colors.fg.grid} 1.5px, transparent 1.5px)"
-      bgSize="28px 28px"
-    >
-      <ToolScrubber />
-      <Flex align="center" h="full" justify="center" p="12">
-        <CanvasDocumentFrame
-          documentHeight={document.height}
-          documentWidth={document.width}
-          hasContent={hasCanvasContent}
-        >
-          {hasCanvasContent ? null : <EmptyCanvasFrame />}
-          {renderedLayers.map((layer) => (
-            <CanvasPlaneImage
-              key={layer.id}
-              image={layer}
-              opacity={selectedImage ? Math.min(layer.placement.opacity, 0.72) : layer.placement.opacity}
-              placement={layer.placement}
-              planeHeight={document.height}
-              planeWidth={document.width}
-            />
-          ))}
-          {selectedImage ? (
-            <CanvasPlaneImage
-              image={selectedImage}
-              isStaged
-              opacity={selectedImage.placement.opacity}
-              placement={selectedImage.placement}
-              planeHeight={document.height}
-              planeWidth={document.width}
-            />
-          ) : null}
-        </CanvasDocumentFrame>
-      </Flex>
-      {hasStagedCandidates && selectedCandidate ? (
-        <CanvasStagingControls
-          areThumbnailsVisible={stagingArea.areThumbnailsVisible}
-          hasMultipleCandidates={hasMultipleCandidates}
-          isVisible={stagingArea.isVisible}
-          pendingImages={stagingArea.pendingImages}
-          selectedCandidate={selectedCandidate}
-          selectedImageIndex={stagingArea.selectedImageIndex}
-          onAccept={handleAccept}
-          onCycle={handleCycle}
-          onDiscardAll={handleDiscardAll}
-          onDiscardSelected={handleDiscardSelected}
-          onSelectImage={handleSelectImage}
-          onToggleThumbnails={handleToggleThumbnails}
-          onToggleVisibility={handleToggleVisibility}
+    <Box aria-label={t('widgets.canvas.surface')} bg="bg.inset" h="full" overflow="hidden" position="relative" w="full">
+      <CanvasSurfaceContextLayout surface={canvasSurface} onContextMenu={handleSurfaceContextMenu}>
+        <CanvasImageDropOverlay
+          isDocumentEditingLocked={interactionCapabilities.isDocumentEditingLocked}
+          isInteractionLocked={isInteractionLocked}
         />
-      ) : (
-        <EmptyStagingControls />
-      )}
+        {engine ? (
+          <>
+            <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
+            <CanvasLayerContextMenu
+              beforeDangerItems={saveToGallerySubmenu}
+              dispatch={canvasDispatch}
+              engine={engine}
+              layers={document.layers}
+              showGroupLabels
+              target={layerContextMenuTarget}
+              onClose={closeContextMenu}
+            />
+          </>
+        ) : null}
+        {contextMenuBranch === 'global' && contextMenuTarget ? (
+          <CanvasGlobalContextMenu target={contextMenuTarget} onClose={closeContextMenu}>
+            {saveToGallerySubmenu}
+          </CanvasGlobalContextMenu>
+        ) : null}
+
+        {/*
+         * Floating bottom-center chrome: the staging bar (when active) stacks
+         * directly above the always-present tool options bar — "just like the
+         * staging UI". The wrapper is click-through so the canvas stays
+         * interactive around the bars; each bar re-enables pointer events.
+         */}
+        <CanvasBottomOverlay.Root>
+          {hasStagingSlots || isCanvasGenerationInFlight ? (
+            <CanvasBottomOverlay.Staging>
+              <StagingBar
+                antialiasProgressImages={antialiasProgressImages}
+                areThumbnailsVisible={stagingArea.areThumbnailsVisible}
+                autoSwitchMode={stagingArea.autoSwitchMode}
+                canAccept={interactionCapabilities.canAcceptStagedImage}
+                hasMultipleSlots={hasMultipleStagingSlots}
+                isGenerating={isCanvasGenerationInFlight}
+                isVisible={stagingArea.isVisible}
+                selectedCandidate={selectedCandidate}
+                selectedImageIndex={stagingArea.selectedImageIndex}
+                selectedSlot={selectedSlot}
+                slots={stagingSlots}
+                onAccept={() => {
+                  if (selectedSlot?.kind === 'candidate') {
+                    engine?.layers.commitStagedImage({
+                      candidate: selectedSlot.candidate,
+                      selectedImageIndex: stagingArea.selectedImageIndex,
+                    });
+                  }
+                }}
+                onCancelQueueItem={(queueItemId) => dispatch({ queueItemId, type: 'cancelQueueItem' })}
+                onCycle={(direction) => canvasDispatch({ direction, type: 'cycleStagedImage' })}
+                onDiscardAll={() => canvasDispatch({ type: 'discardAllStagedImages' })}
+                onDiscardSelected={() => canvasDispatch({ type: 'discardSelectedStagedImage' })}
+                onSelectImage={(imageIndex) => canvasDispatch({ imageIndex, type: 'setStagedImageIndex' })}
+                onSetAutoSwitch={(mode) => canvasDispatch({ mode, type: 'setCanvasStagingAutoSwitch' })}
+                onToggleThumbnails={() => canvasDispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' })}
+                onToggleVisibility={() => canvasDispatch({ type: 'toggleCanvasStagingVisibility' })}
+              />
+            </CanvasBottomOverlay.Staging>
+          ) : null}
+          <CanvasBottomOverlay.Controls>
+            <CanvasBottomControls
+              documentHeight={document.height}
+              documentWidth={document.width}
+              engine={engine}
+              isExternalInteractionLocked={isInteractionLocked}
+              operation={operation}
+            />
+          </CanvasBottomOverlay.Controls>
+        </CanvasBottomOverlay.Root>
+      </CanvasSurfaceContextLayout>
     </Box>
   );
 };

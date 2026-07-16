@@ -37,6 +37,7 @@ def _services(**overrides):
         "style_preset_image_files": object(),
         "workflow_thumbnails": object(),
         "client_state_persistence": object(),
+        "project_records": object(),
         "users": object(),
         "image_moves": None,
     }

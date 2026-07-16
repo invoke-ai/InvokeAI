@@ -57,9 +57,15 @@ export interface ProjectGraphReadiness {
   reasons: string[];
 }
 
+export interface ProjectGraphReadinessOptions {
+  /** Required connection inputs supplied by an ephemeral caller after document compilation. */
+  externallySatisfiedInputs?: ReadonlySet<string>;
+}
+
 export const getProjectGraphReadiness = (
   document: ProjectGraphState,
-  templatesSnapshot: InvocationTemplatesSnapshot
+  templatesSnapshot: InvocationTemplatesSnapshot,
+  options: ProjectGraphReadinessOptions = {}
 ): ProjectGraphReadiness => {
   if (templatesSnapshot.status === 'error') {
     return { canInvoke: false, reasons: ['Node definitions failed to load from the backend.'] };
@@ -103,7 +109,7 @@ export const getProjectGraphReadiness = (
       }
 
       if (inputTemplate.input === 'connection') {
-        if (inputTemplate.required) {
+        if (inputTemplate.required && !options.externallySatisfiedInputs?.has(`${node.id}:${inputTemplate.name}`)) {
           reasons.push(
             `"${getNodeDisplayName(node, templates)}" is missing a connection for "${inputTemplate.title}".`
           );

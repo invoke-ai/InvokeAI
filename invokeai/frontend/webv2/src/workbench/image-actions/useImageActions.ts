@@ -1,6 +1,9 @@
 import type { VaeModelConfig } from '@workbench/generation/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
+import { importGalleryImagesToCanvas, type GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
+import { getCanvasImportNotice } from '@workbench/canvas-operations/canvasImportNotice';
+import { getEngine } from '@workbench/canvas-operations/engineRegistry';
 import {
   addImagesToGalleryBoard,
   deleteGalleryImages,
@@ -25,7 +28,9 @@ import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useEffect, useMemo, type Dispatch } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 import {
   EMPTY_IMAGE_RECALL_CAPABILITIES,
@@ -51,6 +56,7 @@ export interface ImageActions {
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
+  sendToCanvas: (images: readonly GalleryImage[], destination: GalleryCanvasImportDestination) => Promise<void>;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
   useAsReferenceImage: (image: GalleryImage) => void;
 }
@@ -102,6 +108,7 @@ export const useImageActions = ({
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const store = useWorkbenchStore();
+  const { t } = useTranslation();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
   const vaeModels = useMemo(() => models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig), [models]);
@@ -254,6 +261,41 @@ export const useImageActions = ({
       selectForCompare: (image) => {
         dispatch({ image, projectId, type: 'setGalleryCompareImage' });
       },
+      sendToCanvas: async (images, destination) => {
+        try {
+          const state = store.getState();
+          const targetProjectId = projectId ?? state.activeProjectId;
+          const project = state.projects.find((candidate) => candidate.id === targetProjectId);
+
+          if (!project) {
+            const notice = getCanvasImportNotice({ status: 'stale-project' });
+            dispatch({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}), type: 'recordNotice' });
+            return;
+          }
+
+          const result = await importGalleryImagesToCanvas({
+            destination,
+            dispatch,
+            engine: getEngine(project.id) ?? null,
+            getState: store.getState,
+            images,
+            project,
+          });
+          const notice = getCanvasImportNotice(result);
+          dispatch({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}), type: 'recordNotice' });
+
+          if (result.status === 'imported' && store.getState().activeProjectId === project.id) {
+            openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
+          }
+        } catch (error: unknown) {
+          recordCanvasImportError({
+            dispatch,
+            error,
+            localizedMessage: t('widgets.canvas.import.failed'),
+            projectId,
+          });
+        }
+      },
       setImagesStarred: async (imageNames, starred) => {
         onStarredChange?.(imageNames, starred);
 
@@ -307,6 +349,7 @@ export const useImageActions = ({
     projectId,
     store,
     supportedModels,
+    t,
     vaeModels,
   ]);
 };

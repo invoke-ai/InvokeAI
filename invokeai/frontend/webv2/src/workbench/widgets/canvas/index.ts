@@ -2,6 +2,7 @@ import type { WidgetManifest } from '@workbench/types';
 
 import { WandSparklesIcon } from 'lucide-react';
 
+import { CanvasHeaderActions } from './CanvasHeaderActions';
 import { CanvasWidgetView } from './CanvasWidgetView';
 
 export const canvasWidgetManifest: WidgetManifest = {
@@ -9,6 +10,7 @@ export const canvasWidgetManifest: WidgetManifest = {
   allowedRegions: ['center'],
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   graphBearing: { defaultGraphId: 'canvas-graph', sourceId: 'canvas', surfaces: ['center'] },
+  headerActions: CanvasHeaderActions,
   icon: WandSparklesIcon,
   id: 'canvas',
   label: (t) => t('widgets.labels.canvas'),

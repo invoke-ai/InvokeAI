@@ -73,6 +73,7 @@ def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> N
     mock_deps = MockApiDependencies(mock_invoker)
     mock_invoker.services.image_moves = MagicMock()
     mock_invoker.services.image_moves.is_maintenance_active.return_value = True
+    monkeypatch.setattr(mock_invoker.services.image_records, "exists", MagicMock(return_value=True))
     monkeypatch.setattr(mock_invoker.services.image_records, "get_user_id", MagicMock(return_value="system"))
     monkeypatch.setattr(mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=None))
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)

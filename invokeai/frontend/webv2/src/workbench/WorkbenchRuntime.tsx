@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch } from 'react';
 
+import type { EnqueueGenerateRequest, EnqueueWorkflowRequest } from './generation/types';
 import type { Project, QueueItem } from './types';
 import type { WorkbenchAction } from './workbenchState';
 
@@ -12,11 +13,13 @@ import {
   type ReconcileInput,
 } from './backend/queueCoordinator';
 import { socketHub } from './backend/socketHub';
+import { createCanvasDimsSync } from './canvasDimsSync';
 import { configureDiagnostics } from './diagnostics/logger';
 import { addImagesToGalleryBoard } from './gallery/api';
-import { getQueueItemResultImages, resumeQueueProcessor } from './generation/api';
+import { getQueueItemResultImages, resumeQueueProcessor, type QueueItemResultImageOptions } from './generation/api';
 import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
+import { shouldSubmitPendingQueueItem } from './queueSubmission';
 import { useWorkbenchPreferenceSelector } from './settings/store';
 import {
   useWorkbenchDispatch,
@@ -40,6 +43,101 @@ const getSnapshotBatchCount = (queueItem: QueueItem): number => {
   const batchCount = queueItem.snapshot.widgetStates.generate?.values.batchCount;
 
   return sanitizeBatchCount(batchCount);
+};
+
+type QueueItemBackendSubmission =
+  | { kind: 'generate'; request: EnqueueGenerateRequest }
+  | { kind: 'workflow'; request: EnqueueWorkflowRequest }
+  | { error: string; kind: 'invalid' };
+
+const COMPILED_GENERATE_RESULT_NODE_ID = 'canvas_output';
+
+export const getQueueItemResultImageOptions = (queueItem: QueueItem): QueueItemResultImageOptions | undefined => {
+  if (queueItem.snapshot.sourceId === 'generate' || queueItem.snapshot.sourceId === 'canvas') {
+    return { resultNodeIds: [COMPILED_GENERATE_RESULT_NODE_ID] };
+  }
+
+  return undefined;
+};
+
+export const createQueueItemBackendSubmission = (
+  project: Project,
+  queueItem: QueueItem
+): QueueItemBackendSubmission => {
+  const graph = queueItem.snapshot.graph.backendGraph;
+
+  if (!graph) {
+    return { error: `${queueItem.snapshot.sourceId} queue item is missing a compiled backend graph.`, kind: 'invalid' };
+  }
+
+  if (queueItem.snapshot.sourceId === 'generate') {
+    const generateValues = normalizeGenerateSettings(queueItem.snapshot.widgetStates.generate?.values);
+
+    if (!generateValues) {
+      return { error: 'generate queue item is missing generation settings.', kind: 'invalid' };
+    }
+
+    return {
+      kind: 'generate',
+      request: {
+        batchCount: generateValues.batchCount,
+        destination: queueItem.snapshot.destination,
+        graph,
+        negativePrompt: generateValues.negativePromptEnabled ? generateValues.negativePrompt : '',
+        negativePromptNodeId: 'negative_prompt',
+        positivePrompt: generateValues.positivePrompt,
+        positivePromptNodeId: 'positive_prompt',
+        projectId: project.id,
+        seed: generateValues.seed,
+        seedNodeId: 'seed',
+        shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
+        sourceQueueItemId: queueItem.id,
+      },
+    };
+  }
+
+  if (queueItem.snapshot.sourceId === 'canvas') {
+    const generate = queueItem.snapshot.generate;
+    // Persisted canvas queue items from before `snapshot.generate` existed still
+    // carry the generate widget snapshot; use it rather than falling back to
+    // backend primitive defaults for prompt/seed.
+    const generateValues = normalizeGenerateSettings(
+      generate ? generate.values : queueItem.snapshot.widgetStates.generate?.values
+    );
+
+    if (!generateValues) {
+      return { error: 'canvas queue item is missing generation submission metadata.', kind: 'invalid' };
+    }
+
+    return {
+      kind: 'generate',
+      request: {
+        batchCount: generateValues.batchCount,
+        destination: queueItem.snapshot.destination,
+        graph,
+        negativePrompt: generateValues.negativePromptEnabled ? generateValues.negativePrompt : '',
+        negativePromptNodeId: generate?.negativePromptNodeId ?? 'negative_prompt',
+        positivePrompt: generateValues.positivePrompt,
+        positivePromptNodeId: generate?.positivePromptNodeId ?? 'positive_prompt',
+        projectId: project.id,
+        seed: generateValues.seed,
+        seedNodeId: generate?.seedNodeId ?? 'seed',
+        shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
+        sourceQueueItemId: queueItem.id,
+      },
+    };
+  }
+
+  return {
+    kind: 'workflow',
+    request: {
+      batchCount: getSnapshotBatchCount(queueItem),
+      destination: queueItem.snapshot.destination,
+      graph,
+      projectId: project.id,
+      sourceQueueItemId: queueItem.id,
+    },
+  };
 };
 
 const selectQueueRevision = createStableSelector((snapshot: { state: { projects: Project[] } }) =>
@@ -75,7 +173,11 @@ const routeRunResults = async (
   dispatch: Dispatch<WorkbenchAction>
 ): Promise<void> => {
   try {
-    const allImages = await coordinator.waitForResults(queueItem.id, queueItem.snapshot.submittedAt);
+    const allImages = await coordinator.waitForResults(
+      queueItem.id,
+      queueItem.snapshot.submittedAt,
+      getQueueItemResultImageOptions(queueItem)
+    );
     // A workflow session reports every image its nodes produced; only the
     // non-intermediate outputs are user-facing results.
     const images =
@@ -112,32 +214,35 @@ const routeRunResults = async (
   }
 };
 
-/** Route one completed backend item from a still-running local batch into Gallery. */
+/** Route one completed backend item from a still-running local batch into its destination. */
 const routeBackendItemResults = async (
   projectId: string,
   queueItem: QueueItem,
   backendItemId: number,
   dispatch: Dispatch<WorkbenchAction>
 ): Promise<void> => {
-  if (queueItem.snapshot.destination !== 'gallery') {
-    return;
-  }
-
   try {
-    const allImages = await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt);
+    const resultImageOptions = getQueueItemResultImageOptions(queueItem);
+    const allImages = resultImageOptions
+      ? await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt, resultImageOptions)
+      : await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt);
     const images =
       queueItem.snapshot.sourceId === 'workflow' ? allImages.filter((image) => !image.isIntermediate) : allImages;
-    const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
+    if (queueItem.snapshot.destination === 'gallery') {
+      const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
 
-    if (selectedBoardId && selectedBoardId !== 'none') {
-      await addImagesToGalleryBoard(
-        selectedBoardId,
-        images.map((image) => image.imageName)
-      );
+      if (selectedBoardId && selectedBoardId !== 'none') {
+        await addImagesToGalleryBoard(
+          selectedBoardId,
+          images.map((image) => image.imageName)
+        );
+      }
     }
 
     dispatch({ backendItemId, images, projectId, queueItemId: queueItem.id, type: 'routeQueueItemPartialResults' });
-    dispatch({ type: 'refreshBackendData' });
+    if (queueItem.snapshot.destination === 'gallery') {
+      dispatch({ type: 'refreshBackendData' });
+    }
   } catch (error) {
     dispatch({
       area: 'queue-results',
@@ -155,15 +260,11 @@ const submitQueueItem = (
   queueItem: QueueItem,
   dispatch: Dispatch<WorkbenchAction>
 ): void => {
-  const graph = queueItem.snapshot.graph.backendGraph;
-  const generateValues =
-    queueItem.snapshot.sourceId === 'generate'
-      ? normalizeGenerateSettings(queueItem.snapshot.widgetStates.generate.values)
-      : null;
+  const backendSubmission = createQueueItemBackendSubmission(project, queueItem);
 
-  if (!graph || (queueItem.snapshot.sourceId === 'generate' && !generateValues)) {
+  if (backendSubmission.kind === 'invalid') {
     dispatch({
-      error: `${queueItem.snapshot.sourceId} queue item is missing a compiled backend graph.`,
+      error: backendSubmission.error,
       projectId: project.id,
       queueItemId: queueItem.id,
       status: 'failed',
@@ -172,28 +273,10 @@ const submitQueueItem = (
     return;
   }
 
-  const submission = generateValues
-    ? coordinator.submitGenerate(queueItem.id, {
-        batchCount: generateValues.batchCount,
-        destination: queueItem.snapshot.destination,
-        graph,
-        negativePrompt: generateValues.negativePromptEnabled ? generateValues.negativePrompt : '',
-        negativePromptNodeId: 'negative_prompt',
-        positivePrompt: generateValues.positivePrompt,
-        positivePromptNodeId: 'positive_prompt',
-        projectId: project.id,
-        seed: generateValues.seed,
-        seedNodeId: 'seed',
-        shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
-        sourceQueueItemId: queueItem.id,
-      })
-    : coordinator.submitWorkflow(queueItem.id, {
-        batchCount: getSnapshotBatchCount(queueItem),
-        destination: queueItem.snapshot.destination,
-        graph,
-        projectId: project.id,
-        sourceQueueItemId: queueItem.id,
-      });
+  const submission =
+    backendSubmission.kind === 'generate'
+      ? coordinator.submitGenerate(queueItem.id, backendSubmission.request)
+      : coordinator.submitWorkflow(queueItem.id, backendSubmission.request);
 
   submission
     .then(({ batchId, itemIds }) => {
@@ -255,6 +338,15 @@ export const WorkbenchRuntime = () => {
       }),
     [store]
   );
+
+  // Keep the canvas generation frame and the generate-widget dimensions in sync
+  // while a project invokes into the canvas (the frame is the generation size).
+  // Lives beside the other store subscriptions; renders nothing.
+  useEffect(() => {
+    const sync = createCanvasDimsSync(store);
+
+    return () => sync.dispose();
+  }, [store]);
 
   useEffect(() => {
     configureDiagnostics(diagnosticsPreferences);
@@ -446,11 +538,7 @@ export const WorkbenchRuntime = () => {
 
     for (const project of stateRef.current.projects) {
       for (const queueItem of project.queue.items) {
-        if (
-          queueItem.status === 'pending' &&
-          (queueItem.snapshot.sourceId === 'generate' || queueItem.snapshot.sourceId === 'workflow') &&
-          !startedQueueItemIdsRef.current.has(queueItem.id)
-        ) {
+        if (shouldSubmitPendingQueueItem(queueItem) && !startedQueueItemIdsRef.current.has(queueItem.id)) {
           startedQueueItemIdsRef.current.add(queueItem.id);
           submitQueueItem(coordinator, project, queueItem, dispatch);
         }

@@ -76,8 +76,12 @@ interface ListImagesResponse {
 const imageCategories = ['general'];
 const assetCategories = ['control', 'mask', 'user', 'other'];
 
-const getImageThumbnailUrl = (imageName: string): string =>
+export const getImageThumbnailUrl = (imageName: string): string =>
   absolutizeApiUrl(`/api/v1/images/i/${encodeURIComponent(imageName)}/thumbnail`);
+
+/** The full-resolution image URL for an image referenced only by name (e.g. a v2 canvas layer's `CanvasImageRef`). */
+export const getImageFullUrl = (imageName: string): string =>
+  absolutizeApiUrl(`/api/v1/images/i/${encodeURIComponent(imageName)}/full`);
 
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
@@ -222,6 +226,12 @@ export const getGalleryImagesByNames = async (imageNames: string[]): Promise<Gal
   return body.map(mapImage);
 };
 
+export const getGalleryImageByName = async (imageName: string, signal?: AbortSignal): Promise<GalleryImage> => {
+  const body = await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, { signal });
+
+  return mapImage(body);
+};
+
 /**
  * Date virtual boards have no offset-paginated DTO endpoint; list the ordered
  * names for the date, slice the requested window, then bulk-hydrate DTOs.
@@ -298,6 +308,55 @@ export const listGalleryImages = async ({
       offset + items.length + (Array.isArray(body) && items.length >= limit ? 1 : 0)
     ),
   };
+};
+
+/**
+ * The `ImageRecordChanges` body that promotes a staged canvas candidate (an
+ * intermediate image) into a durable, gallery-visible image: clearing
+ * `is_intermediate` stops it being garbage-collected, and `image_category:
+ * 'general'` surfaces it in the gallery's images view. Pure so the request
+ * shape can be unit-tested without a fetch.
+ */
+export const imageSaveToGalleryChanges = (): { is_intermediate: false; image_category: 'general' } => ({
+  image_category: 'general',
+  is_intermediate: false,
+});
+
+/**
+ * The `ImageRecordChanges` body that makes an intermediate image durable without
+ * changing its category. Clearing `is_intermediate` stops garbage collection;
+ * where the image appears is determined by its existing category. Used when a
+ * utility result becomes a canvas source while discarded previews remain
+ * intermediate and can be collected.
+ */
+export const imageMakeDurableChanges = (): { is_intermediate: false } => ({
+  is_intermediate: false,
+});
+
+/**
+ * Makes a single intermediate image durable (survives GC) without changing its
+ * category, via `PATCH /api/v1/images/i/{image_name}`. Resolves once the PATCH
+ * succeeds; the caller commits the layer-source swap only after this settles so a
+ * failed PATCH never strands the layer pointing at a soon-to-be-collected image.
+ */
+export const makeImageDurable = async (imageName: string): Promise<void> => {
+  await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
+    body: JSON.stringify(imageMakeDurableChanges()),
+    method: 'PATCH',
+  });
+};
+
+/**
+ * Promotes a single image (e.g. a staged canvas candidate) into the gallery via
+ * `PATCH /api/v1/images/i/{image_name}` and returns the updated {@link GalleryImage}.
+ */
+export const saveImageToGallery = async (imageName: string): Promise<GalleryImage> => {
+  const body = await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
+    body: JSON.stringify(imageSaveToGalleryChanges()),
+    method: 'PATCH',
+  });
+
+  return mapImage(body);
 };
 
 export const getGalleryImageMetadata = async (imageName: string): Promise<GalleryImageMetadata | null> => {

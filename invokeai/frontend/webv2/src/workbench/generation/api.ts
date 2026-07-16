@@ -86,11 +86,43 @@ export const enqueueWorkflowGraph = async (request: EnqueueWorkflowRequest): Pro
   };
 };
 
+/**
+ * Enqueues a small graph OUTSIDE any project's queue, tagged with a caller-built
+ * utility origin (`webv2:util:<id>`). Used by {@link import('@workbench/canvas-operations/backend/utilityQueue').runUtilityGraph}
+ * for filter previews / SAM: the origin is intentionally opaque to project
+ * routing (see `events.ts`), so results are never staged or added to the gallery.
+ * A single deterministic run (no seed/prompt batch data).
+ */
+export const enqueueUtilityGraph = async (request: {
+  graph: BackendGraphContract;
+  origin: string;
+}): Promise<{ itemIds: number[]; enqueued: number }> => {
+  const body = {
+    batch: {
+      graph: request.graph satisfies BackendGraphContract,
+      origin: request.origin,
+      runs: 1,
+    },
+    prepend: false,
+  };
+  const result = await apiFetchJson<{ enqueued?: number; item_ids?: number[] }>('/api/v1/queue/default/enqueue_batch', {
+    body: JSON.stringify(body),
+    method: 'POST',
+  });
+
+  return { enqueued: result.enqueued ?? 0, itemIds: result.item_ids ?? [] };
+};
+
 export const getQueueItem = (itemId: number): Promise<QueueItemDTO> =>
   apiFetchJson<QueueItemDTO>(`/api/v1/queue/default/i/${itemId}`);
 
 export const listAllQueueItems = (): Promise<QueueItemDTO[]> =>
   apiFetchJson<QueueItemDTO[]>('/api/v1/queue/default/list_all');
+
+export interface QueueItemResultImageOptions {
+  /** Source graph node ids whose prepared execution results should be read. */
+  resultNodeIds?: readonly string[];
+}
 
 const getImageDTO = async (
   imageName: string,
@@ -126,10 +158,19 @@ const getImageDTO = async (
   }
 };
 
-const getResultImageNames = (queueItem: QueueItemDTO): string[] => {
+const getResultImageNames = (queueItem: QueueItemDTO, options?: QueueItemResultImageOptions): string[] => {
   const imageNames = new Set<string>();
+  const results = queueItem.session?.results ?? {};
+  const preparedSourceMapping = queueItem.session?.prepared_source_mapping ?? {};
+  const resultNodeIds = options?.resultNodeIds;
+  const resultValues = resultNodeIds
+    ? Object.entries(results)
+        // Backend result keys are prepared execution ids; source ids carry the graph contract.
+        .filter(([nodeId]) => resultNodeIds.includes(preparedSourceMapping[nodeId] ?? nodeId))
+        .map(([, result]) => result)
+    : Object.values(results);
 
-  for (const result of Object.values(queueItem.session?.results ?? {})) {
+  for (const result of resultValues) {
     if (!result || typeof result !== 'object') {
       continue;
     }
@@ -161,12 +202,13 @@ const getResultImageNames = (queueItem: QueueItemDTO): string[] => {
 export const getQueueItemResultImages = async (
   itemId: number,
   sourceQueueItemId: string,
-  queuedAt: string
+  queuedAt: string,
+  options?: QueueItemResultImageOptions
 ): Promise<ImageDTO[]> => {
   const queueItem = await getQueueItem(itemId);
 
   const images = await Promise.all(
-    getResultImageNames(queueItem).map((imageName) => getImageDTO(imageName, queuedAt, sourceQueueItemId))
+    getResultImageNames(queueItem, options).map((imageName) => getImageDTO(imageName, queuedAt, sourceQueueItemId))
   );
 
   return images.filter((image): image is ImageDTO => image !== null);
