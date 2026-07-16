@@ -3,7 +3,12 @@ import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasRasterLayerCo
 import { describe, expect, it } from 'vitest';
 
 import { getLayerContextActions } from './layerContextActions';
-import { getLayerContextMenuLayout, type LayerContextMenuSection } from './layerContextMenuLayout';
+import {
+  getLayerContextMenuLayerLabelKey,
+  getLayerContextMenuLayout,
+  getLayerContextMenuRenderEntries,
+  type LayerContextMenuSection,
+} from './layerContextMenuLayout';
 import {
   createControlLayer,
   createEmptyPaintLayer,
@@ -146,5 +151,36 @@ describe('getLayerContextMenuLayout', () => {
     expect(summarizeLayout(getLayerContextMenuLayout(reversed))).toEqual(
       summarizeLayout(getLayerContextMenuLayout(actions))
     );
+  });
+
+  it('inserts optional canvas items immediately before the terminal danger section', () => {
+    const upper = paintLayer('upper-with-canvas-items');
+    const below = paintLayer('below-with-canvas-items');
+    const layout = layoutFor(upper, [upper, below]);
+
+    const summarizeEntries = (includeBeforeDangerSlot: boolean) =>
+      getLayerContextMenuRenderEntries(layout, includeBeforeDangerSlot).map((entry) =>
+        entry.kind === 'slot' ? entry.id : entry.section.id
+      );
+
+    expect(summarizeEntries(true)).toEqual([
+      'quick',
+      'primary',
+      'operations',
+      'output',
+      'state',
+      'before-danger',
+      'danger',
+    ]);
+    expect(summarizeEntries(false)).toEqual(['quick', 'primary', 'operations', 'output', 'state', 'danger']);
+  });
+
+  it.each([
+    ['raster', 'widgets.canvas.import.raster'],
+    ['control', 'widgets.canvas.import.control'],
+    ['inpaint_mask', 'widgets.canvas.import.inpaintMask'],
+    ['regional_guidance', 'widgets.canvas.import.regionalGuidance'],
+  ] as const)('uses the legacy singular label for %s layer menus', (type, expected) => {
+    expect(getLayerContextMenuLayerLabelKey(type)).toBe(expected);
   });
 });

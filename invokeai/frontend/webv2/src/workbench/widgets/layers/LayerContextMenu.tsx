@@ -25,10 +25,15 @@ import {
   MoreVerticalIcon,
   PlusIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { LayerContextMenuItem, LayerContextMenuSection, LayerContextSubmenuId } from './layerContextMenuLayout';
+import type {
+  LayerContextMenuItem,
+  LayerContextMenuRenderEntry,
+  LayerContextMenuSection,
+  LayerContextSubmenuId,
+} from './layerContextMenuLayout';
 import type { LayerMoveKind } from './layerGroups';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 import type { LayerPropertiesSection } from './layerPropertiesRequestStore';
@@ -42,7 +47,11 @@ import {
   type LayerContextActionState,
   type LayerType,
 } from './layerContextActions';
-import { getLayerContextMenuLayout } from './layerContextMenuLayout';
+import {
+  getLayerContextMenuLayerLabelKey,
+  getLayerContextMenuLayout,
+  getLayerContextMenuRenderEntries,
+} from './layerContextMenuLayout';
 import { copyBlobToClipboard } from './layerExportActions';
 import { reorderWithinGroupByKind } from './layerGroups';
 import { resolveMenuTargetForRender } from './layerMenuState';
@@ -141,8 +150,10 @@ interface LayerMenuProps {
    */
   dialogKind?: LayerMenuDialogKind | null;
   onDialogKindChange?: (kind: LayerMenuDialogKind | null) => void;
-  /** Additional canvas-only items composed after the shared layer actions. */
-  additionalItems?: ReactNode;
+  /** Canvas-only items composed immediately before the terminal danger section. */
+  beforeDangerItems?: ReactNode;
+  /** Adds the legacy layer and Canvas group labels on the canvas surface. */
+  showGroupLabels?: boolean;
 }
 
 /**
@@ -174,7 +185,8 @@ const LayerMenu = ({
   unmountOnExit,
   dialogKind: controlledDialogKind,
   onDialogKindChange,
-  additionalItems,
+  beforeDangerItems,
+  showGroupLabels,
 }: LayerMenuProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -667,6 +679,13 @@ const LayerMenu = ({
     },
     [actionState, effects, notify, t]
   );
+  const menuRenderEntries = getLayerContextMenuRenderEntries(menuLayout, Boolean(beforeDangerItems));
+  const beforeDangerSlotIndex = menuRenderEntries.findIndex((entry) => entry.kind === 'slot');
+  const isGroupedSurfaceMenu = Boolean(showGroupLabels && beforeDangerItems && beforeDangerSlotIndex >= 0);
+  const layerRenderEntries = isGroupedSurfaceMenu
+    ? menuRenderEntries.slice(0, beforeDangerSlotIndex)
+    : menuRenderEntries;
+  const dangerRenderEntries = isGroupedSurfaceMenu ? menuRenderEntries.slice(beforeDangerSlotIndex + 1) : [];
 
   return (
     <>
@@ -693,15 +712,31 @@ const LayerMenu = ({
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="14rem" py="1">
-              {menuLayout.map((section) => (
-                <LayerMenuSection key={section.id} runAction={runAction} section={section} t={t} />
-              ))}
-              {additionalItems ? (
+              {isGroupedSurfaceMenu ? (
                 <>
+                  <Menu.ItemGroup>
+                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                      {t(getLayerContextMenuLayerLabelKey(layer.type))}
+                    </Menu.ItemGroupLabel>
+                    {renderLayerMenuEntries({ entries: layerRenderEntries, runAction, t })}
+                  </Menu.ItemGroup>
                   <Menu.Separator borderColor="border.subtle" />
-                  {additionalItems}
+                  <Menu.ItemGroup>
+                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                      {t('widgets.labels.canvas')}
+                    </Menu.ItemGroupLabel>
+                    {beforeDangerItems}
+                  </Menu.ItemGroup>
+                  {renderLayerMenuEntries({ entries: dangerRenderEntries, runAction, t })}
                 </>
-              ) : null}
+              ) : (
+                renderLayerMenuEntries({
+                  beforeDangerItems,
+                  entries: menuRenderEntries,
+                  runAction,
+                  t,
+                })
+              )}
             </MenuContent>
           </Menu.Positioner>
         </Portal>
@@ -762,18 +797,20 @@ export interface CanvasLayerContextMenuTarget {
  * the last-known (sticky) target until the dialog closes (F1).
  */
 export const CanvasLayerContextMenu = ({
-  additionalItems,
+  beforeDangerItems,
   dispatch,
   engine,
   layers,
   target,
+  showGroupLabels,
   onClose,
 }: {
-  additionalItems?: ReactNode;
+  beforeDangerItems?: ReactNode;
   dispatch: Dispatch<WorkbenchAction>;
   engine: CanvasEngine | null;
   layers: readonly CanvasLayerContract[];
   target: CanvasLayerContextMenuTarget | null;
+  showGroupLabels?: boolean;
   onClose: () => void;
 }) => {
   // The layer a pending sibling dialog is anchored to. Captured while the live
@@ -815,7 +852,7 @@ export const CanvasLayerContextMenu = ({
   return (
     <LayerMenu
       key={renderTarget.layerId}
-      additionalItems={additionalItems}
+      beforeDangerItems={beforeDangerItems}
       dispatch={dispatch}
       dialogKind={dialogState?.kind ?? null}
       engine={engine}
@@ -827,6 +864,7 @@ export const CanvasLayerContextMenu = ({
       // sibling dialog closes it (target → null), the subtree stays mounted.
       open={!!target}
       positioning={positioning}
+      showGroupLabels={showGroupLabels}
       unmountOnExit
       onOpenChange={handleOpenChange}
       onDialogKindChange={handleDialogKindChange}
@@ -850,6 +888,28 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
 };
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
+
+const renderLayerMenuEntries = ({
+  beforeDangerItems,
+  entries,
+  runAction,
+  t,
+}: {
+  beforeDangerItems?: ReactNode;
+  entries: readonly LayerContextMenuRenderEntry[];
+  runAction: (action: LayerContextAction) => void;
+  t: (key: string, options?: { defaultValue: string }) => string;
+}) =>
+  entries.map((entry) =>
+    entry.kind === 'slot' ? (
+      <Fragment key={entry.id}>
+        <Menu.Separator borderColor="border.subtle" />
+        {beforeDangerItems}
+      </Fragment>
+    ) : (
+      <LayerMenuSection key={entry.section.id} runAction={runAction} section={entry.section} t={t} />
+    )
+  );
 
 const LayerMenuSection = ({
   runAction,

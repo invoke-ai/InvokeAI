@@ -1,4 +1,9 @@
-import type { LayerContextAction, LayerContextMenuSectionId, LayerContextSubmenuId } from './layerContextActions';
+import type {
+  LayerContextAction,
+  LayerContextMenuSectionId,
+  LayerContextSubmenuId,
+  LayerType,
+} from './layerContextActions';
 
 export type { LayerContextSubmenuId } from './layerContextActions';
 
@@ -11,6 +16,16 @@ export interface LayerContextMenuSection {
   items: readonly LayerContextMenuItem[];
   presentation: 'row' | 'list';
 }
+
+export type LayerContextMenuRenderEntry =
+  | { id: 'before-danger'; kind: 'slot' }
+  | { kind: 'section'; section: LayerContextMenuSection };
+
+type LayerContextMenuLayerLabelKey =
+  | 'widgets.canvas.import.control'
+  | 'widgets.canvas.import.inpaintMask'
+  | 'widgets.canvas.import.raster'
+  | 'widgets.canvas.import.regionalGuidance';
 
 const SECTION_LAYOUT: readonly {
   id: LayerContextMenuSectionId;
@@ -68,3 +83,31 @@ export const getLayerContextMenuLayout = (actions: readonly LayerContextAction[]
       const items = buildSectionItems(actions.filter((action) => action.section === section.id));
       return items.length > 0 ? [{ id: section.id, items, presentation: section.presentation }] : [];
     });
+
+/** Inserts canvas-only items before destructive layer actions without coupling them to the layer-action registry. */
+export const getLayerContextMenuRenderEntries = (
+  sections: readonly LayerContextMenuSection[],
+  includeBeforeDangerSlot: boolean
+): LayerContextMenuRenderEntry[] =>
+  sections.flatMap((section): LayerContextMenuRenderEntry[] =>
+    includeBeforeDangerSlot && section.id === 'danger'
+      ? [
+          { id: 'before-danger', kind: 'slot' },
+          { kind: 'section', section },
+        ]
+      : [{ kind: 'section', section }]
+  );
+
+/** Resolves the singular layer labels used by the legacy canvas context menu. */
+export const getLayerContextMenuLayerLabelKey = (type: LayerType): LayerContextMenuLayerLabelKey => {
+  switch (type) {
+    case 'control':
+      return 'widgets.canvas.import.control';
+    case 'inpaint_mask':
+      return 'widgets.canvas.import.inpaintMask';
+    case 'raster':
+      return 'widgets.canvas.import.raster';
+    case 'regional_guidance':
+      return 'widgets.canvas.import.regionalGuidance';
+  }
+};

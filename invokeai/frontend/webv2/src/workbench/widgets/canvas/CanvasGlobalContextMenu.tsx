@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Menu, Portal } from '@chakra-ui/react';
 import { MenuContent } from '@workbench/components/ui';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { CanvasContextMenuTarget } from './canvasContextMenu';
 
@@ -15,6 +16,7 @@ export const CanvasGlobalContextMenu = ({
   onClose: () => void;
   target: CanvasContextMenuTarget;
 }) => {
+  const { t } = useTranslation();
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => ({ height: 1, width: 1, x: target.x, y: target.y }),
@@ -36,7 +38,12 @@ export const CanvasGlobalContextMenu = ({
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="14rem" py="1">
-            {children}
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                {t('widgets.labels.canvas')}
+              </Menu.ItemGroupLabel>
+              {children}
+            </Menu.ItemGroup>
           </MenuContent>
         </Menu.Positioner>
       </Portal>

@@ -473,10 +473,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
           <>
             <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
             <CanvasLayerContextMenu
-              additionalItems={saveToGallerySubmenu}
+              beforeDangerItems={saveToGallerySubmenu}
               dispatch={dispatch}
               engine={engine}
               layers={document.layers}
+              showGroupLabels
               target={layerContextMenuTarget}
               onClose={closeContextMenu}
             />
