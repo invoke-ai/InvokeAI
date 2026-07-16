@@ -5044,8 +5044,13 @@
       "head": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
+        "description": "Gets a full-resolution image file.\n\nBrowser media requests authenticate with the path-scoped HttpOnly cookie set at login.\nReturns 409 while image storage maintenance is active.",
         "operationId": "get_image_full_head",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -5057,6 +5062,22 @@
               "title": "Image Name"
             },
             "description": "The name of full-resolution image file to get"
+          },
+          {
+            "name": "invokeai_media_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invokeai Media Token"
+            }
           }
         ],
         "responses": {
@@ -5084,8 +5105,13 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
+        "description": "Gets a full-resolution image file.\n\nBrowser media requests authenticate with the path-scoped HttpOnly cookie set at login.\nReturns 409 while image storage maintenance is active.",
         "operationId": "get_image_full",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -5097,6 +5123,22 @@
               "title": "Image Name"
             },
             "description": "The name of full-resolution image file to get"
+          },
+          {
+            "name": "invokeai_media_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invokeai Media Token"
+            }
           }
         ],
         "responses": {
@@ -5126,8 +5168,13 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Thumbnail",
-        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
+        "description": "Gets a thumbnail image file.\n\nBrowser media requests authenticate with the path-scoped HttpOnly cookie set at login.\nReturns 409 while image storage maintenance is active.",
         "operationId": "get_image_thumbnail",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -5139,6 +5186,22 @@
               "title": "Image Name"
             },
             "description": "The name of thumbnail image file to get"
+          },
+          {
+            "name": "invokeai_media_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invokeai Media Token"
+            }
           }
         ],
         "responses": {

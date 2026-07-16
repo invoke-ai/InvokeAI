@@ -1235,10 +1235,8 @@ export type paths = {
          * Get Image Full
          * @description Gets a full-resolution image file.
          *
-         *     This endpoint is intentionally unauthenticated because browsers load images
-         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability. Returns 409 while image storage
-         *     maintenance is active.
+         *     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+         *     Returns 409 while image storage maintenance is active.
          */
         get: operations["get_image_full"];
         put?: never;
@@ -1249,10 +1247,8 @@ export type paths = {
          * Get Image Full
          * @description Gets a full-resolution image file.
          *
-         *     This endpoint is intentionally unauthenticated because browsers load images
-         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability. Returns 409 while image storage
-         *     maintenance is active.
+         *     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+         *     Returns 409 while image storage maintenance is active.
          */
         head: operations["get_image_full_head"];
         patch?: never;
@@ -1269,10 +1265,8 @@ export type paths = {
          * Get Image Thumbnail
          * @description Gets a thumbnail image file.
          *
-         *     This endpoint is intentionally unauthenticated because browsers load images
-         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability. Returns 409 while image storage
-         *     maintenance is active.
+         *     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+         *     Returns 409 while image storage maintenance is active.
          */
         get: operations["get_image_thumbnail"];
         put?: never;
@@ -39174,7 +39168,9 @@ export interface operations {
                 /** @description The name of full-resolution image file to get */
                 image_name: string;
             };
-            cookie?: never;
+            cookie?: {
+                invokeai_media_token?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -39213,7 +39209,9 @@ export interface operations {
                 /** @description The name of full-resolution image file to get */
                 image_name: string;
             };
-            cookie?: never;
+            cookie?: {
+                invokeai_media_token?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -39252,7 +39250,9 @@ export interface operations {
                 /** @description The name of thumbnail image file to get */
                 image_name: string;
             };
-            cookie?: never;
+            cookie?: {
+                invokeai_media_token?: string | null;
+            };
         };
         requestBody?: never;
         responses: {

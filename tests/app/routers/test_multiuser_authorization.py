@@ -9,6 +9,7 @@ These tests verify the security fixes for:
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -403,15 +404,66 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/some-image/metadata")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_get_image_full_is_unauthenticated(self, enable_multiuser: Any, client: TestClient):
-        # Binary image endpoints are intentionally unauthenticated because
-        # browsers load them via <img src> which cannot send Bearer tokens.
-        r = client.get("/api/v1/images/i/some-image/full")
-        assert r.status_code != status.HTTP_401_UNAUTHORIZED
+    @pytest.mark.parametrize("suffix", ["full", "thumbnail"])
+    def test_image_media_requires_auth(self, enable_multiuser: Any, client: TestClient, suffix: str):
+        client.cookies.clear()
 
-    def test_get_image_thumbnail_is_unauthenticated(self, enable_multiuser: Any, client: TestClient):
-        r = client.get("/api/v1/images/i/some-image/thumbnail")
-        assert r.status_code != status.HTTP_401_UNAUTHORIZED
+        r = client.get(f"/api/v1/images/i/some-image/{suffix}")
+
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.parametrize("suffix,thumbnail", [("full", False), ("thumbnail", True)])
+    def test_image_owner_can_load_media_with_login_cookie(
+        self,
+        monkeypatch: Any,
+        client: TestClient,
+        mock_invoker: Invoker,
+        user1_token: str,
+        tmp_path: Path,
+        suffix: str,
+        thumbnail: bool,
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "owned-image", user1.user_id)
+        media_path = tmp_path / ("image.webp" if thumbnail else "image.png")
+        media_path.write_bytes(b"media")
+        get_path = MagicMock(return_value=media_path)
+        monkeypatch.setattr(mock_invoker.services.images, "get_path", get_path)
+        client.cookies.clear()
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "user1@test.com", "password": "TestPass123", "remember_me": False},
+        )
+        assert login.status_code == status.HTTP_200_OK
+
+        r = client.get(f"/api/v1/images/i/owned-image/{suffix}")
+
+        assert r.status_code == status.HTTP_200_OK
+        assert r.headers["cache-control"] == "private, no-store"
+        if thumbnail:
+            get_path.assert_called_once_with("owned-image", thumbnail=True)
+        else:
+            get_path.assert_called_once_with("owned-image")
+
+    def test_non_owner_cannot_load_private_image_media(
+        self,
+        monkeypatch: Any,
+        client: TestClient,
+        mock_invoker: Invoker,
+        user1_token: str,
+        user2_token: str,
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "private-image", user1.user_id)
+        get_path = MagicMock()
+        monkeypatch.setattr(mock_invoker.services.images, "get_path", get_path)
+
+        r = client.get("/api/v1/images/i/private-image/full", headers=_auth(user2_token))
+
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+        get_path.assert_not_called()
 
     def test_get_image_urls_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.get("/api/v1/images/i/some-image/urls")

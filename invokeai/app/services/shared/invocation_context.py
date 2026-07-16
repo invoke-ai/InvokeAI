@@ -170,6 +170,22 @@ class ImagesInterface(InvocationContextInterface):
         super().__init__(services, data)
         self._util = util
 
+    def _assert_read_access(self, image_name: str) -> None:
+        if not self._services.configuration.multiuser:
+            return
+        user_id = self._data.queue_item.user_id
+        user = self._services.users.get(user_id)
+        if user is None:
+            raise PermissionError("Queue user is not authorized to access this image")
+        if user.is_admin or self._services.image_records.get_user_id(image_name) == user_id:
+            return
+        board_id = self._services.board_image_records.get_board_for_image(image_name)
+        if board_id is not None:
+            board = self._services.boards.get_dto(board_id)
+            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
+                return
+        raise PermissionError("Queue user is not authorized to access this image")
+
     def save(
         self,
         image: Image,
@@ -212,6 +228,16 @@ class ImagesInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
+        if board_id_ is not None and self._services.configuration.multiuser:
+            board = self._services.boards.get_dto(board_id_)
+            user = self._services.users.get(self._data.queue_item.user_id)
+            if user is None or (
+                not user.is_admin
+                and board.user_id != self._data.queue_item.user_id
+                and board.board_visibility != BoardVisibility.Public
+            ):
+                raise PermissionError("Queue user is not authorized to save images to this board")
+
         workflow_ = None
         if self._data.queue_item.workflow:
             workflow_ = self._data.queue_item.workflow.model_dump_json()
@@ -244,6 +270,7 @@ class ImagesInterface(InvocationContextInterface):
         Returns:
             The image as a PIL Image object.
         """
+        self._assert_read_access(image_name)
         image = self._services.images.get_pil_image(image_name)
         if mode and mode != image.mode:
             try:
@@ -267,6 +294,7 @@ class ImagesInterface(InvocationContextInterface):
         Returns:
             The image's metadata, if it has any.
         """
+        self._assert_read_access(image_name)
         return self._services.images.get_metadata(image_name)
 
     def get_dto(self, image_name: str) -> ImageDTO:
@@ -278,6 +306,7 @@ class ImagesInterface(InvocationContextInterface):
         Returns:
             The image as an ImageDTO object.
         """
+        self._assert_read_access(image_name)
         return self._services.images.get_dto(image_name)
 
     def get_path(self, image_name: str, thumbnail: bool = False) -> Path:
@@ -290,6 +319,7 @@ class ImagesInterface(InvocationContextInterface):
         Returns:
             The local path of the image or thumbnail.
         """
+        self._assert_read_access(image_name)
         return Path(self._services.images.get_path(image_name, thumbnail))
 
 

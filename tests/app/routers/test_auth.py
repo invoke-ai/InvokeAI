@@ -99,7 +99,7 @@ def test_login_success(monkeypatch: Any, mock_invoker: Invoker, client: TestClie
     assert json_response["user"]["is_admin"] is False
     assert response.cookies.get("invokeai_media_token") == json_response["token"]
     assert "HttpOnly" in response.headers["set-cookie"]
-    assert "Path=/api/v1/videos" in response.headers["set-cookie"]
+    assert "Path=/api/v1" in response.headers["set-cookie"]
 
 
 def test_login_with_remember_me(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
@@ -390,7 +390,7 @@ class TestRefreshMediaCookie:
         assert response.cookies.get("invokeai_media_token") == token
         set_cookie = response.headers["set-cookie"]
         assert "HttpOnly" in set_cookie
-        assert "Path=/api/v1/videos" in set_cookie
+        assert "Path=/api/v1" in set_cookie
         # Cookie must not outlive the token: max-age is clamped to the remaining
         # validity (1-day login here, minus the instants since).
         max_age = int(set_cookie.split("Max-Age=")[1].split(";")[0])

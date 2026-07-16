@@ -132,7 +132,7 @@ async def get_current_media_user_or_default(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
     media_token: Annotated[str | None, Cookie(alias=MEDIA_TOKEN_COOKIE)] = None,
 ) -> TokenData:
-    """Authenticate video media requests with a Bearer token or the path-scoped login cookie."""
+    """Authenticate media requests with a Bearer token or the path-scoped login cookie."""
     if not ApiDependencies.invoker.services.configuration.multiuser:
         return TokenData(user_id="system", email="system@system.invokeai", is_admin=True)
     token = credentials.credentials if credentials is not None else media_token

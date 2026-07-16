@@ -89,7 +89,7 @@ class MediaCookieResponse(BaseModel):
 def _set_media_cookie(request: Request, response: Response, token: str, max_age_seconds: int) -> None:
     """Set the HttpOnly cookie that authenticates <video>/<img> media requests.
 
-    Media elements can't send Authorization headers, so the video media routes
+    Media elements can't send Authorization headers, so the image and video media routes
     accept the JWT via this path-scoped cookie instead. Shared by login and
     /media-cookie so the cookie attributes can't drift between the two.
     """
@@ -100,7 +100,7 @@ def _set_media_cookie(request: Request, response: Response, token: str, max_age_
         httponly=True,
         secure=request.url.scheme == "https",
         samesite="lax",
-        path="/api/v1/videos",
+        path="/api/v1",
     )
 
 
@@ -229,7 +229,7 @@ async def logout(
     """
     # TODO: Implement token invalidation when server-side session management is added
     # For now, this is a no-op since we use stateless JWT tokens
-    response.delete_cookie(MEDIA_TOKEN_COOKIE, path="/api/v1/videos")
+    response.delete_cookie(MEDIA_TOKEN_COOKIE, path="/api/v1")
     return LogoutResponse(success=True)
 
 
