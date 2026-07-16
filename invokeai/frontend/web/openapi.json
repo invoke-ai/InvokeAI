@@ -60275,51 +60275,6 @@
         "title": "QueueItemStatusChangedEvent",
         "type": "object"
       },
-      "QueueItemsRetriedEvent": {
-        "description": "Event model for queue_items_retried",
-        "properties": {
-          "timestamp": {
-            "description": "The timestamp of the event",
-            "title": "Timestamp",
-            "type": "integer"
-          },
-          "queue_id": {
-            "description": "The ID of the queue",
-            "title": "Queue Id",
-            "type": "string"
-          },
-          "retried_item_ids": {
-            "description": "The IDs of the queue items that were retried",
-            "items": {
-              "type": "integer"
-            },
-            "title": "Retried Item Ids",
-            "type": "array"
-          },
-          "user_ids": {
-            "description": "The IDs of the users who own the retried root queue items",
-            "items": {
-              "type": "string"
-            },
-            "title": "User Ids",
-            "type": "array"
-          },
-          "retried_item_ids_by_user": {
-            "additionalProperties": {
-              "items": {
-                "type": "integer"
-              },
-              "type": "array"
-            },
-            "description": "The retried root queue item IDs keyed by owner user ID.",
-            "title": "Retried Item Ids By User",
-            "type": "object"
-          }
-        },
-        "required": ["timestamp", "queue_id", "retried_item_ids", "user_ids", "retried_item_ids_by_user"],
-        "title": "QueueItemsRetriedEvent",
-        "type": "object"
-      },
       "QueueItemsCanceledEvent": {
         "description": "Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in\nbulk (e.g. cancel/delete-all-except-current) without per-item status change events.",
         "properties": {
@@ -60363,6 +60318,51 @@
         },
         "required": ["timestamp", "queue_id", "canceled_item_ids", "user_ids", "canceled_item_ids_by_user"],
         "title": "QueueItemsCanceledEvent",
+        "type": "object"
+      },
+      "QueueItemsRetriedEvent": {
+        "description": "Event model for queue_items_retried",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "queue_id": {
+            "description": "The ID of the queue",
+            "title": "Queue Id",
+            "type": "string"
+          },
+          "retried_item_ids": {
+            "description": "The IDs of the queue items that were retried",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Retried Item Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "description": "The IDs of the users who own the retried root queue items",
+            "items": {
+              "type": "string"
+            },
+            "title": "User Ids",
+            "type": "array"
+          },
+          "retried_item_ids_by_user": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "description": "The retried root queue item IDs keyed by owner user ID.",
+            "title": "Retried Item Ids By User",
+            "type": "object"
+          }
+        },
+        "required": ["timestamp", "queue_id", "retried_item_ids", "user_ids", "retried_item_ids_by_user"],
+        "title": "QueueItemsRetriedEvent",
         "type": "object"
       },
       "Qwen3EncoderField": {

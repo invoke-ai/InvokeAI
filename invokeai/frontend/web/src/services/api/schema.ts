@@ -25548,39 +25548,6 @@ export type components = {
             session_id: string;
         };
         /**
-         * QueueItemsRetriedEvent
-         * @description Event model for queue_items_retried
-         */
-        QueueItemsRetriedEvent: {
-            /**
-             * Timestamp
-             * @description The timestamp of the event
-             */
-            timestamp: number;
-            /**
-             * Queue Id
-             * @description The ID of the queue
-             */
-            queue_id: string;
-            /**
-             * Retried Item Ids
-             * @description The IDs of the queue items that were retried
-             */
-            retried_item_ids: number[];
-            /**
-             * User Ids
-             * @description The IDs of the users who own the retried root queue items
-             */
-            user_ids: string[];
-            /**
-             * Retried Item Ids By User
-             * @description The retried root queue item IDs keyed by owner user ID.
-             */
-            retried_item_ids_by_user: {
-                [key: string]: number[];
-            };
-        };
-        /**
          * QueueItemsCanceledEvent
          * @description Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in
          *     bulk (e.g. cancel/delete-all-except-current) without per-item status change events.
@@ -25611,6 +25578,39 @@ export type components = {
              * @description The canceled queue item IDs keyed by owner user ID.
              */
             canceled_item_ids_by_user: {
+                [key: string]: number[];
+            };
+        };
+        /**
+         * QueueItemsRetriedEvent
+         * @description Event model for queue_items_retried
+         */
+        QueueItemsRetriedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * Retried Item Ids
+             * @description The IDs of the queue items that were retried
+             */
+            retried_item_ids: number[];
+            /**
+             * User Ids
+             * @description The IDs of the users who own the retried root queue items
+             */
+            user_ids: string[];
+            /**
+             * Retried Item Ids By User
+             * @description The retried root queue item IDs keyed by owner user ID.
+             */
+            retried_item_ids_by_user: {
                 [key: string]: number[];
             };
         };
