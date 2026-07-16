@@ -13,6 +13,9 @@
     "canceled": "Canceled",
     "clear": "Clear",
     "clearSearch": "Clear search",
+    "noSchedulersFound": "No schedulers found",
+    "openSelector": "Open selector",
+    "searchSchedulers": "Search schedulers…",
     "close": "Close",
     "configure": "Configure",
     "copy": "Copy",
@@ -560,6 +563,7 @@
     "uninstalled": "Uninstalled"
   },
   "launchpad": {
+    "backToProject": "Back to project",
     "projectsGreeting": "Welcome to Invoke",
     "projectsGreetingWithName": "Welcome back, {{name}}",
     "projectsSubtitle": "Pick up where you left off, or start something new.",
@@ -816,6 +820,8 @@
       "showInProgressDiffusion": "Show in-progress diffusion",
       "sideBySide": "Side by Side",
       "slider": "Slider",
+      "hover": "Hover",
+      "hoverComparisonAriaLabel": "Reveal comparison image on hover, focus, or touch",
       "sourceRun": "Source run {{id}}",
       "viewing": "Viewing"
     },
@@ -1625,6 +1631,7 @@
       "settingsThumbnails": "Thumbnails",
       "showArchivedBoards": "Show archived boards",
       "showDateBoards": "Show date boards",
+      "showPendingItems": "Show pending items",
       "showStarredImagesFirst": "Show starred images first",
       "sortBoardsAscending": "Sort boards ascending",
       "sortBoardsDescending": "Sort boards descending",
