@@ -76,7 +76,9 @@ export const ColorPicker = ({
 
   return (
     <ChakraColorPicker.Root
+      lazyMount
       size={size}
+      unmountOnExit
       value={color}
       onValueChange={handleValueChange}
       onValueChangeEnd={handleValueChangeEnd}
