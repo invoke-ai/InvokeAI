@@ -36,6 +36,10 @@ export interface UploadCanvasImageOptions {
   boardId?: string;
   /** File name sent in the multipart part (defaults to `canvas-paint.png`). */
   fileName?: string;
+  /** Optional image metadata sent as JSON in the multipart body. */
+  metadata?: Record<string, unknown>;
+  /** Optional backend resize dimensions sent as JSON in the multipart body. */
+  resizeTo?: { width: number; height: number };
   /** Injectable `fetch` implementation (defaults to the global). */
   fetch?: typeof globalThis.fetch;
   /** Cancels the multipart request when its owning operation is superseded. */
@@ -76,6 +80,12 @@ export const uploadCanvasImage = async (
   const file = new File([blob], fileName, { type: blob.type || 'image/png' });
   const body = new FormData();
   body.append('file', file);
+  if (options.metadata) {
+    body.append('metadata', JSON.stringify(options.metadata));
+  }
+  if (options.resizeTo) {
+    body.append('resize_to', JSON.stringify(options.resizeTo));
+  }
 
   const headers = new Headers();
   const token = getAuthToken();

@@ -49,7 +49,7 @@ describe('uploadCanvasImage', () => {
     expect((file as File).type).toBe('image/png');
   });
 
-  it('honors overrides for category, intermediate flag, and board', async () => {
+  it('honors overrides for category, intermediate flag, board, metadata, and resize dimensions', async () => {
     const fetchImpl = vi.fn(() =>
       Promise.resolve(jsonResponse({ height: 1, image_name: 'x', width: 1 }, { status: 201 }))
     );
@@ -59,12 +59,17 @@ describe('uploadCanvasImage', () => {
       fetch: fetchImpl,
       imageCategory: 'user',
       isIntermediate: true,
+      metadata: { seed: 42 },
+      resizeTo: { width: 1024, height: 768 },
     });
 
-    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain('image_category=user');
     expect(url).toContain('is_intermediate=true');
     expect(url).toContain('board_id=board-9');
+    const formData = init.body as FormData;
+    expect(formData.get('metadata')).toBe(JSON.stringify({ seed: 42 }));
+    expect(formData.get('resize_to')).toBe(JSON.stringify({ width: 1024, height: 768 }));
   });
 
   it('throws a typed error with the status on a non-ok response', async () => {
