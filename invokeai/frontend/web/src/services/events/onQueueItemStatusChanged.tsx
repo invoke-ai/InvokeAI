@@ -87,7 +87,13 @@ export const buildOnQueueItemStatusChanged = (dispatch: AppDispatch, coordinator
     );
 
     // Invalidate caches for things we cannot easily update
-    // Invalidate SessionQueueStatus to refetch with user-specific counts
+    //
+    // SessionQueueStatus stays in this list even though the optimistic write above already
+    // applied the event's counts (including the owner's per-user counts): the refetch is what
+    // refreshes the processor half of the response — the optimistic write only touches .queue,
+    // never .processor (is_started/is_processing, read by the pause/resume controls) — and it
+    // reconciles drift from missed or out-of-order events (getQueueStatusWithObservedEvents
+    // exists to arbitrate exactly that refetch-vs-event race). Do not remove it as "redundant".
     const tagsToInvalidate: ApiTagDescription[] = [
       ...QUEUE_CHANGED_TAGS,
       'InvocationCacheStatus',

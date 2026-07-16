@@ -32,6 +32,11 @@ export const useSocketIO = () => {
   // failure toast) that never replay after hydration. No token means single-user mode (or a
   // stale token that ProtectedRoute has cleared), where every event is the client's own and the
   // socket can connect immediately.
+  //
+  // The token also feeds socketOptions, making it a dependency of the connect effect: an in-tab
+  // logout or session expiry (which nulls the token) tears the authenticated socket down instead
+  // of letting it keep the old user's room membership — and private events — until the next full
+  // page reload.
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectCurrentUser);
   const isAuthHydrated = !token || currentUser !== null;
@@ -41,8 +46,10 @@ export const useSocketIO = () => {
     return `${wsProtocol}://${window.location.host}`;
   }, []);
 
+  // Derived from the redux token (hydrated synchronously from localStorage) rather than a
+  // one-time localStorage read, so the socket always authenticates with the current session's
+  // token and reconnects when it changes.
   const socketOptions = useMemo(() => {
-    const token = localStorage.getItem('auth_token');
     const options: Partial<ManagerOptions & SocketOptions> = {
       timeout: 60000,
       path: '/ws/socket.io',
@@ -57,7 +64,7 @@ export const useSocketIO = () => {
     };
 
     return options;
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (!isAuthHydrated) {
@@ -92,6 +99,7 @@ export const useSocketIO = () => {
       }
       unsubscribeQueueStatusListener();
       socket.disconnect();
+      $socket.set(null);
     };
   }, [isAuthHydrated, socketOptions, socketUrl, store]);
 };
