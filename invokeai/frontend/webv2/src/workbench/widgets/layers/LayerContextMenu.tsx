@@ -10,7 +10,7 @@ import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
 import { deleteLayerActions, duplicateLayerActions } from '@workbench/canvasLayerOps';
-import { IconButton, MenuContent, RenameDialog } from '@workbench/components/ui';
+import { IconButton, MenuContent, RenameDialog, Tooltip } from '@workbench/components/ui';
 import { uploadGalleryImage } from '@workbench/gallery/api';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
@@ -888,6 +888,8 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
 };
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
+const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: '2xs' } as const;
+const QUICK_MENU_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
 
 const renderLayerMenuEntries = ({
   beforeDangerItems,
@@ -986,7 +988,15 @@ const LayerMenuSubmenu = ({
         justifyContent={compact ? 'center' : undefined}
       >
         {compact ? (
-          <Icon as={meta.icon} boxSize="4" color="fg.subtle" />
+          <Tooltip
+            showArrow
+            content={label}
+            contentProps={QUICK_MENU_TOOLTIP_CONTENT_PROPS}
+            openDelay={300}
+            positioning={QUICK_MENU_TOOLTIP_POSITIONING_PROPS}
+          >
+            <Icon as={meta.icon} boxSize="4" color="fg" />
+          </Tooltip>
         ) : (
           <HStack gap="2" minW="0" w="full">
             <Icon as={meta.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
@@ -1095,15 +1105,23 @@ const LayerMenuIconItem = ({
   onSelect: () => void;
   value: string;
 }) => (
-  <Menu.Item
-    aria-label={label}
-    color={color}
-    disabled={disabled}
-    flex="1"
-    justifyContent="center"
-    value={value}
-    onSelect={onSelect}
+  <Tooltip
+    showArrow
+    content={label}
+    contentProps={QUICK_MENU_TOOLTIP_CONTENT_PROPS}
+    openDelay={300}
+    positioning={QUICK_MENU_TOOLTIP_POSITIONING_PROPS}
   >
-    <Icon as={icon} boxSize="4" color={color ?? 'fg.subtle'} />
-  </Menu.Item>
+    <Menu.Item
+      aria-label={label}
+      color={color}
+      disabled={disabled}
+      flex="1"
+      justifyContent="center"
+      value={value}
+      onSelect={onSelect}
+    >
+      <Icon as={icon} boxSize="4" color={color ?? 'fg'} />
+    </Menu.Item>
+  </Tooltip>
 );

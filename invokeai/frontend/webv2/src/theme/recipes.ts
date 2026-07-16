@@ -90,6 +90,10 @@ export const menuSlotRecipe = defineSlotRecipe({
       bg: 'border.subtle',
     },
   },
+  defaultVariants: {
+    ...chakraSlotRecipes.menu.defaultVariants,
+    size: 'sm',
+  },
 });
 
 /** Select dropdown chrome: same surface and item treatment as menus. */
