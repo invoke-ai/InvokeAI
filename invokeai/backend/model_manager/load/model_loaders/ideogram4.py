@@ -13,7 +13,7 @@ FLUX nf4. Both transformer branches are returned as a single ``Ideogram4Transfor
 
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import accelerate
 import torch
@@ -164,15 +164,11 @@ class Ideogram4DiffusersModel(ModelLoader):
             with accelerate.init_empty_weights():
                 model: torch.nn.Module = AutoModel.from_config(cfg)
                 swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
-            load_fp8_state_dict(
-                model, sd, device=torch.device("cpu"), dtype=compute_dtype, assign=True, strict=False
-            )
+            load_fp8_state_dict(model, sd, device=torch.device("cpu"), dtype=compute_dtype, assign=True, strict=False)
             model.eval()
             return model
 
-        is_bnb_nf4 = "quantization_config" in raw_cfg and bool(
-            raw_cfg["quantization_config"].get("load_in_4bit")
-        )
+        is_bnb_nf4 = "quantization_config" in raw_cfg and bool(raw_cfg["quantization_config"].get("load_in_4bit"))
 
         with accelerate.init_empty_weights():
             model = AutoModel.from_config(cfg)

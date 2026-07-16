@@ -20,6 +20,7 @@ from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
     FluxConditioningField,
+    Ideogram4ConditioningField,
     ImageField,
     Input,
     InputField,
@@ -29,7 +30,6 @@ from invokeai.app.invocations.fields import (
     SD3ConditioningField,
     TensorField,
     UIComponent,
-    Ideogram4ConditioningField,
     ZImageConditioningField,
 )
 from invokeai.app.services.images.images_common import ImageDTO
