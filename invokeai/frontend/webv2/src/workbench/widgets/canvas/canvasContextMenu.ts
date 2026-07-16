@@ -19,6 +19,19 @@ interface CanvasContextMenuResolution {
   target: CanvasContextMenuTarget | null;
 }
 
+export type CanvasContextMenuBranch = 'global' | 'layer' | null;
+
+export const resolveCanvasContextMenuBranch = (
+  target: CanvasContextMenuTarget | null,
+  hasEngine: boolean
+): CanvasContextMenuBranch => {
+  if (!target) {
+    return null;
+  }
+
+  return target.layerId !== null && hasEngine ? 'layer' : 'global';
+};
+
 export const resolveCanvasContextMenu = ({
   clientX,
   clientY,

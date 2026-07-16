@@ -24,7 +24,11 @@ import { useTranslation } from 'react-i18next';
 import { gridSizeForModelBase } from './bboxGrid';
 import { CanvasBottomControls } from './CanvasBottomControls';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
-import { resolveCanvasContextMenu, type CanvasContextMenuTarget } from './canvasContextMenu';
+import {
+  resolveCanvasContextMenu,
+  resolveCanvasContextMenuBranch,
+  type CanvasContextMenuTarget,
+} from './canvasContextMenu';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
@@ -401,17 +405,26 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
         : null,
     [contextMenuTarget]
   );
-  const isSaveToGalleryDisabled = isSaving || isInteractionLocked;
+  const contextMenuBranch = resolveCanvasContextMenuBranch(contextMenuTarget, engine !== null);
+  const isSaveToGalleryDisabled = !engine || isSaving || isInteractionLocked;
   const saveToGallerySubmenu = useMemo(
     () => <CanvasSaveToGallerySubmenu disabled={isSaveToGalleryDisabled} onSave={saveToGallery} />,
     [isSaveToGalleryDisabled, saveToGallery]
   );
 
   return (
-    <Box aria-label={t('widgets.canvas.surface')} bg="bg.inset" h="full" overflow="hidden" position="relative" w="full">
+    <Box
+      aria-label={t('widgets.canvas.surface')}
+      bg="bg.inset"
+      h="full"
+      overflow="hidden"
+      position="relative"
+      w="full"
+      onContextMenu={handleSurfaceContextMenu}
+    >
       {engine ? (
         <>
-          <CanvasSurface engine={engine} onContextMenu={handleSurfaceContextMenu} />
+          <CanvasSurface engine={engine} />
           <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
           <CanvasLayerContextMenu
             additionalItems={saveToGallerySubmenu}
@@ -421,12 +434,12 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
             target={layerContextMenuTarget}
             onClose={closeContextMenu}
           />
-          {contextMenuTarget && !layerContextMenuTarget ? (
-            <CanvasGlobalContextMenu target={contextMenuTarget} onClose={closeContextMenu}>
-              {saveToGallerySubmenu}
-            </CanvasGlobalContextMenu>
-          ) : null}
         </>
+      ) : null}
+      {contextMenuBranch === 'global' && contextMenuTarget ? (
+        <CanvasGlobalContextMenu target={contextMenuTarget} onClose={closeContextMenu}>
+          {saveToGallerySubmenu}
+        </CanvasGlobalContextMenu>
       ) : null}
 
       {/*

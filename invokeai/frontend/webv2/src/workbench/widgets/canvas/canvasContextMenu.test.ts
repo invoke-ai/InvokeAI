@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveCanvasContextMenu } from './canvasContextMenu';
+import { resolveCanvasContextMenu, resolveCanvasContextMenuBranch } from './canvasContextMenu';
 
 const baseOptions = {
   clientX: 240,
@@ -47,5 +47,15 @@ describe('resolveCanvasContextMenu', () => {
       preventDefault: true,
       target: { layerId: null, x: 240, y: 160 },
     });
+  });
+
+  it('opens the global menu without a hit-test when the engine is unavailable', () => {
+    const resolution = resolveCanvasContextMenu(baseOptions);
+
+    expect(resolution).toEqual({
+      preventDefault: true,
+      target: { layerId: null, x: 240, y: 160 },
+    });
+    expect(resolveCanvasContextMenuBranch(resolution.target, false)).toBe('global');
   });
 });

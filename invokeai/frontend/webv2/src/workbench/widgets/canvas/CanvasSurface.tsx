@@ -1,6 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the container ref callback is intentionally re-created when `engine` changes, so a project switch detaches the old engine and attaches the new one. */
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
-import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { shouldFocusCanvasSurface } from '@workbench/widgets/canvas/surfaceFocus';
@@ -49,15 +49,7 @@ const focusCanvasSurface = (event: ReactPointerEvent<HTMLDivElement>) => {
  * is owned entirely by the engine via the overlay, so this component never
  * re-renders on interaction.
  */
-export const CanvasSurface = ({
-  engine,
-  onContextMenu,
-}: {
-  engine: CanvasEngine;
-  /** Right-click on the surface: the widget hit-tests the layer under the cursor
-   * and opens the shared layer context menu (or suppresses the browser menu). */
-  onContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
-}) => {
+export const CanvasSurface = ({ engine }: { engine: CanvasEngine }) => {
   const screenRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
 
@@ -99,7 +91,6 @@ export const CanvasSurface = ({
       position="relative"
       tabIndex={-1}
       w="full"
-      onContextMenu={onContextMenu}
       onPointerDownCapture={focusCanvasSurface}
     >
       <canvas ref={screenRef} style={CANVAS_STYLE} />

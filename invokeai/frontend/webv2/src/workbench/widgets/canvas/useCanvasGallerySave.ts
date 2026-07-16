@@ -6,7 +6,7 @@ import { useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+import { getCanvasGallerySaveErrorAction, withMatchingCanvasProject } from './canvasGallerySaveState';
 
 export const useCanvasGallerySave = (
   engine: CanvasEngine | null
@@ -19,44 +19,39 @@ export const useCanvasGallerySave = (
 
   const save = useCallback(
     async (region: CanvasGallerySaveRegion): Promise<void> => {
-      if (!engine || isSavingRef.current) {
+      if (isSavingRef.current) {
         return;
       }
 
-      isSavingRef.current = true;
-      setIsSaving(true);
       const project = store.getSnapshot().activeProject;
 
-      try {
-        const result = await saveCanvasToGallery({ engine, project, region });
+      await withMatchingCanvasProject(engine, project.id, async (matchedEngine) => {
+        isSavingRef.current = true;
+        setIsSaving(true);
 
-        if (result.status === 'saved') {
-          store.dispatch({ projectId: project.id, type: 'touchGalleryImagesRefresh' });
-          notify.success(
-            t('widgets.canvas.contextMenu.saved'),
-            t('widgets.canvas.contextMenu.savedDescription', { name: result.imageName })
-          );
-        } else if (result.status === 'empty') {
-          notify.info(t('widgets.canvas.contextMenu.empty'));
-        } else if (result.status === 'stale') {
-          notify.info(t('widgets.canvas.contextMenu.stale'));
-        } else {
-          notify.info(t('widgets.canvas.contextMenu.notReady'));
+        try {
+          const result = await saveCanvasToGallery({ engine: matchedEngine, project, region });
+
+          if (result.status === 'saved') {
+            store.dispatch({ projectId: project.id, type: 'touchGalleryImagesRefresh' });
+            notify.success(
+              t('widgets.canvas.contextMenu.saved'),
+              t('widgets.canvas.contextMenu.savedDescription', { name: result.imageName })
+            );
+          } else if (result.status === 'empty') {
+            notify.info(t('widgets.canvas.contextMenu.empty'));
+          } else if (result.status === 'stale') {
+            notify.info(t('widgets.canvas.contextMenu.stale'));
+          } else {
+            notify.info(t('widgets.canvas.contextMenu.notReady'));
+          }
+        } catch (error: unknown) {
+          store.dispatch(getCanvasGallerySaveErrorAction(error, project.id, t('widgets.canvas.contextMenu.saveError')));
+        } finally {
+          isSavingRef.current = false;
+          setIsSaving(false);
         }
-      } catch (error: unknown) {
-        const message = toErrorMessage(error);
-        store.dispatch({
-          area: 'canvas-save-to-gallery',
-          message,
-          namespace: 'canvas',
-          projectId: project.id,
-          type: 'recordError',
-        });
-        notify.error(t('widgets.canvas.contextMenu.saveError'), message);
-      } finally {
-        isSavingRef.current = false;
-        setIsSaving(false);
-      }
+      });
     },
     [engine, notify, store, t]
   );
