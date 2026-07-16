@@ -111,6 +111,9 @@ importers:
       oxlint:
         specifier: ^1.71.0
         version: 1.71.0
+      playwright:
+        specifier: 1.61.1
+        version: 1.61.1
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
