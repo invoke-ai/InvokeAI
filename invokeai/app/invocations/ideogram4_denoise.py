@@ -86,8 +86,7 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         default=None,
         ge=-4.0,
         le=4.0,
-        description="Override the logit-normal schedule mean (resolution-adjusted internally). "
-        "Empty = use the preset.",
+        description="Override the logit-normal schedule mean (resolution-adjusted internally). Empty = use the preset.",
     )
 
     @torch.no_grad()

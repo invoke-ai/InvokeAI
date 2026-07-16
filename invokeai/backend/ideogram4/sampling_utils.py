@@ -45,9 +45,7 @@ class Ideogram4DenoiseInputs(TypedDict):
 def validate_dimensions(height: int, width: int) -> None:
     """Ensure the requested resolution is compatible with the patch/VAE grid."""
     if height % PIXELS_PER_IMAGE_TOKEN != 0 or width % PIXELS_PER_IMAGE_TOKEN != 0:
-        raise ValueError(
-            f"height and width must be divisible by {PIXELS_PER_IMAGE_TOKEN}, got {height}x{width}"
-        )
+        raise ValueError(f"height and width must be divisible by {PIXELS_PER_IMAGE_TOKEN}, got {height}x{width}")
 
 
 def build_denoise_inputs(

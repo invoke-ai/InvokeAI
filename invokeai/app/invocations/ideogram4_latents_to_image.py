@@ -44,16 +44,12 @@ class Ideogram4LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         latent_shift, latent_scale = get_latent_norm()
 
         with vae_info.model_on_device() as (_, vae):
-            assert isinstance(vae, AutoEncoder), (
-                f"Expected Ideogram 4 AutoEncoder, got {type(vae).__name__}."
-            )
+            assert isinstance(vae, AutoEncoder), f"Expected Ideogram 4 AutoEncoder, got {type(vae).__name__}."
             context.util.signal_progress("Running VAE")
             vae_dtype = next(vae.parameters()).dtype
 
             # Denormalize + unpatchify to a standard (1, 32, H/8, W/8) latent.
-            z = unpatchify_and_denormalize(
-                latents.float().to(device), latent_shift.to(device), latent_scale.to(device)
-            )
+            z = unpatchify_and_denormalize(latents.float().to(device), latent_shift.to(device), latent_scale.to(device))
             TorchDevice.empty_cache()
             decoded = vae.decoder(z.to(vae_dtype))
 

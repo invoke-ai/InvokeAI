@@ -66,9 +66,7 @@ def run_ideogram4_denoise(
     if guidance_schedule is not None:
         gw_per_step = torch.as_tensor(guidance_schedule, dtype=torch.float32, device=device)
         if gw_per_step.shape != (num_steps,):
-            raise ValueError(
-                f"guidance_schedule must have length {num_steps}, got {tuple(gw_per_step.shape)}"
-            )
+            raise ValueError(f"guidance_schedule must have length {num_steps}, got {tuple(gw_per_step.shape)}")
     else:
         gw_per_step = torch.full((num_steps,), float(guidance_scale), dtype=torch.float32, device=device)
 
@@ -87,9 +85,7 @@ def run_ideogram4_denoise(
     generator = torch.Generator(device=device)
     if seed is not None:
         generator.manual_seed(seed)
-    z = torch.randn(
-        1, num_image_tokens, LATENT_DIM, dtype=torch.float32, device=device, generator=generator
-    )
+    z = torch.randn(1, num_image_tokens, LATENT_DIM, dtype=torch.float32, device=device, generator=generator)
     text_z_padding = torch.zeros(1, num_text_tokens, LATENT_DIM, dtype=torch.float32, device=device)
 
     for i in range(num_steps - 1, -1, -1):

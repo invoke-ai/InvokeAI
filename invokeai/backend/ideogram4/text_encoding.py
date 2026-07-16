@@ -45,9 +45,7 @@ def encode_qwen3vl_prompt(
     token_ids = encoded["input_ids"].to(device)  # (1, L)
     num_text_tokens = int(token_ids.shape[1])
     if num_text_tokens > max_text_tokens:
-        raise ValueError(
-            f"prompt has {num_text_tokens} tokens, exceeds max_text_tokens={max_text_tokens}"
-        )
+        raise ValueError(f"prompt has {num_text_tokens} tokens, exceeds max_text_tokens={max_text_tokens}")
 
     # Text-only sequence: every position is a real LLM token.
     attention_mask = torch.ones((1, num_text_tokens), dtype=torch.long, device=device)
