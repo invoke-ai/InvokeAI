@@ -36,6 +36,7 @@ from invokeai.app.services.events.events_common import (
     ModelLoadStartedEvent,
     QueueClearedEvent,
     QueueEventBase,
+    QueueItemsCanceledEvent,
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
@@ -73,6 +74,7 @@ QUEUE_EVENTS = {
     QueueItemStatusChangedEvent,
     BatchEnqueuedEvent,
     QueueItemsRetriedEvent,
+    QueueItemsCanceledEvent,
     QueueClearedEvent,
     RecallParametersUpdatedEvent,
 }
@@ -472,6 +474,43 @@ class SocketIO:
                 )
                 logger.debug(
                     f"Emitted queue_items_retried: full to user rooms {event_data.user_ids} and admin, "
+                    f"sanitized to queue {event_data.queue_id}"
+                )
+
+            # QueueItemsCanceledEvent: a bulk cancel/delete (e.g. cancel-all-except-current) emits
+            # no per-item queue_item_status_changed, so this event is the only signal that pending
+            # items were removed from the queue. Same routing as QueueItemsRetriedEvent: each owner
+            # gets the full event scoped to their own item ids, admins get the full event, and a
+            # sanitized companion (no ids, no owners) reaches the rest of the queue room so their
+            # badge totals refetch.
+            elif isinstance(event_data, QueueItemsCanceledEvent):
+                for user_id in event_data.user_ids:
+                    user_room = f"user:{user_id}"
+                    owner_event_data = event_data.model_copy(
+                        update={
+                            "canceled_item_ids": event_data.canceled_item_ids_by_user.get(user_id, []),
+                            "user_ids": [user_id],
+                            "canceled_item_ids_by_user": {
+                                user_id: event_data.canceled_item_ids_by_user.get(user_id, [])
+                            },
+                        }
+                    )
+                    await self._sio.emit(
+                        event=event_name, data=owner_event_data.model_dump(mode="json"), room=user_room
+                    )
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+
+                sanitized = event_data.model_copy(
+                    update={"canceled_item_ids": [], "user_ids": [], "canceled_item_ids_by_user": {}}
+                )
+                await self._sio.emit(
+                    event=event_name,
+                    data=sanitized.model_dump(mode="json"),
+                    room=event_data.queue_id,
+                    skip_sid=self._owner_and_admin_sids(event_data.user_ids),
+                )
+                logger.debug(
+                    f"Emitted queue_items_canceled: full to user rooms {event_data.user_ids} and admin, "
                     f"sanitized to queue {event_data.queue_id}"
                 )
 

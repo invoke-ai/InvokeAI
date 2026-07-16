@@ -29,6 +29,7 @@ from invokeai.app.services.events.events_common import (
     ModelLoadCompleteEvent,
     ModelLoadStartedEvent,
     QueueClearedEvent,
+    QueueItemsCanceledEvent,
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
@@ -112,6 +113,10 @@ class EventServiceBase:
     ) -> None:
         """Emitted when a list of queue items are retried"""
         self.dispatch(QueueItemsRetriedEvent.build(retry_result, user_ids, retried_item_ids_by_user))
+
+    def emit_queue_items_canceled(self, queue_id: str, canceled_item_ids_by_user: dict[str, list[int]]) -> None:
+        """Emitted when queue items are canceled or deleted in bulk without per-item status change events"""
+        self.dispatch(QueueItemsCanceledEvent.build(queue_id, canceled_item_ids_by_user))
 
     def emit_queue_cleared(self, queue_id: str, user_id: str | None = None) -> None:
         """Emitted when a queue is cleared. `user_id` scopes the clear to one user's items; None means all."""

@@ -535,6 +535,30 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
   });
 
+  socket.on('queue_items_canceled', (data) => {
+    // A bulk cancel/delete (e.g. cancel-all-except-current) emits no per-item
+    // queue_item_status_changed, so this event is the only signal that pending items left the
+    // queue. Owners receive their own item ids, admins receive all of them, and other users
+    // receive a sanitized companion with no ids — in every case, refetch the queue caches so
+    // lists and badge counts update.
+    log.debug({ data }, 'Queue items canceled');
+    const tagsToInvalidate: ApiTagDescription[] = [
+      'SessionQueueStatus',
+      'BatchStatus',
+      'CurrentSessionQueueItem',
+      'NextSessionQueueItem',
+      'QueueCountsByDestination',
+      'SessionQueueItemIdList',
+      { type: 'SessionQueueItem', id: LIST_TAG },
+      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+    ];
+    // Invalidate each canceled item specifically
+    for (const itemId of data.canceled_item_ids) {
+      tagsToInvalidate.push({ type: 'SessionQueueItem', id: itemId });
+    }
+    dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
+  });
+
   socket.on('recall_parameters_updated', (data) => {
     log.debug('Recall parameters updated');
 

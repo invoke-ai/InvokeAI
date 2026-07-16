@@ -783,15 +783,20 @@ class SqliteSessionQueue(SessionQueueBase):
                 params.append(user_id)
             params.extend(current_chain_item_ids)
 
+            # Collect the affected items per owner so other clients can be notified below - a bulk
+            # delete emits no per-item status change events.
             cursor.execute(
                 f"""--sql
-                SELECT COUNT(*)
+                SELECT item_id, user_id
                 FROM session_queue
                 {where};
                 """,
                 tuple(params),
             )
-            count = cursor.fetchone()[0]
+            deleted_item_ids_by_user: dict[str, list[int]] = {}
+            for item_id, owner_user_id in cursor.fetchall():
+                deleted_item_ids_by_user.setdefault(owner_user_id, []).append(item_id)
+            count = sum(len(item_ids) for item_ids in deleted_item_ids_by_user.values())
             cursor.execute(
                 f"""--sql
                 DELETE
@@ -800,6 +805,8 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 tuple(params),
             )
+        if count > 0:
+            self.__invoker.services.events.emit_queue_items_canceled(queue_id, deleted_item_ids_by_user)
         return DeleteAllExceptCurrentResult(deleted=count)
 
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
@@ -859,15 +866,20 @@ class SqliteSessionQueue(SessionQueueBase):
                 params.append(user_id)
             params.extend(current_chain_item_ids)
 
+            # Collect the affected items per owner so other clients can be notified below - a bulk
+            # cancel emits no per-item status change events.
             cursor.execute(
                 f"""--sql
-                SELECT COUNT(*)
+                SELECT item_id, user_id
                 FROM session_queue
                 {where};
                 """,
                 tuple(params),
             )
-            count = cursor.fetchone()[0]
+            canceled_item_ids_by_user: dict[str, list[int]] = {}
+            for item_id, owner_user_id in cursor.fetchall():
+                canceled_item_ids_by_user.setdefault(owner_user_id, []).append(item_id)
+            count = sum(len(item_ids) for item_ids in canceled_item_ids_by_user.values())
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
@@ -877,6 +889,8 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 tuple(params),
             )
+        if count > 0:
+            self.__invoker.services.events.emit_queue_items_canceled(queue_id, canceled_item_ids_by_user)
         return CancelAllExceptCurrentResult(canceled=count)
 
     def get_queue_item(self, item_id: int) -> SessionQueueItem:

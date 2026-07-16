@@ -543,3 +543,63 @@ describe('setEventListeners cross-user isolation', () => {
     expect($lastProgressEvent.get()).toEqual(own);
   });
 });
+
+/**
+ * A bulk cancel/delete (e.g. cancel-all-except-current) emits no per-item
+ * queue_item_status_changed, so queue_items_canceled is the only signal that pending items left
+ * the queue. Regression: an admin's cancel-all-except-current left other users' badges stale.
+ */
+describe('setEventListeners queue_items_canceled', () => {
+  const setup = () => {
+    const socket = createMockSocket();
+    const dispatch = vi.fn();
+    setEventListeners({
+      socket: socket as never,
+      store: {
+        dispatch,
+        getState: vi.fn(() => ({ auth: { user: { user_id: 'user-a', is_admin: false } } })),
+      } as never,
+      setIsConnected: vi.fn(),
+    });
+    return { socket, dispatch };
+  };
+
+  it('refetches queue caches, including each canceled item, when the full event names item ids', () => {
+    const { socket, dispatch } = setup();
+
+    socket.trigger('queue_items_canceled', {
+      queue_id: 'default',
+      canceled_item_ids: [42, 43],
+      user_ids: ['user-a'],
+      canceled_item_ids_by_user: { 'user-a': [42, 43] },
+    });
+
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.arrayContaining([
+          'SessionQueueStatus',
+          'SessionQueueItemIdList',
+          { type: 'SessionQueueItem', id: 42 },
+          { type: 'SessionQueueItem', id: 43 },
+        ]),
+      })
+    );
+  });
+
+  it('still refetches queue caches for the sanitized companion, which names no item ids', () => {
+    const { socket, dispatch } = setup();
+
+    socket.trigger('queue_items_canceled', {
+      queue_id: 'default',
+      canceled_item_ids: [],
+      user_ids: [],
+      canceled_item_ids_by_user: {},
+    });
+
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.arrayContaining(['SessionQueueStatus', 'SessionQueueItemIdList']),
+      })
+    );
+  });
+});

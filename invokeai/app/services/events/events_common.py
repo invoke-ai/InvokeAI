@@ -326,6 +326,29 @@ class QueueItemsRetriedEvent(QueueEventBase):
 
 
 @payload_schema.register
+class QueueItemsCanceledEvent(QueueEventBase):
+    """Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in
+    bulk (e.g. cancel/delete-all-except-current) without per-item status change events."""
+
+    __event_name__ = "queue_items_canceled"
+
+    canceled_item_ids: list[int] = Field(description="The IDs of the queue items that were canceled or deleted")
+    user_ids: list[str] = Field(description="The IDs of the users who own the canceled queue items")
+    canceled_item_ids_by_user: dict[str, list[int]] = Field(
+        description="The canceled queue item IDs keyed by owner user ID."
+    )
+
+    @classmethod
+    def build(cls, queue_id: str, canceled_item_ids_by_user: dict[str, list[int]]) -> "QueueItemsCanceledEvent":
+        return cls(
+            queue_id=queue_id,
+            canceled_item_ids=[item_id for item_ids in canceled_item_ids_by_user.values() for item_id in item_ids],
+            user_ids=list(canceled_item_ids_by_user.keys()),
+            canceled_item_ids_by_user=canceled_item_ids_by_user,
+        )
+
+
+@payload_schema.register
 class QueueClearedEvent(QueueEventBase):
     """Event model for queue_cleared"""
 

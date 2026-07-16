@@ -2119,6 +2119,96 @@ class TestWebSocketAuth:
         assert admin_calls[0].kwargs["data"]["user_ids"] == ["owner-123", "owner-456"]
         assert admin_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-123": [10], "owner-456": [20]}
 
+    def test_queue_items_canceled_routed_privately_per_owner(self, socketio: Any) -> None:
+        """The FULL queue_items_canceled event, which carries owners' item ids, must reach only the
+        owner/admin rooms, and each owner room may only see that owner's own item ids. A bulk
+        cancel emits no per-item queue_item_status_changed, so this event is each owner's only
+        signal that their pending items were canceled (e.g. by an admin's cancel-all-except-current).
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
+
+        event = QueueItemsCanceledEvent.build(
+            queue_id="default",
+            canceled_item_ids_by_user={"owner-123": [10, 11], "owner-456": [20]},
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_canceled", event)))
+
+        owner_123_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "user:owner-123"]
+        owner_456_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "user:owner-456"]
+        admin_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "admin"]
+
+        assert len(owner_123_calls) == 1
+        assert len(owner_456_calls) == 1
+        assert len(admin_calls) == 1
+        assert owner_123_calls[0].kwargs["data"]["canceled_item_ids"] == [10, 11]
+        assert owner_123_calls[0].kwargs["data"]["user_ids"] == ["owner-123"]
+        assert owner_123_calls[0].kwargs["data"]["canceled_item_ids_by_user"] == {"owner-123": [10, 11]}
+        assert owner_456_calls[0].kwargs["data"]["canceled_item_ids"] == [20]
+        assert admin_calls[0].kwargs["data"]["canceled_item_ids"] == [10, 11, 20]
+        assert admin_calls[0].kwargs["data"]["canceled_item_ids_by_user"] == {
+            "owner-123": [10, 11],
+            "owner-456": [20],
+        }
+
+        # Nothing identifying may reach the queue room: the only emit there is the sanitized
+        # companion, which must not name any owner or any canceled item.
+        queue_room_payloads = [c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        assert len(queue_room_payloads) == 1
+        assert queue_room_payloads[0]["canceled_item_ids"] == []
+        assert queue_room_payloads[0]["user_ids"] == []
+        assert queue_room_payloads[0]["canceled_item_ids_by_user"] == {}
+
+    def test_queue_items_canceled_broadcasts_sanitized_companion(self, socketio: Any) -> None:
+        """Canceled items lower the queue's global total, so every other subscriber's badge must
+        refetch. The sanitized companion reaches them while owners and admins — who already got
+        the full event — are skipped.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
+
+        event = QueueItemsCanceledEvent.build(
+            queue_id="default",
+            canceled_item_ids_by_user={"owner-123": [10], "owner-456": [20]},
+        )
+
+        # A bulk cancel can span several owners — every one of them must be skipped, not just the first.
+        socketio._socket_users["sid-owner-123"] = {"user_id": "owner-123", "is_admin": False}
+        socketio._socket_users["sid-owner-456"] = {"user_id": "owner-456", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_canceled", event)))
+
+        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        assert len(queue_emits) == 1, "expected exactly one sanitized emit to the queue room"
+        payload = queue_emits[0].kwargs["data"]
+        skip_sid = queue_emits[0].kwargs["skip_sid"]
+
+        # Non-sensitive: the queue_id is all a non-owner needs to refetch its redacted status.
+        assert payload["queue_id"] == "default"
+        assert payload["canceled_item_ids"] == []
+        assert payload["user_ids"] == []
+        assert payload["canceled_item_ids_by_user"] == {}
+
+        # Both owners and the admin already received the full event and must not get a second copy.
+        assert "sid-owner-123" in skip_sid
+        assert "sid-owner-456" in skip_sid
+        assert "sid-admin" in skip_sid
+        # The unrelated user is the whole point — they must receive it.
+        assert "sid-other" not in skip_sid
+
     def test_unscoped_queue_cleared_still_broadcast(self, socketio: Any) -> None:
         """An unscoped QueueClearedEvent (user_id=None — an admin or single-user clear that
         deleted every user's items) should still be broadcast to all queue subscribers."""

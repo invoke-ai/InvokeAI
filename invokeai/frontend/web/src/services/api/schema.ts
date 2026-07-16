@@ -25581,6 +25581,40 @@ export type components = {
             };
         };
         /**
+         * QueueItemsCanceledEvent
+         * @description Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in
+         *     bulk (e.g. cancel/delete-all-except-current) without per-item status change events.
+         */
+        QueueItemsCanceledEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * Canceled Item Ids
+             * @description The IDs of the queue items that were canceled or deleted
+             */
+            canceled_item_ids: number[];
+            /**
+             * User Ids
+             * @description The IDs of the users who own the canceled queue items
+             */
+            user_ids: string[];
+            /**
+             * Canceled Item Ids By User
+             * @description The canceled queue item IDs keyed by owner user ID.
+             */
+            canceled_item_ids_by_user: {
+                [key: string]: number[];
+            };
+        };
+        /**
          * Qwen3EncoderField
          * @description Field for Qwen3 text encoder used by Z-Image models.
          */
