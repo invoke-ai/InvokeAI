@@ -243,6 +243,28 @@ describe('widget collision detection', () => {
     expect(collisions.map(({ id }) => id)).toEqual(['right-region']);
   });
 
+  it('uses same-region widget geometry instead of the source-region bar', () => {
+    const activeData = getWidgetInstanceDragData('center', 'preview', 'preview');
+    const collisions = widgetCollisionDetection(
+      createCollisionArgs({
+        activeData,
+        collisionRect: getRect(90, 90, 20, 20),
+        droppables: [
+          { data: activeData, id: 'active-widget', rect: getRect(0, 0, 20, 20) },
+          {
+            data: getWidgetInstanceDragData('center', 'canvas', 'canvas'),
+            id: 'other-center-widget',
+            rect: getRect(100, 100, 20, 20),
+          },
+          { data: getWidgetRegionDropData('center'), id: 'center-region', rect: getRect(40, 40, 20, 20) },
+        ],
+        pointerCoordinates,
+      })
+    );
+
+    expect(collisions.map(({ id }) => id)).toEqual(['other-center-widget']);
+  });
+
   it('treats malformed widget active data as a non-widget drag', () => {
     const collisions = widgetCollisionDetection(
       createCollisionArgs({
