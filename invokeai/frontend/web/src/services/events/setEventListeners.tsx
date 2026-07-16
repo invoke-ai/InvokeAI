@@ -514,8 +514,12 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     );
   });
 
-  socket.on('queue_items_retried', (data) => {
-    log.debug({ data }, 'Queue items retried');
+  // Bulk queue item events (retried/canceled) are the only signal other clients get for a bulk
+  // operation, which changes many rows in one SQL statement and emits no per-item
+  // queue_item_status_changed. Owners receive their own item ids, admins receive all of them,
+  // and other users receive a sanitized companion with no ids — in every case, refetch the
+  // queue caches so lists and badge counts update.
+  const invalidateQueueTagsForBulkItemEvent = (itemIds: number[]) => {
     const tagsToInvalidate: ApiTagDescription[] = [
       'SessionQueueStatus',
       'BatchStatus',
@@ -526,37 +530,21 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       { type: 'SessionQueueItem', id: LIST_TAG },
       { type: 'SessionQueueItem', id: LIST_ALL_TAG },
     ];
-    // Invalidate each retried item specifically
-    if (data.retried_item_ids) {
-      for (const itemId of data.retried_item_ids) {
-        tagsToInvalidate.push({ type: 'SessionQueueItem', id: itemId });
-      }
-    }
-    dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
-  });
-
-  socket.on('queue_items_canceled', (data) => {
-    // A bulk cancel/delete (e.g. cancel-all-except-current) emits no per-item
-    // queue_item_status_changed, so this event is the only signal that pending items left the
-    // queue. Owners receive their own item ids, admins receive all of them, and other users
-    // receive a sanitized companion with no ids — in every case, refetch the queue caches so
-    // lists and badge counts update.
-    log.debug({ data }, 'Queue items canceled');
-    const tagsToInvalidate: ApiTagDescription[] = [
-      'SessionQueueStatus',
-      'BatchStatus',
-      'CurrentSessionQueueItem',
-      'NextSessionQueueItem',
-      'QueueCountsByDestination',
-      'SessionQueueItemIdList',
-      { type: 'SessionQueueItem', id: LIST_TAG },
-      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
-    ];
-    // Invalidate each canceled item specifically
-    for (const itemId of data.canceled_item_ids) {
+    // Invalidate each affected item specifically
+    for (const itemId of itemIds) {
       tagsToInvalidate.push({ type: 'SessionQueueItem', id: itemId });
     }
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
+  };
+
+  socket.on('queue_items_retried', (data) => {
+    log.debug({ data }, 'Queue items retried');
+    invalidateQueueTagsForBulkItemEvent(data.retried_item_ids ?? []);
+  });
+
+  socket.on('queue_items_canceled', (data) => {
+    log.debug({ data }, 'Queue items canceled');
+    invalidateQueueTagsForBulkItemEvent(data.canceled_item_ids);
   });
 
   socket.on('recall_parameters_updated', (data) => {

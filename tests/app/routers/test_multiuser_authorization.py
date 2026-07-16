@@ -2209,6 +2209,42 @@ class TestWebSocketAuth:
         # The unrelated user is the whole point — they must receive it.
         assert "sid-other" not in skip_sid
 
+    def test_bulk_event_admin_owner_receives_exactly_one_copy(self, socketio: Any) -> None:
+        """An admin who also owns affected items is in both their user room and the admin room.
+        The owner-room emit must skip admin sids so such a socket receives only the full
+        admin-room copy — two copies would double-refetch every queue endpoint (single-user
+        mode hits this on every bulk cancel, since the "system" user is an admin)."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
+
+        event = QueueItemsCanceledEvent.build(
+            queue_id="default",
+            canceled_item_ids_by_user={"admin-1": [10], "owner-456": [20]},
+        )
+
+        socketio._socket_users["sid-admin-owner"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-owner-456"] = {"user_id": "owner-456", "is_admin": False}
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_canceled", event)))
+
+        # The admin-owner's user-room emit skips their sid; the admin-room emit is their one copy.
+        owner_room_calls = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "user:admin-1"]
+        assert len(owner_room_calls) == 1
+        assert "sid-admin-owner" in owner_room_calls[0].kwargs["skip_sid"]
+
+        # The non-admin owner's room emit must not skip their sid.
+        other_owner_calls = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "user:owner-456"]
+        assert len(other_owner_calls) == 1
+        assert "sid-owner-456" not in other_owner_calls[0].kwargs["skip_sid"]
+
+        admin_calls = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "admin"]
+        assert len(admin_calls) == 1
+
     def test_unscoped_queue_cleared_still_broadcast(self, socketio: Any) -> None:
         """An unscoped QueueClearedEvent (user_id=None — an admin or single-user clear that
         deleted every user's items) should still be broadcast to all queue subscribers."""

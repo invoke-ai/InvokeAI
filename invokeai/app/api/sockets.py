@@ -279,6 +279,10 @@ class SocketIO:
     async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
         await self._sio.leave_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
 
+    def _admin_sids(self) -> list[str]:
+        """Sids belonging to admin sockets."""
+        return [sid for sid, info in self._socket_users.items() if info.get("is_admin")]
+
     def _owner_and_admin_sids(self, owner_user_ids: str | Collection[str]) -> list[str]:
         """Sids belonging to the event's owner(s) or to any admin.
 
@@ -293,6 +297,60 @@ class SocketIO:
         return [
             sid for sid, info in self._socket_users.items() if info.get("user_id") in owners or info.get("is_admin")
         ]
+
+    async def _emit_bulk_queue_item_event(
+        self,
+        event_name: str,
+        event_data: QueueItemsRetriedEvent | QueueItemsCanceledEvent,
+        item_ids_field: str,
+        item_ids_by_user_field: str,
+    ) -> None:
+        """Routes a multi-owner bulk queue item event (retried/canceled).
+
+        These events carry queue item ids grouped by owner and are the only signal other clients
+        get for a bulk operation, which changes many rows in one SQL statement and emits no
+        per-item queue_item_status_changed events. Routing:
+
+        - Each owner's room gets the event scoped to that owner's own item ids. Admin sids are
+          skipped here because admins receive the full event below — without the skip, an admin
+          who also owns affected items (including the "system" user in single-user mode, whose
+          sockets are all in both rooms) would receive two copies and double-refetch the queue
+          caches.
+        - The admin room gets the full event: all item ids, all owners.
+        - The rest of the queue room gets a sanitized companion carrying no item ids and no
+          owners — just the queue_id its badge-count refetch needs.
+        """
+        item_ids_by_user: dict[str, list[int]] = getattr(event_data, item_ids_by_user_field)
+        admin_sids = self._admin_sids()
+        for user_id in event_data.user_ids:
+            user_room = f"user:{user_id}"
+            owner_item_ids = item_ids_by_user.get(user_id, [])
+            owner_event_data = event_data.model_copy(
+                update={
+                    item_ids_field: owner_item_ids,
+                    "user_ids": [user_id],
+                    item_ids_by_user_field: {user_id: owner_item_ids},
+                }
+            )
+            await self._sio.emit(
+                event=event_name,
+                data=owner_event_data.model_dump(mode="json"),
+                room=user_room,
+                skip_sid=admin_sids,
+            )
+        await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+
+        sanitized = event_data.model_copy(update={item_ids_field: [], "user_ids": [], item_ids_by_user_field: {}})
+        await self._sio.emit(
+            event=event_name,
+            data=sanitized.model_dump(mode="json"),
+            room=event_data.queue_id,
+            skip_sid=self._owner_and_admin_sids(event_data.user_ids),
+        )
+        logger.debug(
+            f"Emitted {event_name}: full to user rooms {event_data.user_ids} and admin, "
+            f"sanitized to queue {event_data.queue_id}"
+        )
 
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
         """Handle queue events with user isolation.
@@ -440,78 +498,22 @@ class SocketIO:
                     f"Emitted batch_enqueued: full to {user_room}+admin, sanitized to queue {event_data.queue_id}"
                 )
 
-            # QueueItemsRetriedEvent carries queue item ids that should only be visible
-            # to the affected owners + admins.
+            # QueueItemsRetriedEvent: retried items are re-enqueued, raising the queue's global
+            # total, but retrying emits no per-item queue_item_status_changed — this event is the
+            # only signal. Item ids are only visible to their owners + admins; everyone else gets
+            # the sanitized companion so their badge total refetches (the frontend handler skips
+            # its per-item invalidation when retried_item_ids is empty).
             elif isinstance(event_data, QueueItemsRetriedEvent):
-                for user_id in event_data.user_ids:
-                    user_room = f"user:{user_id}"
-                    owner_event_data = event_data.model_copy(
-                        update={
-                            "retried_item_ids": event_data.retried_item_ids_by_user.get(user_id, []),
-                            "user_ids": [user_id],
-                            "retried_item_ids_by_user": {user_id: event_data.retried_item_ids_by_user.get(user_id, [])},
-                        }
-                    )
-                    await self._sio.emit(
-                        event=event_name, data=owner_event_data.model_dump(mode="json"), room=user_room
-                    )
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
-
-                # Retried items are re-enqueued, raising the queue's global total, so every other
-                # subscriber's badge total must refresh. Retrying emits no per-item
-                # queue_item_status_changed, so this is their only signal. The companion carries no
-                # item ids or user ids — the frontend handler only needs it to invalidate the queue
-                # tags that refetch the redacted queue status, and it skips its per-item
-                # invalidation when retried_item_ids is empty.
-                sanitized = event_data.model_copy(
-                    update={"retried_item_ids": [], "user_ids": [], "retried_item_ids_by_user": {}}
-                )
-                await self._sio.emit(
-                    event=event_name,
-                    data=sanitized.model_dump(mode="json"),
-                    room=event_data.queue_id,
-                    skip_sid=self._owner_and_admin_sids(event_data.user_ids),
-                )
-                logger.debug(
-                    f"Emitted queue_items_retried: full to user rooms {event_data.user_ids} and admin, "
-                    f"sanitized to queue {event_data.queue_id}"
+                await self._emit_bulk_queue_item_event(
+                    event_name, event_data, "retried_item_ids", "retried_item_ids_by_user"
                 )
 
             # QueueItemsCanceledEvent: a bulk cancel/delete (e.g. cancel-all-except-current) emits
             # no per-item queue_item_status_changed, so this event is the only signal that pending
-            # items were removed from the queue. Same routing as QueueItemsRetriedEvent: each owner
-            # gets the full event scoped to their own item ids, admins get the full event, and a
-            # sanitized companion (no ids, no owners) reaches the rest of the queue room so their
-            # badge totals refetch.
+            # items were removed from the queue.
             elif isinstance(event_data, QueueItemsCanceledEvent):
-                for user_id in event_data.user_ids:
-                    user_room = f"user:{user_id}"
-                    owner_event_data = event_data.model_copy(
-                        update={
-                            "canceled_item_ids": event_data.canceled_item_ids_by_user.get(user_id, []),
-                            "user_ids": [user_id],
-                            "canceled_item_ids_by_user": {
-                                user_id: event_data.canceled_item_ids_by_user.get(user_id, [])
-                            },
-                        }
-                    )
-                    await self._sio.emit(
-                        event=event_name, data=owner_event_data.model_dump(mode="json"), room=user_room
-                    )
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
-
-                sanitized = event_data.model_copy(
-                    update={"canceled_item_ids": [], "user_ids": [], "canceled_item_ids_by_user": {}}
-                )
-                await self._sio.emit(
-                    event=event_name,
-                    data=sanitized.model_dump(mode="json"),
-                    room=event_data.queue_id,
-                    skip_sid=self._owner_and_admin_sids(event_data.user_ids),
-                )
-                logger.debug(
-                    f"Emitted queue_items_canceled: full to user rooms {event_data.user_ids} and admin, "
-                    f"sanitized to queue {event_data.queue_id}"
+                await self._emit_bulk_queue_item_event(
+                    event_name, event_data, "canceled_item_ids", "canceled_item_ids_by_user"
                 )
 
             # QueueClearedEvent: an unscoped clear (user_id=None — admin or single-user mode)
@@ -543,14 +545,29 @@ class SocketIO:
                     )
 
             else:
-                # For remaining queue events that do not carry user identity,
-                # emit to all subscribers in the queue room.
-                await self._sio.emit(
-                    event=event_name, data=event_data.model_dump(mode="json"), room=event_data.queue_id
-                )
-                logger.debug(
-                    f"Emitted general queue event {event_name} to all subscribers in queue {event_data.queue_id}"
-                )
+                # Fail closed: an event type without explicit routing above must not leak user
+                # identity or item ids to the whole queue room. If it carries user identity in
+                # any form, deliver it to the identified owners + admins only and log loudly —
+                # the event needs an explicit branch (and probably a sanitized companion) added
+                # above. Only identity-free events are broadcast.
+                owner_user_ids = getattr(event_data, "user_ids", None) or []
+                single_user_id = getattr(event_data, "user_id", None)
+                if single_user_id is not None:
+                    owner_user_ids = [*owner_user_ids, single_user_id]
+                if owner_user_ids:
+                    rooms = [f"user:{user_id}" for user_id in owner_user_ids] + ["admin"]
+                    await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=rooms)
+                    logger.warning(
+                        f"Queue event {event_name} carries user identity but has no explicit routing; "
+                        f"emitted to owner + admin rooms only. Add a routing branch for it in _handle_queue_event."
+                    )
+                else:
+                    await self._sio.emit(
+                        event=event_name, data=event_data.model_dump(mode="json"), room=event_data.queue_id
+                    )
+                    logger.debug(
+                        f"Emitted general queue event {event_name} to all subscribers in queue {event_data.queue_id}"
+                    )
         except Exception as e:
             # Log any unhandled exceptions in event handling to prevent silent failures
             logger.error(f"Error handling queue event {event[0]}: {e}", exc_info=True)

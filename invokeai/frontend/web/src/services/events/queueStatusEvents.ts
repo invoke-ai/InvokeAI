@@ -42,11 +42,12 @@ const recordQueueItemStatusChangedEvent = (event: QueueItemStatusChangedEvent): 
 };
 
 /**
- * Queue status embedded in socket events is built without a requesting user, so its
- * user_pending/user_in_progress are always null. When replacing a cached/fetched status with an
- * event's status, retain the previous per-user counts - for a non-owner recipient (e.g. an admin
- * observing another user's event) they are still accurate, and for the owner the tag invalidation
- * that accompanies every status change refetches fresh per-user counts immediately.
+ * The queue status embedded in a full queue_item_status_changed event carries the OWNER's
+ * per-user counts, so the owner's optimistic cache write below is complete and personal UI
+ * (progress bar, spinner, favicon) updates without waiting for a refetch. Statuses without
+ * per-user counts still occur — the sanitized companion nulls them — and for those, retain the
+ * previous cached per-user counts: for a non-owner recipient they are still accurate, and the
+ * tag invalidation that accompanies every status change refetches fresh counts immediately.
  */
 const withRetainedUserCounts = (
   next: S['SessionQueueStatus'],

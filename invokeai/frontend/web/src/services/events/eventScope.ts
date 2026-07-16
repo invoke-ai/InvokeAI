@@ -1,5 +1,5 @@
 import type { AppGetState } from 'app/store/store';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { selectAuthToken, selectCurrentUser } from 'features/auth/store/authSlice';
 
 /**
  * Who a socket event belongs to, relative to this client:
@@ -27,9 +27,24 @@ export const getEventScope = (getState: AppGetState, data: { user_id?: string | 
   if (data.user_id === REDACTED_USER_ID) {
     return 'sanitized';
   }
-  const currentUser = selectCurrentUser(getState());
+  const state = getState();
+  const currentUser = selectCurrentUser(state);
   if (!currentUser) {
-    return 'own';
+    // No authenticated user can mean two things:
+    //
+    // - Single-user mode: there is no auth token and auth.user never populates. Every event is
+    //   the client's own.
+    // - Multiuser mode before hydration: the socket connects with the localStorage token as soon
+    //   as the app mounts (GlobalHookIsolator renders outside ProtectedRoute), but auth.user is
+    //   only set once the /me fetch resolves. In that window an admin client already receives
+    //   other users' events via the admin room, and they cannot be attributed yet — so treat
+    //   them as foreign (cache invalidation at most) rather than let another user's events
+    //   drive personal UI. Misclassifying the user's own events as foreign for that moment is
+    //   harmless; the caches refetch and personal state catches up once auth.user hydrates.
+    //
+    // The token distinguishes the two: it is hydrated synchronously from localStorage, and
+    // ProtectedRoute clears a stale token when the server reports single-user mode.
+    return selectAuthToken(state) ? 'foreign' : 'own';
   }
   return data.user_id === currentUser.user_id ? 'own' : 'foreign';
 };

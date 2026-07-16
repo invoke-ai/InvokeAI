@@ -132,8 +132,12 @@ export const buildOnQueueItemStatusChanged = (dispatch: AppDispatch, coordinator
  *
  * In neither case may we run payload-driven cache mutations or per-session side effects — node
  * state reset, progress clear, completion bookkeeping, workflow reconciliation, or the failure
- * toast — those belong to the owner. Just invalidate queue tags so the non-owner's queue list and
- * badge counts refetch.
+ * toast — those belong to the owner. Cache invalidation is the only permitted effect, but it must
+ * cover everything the owner path covers: admin UI also renders the current/next queue item (the
+ * cancel-current button), batch statuses, and the destination queue counts that back the canvas,
+ * and for admins those queries span all users' items. The type-level 'BatchStatus' and
+ * 'QueueCountsByDestination' tags are used because the sanitized companion redacts the ids these
+ * caches would otherwise be matched by.
  */
 export const buildOnNonOwnerQueueItemStatusChanged = (dispatch: AppDispatch) => {
   return (data: QueueItemStatusChangedEvent) => {
@@ -141,6 +145,11 @@ export const buildOnNonOwnerQueueItemStatusChanged = (dispatch: AppDispatch) => 
     const tags: ApiTagDescription[] = [
       'SessionQueueStatus',
       'SessionQueueItemIdList',
+      'CurrentSessionQueueItem',
+      'NextSessionQueueItem',
+      'InvocationCacheStatus',
+      'BatchStatus',
+      'QueueCountsByDestination',
       { type: 'SessionQueueItem', id: data.item_id },
       { type: 'SessionQueueItem', id: LIST_TAG },
       { type: 'SessionQueueItem', id: LIST_ALL_TAG },

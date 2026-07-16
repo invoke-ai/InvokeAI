@@ -193,4 +193,13 @@ describe('buildOnForeignInvocationComplete', () => {
 
     expect(dispatch).not.toHaveBeenCalled();
   });
+
+  it('does nothing for intermediate image outputs, which never appear in the gallery', () => {
+    const dispatch = vi.fn();
+    const handler = buildOnForeignInvocationComplete(dispatch as never);
+
+    handler(buildEvent({ invocation: { id: 'node-1', type: 'l2i', is_intermediate: true } }));
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
 });

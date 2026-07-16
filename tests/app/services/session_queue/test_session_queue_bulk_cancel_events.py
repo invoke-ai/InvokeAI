@@ -25,17 +25,23 @@ def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
     return queue
 
 
-def _insert_queue_item(session_queue: SqliteSessionQueue, queue_id: str, user_id: str) -> int:
+def _insert_queue_item(
+    session_queue: SqliteSessionQueue,
+    queue_id: str,
+    user_id: str,
+    batch_id: str | None = None,
+    destination: str | None = None,
+) -> int:
     """Directly insert a minimal pending queue item for the given user and return its item_id."""
     session_id = str(uuid.uuid4())
-    batch_id = str(uuid.uuid4())
+    batch_id = batch_id or str(uuid.uuid4())
     with session_queue._db.transaction() as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (queue_id, "{}", session_id, batch_id, None, 0, None, None, None, None, user_id),
+            (queue_id, "{}", session_id, batch_id, None, 0, None, None, destination, None, user_id),
         )
         assert cursor.lastrowid is not None
         return cursor.lastrowid
@@ -103,3 +109,68 @@ def test_no_event_when_nothing_was_canceled(session_queue: SqliteSessionQueue, m
 
     assert result.canceled == 0
     assert _canceled_events(mock_invoker) == []
+
+
+def test_cancel_by_batch_ids_emits_queue_items_canceled(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """Canceling batches bulk-updates pending rows with no per-item events; other clients need
+    the bulk event to learn the items left the queue."""
+    batch_id = str(uuid.uuid4())
+    a1 = _insert_queue_item(session_queue, "default", "user_a", batch_id=batch_id)
+    a2 = _insert_queue_item(session_queue, "default", "user_a", batch_id=batch_id)
+    _insert_queue_item(session_queue, "default", "user_b")  # different batch - untouched
+
+    result = session_queue.cancel_by_batch_ids("default", [batch_id])
+
+    assert result.canceled == 2
+    events = _canceled_events(mock_invoker)
+    assert len(events) == 1
+    assert events[0].canceled_item_ids_by_user == {"user_a": [a1, a2]}
+
+
+def test_cancel_by_destination_emits_queue_items_canceled(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """Discarding a canvas staging area cancels by destination; the bulk event keeps other
+    clients' queue badges in sync."""
+    a1 = _insert_queue_item(session_queue, "default", "user_a", destination="canvas:sess-1")
+    b1 = _insert_queue_item(session_queue, "default", "user_b", destination="canvas:sess-1")
+    _insert_queue_item(session_queue, "default", "user_b", destination="other")
+
+    result = session_queue.cancel_by_destination("default", "canvas:sess-1")
+
+    assert result.canceled == 2
+    events = _canceled_events(mock_invoker)
+    assert len(events) == 1
+    assert events[0].canceled_item_ids_by_user == {"user_a": [a1], "user_b": [b1]}
+
+
+def test_delete_by_destination_emits_queue_items_canceled(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """Bulk delete by destination removes rows entirely - same notification requirement."""
+    a1 = _insert_queue_item(session_queue, "default", "user_a", destination="canvas:sess-1")
+    _insert_queue_item(session_queue, "default", "user_a", destination="other")
+
+    result = session_queue.delete_by_destination("default", "canvas:sess-1")
+
+    assert result.deleted == 1
+    events = _canceled_events(mock_invoker)
+    assert len(events) == 1
+    assert events[0].canceled_item_ids_by_user == {"user_a": [a1]}
+
+
+def test_cancel_by_queue_id_emits_queue_items_canceled(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """Canceling a whole queue bulk-updates every user's non-terminal items."""
+    a1 = _insert_queue_item(session_queue, "default", "user_a")
+    b1 = _insert_queue_item(session_queue, "default", "user_b")
+
+    result = session_queue.cancel_by_queue_id("default")
+
+    assert result.canceled == 2
+    events = _canceled_events(mock_invoker)
+    assert len(events) == 1
+    assert events[0].canceled_item_ids_by_user == {"user_a": [a1], "user_b": [b1]}

@@ -1,11 +1,10 @@
-import { Button, Flex, Icon, Spacer, spinAnimation, useShiftModifier } from '@invoke-ai/ui-library';
+import { Button, Flex, Spacer, useShiftModifier } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { InvokeButtonIcon } from 'features/queue/components/InvokeButtonIcon';
 import { QueueIterationsNumberInput } from 'features/queue/components/QueueIterationsNumberInput';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
-import { useUserHasActiveQueueItems } from 'features/queue/hooks/useUserHasActiveQueueItems';
 import { memo } from 'react';
-import { PiCircleNotchBold, PiLightningFill, PiSparkleFill } from 'react-icons/pi';
 import { useAutoAddBoard } from 'services/api/hooks/useAutoAddBoard';
 import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 
@@ -29,7 +28,7 @@ export const InvokeButton = memo(() => {
           isLoading={queue.isLoading || isLoadingDynamicPrompts}
           loadingText={invoke}
           isDisabled={queue.isDisabled || !canWriteImages}
-          rightIcon={<InvokeButtonIcon />}
+          rightIcon={<InvokeButtonIcon isDisabled={queue.isDisabled} boxSize={5} />}
           variant="solid"
           colorScheme="invokeYellow"
           size="lg"
@@ -47,20 +46,3 @@ export const InvokeButton = memo(() => {
 });
 
 InvokeButton.displayName = 'InvokeQueueBackButton';
-
-const InvokeButtonIcon = memo(() => {
-  const shift = useShiftModifier();
-  const queue = useInvoke();
-  const hasActiveQueueItems = useUserHasActiveQueueItems();
-
-  if (!queue.isDisabled && hasActiveQueueItems) {
-    return <Icon boxSize={5} as={PiCircleNotchBold} animation={spinAnimation} />;
-  }
-
-  if (shift) {
-    return <PiLightningFill />;
-  }
-
-  return <PiSparkleFill />;
-});
-InvokeButtonIcon.displayName = 'InvokeButtonIcon';

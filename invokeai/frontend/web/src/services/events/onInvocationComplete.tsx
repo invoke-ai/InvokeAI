@@ -303,6 +303,15 @@ export const buildOnForeignInvocationComplete = (dispatch: AppDispatch) => {
       return;
     }
 
+    // Intermediate images never appear in the gallery, so they cannot change any of the
+    // invalidated queries. Saved images inherit this flag from the node, so checking it on the
+    // event's invocation payload is equivalent to the own-event path's DTO check — without the
+    // fetch. Canvas generations mark most outputs intermediate, so this skips the bulk of
+    // foreign completions.
+    if (data.invocation.is_intermediate) {
+      return;
+    }
+
     const hasImageOutput = objectEntries(data.result).some(
       ([_name, value]) => isImageField(value) || isImageFieldCollection(value)
     );
