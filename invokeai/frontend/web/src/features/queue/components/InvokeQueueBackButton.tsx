@@ -28,7 +28,7 @@ export const InvokeButton = memo(() => {
           isLoading={queue.isLoading || isLoadingDynamicPrompts}
           loadingText={invoke}
           isDisabled={queue.isDisabled || !canWriteImages}
-          rightIcon={<InvokeButtonIcon isDisabled={queue.isDisabled} boxSize={5} />}
+          rightIcon={<InvokeButtonIcon isDisabled={queue.isDisabled || !canWriteImages} boxSize={5} />}
           variant="solid"
           colorScheme="invokeYellow"
           size="lg"

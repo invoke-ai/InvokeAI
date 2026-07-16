@@ -752,10 +752,16 @@ class SqliteSessionQueue(SessionQueueBase):
         with self._db.transaction() as cursor:
             current_queue_item = self.get_current(queue_id)
 
-            # Handle current item separately - check ownership if user_id is provided
+            # Handle current item separately - check ownership if user_id is provided. Its cancel
+            # emits a per-item queue_item_status_changed, so the bulk event below must not signal
+            # it a second time. Its row still matches the destination WHERE (the cancel only flips
+            # its status), so it is excluded from the collected ids — but not from the DELETE or
+            # the returned count.
+            canceled_current_item_id: Optional[int] = None
             if current_queue_item is not None and current_queue_item.destination == destination:
                 if user_id is None or current_queue_item.user_id == user_id:
                     self.cancel_queue_item(current_queue_item.item_id)
+                    canceled_current_item_id = current_queue_item.item_id
 
             # Build WHERE clause with optional user_id filter
             user_filter = "AND user_id = ?" if user_id is not None else ""
@@ -771,6 +777,12 @@ class SqliteSessionQueue(SessionQueueBase):
 
             deleted_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
             count = sum(len(item_ids) for item_ids in deleted_item_ids_by_user.values())
+            if canceled_current_item_id is not None and current_queue_item is not None:
+                owner_item_ids = deleted_item_ids_by_user.get(current_queue_item.user_id)
+                if owner_item_ids is not None and canceled_current_item_id in owner_item_ids:
+                    owner_item_ids.remove(canceled_current_item_id)
+                    if not owner_item_ids:
+                        del deleted_item_ids_by_user[current_queue_item.user_id]
             cursor.execute(
                 f"""--sql
                 DELETE FROM session_queue

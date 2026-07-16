@@ -502,6 +502,45 @@ describe('setEventListeners cross-user isolation', () => {
     );
   });
 
+  it("invalidates id-scoped batch and destination tags for another user's full event", () => {
+    // The admin-room copy of another user's event carries real ids — the handler must not blow
+    // away every BatchStatus/QueueCountsByDestination query on a busy multi-user server.
+    const { socket, dispatch } = setup(ADMIN_USER);
+
+    socket.trigger('queue_item_status_changed', buildQueueItemStatusChangedEvent());
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const { payload } = dispatch.mock.calls[0]?.[0] as { payload: unknown[] };
+    expect(payload).toEqual(
+      expect.arrayContaining([
+        { type: 'BatchStatus', id: 'batch-foreign' },
+        { type: 'QueueCountsByDestination', id: 'canvas' },
+      ])
+    );
+    expect(payload).not.toContain('BatchStatus');
+    expect(payload).not.toContain('QueueCountsByDestination');
+  });
+
+  it('falls back to type-level batch and destination tags for the sanitized companion', () => {
+    // The sanitized companion redacts batch_id and nulls destination, so only the type-level
+    // tags can match the caches these ids would otherwise identify.
+    const { socket, dispatch } = setup(ADMIN_USER);
+
+    socket.trigger(
+      'queue_item_status_changed',
+      buildQueueItemStatusChangedEvent({
+        user_id: 'redacted',
+        batch_id: 'redacted',
+        destination: null,
+        batch_status: { queue_id: 'default', batch_id: 'redacted', origin: null, destination: null },
+      })
+    );
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const { payload } = dispatch.mock.calls[0]?.[0] as { payload: unknown[] };
+    expect(payload).toEqual(expect.arrayContaining(['BatchStatus', 'QueueCountsByDestination']));
+  });
+
   it("does not toast or clear progress on another user's failed queue item", () => {
     const seededProgress = seedProgressEvent();
     const { socket } = setup(ADMIN_USER);

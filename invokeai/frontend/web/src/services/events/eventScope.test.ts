@@ -30,9 +30,9 @@ describe('getEventScope', () => {
   });
 
   it('classifies events as foreign while multiuser auth is hydrating (token present, user not yet loaded)', () => {
-    // The socket connects with the localStorage token before /me populates auth.user. In that
-    // window an admin client already receives other users' events via the admin room; they must
-    // not be treated as the client's own.
+    // useSocketIO defers the socket connection until auth.user hydrates, so no events should
+    // arrive in this window — but if one does, it cannot be attributed yet and must not be
+    // treated as the client's own.
     const getState = buildGetState(null, 'token-1');
     expect(getEventScope(getState, { user_id: 'other-user' })).toBe('foreign');
     expect(getEventScope(getState, { user_id: 'anyone' })).toBe('foreign');

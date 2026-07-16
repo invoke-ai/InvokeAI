@@ -34,13 +34,13 @@ export const getEventScope = (getState: AppGetState, data: { user_id?: string | 
     //
     // - Single-user mode: there is no auth token and auth.user never populates. Every event is
     //   the client's own.
-    // - Multiuser mode before hydration: the socket connects with the localStorage token as soon
-    //   as the app mounts (GlobalHookIsolator renders outside ProtectedRoute), but auth.user is
-    //   only set once the /me fetch resolves. In that window an admin client already receives
-    //   other users' events via the admin room, and they cannot be attributed yet — so treat
-    //   them as foreign (cache invalidation at most) rather than let another user's events
-    //   drive personal UI. Misclassifying the user's own events as foreign for that moment is
-    //   harmless; the caches refetch and personal state catches up once auth.user hydrates.
+    // - Multiuser mode before hydration: useSocketIO defers the socket connection until
+    //   auth.user has hydrated from /me, so no events should arrive in this window. Should one
+    //   arrive anyway, it cannot be attributed yet — classify it as foreign (cache invalidation
+    //   at most) rather than let an event that may be another user's drive personal UI.
+    //   Ownership-driven one-shot side effects (progress, node execution states, gallery
+    //   auto-switch, the failure toast) never replay, which is exactly why the connection is
+    //   deferred instead of events being buffered here.
     //
     // The token distinguishes the two: it is hydrated synchronously from localStorage, and
     // ProtectedRoute clears a stale token when the server reports single-user mode.

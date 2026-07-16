@@ -412,8 +412,12 @@ class SocketIO:
             # the queue room so their queue list, badge, and item caches refresh.
             elif isinstance(event_data, QueueItemStatusChangedEvent):
                 user_room = f"user:{event_data.user_id}"
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                # Single emit to the union of rooms — python-socketio dedups recipients across a
+                # room list, so an admin owner (or the single-user "system" user, which is in both
+                # rooms) receives exactly one copy instead of running the frontend handler twice.
+                await self._sio.emit(
+                    event=event_name, data=event_data.model_dump(mode="json"), room=[user_room, "admin"]
+                )
 
                 sanitized = event_data.model_copy(
                     update={
@@ -455,8 +459,9 @@ class SocketIO:
             # carry user_id) stay private to owner + admins.
             elif isinstance(event_data, QueueItemEventBase) and hasattr(event_data, "user_id"):
                 user_room = f"user:{event_data.user_id}"
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                await self._sio.emit(
+                    event=event_name, data=event_data.model_dump(mode="json"), room=[user_room, "admin"]
+                )
 
                 logger.debug(f"Emitted private queue item event {event_name} to user room {user_room} and admin room")
 
@@ -482,8 +487,9 @@ class SocketIO:
             # room so their badge total and queue list pick up the new items.
             elif isinstance(event_data, BatchEnqueuedEvent):
                 user_room = f"user:{event_data.user_id}"
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                await self._sio.emit(
+                    event=event_name, data=event_data.model_dump(mode="json"), room=[user_room, "admin"]
+                )
 
                 sanitized = event_data.model_copy(
                     update={"user_id": "redacted", "batch_id": "redacted", "origin": None}

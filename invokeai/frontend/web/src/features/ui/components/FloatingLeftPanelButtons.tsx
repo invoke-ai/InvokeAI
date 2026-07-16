@@ -76,7 +76,7 @@ const InvokeIconButton = memo(() => {
         onClick={shift ? queue.enqueueFront : queue.enqueueBack}
         isLoading={queue.isLoading}
         isDisabled={queue.isDisabled || !canWriteImages}
-        icon={<InvokeButtonIcon isDisabled={queue.isDisabled} boxSize={6} />}
+        icon={<InvokeButtonIcon isDisabled={queue.isDisabled || !canWriteImages} boxSize={6} />}
         colorScheme="invokeYellow"
         flexGrow={1}
       />

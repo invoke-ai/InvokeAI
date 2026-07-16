@@ -14,6 +14,8 @@ import pytest
 from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
@@ -42,6 +44,30 @@ def _insert_queue_item(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (queue_id, "{}", session_id, batch_id, None, 0, None, None, destination, None, user_id),
+        )
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
+
+
+def _insert_dequeueable_queue_item(
+    session_queue: SqliteSessionQueue,
+    queue_id: str,
+    user_id: str,
+    destination: str | None = None,
+) -> int:
+    """Insert a pending queue item with a real parseable session, for tests that dequeue it."""
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
+    session = GraphExecutionState(graph=graph)
+    session_json = session.model_dump_json(warnings=False, exclude_none=True)
+    batch_id = str(uuid.uuid4())
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (queue_id, session_json, session.id, batch_id, None, 0, None, None, destination, None, user_id),
         )
         assert cursor.lastrowid is not None
         return cursor.lastrowid
@@ -159,6 +185,26 @@ def test_delete_by_destination_emits_queue_items_canceled(
     events = _canceled_events(mock_invoker)
     assert len(events) == 1
     assert events[0].canceled_item_ids_by_user == {"user_a": [a1]}
+
+
+def test_delete_by_destination_excludes_separately_canceled_current_item(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """The in-progress current item matching the destination is canceled via cancel_queue_item,
+    which emits its own per-item queue_item_status_changed - the bulk event must not signal the
+    same item a second time. The row is still deleted and still counted in the returned total."""
+    current_id = _insert_dequeueable_queue_item(session_queue, "default", "user_a", destination="canvas:sess-1")
+    pending_id = _insert_queue_item(session_queue, "default", "user_a", destination="canvas:sess-1")
+
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == current_id
+
+    result = session_queue.delete_by_destination("default", "canvas:sess-1")
+
+    assert result.deleted == 2
+    events = _canceled_events(mock_invoker)
+    assert len(events) == 1
+    assert events[0].canceled_item_ids_by_user == {"user_a": [pending_id]}
 
 
 def test_cancel_by_queue_id_emits_queue_items_canceled(

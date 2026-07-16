@@ -1892,11 +1892,13 @@ class TestWebSocketAuth:
             (c.kwargs.get("room"), c.kwargs.get("data"), c.kwargs.get("skip_sid")) for c in mock_emit.call_args_list
         ]
 
-        # Full event must go to owner room and admin room with original sensitive fields
-        owner_emits = [(p, s) for r, p, s in emits if r == "user:owner-xyz"]
-        admin_emits = [(p, s) for r, p, s in emits if r == "admin"]
-        assert len(owner_emits) == 1 and len(admin_emits) == 1
-        for payload, _ in owner_emits + admin_emits:
+        # Full event must go to owner + admin rooms with original sensitive fields, in a SINGLE
+        # emit to the room list — python-socketio dedups recipients across a room list, so an
+        # admin owner (or the single-user "system" user, which is in both rooms) receives
+        # exactly one copy instead of running the frontend handler twice.
+        full_emits = [(p, s) for r, p, s in emits if r == ["user:owner-xyz", "admin"]]
+        assert len(full_emits) == 1
+        for payload, _ in full_emits:
             assert payload["user_id"] == "owner-xyz"
             assert payload["batch_id"] == "batch-private"
             assert payload["session_id"] == "sess-private"
@@ -1964,11 +1966,11 @@ class TestWebSocketAuth:
             (c.kwargs.get("room"), c.kwargs.get("data"), c.kwargs.get("skip_sid")) for c in mock_emit.call_args_list
         ]
 
-        # Full event to owner + admin contains the real batch_id and origin
-        owner_emits = [(p, s) for r, p, s in emits if r == "user:owner-zzz"]
-        admin_emits = [(p, s) for r, p, s in emits if r == "admin"]
-        assert len(owner_emits) == 1 and len(admin_emits) == 1
-        for payload, _ in owner_emits + admin_emits:
+        # Full event to owner + admin contains the real batch_id and origin, in a single emit to
+        # the room list so a socket in both rooms receives exactly one copy
+        full_emits = [(p, s) for r, p, s in emits if r == ["user:owner-zzz", "admin"]]
+        assert len(full_emits) == 1
+        for payload, _ in full_emits:
             assert payload["user_id"] == "owner-zzz"
             assert payload["batch_id"] == "batch-pvt"
             assert payload["origin"] == "workflows"

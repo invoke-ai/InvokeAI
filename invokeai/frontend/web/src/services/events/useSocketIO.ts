@@ -1,5 +1,6 @@
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { selectAuthToken, selectCurrentUser } from 'features/auth/store/authSlice';
 import type { MapStore } from 'nanostores';
 import { useEffect, useMemo } from 'react';
 import { selectQueueStatus } from 'services/api/endpoints/queue';
@@ -23,6 +24,17 @@ declare global {
 export const useSocketIO = () => {
   useAssertSingleton('useSocketIO');
   const store = useAppStore();
+
+  // In multiuser mode the socket must not connect until auth.user has hydrated from /me: the
+  // event listeners classify every event's ownership against auth.user (see getEventScope), and
+  // events received while it is still null would be misclassified as another user's — silently
+  // dropping one-shot side effects (progress, node execution states, gallery auto-switch, the
+  // failure toast) that never replay after hydration. No token means single-user mode (or a
+  // stale token that ProtectedRoute has cleared), where every event is the client's own and the
+  // socket can connect immediately.
+  const token = useAppSelector(selectAuthToken);
+  const currentUser = useAppSelector(selectCurrentUser);
+  const isAuthHydrated = !token || currentUser !== null;
 
   const socketUrl = useMemo(() => {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -48,6 +60,9 @@ export const useSocketIO = () => {
   }, []);
 
   useEffect(() => {
+    if (!isAuthHydrated) {
+      return;
+    }
     const socket: AppSocket = io(socketUrl, socketOptions);
     $socket.set(socket);
 
@@ -78,5 +93,5 @@ export const useSocketIO = () => {
       unsubscribeQueueStatusListener();
       socket.disconnect();
     };
-  }, [socketOptions, socketUrl, store]);
+  }, [isAuthHydrated, socketOptions, socketUrl, store]);
 };

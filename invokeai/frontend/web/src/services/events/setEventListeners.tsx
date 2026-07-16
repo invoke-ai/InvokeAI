@@ -34,7 +34,7 @@ import { toast, toastApi } from 'features/toast/toast';
 import { t } from 'i18next';
 import { Trans } from 'react-i18next';
 import type { ApiTagDescription } from 'services/api';
-import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
+import { api, LIST_TAG } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -45,6 +45,7 @@ import {
   buildOnNonOwnerQueueItemStatusChanged,
   buildOnQueueItemStatusChanged,
 } from 'services/events/onQueueItemStatusChanged';
+import { QUEUE_CHANGED_TAGS } from 'services/events/queueCacheTags';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import { createWorkflowExecutionCoordinator } from 'services/events/workflowExecutionCoordinator';
 import type { Socket } from 'socket.io-client';
@@ -486,32 +487,17 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
     dispatch(
       queueApi.util.invalidateTags([
-        'SessionQueueStatus',
+        ...QUEUE_CHANGED_TAGS,
         'SessionProcessorStatus',
         'BatchStatus',
-        'CurrentSessionQueueItem',
-        'NextSessionQueueItem',
         'QueueCountsByDestination',
-        'SessionQueueItemIdList',
-        { type: 'SessionQueueItem', id: LIST_TAG },
-        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       ])
     );
   });
 
   socket.on('batch_enqueued', (data) => {
     log.debug({ data }, 'Batch enqueued');
-    dispatch(
-      queueApi.util.invalidateTags([
-        'SessionQueueStatus',
-        'CurrentSessionQueueItem',
-        'NextSessionQueueItem',
-        'QueueCountsByDestination',
-        'SessionQueueItemIdList',
-        { type: 'SessionQueueItem', id: LIST_TAG },
-        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
-      ])
-    );
+    dispatch(queueApi.util.invalidateTags([...QUEUE_CHANGED_TAGS, 'QueueCountsByDestination']));
   });
 
   // Bulk queue item events (retried/canceled) are the only signal other clients get for a bulk
@@ -520,16 +506,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   // and other users receive a sanitized companion with no ids — in every case, refetch the
   // queue caches so lists and badge counts update.
   const invalidateQueueTagsForBulkItemEvent = (itemIds: number[]) => {
-    const tagsToInvalidate: ApiTagDescription[] = [
-      'SessionQueueStatus',
-      'BatchStatus',
-      'CurrentSessionQueueItem',
-      'NextSessionQueueItem',
-      'QueueCountsByDestination',
-      'SessionQueueItemIdList',
-      { type: 'SessionQueueItem', id: LIST_TAG },
-      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
-    ];
+    const tagsToInvalidate: ApiTagDescription[] = [...QUEUE_CHANGED_TAGS, 'BatchStatus', 'QueueCountsByDestination'];
     // Invalidate each affected item specifically
     for (const itemId of itemIds) {
       tagsToInvalidate.push({ type: 'SessionQueueItem', id: itemId });

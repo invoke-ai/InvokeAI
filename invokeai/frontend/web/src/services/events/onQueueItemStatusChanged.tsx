@@ -3,9 +3,10 @@ import type { AppDispatch } from 'app/store/store';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import type { ApiTagDescription } from 'services/api';
-import { LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
+import { REDACTED_USER_ID } from 'services/events/eventScope';
+import { QUEUE_CHANGED_TAGS } from 'services/events/queueCacheTags';
 import { getUpdatedQueueStatusOnQueueItemStatusChanged } from 'services/events/queueStatusEvents';
 import { $lastProgressEvent } from 'services/events/stores';
 
@@ -88,14 +89,9 @@ export const buildOnQueueItemStatusChanged = (dispatch: AppDispatch, coordinator
     // Invalidate caches for things we cannot easily update
     // Invalidate SessionQueueStatus to refetch with user-specific counts
     const tagsToInvalidate: ApiTagDescription[] = [
-      'CurrentSessionQueueItem',
-      'NextSessionQueueItem',
+      ...QUEUE_CHANGED_TAGS,
       'InvocationCacheStatus',
-      'SessionQueueStatus',
-      'SessionQueueItemIdList',
       { type: 'SessionQueueItem', id: item_id },
-      { type: 'SessionQueueItem', id: LIST_TAG },
-      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       { type: 'BatchStatus', id: batch_status.batch_id },
     ];
     if (destination) {
@@ -135,25 +131,26 @@ export const buildOnQueueItemStatusChanged = (dispatch: AppDispatch, coordinator
  * toast — those belong to the owner. Cache invalidation is the only permitted effect, but it must
  * cover everything the owner path covers: admin UI also renders the current/next queue item (the
  * cancel-current button), batch statuses, and the destination queue counts that back the canvas,
- * and for admins those queries span all users' items. The type-level 'BatchStatus' and
- * 'QueueCountsByDestination' tags are used because the sanitized companion redacts the ids these
- * caches would otherwise be matched by.
+ * and for admins those queries span all users' items. The admin-room full event carries real ids,
+ * so its batch and destination caches are invalidated narrowly; the sanitized companion redacts
+ * batch_id and nulls destination, so only it falls back to the type-level tags.
  */
 export const buildOnNonOwnerQueueItemStatusChanged = (dispatch: AppDispatch) => {
   return (data: QueueItemStatusChangedEvent) => {
     log.trace({ data }, `Non-owner queue_item_status_changed for item ${data.item_id}`);
     const tags: ApiTagDescription[] = [
-      'SessionQueueStatus',
-      'SessionQueueItemIdList',
-      'CurrentSessionQueueItem',
-      'NextSessionQueueItem',
+      ...QUEUE_CHANGED_TAGS,
       'InvocationCacheStatus',
-      'BatchStatus',
-      'QueueCountsByDestination',
       { type: 'SessionQueueItem', id: data.item_id },
-      { type: 'SessionQueueItem', id: LIST_TAG },
-      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
     ];
+    if (data.user_id === REDACTED_USER_ID) {
+      tags.push('BatchStatus', 'QueueCountsByDestination');
+    } else {
+      tags.push({ type: 'BatchStatus', id: data.batch_status.batch_id });
+      if (data.destination) {
+        tags.push({ type: 'QueueCountsByDestination', id: data.destination });
+      }
+    }
     dispatch(queueApi.util.invalidateTags(tags));
   };
 };
