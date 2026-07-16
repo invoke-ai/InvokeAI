@@ -70,3 +70,8 @@ export interface CanvasOperationCapability {
 }
 
 export type { CommitRasterFilterResult };
+export {
+  importGalleryImagesToCanvas,
+  type GalleryCanvasImportDestination,
+  type ImportGalleryImagesResult,
+} from './importGalleryImages';
