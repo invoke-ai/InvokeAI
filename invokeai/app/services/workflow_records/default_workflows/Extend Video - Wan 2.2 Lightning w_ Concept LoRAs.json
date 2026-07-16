@@ -28,30 +28,6 @@
       "fieldName": "wan_t5_encoder_model"
     },
     {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "lora"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "weight"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "target"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "lora"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "weight"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "target"
-    },
-    {
       "nodeId": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
       "fieldName": "prompt"
     },
@@ -107,26 +83,22 @@
           "model": {
             "name": "model",
             "label": "Transformer (High Noise)",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "transformer_low_noise_model": {
             "name": "transformer_low_noise_model",
             "label": "",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "vae_model": {
             "name": "vae_model",
             "label": "",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "wan_t5_encoder_model": {
             "name": "wan_t5_encoder_model",
             "label": "",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "component_source": {
             "name": "component_source",
@@ -134,13 +106,14 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": false
       },
       "position": {
-        "x": 350,
-        "y": 367.5
+        "x": 0,
+        "y": 933.5
       }
     },
     {
@@ -166,13 +139,14 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
         "x": 1050,
-        "y": 579.5
+        "y": 1595.5
       }
     },
     {
@@ -198,13 +172,14 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
         "x": 1050,
-        "y": 759.5
+        "y": 1415.5
       }
     },
     {
@@ -231,13 +206,14 @@
             "value": 2147483647
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": false
       },
       "position": {
         "x": 1050,
-        "y": 939.5
+        "y": 471.5
       }
     },
     {
@@ -314,13 +290,14 @@
             "value": 0
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": 1511.9383824221495,
-        "y": 1036.079759854583
+        "x": 1400,
+        "y": 905.5
       }
     },
     {
@@ -361,13 +338,14 @@
             "value": 16
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": false,
         "useCache": true
       },
       "position": {
         "x": 1750,
-        "y": 400.5
+        "y": 960.5
       }
     },
     {
@@ -384,8 +362,7 @@
           "lora": {
             "name": "lora",
             "label": "Lightning LoRA (High Noise)",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "weight": {
             "name": "weight",
@@ -405,13 +382,14 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": 529.5242169371062,
-        "y": 1151.2120766989774
+        "x": 350,
+        "y": 1145.5
       }
     },
     {
@@ -428,8 +406,7 @@
           "lora": {
             "name": "lora",
             "label": "Lightning LoRA (Low Noise)",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "weight": {
             "name": "weight",
@@ -449,13 +426,14 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": 886.0309262143157,
-        "y": 1148.6093929880935
+        "x": 700,
+        "y": 1145.5
       }
     },
     {
@@ -463,7 +441,7 @@
       "type": "invocation",
       "data": {
         "id": "97c6fecb-8354-4ace-b337-e544b0ba9982",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -496,15 +474,21 @@
             "label": "",
             "description": "",
             "value": 1
+          },
+          "end_image": {
+            "name": "end_image",
+            "label": "",
+            "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": 1042.1919488673484,
-        "y": 1629.6878597618713
+        "x": 1050,
+        "y": 691.5
       }
     },
     {
@@ -543,13 +527,14 @@
             "value": "nearest"
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": 681.7812140238128,
-        "y": 1608.6053038826165
+        "x": 700,
+        "y": 857.5
       }
     },
     {
@@ -570,13 +555,14 @@
             "value": 81
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": 690.8906070119064,
-        "y": 1873.1811504846617
+        "x": 700,
+        "y": 587.5
       }
     },
     {
@@ -625,13 +611,14 @@
             "value": 0
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": false,
         "useCache": true
       },
       "position": {
         "x": 2450,
-        "y": 108.5
+        "y": 173.5
       }
     },
     {
@@ -656,13 +643,14 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
         "x": 1750,
-        "y": 280.5
+        "y": 401.5
       }
     },
     {
@@ -687,13 +675,14 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
         "x": 2100,
-        "y": 280.5
+        "y": 401.5
       }
     },
     {
@@ -726,13 +715,14 @@
             "value": "Nearest"
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": 463.36245980839465,
-        "y": 105.04759620704448
+        "x": 1400,
+        "y": 229.5
       }
     },
     {
@@ -781,13 +771,14 @@
             "value": 0
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": -210.7591703842118,
-        "y": 102.45237449232519
+        "x": 0,
+        "y": 0
       }
     },
     {
@@ -824,42 +815,35 @@
             "value": -1
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
       },
       "position": {
-        "x": 279.7075855472698,
-        "y": 1622.9052864414045
+        "x": 350,
+        "y": 684.5
       }
     },
     {
-      "id": "8da34144-8931-4a61-adb7-b3f772866f98",
+      "id": "c1a982eb-c1dd-4565-a7d4-25dfc58339fd",
       "type": "invocation",
       "data": {
-        "id": "8da34144-8931-4a61-adb7-b3f772866f98",
+        "id": "c1a982eb-c1dd-4565-a7d4-25dfc58339fd",
+        "type": "wan_lora_collection_loader",
         "version": "1.0.0",
-        "nodePack": "invokeai",
-        "label": "Apply Concept LoRA (High Noise)",
+        "label": "",
         "notes": "",
-        "type": "wan_lora_loader",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "nodePack": "invokeai",
         "inputs": {
-          "lora": {
-            "name": "lora",
-            "label": "Concept LoRA (High Noise)",
-            "description": ""
-          },
-          "weight": {
-            "name": "weight",
-            "label": "",
+          "loras": {
+            "name": "loras",
+            "label": "Concept LoRAs",
             "description": "",
-            "value": 0.75
-          },
-          "target": {
-            "name": "target",
-            "label": "",
-            "description": "",
-            "value": "high"
+            "value": []
           },
           "transformer": {
             "name": "transformer",
@@ -867,56 +851,11 @@
             "description": ""
           }
         },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
+        "dynamicInputTemplates": {}
       },
       "position": {
-        "x": 535.4274779696555,
-        "y": 1384.3634046282455
-      }
-    },
-    {
-      "id": "5d602b68-c4f6-4bd1-a939-5a00c9892e18",
-      "type": "invocation",
-      "data": {
-        "id": "5d602b68-c4f6-4bd1-a939-5a00c9892e18",
-        "version": "1.0.0",
-        "nodePack": "invokeai",
-        "label": "Apply Concept LoRA (Low Noise)",
-        "notes": "",
-        "type": "wan_lora_loader",
-        "inputs": {
-          "lora": {
-            "name": "lora",
-            "label": "Concept LoRA (Low Noise)",
-            "description": ""
-          },
-          "weight": {
-            "name": "weight",
-            "label": "",
-            "description": "",
-            "value": 0.75
-          },
-          "target": {
-            "name": "target",
-            "label": "",
-            "description": "",
-            "value": "low"
-          },
-          "transformer": {
-            "name": "transformer",
-            "label": "",
-            "description": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 894.5978300716305,
-        "y": 1386.9660883391293
+        "x": 1050,
+        "y": 1194.5
       }
     }
   ],
@@ -1146,25 +1085,17 @@
       "targetHandle": "fps"
     },
     {
-      "id": "reactflow__edge-ae8f115d-a3b8-4f76-b280-7313366a94adtransformer-8da34144-8931-4a61-adb7-b3f772866f98transformer",
+      "id": "reactflow__edge-ae8f115d-a3b8-4f76-b280-7313366a94adtransformer-c1a982eb-c1dd-4565-a7d4-25dfc58339fdtransformer",
       "type": "default",
       "source": "ae8f115d-a3b8-4f76-b280-7313366a94ad",
-      "target": "8da34144-8931-4a61-adb7-b3f772866f98",
+      "target": "c1a982eb-c1dd-4565-a7d4-25dfc58339fd",
       "sourceHandle": "transformer",
       "targetHandle": "transformer"
     },
     {
-      "id": "reactflow__edge-8da34144-8931-4a61-adb7-b3f772866f98transformer-5d602b68-c4f6-4bd1-a939-5a00c9892e18transformer",
+      "id": "reactflow__edge-c1a982eb-c1dd-4565-a7d4-25dfc58339fdtransformer-4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dabtransformer",
       "type": "default",
-      "source": "8da34144-8931-4a61-adb7-b3f772866f98",
-      "target": "5d602b68-c4f6-4bd1-a939-5a00c9892e18",
-      "sourceHandle": "transformer",
-      "targetHandle": "transformer"
-    },
-    {
-      "id": "reactflow__edge-5d602b68-c4f6-4bd1-a939-5a00c9892e18transformer-4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dabtransformer",
-      "type": "default",
-      "source": "5d602b68-c4f6-4bd1-a939-5a00c9892e18",
+      "source": "c1a982eb-c1dd-4565-a7d4-25dfc58339fd",
       "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
       "sourceHandle": "transformer",
       "targetHandle": "transformer"
@@ -1186,10 +1117,10 @@
             "heading-wuPtY8B4vR",
             "container-AkpUH1WtID",
             "divider-w19S1gIyNJ",
-            "heading-7ZKUFfihCo",
-            "container-GnMzsFf3bp",
             "heading-TwsoE3wQi9",
             "container-0u7wyxEdNa",
+            "heading-7ZKUFfihCo",
+            "node-field-hFIdNT3hYF",
             "divider-FKc8lld0Eb",
             "heading-10PuWMKJg9",
             "container-C0z6ru33to"
@@ -1672,121 +1603,17 @@
         },
         "type": "heading"
       },
-      "container-GnMzsFf3bp": {
-        "id": "container-GnMzsFf3bp",
+      "node-field-hFIdNT3hYF": {
+        "id": "node-field-hFIdNT3hYF",
+        "type": "node-field",
         "parentId": "root",
         "data": {
-          "layout": "row",
-          "children": [
-            "container-HiZyrp0zop",
-            "container-aeDJhcU5Zr"
-          ]
-        },
-        "type": "container"
-      },
-      "container-aeDJhcU5Zr": {
-        "id": "container-aeDJhcU5Zr",
-        "parentId": "container-GnMzsFf3bp",
-        "data": {
-          "layout": "row",
-          "children": [
-            "container-1R7Lgckwoe"
-          ]
-        },
-        "type": "container"
-      },
-      "container-HiZyrp0zop": {
-        "id": "container-HiZyrp0zop",
-        "parentId": "container-GnMzsFf3bp",
-        "data": {
-          "layout": "row",
-          "children": [
-            "container-rAvu5j575m"
-          ]
-        },
-        "type": "container"
-      },
-      "container-rAvu5j575m": {
-        "id": "container-rAvu5j575m",
-        "parentId": "container-HiZyrp0zop",
-        "data": {
-          "layout": "column",
-          "children": [
-            "node-field-vtfoXGJjAB",
-            "node-field-jzBwpMn21l"
-          ]
-        },
-        "type": "container"
-      },
-      "container-1R7Lgckwoe": {
-        "id": "container-1R7Lgckwoe",
-        "parentId": "container-aeDJhcU5Zr",
-        "data": {
-          "layout": "column",
-          "children": [
-            "node-field-m9Vo9LXub9",
-            "node-field-njICXCR5l0"
-          ]
-        },
-        "type": "container"
-      },
-      "node-field-vtfoXGJjAB": {
-        "id": "node-field-vtfoXGJjAB",
-        "parentId": "container-rAvu5j575m",
-        "data": {
           "fieldIdentifier": {
-            "nodeId": "8da34144-8931-4a61-adb7-b3f772866f98",
-            "fieldName": "lora"
+            "nodeId": "c1a982eb-c1dd-4565-a7d4-25dfc58339fd",
+            "fieldName": "loras"
           },
           "showDescription": true
-        },
-        "type": "node-field"
-      },
-      "node-field-jzBwpMn21l": {
-        "id": "node-field-jzBwpMn21l",
-        "parentId": "container-rAvu5j575m",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "8da34144-8931-4a61-adb7-b3f772866f98",
-            "fieldName": "weight"
-          },
-          "showDescription": true,
-          "settings": {
-            "type": "float-field-config",
-            "showShuffle": false,
-            "component": "number-input"
-          }
-        },
-        "type": "node-field"
-      },
-      "node-field-m9Vo9LXub9": {
-        "id": "node-field-m9Vo9LXub9",
-        "parentId": "container-1R7Lgckwoe",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "5d602b68-c4f6-4bd1-a939-5a00c9892e18",
-            "fieldName": "lora"
-          },
-          "showDescription": true
-        },
-        "type": "node-field"
-      },
-      "node-field-njICXCR5l0": {
-        "id": "node-field-njICXCR5l0",
-        "parentId": "container-1R7Lgckwoe",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "5d602b68-c4f6-4bd1-a939-5a00c9892e18",
-            "fieldName": "weight"
-          },
-          "showDescription": true,
-          "settings": {
-            "type": "float-field-config",
-            "showShuffle": false,
-            "component": "number-input"
-          }
-        },
-        "type": "node-field"
+        }
       }
     },
     "rootElementId": "root"

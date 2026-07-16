@@ -28,30 +28,6 @@
       "fieldName": "wan_t5_encoder_model"
     },
     {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "lora"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "weight"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "target"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "lora"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "weight"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "target"
-    },
-    {
       "nodeId": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
       "fieldName": "prompt"
     },
@@ -107,26 +83,22 @@
           "model": {
             "name": "model",
             "label": "Transformer (High Noise)",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "transformer_low_noise_model": {
             "name": "transformer_low_noise_model",
             "label": "",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "vae_model": {
             "name": "vae_model",
             "label": "",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "wan_t5_encoder_model": {
             "name": "wan_t5_encoder_model",
             "label": "",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "component_source": {
             "name": "component_source",
@@ -134,6 +106,7 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": false
@@ -166,6 +139,7 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
@@ -198,6 +172,7 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
@@ -231,6 +206,7 @@
             "value": 2147483647
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": false
@@ -314,6 +290,7 @@
             "value": 0
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
@@ -361,6 +338,7 @@
             "value": 16
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": false,
         "useCache": true
@@ -368,92 +346,6 @@
       "position": {
         "x": 2100,
         "y": 33
-      }
-    },
-    {
-      "id": "db11f579-9c71-4e2e-8e4b-8d271a30befb",
-      "type": "invocation",
-      "data": {
-        "id": "db11f579-9c71-4e2e-8e4b-8d271a30befb",
-        "version": "1.0.0",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "wan_lora_loader",
-        "inputs": {
-          "lora": {
-            "name": "lora",
-            "label": "Concept  LoRA (Low Noise)",
-            "description": ""
-          },
-          "weight": {
-            "name": "weight",
-            "label": "",
-            "description": "",
-            "value": 0.75
-          },
-          "target": {
-            "name": "target",
-            "label": "",
-            "description": "",
-            "value": "low"
-          },
-          "transformer": {
-            "name": "transformer",
-            "label": "",
-            "description": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 1400,
-        "y": 772
-      }
-    },
-    {
-      "id": "acd771f6-19e4-4bfb-a443-3d613268ce80",
-      "type": "invocation",
-      "data": {
-        "id": "acd771f6-19e4-4bfb-a443-3d613268ce80",
-        "version": "1.0.0",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "wan_lora_loader",
-        "inputs": {
-          "lora": {
-            "name": "lora",
-            "label": "Concept LoRA (High Noise)",
-            "description": ""
-          },
-          "weight": {
-            "name": "weight",
-            "label": "",
-            "description": "",
-            "value": 0.75
-          },
-          "target": {
-            "name": "target",
-            "label": "",
-            "description": "",
-            "value": "high"
-          },
-          "transformer": {
-            "name": "transformer",
-            "label": "",
-            "description": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 1050,
-        "y": 772
       }
     },
     {
@@ -470,8 +362,7 @@
           "lora": {
             "name": "lora",
             "label": "Lightning LoRA (High Noise)",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "weight": {
             "name": "weight",
@@ -491,6 +382,7 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
@@ -514,8 +406,7 @@
           "lora": {
             "name": "lora",
             "label": "Lightning LoRA (Low Noise)",
-            "description": "",
-            "value": null
+            "description": ""
           },
           "weight": {
             "name": "weight",
@@ -535,6 +426,7 @@
             "description": ""
           }
         },
+        "dynamicInputTemplates": {},
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true
@@ -542,6 +434,39 @@
       "position": {
         "x": 700,
         "y": 772
+      }
+    },
+    {
+      "id": "f37bd1f0-f0d8-4105-8e07-5ec484298d36",
+      "type": "invocation",
+      "data": {
+        "id": "f37bd1f0-f0d8-4105-8e07-5ec484298d36",
+        "type": "wan_lora_collection_loader",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "nodePack": "invokeai",
+        "inputs": {
+          "loras": {
+            "name": "loras",
+            "label": "",
+            "description": "",
+            "value": []
+          },
+          "transformer": {
+            "name": "transformer",
+            "label": "",
+            "description": ""
+          }
+        },
+        "dynamicInputTemplates": {}
+      },
+      "position": {
+        "x": 1053.289904257177,
+        "y": 770.7485394743496
       }
     }
   ],
@@ -619,25 +544,17 @@
       "targetHandle": "transformer"
     },
     {
-      "id": "reactflow__edge-eb6b4c66-0bfb-4e0d-bc39-9d8814f3cd75transformer-acd771f6-19e4-4bfb-a443-3d613268ce80transformer",
+      "id": "reactflow__edge-eb6b4c66-0bfb-4e0d-bc39-9d8814f3cd75transformer-f37bd1f0-f0d8-4105-8e07-5ec484298d36transformer",
       "type": "default",
       "source": "eb6b4c66-0bfb-4e0d-bc39-9d8814f3cd75",
-      "target": "acd771f6-19e4-4bfb-a443-3d613268ce80",
+      "target": "f37bd1f0-f0d8-4105-8e07-5ec484298d36",
       "sourceHandle": "transformer",
       "targetHandle": "transformer"
     },
     {
-      "id": "reactflow__edge-acd771f6-19e4-4bfb-a443-3d613268ce80transformer-db11f579-9c71-4e2e-8e4b-8d271a30befbtransformer",
+      "id": "reactflow__edge-f37bd1f0-f0d8-4105-8e07-5ec484298d36transformer-4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dabtransformer",
       "type": "default",
-      "source": "acd771f6-19e4-4bfb-a443-3d613268ce80",
-      "target": "db11f579-9c71-4e2e-8e4b-8d271a30befb",
-      "sourceHandle": "transformer",
-      "targetHandle": "transformer"
-    },
-    {
-      "id": "reactflow__edge-db11f579-9c71-4e2e-8e4b-8d271a30befbtransformer-4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dabtransformer",
-      "type": "default",
-      "source": "db11f579-9c71-4e2e-8e4b-8d271a30befb",
+      "source": "f37bd1f0-f0d8-4105-8e07-5ec484298d36",
       "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
       "sourceHandle": "transformer",
       "targetHandle": "transformer"
@@ -656,10 +573,10 @@
             "container-mUeBcw2tYf",
             "heading-wuPtY8B4vR",
             "container-AkpUH1WtID",
-            "heading-vSOD5q5gvL",
-            "container-EeeKKz36Ba",
             "heading-TwsoE3wQi9",
             "container-0u7wyxEdNa",
+            "heading-vSOD5q5gvL",
+            "node-field-EbS4ZMqDPZ",
             "heading-10PuWMKJg9",
             "container-C0z6ru33to"
           ]
@@ -1031,64 +948,6 @@
         },
         "type": "heading"
       },
-      "container-EeeKKz36Ba": {
-        "id": "container-EeeKKz36Ba",
-        "parentId": "root",
-        "data": {
-          "layout": "row",
-          "children": [
-            "container-Qxormn51Mx",
-            "container-N0tnTlpnZl"
-          ]
-        },
-        "type": "container"
-      },
-      "container-Qxormn51Mx": {
-        "id": "container-Qxormn51Mx",
-        "parentId": "container-EeeKKz36Ba",
-        "data": {
-          "layout": "row",
-          "children": [
-            "container-8vzmVHxNM3"
-          ]
-        },
-        "type": "container"
-      },
-      "container-N0tnTlpnZl": {
-        "id": "container-N0tnTlpnZl",
-        "parentId": "container-EeeKKz36Ba",
-        "data": {
-          "layout": "row",
-          "children": [
-            "container-HWoz5KuI1T"
-          ]
-        },
-        "type": "container"
-      },
-      "container-8vzmVHxNM3": {
-        "id": "container-8vzmVHxNM3",
-        "parentId": "container-Qxormn51Mx",
-        "data": {
-          "layout": "column",
-          "children": [
-            "node-field-L0YRkfsKLf",
-            "node-field-1dC61dfAnb"
-          ]
-        },
-        "type": "container"
-      },
-      "container-HWoz5KuI1T": {
-        "id": "container-HWoz5KuI1T",
-        "parentId": "container-N0tnTlpnZl",
-        "data": {
-          "layout": "column",
-          "children": [
-            "node-field-vJThkvS9Ky",
-            "node-field-33PaXUUXpM"
-          ]
-        },
-        "type": "container"
-      },
       "node-field-tpqKlLmMtv": {
         "id": "node-field-tpqKlLmMtv",
         "parentId": "container-lF8o60KuVb",
@@ -1113,63 +972,17 @@
         },
         "type": "node-field"
       },
-      "node-field-L0YRkfsKLf": {
-        "id": "node-field-L0YRkfsKLf",
-        "parentId": "container-8vzmVHxNM3",
+      "node-field-EbS4ZMqDPZ": {
+        "id": "node-field-EbS4ZMqDPZ",
+        "type": "node-field",
+        "parentId": "root",
         "data": {
           "fieldIdentifier": {
-            "nodeId": "acd771f6-19e4-4bfb-a443-3d613268ce80",
-            "fieldName": "lora"
+            "nodeId": "f37bd1f0-f0d8-4105-8e07-5ec484298d36",
+            "fieldName": "loras"
           },
           "showDescription": true
-        },
-        "type": "node-field"
-      },
-      "node-field-1dC61dfAnb": {
-        "id": "node-field-1dC61dfAnb",
-        "parentId": "container-8vzmVHxNM3",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "acd771f6-19e4-4bfb-a443-3d613268ce80",
-            "fieldName": "weight"
-          },
-          "showDescription": true,
-          "settings": {
-            "type": "float-field-config",
-            "showShuffle": false,
-            "component": "number-input"
-          }
-        },
-        "type": "node-field"
-      },
-      "node-field-vJThkvS9Ky": {
-        "id": "node-field-vJThkvS9Ky",
-        "parentId": "container-HWoz5KuI1T",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "db11f579-9c71-4e2e-8e4b-8d271a30befb",
-            "fieldName": "lora"
-          },
-          "showDescription": true
-        },
-        "type": "node-field"
-      },
-      "node-field-33PaXUUXpM": {
-        "id": "node-field-33PaXUUXpM",
-        "parentId": "container-HWoz5KuI1T",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "db11f579-9c71-4e2e-8e4b-8d271a30befb",
-            "fieldName": "weight"
-          },
-          "showDescription": true,
-          "settings": {
-            "type": "float-field-config",
-            "showShuffle": false,
-            "component": "number-input"
-          }
-        },
-        "type": "node-field"
+        }
       }
     },
     "rootElementId": "root"
