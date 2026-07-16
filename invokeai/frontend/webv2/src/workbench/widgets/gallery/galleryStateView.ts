@@ -209,7 +209,9 @@ export const getGalleryStateView = (
     galleryView,
     images,
     isLoading,
-    pendingPlaceholders: getGalleryQueuePlaceholders(queueItems, { galleryView, searchTerm, selectedBoardId }),
+    pendingPlaceholders: settings.showPendingItems
+      ? getGalleryQueuePlaceholders(queueItems, { galleryView, searchTerm, selectedBoardId })
+      : [],
     projectBoardId: getGalleryProjectBoardId(values),
     searchTerm,
     selectedBoardId,

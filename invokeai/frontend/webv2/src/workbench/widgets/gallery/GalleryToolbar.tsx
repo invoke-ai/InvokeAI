@@ -180,8 +180,15 @@ const GalleryUploadButton = () => {
 const GallerySettingsMenu = () => {
   const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
-  const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, starredFirst, thumbnailFit } =
-    gallery.settings;
+  const {
+    imageDensityPercent,
+    imageOrderDir,
+    paginationMode,
+    showImageDimensions,
+    showPendingItems,
+    starredFirst,
+    thumbnailFit,
+  } = gallery.settings;
   const handleDensityKeyDown = useCallback((event: React.KeyboardEvent) => event.stopPropagation(), []);
   const handleDensityChange = useCallback(
     (event: { value: number[] }) =>
@@ -192,6 +199,10 @@ const GallerySettingsMenu = () => {
   const handleAspectFit = useCallback(() => actions.updateSettings({ thumbnailFit: 'aspect' }), [actions]);
   const handleShowDimensionsChange = useCallback(
     (showImageDimensions: boolean) => actions.updateSettings({ showImageDimensions }),
+    [actions]
+  );
+  const handleShowPendingItemsChange = useCallback(
+    (showPendingItems: boolean) => actions.updateSettings({ showPendingItems }),
     [actions]
   );
   const handleNewestFirst = useCallback(() => actions.updateSettings({ imageOrderDir: 'DESC' }), [actions]);
@@ -267,6 +278,11 @@ const GallerySettingsMenu = () => {
                   checked={showImageDimensions}
                   label={t('widgets.gallery.alwaysShowDimensions')}
                   onChange={handleShowDimensionsChange}
+                />
+                <SettingSwitch
+                  checked={showPendingItems}
+                  label={t('widgets.gallery.showPendingItems')}
+                  onChange={handleShowPendingItemsChange}
                 />
               </Stack>
               <Stack gap="2">

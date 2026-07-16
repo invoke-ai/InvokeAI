@@ -98,6 +98,7 @@ describe('gallery state view', () => {
       showArchivedBoards: false,
       showDateBoards: false,
       showImageDimensions: false,
+      showPendingItems: true,
       starredFirst: false,
       thumbnailFit: 'square',
     });
@@ -215,5 +216,26 @@ describe('gallery state view', () => {
     expect(
       getGalleryStateView({ selectedBoardId: 'none' }, boards, [], false, queueItems).pendingPlaceholders
     ).toHaveLength(1);
+  });
+
+  it('hides only pending placeholders when the persisted setting is disabled', () => {
+    const queueItems = [createQueueItem({ boardId: 'none', status: 'pending' })];
+    const image = {
+      ...createImage('completed.png'),
+      boardId: 'none',
+      imageCategory: 'general',
+      starred: false,
+    } as const;
+    const gallery = getGalleryStateView(
+      { selectedBoardId: 'none', showPendingItems: false },
+      boards,
+      [image],
+      false,
+      queueItems
+    );
+
+    expect(gallery.pendingPlaceholders).toEqual([]);
+    expect(gallery.images).toEqual([image]);
+    expect(gallery.settings.showPendingItems).toBe(false);
   });
 });

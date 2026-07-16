@@ -446,6 +446,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
             role="listbox"
             tabIndex={0}
             w="full"
+            outline="none"
           >
             <ScrollArea.Content>
               <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
