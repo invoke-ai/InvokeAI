@@ -1,10 +1,9 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings, VaeModelConfig } from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
-import type { ChangeEvent } from 'react';
 
-import { HStack, Icon, InputGroup, NativeSelect, NumberInput, Stack } from '@chakra-ui/react';
-import { Button, IconButton, Field, Tooltip } from '@workbench/components/ui';
+import { HStack, Icon, InputGroup, NumberInput, Stack } from '@chakra-ui/react';
+import { Button, Combobox, IconButton, Field, Tooltip } from '@workbench/components/ui';
 import {
   getDefaultGenerateSettings,
   getGenerationModelPolicy,
@@ -209,22 +208,14 @@ export const GenerateModelFields = ({
           {policy.ui.schedulerVisible ? (
             <Field label={t('widgets.generate.scheduler')}>
               <HStack gap="1">
-                <NativeSelect.Root flex="1" size="xs">
-                  <NativeSelect.Field
-                    aria-label={t('widgets.generate.scheduler')}
-                    value={settings.scheduler}
-                    onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                      onCommit({ scheduler: event.currentTarget.value })
-                    }
-                  >
-                    {policy.scheduler.options.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
+                <Combobox
+                  aria-label={t('widgets.generate.scheduler')}
+                  flex="1"
+                  options={policy.scheduler.options}
+                  size="xs"
+                  value={settings.scheduler}
+                  onValueChange={(scheduler) => onCommit({ scheduler })}
+                />
                 <ModelDefaultButton
                   disabled={!modelDefaults || settings.scheduler === modelDefaults.scheduler}
                   label={t('widgets.generate.useModelDefaultScheduler')}

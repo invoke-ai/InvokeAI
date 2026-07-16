@@ -1,5 +1,6 @@
 export * from './Button';
 export * from './ColorPicker';
+export * from './Combobox';
 export * from './ConfirmDialog';
 export * from './Field';
 export * from './JsonPreview';
