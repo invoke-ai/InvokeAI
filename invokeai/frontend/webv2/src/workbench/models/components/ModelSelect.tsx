@@ -22,6 +22,7 @@ import { getModelPickerGroups } from '@workbench/models/library';
 import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { formatBytes, getModelTypePluralLabel } from '@workbench/models/taxonomy';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useActiveProjectId } from '@workbench/WorkbenchContext';
 import { BoxIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SearchIcon, XIcon } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -397,15 +398,20 @@ export const ModelSelect = ({
   );
 };
 
-const ModelManagerLinkButton = () => (
-  <Tooltip content="Manage models" showArrow>
-    <IconButton aria-label="Manage models" asChild flexShrink={0} size="xs" variant="ghost">
-      <Link to="/models">
-        <BoxIcon />
-      </Link>
-    </IconButton>
-  </Tooltip>
-);
+const ModelManagerLinkButton = () => {
+  const projectId = useActiveProjectId();
+  const search = useMemo(() => ({ project: projectId }), [projectId]);
+
+  return (
+    <Tooltip content="Manage models" showArrow>
+      <IconButton aria-label="Manage models" asChild flexShrink={0} size="xs" variant="ghost">
+        <Link search={search} to="/models">
+          <BoxIcon />
+        </Link>
+      </IconButton>
+    </Tooltip>
+  );
+};
 
 const BaseChip = ({
   base,

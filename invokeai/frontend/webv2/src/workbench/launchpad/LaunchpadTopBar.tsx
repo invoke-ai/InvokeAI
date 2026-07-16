@@ -1,10 +1,15 @@
 import type { BackendConnectionStatus } from '@workbench/types';
 
 import { Box, Flex, HStack, Text } from '@chakra-ui/react';
+import { Link, useSearch } from '@tanstack/react-router';
 import { AccountMenu } from '@workbench/auth/components/AccountMenu';
 import { useConnectionStatusSelector } from '@workbench/backend/connectionStore';
 import { InvokeMark } from '@workbench/components/InvokeMark';
+import { Button } from '@workbench/components/ui';
 import { SettingsButton } from '@workbench/settings/SettingsDialog';
+import { ArrowLeftIcon } from 'lucide-react';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const CONNECTION_LABEL: Record<Exclude<BackendConnectionStatus, 'connected'>, string> = {
   connecting: 'Connecting…',
@@ -39,29 +44,43 @@ const ConnectionChip = () => {
   );
 };
 
-export const LaunchpadTopBar = () => (
-  <Flex
-    align="center"
-    borderBottomWidth="1px"
-    bg="bg.subtle"
-    flexShrink={0}
-    justify="space-between"
-    pe="1.5"
-    ps="4"
-    h="12"
-  >
-    <HStack gap="3">
-      <InvokeMark size={20} />
-      <Text fontSize="sm" fontWeight="700">
-        Invoke
-      </Text>
-    </HStack>
-    <HStack gap="2">
-      <ConnectionChip />
-      <HStack gap="0.5">
-        <SettingsButton />
-        <AccountMenu />
+export const LaunchpadTopBar = () => {
+  const { t } = useTranslation();
+  const search = useSearch({ strict: false }) as { project?: string };
+  const projectSearch = useMemo(() => (search.project ? { project: search.project } : {}), [search.project]);
+
+  return (
+    <Flex
+      align="center"
+      borderBottomWidth="1px"
+      bg="bg.subtle"
+      flexShrink={0}
+      justify="space-between"
+      pe="1.5"
+      ps="4"
+      h="12"
+    >
+      <HStack gap="3">
+        <InvokeMark size={20} />
+        <Text fontSize="sm" fontWeight="700">
+          Invoke
+        </Text>
+        {search.project ? (
+          <Button asChild colorPalette="accent" size="sm" variant="solid">
+            <Link search={projectSearch} to="/app">
+              <ArrowLeftIcon />
+              {t('launchpad.backToProject')}
+            </Link>
+          </Button>
+        ) : null}
       </HStack>
-    </HStack>
-  </Flex>
-);
+      <HStack gap="2">
+        <ConnectionChip />
+        <HStack gap="0.5">
+          <SettingsButton />
+          <AccountMenu />
+        </HStack>
+      </HStack>
+    </Flex>
+  );
+};
