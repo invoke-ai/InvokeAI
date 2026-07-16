@@ -1361,6 +1361,10 @@
         "animaVaePlaceholder": "Select Anima-compatible VAE",
         "animaQwen3Encoder": "Qwen3 0.6B Encoder",
         "animaQwen3EncoderPlaceholder": "Select Qwen3 0.6B encoder",
+        "animaInpaintAdapter": "Inpaint Adapter",
+        "animaInpaintAdapterPlaceholder": "Select inpaint adapter (optional)",
+        "animaInpaintAdapterHelper": "Only used when inpainting or outpainting on Canvas.",
+        "animaInpaintAdapterWeight": "Adapter Weight",
         "zImageVae": "VAE (optional)",
         "zImageVaePlaceholder": "From VAE source model",
         "zImageQwen3Encoder": "Qwen3 Encoder (optional)",
@@ -2493,7 +2497,7 @@
         "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
-        "savedWorkflowUnsupportedDescription": "This workflow cannot currently be used by Call Saved Workflow.",
+        "callable": "Callable",
         "savedWorkflowCompatibility": {
             "missingWorkflowReturn": "The workflow must contain a Workflow Return node.",
             "multipleWorkflowReturn": "The workflow may contain only one Workflow Return node.",
@@ -2907,6 +2911,7 @@
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
             "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill",
+            "controlAdapterDuplicateAnimaLLLiteModel": "each Anima control model can only be used by one Control Layer",
             "bboxHidden": "Bounding box is hidden (shift+o to toggle)"
         },
         "errors": {

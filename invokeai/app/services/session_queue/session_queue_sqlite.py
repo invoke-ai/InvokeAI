@@ -524,7 +524,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 tuple(params),
             )
-        self.__invoker.services.events.emit_queue_cleared(queue_id)
+        self.__invoker.services.events.emit_queue_cleared(queue_id, user_id)
         return ClearResult(deleted=count)
 
     def delete_queue_items_by_id(self, item_ids: list[int]) -> None:

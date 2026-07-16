@@ -172,6 +172,71 @@ def test_build_graph_from_workflow_flattens_connector_edges():
     assert graph.nodes["return-1"].values == []
 
 
+def test_build_graph_from_workflow_uses_defaults_for_inputs_without_saved_values():
+    collect_node = _build_workflow_node("return-collect-1", "collect", {})
+    collect_node["data"]["inputs"] = {
+        "item": {"name": "item", "label": "", "description": ""},
+        "collection": {"name": "collection", "label": "", "description": ""},
+    }
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("return-value-1", "workflow_return_value", {"key": "result", "value": None}),
+            collect_node,
+            _build_workflow_node("return-1", "workflow_return", {"values": []}),
+        ],
+        edges=[
+            {
+                "id": "edge-return-collect",
+                "type": "default",
+                "source": "return-value-1",
+                "sourceHandle": "value",
+                "target": "return-collect-1",
+                "targetHandle": "item",
+            },
+            {
+                "id": "edge-return-values",
+                "type": "default",
+                "source": "return-collect-1",
+                "sourceHandle": "collection",
+                "target": "return-1",
+                "targetHandle": "values",
+            },
+        ],
+    )
+
+    graph = build_graph_from_workflow(workflow)
+
+    assert graph.nodes["return-collect-1"].collection == []
+
+
+def test_build_graph_from_workflow_uses_default_for_legacy_auto_board_values():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("image-1", "blank_image", {"board": "auto", "width": 64, "height": 64}),
+            *_build_named_return_nodes(),
+        ],
+        edges=_build_named_return_edges("image-1", "image"),
+    )
+
+    graph = build_graph_from_workflow(workflow)
+
+    assert graph.nodes["image-1"].board is None
+
+
+def test_build_graph_from_workflow_uses_default_for_legacy_none_board_values():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("image-1", "blank_image", {"board": "none", "width": 64, "height": 64}),
+            *_build_named_return_nodes(),
+        ],
+        edges=_build_named_return_edges("image-1", "image"),
+    )
+
+    graph = build_graph_from_workflow(workflow)
+
+    assert graph.nodes["image-1"].board is None
+
+
 def test_build_graph_from_workflow_rejects_batch_special_nodes_with_clear_error():
     workflow = _build_workflow(
         nodes=[_build_workflow_node("image-batch-1", "image_batch", {"images": []})],

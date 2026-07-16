@@ -182,6 +182,67 @@ const fieldValueReducer = <T extends FieldValue>(
   field.value = result.data;
 };
 
+const clearCallSavedWorkflowDynamicFields = (state: NodesState, nodeId: string) => {
+  const node = state.nodes.find((n) => n.id === nodeId);
+  if (!isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
+    return;
+  }
+
+  const removedFieldNames = new Set<string>();
+  for (const fieldName of Object.keys(node.data.inputs)) {
+    if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)) {
+      removedFieldNames.add(fieldName);
+      delete node.data.inputs[fieldName];
+      delete node.data.dynamicInputTemplates[fieldName];
+    }
+  }
+
+  state.edges = state.edges.filter((edge) => {
+    return (
+      edge.type !== 'default' ||
+      edge.target !== nodeId ||
+      !edge.targetHandle?.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)
+    );
+  });
+
+  removeCallSavedWorkflowDynamicFieldsFromForm(state, nodeId, removedFieldNames);
+};
+
+const clearCallSavedWorkflowDynamicFieldsIfWorkflowIdIsEmpty = (
+  state: NodesState,
+  { nodeId, fieldName, value }: FieldValueAction<StatefulFieldValue>['payload']
+) => {
+  if (fieldName === 'workflow_id' && value === '') {
+    clearCallSavedWorkflowDynamicFields(state, nodeId);
+  }
+};
+
+const removeCallSavedWorkflowDynamicFieldsFromForm = (
+  state: NodesState,
+  nodeId: string,
+  fieldNames: ReadonlySet<string>
+) => {
+  if (fieldNames.size === 0) {
+    return;
+  }
+
+  const formElementIdsToRemove = Object.values(state.form.elements).flatMap((element) => {
+    if (!isNodeFieldElement(element)) {
+      return [];
+    }
+    const { fieldIdentifier } = element.data;
+    if (fieldIdentifier.nodeId === nodeId && fieldNames.has(fieldIdentifier.fieldName)) {
+      return [element.id];
+    }
+    return [];
+  });
+
+  for (const id of formElementIdsToRemove) {
+    removeElement({ form: state.form, id });
+    delete state.formFieldInitialValues[id];
+  }
+};
+
 const slice = createSlice({
   name: 'nodes',
   initialState: getInitialState(),
@@ -489,9 +550,11 @@ const slice = createSlice({
     },
     fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
       fieldValueReducer(state, action, zStatefulFieldValue);
+      clearCallSavedWorkflowDynamicFieldsIfWorkflowIdIsEmpty(state, action.payload);
     },
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
+      clearCallSavedWorkflowDynamicFieldsIfWorkflowIdIsEmpty(state, action.payload);
     },
     fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
       fieldValueReducer(state, action, zStringFieldCollectionValue);
@@ -579,13 +642,16 @@ const slice = createSlice({
       }
 
       const nextFieldNames = new Set(fields.map((field) => field.fieldName));
+      const removedFieldNames = new Set<string>();
 
       for (const fieldName of Object.keys(node.data.inputs)) {
         if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX) && !nextFieldNames.has(fieldName)) {
+          removedFieldNames.add(fieldName);
           delete node.data.inputs[fieldName];
           delete node.data.dynamicInputTemplates[fieldName];
         }
       }
+      removeCallSavedWorkflowDynamicFieldsFromForm(state, nodeId, removedFieldNames);
 
       for (const { fieldName, fieldTemplate, label, description, initialValue } of fields) {
         const existingTemplate = node.data.dynamicInputTemplates[fieldName];
