@@ -205,7 +205,7 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
   const denoiseAria = useMemo(() => [t('widgets.layers.maskFill.denoiseLimit')], [t]);
 
   return (
-    <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md">
+    <Stack gap="2">
       <HStack gap="2">
         <Field flexShrink="0" label={t('widgets.layers.maskFill.color')}>
           <ColorPicker

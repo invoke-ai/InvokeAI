@@ -217,7 +217,7 @@ const RasterLayerSettings = ({
   );
 
   return (
-    <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md">
+    <Stack gap="2">
       <Switch.Root checked={isLocked} size="sm" onCheckedChange={handleTransparencyLock}>
         <Switch.HiddenInput />
         <Switch.Control>
