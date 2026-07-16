@@ -17,7 +17,9 @@
     "lint:oxc:fix": "oxlint --react-plugin --import-plugin --fix .",
     "lint:tsc": "tsc --noEmit",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run --config vitest.config.mts",
+    "test:all": "pnpm run test && pnpm run test:browser",
+    "test:browser": "vitest run --config vitest.browser.config.mts"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
@@ -31,7 +33,6 @@
     "@tanstack/react-virtual": "^3.14.3",
     "@xyflow/react": "^12.11.1",
     "ag-psd": "^31.0.1",
-    "fflate": "^0.8.3",
     "i18next": "^25.7.3",
     "i18next-http-backend": "^3.0.2",
     "lucide-react": "^1.21.0",
@@ -53,6 +54,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/use-sync-external-store": "^1.5.0",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/browser-playwright": "4.1.9",
     "babel-plugin-react-compiler": "^1.0.0",
     "oxfmt": "^0.56.0",
     "oxlint": "^1.71.0",

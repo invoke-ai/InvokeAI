@@ -79,6 +79,7 @@ jobs:
         with:
           files_yaml: |
             webv2:
+              - '.github/workflows/frontend-tests.yml'
               - 'invokeai/frontend/webv2/**'
 
       - name: install dependencies
@@ -90,4 +91,14 @@ jobs:
       - name: vitest
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
         run: 'pnpm test'
+        shell: bash
+
+      - name: install Chromium
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm exec playwright install chromium'
+        shell: bash
+
+      - name: vitest browser
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm test:browser'
         shell: bash
