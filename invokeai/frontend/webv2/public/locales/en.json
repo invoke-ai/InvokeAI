@@ -948,6 +948,17 @@
         "selectViewTool": "Select view tool",
         "undo": "Undo canvas edit"
       },
+      "contextMenu": {
+        "empty": "This region has no visible raster content.",
+        "notReady": "The canvas is still preparing image data.",
+        "saveBboxToGallery": "Save BBox to Gallery",
+        "saveCanvasToGallery": "Save Canvas to Gallery",
+        "saveError": "Couldn't save to gallery",
+        "saveToGallery": "Save to Gallery",
+        "saved": "Saved to gallery",
+        "savedDescription": "{{name}} was added to your gallery.",
+        "stale": "The canvas changed while saving. Try again."
+      },
       "controls": {
         "fitBboxToLayers": "Fit frame to layers",
         "fitBboxToMasks": "Fit frame to masks",

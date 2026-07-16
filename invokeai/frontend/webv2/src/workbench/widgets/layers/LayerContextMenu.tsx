@@ -4,7 +4,7 @@ import type { GenerateReferenceImage } from '@workbench/generation/types';
 import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasMaskContract } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { LucideIcon } from 'lucide-react';
-import type { ComponentProps, Dispatch } from 'react';
+import type { ComponentProps, Dispatch, ReactNode } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
@@ -141,6 +141,8 @@ interface LayerMenuProps {
    */
   dialogKind?: LayerMenuDialogKind | null;
   onDialogKindChange?: (kind: LayerMenuDialogKind | null) => void;
+  /** Additional canvas-only items composed after the shared layer actions. */
+  additionalItems?: ReactNode;
 }
 
 /**
@@ -172,6 +174,7 @@ const LayerMenu = ({
   unmountOnExit,
   dialogKind: controlledDialogKind,
   onDialogKindChange,
+  additionalItems,
 }: LayerMenuProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -693,6 +696,12 @@ const LayerMenu = ({
               {menuLayout.map((section) => (
                 <LayerMenuSection key={section.id} runAction={runAction} section={section} t={t} />
               ))}
+              {additionalItems ? (
+                <>
+                  <Menu.Separator borderColor="border.subtle" />
+                  {additionalItems}
+                </>
+              ) : null}
             </MenuContent>
           </Menu.Positioner>
         </Portal>
@@ -753,12 +762,14 @@ export interface CanvasLayerContextMenuTarget {
  * the last-known (sticky) target until the dialog closes (F1).
  */
 export const CanvasLayerContextMenu = ({
+  additionalItems,
   dispatch,
   engine,
   layers,
   target,
   onClose,
 }: {
+  additionalItems?: ReactNode;
   dispatch: Dispatch<WorkbenchAction>;
   engine: CanvasEngine | null;
   layers: readonly CanvasLayerContract[];
@@ -804,6 +815,7 @@ export const CanvasLayerContextMenu = ({
   return (
     <LayerMenu
       key={renderTarget.layerId}
+      additionalItems={additionalItems}
       dispatch={dispatch}
       dialogKind={dialogState?.kind ?? null}
       engine={engine}

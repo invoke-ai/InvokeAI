@@ -14,17 +14,20 @@ import {
 } from '@workbench/canvasLayerOps';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
-import { CanvasLayerContextMenu, type CanvasLayerContextMenuTarget } from '@workbench/widgets/layers/LayerContextMenu';
+import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { gridSizeForModelBase } from './bboxGrid';
 import { CanvasBottomControls } from './CanvasBottomControls';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
+import { resolveCanvasContextMenu, type CanvasContextMenuTarget } from './canvasContextMenu';
+import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
+import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
 import {
   CANVAS_SETTINGS,
   CANVAS_SHOW_PROGRESS_KEY,
@@ -39,6 +42,7 @@ import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolStrip } from './ToolStrip';
 import { useCanvasEngine } from './useCanvasEngine';
+import { useCanvasGallerySave } from './useCanvasGallerySave';
 
 /** Command id → document-space nudge delta (shift variants are ×10). */
 const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
@@ -76,40 +80,34 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
   const { document, stagingArea } = canvas;
   const operation = useCanvasOperation(engine);
+  const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
 
-  // Right-click on the canvas surface: hit-test the layer under the cursor, select
-  // it, and open the SAME per-layer context menu the layers panel uses — anchored
-  // at the pointer. `null` (empty space, or a mid-flight gesture/session the engine
-  // refuses) means "browser menu suppressed, no layer menu".
-  const [layerMenuTarget, setLayerMenuTarget] = useState<CanvasLayerContextMenuTarget | null>(null);
-  const closeLayerMenu = useCallback(() => setLayerMenuTarget(null), []);
+  // Right-click on the canvas surface: hit-test the layer under the cursor and
+  // open either the shared per-layer menu or the global empty-space menu at the
+  // pointer. Locked interaction skips the hit-test but keeps global save visible.
+  const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null);
+  const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
   const handleSurfaceContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     // Keep the native menu inside inline editors (the text tool's contenteditable
     // overlay), consistent with the surface-focus INLINE_EDIT_SELECTOR.
-    if (event.target instanceof Element && event.target.closest(INLINE_EDIT_SELECTOR)) {
-      return;
-    }
-    // Suppress the browser context menu everywhere else on the surface.
-    event.preventDefault();
-    if (isInteractionLocked) {
-      setLayerMenuTarget(null);
-      return;
-    }
-    if (!engine) {
-      setLayerMenuTarget(null);
-      return;
-    }
-    // The container and the canvas targets share a top-left origin, so its rect
-    // gives the same screen coords the pointer pipeline feeds the viewport.
     const rect = event.currentTarget.getBoundingClientRect();
-    const layerId = engine.tools.contextMenuLayerIdAt({ x: event.clientX - rect.left, y: event.clientY - rect.top });
-    if (!layerId) {
-      setLayerMenuTarget(null);
+    const resolution = resolveCanvasContextMenu({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      hitTest: engine ? (point) => engine.tools.contextMenuLayerIdAt(point) : undefined,
+      isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
+      isInteractionLocked,
+      surfaceLeft: rect.left,
+      surfaceTop: rect.top,
+    });
+    if (!resolution.preventDefault) {
       return;
     }
-    // Select first (one dispatch, matching a left-click select), then open the menu.
-    dispatch({ id: layerId, type: 'setCanvasSelectedLayer' });
-    setLayerMenuTarget({ layerId, x: event.clientX, y: event.clientY });
+    event.preventDefault();
+    if (resolution.target?.layerId) {
+      dispatch({ id: resolution.target.layerId, type: 'setCanvasSelectedLayer' });
+    }
+    setContextMenuTarget(resolution.target);
   };
 
   // The bbox tool snaps to a model-dependent grid; the engine is model-agnostic,
@@ -396,6 +394,19 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     };
   }, [runtime.commands, runtime.hotkeys, t]);
 
+  const layerContextMenuTarget = useMemo(
+    () =>
+      contextMenuTarget?.layerId !== null && contextMenuTarget?.layerId !== undefined
+        ? { layerId: contextMenuTarget.layerId, x: contextMenuTarget.x, y: contextMenuTarget.y }
+        : null,
+    [contextMenuTarget]
+  );
+  const isSaveToGalleryDisabled = isSaving || isInteractionLocked;
+  const saveToGallerySubmenu = useMemo(
+    () => <CanvasSaveToGallerySubmenu disabled={isSaveToGalleryDisabled} onSave={saveToGallery} />,
+    [isSaveToGalleryDisabled, saveToGallery]
+  );
+
   return (
     <Box aria-label={t('widgets.canvas.surface')} bg="bg.inset" h="full" overflow="hidden" position="relative" w="full">
       {engine ? (
@@ -403,12 +414,18 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
           <CanvasSurface engine={engine} onContextMenu={handleSurfaceContextMenu} />
           <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
           <CanvasLayerContextMenu
+            additionalItems={saveToGallerySubmenu}
             dispatch={dispatch}
             engine={engine}
             layers={document.layers}
-            target={layerMenuTarget}
-            onClose={closeLayerMenu}
+            target={layerContextMenuTarget}
+            onClose={closeContextMenu}
           />
+          {contextMenuTarget && !layerContextMenuTarget ? (
+            <CanvasGlobalContextMenu target={contextMenuTarget} onClose={closeContextMenu}>
+              {saveToGallerySubmenu}
+            </CanvasGlobalContextMenu>
+          ) : null}
         </>
       ) : null}
 
