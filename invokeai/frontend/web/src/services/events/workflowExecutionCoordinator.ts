@@ -44,10 +44,11 @@ type WorkflowExecutionCoordinatorDeps = {
 export const createWorkflowExecutionCoordinator = (deps: WorkflowExecutionCoordinatorDeps) => {
   const workflowExecutionStates = new LRUCache<number, WorkflowExecutionState>({ max: 100 });
   // Each tracked item's owner, recorded from incoming events, lets a user-scoped queue clear be
-  // applied to just that user's items. Every event reaching the coordinator carries a real owner:
-  // invocation and status events are private to the owner and admins, and the sanitized
-  // (user_id="redacted") companions are filtered out before the coordinator. Sized to match
-  // workflowExecutionStates - an item without a tracked state needs no owner.
+  // applied to just that user's items. The socket listeners route only the current user's own
+  // events into the coordinator (foreign and sanitized events are handled upstream in
+  // setEventListeners), so in practice this map only ever holds the current user's items; it is
+  // kept as a guard for queue_cleared scoping in single-user mode and edge event orderings.
+  // Sized to match workflowExecutionStates - an item without a tracked state needs no owner.
   const itemOwnerUserIds = new LRUCache<number, string>({ max: 100 });
   const pendingWorkflowReconciliationRequests = new Map<number, ReconciliationRequest>();
   let activeWorkflowQueueItemId: number | null = null;
