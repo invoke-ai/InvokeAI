@@ -1,5 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from collections.abc import Collection
 from typing import Any
 
 from fastapi import FastAPI
@@ -276,17 +277,19 @@ class SocketIO:
     async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
         await self._sio.leave_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
 
-    def _owner_and_admin_sids(self, owner_user_id: str) -> list[str]:
-        """Sids belonging to the event's owner or to any admin.
+    def _owner_and_admin_sids(self, owner_user_ids: str | Collection[str]) -> list[str]:
+        """Sids belonging to the event's owner(s) or to any admin.
 
         Used as `skip_sid` when broadcasting a sanitized companion event to the queue room,
-        so the owner and admins (who already received the full event) don't get a second
+        so the owners and admins (who already received the full event) don't get a second
         copy that would clobber their cache with redacted values.
+
+        Accepts a collection because a single event can have several owners — a retry batch may
+        span multiple users' queue items.
         """
+        owners = {owner_user_ids} if isinstance(owner_user_ids, str) else set(owner_user_ids)
         return [
-            sid
-            for sid, info in self._socket_users.items()
-            if info.get("user_id") == owner_user_id or info.get("is_admin")
+            sid for sid, info in self._socket_users.items() if info.get("user_id") in owners or info.get("is_admin")
         ]
 
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
@@ -325,18 +328,25 @@ class SocketIO:
             if isinstance(event_data, InvocationEventBase) and hasattr(event_data, "user_id"):
                 user_room = f"user:{event_data.user_id}"
 
-                # Emit to the user's room
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
-
-                # Also emit to admin room so admins can see all events, but strip image preview data
-                # from InvocationProgressEvent to prevent admins from seeing other users' image content
                 if isinstance(event_data, InvocationProgressEvent):
-                    admin_event_data = event_data.model_copy(update={"image": None})
-                    await self._sio.emit(event=event_name, data=admin_event_data.model_dump(mode="json"), room="admin")
+                    # Progress events only drive personal UI (the global progress bar and progress
+                    # image previews) and are high-frequency. No admin UI consumes other users'
+                    # progress, so emit to the owner only. This also keeps other users' progress
+                    # from hijacking an admin's progress bar and image previews.
+                    await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+                    logger.debug(f"Emitted invocation progress event to user room {user_room}")
                 else:
-                    await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
-
-                logger.debug(f"Emitted private invocation event {event_name} to user room {user_room} and admin room")
+                    # started/complete/error also feed admins' gallery cache updates, so admins
+                    # receive them for all users. Emit to the union of owner + admin rooms in a
+                    # SINGLE call so an admin owner receives exactly one copy (see the
+                    # RecallParametersUpdatedEvent note below on python-socketio's recipient
+                    # dedup across a room list).
+                    await self._sio.emit(
+                        event=event_name, data=event_data.model_dump(mode="json"), room=[user_room, "admin"]
+                    )
+                    logger.debug(
+                        f"Emitted private invocation event {event_name} to user room {user_room} and admin room"
+                    )
 
             # QueueItemStatusChangedEvent: full to owner+admin, sanitized to everyone else in
             # the queue room so their queue list, badge, and item caches refresh.
@@ -444,8 +454,25 @@ class SocketIO:
                         event=event_name, data=owner_event_data.model_dump(mode="json"), room=user_room
                     )
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+
+                # Retried items are re-enqueued, raising the queue's global total, so every other
+                # subscriber's badge total must refresh. Retrying emits no per-item
+                # queue_item_status_changed, so this is their only signal. The companion carries no
+                # item ids or user ids — the frontend handler only needs it to invalidate the queue
+                # tags that refetch the redacted queue status, and it skips its per-item
+                # invalidation when retried_item_ids is empty.
+                sanitized = event_data.model_copy(
+                    update={"retried_item_ids": [], "user_ids": [], "retried_item_ids_by_user": {}}
+                )
+                await self._sio.emit(
+                    event=event_name,
+                    data=sanitized.model_dump(mode="json"),
+                    room=event_data.queue_id,
+                    skip_sid=self._owner_and_admin_sids(event_data.user_ids),
+                )
                 logger.debug(
-                    f"Emitted private queue_items_retried event to user rooms {event_data.user_ids} and admin room"
+                    f"Emitted queue_items_retried: full to user rooms {event_data.user_ids} and admin, "
+                    f"sanitized to queue {event_data.queue_id}"
                 )
 
             # QueueClearedEvent: an unscoped clear (user_id=None — admin or single-user mode)
@@ -490,7 +517,22 @@ class SocketIO:
             logger.error(f"Error handling queue event {event[0]}: {e}", exc_info=True)
 
     async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase | DownloadEventBase]) -> None:
-        await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"))
+        event_name, event_data = event
+
+        # Model load events only drive personal UI (the loading-models spinner that puts the
+        # progress bar into indeterminate mode), so they are routed to the user whose action
+        # triggered the load. Broadcasting them made every user's progress bar animate whenever
+        # any user's generation loaded a model. In single-user mode the owner is "system" and
+        # every socket is in user:system, preserving the old behavior.
+        if isinstance(event_data, (ModelLoadStartedEvent, ModelLoadCompleteEvent)):
+            await self._sio.emit(
+                event=event_name, data=event_data.model_dump(mode="json"), room=f"user:{event_data.user_id}"
+            )
+            return
+
+        # Model install / download events remain broadcast to all connected sockets - they feed
+        # the model manager UI, which is not per-user.
+        await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"))
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, event_data = event
