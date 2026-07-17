@@ -3,6 +3,8 @@ import type { StreamingImageSource } from '@workbench/images/streamingImageSourc
 import { Badge, Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
 import { useCallback, useMemo, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 
+import { PreviewLiveOverlay } from './PreviewLiveReadout';
+
 /**
  * The preview's image surface: a dot-grid backdrop with an aspect-fitted,
  * shadowed frame. Owns everything drawn over the image (live badge, and later
@@ -31,6 +33,7 @@ export const PreviewFrame = ({
   frameWidth,
   isLive,
   liveBadgeLabel,
+  liveQueueItemId,
   onContextMenu,
   padding,
   shouldAntialiasLiveImage,
@@ -43,6 +46,8 @@ export const PreviewFrame = ({
   frameWidth: number;
   isLive: boolean;
   liveBadgeLabel: string;
+  /** When set, the static live badge is replaced by the live progress readout for this run. */
+  liveQueueItemId?: string | null;
   onContextMenu?: (x: number, y: number) => void;
   padding?: string;
   shouldAntialiasLiveImage: boolean;
@@ -69,9 +74,13 @@ export const PreviewFrame = ({
     [isLive, shouldAntialiasLiveImage]
   );
   const liveBadge = isLive ? (
-    <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-      {liveBadgeLabel}
-    </Badge>
+    typeof liveQueueItemId === 'string' ? (
+      <PreviewLiveOverlay queueItemId={liveQueueItemId} />
+    ) : (
+      <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
+        {liveBadgeLabel}
+      </Badge>
+    )
   ) : null;
 
   if (variant === 'inset') {

@@ -2,7 +2,8 @@
 import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
 import { Box, Stack, Text } from '@chakra-ui/react';
-import { useProgressImage, type ProgressImageSnapshot } from '@workbench/backend/progressImageStore';
+import { useProgressImage, type LatestProgressImageSnapshot } from '@workbench/backend/progressImageStore';
+import { useRevealHold } from '@workbench/backend/revealHoldStore';
 import {
   listGalleryBoards,
   listGalleryImages,
@@ -337,7 +338,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [boardImages, displayBoardId, selectedImage]);
   const isComparing =
     selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
-  const shouldShowProgressImage = showProgressImagesInViewer && progressImage !== null && !isComparing;
+  // The reveal window suppresses live frames briefly after a completion so the
+  // finished result is seen before the next item's noise takes over.
+  const isRevealHolding = useRevealHold();
+  const shouldShowProgressImage =
+    showProgressImagesInViewer && progressImage !== null && !isComparing && !isRevealHolding;
   const exitCompare = useCallback(() => dispatch({ image: null, type: 'setGalleryCompareImage' }), [dispatch]);
   const swapCompareImages = useCallback(() => {
     if (selectedImage && compareImage) {
@@ -374,6 +379,19 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [boardName, selectedImageName]);
 
   useEffect(() => () => previewHeaderStore.clear(), []);
+
+  // Warm the browser cache for the board neighbors so arrow-key navigation
+  // swaps without a decode flash.
+  const previousNeighborUrl = boardImages[selectedIndex - 1]?.imageUrl ?? null;
+  const nextNeighborUrl = boardImages[selectedIndex + 1]?.imageUrl ?? null;
+
+  useEffect(() => {
+    [previousNeighborUrl, nextNeighborUrl].forEach((url) => {
+      if (url) {
+        new Image().src = url;
+      }
+    });
+  }, [nextNeighborUrl, previousNeighborUrl]);
   const executeViewerHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'viewer.toggleViewer') {
       runtime.workbench.closeWidgetInstance(runtime.instanceId);
@@ -477,7 +495,7 @@ const SelectedImagePreview = ({
   density: PreviewDensity;
   image: GeneratedImageContract;
   isLoadingBoard: boolean;
-  progressImage: ProgressImageSnapshot | null;
+  progressImage: LatestProgressImageSnapshot | null;
   selectedIndex: number;
   shouldAntialiasProgressImage: boolean;
   onContextMenu: (x: number, y: number) => void;
@@ -498,6 +516,7 @@ const SelectedImagePreview = ({
   const isProgressImage = previewImage?.kind === 'live';
   const previewWidth = previewImage?.width ?? image.width;
   const previewHeight = previewImage?.height ?? image.height;
+  const liveQueueItemId = progressImage?.target?.queueItemId ?? null;
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key === 'ArrowLeft') {
@@ -520,6 +539,7 @@ const SelectedImagePreview = ({
         frameWidth={previewWidth}
         isLive={isProgressImage}
         liveBadgeLabel={t('common.generating')}
+        liveQueueItemId={liveQueueItemId}
         padding={density === 'full' ? '6' : '3'}
         shouldAntialiasLiveImage={shouldAntialiasProgressImage}
         source={previewImage}
@@ -535,6 +555,7 @@ const SelectedImagePreview = ({
         image={image}
         isLive={isProgressImage}
         isLoadingBoard={isLoadingBoard}
+        liveQueueItemId={liveQueueItemId}
         selectedIndex={selectedIndex}
         onNext={onNext}
         onPrevious={onPrevious}
@@ -547,7 +568,7 @@ const EmptyPreview = ({
   progressImage,
   shouldAntialiasProgressImage,
 }: {
-  progressImage: ProgressImageSnapshot | null;
+  progressImage: LatestProgressImageSnapshot | null;
   shouldAntialiasProgressImage: boolean;
 }) => {
   const { t } = useTranslation();
@@ -561,6 +582,7 @@ const EmptyPreview = ({
       frameWidth={previewImage?.width ?? 1}
       isLive
       liveBadgeLabel={t('common.generating')}
+      liveQueueItemId={progressImage?.target?.queueItemId ?? null}
       shouldAntialiasLiveImage={shouldAntialiasProgressImage}
       source={previewImage}
       variant="inset"

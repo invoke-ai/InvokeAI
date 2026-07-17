@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { PreviewDensity } from './previewDensity';
 
 import { PreviewActionStrip } from './PreviewActionStrip';
+import { PreviewLiveStatusLine } from './PreviewLiveReadout';
 
 /**
  * The preview's info card: board context ("N of M"), the action strip,
@@ -25,6 +26,7 @@ export const PreviewFooter = ({
   image,
   isLive,
   isLoadingBoard,
+  liveQueueItemId,
   onNext,
   onPrevious,
   selectedIndex,
@@ -37,6 +39,8 @@ export const PreviewFooter = ({
   image: GeneratedImageContract;
   isLive: boolean;
   isLoadingBoard: boolean;
+  /** The live run's local queue item id, when a progress readout should replace the dimensions row. */
+  liveQueueItemId?: string | null;
   onNext: () => void;
   onPrevious: () => void;
   selectedIndex: number;
@@ -92,9 +96,13 @@ export const PreviewFooter = ({
         <Text color="fg.subtle" fontSize="2xs">
           {t('widgets.preview.sourceRun', { id: image.sourceQueueItemId })}
         </Text>
-        <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
-          {isLive ? t('common.generating') : `${image.width} x ${image.height}`}
-        </Text>
+        {isLive && density === 'full' && typeof liveQueueItemId === 'string' ? (
+          <PreviewLiveStatusLine queueItemId={liveQueueItemId} />
+        ) : (
+          <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+            {isLive ? t('common.generating') : `${image.width} x ${image.height}`}
+          </Text>
+        )}
       </Stack>
     </Stack>
   );

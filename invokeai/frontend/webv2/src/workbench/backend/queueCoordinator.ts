@@ -35,6 +35,7 @@ import { modelLoadStore } from './modelLoadStore';
 import { nodeExecutionStore, type NodeExecutionSink } from './nodeExecutionStore';
 import { progressImageStore, type ProgressImageSink, type ProgressImageTarget } from './progressImageStore';
 import { queueItemProgressStore, type QueueItemProgressSink } from './progressStore';
+import { revealHoldStore, type RevealHoldSink } from './revealHoldStore';
 
 const GALLERY_REFRESH_COALESCE_MS = 400;
 const SAFETY_SWEEP_INTERVAL_MS = 30_000;
@@ -173,6 +174,7 @@ export const createQueueCoordinator = (
     nodeExecution?: NodeExecutionSink;
     progress?: QueueItemProgressSink;
     progressImage?: ProgressImageSink;
+    revealHold?: RevealHoldSink;
     sweepIntervalMs?: number;
   }
 ): QueueCoordinator => {
@@ -181,6 +183,7 @@ export const createQueueCoordinator = (
   const progress = options.progress ?? queueItemProgressStore;
   const nodeExecution = options.nodeExecution ?? nodeExecutionStore;
   const progressImage = options.progressImage ?? progressImageStore;
+  const revealHold = options.revealHold ?? revealHoldStore;
   const galleryRefreshCoalesceMs = options.galleryRefreshCoalesceMs ?? GALLERY_REFRESH_COALESCE_MS;
   const sweepIntervalMs = options.sweepIntervalMs ?? SAFETY_SWEEP_INTERVAL_MS;
 
@@ -287,13 +290,22 @@ export const createQueueCoordinator = (
 
     if (outcome.status === 'completed') {
       const routingPromise = callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
+      // Reveal window: while sibling items keep generating, hold off the next
+      // live frames briefly so the just-finished result is actually seen.
+      const settleCompleted = (): void => {
+        clearProgressImage();
+
+        if (waits.size > 0) {
+          revealHold.arm();
+        }
+      };
 
       if (routingPromise) {
         void Promise.resolve(routingPromise)
-          .finally(clearProgressImage)
+          .finally(settleCompleted)
           .catch(() => undefined);
       } else {
-        clearProgressImage();
+        settleCompleted();
       }
     }
 
