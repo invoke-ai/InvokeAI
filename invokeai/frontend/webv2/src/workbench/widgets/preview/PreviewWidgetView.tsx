@@ -35,6 +35,7 @@ import { PreviewCompare } from './PreviewCompare';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewFooter } from './PreviewFooter';
 import { PreviewFrame } from './PreviewFrame';
+import { previewHeaderStore } from './previewHeaderStore';
 import { getPreviewComparisonMode, type PreviewComparisonMode } from './previewSettings';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
@@ -355,6 +356,19 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const selectNextImage = useCallback(() => selectByOffset(1), [selectByOffset]);
   const selectPreviousImage = useCallback(() => selectByOffset(-1), [selectByOffset]);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
+  const selectedImageName = selectedImage?.imageName ?? null;
+
+  // Publish the header label context ("[board] / [image]") for the widget
+  // frame; the frame chrome renders outside this view, so an external store is
+  // the sync channel. Cleared on unmount so a stale title never outlives us.
+  useEffect(() => {
+    previewHeaderStore.set({
+      boardName: selectedImageName === null ? null : boardName,
+      imageName: selectedImageName,
+    });
+  }, [boardName, selectedImageName]);
+
+  useEffect(() => () => previewHeaderStore.clear(), []);
   const executeViewerHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'viewer.toggleViewer') {
       runtime.workbench.closeWidgetInstance(runtime.instanceId);
