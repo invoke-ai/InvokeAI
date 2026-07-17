@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { PreviewComparisonMode } from './previewSettings';
 
+import { useCompareLoupe, type CompareLoupePane } from './useCompareLoupe';
+
 const COMPARISON_MODES: { labelKey: string; value: PreviewComparisonMode }[] = [
   { labelKey: 'widgets.preview.slider', value: 'slider' },
   { labelKey: 'widgets.preview.sideBySide', value: 'side-by-side' },
@@ -85,6 +87,13 @@ export const PreviewCompare = ({
   const [dividerPercent, setDividerPercent] = useState(50);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
+  // Zoom-synced side-by-side: one shared transform drives both panes. Gated to
+  // matching-dimension pairs, where fraction-space sync is exact.
+  const dimensionsMatch = baseImage.width === compareImage.width && baseImage.height === compareImage.height;
+  const compareLoupe = useCompareLoupe({
+    enabled: mode === 'side-by-side' && dimensionsMatch,
+    naturalWidth: baseImage.width,
+  });
   const nextMode = useEffectEvent(() => onModeChange(getNextPreviewComparisonMode(mode)));
   const nextComparisonModeLabel = t('widgets.preview.commands.nextComparisonMode');
 
@@ -224,8 +233,18 @@ export const PreviewCompare = ({
           <HoverCompareFrame baseImage={baseImage} compareImage={compareImage} />
         ) : (
           <HStack gap="2" h="full" minH="0" w="full">
-            <CompareSidePane image={compareImage} label={t('widgets.preview.compare')} />
-            <CompareSidePane image={baseImage} label={t('widgets.preview.viewing')} />
+            <CompareSidePane
+              image={compareImage}
+              isZoomed={compareLoupe.isZoomed}
+              label={t('widgets.preview.compare')}
+              pane={compareLoupe.getPane(0)}
+            />
+            <CompareSidePane
+              image={baseImage}
+              isZoomed={compareLoupe.isZoomed}
+              label={t('widgets.preview.viewing')}
+              pane={compareLoupe.getPane(1)}
+            />
           </HStack>
         )}
       </Flex>
@@ -386,17 +405,32 @@ const ComparisonBadges = ({ compareLabel, viewingLabel }: { compareLabel: string
   </>
 );
 
-const CompareSidePane = ({ image, label }: { image: GeneratedImageContract; label: string }) => (
+const CompareSidePane = ({
+  image,
+  isZoomed = false,
+  label,
+  pane = null,
+}: {
+  image: GeneratedImageContract;
+  isZoomed?: boolean;
+  label: string;
+  /** Shared-loupe pane handle when zoom-synced comparison is active. */
+  pane?: CompareLoupePane | null;
+}) => (
   <Flex align="center" containerType="size" flex="1" h="full" justify="center" minW="0" overflow="hidden">
     <Box
+      ref={pane?.frameRefCallback}
       borderColor="border.emphasized"
       borderWidth="1px"
       css={getFittedFrameCss(image.width, image.height)}
+      cursor={isZoomed ? 'grab' : undefined}
       overflow="hidden"
       position="relative"
       rounded="lg"
+      {...pane?.frameProps}
     >
       <img
+        ref={pane?.imageRefCallback}
         alt={image.imageName}
         draggable={false}
         height={image.height}
