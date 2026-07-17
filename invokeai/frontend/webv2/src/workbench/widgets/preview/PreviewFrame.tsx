@@ -5,6 +5,7 @@ import { Badge, Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
 import { useCallback, useMemo, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PreviewCompareDropZone } from './PreviewCompareDropZone';
 import { PreviewLiveOverlay } from './PreviewLiveReadout';
 import { usePreviewLoupe, type PreviewLoupeControls } from './usePreviewLoupe';
 
@@ -147,9 +148,11 @@ export const PreviewFrame = ({
       minH="0"
       overflow="hidden"
       p={padding}
+      position="relative"
       rounded="lg"
       w="full"
     >
+      <PreviewCompareDropZone />
       <Box
         ref={loupe.frameRefCallback}
         bg="transparent"

@@ -2,9 +2,11 @@
 import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
 import { Box, Stack, Text } from '@chakra-ui/react';
+import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useProgressImage, type LatestProgressImageSnapshot } from '@workbench/backend/progressImageStore';
 import { useRevealHold } from '@workbench/backend/revealHoldStore';
 import {
+  getGalleryImageByName,
   listGalleryBoards,
   listGalleryImages,
   type GalleryBoard,
@@ -40,11 +42,18 @@ import { useTranslation } from 'react-i18next';
 import type { PreviewLoupeControls } from './usePreviewLoupe';
 
 import { PreviewCompare } from './PreviewCompare';
+import { resolvePreviewCompareDrop } from './previewCompareDnd';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
+import { PreviewFilmstrip } from './PreviewFilmstrip';
 import { PreviewFooter } from './PreviewFooter';
 import { PreviewFrame } from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
-import { getPreviewComparisonMode, getPreviewMetadataOpen, type PreviewComparisonMode } from './previewSettings';
+import {
+  getPreviewComparisonMode,
+  getPreviewFilmstripVisible,
+  getPreviewMetadataOpen,
+  type PreviewComparisonMode,
+} from './previewSettings';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
 
@@ -363,6 +372,36 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     () => dispatch({ type: 'patchWidgetValues', values: { metadataOpen: !isMetadataOpen }, widgetId: 'preview' }),
     [dispatch, isMetadataOpen]
   );
+  const isFilmstripVisible = getPreviewFilmstripVisible(previewValues);
+  const selectImage = useCallback(
+    (image: GeneratedImageContract) => dispatch({ image, type: 'selectGalleryImage' }),
+    [dispatch]
+  );
+
+  // Drop-to-compare: any gallery-image drag dropped on the frame's drop zone
+  // arms that image for comparison. The drag payload only carries names, so
+  // the full contract is fetched before dispatching.
+  const handleCompareDrop = useEffectEvent((event: DragEndEvent) => {
+    const resolution = resolvePreviewCompareDrop(event.active.data.current, event.over?.data.current ?? null);
+
+    if (!resolution) {
+      return;
+    }
+
+    getGalleryImageByName(resolution.imageName)
+      .then((image) => dispatch({ image, type: 'setGalleryCompareImage' }))
+      .catch((error: unknown) => {
+        dispatch({
+          area: 'preview-compare-drop',
+          message: error instanceof Error ? error.message : String(error),
+          namespace: 'gallery',
+          type: 'recordError',
+        });
+      });
+  });
+  const onCompareDragEnd = useCallback((event: DragEndEvent) => handleCompareDrop(event), []);
+
+  useDndMonitor({ onDragEnd: onCompareDragEnd });
   const openImageContextMenu = useCallback(
     (x: number, y: number) => {
       if (contextMenuImage) {
@@ -427,6 +466,15 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
     if (commandId === 'viewer.zoomToFit') {
       loupeControlsRef.current?.reset();
+      return;
+    }
+
+    if (commandId === 'viewer.toggleFilmstrip') {
+      dispatch({
+        type: 'patchWidgetValues',
+        values: { filmstripVisible: !getPreviewFilmstripVisible(previewValues) },
+        widgetId: 'preview',
+      });
     }
   });
 
@@ -437,6 +485,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
       ['viewer.zoomToActual', t('widgets.preview.commands.zoomToActual'), ['1']],
       ['viewer.zoomToFit', t('widgets.preview.commands.zoomToFit'), ['f']],
+      ['viewer.toggleFilmstrip', t('widgets.preview.commands.toggleFilmstrip'), ['t']],
     ] as const;
     const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeViewerHotkey(id), id, title }),
@@ -466,6 +515,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             <SelectedImagePreview
               actionImage={contextMenuImage}
               actions={imageActions}
+              filmstripImages={isFilmstripVisible && density !== 'minimal' ? boardImages : null}
               loupeControlsRef={loupeControlsRef}
               boardImageCount={boardImages.length}
               boardName={boardName}
@@ -479,6 +529,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               onContextMenu={openImageContextMenu}
               onNext={selectNextImage}
               onPrevious={selectPreviousImage}
+              onSelectImage={selectImage}
               onToggleMetadata={toggleMetadata}
             />
           )}
@@ -505,6 +556,7 @@ const SelectedImagePreview = ({
   boardImageCount,
   boardName,
   density,
+  filmstripImages,
   image,
   isLoadingBoard,
   isMetadataOpen,
@@ -515,6 +567,7 @@ const SelectedImagePreview = ({
   onContextMenu,
   onNext,
   onPrevious,
+  onSelectImage,
   onToggleMetadata,
 }: {
   actionImage: GalleryImage | null;
@@ -522,6 +575,8 @@ const SelectedImagePreview = ({
   boardImageCount: number;
   boardName: string;
   density: PreviewDensity;
+  /** Board thumbnails for the filmstrip, or null when the strip is hidden. */
+  filmstripImages: PreviewImage[] | null;
   image: GeneratedImageContract;
   isLoadingBoard: boolean;
   isMetadataOpen: boolean;
@@ -532,6 +587,7 @@ const SelectedImagePreview = ({
   onContextMenu: (x: number, y: number) => void;
   onNext: () => void;
   onPrevious: () => void;
+  onSelectImage: (image: GeneratedImageContract) => void;
   onToggleMetadata: () => void;
 }) => {
   const { t } = useTranslation();
@@ -580,6 +636,14 @@ const SelectedImagePreview = ({
         variant="framed"
         onContextMenu={onContextMenu}
       />
+      {filmstripImages ? (
+        <PreviewFilmstrip
+          density={density}
+          images={filmstripImages}
+          selectedImageName={image.imageName}
+          onSelect={onSelectImage}
+        />
+      ) : null}
       <PreviewFooter
         actionImage={actionImage}
         actions={actions}

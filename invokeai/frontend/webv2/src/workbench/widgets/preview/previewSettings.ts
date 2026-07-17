@@ -9,3 +9,6 @@ export const getPreviewComparisonMode = (values: Record<string, unknown>): Previ
 };
 
 export const getPreviewMetadataOpen = (values: Record<string, unknown>): boolean => values.metadataOpen === true;
+
+export const getPreviewFilmstripVisible = (values: Record<string, unknown>): boolean =>
+  values.filmstripVisible !== false;
