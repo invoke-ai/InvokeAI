@@ -18,9 +18,21 @@ export interface PreviewHeaderContext {
   actions: ImageActions | null;
   boardName: string | null;
   imageName: string | null;
+  /**
+   * Opens the view's full image context menu anchored at viewport coordinates.
+   * The header's "image actions" dropdown reuses the exact right-click menu —
+   * one source of truth for every image verb.
+   */
+  openImageMenu: ((x: number, y: number) => void) | null;
 }
 
-const emptyContext: PreviewHeaderContext = { actionImage: null, actions: null, boardName: null, imageName: null };
+const emptyContext: PreviewHeaderContext = {
+  actionImage: null,
+  actions: null,
+  boardName: null,
+  imageName: null,
+  openImageMenu: null,
+};
 
 const store = createExternalStore<PreviewHeaderContext>(emptyContext);
 

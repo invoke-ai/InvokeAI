@@ -436,8 +436,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       actions: imageActions,
       boardName: selectedImageName === null ? null : boardName,
       imageName: selectedImageName,
+      openImageMenu: openImageContextMenu,
     });
-  }, [boardName, contextMenuImage, imageActions, selectedImageName]);
+  }, [boardName, contextMenuImage, imageActions, openImageContextMenu, selectedImageName]);
 
   useEffect(() => () => previewHeaderStore.clear(), []);
 
