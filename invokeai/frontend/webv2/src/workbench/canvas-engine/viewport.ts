@@ -31,12 +31,16 @@ import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 import { clampZoom, snapZoom } from '@workbench/canvas-engine/math/snapping';
+import {
+  panBy as calculatePanBy,
+  wheelZoomAtPoint as calculateWheelZoomAtPoint,
+  zoomAtPoint as calculateZoomAtPoint,
+} from '@workbench/panZoom';
+
+export { WHEEL_ZOOM_STEP } from '@workbench/panZoom';
 
 /** Maximum device-pixel ratio the engine honors; higher DPRs are clamped to bound backing-store size. */
 export const MAX_DPR = 2;
-
-/** Wheel exponential zoom sensitivity: `zoom *= exp(-deltaY * step)`. */
-export const WHEEL_ZOOM_STEP = 0.0015;
 
 /** The mutable view state. */
 export interface ViewState {
@@ -111,21 +115,25 @@ export const createViewport = (initial?: Partial<ViewState>): Viewport => {
   };
 
   const zoomAtPoint = (newZoom: number, screenAnchor: Vec2): void => {
-    const clamped = clampZoom(newZoom);
-    // Keep the document point currently under the anchor fixed on screen.
-    const docAnchor = screenToDocument(screenAnchor);
-    zoom = clamped;
-    pan = { x: screenAnchor.x - clamped * docAnchor.x, y: screenAnchor.y - clamped * docAnchor.y };
+    const next = calculateZoomAtPoint({ pan, zoom }, newZoom, screenAnchor, clampZoom);
+    zoom = next.zoom;
+    pan = next.pan;
     emit();
   };
 
   const wheelZoom = (deltaY: number, screenAnchor: Vec2): void => {
-    const target = clampZoom(zoom * Math.exp(-deltaY * WHEEL_ZOOM_STEP));
-    zoomAtPoint(snapZoom(target), screenAnchor);
+    const next = calculateWheelZoomAtPoint({ pan, zoom }, deltaY, screenAnchor, {
+      constrainZoom: clampZoom,
+      snapZoom,
+    });
+    zoom = next.zoom;
+    pan = next.pan;
+    emit();
   };
 
   const panBy = (screenDelta: Vec2): void => {
-    pan = { x: pan.x + screenDelta.x, y: pan.y + screenDelta.y };
+    const next = calculatePanBy({ pan, zoom }, screenDelta);
+    pan = next.pan;
     emit();
   };
 

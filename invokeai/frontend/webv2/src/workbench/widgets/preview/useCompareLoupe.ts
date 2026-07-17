@@ -1,3 +1,4 @@
+import { panBy, WHEEL_ZOOM_STEP, zoomAtPoint as calculateZoomAtPoint } from '@workbench/panZoom';
 /* eslint-disable react/react-compiler */
 import { useEffectEvent, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 
@@ -10,7 +11,6 @@ import { useEffectEvent, useRef, useState, type MouseEvent, type PointerEvent } 
  */
 
 const MAX_ACTUAL_ZOOM = 8;
-const WHEEL_ZOOM_FACTOR = 0.0015;
 const PIXELATED_ACTUAL_ZOOM = 2;
 
 interface FractionTransform {
@@ -88,11 +88,7 @@ export const useCompareLoupe = ({
   });
 
   const setTransform = useEffectEvent((next: FractionTransform) => {
-    const firstFrame = panesRef.current.find((pane) => pane.frame)?.frame ?? null;
-    const maxScale = firstFrame
-      ? Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidth) / Math.max(1, firstFrame.clientWidth))
-      : MAX_ACTUAL_ZOOM;
-    const scale = Math.max(1, Math.min(next.scale, maxScale));
+    const scale = next.scale;
 
     transformRef.current =
       scale === 1
@@ -103,12 +99,18 @@ export const useCompareLoupe = ({
 
   const zoomAroundFraction = useEffectEvent((pfx: number, pfy: number, nextScale: number) => {
     const { fx, fy, scale } = transformRef.current;
-    const ratio = nextScale / scale;
+    const firstFrame = panesRef.current.find((pane) => pane.frame)?.frame ?? null;
+    const maxScale = firstFrame
+      ? Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidth) / Math.max(1, firstFrame.clientWidth))
+      : MAX_ACTUAL_ZOOM;
+    const next = calculateZoomAtPoint({ pan: { x: fx, y: fy }, zoom: scale }, nextScale, { x: pfx, y: pfy }, (zoom) =>
+      Math.max(1, Math.min(zoom, maxScale))
+    );
 
     setTransform({
-      fx: pfx - (pfx - fx) * ratio,
-      fy: pfy - (pfy - fy) * ratio,
-      scale: nextScale,
+      fx: next.pan.x,
+      fy: next.pan.y,
+      scale: next.zoom,
     });
   });
 
@@ -120,7 +122,7 @@ export const useCompareLoupe = ({
       return;
     }
 
-    const sensitivity = event.ctrlKey ? WHEEL_ZOOM_FACTOR * 4 : WHEEL_ZOOM_FACTOR;
+    const sensitivity = event.ctrlKey ? WHEEL_ZOOM_STEP * 4 : WHEEL_ZOOM_STEP;
 
     zoomAroundFraction(
       (event.clientX - rect.left) / rect.width,
@@ -180,11 +182,14 @@ export const useCompareLoupe = ({
           }
 
           event.preventDefault();
-          setTransform({
-            fx: pan.fx + (event.clientX - pan.startX) / frame.clientWidth,
-            fy: pan.fy + (event.clientY - pan.startY) / frame.clientHeight,
-            scale: transformRef.current.scale,
-          });
+          const next = panBy(
+            { pan: { x: pan.fx, y: pan.fy }, zoom: transformRef.current.scale },
+            {
+              x: (event.clientX - pan.startX) / frame.clientWidth,
+              y: (event.clientY - pan.startY) / frame.clientHeight,
+            }
+          );
+          setTransform({ fx: next.pan.x, fy: next.pan.y, scale: next.zoom });
         },
         onPointerUp: (event) => endPan(event),
       },

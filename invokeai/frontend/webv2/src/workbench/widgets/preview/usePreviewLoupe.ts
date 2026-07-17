@@ -1,3 +1,4 @@
+import { panBy, WHEEL_ZOOM_STEP, zoomAtPoint as calculateZoomAtPoint } from '@workbench/panZoom';
 import {
   useEffectEvent,
   useImperativeHandle,
@@ -22,8 +23,6 @@ import {
 
 /** Max zoom, as a fraction of the image's actual pixel size. */
 const MAX_ACTUAL_ZOOM = 8;
-/** Wheel-to-zoom sensitivity. */
-const WHEEL_ZOOM_FACTOR = 0.0015;
 /** Switch to pixelated rendering at/above this actual-pixel zoom. */
 const PIXELATED_ACTUAL_ZOOM = 2;
 
@@ -146,8 +145,7 @@ export const usePreviewLoupe = ({
       return;
     }
 
-    const maxScale = Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidth) / content.clientWidth);
-    const scale = Math.max(1, Math.min(next.scale, maxScale));
+    const scale = next.scale;
 
     transformRef.current =
       scale === 1
@@ -169,14 +167,18 @@ export const usePreviewLoupe = ({
     }
 
     const { scale, tx, ty } = transformRef.current;
-    const ratio = nextScale / scale;
-    const anchorX = stageX - content.offsetLeft;
-    const anchorY = stageY - content.offsetTop;
+    const maxScale = Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidth) / content.clientWidth);
+    const next = calculateZoomAtPoint(
+      { pan: { x: tx, y: ty }, zoom: scale },
+      nextScale,
+      { x: stageX - content.offsetLeft, y: stageY - content.offsetTop },
+      (zoom) => Math.max(1, Math.min(zoom, maxScale))
+    );
 
     setTransform({
-      scale: nextScale,
-      tx: anchorX - (anchorX - tx) * ratio,
-      ty: anchorY - (anchorY - ty) * ratio,
+      scale: next.zoom,
+      tx: next.pan.x,
+      ty: next.pan.y,
     });
   });
 
@@ -210,7 +212,7 @@ export const usePreviewLoupe = ({
       const rect = node.getBoundingClientRect();
       const { scale } = transformRef.current;
       // Trackpad pinch arrives as ctrl+wheel with finer deltas.
-      const sensitivity = event.ctrlKey ? WHEEL_ZOOM_FACTOR * 4 : WHEEL_ZOOM_FACTOR;
+      const sensitivity = event.ctrlKey ? WHEEL_ZOOM_STEP * 4 : WHEEL_ZOOM_STEP;
 
       zoomAroundPoint(
         event.clientX - rect.left,
@@ -255,11 +257,11 @@ export const usePreviewLoupe = ({
     }
 
     event.preventDefault();
-    setTransform({
-      scale: transformRef.current.scale,
-      tx: pan.tx + (event.clientX - pan.startX),
-      ty: pan.ty + (event.clientY - pan.startY),
-    });
+    const next = panBy(
+      { pan: { x: pan.tx, y: pan.ty }, zoom: transformRef.current.scale },
+      { x: event.clientX - pan.startX, y: event.clientY - pan.startY }
+    );
+    setTransform({ scale: next.zoom, tx: next.pan.x, ty: next.pan.y });
   };
 
   const handlePointerEnd = (event: PointerEvent<HTMLDivElement>): void => {
