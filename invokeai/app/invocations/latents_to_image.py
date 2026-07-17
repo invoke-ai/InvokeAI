@@ -73,8 +73,9 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Use the VAE's actual device (may be CPU if the model is configured cpu_only).
             device = get_effective_device(vae)
             latents = latents.to(device)
-            # fp16 VAE ops are not supported on CPU, so force fp32 when running on CPU
-            # (e.g. when the VAE is configured cpu_only).
+            # Force fp32 when running on CPU (e.g. when the VAE is configured cpu_only). fp16 conv does run on CPU with
+            # the pinned torch, but it's much slower than fp32 there, and SD/SDXL VAE has known fp16 overflow issues
+            # that produce black images — fp32 avoids both.
             if self.fp32 or device.type == "cpu":
                 # FP32 mode: convert everything to float32 for maximum precision
                 vae.to(dtype=torch.float32)
