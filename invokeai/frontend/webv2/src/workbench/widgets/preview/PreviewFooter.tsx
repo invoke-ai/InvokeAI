@@ -105,7 +105,6 @@ export const PreviewFooter = ({
       </Stack>
       {actionImage ? (
         <PreviewMetadataPanel
-          key={actionImage.imageName}
           actions={actions}
           image={actionImage}
           isOpen={isMetadataOpen}

@@ -623,7 +623,6 @@ const SelectedImagePreview = ({
   return (
     <Stack gap="3" h="full" minH="0" outline="none" tabIndex={0} w="full" onKeyDown={handleKeyDown}>
       <PreviewFrame
-        key={`${image.imageName}:${isProgressImage ? 'live' : 'still'}`}
         frameHeight={previewHeight}
         frameWidth={previewWidth}
         isLive={isProgressImage}

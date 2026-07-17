@@ -55,7 +55,43 @@ export const usePreviewLoupe = ({
   const panPointerRef = useRef<{ pointerId: number; startX: number; startY: number; tx: number; ty: number } | null>(
     null
   );
+  const lastSourceTokenRef = useRef<string | null | undefined>(undefined);
   const [zoomPercent, setZoomPercent] = useState<number | null>(null);
+
+  /**
+   * Called during render with a token identifying the displayed image (or null
+   * while the loupe is inapplicable, e.g. live frames). A token change resets
+   * the transform in place — no remount, so the img element (and its decoded
+   * pixels) survive selection changes without a flash.
+   */
+  const syncDisplayedSource = (token: string | null): void => {
+    if (lastSourceTokenRef.current === token) {
+      return;
+    }
+
+    lastSourceTokenRef.current = token;
+
+    if (transformRef.current.scale === 1) {
+      return;
+    }
+
+    transformRef.current = { scale: 1, tx: 0, ty: 0 };
+    panPointerRef.current = null;
+
+    if (rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const image = imageRef.current;
+
+        if (image) {
+          image.style.transform = '';
+          image.style.imageRendering = '';
+        }
+
+        setZoomPercent(null);
+      });
+    }
+  };
 
   const getActualZoom = (scale: number): number => {
     const renderedWidth = frameRef.current?.clientWidth ?? 0;
@@ -242,6 +278,7 @@ export const usePreviewLoupe = ({
       imageRef: null,
       isZoomed: false,
       reset,
+      syncDisplayedSource,
       zoomPercent: null,
     };
   }
@@ -259,6 +296,7 @@ export const usePreviewLoupe = ({
     imageRef,
     isZoomed: zoomPercent !== null,
     reset,
+    syncDisplayedSource,
     zoomPercent,
   };
 };

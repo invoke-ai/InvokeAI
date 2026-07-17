@@ -1,6 +1,6 @@
 import type { GeneratedImageContract } from '@workbench/types';
 
-import { Box, HStack } from '@chakra-ui/react';
+import { Box, HStack, ScrollArea } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
 import { useCallback, useMemo } from 'react';
@@ -35,17 +35,26 @@ export const PreviewFilmstrip = ({
   }
 
   return (
-    <HStack flexShrink={0} gap="1" overflowX="auto" overflowY="hidden" pb="1" w="full">
-      {images.map((image) => (
-        <FilmstripThumb
-          key={image.imageName}
-          image={image}
-          isSelected={image.imageName === selectedImageName}
-          size={thumbSize}
-          onSelect={onSelect}
-        />
-      ))}
-    </HStack>
+    <ScrollArea.Root flexShrink={0} minW="0" size="xs" variant="hover" w="full">
+      <ScrollArea.Viewport w="full">
+        <ScrollArea.Content asChild>
+          <HStack gap="1" pb="1">
+            {images.map((image) => (
+              <FilmstripThumb
+                key={image.imageName}
+                image={image}
+                isSelected={image.imageName === selectedImageName}
+                size={thumbSize}
+                onSelect={onSelect}
+              />
+            ))}
+          </HStack>
+        </ScrollArea.Content>
+      </ScrollArea.Viewport>
+      <ScrollArea.Scrollbar orientation="horizontal">
+        <ScrollArea.Thumb />
+      </ScrollArea.Scrollbar>
+    </ScrollArea.Root>
   );
 };
 

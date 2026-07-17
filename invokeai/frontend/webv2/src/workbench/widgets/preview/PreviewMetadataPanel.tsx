@@ -48,14 +48,17 @@ export const PreviewMetadataPanel = ({
   const { t } = useTranslation();
   const [loaded, setLoaded] = useState<{
     capabilities: ImageRecallCapabilities;
+    imageName: string;
     metadata: GalleryImageMetadata | null;
   } | null>(null);
+  // Stale-while-loading: when the selection changes, the previous image's rows
+  // stay in place (slightly dimmed) until the new metadata arrives, so
+  // navigating never collapses the panel or shifts the layout.
+  const isCurrent = loaded?.imageName === image.imageName;
   const isLoading = isOpen && loaded === null;
 
-  // Metadata is immutable per image and this component is keyed per image, so
-  // fetch exactly once, on first expand.
   useEffect(() => {
-    if (!isOpen || loaded !== null) {
+    if (!isOpen || loaded?.imageName === image.imageName) {
       return;
     }
 
@@ -64,22 +67,22 @@ export const PreviewMetadataPanel = ({
     Promise.all([getGalleryImageMetadata(image.imageName), actions.getImageRecallCapabilities(image)])
       .then(([metadata, capabilities]) => {
         if (!isStale) {
-          setLoaded({ capabilities, metadata });
+          setLoaded({ capabilities, imageName: image.imageName, metadata });
         }
       })
       .catch(() => {
         if (!isStale) {
-          setLoaded({ capabilities: EMPTY_IMAGE_RECALL_CAPABILITIES, metadata: null });
+          setLoaded({ capabilities: EMPTY_IMAGE_RECALL_CAPABILITIES, imageName: image.imageName, metadata: null });
         }
       });
 
     return () => {
       isStale = true;
     };
-  }, [actions, image, isOpen, loaded]);
+  }, [actions, image, isOpen, loaded?.imageName]);
 
   const entries = parsePreviewMetadata(loaded?.metadata ?? null);
-  const recallItems = loaded ? RECALL_ITEMS.filter((item) => loaded.capabilities[item.capability]) : [];
+  const recallItems = loaded && isCurrent ? RECALL_ITEMS.filter((item) => loaded.capabilities[item.capability]) : [];
 
   return (
     <Stack gap="2">
@@ -98,7 +101,15 @@ export const PreviewMetadataPanel = ({
         </Text>
       </HStack>
       {isOpen ? (
-        <Stack gap="2" maxH="40cqh" overflowY="auto" pe="1">
+        <Stack
+          gap="2"
+          maxH="40cqh"
+          opacity={isCurrent || loaded === null ? 1 : 0.6}
+          overflowY="auto"
+          pe="1"
+          transitionDuration="var(--wb-motion-duration-fast)"
+          transitionProperty="opacity"
+        >
           {isLoading ? (
             <Text color="fg.subtle" fontSize="2xs">
               {t('widgets.preview.loadingMetadata')}

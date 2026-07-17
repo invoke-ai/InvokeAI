@@ -68,6 +68,10 @@ export const PreviewFrame = ({
     enabled: variant === 'framed' && !isLive,
     naturalWidth: frameWidth,
   });
+
+  // Reset zoom in place when the displayed image changes (or goes live) — a
+  // remount would flash the frame on every selection.
+  loupe.syncDisplayedSource(variant === 'framed' && !isLive && source ? source.src : null);
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (onContextMenu) {
