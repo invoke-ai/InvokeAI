@@ -162,7 +162,6 @@ export const NegativePromptField = ({
             {...PROMPT_ATTENTION_TARGET_PROPS}
             aria-label={t('widgets.generate.negativePrompt')}
             defaultHeightPx={heightPx}
-            maxHeightPx={240}
             minHeightPx={56}
             resizeHandleAriaLabel={t('widgets.generate.resizeNegativePrompt')}
             size="xs"

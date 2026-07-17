@@ -1,5 +1,9 @@
 import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
-import type { GenerateReferenceImage, GenerateReferenceImageAsset, IPAdapterMethod } from '@workbench/generation/types';
+import type {
+  IPAdapterMethod,
+  RegionalGuidanceReferenceImage,
+  RegionalGuidanceReferenceImageAsset,
+} from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
 import type { CanvasMaskContract, CanvasMaskFillContract, CanvasRegionalGuidanceLayerContract } from '@workbench/types';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
@@ -29,7 +33,7 @@ interface RegionalConfigPatch {
   positivePrompt?: string | null;
   negativePrompt?: string | null;
   autoNegative?: boolean;
-  referenceImages?: GenerateReferenceImage[];
+  referenceImages?: RegionalGuidanceReferenceImage[];
 }
 
 /** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
@@ -65,7 +69,8 @@ const referenceImageDropId = (layerId: string, refId: string): string => `region
  * A fresh regional reference image for the currently selected model's base. Shared
  * with the header add-layer menu via `layerOps.createRegionalReferenceImage`.
  */
-const createReferenceImage = (base: string | null): GenerateReferenceImage => createRegionalReferenceImage(base);
+const createReferenceImage = (base: string | null): RegionalGuidanceReferenceImage =>
+  createRegionalReferenceImage(base);
 
 interface RegionalGuidanceSettingsProps {
   engine: CanvasStructuralEngine | null;
@@ -227,7 +232,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const referenceImages = layer.referenceImages;
 
   const commitReferenceImages = useCallback(
-    (next: GenerateReferenceImage[]) => {
+    (next: RegionalGuidanceReferenceImage[]) => {
       commitConfig(
         t('widgets.layers.regionalGuidance.referenceImages'),
         { referenceImages: next },
@@ -247,7 +252,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   // (`commitReferenceImages` → `updateCanvasLayerConfig`), so a drop/upload/clear
   // is a single, undoable document change.
   const setReferenceImageAsset = useCallback(
-    (refId: string, image: GenerateReferenceImageAsset | null) => {
+    (refId: string, image: RegionalGuidanceReferenceImageAsset | null) => {
       commitReferenceImages(
         referenceImages.map((ref) => (ref.id === refId ? { ...ref, config: { ...ref.config, image } } : ref))
       );
@@ -336,7 +341,6 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           {...PROMPT_ATTENTION_TARGET_PROPS}
           aria-label={t('widgets.layers.regionalGuidance.positivePrompt')}
           defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
-          maxHeightPx={180}
           minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
           placeholder={t('widgets.layers.regionalGuidance.positivePromptPlaceholder')}
           resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.positivePrompt')}
@@ -353,7 +357,6 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
             {...PROMPT_ATTENTION_TARGET_PROPS}
             aria-label={t('widgets.layers.regionalGuidance.negativePrompt')}
             defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
-            maxHeightPx={180}
             minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
             placeholder={t('widgets.layers.regionalGuidance.negativePromptPlaceholder')}
             resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.negativePrompt')}
@@ -440,14 +443,14 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 interface ReferenceImageRowProps {
   dropId: string;
   index: number;
-  referenceImage: GenerateReferenceImage;
-  referenceImages: readonly GenerateReferenceImage[];
+  referenceImage: RegionalGuidanceReferenceImage;
+  referenceImages: readonly RegionalGuidanceReferenceImage[];
   ipAdapterModelCollection: ReturnType<typeof createListCollection<{ label: string; value: string }>>;
   fluxReduxModelCollection: ReturnType<typeof createListCollection<{ label: string; value: string }>>;
   methodCollection: ReturnType<typeof createListCollection<{ label: string; value: string }>>;
   models: readonly ModelConfig[];
-  onCommit: (next: GenerateReferenceImage[]) => void;
-  onSetImage: (refId: string, image: GenerateReferenceImageAsset | null) => void;
+  onCommit: (next: RegionalGuidanceReferenceImage[]) => void;
+  onSetImage: (refId: string, image: RegionalGuidanceReferenceImageAsset | null) => void;
   onUpload: (refId: string, file: File) => void;
 }
 
@@ -476,7 +479,7 @@ const ReferenceImageRow = ({
   const { isOver, setNodeRef } = useDroppable({ data: { kind: 'regional-reference-image' }, id: dropId });
 
   const replaceRef = useCallback(
-    (next: GenerateReferenceImage) => {
+    (next: RegionalGuidanceReferenceImage) => {
       onCommit(referenceImages.map((entry, i) => (i === index ? next : entry)));
     },
     [index, onCommit, referenceImages]
@@ -560,7 +563,7 @@ const ReferenceImageRow = ({
   );
 
   const handleFluxReduxConfig = useCallback(
-    (nextConfig: GenerateReferenceImage['config']) => {
+    (nextConfig: RegionalGuidanceReferenceImage['config']) => {
       replaceRef({ ...referenceImage, config: nextConfig });
     },
     [referenceImage, replaceRef]

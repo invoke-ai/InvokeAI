@@ -1903,7 +1903,13 @@ describe('createCanvasEngine', () => {
       negativePrompt: 'negative',
       opacity: 0.8,
       positivePrompt: 'positive',
-      referenceImages: [{ config: { image: null, type: 'flux2_reference_image' }, id: 'reference', isEnabled: true }],
+      referenceImages: [
+        {
+          config: { image: null, imageInfluence: 'highest', model: null, type: 'flux_redux' },
+          id: 'reference',
+          isEnabled: true,
+        },
+      ],
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
       type: 'regional_guidance',
     };

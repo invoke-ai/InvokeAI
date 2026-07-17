@@ -3,7 +3,7 @@ import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } 
 
 // `generation/types.ts` imports value-less (`import type`) symbols back from this
 // module; both sides are type-only so this doesn't create a runtime cycle.
-import type { GenerateReferenceImage, GenerateWidgetValues } from './generation/types';
+import type { GenerateWidgetValues, RegionalGuidanceReferenceImage } from './generation/types';
 import type { WorkbenchLanguage } from './i18n/languages';
 import type { ProjectGraphState } from './workflows/types';
 
@@ -599,7 +599,7 @@ export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseCont
   positivePrompt: string | null;
   negativePrompt: string | null;
   autoNegative: boolean;
-  referenceImages: GenerateReferenceImage[];
+  referenceImages: RegionalGuidanceReferenceImage[];
 }
 
 export interface CanvasInpaintMaskLayerContract extends CanvasLayerBaseContract {

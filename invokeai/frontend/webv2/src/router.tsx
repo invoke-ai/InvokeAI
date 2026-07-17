@@ -99,6 +99,9 @@ const modelsHomeRoute = createRoute({
   component: Launchpad,
   getParentRoute: () => authenticatedRoute,
   path: 'models',
+  validateSearch: (search: Record<string, unknown>): { project?: string } => ({
+    project: typeof search.project === 'string' && search.project.length > 0 ? search.project : undefined,
+  }),
 });
 
 const nodesHomeRoute = createRoute({

@@ -4,8 +4,9 @@ import type { ModelConfig } from '@workbench/models/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
 
-import { getGalleryImageMetadata } from '@workbench/gallery/api';
+import { getGalleryImageMetadata, getGalleryImagesByNames } from '@workbench/gallery/api';
 import { getDefaultGenerateSettings, isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
+import { getEffectiveReferenceImage } from '@workbench/generation/referenceImage';
 import { isVaeModelConfig, normalizeGenerateWidgetValues } from '@workbench/generation/settings';
 
 import {
@@ -109,6 +110,33 @@ export const executeImageRecall = async ({
     });
 
     if (!result) {
+      dispatch({
+        kind: 'info',
+        message: 'This image does not include supported Generate metadata.',
+        title: 'No recallable image data',
+        type: 'recordNotice',
+      });
+      return false;
+    }
+
+    if (result.fields.includes('referenceImages')) {
+      const effectiveNames = result.values.referenceImages.flatMap((referenceImage) =>
+        referenceImage.config.image ? [getEffectiveReferenceImage(referenceImage.config.image).image_name] : []
+      );
+      const availableNames = new Set(
+        (await getGalleryImagesByNames([...new Set(effectiveNames)])).map((availableImage) => availableImage.imageName)
+      );
+      result.values.referenceImages = result.values.referenceImages.filter((referenceImage) => {
+        const referenceAsset = referenceImage.config.image;
+        return referenceAsset && availableNames.has(getEffectiveReferenceImage(referenceAsset).image_name);
+      });
+
+      if (result.values.referenceImages.length === 0) {
+        result.fields = result.fields.filter((field) => field !== 'referenceImages');
+      }
+    }
+
+    if (result.fields.length === 0) {
       dispatch({
         kind: 'info',
         message: 'This image does not include supported Generate metadata.',

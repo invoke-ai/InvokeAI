@@ -3,7 +3,7 @@ import type { AnyModelDefaultSettings, ModelConfig } from '@workbench/models/typ
 import type { TFunction } from 'i18next';
 
 import { Grid, HStack, Icon, NativeSelect, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
-import { Button, FieldLabel, Panel } from '@workbench/components/ui';
+import { Button, Combobox, FieldLabel, Panel } from '@workbench/components/ui';
 import { updateModel } from '@workbench/models/api';
 import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@workbench/models/schemas';
@@ -49,6 +49,7 @@ const SCHEDULERS = [
   'unipc',
   'unipc_k',
 ];
+const SCHEDULER_OPTIONS = SCHEDULERS.map((scheduler) => ({ label: scheduler, value: scheduler }));
 
 const CONTROL_ADAPTER_TYPES = new Set(['controlnet', 't2i_adapter', 'control_lora']);
 
@@ -83,7 +84,7 @@ interface FieldSpec {
   key: keyof AnyModelDefaultSettings;
   labelKey: string;
   /** Render the control; disabled (showing the inherited value) until customized. */
-  control: (value: unknown, setValue: (value: unknown) => void, disabled: boolean) => ReactNode;
+  control: (value: unknown, setValue: (value: unknown) => void, disabled: boolean, label: string) => ReactNode;
   /** Value used when the toggle is switched on; also previewed while off. */
   defaultValue: unknown;
   /** Translation key for what applies while the toggle is off. */
@@ -92,7 +93,7 @@ interface FieldSpec {
 
 const numberControl =
   (props: { max?: number; min?: number; step?: number }) =>
-  (value: unknown, setValue: (value: unknown) => void, disabled: boolean) => (
+  (value: unknown, setValue: (value: unknown) => void, disabled: boolean, _label: string) => (
     <NumberInput.Root
       disabled={disabled}
       max={props.max}
@@ -129,7 +130,7 @@ const numberControl =
   );
 
 const selectControl =
-  (options: string[]) => (value: unknown, setValue: (value: unknown) => void, disabled: boolean) => (
+  (options: string[]) => (value: unknown, setValue: (value: unknown) => void, disabled: boolean, _label: string) => (
     <NativeSelect.Root disabled={disabled} size="sm">
       <NativeSelect.Field
         value={typeof value === 'string' ? value : ''}
@@ -145,9 +146,22 @@ const selectControl =
     </NativeSelect.Root>
   );
 
+const schedulerControl =
+  (options: { label: string; value: string }[]) =>
+  (value: unknown, setValue: (value: unknown) => void, disabled: boolean, label: string) => (
+    <Combobox
+      aria-label={label}
+      disabled={disabled}
+      options={options}
+      size="sm"
+      value={typeof value === 'string' ? value : null}
+      onValueChange={setValue}
+    />
+  );
+
 const MAIN_FIELDS: FieldSpec[] = [
   {
-    control: selectControl(SCHEDULERS),
+    control: schedulerControl(SCHEDULER_OPTIONS),
     defaultValue: 'euler_a',
     inheritLabelKey: 'models.defaultFieldInherited.scheduler',
     key: 'scheduler',
@@ -375,7 +389,8 @@ export const DefaultSettingsSection = ({
               {field.control(
                 isEnabled ? value : field.defaultValue,
                 (nextValue) => setFieldValue(field.key, nextValue),
-                !isEnabled
+                !isEnabled,
+                t(field.labelKey)
               )}
               <Text color="fg.subtle" fontSize="2xs">
                 {isEnabled ? t('models.customizedForThisModel') : t(field.inheritLabelKey)}

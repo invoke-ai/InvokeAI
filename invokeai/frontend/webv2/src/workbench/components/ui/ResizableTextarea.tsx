@@ -7,7 +7,7 @@ import type {
   ReactNode,
 } from 'react';
 
-import { Box, Textarea } from '@chakra-ui/react';
+import { Box, ScrollArea, Textarea } from '@chakra-ui/react';
 import { useCallback, useState } from 'react';
 
 type TextareaProps = ComponentProps<typeof Textarea>;
@@ -15,22 +15,28 @@ type TextareaProps = ComponentProps<typeof Textarea>;
 const DEFAULT_STEP_PX = 12;
 const DEFAULT_LARGE_STEP_PX = 48;
 
-const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max?: number): number => {
+  const minClamped = Math.max(value, min);
+
+  return max === undefined ? minClamped : Math.min(minClamped, max);
+};
 
 const resizeHandleAfter = {
   bg: 'border.emphasized',
   borderRadius: 'full',
-  bottom: '1px',
+  bottom: '3px',
   content: '""',
-  h: '1px',
-  left: '25%',
-  opacity: 0.55,
+  h: '3px',
+  left: '50%',
   position: 'absolute',
-  right: '25%',
+  transform: 'translateX(-50%)',
+  transition: 'background var(--wb-motion-duration-fast) ease',
+  w: '10',
 } as const;
 
 const resizeHandleFocusVisible = { bg: 'accent.solid/20', outline: '2px solid {colors.accent.solid}' } as const;
-const resizeHandleHover = { bg: 'accent.solid/12' } as const;
+const resizeHandleHover = { _after: { bg: 'fg.subtle' } } as const;
+const resizeHandleDragging = { '&[data-dragging]::after': { bg: 'fg.subtle' } } as const;
 
 export interface ResizableTextareaProps extends Omit<
   TextareaProps,
@@ -50,7 +56,7 @@ export interface ResizableTextareaProps extends Omit<
 export const ResizableTextarea = ({
   defaultHeightPx,
   largeStepPx = DEFAULT_LARGE_STEP_PX,
-  maxHeightPx = 420,
+  maxHeightPx,
   minHeightPx,
   onResizeEnd,
   resizeHandleAriaLabel,
@@ -111,7 +117,9 @@ export const ResizableTextarea = ({
           : event.key === 'ArrowUp'
             ? -step
             : event.key === 'End'
-              ? maxHeightPx - displayHeightPx
+              ? maxHeightPx === undefined
+                ? undefined
+                : maxHeightPx - displayHeightPx
               : event.key === 'Home'
                 ? minHeightPx - displayHeightPx
                 : undefined;
@@ -129,14 +137,23 @@ export const ResizableTextarea = ({
   return (
     <Box position="relative">
       {underlay}
-      <Textarea
-        ref={textareaRef}
+      <ScrollArea.Root
+        borderRadius="l2"
         h={`${displayHeightPx}px`}
-        position={underlay ? 'relative' : textareaProps.position}
-        resize="none"
-        zIndex={underlay ? 1 : textareaProps.zIndex}
-        {...textareaProps}
-      />
+        size="xs"
+        variant="hover"
+        zIndex={underlay ? 1 : undefined}
+      >
+        <ScrollArea.Viewport asChild>
+          <Textarea ref={textareaRef} resize="none" {...textareaProps} />
+        </ScrollArea.Viewport>
+        {/* zag skips scrollbar re-measurement entirely without a content element;
+            the textarea is the viewport, so park an empty one for its observer. */}
+        <ScrollArea.Content h="0" minW="0" overflow="hidden" position="absolute" />
+        <ScrollArea.Scrollbar>
+          <ScrollArea.Thumb />
+        </ScrollArea.Scrollbar>
+      </ScrollArea.Root>
       <Box
         aria-label={resizeHandleAriaLabel}
         aria-orientation="horizontal"
@@ -145,7 +162,8 @@ export const ResizableTextarea = ({
         aria-valuenow={displayHeightPx}
         bottom="0"
         cursor="ns-resize"
-        h="2"
+        data-dragging={dragHeightPx === null ? undefined : ''}
+        h="2.5"
         left="0"
         position="absolute"
         right="0"
@@ -153,6 +171,7 @@ export const ResizableTextarea = ({
         tabIndex={0}
         transition="background var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease"
         zIndex={2}
+        css={resizeHandleDragging}
         _after={resizeHandleAfter}
         _focusVisible={resizeHandleFocusVisible}
         _hover={resizeHandleHover}

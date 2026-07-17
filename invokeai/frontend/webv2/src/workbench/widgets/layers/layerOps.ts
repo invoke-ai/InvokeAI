@@ -8,7 +8,7 @@
 import type { CanvasLayerCapability } from '@workbench/canvas-engine/api';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { GenerateReferenceImage } from '@workbench/generation/types';
+import type { RegionalGuidanceReferenceImage } from '@workbench/generation/types';
 import type {
   CanvasBlendMode,
   CanvasControlLayerContract,
@@ -247,7 +247,7 @@ export const createReferenceImageId = (): string =>
 export const createRegionalReferenceImage = (
   base: string | null,
   id: string = createReferenceImageId()
-): GenerateReferenceImage => {
+): RegionalGuidanceReferenceImage => {
   if (base === 'flux') {
     return {
       config: { image: null, imageInfluence: 'highest', model: null, type: 'flux_redux' },

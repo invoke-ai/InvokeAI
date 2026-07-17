@@ -88,7 +88,7 @@ export const PromptTextarea = ({
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
   const [textareaClientWidth, setTextareaClientWidth] = useState<number | null>(null);
   const shouldHighlight = showSyntaxHighlighting && value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
-  const effectiveFontSize = fontSize ?? 'xs';
+  const effectiveFontSize = fontSize ?? '0.82rem';
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
 
   const segments = useMemo(

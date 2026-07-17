@@ -70,8 +70,34 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.referenceImages[0]).toMatchObject({
       id: 'ref-1',
       isEnabled: true,
-      config: { type: 'qwen_image_reference_image', image: { imageName: 'reference.png' } },
+      config: {
+        type: 'qwen_image_reference_image',
+        image: { original: { image: { height: 768, image_name: 'reference.png', width: 512 } } },
+      },
     });
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(
+      isGenerateSettings({
+        ...normalized,
+        referenceImages: [
+          {
+            ...normalized?.referenceImages[0],
+            config: {
+              ...normalized?.referenceImages[0]?.config,
+              image: {
+                height: 768,
+                imageName: 'reference.png',
+                imageUrl: '/full',
+                queuedAt: 'now',
+                sourceQueueItemId: 'queue',
+                thumbnailUrl: '/thumbnail',
+                width: 512,
+              },
+            },
+          },
+        ],
+      })
+    ).toBe(false);
   });
 
   it('keeps more than five valid persisted reference images for provider-specific caps', () => {

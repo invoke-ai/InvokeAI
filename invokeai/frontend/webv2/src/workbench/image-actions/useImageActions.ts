@@ -22,6 +22,7 @@ import {
   isReferenceImageSupported,
   isSupportedGenerateModel,
 } from '@workbench/generation/baseGenerationPolicies';
+import { generatedImageToReferenceImage } from '@workbench/generation/referenceImage';
 import { isVaeModelConfig } from '@workbench/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -324,7 +325,7 @@ export const useImageActions = ({
         }
 
         const referenceImage = {
-          config: getDefaultReferenceImageConfig(currentValues.model, models, image),
+          config: getDefaultReferenceImageConfig(currentValues.model, models, generatedImageToReferenceImage(image)),
           id: createReferenceImageId(),
           isEnabled: true,
         };

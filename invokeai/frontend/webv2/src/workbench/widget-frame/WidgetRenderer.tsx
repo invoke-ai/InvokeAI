@@ -7,6 +7,7 @@ import type {
 } from '@workbench/types';
 
 import { Box, Flex, Text } from '@chakra-ui/react';
+import { Scrollable } from '@workbench/components/ui';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
@@ -236,10 +237,24 @@ const HeaderSlot = memo(function HeaderSlot({
   );
 }, areSlotPropsEqual);
 
-const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
-  <Flex direction="column" flex="1" minH="0" minW="0" overflowX="hidden" overflowY="auto">
+// Grid content with minH="full" stretches fill-height widget views (gallery,
+// layers, preview) to the viewport while letting flowing views grow and scroll.
+// The explicit minmax(0, 1fr) column is load-bearing: an implicit auto track
+// sizes to its item's max-content, so any long unbreakable text or wide row
+// inside a widget (prompt strings, UUIDs, button groups) silently stretches
+// the widget past its panel and clips. Panels only ever scroll vertically.
+// Covered by PanelBodySlot.browser.test.tsx.
+const panelBodyContentProps = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  maxW: 'full',
+  minH: 'full',
+} as const;
+
+export const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
+  <Scrollable contentProps={panelBodyContentProps} flex="1" minH="0" minW="0" overflowX="hidden">
     {children}
-  </Flex>
+  </Scrollable>
 );
 
 const FooterSlot = memo(function FooterSlot({

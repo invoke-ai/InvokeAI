@@ -1,6 +1,6 @@
 import type { BooleanRasterOperation } from '@workbench/canvas-engine/engine';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { GenerateReferenceImage } from '@workbench/generation/types';
+import type { RegionalGuidanceReferenceImage } from '@workbench/generation/types';
 import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasMaskContract } from '@workbench/types';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { LucideIcon } from 'lucide-react';
@@ -96,7 +96,7 @@ type LayerConfigPatch =
       positivePrompt?: string | null;
       negativePrompt?: string | null;
       autoNegative?: boolean;
-      referenceImages?: GenerateReferenceImage[];
+      referenceImages?: RegionalGuidanceReferenceImage[];
     }
   | { layerType: 'inpaint_mask'; noiseLevel?: number; denoiseLimit?: number };
 

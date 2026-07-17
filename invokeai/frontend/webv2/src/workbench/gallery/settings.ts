@@ -17,6 +17,7 @@ export interface GallerySettings {
   showArchivedBoards: boolean;
   showDateBoards: boolean;
   showImageDimensions: boolean;
+  showPendingItems: boolean;
   starredFirst: boolean;
   thumbnailFit: GalleryThumbnailFit;
 }
@@ -30,6 +31,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   showArchivedBoards: false,
   showDateBoards: false,
   showImageDimensions: false,
+  showPendingItems: true,
   starredFirst: true,
   thumbnailFit: 'square',
 };
@@ -58,6 +60,8 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
     typeof values.showImageDimensions === 'boolean'
       ? values.showImageDimensions
       : DEFAULT_GALLERY_SETTINGS.showImageDimensions,
+  showPendingItems:
+    typeof values.showPendingItems === 'boolean' ? values.showPendingItems : DEFAULT_GALLERY_SETTINGS.showPendingItems,
   starredFirst: typeof values.starredFirst === 'boolean' ? values.starredFirst : DEFAULT_GALLERY_SETTINGS.starredFirst,
   thumbnailFit: values.thumbnailFit === 'aspect' ? 'aspect' : DEFAULT_GALLERY_SETTINGS.thumbnailFit,
 });

@@ -69,7 +69,26 @@ export interface GenerateLora {
   weight: number;
 }
 
-export type GenerateReferenceImageAsset = GeneratedImageContract;
+export interface ImageWithDims {
+  image_name: string;
+  width: number;
+  height: number;
+}
+
+export interface CroppableImageWithDims {
+  original: { image: ImageWithDims };
+  crop?: {
+    image: ImageWithDims;
+    box: { x: number; y: number; width: number; height: number };
+    ratio: number | null;
+  };
+}
+
+/** Canonical persisted/metadata asset for global Generate reference images. */
+export type GenerateReferenceImageAsset = CroppableImageWithDims;
+
+/** Canvas regional guidance intentionally keeps its flat, URL-bearing image contract. */
+export type RegionalGuidanceReferenceImageAsset = GeneratedImageContract;
 
 export type ClipVisionModel = 'ViT-H' | 'ViT-G' | 'ViT-L';
 
@@ -77,22 +96,26 @@ export type IPAdapterMethod = 'full' | 'style' | 'composition' | 'style_strong' 
 
 export type FluxReduxImageInfluence = 'lowest' | 'low' | 'medium' | 'high' | 'highest';
 
+type IPAdapterReferenceImageConfig<TImage> = {
+  type: 'ip_adapter';
+  image: TImage | null;
+  model: ComponentModelConfig | null;
+  weight: number;
+  beginEndStepPct: [number, number];
+  method: IPAdapterMethod;
+  clipVisionModel: ClipVisionModel;
+};
+
+type FluxReduxReferenceImageConfig<TImage> = {
+  type: 'flux_redux';
+  image: TImage | null;
+  model: ComponentModelConfig | null;
+  imageInfluence: FluxReduxImageInfluence;
+};
+
 export type GenerateReferenceImageConfig =
-  | {
-      type: 'ip_adapter';
-      image: GenerateReferenceImageAsset | null;
-      model: ComponentModelConfig | null;
-      weight: number;
-      beginEndStepPct: [number, number];
-      method: IPAdapterMethod;
-      clipVisionModel: ClipVisionModel;
-    }
-  | {
-      type: 'flux_redux';
-      image: GenerateReferenceImageAsset | null;
-      model: ComponentModelConfig | null;
-      imageInfluence: FluxReduxImageInfluence;
-    }
+  | IPAdapterReferenceImageConfig<GenerateReferenceImageAsset>
+  | FluxReduxReferenceImageConfig<GenerateReferenceImageAsset>
   | {
       type: 'flux_kontext_reference_image';
       image: GenerateReferenceImageAsset | null;
@@ -106,6 +129,16 @@ export interface GenerateReferenceImage {
   id: string;
   isEnabled: boolean;
   config: GenerateReferenceImageConfig;
+}
+
+export type RegionalGuidanceReferenceImageConfig =
+  | IPAdapterReferenceImageConfig<RegionalGuidanceReferenceImageAsset>
+  | FluxReduxReferenceImageConfig<RegionalGuidanceReferenceImageAsset>;
+
+export interface RegionalGuidanceReferenceImage {
+  id: string;
+  isEnabled: boolean;
+  config: RegionalGuidanceReferenceImageConfig;
 }
 
 export type VaePrecision = 'fp16' | 'fp32';

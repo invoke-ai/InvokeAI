@@ -314,8 +314,33 @@ const hasComponentModels = (metadata: unknown, models: readonly ComponentModelCo
   getMetadataComponent(metadata, 'qwen3_encoder', models) !== undefined ||
   getMetadataComponent(metadata, 'qwen_image_qwen_vl_encoder', models) !== undefined;
 
-const getMetadataReferenceImages = (metadata: unknown) =>
-  isRecord(metadata) ? normalizeReferenceImages(metadata.ref_images) : [];
+export const getMetadataReferenceImages = (metadata: unknown) => {
+  if (!isRecord(metadata)) {
+    return [];
+  }
+
+  const direct = normalizeReferenceImages(metadata.ref_images).filter(
+    (referenceImage) => referenceImage.config.image !== null
+  );
+  if (direct.length > 0) {
+    return direct;
+  }
+
+  const canvasMetadata = getRecord(metadata, 'canvas_v2_metadata');
+  const referenceImages = getRecord(canvasMetadata, 'referenceImages');
+  const legacyEntities = referenceImages?.entities;
+  if (!Array.isArray(legacyEntities)) {
+    return [];
+  }
+
+  return normalizeReferenceImages(
+    legacyEntities.map((entry) =>
+      isRecord(entry) && isRecord(entry.ipAdapter)
+        ? { config: entry.ipAdapter, id: entry.id, isEnabled: entry.isEnabled }
+        : entry
+    )
+  ).filter((referenceImage) => referenceImage.config.image !== null);
+};
 
 const withDimensions = (
   values: GenerateWidgetValues,

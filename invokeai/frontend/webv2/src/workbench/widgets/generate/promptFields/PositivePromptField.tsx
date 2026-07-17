@@ -171,7 +171,6 @@ export const PositivePromptField = ({
         {...PROMPT_ATTENTION_TARGET_PROPS}
         aria-label={t('widgets.generate.positivePrompt')}
         defaultHeightPx={heightPx}
-        maxHeightPx={360}
         minHeightPx={96}
         resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
         size="xs"

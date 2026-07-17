@@ -19,6 +19,7 @@ import {
   getMaxReferenceImages,
   isReferenceImageSupported,
 } from '@workbench/generation/baseGenerationPolicies';
+import { generatedImageToReferenceImage, getEffectiveReferenceImage } from '@workbench/generation/referenceImage';
 import { clampDimension, deriveAspectRatioId } from '@workbench/generation/settings';
 import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
 import { GenerateCollapsibleSection } from '@workbench/widgets/generate/shared/GenerateCollapsibleSection';
@@ -117,8 +118,9 @@ export const GenerateReferenceImagesSection = ({
       }
 
       const grid = getGenerationDimensions(selectedModel).grid;
-      const width = clampDimension(image.width, grid);
-      const height = clampDimension(image.height, grid);
+      const effectiveImage = getEffectiveReferenceImage(image);
+      const width = clampDimension(effectiveImage.width, grid);
+      const height = clampDimension(effectiveImage.height, grid);
 
       onCommitImmediate({
         aspectRatioId: deriveAspectRatioId(width, height),
@@ -141,7 +143,7 @@ export const GenerateReferenceImagesSection = ({
           files.slice(0, maxReferenceImages - referenceImageCount).map((file) => uploadGalleryImage(file, 'none'))
         );
 
-        appendReferenceImages(uploaded);
+        appendReferenceImages(uploaded.map(generatedImageToReferenceImage));
         dispatch({ type: 'touchGalleryImagesRefresh' });
       } catch (error) {
         dispatch({
@@ -177,7 +179,7 @@ export const GenerateReferenceImagesSection = ({
     const images = await getGalleryImagesByNames(imageNames.slice(0, maxReferenceImages - referenceImageCount));
 
     if (images.length > 0) {
-      appendReferenceImages(images);
+      appendReferenceImages(images.map(generatedImageToReferenceImage));
     }
   };
 

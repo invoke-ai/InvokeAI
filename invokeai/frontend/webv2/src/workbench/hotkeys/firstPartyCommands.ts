@@ -179,7 +179,7 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Select Workflows tab',
       }),
       commandApi.register({
-        handler: () => (window.location.hash = '#/models'),
+        handler: () => (window.location.hash = `#/models?project=${encodeURIComponent(projectRef.current.id)}`),
         id: 'app.selectModelsTab',
         title: 'Select Models tab',
       }),

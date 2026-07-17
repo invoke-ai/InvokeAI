@@ -109,13 +109,7 @@ const createSettings = (model: GenerateModelConfig, overrides: Partial<GenerateS
 });
 
 const refImage = {
-  height: 768,
-  imageName: 'reference.png',
-  imageUrl: '/api/v1/images/i/reference.png/full',
-  queuedAt: '2026-01-01T00:00:00.000Z',
-  sourceQueueItemId: 'backend-gallery',
-  thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
-  width: 512,
+  original: { image: { height: 768, image_name: 'reference.png', width: 512 } },
 };
 
 const compile = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}) =>
@@ -375,6 +369,44 @@ describe('compileGenerateGraph', () => {
       weight: 0.6,
     });
     expect(getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toContain('ip_adapter_collector');
+  });
+
+  it('generates from the crop while serializing complete original and crop metadata', () => {
+    const croppedReferenceImage = {
+      crop: {
+        box: { height: 256, width: 320, x: 40, y: 50 },
+        image: { height: 256, image_name: 'reference-crop.png', width: 320 },
+        ratio: null,
+      },
+      original: { image: { height: 768, image_name: 'reference-original.png', width: 512 } },
+    };
+    const graph = compile(sd1Model, {
+      referenceImages: [
+        {
+          config: {
+            beginEndStepPct: [0, 1],
+            clipVisionModel: 'ViT-H',
+            image: croppedReferenceImage,
+            method: 'full',
+            model: sd1IpAdapter,
+            type: 'ip_adapter',
+            weight: 1,
+          },
+          id: 'cropped-ref',
+          isEnabled: true,
+        },
+      ],
+    });
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(getNodeByType(graph, 'ip_adapter')?.image).toEqual({ image_name: 'reference-crop.png' });
+    expect(metadata?.ref_images).toMatchObject([
+      {
+        config: { image: croppedReferenceImage },
+        id: 'cropped-ref',
+        isEnabled: true,
+      },
+    ]);
   });
 
   it('wires FLUX Redux reference images into denoise', () => {

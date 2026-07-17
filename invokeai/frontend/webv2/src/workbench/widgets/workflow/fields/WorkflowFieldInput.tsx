@@ -3,7 +3,7 @@ import type { GeneratedImageContract } from '@workbench/types';
 import type { FieldInputTemplate } from '@workbench/workflows/types';
 
 import { HStack, Input, NativeSelect, Switch, Text, Textarea } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui';
+import { Button, Combobox } from '@workbench/components/ui';
 import { listGalleryBoards, type GalleryBoard } from '@workbench/gallery/api';
 import { SCHEDULER_OPTIONS } from '@workbench/generation/baseGenerationPolicies';
 import { ModelSelect } from '@workbench/models/components';
@@ -192,6 +192,21 @@ const EnumInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInpu
     [template.options, template.uiChoiceLabels]
   );
 
+  if (template.name === 'scheduler') {
+    return (
+      <Combobox
+        aria-label={template.title}
+        className="nodrag nowheel"
+        id={id ? `${id}-scheduler-combobox` : undefined}
+        invalid={invalid}
+        options={options}
+        size="xs"
+        value={typeof value === 'string' ? value : null}
+        onValueChange={onChange}
+      />
+    );
+  }
+
   return (
     <SelectInput id={id} invalid={invalid} options={options} title={template.title} value={value} onChange={onChange} />
   );
@@ -232,13 +247,15 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
 };
 
 const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => (
-  <SelectInput
-    id={id}
+  <Combobox
+    aria-label={template.title}
+    className="nodrag nowheel"
+    id={id ? `${id}-scheduler-combobox` : undefined}
     invalid={invalid}
     options={SCHEDULER_OPTIONS}
-    title={template.title}
-    value={value}
-    onChange={onChange}
+    size="xs"
+    value={typeof value === 'string' ? value : null}
+    onValueChange={onChange}
   />
 );
 

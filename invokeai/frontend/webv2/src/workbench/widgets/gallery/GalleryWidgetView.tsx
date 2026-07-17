@@ -59,6 +59,7 @@ const areGallerySettingsEqual = (left: GallerySettings, right: GallerySettings):
   left.showArchivedBoards === right.showArchivedBoards &&
   left.showDateBoards === right.showDateBoards &&
   left.showImageDimensions === right.showImageDimensions &&
+  left.showPendingItems === right.showPendingItems &&
   left.starredFirst === right.starredFirst &&
   left.thumbnailFit === right.thumbnailFit;
 

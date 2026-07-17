@@ -413,14 +413,14 @@ export const ClipVisionSelect = ({
   );
 };
 
-export const FluxReduxControls = ({
+export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfluence; type: 'flux_redux' }>({
   config,
   disabled,
   onChange,
 }: {
-  config: Extract<GenerateReferenceImageConfig, { type: 'flux_redux' }>;
+  config: T;
   disabled: boolean;
-  onChange: (config: GenerateReferenceImageConfig) => void;
+  onChange: (config: T) => void;
 }) => {
   const { t } = useTranslation();
   const imageInfluenceValue = useMemo(() => [config.imageInfluence], [config.imageInfluence]);

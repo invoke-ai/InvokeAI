@@ -1,24 +1,36 @@
 import type { GenerateWidgetValues } from '@workbench/generation/types';
 
-import { ButtonGroup, Dialog, Icon, Portal } from '@chakra-ui/react';
-import { Button, CloseButton, JsonPreview, Tooltip } from '@workbench/components/ui';
+import { Dialog, Icon, Portal } from '@chakra-ui/react';
+import { Button, CloseButton, JsonPreview } from '@workbench/components/ui';
+import { isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
+import {
+  getCurrentGenerateValues,
+  getImageRecallTitle,
+  RecallActionButtons,
+  type ImageRecallKind,
+} from '@workbench/image-actions';
+import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { FileTextIcon, UndoIcon, WandSparklesIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { createGenerateFormValuesSelector } from '@workbench/widgets/generate/generateFormViewModel';
+import { useWidgetValuesSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { FileTextIcon, WandSparklesIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { QueueServerItem } from './queueServerApi';
 
+import { extractGenerationMeta } from './fieldValues';
+import { buildQueueRecallValues, getQueueRecallCapabilities } from './queueRecall';
+
+const selectGenerateRecallValues = createGenerateFormValuesSelector();
+
 /**
- * Per-item actions for the RECENT details panel.
- *
- * - **Use again** recalls the exact submission snapshot into Generate (only the
- *   submitting client has it; otherwise disabled — recall from the gallery).
- * - **Send to canvas** is deferred (no canvas-import path exists in webv2 yet),
- *   so it reports "coming soon" rather than silently no-op'ing.
- * - **View JSON** opens the raw queue item (incl. its session) in a dialog.
+ * Per-item actions for the RECENT details panel. Recall uses the shared
+ * {@link RecallActionButtons} verbs (same look as the preview's metadata
+ * panel): items this client submitted recall from the exact submission
+ * snapshot; foreign items still offer prompts + the executed seed from the
+ * session. "View JSON" opens the raw queue item in a dialog.
  */
 export const QueueItemActions = ({
   item,
@@ -32,18 +44,35 @@ export const QueueItemActions = ({
   const openWidget = useOpenWorkbenchWidget();
   const notify = useNotify();
   const [jsonOpen, setJsonOpen] = useState(false);
+  const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
+  const meta = useMemo(() => extractGenerationMeta(item), [item]);
+  const capabilities = useMemo(
+    () => getQueueRecallCapabilities(localGenerateValues, meta),
+    [localGenerateValues, meta]
+  );
 
-  const canRecall = localGenerateValues !== null;
+  useEffect(() => {
+    ensureModelsLoaded();
+  }, []);
 
-  const onUseAgain = useCallback(() => {
-    if (!localGenerateValues) {
-      return;
-    }
+  const onRecall = useCallback(
+    (kind: ImageRecallKind) => {
+      const current = getCurrentGenerateValues({ generateValues, supportedModels });
+      const values = buildQueueRecallValues(kind, { current, meta, snapshot: localGenerateValues });
 
-    dispatch({ type: 'setGenerateSettings', values: localGenerateValues });
-    openWidget('generate', { preferredRegions: ['left'] });
-    notify.success(t('widgets.queue.settingsRecalled'), t('widgets.queue.settingsRecalledDescription'));
-  }, [dispatch, localGenerateValues, notify, openWidget, t]);
+      if (!values) {
+        notify.info(getImageRecallTitle(kind), t('widgets.queue.recallUnavailable'));
+        return;
+      }
+
+      dispatch({ type: 'setGenerateSettings', values });
+      openWidget('generate', { preferredRegions: ['left'] });
+      notify.success(getImageRecallTitle(kind), t('widgets.queue.settingsRecalledDescription'));
+    },
+    [dispatch, generateValues, localGenerateValues, meta, notify, openWidget, supportedModels, t]
+  );
 
   const onSendToCanvas = useCallback(
     () => notify.info(t('widgets.queue.sendToCanvas'), t('widgets.queue.sendToCanvasComingSoon')),
@@ -55,38 +84,20 @@ export const QueueItemActions = ({
 
   return (
     <>
-      {/*<HStack flexWrap="wrap" gap="1.5">
-        <Tooltip content={canRecall ? 'Load these settings into Generate' : 'Recall this generation from the gallery'}>
-          <Button disabled={!canRecall} size="2xs" variant="surface" onClick={onUseAgain}>
-            Recall All
-          </Button>
-        </Tooltip>
-        <Button color="fg.subtle" size="2xs" variant="ghost" onClick={onSendToCanvas}>
-          Send to canvas
-        </Button>
-        <Button size="2xs" variant="surface" onClick={openJson}>
-          View JSON
-        </Button>
-      </HStack>*/}
-
-      <ButtonGroup size="2xs" variant="subtle">
-        <Tooltip
-          content={canRecall ? t('widgets.queue.loadSettingsIntoGenerate') : t('widgets.queue.recallFromGallery')}
-        >
-          <Button onClick={onUseAgain} disabled={!canRecall}>
-            <Icon as={UndoIcon} boxSize="3" />
-            {t('widgets.queue.recallAll')}
-          </Button>
-        </Tooltip>
+      <RecallActionButtons
+        capabilities={capabilities}
+        disabledReason={t('widgets.queue.recallFromGallery')}
+        onRecall={onRecall}
+      >
         <Button disabled variant="ghost" onClick={onSendToCanvas}>
           <Icon as={WandSparklesIcon} boxSize="3" />
           {t('widgets.queue.sendToCanvas')}
         </Button>
-        <Button size="2xs" onClick={openJson}>
+        <Button onClick={openJson}>
           <Icon as={FileTextIcon} boxSize="3" />
           {t('common.viewJson')}
         </Button>
-      </ButtonGroup>
+      </RecallActionButtons>
 
       <Dialog.Root open={jsonOpen} placement="center" scrollBehavior="inside" size="lg" onOpenChange={closeJson}>
         <Portal>

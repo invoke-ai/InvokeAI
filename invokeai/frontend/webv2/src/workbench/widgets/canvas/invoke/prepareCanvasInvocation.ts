@@ -41,7 +41,7 @@ import type {
   RegionalReferenceImageInput,
 } from '@workbench/generation/canvas/addRegionalGuidance';
 import type { CanvasCompileMode } from '@workbench/generation/canvas/types';
-import type { GenerateModelConfig, GenerateReferenceImage } from '@workbench/generation/types';
+import type { GenerateModelConfig, RegionalGuidanceReferenceImage } from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
 import type {
   CanvasDocumentContractV2,
@@ -216,7 +216,7 @@ const FLUX_REDUX_INFLUENCE_SETTINGS = {
 
 /** Resolves a regional-guidance layer's reference images into graph inputs (drops incomplete/incompatible ones). */
 export const resolveRegionalReferenceImages = (
-  region: { referenceImages: GenerateReferenceImage[] },
+  region: { referenceImages: RegionalGuidanceReferenceImage[] },
   base: string
 ): RegionalReferenceImageInput[] => {
   const inputs: RegionalReferenceImageInput[] = [];

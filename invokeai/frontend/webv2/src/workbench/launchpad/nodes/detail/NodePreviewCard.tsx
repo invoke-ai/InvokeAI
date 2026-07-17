@@ -71,13 +71,13 @@ const FieldTooltip = ({
 };
 
 const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
-  <Box position="relative" px="3" py="1">
+  <Box position="relative" px="3" py="0.5">
     <Tooltip
       content={<FieldTooltip description={template.description} direction="output" template={template} />}
       positioning={{ placement: 'top-end' }}
     >
       <Flex justify="flex-end">
-        <Text color="fg.muted" fontSize="2xs" lineHeight="1" maxW="full" textAlign="end" truncate>
+        <Text color="fg.muted" fontSize="2xs" lineHeight="shorter" maxW="full" textAlign="end" truncate>
           {template.title}
         </Text>
       </Flex>
@@ -87,12 +87,12 @@ const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
 );
 
 const InputRow = ({ template }: { template: FieldInputTemplate }) => (
-  <Box position="relative" px="3" py="1">
+  <Box position="relative" px="3" py="0.5">
     <Tooltip
       content={<FieldTooltip description={template.description} direction="input" template={template} />}
       positioning={{ placement: 'top-start' }}
     >
-      <Text color="fg" fontSize="2xs" lineHeight="1" minW="0" truncate>
+      <Text color="fg" fontSize="2xs" lineHeight="shorter" minW="0" truncate>
         {template.title}
         {template.required ? (
           <Text as="span" color="fg.error">

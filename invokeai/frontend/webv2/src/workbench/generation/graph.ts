@@ -42,6 +42,7 @@ import {
   toModelIdentifier,
   toGraphContract,
 } from './graphBuilder';
+import { getEffectiveReferenceImage } from './referenceImage';
 import { SEED_MAX } from './settings';
 
 const getCompatibleComponentSource = (
@@ -52,7 +53,9 @@ const getCompatibleComponentSource = (
 const getCompatibleVae = (settings: GenerateSettings, bases: readonly string[]) =>
   settings.vae && isVaeForBases(bases)(settings.vae) ? settings.vae : null;
 
-const toImageField = (image: GenerateReferenceImageAsset) => ({ image_name: image.imageName });
+const toImageField = (image: GenerateReferenceImageAsset) => ({
+  image_name: getEffectiveReferenceImage(image).image_name,
+});
 
 const getEnabledReferenceImages = <T extends GenerateReferenceImageConfig['type']>(
   settings: GenerateSettings,
