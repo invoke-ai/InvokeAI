@@ -239,9 +239,19 @@ const HeaderSlot = memo(function HeaderSlot({
 
 // Grid content with minH="full" stretches fill-height widget views (gallery,
 // layers, preview) to the viewport while letting flowing views grow and scroll.
-const panelBodyContentProps = { display: 'grid', minH: 'full' } as const;
+// The explicit minmax(0, 1fr) column is load-bearing: an implicit auto track
+// sizes to its item's max-content, so any long unbreakable text or wide row
+// inside a widget (prompt strings, UUIDs, button groups) silently stretches
+// the widget past its panel and clips. Panels only ever scroll vertically.
+// Covered by PanelBodySlot.browser.test.tsx.
+const panelBodyContentProps = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  maxW: 'full',
+  minH: 'full',
+} as const;
 
-const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
+export const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
   <Scrollable contentProps={panelBodyContentProps} flex="1" minH="0" minW="0" overflowX="hidden">
     {children}
   </Scrollable>

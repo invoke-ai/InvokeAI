@@ -13,7 +13,9 @@ import { useLocalGenerateValues } from './useLocalGenerateValues';
 const DetailRow = ({ label, children }: { label: string; children: ReactNode }) => (
   <DataList.Item key={label} alignItems="start">
     <DataList.ItemLabel>{label}</DataList.ItemLabel>
-    <DataList.ItemValue fontFamily="mono" fontSize="2xs">
+    {/* minW=0 lets unbreakable values (batch UUIDs) truncate instead of
+        pushing the row's min-content past the panel. */}
+    <DataList.ItemValue fontFamily="mono" fontSize="2xs" minW="0">
       {children}
     </DataList.ItemValue>
   </DataList.Item>
