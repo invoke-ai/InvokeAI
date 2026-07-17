@@ -5,7 +5,7 @@
 /docs/
 
 # nodes
-/invokeai/app/ @blessedcoolant @lstein @dunkeroni @JPPhoto
+/invokeai/app/ @blessedcoolant @lstein @dunkeroni @JPPhoto @pfannkuchensack
 
 # installation and configuration
 /pyproject.toml  @lstein @blessedcoolant
@@ -17,7 +17,7 @@
 /invokeai/version @lstein @blessedcoolant
 
 # web ui
-/invokeai/frontend @blessedcoolant  @lstein  @dunkeroni
+/invokeai/frontend @blessedcoolant  @lstein  @dunkeroni @jpphoto @pfannkuchensack
 
 # generation, model management, postprocessing
 /invokeai/backend  @lstein @blessedcoolant @dunkeroni @JPPhoto  @Pfannkuchensack
@@ -27,4 +27,4 @@
 /invokeai/frontend/install @lstein
 /invokeai/frontend/merge @lstein @blessedcoolant
 /invokeai/frontend/training @lstein @blessedcoolant
-/invokeai/frontend/web  @blessedcoolant  @lstein @dunkeroni @Pfannkuchensack
+/invokeai/frontend/web  @blessedcoolant  @lstein @dunkeroni @Pfannkuchensack @jpphoto
