@@ -12,7 +12,12 @@ import {
   type GalleryView,
 } from '@workbench/gallery/api';
 import { getGallerySettings } from '@workbench/gallery/settings';
-import { ImageContextMenu, useImageActions, type ImageContextMenuTarget } from '@workbench/image-actions';
+import {
+  ImageContextMenu,
+  useImageActions,
+  type ImageActions,
+  type ImageContextMenuTarget,
+} from '@workbench/image-actions';
 import { imageUrlToStreamingSource, progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
 import { useStreamingImageSource } from '@workbench/images/useStreamingImageSource';
 import {
@@ -39,7 +44,7 @@ import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewFooter } from './PreviewFooter';
 import { PreviewFrame } from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
-import { getPreviewComparisonMode, type PreviewComparisonMode } from './previewSettings';
+import { getPreviewComparisonMode, getPreviewMetadataOpen, type PreviewComparisonMode } from './previewSettings';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
 
@@ -353,6 +358,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       dispatch({ type: 'patchWidgetValues', values: { comparisonMode }, widgetId: 'preview' }),
     [dispatch]
   );
+  const isMetadataOpen = getPreviewMetadataOpen(previewValues);
+  const toggleMetadata = useCallback(
+    () => dispatch({ type: 'patchWidgetValues', values: { metadataOpen: !isMetadataOpen }, widgetId: 'preview' }),
+    [dispatch, isMetadataOpen]
+  );
   const openImageContextMenu = useCallback(
     (x: number, y: number) => {
       if (contextMenuImage) {
@@ -454,18 +464,22 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             />
           ) : (
             <SelectedImagePreview
+              actionImage={contextMenuImage}
+              actions={imageActions}
               loupeControlsRef={loupeControlsRef}
               boardImageCount={boardImages.length}
               boardName={boardName}
               density={density}
               image={selectedImage}
               isLoadingBoard={isLoadingBoard}
+              isMetadataOpen={isMetadataOpen}
               progressImage={shouldShowProgressImage ? progressImage : null}
               selectedIndex={selectedIndex}
               shouldAntialiasProgressImage={antialiasProgressImages}
               onContextMenu={openImageContextMenu}
               onNext={selectNextImage}
               onPrevious={selectPreviousImage}
+              onToggleMetadata={toggleMetadata}
             />
           )}
           <ImageContextMenu
@@ -486,11 +500,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 };
 
 const SelectedImagePreview = ({
+  actionImage,
+  actions,
   boardImageCount,
   boardName,
   density,
   image,
   isLoadingBoard,
+  isMetadataOpen,
   loupeControlsRef,
   progressImage,
   selectedIndex,
@@ -498,12 +515,16 @@ const SelectedImagePreview = ({
   onContextMenu,
   onNext,
   onPrevious,
+  onToggleMetadata,
 }: {
+  actionImage: GalleryImage | null;
+  actions: ImageActions;
   boardImageCount: number;
   boardName: string;
   density: PreviewDensity;
   image: GeneratedImageContract;
   isLoadingBoard: boolean;
+  isMetadataOpen: boolean;
   loupeControlsRef?: Ref<PreviewLoupeControls>;
   progressImage: LatestProgressImageSnapshot | null;
   selectedIndex: number;
@@ -511,6 +532,7 @@ const SelectedImagePreview = ({
   onContextMenu: (x: number, y: number) => void;
   onNext: () => void;
   onPrevious: () => void;
+  onToggleMetadata: () => void;
 }) => {
   const { t } = useTranslation();
   const previewImage = useStreamingImageSource({
@@ -559,16 +581,20 @@ const SelectedImagePreview = ({
         onContextMenu={onContextMenu}
       />
       <PreviewFooter
+        actionImage={actionImage}
+        actions={actions}
         boardImageCount={boardImageCount}
         boardName={boardName}
         density={density}
         image={image}
         isLive={isProgressImage}
         isLoadingBoard={isLoadingBoard}
+        isMetadataOpen={isMetadataOpen}
         liveQueueItemId={liveQueueItemId}
         selectedIndex={selectedIndex}
         onNext={onNext}
         onPrevious={onPrevious}
+        onToggleMetadata={onToggleMetadata}
       />
     </Stack>
   );

@@ -1,3 +1,5 @@
+import type { GalleryImage } from '@workbench/gallery/api';
+import type { ImageActions } from '@workbench/image-actions';
 import type { GeneratedImageContract } from '@workbench/types';
 
 import { Badge, HStack, Stack, Text } from '@chakra-ui/react';
@@ -8,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { PreviewDensity } from './previewDensity';
 
 import { PreviewLiveStatusLine } from './PreviewLiveReadout';
+import { PreviewMetadataPanel } from './PreviewMetadataPanel';
 
 /**
  * The preview's info card: board context ("N of M"), prev/next navigation and
@@ -15,27 +18,36 @@ import { PreviewLiveStatusLine } from './PreviewLiveReadout';
  * slot (`PreviewHeaderActions`), not here.
  */
 export const PreviewFooter = ({
+  actionImage,
+  actions,
   boardImageCount,
   boardName,
   density,
   image,
   isLive,
   isLoadingBoard,
+  isMetadataOpen,
   liveQueueItemId,
   onNext,
   onPrevious,
+  onToggleMetadata,
   selectedIndex,
 }: {
+  /** The selected image with board/star context, for the metadata/recall panel. */
+  actionImage: GalleryImage | null;
+  actions: ImageActions;
   boardImageCount: number;
   boardName: string;
   density: PreviewDensity;
   image: GeneratedImageContract;
   isLive: boolean;
   isLoadingBoard: boolean;
+  isMetadataOpen: boolean;
   /** The live run's local queue item id, when a progress readout should replace the dimensions row. */
   liveQueueItemId?: string | null;
   onNext: () => void;
   onPrevious: () => void;
+  onToggleMetadata: () => void;
   selectedIndex: number;
 }) => {
   const { t } = useTranslation();
@@ -91,6 +103,15 @@ export const PreviewFooter = ({
           </Text>
         )}
       </Stack>
+      {actionImage ? (
+        <PreviewMetadataPanel
+          key={actionImage.imageName}
+          actions={actions}
+          image={actionImage}
+          isOpen={isMetadataOpen}
+          onToggle={onToggleMetadata}
+        />
+      ) : null}
     </Stack>
   );
 };

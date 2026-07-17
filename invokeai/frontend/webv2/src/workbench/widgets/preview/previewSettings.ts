@@ -7,3 +7,5 @@ export const getPreviewComparisonMode = (values: Record<string, unknown>): Previ
 
   return mode === 'side-by-side' || mode === 'hover' ? mode : DEFAULT_PREVIEW_COMPARISON_MODE;
 };
+
+export const getPreviewMetadataOpen = (values: Record<string, unknown>): boolean => values.metadataOpen === true;
