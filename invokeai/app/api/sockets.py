@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from socketio import ASGIApp, AsyncServer
 
 from invokeai.app.services.auth.token_service import verify_token
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     BulkDownloadCompleteEvent,
@@ -108,7 +109,14 @@ class SocketIO:
 
     def __init__(self, app: FastAPI):
         self._sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
-        self._app = ASGIApp(socketio_server=self._sio, socketio_path="/ws/socket.io")
+        # When deployed behind a reverse proxy under a sub-path, `base_url` is set and the
+        # SubPathASGIMiddleware advertises it via `root_path`. Starlette then hands mounted
+        # sub-apps the full public path (e.g. `/invoke/ws/socket.io`). Unlike routers and
+        # StaticFiles, engine.io is not root_path-aware: it matches the raw `scope["path"]`
+        # against `socketio_path`, so the path must include the sub-path prefix or every
+        # handshake 404s. The frontend already targets `{basePath}/ws/socket.io`.
+        base_url = get_config().base_url or ""
+        self._app = ASGIApp(socketio_server=self._sio, socketio_path=f"{base_url}/ws/socket.io")
         app.mount("/ws", self._app)
 
         # Track user information for each socket connection
