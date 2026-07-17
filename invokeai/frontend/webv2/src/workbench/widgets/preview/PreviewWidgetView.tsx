@@ -1,9 +1,8 @@
 /* eslint-disable react/react-compiler */
 import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
-import { Badge, Box, Flex, HStack, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Stack, Text } from '@chakra-ui/react';
 import { useProgressImage, type ProgressImageSnapshot } from '@workbench/backend/progressImageStore';
-import { Button } from '@workbench/components/ui';
 import {
   listGalleryBoards,
   listGalleryImages,
@@ -29,21 +28,13 @@ import {
   useWidgetValuesSelector,
   useWorkbenchDispatch,
 } from '@workbench/WorkbenchContext';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type MouseEvent,
-  type CSSProperties,
-} from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PreviewCompare } from './PreviewCompare';
+import { usePreviewDensity, type PreviewDensity } from './previewDensity';
+import { PreviewFooter } from './PreviewFooter';
+import { PreviewFrame } from './PreviewFrame';
 import { getPreviewComparisonMode, type PreviewComparisonMode } from './previewSettings';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
@@ -125,25 +116,9 @@ export const getPreviewBoardsRequestKey = ({
   refreshToken: string;
 }): string | null => (hasSelectedImage ? refreshToken : null);
 
-const previewGridCss = {
-  backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'repeat',
-  backgroundSize: '24px 24px',
-} as const;
-
-const getFittedFrameCss = (width: number, height: number): SystemStyleObject => ({
-  aspectRatio: `${width} / ${height}`,
-  height: 'auto',
-  maxHeight: '100%',
-  maxWidth: '100%',
-  width: `min(100cqw, calc(100cqh * ${width / height}))`,
-});
-
 const selectGenerateRecallValues = createGenerateFormValuesSelector();
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
-  const { t } = useTranslation();
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
   const previewValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'preview'));
   const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
@@ -152,6 +127,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const progressImage = useProgressImage();
   const dispatch = useWorkbenchDispatch();
+  const { density, rootRef } = usePreviewDensity(region);
   const selectedImage = useMemo(() => getSelectedImage(galleryValues), [galleryValues]);
   const compareImage = getGalleryCompareImage(galleryValues);
   const comparisonMode = getPreviewComparisonMode(previewValues);
@@ -169,7 +145,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const [boards, setBoards] = useState<GalleryBoard[]>(fallbackBoards);
   const [boardImages, setBoardImages] = useState<PreviewImage[]>(localImages);
   const [isLoadingBoard, setIsLoadingBoard] = useState(false);
-  const isSidePanel = region === 'left' || region === 'right';
+  const { t } = useTranslation();
   const selectedIndex = selectedImage
     ? boardImages.findIndex((image) => image.imageName === selectedImage.imageName)
     : -1;
@@ -413,7 +389,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [runtime.commands, runtime.hotkeys, t]);
 
   return (
-    <Box p="2" h="full">
+    <Box ref={rootRef} p="2" h="full">
       {selectedImage ? (
         <>
           {isComparing && compareImage ? (
@@ -430,8 +406,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             <SelectedImagePreview
               boardImageCount={boardImages.length}
               boardName={boardName}
+              density={density}
               image={selectedImage}
-              isCompact={isSidePanel}
               isLoadingBoard={isLoadingBoard}
               progressImage={shouldShowProgressImage ? progressImage : null}
               selectedIndex={selectedIndex}
@@ -461,8 +437,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 const SelectedImagePreview = ({
   boardImageCount,
   boardName,
+  density,
   image,
-  isCompact,
   isLoadingBoard,
   progressImage,
   selectedIndex,
@@ -473,8 +449,8 @@ const SelectedImagePreview = ({
 }: {
   boardImageCount: number;
   boardName: string;
+  density: PreviewDensity;
   image: GeneratedImageContract;
-  isCompact: boolean;
   isLoadingBoard: boolean;
   progressImage: ProgressImageSnapshot | null;
   selectedIndex: number;
@@ -511,114 +487,30 @@ const SelectedImagePreview = ({
     },
     [onNext, onPrevious]
   );
-  const handleContextMenu = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      onContextMenu(event.clientX, event.clientY);
-    },
-    [onContextMenu]
-  );
-  const imageStyle = useMemo<CSSProperties>(
-    () => ({
-      display: 'block',
-      height: 'auto',
-      imageRendering: isProgressImage && !shouldAntialiasProgressImage ? 'pixelated' : 'auto',
-      width: '100%',
-    }),
-    [isProgressImage, shouldAntialiasProgressImage]
-  );
 
   return (
     <Stack gap="3" h="full" minH="0" outline="none" tabIndex={0} w="full" onKeyDown={handleKeyDown}>
-      <Flex
-        align="center"
-        borderWidth="1px"
-        borderColor="border.subtle"
-        color="fg.grid"
-        containerType="size"
-        css={previewGridCss}
-        flex="1"
-        justify="center"
-        minH="0"
-        overflow="hidden"
-        p={isCompact ? '3' : '6'}
-        rounded="lg"
-        w="full"
-      >
-        <Box
-          bg="transparent"
-          borderWidth="1px"
-          borderColor={isProgressImage ? 'accent.solid' : 'border.emphasized'}
-          boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-          css={getFittedFrameCss(previewWidth, previewHeight)}
-          overflow="hidden"
-          position="relative"
-          rounded="lg"
-          onContextMenu={handleContextMenu}
-        >
-          {previewImage ? (
-            <img
-              alt={previewImage.alt}
-              height={previewHeight}
-              src={previewImage.src}
-              style={imageStyle}
-              width={previewWidth}
-            />
-          ) : null}
-          {isProgressImage ? (
-            <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-              {t('common.generating')}
-            </Badge>
-          ) : null}
-        </Box>
-      </Flex>
-      <Stack borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
-        <HStack align="center" justify="space-between">
-          <HStack gap="2" minW="0">
-            <Badge flexShrink={0} size="xs" variant="subtle">
-              {boardName}
-            </Badge>
-            <Text color="fg.subtle" fontSize="2xs" truncate>
-              {isLoadingBoard
-                ? t('widgets.preview.loadingBoard')
-                : selectedIndex === -1
-                  ? t('widgets.preview.imageCount', { count: boardImageCount })
-                  : t('common.countOfTotal', { count: selectedIndex + 1, total: boardImageCount })}
-            </Text>
-          </HStack>
-          <HStack flexShrink={0} gap="1">
-            <Button
-              aria-label={t('widgets.preview.previousImageInBoard')}
-              disabled={selectedIndex <= 0}
-              size="2xs"
-              variant="outline"
-              onClick={onPrevious}
-            >
-              <ChevronLeftIcon />
-            </Button>
-            <Button
-              aria-label={t('widgets.preview.nextImageInBoard')}
-              disabled={selectedIndex === -1 || selectedIndex >= boardImageCount - 1}
-              size="2xs"
-              variant="outline"
-              onClick={onNext}
-            >
-              <ChevronRightIcon />
-            </Button>
-          </HStack>
-        </HStack>
-        <Stack>
-          <Text fontSize="xs" fontWeight="800" truncate>
-            {image.imageName}
-          </Text>
-          <Text color="fg.subtle" fontSize="2xs">
-            {t('widgets.preview.sourceRun', { id: image.sourceQueueItemId })}
-          </Text>
-          <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
-            {isProgressImage ? t('common.generating') : `${image.width} x ${image.height}`}
-          </Text>
-        </Stack>
-      </Stack>
+      <PreviewFrame
+        frameHeight={previewHeight}
+        frameWidth={previewWidth}
+        isLive={isProgressImage}
+        liveBadgeLabel={t('common.generating')}
+        padding={density === 'full' ? '6' : '3'}
+        shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+        source={previewImage}
+        variant="framed"
+        onContextMenu={onContextMenu}
+      />
+      <PreviewFooter
+        boardImageCount={boardImageCount}
+        boardName={boardName}
+        image={image}
+        isLive={isProgressImage}
+        isLoadingBoard={isLoadingBoard}
+        selectedIndex={selectedIndex}
+        onNext={onNext}
+        onPrevious={onPrevious}
+      />
     </Stack>
   );
 };
@@ -636,53 +528,23 @@ const EmptyPreview = ({
   });
 
   return (
-    <Flex
-      align="center"
-      backgroundColor="bg.inset"
-      color="fg.grid"
-      containerType="size"
-      css={previewGridCss}
-      h="full"
-      justify="center"
-      w="full"
+    <PreviewFrame
+      frameHeight={previewImage?.height ?? 1}
+      frameWidth={previewImage?.width ?? 1}
+      isLive
+      liveBadgeLabel={t('common.generating')}
+      shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+      source={previewImage}
+      variant="inset"
     >
-      {previewImage ? (
-        <Box
-          borderColor="accent.solid"
-          borderWidth="1px"
-          boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-          css={getFittedFrameCss(previewImage.width ?? 1, previewImage.height ?? 1)}
-          overflow="hidden"
-          position="relative"
-          rounded="lg"
-        >
-          <img
-            alt={previewImage.alt}
-            draggable={false}
-            height={previewImage.height}
-            src={previewImage.src}
-            style={{
-              display: 'block',
-              height: 'auto',
-              imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
-              width: '100%',
-            }}
-            width={previewImage.width}
-          />
-          <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-            {t('common.generating')}
-          </Badge>
-        </Box>
-      ) : (
-        <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
-          <Text fontSize="sm" fontWeight="800">
-            {t('widgets.preview.noGallerySelection')}
-          </Text>
-          <Text color="fg.subtle" fontSize="2xs">
-            {t('widgets.preview.emptyDescription')}
-          </Text>
-        </Stack>
-      )}
-    </Flex>
+      <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
+        <Text fontSize="sm" fontWeight="800">
+          {t('widgets.preview.noGallerySelection')}
+        </Text>
+        <Text color="fg.subtle" fontSize="2xs">
+          {t('widgets.preview.emptyDescription')}
+        </Text>
+      </Stack>
+    </PreviewFrame>
   );
 };
