@@ -10483,7 +10483,9 @@ export type components = {
          * @description Run denoising process with a FLUX.2 Klein transformer model.
          *
          *     This node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.
-         *     It does not support ControlNet, IP-Adapters, or regional prompting.
+         *     Regional prompting is supported via per-conditioning masks (single mask is applied
+         *     to every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters
+         *     are not supported. Regional masking is skipped when reference images are attached.
          */
         Flux2DenoiseInvocation: {
             /**
@@ -10543,10 +10545,11 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * Positive Text Conditioning
              * @description Positive conditioning tensor
              * @default null
              */
-            positive_text_conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            positive_text_conditioning?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
             /**
              * @description Negative conditioning tensor. Can be None if cfg_scale is 1.0.
              * @default null
@@ -16636,6 +16639,8 @@ export type components = {
          *         external_openai_base_url: Base URL override for OpenAI image generation.
          *         external_seedream_api_key: API key for Seedream image generation.
          *         external_seedream_base_url: Base URL override for Seedream image generation.
+         *         base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
+         *         forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
          */
         InvokeAIAppConfig: {
             /**
@@ -16699,6 +16704,17 @@ export type components = {
              * @description SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
              */
             ssl_keyfile?: string | null;
+            /**
+             * Base Url
+             * @description Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash.
+             */
+            base_url?: string | null;
+            /**
+             * Forwarded Allow Ips
+             * @description Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+             * @default 127.0.0.1
+             */
+            forwarded_allow_ips?: string;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.
@@ -31730,6 +31746,11 @@ export type components = {
              * @constant
              */
             base: "anima";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Checkpoint_FLUX_Config */
         VAE_Checkpoint_FLUX_Config: {
@@ -31802,6 +31823,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default flux
@@ -31889,6 +31915,11 @@ export type components = {
              * @constant
              */
             base: "flux2";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * VAE_Checkpoint_QwenImage_Config
@@ -31970,6 +32001,11 @@ export type components = {
              * @constant
              */
             base: "qwen-image";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Checkpoint_SD1_Config */
         VAE_Checkpoint_SD1_Config: {
@@ -32042,6 +32078,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sd-1
@@ -32121,6 +32162,11 @@ export type components = {
              */
             format: "checkpoint";
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Base
              * @default sd-2
              * @constant
@@ -32198,6 +32244,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sdxl
@@ -32282,6 +32333,11 @@ export type components = {
              * @constant
              */
             base: "flux2";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Diffusers_SD1_Config */
         VAE_Diffusers_SD1_Config: {
@@ -32351,6 +32407,11 @@ export type components = {
              * @constant
              */
             type: "vae";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sd-1
@@ -32426,6 +32487,11 @@ export type components = {
              * @constant
              */
             type: "vae";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sdxl

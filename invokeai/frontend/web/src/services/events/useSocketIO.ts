@@ -1,5 +1,6 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { getBasePath, getDeploymentBaseUrl } from 'common/util/baseUrl';
 import { selectAuthToken, selectCurrentUser } from 'features/auth/store/authSlice';
 import type { MapStore } from 'nanostores';
 import { useEffect, useMemo } from 'react';
@@ -42,8 +43,10 @@ export const useSocketIO = () => {
   const isAuthHydrated = !token || currentUser !== null;
 
   const socketUrl = useMemo(() => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${wsProtocol}://${window.location.host}`;
+    const base = new URL(getDeploymentBaseUrl());
+    const wsProtocol = base.protocol === 'https:' ? 'wss' : 'ws';
+    // Origin only - the sub-path prefix (if any) is passed via the socket.io `path` option below.
+    return `${wsProtocol}://${base.host}`;
   }, []);
 
   // Derived from the redux token (hydrated synchronously from localStorage) rather than a
@@ -52,7 +55,7 @@ export const useSocketIO = () => {
   const socketOptions = useMemo(() => {
     const options: Partial<ManagerOptions & SocketOptions> = {
       timeout: 60000,
-      path: '/ws/socket.io',
+      path: `${getBasePath()}/ws/socket.io`,
       autoConnect: false, // achtung! removing this breaks the dynamic middleware
       forceNew: true,
       auth: token ? { token } : undefined,
