@@ -24818,7 +24818,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nIt does not support ControlNet, IP-Adapters, or regional prompting.",
+        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nRegional prompting is supported via per-conditioning masks (single mask is applied\nto every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters\nare not supported. Regional masking is skipped when reference images are attached.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -24949,6 +24949,12 @@
                 "$ref": "#/components/schemas/FluxConditioningField"
               },
               {
+                "items": {
+                  "$ref": "#/components/schemas/FluxConditioningField"
+                },
+                "type": "array"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -24956,7 +24962,8 @@
             "description": "Positive conditioning tensor",
             "field_kind": "input",
             "input": "connection",
-            "orig_required": true
+            "orig_required": true,
+            "title": "Positive Text Conditioning"
           },
           "negative_text_conditioning": {
             "anyOf": [
@@ -25104,7 +25111,7 @@
         "tags": ["image", "flux", "flux2", "klein", "denoise"],
         "title": "FLUX2 Denoise",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
