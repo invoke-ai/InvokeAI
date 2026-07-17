@@ -1199,6 +1199,25 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion AnimaQwen3EncoderModel
 
+/**
+ * FLUX.2 Klein and FLUX.2 [dev] both have base `flux2` and write their VAE
+ * under `metadata.vae`, so the two VAE handlers must disambiguate which slice
+ * to recall into. We resolve the image's own main model and inspect its
+ * variant — the same signal the graph builder uses (`isFlux2Dev =
+ * model.variant === 'dev'`, see buildFLUXGraph.ts).
+ *
+ * We must NOT key off the presence of `mistral_encoder`/`qwen3_encoder`: those
+ * fields are written only when a *standalone* encoder was selected, so a dev
+ * image whose encoder was extracted from a Diffusers source carries neither.
+ * Keying off `mistral_encoder` presence would silently recall such a dev image's
+ * VAE into the Klein slice (the exact cross-contamination this guards against).
+ */
+const isFlux2DevMetadata = async (metadata: unknown, store: AppStore): Promise<boolean> => {
+  const identifier = zModelIdentifierField.parse(getProperty(metadata, 'model'));
+  const config = await resolveModel(identifier, store);
+  return config.base === 'flux2' && 'variant' in config && config.variant === 'dev';
+};
+
 //#region KleinVAEModel
 const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
@@ -1207,17 +1226,13 @@ const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
-    // FLUX.2 Klein and FLUX.2 [dev] both have base `flux2` and write the VAE
-    // under `metadata.vae`. They use the presence of `mistral_encoder` (dev
-    // only) vs `qwen3_encoder` (Klein only) as a distinguisher so each VAE
-    // handler dispatches into its own slice.
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'KleinVAEModel handler only works with FLUX.2 Klein models');
     assert(
-      getProperty(metadata, 'mistral_encoder') === undefined,
-      'KleinVAEModel does not handle FLUX.2 [dev] images (mistral_encoder present)'
+      !(await isFlux2DevMetadata(metadata, store)),
+      'KleinVAEModel does not handle FLUX.2 [dev] images (main model variant is `dev`)'
     );
-    return Promise.resolve(parsed);
+    return parsed;
   },
   recall: (value, store) => {
     store.dispatch(kleinVaeModelSelected(value));
@@ -1240,14 +1255,11 @@ const Flux2DevVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     assert(parsed.type === 'vae');
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'Flux2DevVAEModel handler only works with FLUX.2 models');
-    // FLUX.2 [dev] images always carry a `mistral_encoder` field; Klein images
-    // carry `qwen3_encoder` instead. This is the disambiguator that keeps dev's
-    // VAE recall from clobbering Klein's slice (and vice versa).
     assert(
-      getProperty(metadata, 'mistral_encoder') !== undefined,
-      'Flux2DevVAEModel handler only fires on FLUX.2 [dev] images (mistral_encoder must be present)'
+      await isFlux2DevMetadata(metadata, store),
+      'Flux2DevVAEModel handler only fires on FLUX.2 [dev] images (main model variant is `dev`)'
     );
-    return Promise.resolve(parsed);
+    return parsed;
   },
   recall: (value, store) => {
     store.dispatch(flux2DevVaeModelSelected(value));
