@@ -906,6 +906,7 @@
       "queued_other": "{{count}} queued",
       "recallAll": "Recall All",
       "recallFromGallery": "Recall this generation from the gallery",
+      "recallUnavailable": "Nothing recallable for this item — select a supported Generate model first.",
       "resumeProcessor": "Resume Processor",
       "sendToCanvas": "Send to canvas",
       "sendToCanvasComingSoon": "Sending queue results to the canvas is coming soon.",
