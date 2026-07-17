@@ -378,6 +378,22 @@ def test_import_waits_for_startup_restore(
         installer.stop()
 
 
+def _write_test_install_marker(tmpdir: Path, source_str: str) -> None:
+    """Create a tmp install dir containing an active (downloading) install marker."""
+    tmpdir.mkdir(parents=True)
+    marker = {
+        "version": INSTALL_MARKER_VERSION,
+        "source": source_str,
+        "access_token": None,
+        "config_in": {},
+        "status": InstallStatus.DOWNLOADING.value,
+        "updated_at": "",
+        "files": [],
+    }
+    with open(tmpdir / INSTALL_MARKER_FILENAME, "wt", encoding="utf-8") as f:
+        json.dump(marker, f)
+
+
 @pytest.mark.timeout(timeout=20, method="thread")
 def test_restore_skips_source_queued_during_restore(
     mm2_app_config: InvokeAIAppConfig,
@@ -399,18 +415,7 @@ def test_restore_skips_source_queued_during_restore(
     source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
 
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}race"
-    tmpdir.mkdir(parents=True)
-    marker = {
-        "version": INSTALL_MARKER_VERSION,
-        "source": str(source),
-        "access_token": None,
-        "config_in": {},
-        "status": InstallStatus.DOWNLOADING.value,
-        "updated_at": "",
-        "files": [],
-    }
-    with open(tmpdir / INSTALL_MARKER_FILENAME, "wt", encoding="utf-8") as f:
-        json.dump(marker, f)
+    _write_test_install_marker(tmpdir, str(source))
 
     marker_observed = threading.Event()
     release_restore = threading.Event()
@@ -450,6 +455,212 @@ def test_restore_skips_source_queued_during_restore(
         assert resumed == []
     finally:
         release_restore.set()
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restore_preserves_active_jobs_tmpdir(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When two tmpdirs hold markers for the same source and an active job owns the
+    later-visited one, restore must not delete the active job's tmpdir: seeing the
+    stale dir first must not cause the active dir to be treated as a duplicate."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+
+    stale_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}0_stale"
+    active_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}1_active"
+    _write_test_install_marker(stale_dir, str(source))
+    _write_test_install_marker(active_dir, str(source))
+
+    # Force restore to visit the stale dir before the active one.
+    real_glob = Path.glob
+    monkeypatch.setattr(Path, "glob", lambda self, pattern: iter(sorted(real_glob(self, pattern))))
+
+    active_job = ModelInstallJob(
+        id=installer._next_id(),
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=active_dir,
+    )
+    active_job._install_tmpdir = active_dir
+    active_job.status = InstallStatus.DOWNLOADING
+    installer._install_jobs.append(active_job)
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    try:
+        installer.start()
+        installer._wait_for_restore_complete()
+
+        assert active_dir.exists()
+        jobs_for_source = [job for job in installer._install_jobs if str(job.source) == str(source)]
+        assert jobs_for_source == [active_job]
+        assert resumed == []
+    finally:
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restore_preserves_tmpdir_of_job_in_download_cache(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Like test_restore_preserves_active_jobs_tmpdir, but the active job is tracked
+    only in _download_cache - the shape of a real remote import mid-download, where
+    _enqueue_remote_download registers the job before import_model appends it to
+    _install_jobs."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+
+    stale_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}0_stale"
+    active_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}1_active"
+    _write_test_install_marker(stale_dir, str(source))
+    _write_test_install_marker(active_dir, str(source))
+
+    real_glob = Path.glob
+    monkeypatch.setattr(Path, "glob", lambda self, pattern: iter(sorted(real_glob(self, pattern))))
+
+    active_job = ModelInstallJob(
+        id=installer._next_id(),
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=active_dir,
+    )
+    active_job._install_tmpdir = active_dir
+    active_job.status = InstallStatus.DOWNLOADING
+    installer._download_cache[999] = active_job
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    try:
+        installer.start()
+        installer._wait_for_restore_complete()
+
+        assert active_dir.exists()
+        assert [job for job in installer._install_jobs if str(job.source) == str(source)] == []
+        assert resumed == []
+    finally:
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=30, method="thread")
+def test_concurrent_import_and_restore_register_single_job(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real import_model() call that passes _wait_for_restore_complete() before
+    start() clears the event must not race _restore_incomplete_installs into
+    registering the same source twice. Unlike
+    test_restore_skips_source_queued_during_restore, this drives the production
+    import path instead of manually appending a job under the lock."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    _write_test_install_marker(mm2_app_config.models_path / f"{TMPDIR_PREFIX}race", str(source))
+
+    import_reached = threading.Event()
+    release_import = threading.Event()
+    real_import_from_url = installer._import_from_url
+
+    def _pausing_import_from_url(src, config=None):
+        import_reached.set()
+        assert release_import.wait(timeout=10)
+        return real_import_from_url(src, config)
+
+    monkeypatch.setattr(installer, "_import_from_url", _pausing_import_from_url)
+
+    restore_observed_marker = threading.Event()
+    real_guess_source = installer._guess_source
+
+    def _observing_guess_source(source_str: str):
+        result = real_guess_source(source_str)
+        restore_observed_marker.set()
+        return result
+
+    monkeypatch.setattr(installer, "_guess_source", _observing_guess_source)
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    # Buffer the install queue so the import job cannot reach a terminal state
+    # (and delete its marker dir) before restore performs its active-source
+    # check - otherwise the assertions below race the install thread.
+    queued: list[ModelInstallJob] = []
+    real_put_in_queue = installer._put_in_queue
+    monkeypatch.setattr(installer, "_put_in_queue", lambda job: queued.append(job))
+
+    import_thread = threading.Thread(target=lambda: installer.import_model(source))
+    start_thread = threading.Thread(target=installer.start)
+    try:
+        # The import passes _wait_for_restore_complete() (the event starts out
+        # set) and its duplicate check, then pauses before registering anything.
+        import_thread.start()
+        assert import_reached.wait(timeout=10)
+
+        # Start the service so restoration processes the marker for the same
+        # source. With the fix, restore cannot get past the lock held by the
+        # paused import; without it, restore registers a duplicate job now.
+        start_thread.start()
+        if restore_observed_marker.wait(timeout=2):
+            # Restore got past the import's lock (the bug): let it finish its
+            # pass before releasing the import so the interleaving is
+            # deterministic.
+            installer._restore_completed_event.wait(timeout=5)
+
+        release_import.set()
+        import_thread.join(timeout=10)
+        start_thread.join(timeout=10)
+        installer._wait_for_restore_complete()
+
+        jobs_for_source = [job for job in installer._install_jobs if str(job.source) == str(source)]
+        assert len(jobs_for_source) == 1
+        assert resumed == []
+
+        # Wait for the download-complete callback to hand the job to the
+        # (buffered) install queue, then un-buffer and let it finish end-to-end.
+        # The test's single download produces exactly one such hand-off, so once
+        # it has arrived no more calls hit the buffering lambda.
+        deadline = time.time() + 10
+        while not queued and time.time() < deadline:
+            time.sleep(0.05)
+        assert queued
+        monkeypatch.setattr(installer, "_put_in_queue", real_put_in_queue)
+        for queued_job in queued:
+            real_put_in_queue(queued_job)
+        installer.wait_for_installs(timeout=10)
+        assert jobs_for_source[0].complete
+    finally:
+        release_import.set()
         installer.stop()
 
 

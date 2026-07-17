@@ -108,7 +108,9 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
         self._install_jobs: List[ModelInstallJob] = []
         self._install_queue: Queue[ModelInstallJob] = Queue()
-        self._lock = threading.Lock()
+        # Reentrant so that import_model can hold it across helpers such as
+        # _next_id() while making its duplicate check atomic with registration.
+        self._lock = threading.RLock()
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
         self._install_completed_event = threading.Event()
@@ -219,11 +221,6 @@ class ModelInstallService(ModelInstallServiceBase):
                 access_token = marker.get("access_token")
                 if isinstance(source, (HFModelSource, URLModelSource)) and isinstance(access_token, str):
                     source.access_token = access_token
-                if source_str in seen_sources:
-                    self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
-                    self._safe_rmtree(tmpdir, self._logger)
-                    continue
-                seen_sources.add(source_str)
             except Exception as e:
                 self._logger.warning(f"Skipping install marker in {tmpdir}: {e}")
                 continue
@@ -246,6 +243,13 @@ class ModelInstallService(ModelInstallServiceBase):
             # foreground import_model calls can enqueue the same source twice and
             # cause a FileNotFoundError when the second download tries to rename
             # the .downloading file the first one already moved.
+            #
+            # The duplicate-tmpdir check must come after the active check: when a
+            # source is active, none of its tmpdirs may be deleted, because one of
+            # them is the active job's download directory. Stale duplicates for an
+            # active source are cleaned up on a later startup when the source is
+            # idle.
+            duplicate_tmpdir = False
             with self._lock:
                 already_active = any(
                     str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state
@@ -253,7 +257,15 @@ class ModelInstallService(ModelInstallServiceBase):
                 if already_active:
                     self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                     continue
-                self._install_jobs.append(job)
+                if source_str in seen_sources:
+                    duplicate_tmpdir = True
+                else:
+                    seen_sources.add(source_str)
+                    self._install_jobs.append(job)
+            if duplicate_tmpdir:
+                self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
+                self._safe_rmtree(tmpdir, self._logger)
+                continue
 
             if job.paused:
                 continue
@@ -474,26 +486,31 @@ class ModelInstallService(ModelInstallServiceBase):
     def import_model(self, source: ModelSource, config: Optional[ModelRecordChanges] = None) -> ModelInstallJob:  # noqa D102
         self._wait_for_restore_complete()
 
-        similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
-        if similar_jobs:
-            self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
-            return similar_jobs[0]
+        # Hold the lock across the duplicate check and job registration so that
+        # check-and-register is atomic with respect to _restore_incomplete_installs,
+        # which does its own locked check-and-append for each restored marker.
+        # _lock is reentrant, so the _next_id() calls in the import helpers are safe.
+        with self._lock:
+            similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
+            if similar_jobs:
+                self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
+                return similar_jobs[0]
 
-        if isinstance(source, LocalModelSource):
-            install_job = self._import_local_model(source, config)
-            self._put_in_queue(install_job)  # synchronously install
-        elif isinstance(source, HFModelSource):
-            install_job = self._import_from_hf(source, config)
-        elif isinstance(source, URLModelSource):
-            install_job = self._import_from_url(source, config)
-        elif isinstance(source, ExternalModelSource):
-            install_job = self._import_external_model(source, config)
-            self._put_in_queue(install_job)
-        else:
-            raise ValueError(f"Unsupported model source: '{type(source)}'")
+            if isinstance(source, LocalModelSource):
+                install_job = self._import_local_model(source, config)
+                self._put_in_queue(install_job)  # synchronously install
+            elif isinstance(source, HFModelSource):
+                install_job = self._import_from_hf(source, config)
+            elif isinstance(source, URLModelSource):
+                install_job = self._import_from_url(source, config)
+            elif isinstance(source, ExternalModelSource):
+                install_job = self._import_external_model(source, config)
+                self._put_in_queue(install_job)
+            else:
+                raise ValueError(f"Unsupported model source: '{type(source)}'")
 
-        self._install_jobs.append(install_job)
-        return install_job
+            self._install_jobs.append(install_job)
+            return install_job
 
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
         return self._install_jobs
