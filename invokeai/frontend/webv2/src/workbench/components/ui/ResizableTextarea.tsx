@@ -24,17 +24,19 @@ const clamp = (value: number, min: number, max?: number): number => {
 const resizeHandleAfter = {
   bg: 'border.emphasized',
   borderRadius: 'full',
-  bottom: '1px',
+  bottom: '3px',
   content: '""',
-  h: '1px',
-  left: '25%',
-  opacity: 0.55,
+  h: '3px',
+  left: '50%',
   position: 'absolute',
-  right: '25%',
+  transform: 'translateX(-50%)',
+  transition: 'background var(--wb-motion-duration-fast) ease',
+  w: '10',
 } as const;
 
 const resizeHandleFocusVisible = { bg: 'accent.solid/20', outline: '2px solid {colors.accent.solid}' } as const;
-const resizeHandleHover = { bg: 'accent.solid/12' } as const;
+const resizeHandleHover = { _after: { bg: 'fg.subtle' } } as const;
+const resizeHandleDragging = { '&[data-dragging]::after': { bg: 'fg.subtle' } } as const;
 
 export interface ResizableTextareaProps extends Omit<
   TextareaProps,
@@ -160,7 +162,8 @@ export const ResizableTextarea = ({
         aria-valuenow={displayHeightPx}
         bottom="0"
         cursor="ns-resize"
-        h="2"
+        data-dragging={dragHeightPx === null ? undefined : ''}
+        h="2.5"
         left="0"
         position="absolute"
         right="0"
@@ -168,6 +171,7 @@ export const ResizableTextarea = ({
         tabIndex={0}
         transition="background var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease"
         zIndex={2}
+        css={resizeHandleDragging}
         _after={resizeHandleAfter}
         _focusVisible={resizeHandleFocusVisible}
         _hover={resizeHandleHover}
