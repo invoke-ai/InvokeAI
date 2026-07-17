@@ -823,6 +823,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -887,6 +890,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -1141,6 +1147,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1205,6 +1214,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -1459,6 +1471,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1523,6 +1538,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -1827,6 +1845,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1891,6 +1912,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -2219,6 +2243,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -2283,6 +2310,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -3431,6 +3461,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -3495,6 +3528,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -4154,6 +4190,78 @@
         ]
       }
     },
+    "/api/v1/image_moves/start": {
+      "post": {
+        "tags": ["image_moves"],
+        "summary": "Start Image Move",
+        "operationId": "start_image_move",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_moves/recover": {
+      "post": {
+        "tags": ["image_moves"],
+        "summary": "Start Image Move Recovery",
+        "operationId": "start_image_move_recovery",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_moves/status": {
+      "get": {
+        "tags": ["image_moves"],
+        "summary": "Get Image Move Status",
+        "operationId": "get_image_move_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMoveStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/images/upload": {
       "post": {
         "tags": ["images"],
@@ -4803,7 +4911,7 @@
       "head": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_full_head",
         "parameters": [
           {
@@ -4843,7 +4951,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_full",
         "parameters": [
           {
@@ -4885,7 +4993,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Thumbnail",
-        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_thumbnail",
         "parameters": [
           {
@@ -6917,7 +7025,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Item Ids",
-        "description": "Gets all queue item ids that match the given parameters. Non-admin users only see their own items.",
+        "description": "Gets all queue item ids that match the given parameters.\n\nIDs for every user's items are returned (item ids carry no sensitive data on their own).\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
         "operationId": "get_queue_item_ids",
         "security": [
           {
@@ -7630,7 +7738,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Status",
-        "description": "Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it.",
+        "description": "Gets the status of the session queue. Returns global counts; every user additionally gets\ntheir own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI\nlike the progress bar to the user's own activity). Non-admin users cannot see the current\nitem's identifiers unless they own it.",
         "operationId": "get_queue_status",
         "security": [
           {
@@ -8361,6 +8469,24 @@
               "title": "Is Public"
             },
             "description": "Filter by public/shared status"
+          },
+          {
+            "name": "callable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by whether workflows are callable by call_saved_workflow",
+              "title": "Callable"
+            },
+            "description": "Filter by whether workflows are callable by call_saved_workflow"
           }
         ],
         "responses": {
@@ -9575,7 +9701,7 @@
       "post": {
         "tags": ["recall"],
         "summary": "Update Recall Parameters",
-        "description": "Update recallable parameters that can be recalled on the frontend.\n\nThis endpoint allows updating parameters such as prompt, model, steps, and other\ngeneration settings. These parameters are stored in client state and can be\naccessed by the frontend to populate UI elements.\n\nArgs:\n    queue_id: The queue ID to associate these parameters with\n    parameters: The RecallParameter object containing the parameters to update\n    strict: When true, parameters not included in the request body are reset\n        to their defaults (cleared on the frontend).  Defaults to false,\n        which preserves the existing behaviour of only updating the\n        parameters that are explicitly provided.\n\nReturns:\n    A dictionary containing the updated parameters and status\n\nExample:\n    POST /api/v1/recall/{queue_id}?strict=true\n    {\n        \"positive_prompt\": \"a beautiful landscape\",\n        \"model\": \"sd-1.5\",\n        \"steps\": 20\n    }\n    # In strict mode, all other parameters (reference_images, loras, etc.)\n    # are cleared.  In non-strict mode (default) they would be left as-is.",
+        "description": "Update recallable parameters that can be recalled on the frontend.\n\nThis endpoint allows updating parameters such as prompt, model, steps, and other\ngeneration settings. These parameters are stored in client state and can be\naccessed by the frontend to populate UI elements.\n\nArgs:\n    queue_id: The queue ID to associate these parameters with\n    parameters: The RecallParameter object containing the parameters to update\n    strict: When true, parameters not included in the request body are reset\n        to their defaults (cleared on the frontend).  Defaults to false,\n        which preserves the existing behaviour of only updating the\n        parameters that are explicitly provided.\n    append: When true, recalled reference images (``ip_adapters`` and\n        ``reference_images``) are appended to whatever reference images the\n        frontend already has, instead of replacing the whole list.  Mutually\n        exclusive with ``strict`` (which clears omitted parameters).\n\nReturns:\n    A dictionary containing the updated parameters and status\n\nExample:\n    POST /api/v1/recall/{queue_id}?strict=true\n    {\n        \"positive_prompt\": \"a beautiful landscape\",\n        \"model\": \"sd-1.5\",\n        \"steps\": 20\n    }\n    # In strict mode, all other parameters (reference_images, loras, etc.)\n    # are cleared.  In non-strict mode (default) they would be left as-is.",
         "operationId": "update_recall_parameters",
         "security": [
           {
@@ -9605,6 +9731,18 @@
               "title": "Strict"
             },
             "description": "When true, parameters not included in the request are reset to their defaults (cleared)."
+          },
+          {
+            "name": "append",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, recalled reference images (ip_adapters and reference_images) are appended to the frontend's existing reference-image list instead of replacing it. Mutually exclusive with strict.",
+              "default": false,
+              "title": "Append"
+            },
+            "description": "When true, recalled reference images (ip_adapters and reference_images) are appended to the frontend's existing reference-image list instead of replacing it. Mutually exclusive with strict."
           }
         ],
         "requestBody": {
@@ -10609,6 +10747,29 @@
             "title": "Seed",
             "type": "integer"
           },
+          "control_lllite": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnimaLLLiteField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Anima ControlNet-LLLite conditioning (e.g. inpaint adapter, control layers). Adapters are applied in a deterministic order (sorted by model key); each model may be used at most once.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Control Lllite"
+          },
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
@@ -10640,7 +10801,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.8.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -10750,10 +10911,219 @@
         "tags": ["image", "latents", "vae", "i2l", "anima"],
         "title": "Image to Latents - Anima",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
+      },
+      "AnimaLLLiteField": {
+        "description": "An Anima ControlNet-LLLite conditioning field (e.g. inpaint adapter).",
+        "properties": {
+          "image_name": {
+            "description": "The name of the conditioning image (the initial/raster image)",
+            "title": "Image Name",
+            "type": "string"
+          },
+          "mask_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The name of the inpaint mask image (white = inpaint area)",
+            "title": "Mask Name"
+          },
+          "control_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Anima ControlNet-LLLite adapter model"
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "The strength of the LLLite adapter",
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Weight",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the adapter is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the adapter is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          }
+        },
+        "required": ["image_name", "control_model"],
+        "title": "AnimaLLLiteField",
+        "type": "object"
+      },
+      "AnimaLLLiteInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Configure an Anima ControlNet-LLLite adapter for model-level conditioning.\n\nTakes a conditioning image (the initial/raster image), an optional inpaint\nmask (white = area to inpaint), and a LLLite adapter model. Inpainting\nadapters (4-channel conditioning) require a mask; other adapters ignore it.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The conditioning image (the initial/raster image for inpainting)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask (white = area to inpaint). Required by inpainting adapters.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "control_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control Model",
+            "ui_model_base": ["anima"],
+            "ui_model_type": ["controlnet"]
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "Strength of the LLLite adapter.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the adapter is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the adapter is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "type": {
+            "const": "anima_lllite",
+            "default": "anima_lllite",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "anima", "control", "controlnet", "inpaint"],
+        "title": "Anima ControlNet-LLLite",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/AnimaLLLiteOutput"
+        }
+      },
+      "AnimaLLLiteOutput": {
+        "class": "output",
+        "description": "Anima ControlNet-LLLite output containing adapter configuration.",
+        "properties": {
+          "control": {
+            "$ref": "#/components/schemas/AnimaLLLiteField",
+            "description": "Anima ControlNet-LLLite conditioning",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "anima_lllite_output",
+            "default": "anima_lllite_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control", "type", "type"],
+        "title": "AnimaLLLiteOutput",
+        "type": "object"
       },
       "AnimaLatentsToImageInvocation": {
         "category": "latents",
@@ -10860,7 +11230,7 @@
         "tags": ["latents", "image", "vae", "l2i", "anima"],
         "title": "Latents to Image - Anima",
         "type": "object",
-        "version": "1.0.2",
+        "version": "1.0.3",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -10917,7 +11287,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["anima"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -10965,7 +11337,7 @@
         "tags": ["lora", "model", "anima"],
         "title": "Apply LoRA Collection - Anima",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
         }
@@ -11387,6 +11759,9 @@
             "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
           },
           {
@@ -11451,6 +11826,9 @@
           },
           {
             "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
           },
           {
             "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -12008,6 +12386,25 @@
                 },
                 {
                   "$ref": "#/components/schemas/ImageField"
+                },
+                {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ImageField"
+                      }
+                    ]
+                  },
+                  "type": "array"
                 }
               ]
             },
@@ -12123,6 +12520,11 @@
             "title": "In Progress",
             "description": "Number of queue items with status 'in_progress'"
           },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting",
+            "description": "Number of queue items with status 'waiting'"
+          },
           "completed": {
             "type": "integer",
             "title": "Completed",
@@ -12152,6 +12554,7 @@
           "destination",
           "pending",
           "in_progress",
+          "waiting",
           "completed",
           "failed",
           "canceled",
@@ -14343,7 +14746,8 @@
           }
         },
         "type": "object",
-        "title": "CacheStats"
+        "title": "CacheStats",
+        "description": "Collect statistics on cache performance."
       },
       "CalculateImageTilesEvenSplitInvocation": {
         "category": "tiles",
@@ -14679,6 +15083,77 @@
         "required": ["output_meta", "tiles", "type", "type"],
         "title": "CalculateImageTilesOutput",
         "type": "object"
+      },
+      "CallSavedWorkflowInvocation": {
+        "category": "workflow",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Displays and later executes against a selected saved workflow.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "workflow_id": {
+            "default": "",
+            "description": "The selected saved workflow ID, managed by the workflow editor UI.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Workflow Id",
+            "type": "string",
+            "ui_type": "SavedWorkflowField"
+          },
+          "workflow_inputs": {
+            "additionalProperties": true,
+            "default": {},
+            "description": "Literal values for the selected workflow's exposed inputs, managed by the workflow editor UI.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": {},
+            "orig_required": false,
+            "title": "Workflow Inputs",
+            "type": "object",
+            "ui_hidden": true
+          },
+          "type": {
+            "const": "call_saved_workflow",
+            "default": "call_saved_workflow",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["workflow", "saved", "library"],
+        "title": "Call Saved Workflow",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WorkflowReturnOutput"
+        }
       },
       "CancelAllExceptCurrentResult": {
         "properties": {
@@ -17435,6 +17910,166 @@
         "required": ["model_name"],
         "title": "ControlNetRecallParameter",
         "description": "ControlNet configuration for recall"
+      },
+      "ControlNet_Checkpoint_Anima_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "controlnet",
+            "title": "Type",
+            "default": "controlnet"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "anima",
+            "title": "Base",
+            "default": "anima"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cond_in_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cond In Channels",
+            "description": "Number of conditioning image channels (3 = RGB control image, 4 = RGB + inpaint mask). None for models installed before this field was recorded."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "default_settings",
+          "cond_in_channels"
+        ],
+        "title": "ControlNet_Checkpoint_Anima_Config",
+        "description": "Model config for Anima ControlNet-LLLite adapter models (Safetensors checkpoint).\n\nAnima LLLite adapters are standalone adapters consisting of a shared conditioning trunk\n(lllite_conditioning1) that encodes a conditioning image, plus tiny per-Linear modules\n(lllite_dit_blocks_*) that perturb the inputs of target Linears in the Anima DiT."
       },
       "ControlNet_Checkpoint_FLUX_Config": {
         "properties": {
@@ -22892,7 +23527,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["flux"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -22957,7 +23594,7 @@
         "tags": ["lora", "model", "flux"],
         "title": "Apply LoRA Collection - FLUX",
         "type": "object",
-        "version": "1.3.1",
+        "version": "1.3.2",
         "output": {
           "$ref": "#/components/schemas/FluxLoRALoaderOutput"
         }
@@ -24181,7 +24818,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nIt does not support ControlNet, IP-Adapters, or regional prompting.",
+        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nRegional prompting is supported via per-conditioning masks (single mask is applied\nto every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters\nare not supported. Regional masking is skipped when reference images are attached.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -24312,6 +24949,12 @@
                 "$ref": "#/components/schemas/FluxConditioningField"
               },
               {
+                "items": {
+                  "$ref": "#/components/schemas/FluxConditioningField"
+                },
+                "type": "array"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -24319,7 +24962,8 @@
             "description": "Positive conditioning tensor",
             "field_kind": "input",
             "input": "connection",
-            "orig_required": true
+            "orig_required": true,
+            "title": "Positive Text Conditioning"
           },
           "negative_text_conditioning": {
             "anyOf": [
@@ -24467,7 +25111,7 @@
         "tags": ["image", "flux", "flux2", "klein", "denoise"],
         "title": "FLUX2 Denoise",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -24524,7 +25168,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -24572,7 +25218,7 @@
         "tags": ["lora", "model", "flux", "klein", "flux2"],
         "title": "Apply LoRA Collection - Flux2 Klein",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/Flux2KleinLoRALoaderOutput"
         }
@@ -28590,6 +29236,9 @@
                   "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
                 },
                 {
@@ -28639,6 +29288,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
@@ -29310,6 +29962,15 @@
                   "$ref": "#/components/schemas/VAELoaderInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkflowReturnInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ZImageControlInvocation"
                 },
                 {
@@ -29395,6 +30056,9 @@
               "oneOf": [
                 {
                   "$ref": "#/components/schemas/AnimaConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/AnimaLLLiteOutput"
                 },
                 {
                   "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
@@ -29652,6 +30316,15 @@
                   "$ref": "#/components/schemas/VAEOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/WorkflowReturnGetOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkflowReturnOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkflowReturnValueOutput"
+                },
+                {
                   "$ref": "#/components/schemas/ZImageConditioningOutput"
                 },
                 {
@@ -29676,6 +30349,73 @@
             "type": "object",
             "title": "Errors",
             "description": "Errors raised when executing nodes"
+          },
+          "workflow_call_stack": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowCallFrame"
+            },
+            "type": "array",
+            "title": "Workflow Call Stack",
+            "description": "The nested workflow call stack inherited by this execution state."
+          },
+          "workflow_call_history": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowCallExecution"
+            },
+            "type": "array",
+            "title": "Workflow Call History",
+            "description": "Completed or failed workflow-call relationships observed by this execution state."
+          },
+          "workflow_call_parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallParentRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent workflow-call relationship metadata when this execution state is a child workflow session."
+          },
+          "waiting_workflow_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallFrame"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The child workflow call this execution state is currently waiting on, if any."
+          },
+          "waiting_workflow_call_execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallExecution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The active workflow-call relationship metadata for the current waiting child workflow, if any."
+          },
+          "waiting_workflow_call_child_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphExecutionState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The child workflow execution state spawned by the current waiting workflow call, if any."
+          },
+          "max_workflow_call_depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Workflow Call Depth",
+            "description": "The maximum permitted workflow call depth for nested workflow execution.",
+            "default": 4
           },
           "prepared_source_mapping": {
             "additionalProperties": {
@@ -29722,6 +30462,8 @@
           "executed_history",
           "results",
           "errors",
+          "workflow_call_stack",
+          "workflow_call_history",
           "prepared_source_mapping",
           "source_prepared_mapping"
         ],
@@ -32412,11 +33154,34 @@
               }
             ],
             "default": null,
-            "description": "The collection of image values",
+            "description": "An optional image collection to append to",
             "field_kind": "input",
-            "input": "any",
-            "orig_required": true,
-            "title": "Collection"
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Collection",
+            "ui_order": 0
+          },
+          "images": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The images to append to the collection",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Images",
+            "ui_order": 1
           },
           "type": {
             "const": "image_collection",
@@ -32430,7 +33195,7 @@
         "tags": ["primitives", "image", "collection"],
         "title": "Image Collection Primitive",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "output": {
           "$ref": "#/components/schemas/ImageCollectionOutput"
         }
@@ -33463,6 +34228,101 @@
         "output": {
           "$ref": "#/components/schemas/MaskOutput"
         }
+      },
+      "ImageMoveJobResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "The image move job id."
+          },
+          "state": {
+            "type": "string",
+            "enum": ["planned", "moving", "moved", "committed", "error"],
+            "title": "State",
+            "description": "The image move job state."
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "The last error recorded for the job, if any."
+          }
+        },
+        "type": "object",
+        "required": ["id", "state"],
+        "title": "ImageMoveJobResponse"
+      },
+      "ImageMoveStatusResponse": {
+        "properties": {
+          "is_running": {
+            "type": "boolean",
+            "title": "Is Running",
+            "description": "Whether an image move background operation is currently running."
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["move_all", "recovery"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation",
+            "description": "The active background operation, if any."
+          },
+          "active_job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Job Id",
+            "description": "The active journal job id, if any."
+          },
+          "latest_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageMoveJobResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest journal job, if any."
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error",
+            "description": "The last background worker error, if any."
+          },
+          "needs_move_count": {
+            "type": "integer",
+            "title": "Needs Move Count",
+            "description": "The number of images that do not match the current subfolder strategy."
+          }
+        },
+        "type": "object",
+        "required": ["is_running", "needs_move_count"],
+        "title": "ImageMoveStatusResponse"
       },
       "ImageMultiplyInvocation": {
         "category": "image",
@@ -36078,6 +36938,9 @@
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
               },
               {
@@ -36127,6 +36990,9 @@
               },
               {
                 "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
               },
               {
                 "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
@@ -36798,6 +37664,15 @@
                 "$ref": "#/components/schemas/VAELoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageControlInvocation"
               },
               {
@@ -36840,6 +37715,9 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/AnimaConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteOutput"
               },
               {
                 "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
@@ -37097,6 +37975,15 @@
                 "$ref": "#/components/schemas/VAEOutput"
               },
               {
+                "$ref": "#/components/schemas/WorkflowReturnGetOutput"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnOutput"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueOutput"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageConditioningOutput"
               },
               {
@@ -37207,6 +38094,9 @@
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
               },
               {
@@ -37256,6 +38146,9 @@
               },
               {
                 "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
               },
               {
                 "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
@@ -37927,6 +38820,15 @@
                 "$ref": "#/components/schemas/VAELoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageControlInvocation"
               },
               {
@@ -38019,6 +38921,9 @@
           "anima_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "anima_lllite": {
+            "$ref": "#/components/schemas/AnimaLLLiteOutput"
+          },
           "anima_lora_collection_loader": {
             "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
           },
@@ -38057,6 +38962,9 @@
           },
           "calculate_image_tiles_min_overlap": {
             "$ref": "#/components/schemas/CalculateImageTilesOutput"
+          },
+          "call_saved_workflow": {
+            "$ref": "#/components/schemas/WorkflowReturnOutput"
           },
           "canny_edge_detection": {
             "$ref": "#/components/schemas/ImageOutput"
@@ -38736,6 +39644,15 @@
           "vae_loader": {
             "$ref": "#/components/schemas/VAEOutput"
           },
+          "workflow_return": {
+            "$ref": "#/components/schemas/WorkflowReturnOutput"
+          },
+          "workflow_return_get": {
+            "$ref": "#/components/schemas/WorkflowReturnGetOutput"
+          },
+          "workflow_return_value": {
+            "$ref": "#/components/schemas/WorkflowReturnValueOutput"
+          },
           "z_image_control": {
             "$ref": "#/components/schemas/ZImageControlOutput"
           },
@@ -38774,6 +39691,7 @@
           "anima_denoise",
           "anima_i2l",
           "anima_l2i",
+          "anima_lllite",
           "anima_lora_collection_loader",
           "anima_lora_loader",
           "anima_model_loader",
@@ -38787,6 +39705,7 @@
           "calculate_image_tiles",
           "calculate_image_tiles_even_split",
           "calculate_image_tiles_min_overlap",
+          "call_saved_workflow",
           "canny_edge_detection",
           "canvas_output",
           "canvas_paste_back",
@@ -39013,6 +39932,9 @@
           "unsharp_mask",
           "unsharp_mask_oklab",
           "vae_loader",
+          "workflow_return",
+          "workflow_return_get",
+          "workflow_return_value",
           "z_image_control",
           "z_image_denoise",
           "z_image_denoise_meta",
@@ -39104,6 +40026,9 @@
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
               },
               {
@@ -39153,6 +40078,9 @@
               },
               {
                 "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
               },
               {
                 "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
@@ -39822,6 +40750,15 @@
               },
               {
                 "$ref": "#/components/schemas/VAELoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageControlInvocation"
@@ -39991,6 +40928,9 @@
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
               },
               {
@@ -40040,6 +40980,9 @@
               },
               {
                 "$ref": "#/components/schemas/CalculateImageTilesMinimumOverlapInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/CallSavedWorkflowInvocation"
               },
               {
                 "$ref": "#/components/schemas/CannyEdgeDetectionInvocation"
@@ -40711,6 +41654,15 @@
                 "$ref": "#/components/schemas/VAELoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/WorkflowReturnGetInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageControlInvocation"
               },
               {
@@ -40855,6 +41807,24 @@
             ],
             "title": "Ssl Keyfile",
             "description": "SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https."
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url",
+            "description": "Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash."
+          },
+          "forwarded_allow_ips": {
+            "type": "string",
+            "title": "Forwarded Allow Ips",
+            "description": "Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.",
+            "default": "127.0.0.1"
           },
           "log_tokenization": {
             "type": "boolean",
@@ -41164,6 +42134,13 @@
             "description": "Maximum number of items in the session queue.",
             "default": 10000
           },
+          "session_queue_mode": {
+            "type": "string",
+            "enum": ["FIFO", "round_robin"],
+            "title": "Session Queue Mode",
+            "description": "Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.",
+            "default": "round_robin"
+          },
           "clear_queue_on_startup": {
             "type": "boolean",
             "title": "Clear Queue On Startup",
@@ -41389,7 +42366,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "InvokeAIAppConfig",
-        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation."
+        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set."
       },
       "InvokeAIAppConfigWithSetFields": {
         "properties": {
@@ -43603,7 +44580,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["sd-1", "sd-2"],
+            "ui_model_type": ["lora"]
           },
           "unet": {
             "anyOf": [
@@ -43651,7 +44630,7 @@
         "tags": ["model"],
         "title": "Apply LoRA Collection - SD1.5",
         "type": "object",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "output": {
           "$ref": "#/components/schemas/LoRALoaderOutput"
         }
@@ -46543,9 +47522,7 @@
           "weight": {
             "anyOf": [
               {
-                "type": "number",
-                "maximum": 2.0,
-                "minimum": -1.0
+                "type": "number"
               },
               {
                 "type": "null"
@@ -46553,6 +47530,30 @@
             ],
             "title": "Weight",
             "description": "Default weight for this model"
+          },
+          "weight_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Min",
+            "description": "Minimum weight slider value for this model"
+          },
+          "weight_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Max",
+            "description": "Maximum weight slider value for this model"
           }
         },
         "additionalProperties": false,
@@ -47699,6 +48700,182 @@
         ],
         "title": "Main_Checkpoint_Flux2_Config",
         "description": "Model config for FLUX.2 checkpoint models (e.g. Klein)."
+      },
+      "Main_Checkpoint_QwenImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image",
+            "title": "Base",
+            "default": "qwen-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImageVariantType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_Checkpoint_QwenImage_Config",
+        "description": "Model config for Qwen Image single-file checkpoint models (safetensors, etc).\n\nCovers both raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled checkpoints.\nThe loader dequantizes fp8 weights back to bf16 at load time; the\n`default_settings.fp8_storage` toggle can then optionally re-cast to fp8 for\nVRAM savings."
       },
       "Main_Checkpoint_SD1_Config": {
         "properties": {
@@ -54681,6 +55858,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -54745,6 +55925,9 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -55250,6 +56433,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                   },
                   {
@@ -55314,6 +56500,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                   },
                   {
                     "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -55704,6 +56893,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -55768,6 +56960,9 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -55942,9 +57137,15 @@
             ],
             "default": null,
             "description": "The submodel type, if any"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user whose action triggered the load",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "config", "submodel_type"],
+        "required": ["timestamp", "config", "submodel_type", "user_id"],
         "title": "ModelLoadCompleteEvent",
         "type": "object"
       },
@@ -56008,6 +57209,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -56072,6 +57276,9 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -56246,9 +57453,15 @@
             ],
             "default": null,
             "description": "The submodel type, if any"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user whose action triggered the load",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "config", "submodel_type"],
+        "required": ["timestamp", "config", "submodel_type", "user_id"],
         "title": "ModelLoadStartedEvent",
         "type": "object"
       },
@@ -56761,6 +57974,9 @@
                   "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                 },
                 {
@@ -56825,6 +58041,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -57089,6 +58308,25 @@
               },
               {
                 "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImageField"
+                    }
+                  ]
+                },
+                "type": "array"
               }
             ],
             "title": "Value",
@@ -58856,9 +60094,22 @@
             "description": "The ID of the queue",
             "title": "Queue Id",
             "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The ID of the user whose queue items were cleared, or None if all users' items were cleared",
+            "title": "User Id"
           }
         },
-        "required": ["timestamp", "queue_id"],
+        "required": ["timestamp", "queue_id", "user_id"],
         "title": "QueueClearedEvent",
         "type": "object"
       },
@@ -58919,7 +60170,7 @@
           },
           "status": {
             "description": "The new status of the queue item",
-            "enum": ["pending", "in_progress", "completed", "failed", "canceled"],
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
             "title": "Status",
             "type": "string"
           },
@@ -59049,6 +60300,51 @@
         "title": "QueueItemStatusChangedEvent",
         "type": "object"
       },
+      "QueueItemsCanceledEvent": {
+        "description": "Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in\nbulk (e.g. cancel/delete-all-except-current) without per-item status change events.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "queue_id": {
+            "description": "The ID of the queue",
+            "title": "Queue Id",
+            "type": "string"
+          },
+          "canceled_item_ids": {
+            "description": "The IDs of the queue items that were canceled or deleted",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Canceled Item Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "description": "The IDs of the users who own the canceled queue items",
+            "items": {
+              "type": "string"
+            },
+            "title": "User Ids",
+            "type": "array"
+          },
+          "canceled_item_ids_by_user": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "description": "The canceled queue item IDs keyed by owner user ID.",
+            "title": "Canceled Item Ids By User",
+            "type": "object"
+          }
+        },
+        "required": ["timestamp", "queue_id", "canceled_item_ids", "user_ids", "canceled_item_ids_by_user"],
+        "title": "QueueItemsCanceledEvent",
+        "type": "object"
+      },
       "QueueItemsRetriedEvent": {
         "description": "Event model for queue_items_retried",
         "properties": {
@@ -59069,9 +60365,28 @@
             },
             "title": "Retried Item Ids",
             "type": "array"
+          },
+          "user_ids": {
+            "description": "The IDs of the users who own the retried root queue items",
+            "items": {
+              "type": "string"
+            },
+            "title": "User Ids",
+            "type": "array"
+          },
+          "retried_item_ids_by_user": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "description": "The retried root queue item IDs keyed by owner user ID.",
+            "title": "Retried Item Ids By User",
+            "type": "object"
           }
         },
-        "required": ["timestamp", "queue_id", "retried_item_ids"],
+        "required": ["timestamp", "queue_id", "retried_item_ids", "user_ids", "retried_item_ids_by_user"],
         "title": "QueueItemsRetriedEvent",
         "type": "object"
       },
@@ -60174,7 +61489,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -60205,7 +61522,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA Collection - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -62880,7 +64197,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["sdxl"],
+            "ui_model_type": ["lora"]
           },
           "unet": {
             "anyOf": [
@@ -62945,7 +64264,7 @@
         "tags": ["model"],
         "title": "Apply LoRA Collection - SDXL",
         "type": "object",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "output": {
           "$ref": "#/components/schemas/SDXLLoRALoaderOutput"
         }
@@ -64882,6 +66201,11 @@
             "title": "In Progress",
             "description": "Number of queue items with status 'in_progress' for the destination"
           },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting",
+            "description": "Number of queue items with status 'waiting' for the destination"
+          },
           "completed": {
             "type": "integer",
             "title": "Completed",
@@ -64904,7 +66228,17 @@
           }
         },
         "type": "object",
-        "required": ["queue_id", "destination", "pending", "in_progress", "completed", "failed", "canceled", "total"],
+        "required": [
+          "queue_id",
+          "destination",
+          "pending",
+          "in_progress",
+          "waiting",
+          "completed",
+          "failed",
+          "canceled",
+          "total"
+        ],
         "title": "SessionQueueCountsByDestination"
       },
       "SessionQueueItem": {
@@ -64916,7 +66250,7 @@
           },
           "status": {
             "type": "string",
-            "enum": ["pending", "in_progress", "completed", "failed", "canceled"],
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
             "title": "Status",
             "description": "The status of this queue item",
             "default": "pending"
@@ -65129,6 +66463,66 @@
             "title": "Retried From Item Id",
             "description": "The item_id of the queue item that this item was retried from"
           },
+          "workflow_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Call Id",
+            "description": "The active workflow-call relationship id when this queue item is a child execution."
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id",
+            "description": "The parent queue item id when this queue item is a child workflow execution."
+          },
+          "parent_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Session Id",
+            "description": "The parent session id when this queue item is a child workflow execution."
+          },
+          "root_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Item Id",
+            "description": "The root queue item id for this workflow call chain, if any."
+          },
+          "workflow_call_depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Call Depth",
+            "description": "The 1-based workflow-call depth for this queue item when it is a child execution."
+          },
           "session": {
             "$ref": "#/components/schemas/GraphExecutionState",
             "description": "The fully-populated session to be executed"
@@ -65214,6 +66608,11 @@
             "title": "In Progress",
             "description": "Number of queue items with status 'in_progress'"
           },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting",
+            "description": "Number of queue items with status 'waiting'"
+          },
           "completed": {
             "type": "integer",
             "title": "Completed",
@@ -65233,6 +66632,30 @@
             "type": "integer",
             "title": "Total",
             "description": "Total number of queue items"
+          },
+          "user_pending": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Pending",
+            "description": "Number of the requesting user's queue items with status 'pending' (None for admins/global callers)"
+          },
+          "user_in_progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User In Progress",
+            "description": "Number of the requesting user's queue items with status 'in_progress' (None for admins/global callers)"
           }
         },
         "type": "object",
@@ -65243,6 +66666,7 @@
           "session_id",
           "pending",
           "in_progress",
+          "waiting",
           "completed",
           "failed",
           "canceled",
@@ -69611,6 +71035,7 @@
         "enum": [
           "SchedulerField",
           "AnyField",
+          "SavedWorkflowField",
           "CollectionField",
           "CollectionItemField",
           "IsIntermediate",
@@ -71973,6 +73398,29 @@
         ],
         "title": "Workflow"
       },
+      "WorkflowAccessRevokedEvent": {
+        "description": "Event model for workflow_access_revoked.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id"],
+        "title": "WorkflowAccessRevokedEvent",
+        "type": "object"
+      },
       "WorkflowAndGraphResponse": {
         "properties": {
           "workflow": {
@@ -72004,10 +73452,309 @@
         "required": ["workflow", "graph"],
         "title": "WorkflowAndGraphResponse"
       },
+      "WorkflowCallCompatibility": {
+        "properties": {
+          "is_callable": {
+            "type": "boolean",
+            "title": "Is Callable",
+            "description": "Whether the workflow can currently be executed by call_saved_workflow."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/WorkflowCallCompatibilityReason",
+            "description": "Structured compatibility result."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Human-readable compatibility detail when unavailable."
+          }
+        },
+        "type": "object",
+        "required": ["is_callable", "reason"],
+        "title": "WorkflowCallCompatibility"
+      },
+      "WorkflowCallCompatibilityReason": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "missing_workflow_return",
+          "multiple_workflow_return",
+          "unsupported_node",
+          "unsupported_batch_input",
+          "invalid_graph",
+          "invalid_inputs",
+          "exceeds_capacity",
+          "unknown"
+        ],
+        "title": "WorkflowCallCompatibilityReason"
+      },
+      "WorkflowCallExecution": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The workflow-call execution id."
+          },
+          "parent_session_id": {
+            "type": "string",
+            "title": "Parent Session Id",
+            "description": "The parent graph execution state id."
+          },
+          "child_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Session Id",
+            "description": "The child graph execution state id, if any."
+          },
+          "prepared_call_node_id": {
+            "type": "string",
+            "title": "Prepared Call Node Id",
+            "description": "The prepared exec node id for the parent call site."
+          },
+          "source_call_node_id": {
+            "type": "string",
+            "title": "Source Call Node Id",
+            "description": "The source graph node id for the parent call site."
+          },
+          "workflow_id": {
+            "type": "string",
+            "title": "Workflow Id",
+            "description": "The saved workflow being called."
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Depth",
+            "description": "The 1-based depth of this call frame."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["waiting_for_child", "running_child", "completed", "failed"],
+            "title": "Status",
+            "description": "The current workflow-call lifecycle state."
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "Failure reason, if the call failed."
+          },
+          "child_session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Child Session Ids",
+            "description": "All child graph execution state ids."
+          },
+          "child_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Child Item Ids",
+            "description": "Child queue item ids in enqueue order."
+          },
+          "expected_child_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Child Count",
+            "description": "The number of child executions for this call.",
+            "default": 1
+          },
+          "completed_child_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Completed Child Item Ids",
+            "description": "The child queue item ids whose workflow_return outputs have been aggregated."
+          },
+          "aggregated_values": {
+            "additionalProperties": {
+              "items": {},
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Aggregated Values",
+            "description": "The aggregated workflow_return values accumulated from child executions."
+          },
+          "child_outputs": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Child Outputs",
+            "description": "Workflow return values keyed by child queue item id."
+          }
+        },
+        "type": "object",
+        "required": [
+          "parent_session_id",
+          "prepared_call_node_id",
+          "source_call_node_id",
+          "workflow_id",
+          "depth",
+          "status"
+        ],
+        "title": "WorkflowCallExecution",
+        "description": "Tracks one parent/child workflow-call relationship and its lifecycle."
+      },
+      "WorkflowCallFrame": {
+        "properties": {
+          "prepared_call_node_id": {
+            "type": "string",
+            "title": "Prepared Call Node Id",
+            "description": "The prepared exec node id for the call site."
+          },
+          "source_call_node_id": {
+            "type": "string",
+            "title": "Source Call Node Id",
+            "description": "The source graph node id for the call site."
+          },
+          "workflow_id": {
+            "type": "string",
+            "title": "Workflow Id",
+            "description": "The saved workflow being called."
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Depth",
+            "description": "The 1-based depth of this call frame."
+          }
+        },
+        "type": "object",
+        "required": ["prepared_call_node_id", "source_call_node_id", "workflow_id", "depth"],
+        "title": "WorkflowCallFrame",
+        "description": "Represents one workflow-call frame in a nested call chain."
+      },
+      "WorkflowCallParentRef": {
+        "properties": {
+          "workflow_call_id": {
+            "type": "string",
+            "title": "Workflow Call Id",
+            "description": "The workflow-call execution id."
+          },
+          "parent_session_id": {
+            "type": "string",
+            "title": "Parent Session Id",
+            "description": "The parent graph execution state id."
+          },
+          "prepared_call_node_id": {
+            "type": "string",
+            "title": "Prepared Call Node Id",
+            "description": "The prepared exec node id for the parent call site."
+          },
+          "source_call_node_id": {
+            "type": "string",
+            "title": "Source Call Node Id",
+            "description": "The source graph node id for the parent call site."
+          },
+          "workflow_id": {
+            "type": "string",
+            "title": "Workflow Id",
+            "description": "The saved workflow being called."
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Depth",
+            "description": "The 1-based depth of this call frame."
+          }
+        },
+        "type": "object",
+        "required": [
+          "workflow_call_id",
+          "parent_session_id",
+          "prepared_call_node_id",
+          "source_call_node_id",
+          "workflow_id",
+          "depth"
+        ],
+        "title": "WorkflowCallParentRef",
+        "description": "Reference from a child execution state back to its parent workflow-call relationship."
+      },
       "WorkflowCategory": {
         "type": "string",
         "enum": ["user", "default"],
         "title": "WorkflowCategory"
+      },
+      "WorkflowCreatedEvent": {
+        "description": "Event model for workflow_created",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          },
+          "is_public": {
+            "description": "Whether the workflow is shared with all users",
+            "title": "Is Public",
+            "type": "boolean"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id", "is_public"],
+        "title": "WorkflowCreatedEvent",
+        "type": "object"
+      },
+      "WorkflowDeletedEvent": {
+        "description": "Event model for workflow_deleted",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          },
+          "is_public": {
+            "description": "Whether the workflow was shared when it was deleted",
+            "title": "Is Public",
+            "type": "boolean"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id", "is_public"],
+        "title": "WorkflowDeletedEvent",
+        "type": "object"
       },
       "WorkflowMeta": {
         "properties": {
@@ -72187,6 +73934,17 @@
             ],
             "title": "Thumbnail Url",
             "description": "The URL of the workflow thumbnail."
+          },
+          "call_saved_workflow_compatibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallCompatibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether this workflow is currently callable by call_saved_workflow."
           }
         },
         "type": "object",
@@ -72288,11 +74046,358 @@
             ],
             "title": "Thumbnail Url",
             "description": "The URL of the workflow thumbnail."
+          },
+          "call_saved_workflow_compatibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowCallCompatibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether this workflow is currently callable by call_saved_workflow."
           }
         },
         "type": "object",
         "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
         "title": "WorkflowRecordWithThumbnailDTO"
+      },
+      "WorkflowReturnGetInvocation": {
+        "category": "workflow",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Extracts one named value from a callable workflow return.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "values": {
+            "additionalProperties": true,
+            "default": {},
+            "description": "The named workflow return values.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": {},
+            "orig_required": false,
+            "title": "Values",
+            "type": "object",
+            "ui_type": "AnyField"
+          },
+          "key": {
+            "default": "",
+            "description": "The return key to extract.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Key",
+            "type": "string"
+          },
+          "type": {
+            "const": "workflow_return_get",
+            "default": "workflow_return_get",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["workflow", "return", "input"],
+        "title": "Get Workflow Return Value",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WorkflowReturnGetOutput"
+        }
+      },
+      "WorkflowReturnGetOutput": {
+        "class": "output",
+        "description": "A value extracted from named workflow return values.",
+        "properties": {
+          "value": {
+            "description": "The extracted workflow return value.",
+            "field_kind": "output",
+            "title": "Value",
+            "ui_hidden": false,
+            "ui_type": "AnyField"
+          },
+          "type": {
+            "const": "workflow_return_get_output",
+            "default": "workflow_return_get_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "value", "type", "type"],
+        "title": "WorkflowReturnGetOutput",
+        "type": "object"
+      },
+      "WorkflowReturnInvocation": {
+        "category": "workflow",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Defines the explicit named result returned by a callable workflow.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowReturnValueField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WorkflowReturnValueField"
+                },
+                "type": "array"
+              }
+            ],
+            "default": [],
+            "description": "The named values returned to a calling workflow.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Values"
+          },
+          "type": {
+            "const": "workflow_return",
+            "default": "workflow_return",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["workflow", "return", "output"],
+        "title": "Workflow Return",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WorkflowReturnOutput"
+        }
+      },
+      "WorkflowReturnOutput": {
+        "class": "output",
+        "description": "The explicit named values returned from a callable workflow.",
+        "properties": {
+          "values": {
+            "additionalProperties": true,
+            "default": {},
+            "description": "The workflow return values, keyed by return name.",
+            "field_kind": "output",
+            "title": "Values",
+            "type": "object",
+            "ui_hidden": false,
+            "ui_type": "AnyField"
+          },
+          "type": {
+            "const": "workflow_return_output",
+            "default": "workflow_return_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "values", "type", "type"],
+        "title": "WorkflowReturnOutput",
+        "type": "object"
+      },
+      "WorkflowReturnValueField": {
+        "description": "One named workflow return value.",
+        "properties": {
+          "key": {
+            "description": "The workflow return key.",
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "default": null,
+            "description": "The workflow return value.",
+            "title": "Value"
+          }
+        },
+        "required": ["key"],
+        "title": "WorkflowReturnValueField",
+        "type": "object"
+      },
+      "WorkflowReturnValueInvocation": {
+        "category": "workflow",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Creates one named value for a callable workflow return.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "key": {
+            "default": "",
+            "description": "The return key.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The value returned under this key.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Value",
+            "ui_type": "AnyField"
+          },
+          "type": {
+            "const": "workflow_return_value",
+            "default": "workflow_return_value",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["workflow", "return", "output"],
+        "title": "Workflow Return Value",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WorkflowReturnValueOutput"
+        }
+      },
+      "WorkflowReturnValueOutput": {
+        "class": "output",
+        "description": "A named workflow return value.",
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/WorkflowReturnValueField",
+            "description": "The named workflow return value.",
+            "field_kind": "output",
+            "title": "Return Value",
+            "ui_hidden": false,
+            "ui_type": "CollectionItemField"
+          },
+          "type": {
+            "const": "workflow_return_value_output",
+            "default": "workflow_return_value_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "value", "type", "type"],
+        "title": "WorkflowReturnValueOutput",
+        "type": "object"
+      },
+      "WorkflowUpdatedEvent": {
+        "description": "Event model for workflow_updated",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          },
+          "old_is_public": {
+            "description": "Whether the workflow was shared before the update",
+            "title": "Old Is Public",
+            "type": "boolean"
+          },
+          "new_is_public": {
+            "description": "Whether the workflow is shared after the update",
+            "title": "New Is Public",
+            "type": "boolean"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id", "old_is_public", "new_is_public"],
+        "title": "WorkflowUpdatedEvent",
+        "type": "object"
       },
       "WorkflowWithoutID": {
         "properties": {
@@ -73534,7 +75639,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["z-image"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -73582,7 +75689,7 @@
         "tags": ["lora", "model", "z-image"],
         "title": "Apply LoRA Collection - Z-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ZImageLoRALoaderOutput"
         }
