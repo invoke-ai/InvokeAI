@@ -9,8 +9,10 @@ from copy import deepcopy
 from enum import Enum
 from tempfile import TemporaryDirectory
 from typing import List, Optional, Type
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import huggingface_hub
+import requests
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRouter
@@ -41,8 +43,17 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+from invokeai.backend.model_manager.metadata.fetch.civitai import (
+    CivitaiMetadataFetch,
+    is_civitai_model_version_url,
+    is_civitai_url,
+)
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
-from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
+from invokeai.backend.model_manager.metadata.metadata_base import (
+    CivitaiMetadata,
+    ModelMetadataWithFiles,
+    UnknownMetadataException,
+)
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.starter_models import (
@@ -108,6 +119,88 @@ def prepare_model_config_for_response(config: AnyModelConfig, dependencies: Type
     """Apply API-only model config overlays before returning a response."""
     config = apply_external_starter_model_overrides(config)
     return add_cover_image_to_model_config(config, dependencies)
+
+
+def _get_civitai_source_urls(config: AnyModelConfig) -> list[str]:
+    """Return version-specific CivitAI URLs stored on a model config, preserving lookup order."""
+    urls = []
+    for value in (config.source_url, config.source):
+        if value and is_civitai_model_version_url(value) and value not in urls:
+            urls.append(value)
+    return urls
+
+
+def _get_civitai_hash(config: AnyModelConfig) -> str | None:
+    """Return the hash value to pass to CivitAI's by-hash lookup."""
+    if not config.hash:
+        return None
+    return config.hash.partition(":")[2] or config.hash
+
+
+def _fetch_civitai_metadata_for_config(config: AnyModelConfig) -> CivitaiMetadata:
+    """Resolve CivitAI metadata from live CivitAI sources, then cached CivitAI metadata."""
+    fetcher = CivitaiMetadataFetch()
+    errors: list[str] = []
+
+    for url in _get_civitai_source_urls(config):
+        try:
+            metadata = fetcher.from_url(url)  # type: ignore[arg-type]
+            if isinstance(metadata, CivitaiMetadata):
+                return metadata
+        except (UnknownMetadataException, requests.RequestException, ValueError) as e:
+            errors.append(str(e))
+
+    hash_value = _get_civitai_hash(config)
+    if hash_value:
+        try:
+            return fetcher.from_hash(hash_value)
+        except (UnknownMetadataException, requests.RequestException, ValueError) as e:
+            errors.append(str(e))
+
+    if config.source_api_response:
+        try:
+            return fetcher.from_api_response(config.source_api_response)
+        except (UnknownMetadataException, ValueError) as e:
+            errors.append(str(e))
+
+    details = "; ".join(errors) if errors else "no lookup attempts were possible"
+    raise UnknownMetadataException(
+        f"No version-specific CivitAI URL, matching CivitAI hash, or cached CivitAI response was usable ({details})"
+    )
+
+
+def _get_civitai_source_url_with_model_version_id(url: str, metadata: CivitaiMetadata) -> str | None:
+    """Return a CivitAI model page URL with metadata's concrete model version id, preserving slugs."""
+    if not is_civitai_url(url):
+        return None
+
+    parsed = urlparse(url)
+    path_parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if len(path_parts) < 2 or path_parts[0] != "models":
+        return None
+
+    try:
+        model_id = int(path_parts[1])
+    except ValueError:
+        return None
+
+    if model_id != metadata.model_id:
+        return None
+
+    query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "modelVersionId"]
+    query.append(("modelVersionId", str(metadata.model_version_id)))
+    return urlunparse(parsed._replace(query=urlencode(query)))
+
+
+def _get_refreshed_civitai_source_url(config: AnyModelConfig, metadata: CivitaiMetadata) -> str | None:
+    """Return the source URL to save after refreshing CivitAI metadata."""
+    if config.source_url and is_civitai_model_version_url(config.source_url):
+        return config.source_url
+    if config.source_url and metadata.source_url:
+        civitai_source_url = _get_civitai_source_url_with_model_version_id(config.source_url, metadata)
+        if civitai_source_url:
+            return civitai_source_url
+    return metadata.source_url or config.source_url
 
 
 ##############################################################################
@@ -323,6 +416,50 @@ async def reidentify_model(
         return new_config
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@model_manager_router.post(
+    "/i/{key}/refresh_trigger_phrases",
+    operation_id="refresh_model_trigger_phrases",
+    responses={
+        200: {
+            "description": "The model trigger phrases were refreshed successfully",
+            "content": {"application/json": {"example": example_model_config}},
+        },
+        400: {"description": "Bad request"},
+        404: {"description": "The model or CivitAI metadata could not be found"},
+    },
+)
+async def refresh_model_trigger_phrases(
+    key: Annotated[str, Path(description="Key of the model to refresh trigger phrases for.")],
+    current_admin: AdminUserOrDefault,
+) -> AnyModelConfig:
+    """Refresh a LoRA model's trigger phrases from CivitAI metadata."""
+    record_store = ApiDependencies.invoker.services.model_manager.store
+    try:
+        config = record_store.get_model(key)
+    except UnknownModelException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if config.type != ModelType.LoRA:
+        raise HTTPException(status_code=400, detail="Trigger phrase refresh is only supported for LoRA models")
+
+    try:
+        metadata = _fetch_civitai_metadata_for_config(config)
+    except (UnknownMetadataException, requests.RequestException, ValueError) as e:
+        raise HTTPException(status_code=404, detail=f"Unable to resolve CivitAI metadata: {e}")
+
+    existing_phrases = set(config.trigger_phrases or [])
+    changes_kwargs = {
+        "source_api_response": metadata.api_response,
+        "source_url": _get_refreshed_civitai_source_url(config, metadata),
+    }
+    if metadata.trained_words:
+        changes_kwargs["trigger_phrases"] = existing_phrases.union(metadata.trained_words)
+
+    changes = ModelRecordChanges(**changes_kwargs)
+    updated_config = record_store.update_model(key, changes=changes, allow_class_change=True)
+    return prepare_model_config_for_response(updated_config, ApiDependencies)
 
 
 class FoundModel(BaseModel):
