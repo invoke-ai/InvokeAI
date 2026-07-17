@@ -163,10 +163,137 @@ describe('image recall', () => {
 
     expect(result?.values.referenceImages).toHaveLength(1);
     expect(result?.values.referenceImages[0]?.config).toMatchObject({
-      image: { imageName: 'reference.png' },
+      image: { original: { image: { height: 770, image_name: 'reference.png', width: 513 } } },
       type: 'ip_adapter',
     });
     expect(result?.fields).toContain('referenceImages');
+  });
+
+  it('preserves canonical original and crop provenance from legacy metadata', () => {
+    const crop = {
+      box: { height: 256, width: 320, x: 12, y: 24 },
+      image: { height: 256, image_name: 'crop.png', width: 320 },
+      ratio: null,
+    };
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        ref_images: [
+          {
+            config: {
+              image: {
+                crop,
+                original: { image: { height: 768, image_name: 'original.png', width: 512 } },
+              },
+              type: 'qwen_image_reference_image',
+            },
+            id: 'canonical-ref',
+            isEnabled: false,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages[0]).toMatchObject({
+      id: 'canonical-ref',
+      isEnabled: false,
+      config: {
+        image: {
+          crop,
+          original: { image: { height: 768, image_name: 'original.png', width: 512 } },
+        },
+      },
+    });
+  });
+
+  it('falls back to pre-v6 canvas ipAdapter metadata when ref_images has no valid entries', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        canvas_v2_metadata: {
+          referenceImages: {
+            entities: [
+              {
+                id: 'legacy-canvas-ref',
+                ipAdapter: {
+                  beginEndStepPct: [0.2, 0.9],
+                  clipVisionModel: 'ViT-G',
+                  image: { height: 512, image_name: 'legacy.png', width: 512 },
+                  method: 'composition',
+                  model: { base: 'sdxl', key: 'adapter', name: 'Adapter', type: 'ip_adapter' },
+                  type: 'ip_adapter',
+                  weight: 0.7,
+                },
+                isEnabled: false,
+              },
+            ],
+          },
+        },
+        ref_images: [
+          { id: 'invalid' },
+          {
+            config: { image: null, type: 'qwen_image_reference_image' },
+            id: 'incomplete-direct-ref',
+            isEnabled: true,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toHaveLength(1);
+    expect(result?.values.referenceImages[0]).toMatchObject({
+      id: 'legacy-canvas-ref',
+      isEnabled: false,
+      config: {
+        image: { original: { image: { image_name: 'legacy.png' } } },
+        type: 'ip_adapter',
+      },
+    });
+  });
+
+  it('prefers valid ref_images over canvas fallback entries', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        canvas_v2_metadata: {
+          referenceImages: {
+            entities: [
+              {
+                id: 'fallback',
+                ipAdapter: { image: { height: 1, image_name: 'fallback.png', width: 1 }, type: 'flux_redux' },
+              },
+            ],
+          },
+        },
+        ref_images: [
+          {
+            config: {
+              image: { height: 64, image_name: 'direct.png', width: 64 },
+              type: 'qwen_image_reference_image',
+            },
+            id: 'direct',
+            isEnabled: true,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages.map((referenceImage) => referenceImage.id)).toEqual(['direct']);
   });
 
   it('drops recalled reference images when the effective model does not support them', () => {

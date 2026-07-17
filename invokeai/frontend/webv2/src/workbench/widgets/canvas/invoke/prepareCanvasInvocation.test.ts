@@ -4,9 +4,9 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type {
   GenerateModelConfig,
-  GenerateReferenceImage,
-  GenerateReferenceImageAsset,
   MainModelConfig,
+  RegionalGuidanceReferenceImage,
+  RegionalGuidanceReferenceImageAsset,
 } from '@workbench/generation/types';
 import type {
   CanvasDocumentContractV2,
@@ -918,11 +918,11 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
 // the resolver seam: refs without an image are dropped; refs with an image + a
 // compatible model survive into the graph inputs.
 describe('resolveRegionalReferenceImages', () => {
-  const asset = { imageName: 'ref.png' } as GenerateReferenceImageAsset;
+  const asset = { imageName: 'ref.png' } as RegionalGuidanceReferenceImageAsset;
   const ipAdapterModel = { base: 'sd-1', key: 'ipa', name: 'IP Adapter', type: 'ip_adapter' };
   const fluxReduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' };
 
-  const ipAdapterRef = (image: GenerateReferenceImageAsset | null): GenerateReferenceImage => ({
+  const ipAdapterRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
     config: {
       beginEndStepPct: [0, 1],
       clipVisionModel: 'ViT-H',
@@ -936,7 +936,7 @@ describe('resolveRegionalReferenceImages', () => {
     isEnabled: true,
   });
 
-  const fluxReduxRef = (image: GenerateReferenceImageAsset | null): GenerateReferenceImage => ({
+  const fluxReduxRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
     config: { image, imageInfluence: 'highest', model: fluxReduxModel, type: 'flux_redux' },
     id: 'ref-redux',
     isEnabled: true,

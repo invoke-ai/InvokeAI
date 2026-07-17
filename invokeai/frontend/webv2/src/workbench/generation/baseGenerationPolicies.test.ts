@@ -84,13 +84,7 @@ const sdxlIpAdapter: ComponentModelConfig = {
   type: 'ip_adapter',
 };
 const referenceImage = {
-  height: 768,
-  imageName: 'reference.png',
-  imageUrl: '/api/v1/images/i/reference.png/full',
-  queuedAt: '2026-01-01T00:00:00.000Z',
-  sourceQueueItemId: 'backend-gallery',
-  thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
-  width: 512,
+  original: { image: { height: 768, image_name: 'reference.png', width: 512 } },
 };
 const externalModel: GenerateModelConfig = {
   base: 'external',

@@ -9,6 +9,7 @@ import type { CSSProperties } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { IconButton, ToggleDot, Tooltip } from '@workbench/components/ui';
+import { getEffectiveReferenceImage, getReferenceImageUrls } from '@workbench/generation/referenceImage';
 import { ModelSelect } from '@workbench/models/components';
 import { ChevronDownIcon, CropIcon, ImageIcon, RulerIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
@@ -282,17 +283,22 @@ const ReferenceModelSelector = ({
   );
 };
 
-const MiniThumbnail = ({ image }: { image: GenerateReferenceImageAsset | null }) => (
-  <Box bg="bg.muted" borderWidth="1px" flexShrink="0" h="6" overflow="hidden" rounded="sm" w="6">
-    {image ? (
-      <img alt={image.imageName} draggable={false} src={image.thumbnailUrl} style={COVER_IMG_STYLE} />
-    ) : (
-      <Box alignItems="center" color="fg.muted" display="flex" h="full" justifyContent="center" w="full">
-        <ImageIcon size="12" />
-      </Box>
-    )}
-  </Box>
-);
+const MiniThumbnail = ({ image }: { image: GenerateReferenceImageAsset | null }) => {
+  const effectiveImage = image ? getEffectiveReferenceImage(image) : null;
+  const urls = image ? getReferenceImageUrls(image) : null;
+
+  return (
+    <Box bg="bg.muted" borderWidth="1px" flexShrink="0" h="6" overflow="hidden" rounded="sm" w="6">
+      {effectiveImage && urls ? (
+        <img alt={effectiveImage.image_name} draggable={false} src={urls.thumbnailUrl} style={COVER_IMG_STYLE} />
+      ) : (
+        <Box alignItems="center" color="fg.muted" display="flex" h="full" justifyContent="center" w="full">
+          <ImageIcon size="12" />
+        </Box>
+      )}
+    </Box>
+  );
+};
 
 const ReferenceImageThumbnail = ({
   disabled,
@@ -307,6 +313,8 @@ const ReferenceImageThumbnail = ({
 }) => {
   const { t } = useTranslation();
   const [isCropOpen, setIsCropOpen] = useState(false);
+  const effectiveImage = image ? getEffectiveReferenceImage(image) : null;
+  const urls = image ? getReferenceImageUrls(image) : null;
 
   const openCrop = useCallback(() => setIsCropOpen(true), []);
   const closeCrop = useCallback(() => setIsCropOpen(false), []);
@@ -330,8 +338,8 @@ const ReferenceImageThumbnail = ({
         rounded="md"
         w="20"
       >
-        {image ? (
-          <img alt={image.imageName} draggable={false} src={image.thumbnailUrl} style={COVER_IMG_STYLE} />
+        {effectiveImage && urls ? (
+          <img alt={effectiveImage.image_name} draggable={false} src={urls.thumbnailUrl} style={COVER_IMG_STYLE} />
         ) : (
           <Box alignItems="center" color="fg.muted" display="flex" h="full" justifyContent="center" w="full">
             <ImageIcon size="24" />
@@ -376,7 +384,7 @@ const ReferenceImageThumbnail = ({
           </HStack>
         ) : null}
       </Box>
-      {image ? (
+      {image && isCropOpen ? (
         <ReferenceImageCropDialog image={image} isOpen={isCropOpen} onApply={onCrop} onClose={closeCrop} />
       ) : null}
     </>

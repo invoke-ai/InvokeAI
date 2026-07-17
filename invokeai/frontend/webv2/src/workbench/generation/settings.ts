@@ -16,6 +16,7 @@ import type {
 
 import { sanitizeBatchCount } from './batch';
 import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
+import { cloneCroppableImage, isCanonicalCroppableImage, normalizeCroppableImage } from './referenceImage';
 
 /** Preset ratios, with the preset to switch to when dimensions are swapped. */
 export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioId, 'Free'>, { ratio: number; inverseId: AspectRatioId }> = {
@@ -189,20 +190,8 @@ const isIPAdapterMethod = (
 const isFluxReduxImageInfluence = (value: unknown): value is 'lowest' | 'low' | 'medium' | 'high' | 'highest' =>
   value === 'lowest' || value === 'low' || value === 'medium' || value === 'high' || value === 'highest';
 
-export const isReferenceImageAsset = (value: unknown): value is GenerateReferenceImageAsset =>
-  isRecord(value) &&
-  typeof value.imageName === 'string' &&
-  typeof value.imageUrl === 'string' &&
-  typeof value.thumbnailUrl === 'string' &&
-  typeof value.queuedAt === 'string' &&
-  typeof value.sourceQueueItemId === 'string' &&
-  hasFiniteNumber(value, 'width') &&
-  hasFiniteNumber(value, 'height');
-
-const cloneReferenceImageAsset = (image: GenerateReferenceImageAsset): GenerateReferenceImageAsset => ({ ...image });
-
 const normalizeReferenceImageAsset = (value: unknown): GenerateReferenceImageAsset | null =>
-  value === null ? null : isReferenceImageAsset(value) ? cloneReferenceImageAsset(value) : null;
+  value === null ? null : normalizeCroppableImage(value);
 
 const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageConfig | null => {
   if (!isRecord(value) || typeof value.type !== 'string' || !REFERENCE_IMAGE_CONFIG_TYPES.has(value.type)) {
@@ -273,23 +262,32 @@ export const normalizeReferenceImages = (value: unknown): GenerateReferenceImage
   return images;
 };
 
+const areReferenceImagesCanonical = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.every(
+    (item) =>
+      isRecord(item) &&
+      isRecord(item.config) &&
+      (item.config.image === null || isCanonicalCroppableImage(item.config.image))
+  );
+
 const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): GenerateReferenceImageConfig => {
   switch (config.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
     case 'qwen_image_reference_image':
-      return { ...config, image: config.image ? cloneReferenceImageAsset(config.image) : null };
+      return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
     case 'flux_kontext_reference_image':
       return {
         ...config,
-        image: config.image ? cloneReferenceImageAsset(config.image) : null,
+        image: config.image ? cloneCroppableImage(config.image) : null,
         model: config.model ? { ...config.model } : null,
       };
     case 'flux_redux':
     case 'ip_adapter':
       return {
         ...config,
-        image: config.image ? cloneReferenceImageAsset(config.image) : null,
+        image: config.image ? cloneCroppableImage(config.image) : null,
         model: config.model ? { ...config.model } : null,
       };
   }
@@ -628,6 +626,7 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     values.loras.every(isGenerateLora) &&
     Array.isArray(values.referenceImages) &&
     normalizeReferenceImages(values.referenceImages).length === values.referenceImages.length &&
+    areReferenceImagesCanonical(values.referenceImages) &&
     typeof values.seamlessXAxis === 'boolean' &&
     typeof values.seamlessYAxis === 'boolean' &&
     isVaePrecision(values.vaePrecision) &&

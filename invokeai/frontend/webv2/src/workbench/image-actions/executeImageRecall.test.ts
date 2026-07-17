@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
   getGalleryImageMetadata: vi.fn(),
+  getGalleryImagesByNames: vi.fn(),
 }));
 
 vi.mock('@workbench/gallery/api', () => galleryApi);
@@ -40,6 +41,7 @@ const image: GalleryImage = {
 describe('executeImageRecall', () => {
   beforeEach(() => {
     galleryApi.getGalleryImageMetadata.mockReset();
+    galleryApi.getGalleryImagesByNames.mockReset();
   });
 
   it('recalls remix settings into Generate values', async () => {
@@ -88,6 +90,53 @@ describe('executeImageRecall', () => {
       projectId: 'project-1',
       type: 'setGenerateSettings',
       values: expect.objectContaining({ positivePrompt: 'fresh prompt', height: image.height, width: image.width }),
+    });
+  });
+
+  it('bulk-checks effective reference images and omits deleted entries before committing', async () => {
+    const dispatch = vi.fn();
+    const recallImage = { ...image, imageName: 'selected-with-references.png' };
+    const makeReference = (id: string, imageName: string) => ({
+      config: {
+        image: {
+          crop: {
+            box: { height: 128, width: 128, x: 0, y: 0 },
+            image: { height: 128, image_name: imageName, width: 128 },
+            ratio: 1,
+          },
+          original: { image: { height: 256, image_name: `${id}-original.png`, width: 256 } },
+        },
+        type: 'qwen_image_reference_image',
+      },
+      id,
+      isEnabled: true,
+    });
+
+    galleryApi.getGalleryImageMetadata.mockResolvedValue({
+      positive_prompt: 'keep other fields',
+      ref_images: [makeReference('valid', 'valid-crop.png'), makeReference('deleted', 'deleted-crop.png')],
+    });
+    galleryApi.getGalleryImagesByNames.mockResolvedValue([{ ...image, imageName: 'valid-crop.png' }]);
+
+    await expect(
+      executeImageRecall({
+        dispatch,
+        generateValues: { modelKey: model.key },
+        image: recallImage,
+        kind: 'all',
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(galleryApi.getGalleryImagesByNames).toHaveBeenCalledWith(['valid-crop.png', 'deleted-crop.png']);
+    expect(dispatch).toHaveBeenCalledWith({
+      projectId: 'project-1',
+      type: 'setGenerateSettings',
+      values: expect.objectContaining({
+        positivePrompt: 'keep other fields',
+        referenceImages: [expect.objectContaining({ id: 'valid' })],
+      }),
     });
   });
 });
