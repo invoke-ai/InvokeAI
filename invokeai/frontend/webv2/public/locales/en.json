@@ -823,7 +823,7 @@
       "loadingMetadata": "Loading metadata",
       "nextImageInBoard": "Next image in board",
       "noGallerySelection": "No gallery selection",
-      "noMetadata": "No metadata recorded for this image.",
+      "recallNotAvailable": "Not recallable for this image",
       "previousImageInBoard": "Previous image in board",
       "resetZoom": "Reset zoom",
       "showFilmstrip": "Show filmstrip",

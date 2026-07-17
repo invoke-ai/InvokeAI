@@ -73,12 +73,23 @@ export const PreviewMetadataPanel = ({
     };
   }, [actions, image, isOpen, loaded?.imageName]);
 
-  const entries = parsePreviewMetadata(loaded?.metadata ?? null);
+  // Source run is identity the status bar no longer shows; it reads as one
+  // more metadata fact here.
+  const entries = [
+    ...parsePreviewMetadata(loaded?.metadata ?? null),
+    { key: 'sourceRun', label: 'Source Run', value: image.sourceQueueItemId },
+  ];
   const handleRecall = useCallback(
     (kind: ImageRecallKind) => void actions.recallImageData(image, kind),
     [actions, image]
   );
-  const hasAnyRecall = loaded !== null && isCurrent && Object.values(loaded.capabilities).some(Boolean);
+  // The recall row is part of the panel's fixed skeleton — never unmounted on
+  // navigation, so it can't cause layout shift. While the next image's
+  // capabilities load, the previous ones stay displayed (the panel dims to
+  // signal staleness); clicks remain safe because `recallImageData` targets
+  // the CURRENT image and re-validates against its fresh metadata. Only the
+  // first-ever load shows all verbs disabled.
+  const capabilities = loaded?.capabilities ?? EMPTY_IMAGE_RECALL_CAPABILITIES;
 
   return (
     <Stack gap="2">
@@ -110,22 +121,18 @@ export const PreviewMetadataPanel = ({
             <Text color="fg.subtle" fontSize="2xs">
               {t('widgets.preview.loadingMetadata')}
             </Text>
-          ) : entries.length === 0 ? (
-            <Text color="fg.subtle" fontSize="2xs">
-              {t('widgets.preview.noMetadata')}
-            </Text>
           ) : (
-            <>
-              <DataList.Root gap="1.5" orientation="horizontal" size="sm">
-                {entries.map((entry) => (
-                  <MetadataRow key={entry.key} entry={entry} />
-                ))}
-              </DataList.Root>
-              {hasAnyRecall && loaded ? (
-                <RecallActionButtons capabilities={loaded.capabilities} onRecall={handleRecall} />
-              ) : null}
-            </>
+            <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+              {entries.map((entry) => (
+                <MetadataRow key={entry.key} entry={entry} />
+              ))}
+            </DataList.Root>
           )}
+          <RecallActionButtons
+            capabilities={capabilities}
+            disabledReason={t('widgets.preview.recallNotAvailable')}
+            onRecall={handleRecall}
+          />
         </Stack>
       ) : null}
     </Stack>
