@@ -93,3 +93,45 @@ def test_image_read_allows_any_image_in_single_user_mode() -> None:
     images.get_dto("foreign-image")
 
     services.images.get_dto.assert_called_once_with("foreign-image")
+
+
+def test_image_read_rejects_deactivated_queue_user() -> None:
+    """A deactivated account keeps no queue-time privileges, even for its own images."""
+    images, services = _make_interface(BoardVisibility.Private)
+    services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
+    services.image_records.get_user_id.return_value = "queue-user"
+
+    with pytest.raises(PermissionError, match="not authorized"):
+        images.get_dto("own-image")
+
+    services.images.get_dto.assert_not_called()
+
+
+def test_image_read_rejects_deleted_queue_user() -> None:
+    images, services = _make_interface(BoardVisibility.Private)
+    services.users.get.return_value = None
+
+    with pytest.raises(PermissionError, match="not authorized"):
+        images.get_dto("any-image")
+
+    services.images.get_dto.assert_not_called()
+
+
+def test_image_save_rejects_deactivated_queue_user() -> None:
+    """No output may be saved on behalf of a deactivated account — even uncategorized."""
+    images, services = _make_interface(BoardVisibility.Private)
+    services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
+
+    with pytest.raises(PermissionError, match="not authorized"):
+        images.save(MagicMock())
+
+    services.images.create.assert_not_called()
+
+
+def test_image_save_allows_active_queue_user_without_board() -> None:
+    images, services = _make_interface(BoardVisibility.Private)
+    services.users.get.return_value = MagicMock(is_admin=False, is_active=True)
+
+    images.save(MagicMock())
+
+    services.images.create.assert_called_once()

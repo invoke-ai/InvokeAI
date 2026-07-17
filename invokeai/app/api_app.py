@@ -126,6 +126,27 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
 
                     token_data = verify_token(token)
                     if token_data is not None:
+                        # In multiuser mode, refresh only for a user that still exists and
+                        # is active, and mint the new token from the *database* record —
+                        # not the old token's claims. Otherwise a demoted administrator's
+                        # stale is_admin claim (and the media cookie carrying it) would be
+                        # renewed indefinitely by their own mutations, and a deactivated
+                        # user could keep an active session alive.
+                        from invokeai.app.api.dependencies import ApiDependencies
+
+                        if ApiDependencies.invoker.services.configuration.multiuser:
+                            from invokeai.app.services.auth.token_service import TokenData
+
+                            user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+                            if user is None or not user.is_active:
+                                return response
+                            token_data = TokenData(
+                                user_id=user.user_id,
+                                email=user.email,
+                                is_admin=user.is_admin,
+                                remember_me=token_data.remember_me,
+                            )
+
                         # Use the remember_me claim from the token to determine the
                         # correct refresh duration. This avoids the bug where a 7-day
                         # token with <24h remaining would be silently downgraded to 1 day.

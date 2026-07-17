@@ -1,6 +1,6 @@
 """FastAPI dependencies for authentication."""
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -8,6 +8,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.auth.token_service import TokenData, verify_token
 from invokeai.backend.util.logging import logging
+
+if TYPE_CHECKING:
+    from invokeai.app.services.users.users_common import UserDTO
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,24 @@ def _validate_token(token: str, invalid_detail: str) -> TokenData:
     user = ApiDependencies.invoker.services.users.get(token_data.user_id)
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
-    return token_data
+    return _db_derived_token_data(token_data, user)
+
+
+def _db_derived_token_data(token_data: TokenData, user: "UserDTO") -> TokenData:
+    """Build TokenData whose authorization fields come from the database record.
+
+    The JWT proves *identity* only. Authorization (``is_admin``) must reflect the
+    current database state on every request; otherwise a demoted administrator
+    keeps admin rights until their token expires — and sliding-window refresh
+    would renew that stale claim indefinitely. A promoted user symmetrically
+    gains admin rights on their next request without re-login.
+    """
+    return TokenData(
+        user_id=user.user_id,
+        email=user.email,
+        is_admin=user.is_admin,
+        remember_me=token_data.remember_me,
+    )
 
 
 async def get_current_user(
@@ -73,7 +93,7 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return token_data
+    return _db_derived_token_data(token_data, user)
 
 
 async def get_current_user_or_default(
@@ -125,7 +145,7 @@ async def get_current_user_or_default(
         # User doesn't exist or is inactive in multiuser mode - reject
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
 
-    return token_data
+    return _db_derived_token_data(token_data, user)
 
 
 async def get_current_media_user_or_default(

@@ -175,7 +175,10 @@ class ImagesInterface(InvocationContextInterface):
             return
         user_id = self._data.queue_item.user_id
         user = self._services.users.get(user_id)
-        if user is None:
+        # A deactivated or deleted account keeps no queue-time privileges: its
+        # queued graphs must not read media even if the item slipped past the
+        # processor's owner checks.
+        if user is None or not user.is_active:
             raise PermissionError("Queue user is not authorized to access this image")
         if user.is_admin or self._services.image_records.get_user_id(image_name) == user_id:
             return
@@ -228,15 +231,20 @@ class ImagesInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
-        if board_id_ is not None and self._services.configuration.multiuser:
-            board = self._services.boards.get_dto(board_id_)
+        if self._services.configuration.multiuser:
             user = self._services.users.get(self._data.queue_item.user_id)
-            if user is None or (
-                not user.is_admin
-                and board.user_id != self._data.queue_item.user_id
-                and board.board_visibility != BoardVisibility.Public
-            ):
-                raise PermissionError("Queue user is not authorized to save images to this board")
+            # A deactivated or deleted account must not save outputs, even
+            # uncategorized ones — deactivation revokes queue-time privileges.
+            if user is None or not user.is_active:
+                raise PermissionError("Queue user is not authorized to save images")
+            if board_id_ is not None:
+                board = self._services.boards.get_dto(board_id_)
+                if (
+                    not user.is_admin
+                    and board.user_id != self._data.queue_item.user_id
+                    and board.board_visibility != BoardVisibility.Public
+                ):
+                    raise PermissionError("Queue user is not authorized to save images to this board")
 
         workflow_ = None
         if self._data.queue_item.workflow:
@@ -339,7 +347,9 @@ class VideosInterface(InvocationContextInterface):
     def _assert_read_access(self, video_name: str) -> None:
         user_id = self._data.queue_item.user_id
         user = self._services.users.get(user_id)
-        if user is None:
+        # See ImagesInterface._assert_read_access: deactivated accounts keep no
+        # queue-time privileges.
+        if user is None or not user.is_active:
             raise PermissionError("Queue user is not authorized to access this video")
         if user.is_admin or self._services.video_records.get_user_id(video_name) == user_id:
             return
@@ -385,13 +395,23 @@ class VideosInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
+        if self._services.configuration.multiuser:
+            # See ImagesInterface.save: deactivated accounts must not save outputs.
+            user = self._services.users.get(self._data.queue_item.user_id)
+            if user is None or not user.is_active:
+                raise PermissionError("Queue user is not authorized to save videos")
+
         if board_id_ is not None:
             board = self._services.boards.get_dto(board_id_)
             user = self._services.users.get(self._data.queue_item.user_id)
-            if user is None or (
-                not user.is_admin
-                and board.user_id != self._data.queue_item.user_id
-                and board.board_visibility != BoardVisibility.Public
+            if (
+                user is None
+                or not user.is_active
+                or (
+                    not user.is_admin
+                    and board.user_id != self._data.queue_item.user_id
+                    and board.board_visibility != BoardVisibility.Public
+                )
             ):
                 raise PermissionError("Queue user is not authorized to save videos to this board")
 

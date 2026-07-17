@@ -806,3 +806,25 @@ class RecallParametersUpdatedEvent(QueueEventBase):
     @classmethod
     def build(cls, queue_id: str, user_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
         return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)
+
+
+class UserAccessChangedEvent(EventBase):
+    """Event model for user_access_changed.
+
+    Emitted when a user's authorization state changes (role change, deactivation,
+    or deletion) so that live connections — e.g. open sockets — can be re-authorized
+    immediately instead of trusting connect-time claims until reconnect.
+
+    This event is server-internal: it is deliberately NOT registered with
+    `payload_schema` and is never emitted to clients.
+    """
+
+    __event_name__ = "user_access_changed"
+
+    user_id: str = Field(description="The ID of the affected user")
+    is_admin: bool = Field(description="Whether the user currently has admin privileges")
+    is_active: bool = Field(description="Whether the user account is currently active (False for deleted users)")
+
+    @classmethod
+    def build(cls, user_id: str, is_admin: bool, is_active: bool) -> "UserAccessChangedEvent":
+        return cls(user_id=user_id, is_admin=is_admin, is_active=is_active)
