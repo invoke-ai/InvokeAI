@@ -69,6 +69,24 @@ describe('ResizableTextarea', () => {
     expect(handle.hasAttribute('aria-valuemax')).toBe(false);
   });
 
+  it('scrolls through the ScrollArea viewport instead of a native scrollbar', async () => {
+    const { textarea } = await renderTextarea(140);
+
+    expect(textarea.dataset.part).toBe('viewport');
+    expect(getComputedStyle(textarea).scrollbarWidth).toBe('none');
+
+    await act(() => {
+      textarea.value = Array.from({ length: 50 }, (_, index) => `line ${index}`).join('\n');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.scrollTop = 100;
+    });
+
+    const scrollbar = host!.querySelector<HTMLElement>('[data-part="scrollbar"]')!;
+
+    await expect.poll(() => scrollbar.hasAttribute('data-overflow-y')).toBe(true);
+    await expect.poll(() => host!.querySelector<HTMLElement>('[data-part="thumb"]')!.clientHeight).toBeGreaterThan(0);
+  });
+
   it('retains bounded End behavior when a maximum is supplied', async () => {
     const { handle, textarea } = await renderTextarea(140);
 

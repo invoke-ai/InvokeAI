@@ -7,7 +7,7 @@ import type {
   ReactNode,
 } from 'react';
 
-import { Box, Textarea } from '@chakra-ui/react';
+import { Box, ScrollArea, Textarea } from '@chakra-ui/react';
 import { useCallback, useState } from 'react';
 
 type TextareaProps = ComponentProps<typeof Textarea>;
@@ -135,14 +135,23 @@ export const ResizableTextarea = ({
   return (
     <Box position="relative">
       {underlay}
-      <Textarea
-        ref={textareaRef}
+      <ScrollArea.Root
+        borderRadius="l2"
         h={`${displayHeightPx}px`}
-        position={underlay ? 'relative' : textareaProps.position}
-        resize="none"
-        zIndex={underlay ? 1 : textareaProps.zIndex}
-        {...textareaProps}
-      />
+        size="xs"
+        variant="hover"
+        zIndex={underlay ? 1 : undefined}
+      >
+        <ScrollArea.Viewport asChild>
+          <Textarea ref={textareaRef} resize="none" {...textareaProps} />
+        </ScrollArea.Viewport>
+        {/* zag skips scrollbar re-measurement entirely without a content element;
+            the textarea is the viewport, so park an empty one for its observer. */}
+        <ScrollArea.Content h="0" minW="0" overflow="hidden" position="absolute" />
+        <ScrollArea.Scrollbar>
+          <ScrollArea.Thumb />
+        </ScrollArea.Scrollbar>
+      </ScrollArea.Root>
       <Box
         aria-label={resizeHandleAriaLabel}
         aria-orientation="horizontal"
