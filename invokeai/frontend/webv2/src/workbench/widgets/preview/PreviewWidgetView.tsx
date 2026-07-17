@@ -388,6 +388,17 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       return;
     }
 
+    // Prefer images we already hold (board context includes fresh local
+    // generations that would 404 on a backend by-name fetch).
+    const localImage =
+      boardImagesRef.current.find((image) => image.imageName === resolution.imageName) ??
+      (selectedImageRef.current?.imageName === resolution.imageName ? selectedImageRef.current : null);
+
+    if (localImage) {
+      dispatch({ image: localImage, type: 'setGalleryCompareImage' });
+      return;
+    }
+
     getGalleryImageByName(resolution.imageName)
       .then((image) => dispatch({ image, type: 'setGalleryCompareImage' }))
       .catch((error: unknown) => {

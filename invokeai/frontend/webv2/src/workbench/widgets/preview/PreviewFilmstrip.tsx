@@ -35,10 +35,20 @@ export const PreviewFilmstrip = ({
   }
 
   return (
-    <ScrollArea.Root flexShrink={0} minW="0" size="xs" variant="hover" w="full">
-      <ScrollArea.Viewport w="full">
+    // The ScrollArea root's recipe defaults to `height: 100%`, so the strip
+    // MUST get an explicit height or it swallows the widget (the frame's
+    // flex-1 collapses). Height = thumb size + scrollbar allowance.
+    <ScrollArea.Root
+      flexShrink={0}
+      h={density === 'full' ? '3.75rem' : '2.75rem'}
+      minW="0"
+      size="xs"
+      variant="hover"
+      w="full"
+    >
+      <ScrollArea.Viewport h="full" w="full">
         <ScrollArea.Content asChild>
-          <HStack gap="1" pb="1">
+          <HStack align="center" gap="1" h="full">
             {images.map((image) => (
               <FilmstripThumb
                 key={image.imageName}
