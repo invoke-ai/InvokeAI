@@ -251,7 +251,7 @@ const addLoraSelectors = (
   return loader;
 };
 
-const addLoraCollectionLoader = (
+export const addLoraCollectionLoader = (
   graph: BackendGraphContract,
   loras: GenerateLora[],
   model: GenerateModelConfig,

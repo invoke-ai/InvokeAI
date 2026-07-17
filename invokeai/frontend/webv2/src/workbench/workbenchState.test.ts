@@ -320,6 +320,85 @@ describe('workbench widget region defaults', () => {
     ]);
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual(['gallery', 'layers']);
   });
+
+  it('adds Upscale to untouched legacy left rails while preserving customized rails', () => {
+    const initial = createInitialWorkbenchState();
+    const withoutUpscaleInstance = Object.fromEntries(
+      Object.entries(getActiveProject(initial).widgetInstances).filter(([id]) => id !== 'upscale')
+    ) as Project['widgetInstances'];
+    const withLeftIds = (instanceIds: Project['widgetRegions']['left']['instanceIds']): WorkbenchState => ({
+      ...initial,
+      projects: initial.projects.map((project) => ({
+        ...project,
+        widgetInstances: withoutUpscaleInstance,
+        widgetRegions: { ...project.widgetRegions, left: { ...project.widgetRegions.left, instanceIds } },
+      })),
+    });
+
+    const migrated = workbenchReducer(initial, {
+      state: withLeftIds(['generate', 'workflow']),
+      type: 'hydrateWorkbench',
+    });
+    const customized = workbenchReducer(initial, {
+      state: withLeftIds(['generate', 'gallery']),
+      type: 'hydrateWorkbench',
+    });
+
+    expect(getActiveProject(migrated).widgetRegions.left.instanceIds).toEqual(['generate', 'workflow', 'upscale']);
+    expect(getActiveProject(migrated).widgetInstances.upscale?.typeId).toBe('upscale');
+    expect(getActiveProject(customized).widgetRegions.left.instanceIds).toEqual(['generate', 'gallery']);
+  });
+
+  it('migrates a legacy Upscale prompt only when Generate has no prompt content', () => {
+    const initial = createInitialWorkbenchState();
+    const withPrompts = (generatePrompt: string): WorkbenchState => ({
+      ...initial,
+      projects: initial.projects.map((project) => {
+        const generate = project.widgetInstances.generate!;
+        const upscale = project.widgetInstances.upscale!;
+
+        return {
+          ...project,
+          widgetInstances: {
+            ...project.widgetInstances,
+            generate: {
+              ...generate,
+              state: { ...generate.state, values: { ...generate.state.values, positivePrompt: generatePrompt } },
+            },
+            upscale: {
+              ...upscale,
+              state: {
+                ...upscale.state,
+                values: {
+                  ...upscale.state.values,
+                  negativePrompt: 'legacy negative',
+                  negativePromptEnabled: false,
+                  positivePrompt: 'legacy positive',
+                },
+              },
+            },
+          },
+        };
+      }),
+    });
+
+    const migrated = workbenchReducer(initial, { state: withPrompts(''), type: 'hydrateWorkbench' });
+    const preserved = workbenchReducer(initial, { state: withPrompts('generate positive'), type: 'hydrateWorkbench' });
+
+    expect(getProjectWidgetValues(getActiveProject(migrated), 'generate')).toMatchObject({
+      negativePrompt: 'legacy negative',
+      negativePromptEnabled: false,
+      positivePrompt: 'legacy positive',
+    });
+    expect(getProjectWidgetValues(getActiveProject(migrated), 'upscale')).toMatchObject({
+      negativePrompt: '',
+      negativePromptEnabled: true,
+      positivePrompt: '',
+    });
+    expect(getProjectWidgetValues(getActiveProject(preserved), 'generate')).toMatchObject({
+      positivePrompt: 'generate positive',
+    });
+  });
 });
 
 describe('workbench widget region opening', () => {
@@ -463,7 +542,7 @@ describe('workbench layout presets', () => {
     expect(project.layout.panels).toEqual({ isBottomOpen: false, isLeftOpen: true, isRightOpen: true });
     expect(project.widgetRegions.left).toMatchObject({
       activeInstanceId: 'generate',
-      instanceIds: ['generate', 'workflow'],
+      instanceIds: ['generate', 'workflow', 'upscale'],
       isCollapsed: false,
       sizePx: 450,
     });
@@ -1421,12 +1500,12 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getActiveProject(state).projectGraph.id).toBe(originalGraphId);
   });
 
-  it('does not queue sources that are still unavailable', () => {
+  it('does not queue Upscale while its required settings are incomplete', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { sourceId: 'upscale', type: 'setInvocationSource' });
 
-    expect(getActiveProject(state).invocation.sourceId).toBe('generate');
+    expect(getActiveProject(state).invocation.sourceId).toBe('upscale');
 
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
@@ -1492,6 +1571,22 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(afterValues.positivePrompt).toBe('after');
     expect(afterValues.model).toBe(beforeValues.model);
     expect(afterValues.loras).toBe(beforeValues.loras);
+  });
+
+  it('shares prompt content through Generate without changing Upscale-local textarea sizing', () => {
+    const state = createInitialWorkbenchState();
+    const beforeUpscale = getProjectWidgetValues(getActiveProject(state), 'upscale');
+    const nextState = workbenchReducer(state, {
+      type: 'patchProjectPromptDraft',
+      values: { negativePrompt: 'blur', negativePromptEnabled: false, positivePrompt: 'fine detail' },
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(nextState), 'generate')).toMatchObject({
+      negativePrompt: 'blur',
+      negativePromptEnabled: false,
+      positivePrompt: 'fine detail',
+    });
+    expect(getProjectWidgetValues(getActiveProject(nextState), 'upscale')).toBe(beforeUpscale);
   });
 
   it('deduplicates prompt history by prompt pair and moves the newest submission to the top', () => {
@@ -1823,6 +1918,14 @@ describe('workbench backend connection recovery', () => {
       values: { recentImages: [image], selectedImage: image, selectedImageName: image.imageName },
       widgetId: 'gallery',
     });
+    for (const projectId of [firstProjectId, secondProjectId]) {
+      state = workbenchReducer(state, {
+        projectId,
+        type: 'patchWidgetValues',
+        values: { inputImage: { height: image.height, image_name: image.imageName, width: image.width } },
+        widgetId: 'upscale',
+      });
+    }
 
     state = workbenchReducer(state, {
       imageNames: [image.imageName],
@@ -1832,6 +1935,10 @@ describe('workbench backend connection recovery', () => {
 
     expect(getProjectWidgetValues(getProject(state, firstProjectId), 'gallery').recentImages).toEqual([]);
     expect(getProjectWidgetValues(getProject(state, secondProjectId), 'gallery').recentImages).toEqual([image]);
+    expect(getProjectWidgetValues(getProject(state, firstProjectId), 'upscale').inputImage).toBeNull();
+    expect(getProjectWidgetValues(getProject(state, secondProjectId), 'upscale').inputImage).toMatchObject({
+      image_name: image.imageName,
+    });
   });
 
   it('does not hydrate stale persisted backend connection state', () => {

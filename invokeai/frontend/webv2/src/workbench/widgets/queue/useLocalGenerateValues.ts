@@ -21,7 +21,7 @@ export const useLocalGenerateValues = (origin?: string | null): GenerateWidgetVa
     for (const project of snapshot.state.projects) {
       const localItem = project.queue.items.find((queueItem) => queueItem.id === localId);
 
-      if (localItem) {
+      if (localItem && (localItem.snapshot.sourceId === 'generate' || localItem.snapshot.sourceId === 'canvas')) {
         const generate = (localItem.snapshot.widgetStates as Record<string, { values?: unknown }>).generate;
 
         return (generate?.values as GenerateWidgetValues | undefined) ?? null;

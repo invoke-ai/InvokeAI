@@ -1,6 +1,6 @@
 import type { CanvasStagingCandidateContract, CanvasStateContractV2, QueueItem } from './types';
 
-import { sanitizeBatchCount } from './generation/batch';
+import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from './queueSnapshot';
 
 export interface CanvasQueuePlaceholderSlot {
   height: number;
@@ -34,11 +34,12 @@ const getFiniteNumber = (value: unknown, fallback: number): number =>
 
 const getSubmittedBboxSize = (item: QueueItem): { height: number; width: number } => {
   const { bbox } = item.snapshot.canvas.document;
-
-  return {
+  const bboxSize = {
     height: Math.max(1, Math.round(getFiniteNumber(bbox.height, item.snapshot.canvas.document.height))),
     width: Math.max(1, Math.round(getFiniteNumber(bbox.width, item.snapshot.canvas.document.width))),
   };
+
+  return item.snapshot.sourceId === 'upscale' ? getQueueItemSnapshotDimensions(item, bboxSize) : bboxSize;
 };
 
 const getExpectedImageCount = (item: QueueItem): number => {
@@ -46,9 +47,7 @@ const getExpectedImageCount = (item: QueueItem): number => {
     return item.backendItemIds.length;
   }
 
-  return sanitizeBatchCount(
-    item.snapshot.generate?.values.batchCount ?? item.snapshot.widgetStates.generate?.values.batchCount
-  );
+  return getQueueItemSnapshotBatchCount(item);
 };
 
 /** Collision-safe candidate value identity used with the selected slot index for guarded acceptance. */

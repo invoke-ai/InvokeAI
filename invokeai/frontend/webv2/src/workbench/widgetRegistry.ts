@@ -19,12 +19,14 @@ import { previewWidgetManifest } from './widgets/preview';
 import { projectWidgetManifest } from './widgets/project';
 import { queueWidgetManifest } from './widgets/queue';
 import { serverStatusWidgetManifest } from './widgets/server-status';
+import { upscaleWidgetManifest } from './widgets/upscale';
 import { versionStatusWidgetManifest } from './widgets/version-status';
 import { workflowWidgetManifest } from './widgets/workflow';
 
 export const firstPartyWidgetManifests: WidgetManifest[] = [
   generateWidgetManifest,
   workflowWidgetManifest,
+  upscaleWidgetManifest,
   canvasWidgetManifest,
   diagnosticsWidgetManifest,
   galleryWidgetManifest,

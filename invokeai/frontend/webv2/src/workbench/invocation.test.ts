@@ -7,11 +7,13 @@ import type {
   MainModelConfig,
   VaeModelConfig,
 } from './generation/types';
+import type { ModelConfig } from './models/types';
 import type { InvocationRoute, WidgetId } from './types';
 
 import { getDefaultGenerateSettings } from './generation/baseGenerationPolicies';
 import { getInvocationRouteInput, resolveInvocationRoute, resolveInvocationRouteInput } from './invocation';
 import { submitResolvedInvocation } from './invocationSubmit';
+import { createDefaultUpscaleWidgetValues } from './upscale/settings';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
 
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
@@ -56,6 +58,24 @@ const unknownExternalModel: GenerateModelConfig = {
   provider_id: 'future-provider',
   type: 'external_image_generator',
 };
+
+const upscaleModel = (key: string, type: string, base: string, name = key): ModelConfig => ({
+  base,
+  file_size: 1,
+  format: 'checkpoint',
+  hash: `${key}-hash`,
+  key,
+  name,
+  path: key,
+  source: key,
+  source_type: 'path',
+  type,
+});
+const upscaleModels = [
+  upscaleModel('sdxl-upscale', 'main', 'sdxl'),
+  upscaleModel('spandrel-upscale', 'spandrel_image_to_image', 'any'),
+  upscaleModel('tile-upscale', 'controlnet', 'sdxl', 'SDXL Tile ControlNet'),
+];
 
 const createGenerateValues = (
   model: GenerateModelConfig = animaModel,
@@ -121,6 +141,67 @@ describe('resolveInvocationRoute', () => {
 
     expect(route.sourceValid).toBe(false);
     expect(route.validationReasons).toContain("No invocation node registered for external provider 'future-provider'.");
+  });
+});
+
+describe('resolveInvocationRoute — upscale source', () => {
+  const route: InvocationRoute = {
+    destination: 'gallery',
+    destinationLocked: false,
+    sourceId: 'upscale',
+    sourceLocked: false,
+  };
+
+  const createInput = () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: {
+        ...createDefaultUpscaleWidgetValues(upscaleModels),
+        inputImage: { height: 512, image_name: 'input.png', width: 768 },
+      },
+      widgetId: 'upscale',
+    });
+
+    const project = state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
+
+    return getInvocationRouteInput(project);
+  };
+
+  it('is ready only with a mounted widget and installed compatible required models', () => {
+    expect(resolveInvocationRouteInput(createInput(), 'global', route, upscaleModels)).toMatchObject({
+      sourceValid: true,
+      validationReasons: [],
+    });
+
+    const input = createInput();
+    const withoutWidget = { ...input, mountedWidgetIds: input.mountedWidgetIds.filter((id) => id !== 'upscale') };
+    const missingTile = upscaleModels.filter((model) => model.key !== 'tile-upscale');
+
+    expect(resolveInvocationRouteInput(withoutWidget, 'global', route, upscaleModels).validationReasons).toContain(
+      'The Upscale widget is not mounted in this project.'
+    );
+    expect(resolveInvocationRouteInput(input, 'global', route, missingTile).validationReasons).toContain(
+      'SDXL Tile ControlNet is no longer installed.'
+    );
+  });
+
+  it('rejects unsupported main-model bases and non-Tile ControlNets', () => {
+    const input = createInput();
+    const values = {
+      ...input.upscaleValues,
+      model: upscaleModel('flux-upscale', 'main', 'flux', 'FLUX'),
+      tileControlnetModel: upscaleModel('depth-upscale', 'controlnet', 'flux', 'FLUX Depth ControlNet'),
+    };
+    const models = [values.model, values.tileControlnetModel, upscaleModels[1]!];
+    const result = resolveInvocationRouteInput({ ...input, upscaleValues: values }, 'global', route, models);
+
+    expect(result.sourceValid).toBe(false);
+    expect(result.validationReasons).toContain('Upscale supports only SD1.5 and SDXL main models.');
+    expect(result.validationReasons).toContain(
+      'The Tile ControlNet must match the main model base and be a Tile or Union model.'
+    );
   });
 });
 

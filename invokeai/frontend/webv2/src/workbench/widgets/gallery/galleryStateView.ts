@@ -2,7 +2,7 @@ import type { GalleryBoard, GalleryImage, GalleryView } from '@workbench/gallery
 import type { GeneratedImageContract, QueueItem } from '@workbench/types';
 
 import { getGallerySettings, type GallerySettings } from '@workbench/gallery/settings';
-import { sanitizeBatchCount } from '@workbench/generation/batch';
+import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@workbench/queueSnapshot';
 
 const UNCATEGORIZED_BOARD: GalleryBoard = {
   archived: false,
@@ -107,9 +107,6 @@ export const getGalleryRecentImagesKey = (values: Record<string, unknown>): stri
   return (values.recentImages as GeneratedImageContract[]).map((image) => image.imageName).join('\0');
 };
 
-const getFiniteNumber = (value: unknown, fallback: number): number =>
-  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-
 export const getGalleryQueuePlaceholders = (
   queueItems: QueueItem[],
   {
@@ -140,12 +137,10 @@ export const getGalleryQueuePlaceholders = (
       continue;
     }
 
-    const generateValues = item.snapshot.widgetStates.generate?.values ?? {};
     const expectedImageCount = item.backendItemIds?.length
       ? item.backendItemIds.length
-      : sanitizeBatchCount(generateValues.batchCount);
-    const width = getFiniteNumber(generateValues.width, 1024);
-    const height = getFiniteNumber(generateValues.height, 1024);
+      : getQueueItemSnapshotBatchCount(item);
+    const { width, height } = getQueueItemSnapshotDimensions(item, { height: 1024, width: 1024 });
     const completedBackendItemIds = new Set(item.completedBackendItemIds ?? []);
     const cancelledBackendItemIds = new Set(item.cancelledBackendItemIds ?? []);
 

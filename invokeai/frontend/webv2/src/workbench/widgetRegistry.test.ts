@@ -1,8 +1,10 @@
+import { ImageUpscaleIcon } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 
 import type { WidgetManifest } from './types';
 
 import { getWidgetHosts, registerFirstPartyWidgets, registerWidgets } from './widgetRegistry';
+import { upscaleWidgetManifest } from './widgets/upscale';
 
 const TestIcon = () => null;
 const TestView = () => null;
@@ -23,9 +25,13 @@ describe('widget registry', () => {
   it('registers first-party widget manifests without icon validation failures', () => {
     const widgets = registerFirstPartyWidgets();
 
-    expect(widgets).toHaveLength(13);
+    expect(widgets).toHaveLength(14);
     expect(widgets.flatMap((widget) => widget.failure ?? [])).toEqual([]);
     expect(widgets.every((widget) => widget.status === 'enabled')).toBe(true);
+  });
+
+  it('uses the image-upscale icon for Upscale', () => {
+    expect(upscaleWidgetManifest.icon).toBe(ImageUpscaleIcon);
   });
 
   it('normalizes default state and api version', () => {

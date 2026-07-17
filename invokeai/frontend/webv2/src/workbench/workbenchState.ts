@@ -37,6 +37,7 @@ import type {
   WorkbenchNotificationKind,
   WorkbenchState,
 } from './types';
+import type { UpscaleWidgetValues } from './upscale/types';
 import type { ProjectGraphState } from './workflows/types';
 
 import { createNewCanvasStateV2, migrateCanvasStateToV2 } from './canvasMigration';
@@ -50,6 +51,12 @@ import {
 import { getGenerationModelAvailabilityReasons } from './generation/baseGenerationPolicies';
 import { sanitizeBatchCount } from './generation/batch';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
+import {
+  applyProjectPromptDraft,
+  getProjectPromptDraft,
+  migrateProjectPromptDraft,
+  type ProjectPromptDraftPatch,
+} from './generation/projectPromptDraft';
 import {
   addPromptHistoryItem,
   getPromptHistoryItemFromGenerateSettings,
@@ -70,6 +77,15 @@ import {
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
 import { cloneLayoutPresetWidgetRegions, createLayoutPresetSnapshot } from './layoutPresetSnapshots';
 import { normalizeProjectSettings } from './settings/store';
+import { compileUpscaleGraph } from './upscale/graph';
+import {
+  clearDeletedUpscaleInput,
+  cloneUpscaleWidgetValues,
+  getUpscaleValidationReasons,
+  normalizeUpscaleWidgetValues,
+  resolveUpscaleSeed,
+  syncUpscaleWidgetValuesWithModels,
+} from './upscale/settings';
 import { compileProjectGraph } from './workflows/buildGraph';
 import {
   cloneProjectGraph,
@@ -128,6 +144,7 @@ type WorkbenchReducerAction =
   | { type: 'setRegionWidgetSize'; region: WidgetRegion; sizePx: number }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string }
   | { type: 'patchGenerateSettings'; values: Partial<GenerateWidgetValues>; projectId?: string }
+  | { type: 'patchProjectPromptDraft'; values: ProjectPromptDraftPatch; projectId?: string }
   | { type: 'setGenerateBatchCount'; batchCount: number; projectId?: string }
   | { type: 'addPromptToHistory'; prompt: PromptHistoryItem; projectId?: string }
   | { type: 'removePromptFromHistory'; prompt: PromptHistoryItem; projectId?: string }
@@ -845,6 +862,7 @@ const createWidgetStates = (): WidgetStateMap => ({
   users: { id: 'users', label: 'Users', values: {}, version: 1 },
   'version-status': { id: 'version-status', label: 'Version', values: {}, version: 1 },
   workflow: { graphId: 'workflow-graph', id: 'workflow', label: 'Workflow', values: {}, version: 1 },
+  upscale: { graphId: 'upscale-graph', id: 'upscale', label: 'Upscale', values: {}, version: 1 },
 });
 
 const createWidgetState = (widgetId: WidgetTypeId): WidgetStateContract =>
@@ -877,6 +895,7 @@ const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   'gallery:bottom': 'gallery',
   'gallery:center': 'gallery',
   generate: 'generate',
+  upscale: 'upscale',
   layers: 'layers',
   notifications: 'notifications',
   preview: 'preview',
@@ -900,6 +919,39 @@ const createWidgetInstances = (): Record<WidgetInstanceId, WidgetInstanceContrac
 const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
   ...cloneLayoutPresetWidgetRegions(defaultLayoutPreset.snapshot.widgetRegions),
 });
+
+const LEGACY_DEFAULT_LEFT_REGION_WIDGET_IDS: readonly WidgetInstanceId[][] = [
+  ['generate', 'workflow'],
+  ['workflow', 'generate'],
+  ['generate', 'workflow', 'gallery'],
+];
+
+const ensureLeftRegion = (leftRegion: WidgetRegionState | undefined): WidgetRegionState => {
+  const fallback = createWidgetRegions().left;
+
+  if (!leftRegion) {
+    return fallback;
+  }
+  if (leftRegion.instanceIds.includes('upscale')) {
+    return leftRegion;
+  }
+
+  const legacyMatch = LEGACY_DEFAULT_LEFT_REGION_WIDGET_IDS.some(
+    (ids) =>
+      ids.length === leftRegion.instanceIds.length && ids.every((id, index) => leftRegion.instanceIds[index] === id)
+  );
+
+  if (!legacyMatch) {
+    return leftRegion;
+  }
+
+  const galleryIndex = leftRegion.instanceIds.indexOf('gallery');
+  const instanceIds = [...leftRegion.instanceIds];
+
+  instanceIds.splice(galleryIndex === -1 ? instanceIds.length : galleryIndex, 0, 'upscale');
+
+  return { ...leftRegion, instanceIds };
+};
 
 const LEGACY_RIGHT_REGION_WIDGET_IDS: WidgetId[] = ['queue', 'gallery', 'layers'];
 
@@ -979,7 +1031,38 @@ const ensureProjectWidgetContracts = (project: Project): Project => {
   const legacyWidgetRegions = project.widgetRegions as
     | Partial<Record<WidgetRegion | 'left-panel' | 'right-panel' | 'status-bar', WidgetRegionState>>
     | undefined;
-  const widgetInstances = project.widgetInstances ?? createWidgetInstances();
+  const leftRegion = ensureLeftRegion(legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel']);
+  const widgetInstances = cloneWidgetInstances(project.widgetInstances ?? createWidgetInstances());
+
+  const generateInstance = widgetInstances.generate;
+  const upscaleInstance = widgetInstances.upscale;
+
+  if (generateInstance && upscaleInstance) {
+    const migratedValues = migrateProjectPromptDraft(generateInstance.state.values, upscaleInstance.state.values);
+    const clearedLegacyUpscaleValues = applyProjectPromptDraft(upscaleInstance.state.values, {
+      negativePrompt: '',
+      negativePromptEnabled: true,
+      positivePrompt: '',
+    });
+
+    if (migratedValues !== generateInstance.state.values) {
+      widgetInstances.generate = {
+        ...generateInstance,
+        state: { ...generateInstance.state, values: migratedValues },
+      };
+    }
+
+    if (clearedLegacyUpscaleValues !== upscaleInstance.state.values) {
+      widgetInstances.upscale = {
+        ...upscaleInstance,
+        state: { ...upscaleInstance.state, values: clearedLegacyUpscaleValues },
+      };
+    }
+  }
+
+  if (leftRegion.instanceIds.includes('upscale') && !widgetInstances.upscale) {
+    widgetInstances.upscale = createWidgetInstance('upscale');
+  }
 
   return {
     ...project,
@@ -990,12 +1073,12 @@ const ensureProjectWidgetContracts = (project: Project): Project => {
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
     settings: normalizeProjectSettings(project.settings),
     widgetRegions: {
-      left: legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel'] ?? defaultWidgetRegions.left,
+      left: leftRegion,
       right: ensureRightRegion(legacyWidgetRegions?.right ?? legacyWidgetRegions?.['right-panel']),
       bottom: legacyWidgetRegions?.bottom ?? legacyWidgetRegions?.['status-bar'] ?? defaultWidgetRegions.bottom,
       center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
     },
-    widgetInstances: cloneWidgetInstances(widgetInstances),
+    widgetInstances,
   };
 };
 
@@ -1316,6 +1399,32 @@ const compileInvocationSnapshot = (
     return { graph: compileProjectGraph(project.projectGraph, templatesSnapshot.templates), widgetStates };
   }
 
+  if (route.sourceId === 'upscale') {
+    const values = normalizeUpscaleWidgetValues(getWidgetValues(project, 'upscale'));
+
+    if (!values) {
+      return null;
+    }
+
+    const syncedValues = models ? syncUpscaleWidgetValuesWithModels(values, models) : values;
+    const currentValues: UpscaleWidgetValues = { ...syncedValues, ...getProjectPromptDraft(project) };
+
+    if (getUpscaleValidationReasons(currentValues, models).length > 0) {
+      return null;
+    }
+
+    const resolvedValues: UpscaleWidgetValues = { ...currentValues, seed: resolveUpscaleSeed(currentValues) };
+    const compiledGraph = compileUpscaleGraph(resolvedValues, route.destination, project.settings).graph;
+
+    widgetStates.upscale = {
+      ...widgetStates.upscale,
+      graphId: compiledGraph.id,
+      values: { ...cloneUpscaleWidgetValues(resolvedValues) },
+    };
+
+    return { graph: compiledGraph, widgetStates };
+  }
+
   if (route.sourceId !== 'generate') {
     const widgetGraph = project.widgetGraphs[route.sourceId as WidgetTypeId];
 
@@ -1574,6 +1683,8 @@ const enqueueCompiledSnapshot = (
   const graphHistorySnapshot = createGraphHistorySnapshot(`Queue snapshot ${queueItemId}`, graph);
   const generateSettings =
     route.sourceId === 'generate' ? normalizeGenerateSettings(widgetStates.generate.values) : null;
+  const upscaleSettings =
+    route.sourceId === 'upscale' ? normalizeUpscaleWidgetValues(widgetStates.upscale.values) : null;
   const queueItem: QueueItem = {
     cancellable: backendSupportsCancellation,
     id: queueItemId,
@@ -1605,7 +1716,12 @@ const enqueueCompiledSnapshot = (
     graphHistory: [graphHistorySnapshot, ...project.graphHistory].slice(0, HISTORY_LIMIT),
     promptHistory: generateSettings
       ? addPromptHistoryItem(project.promptHistory, getPromptHistoryItemFromGenerateSettings(generateSettings))
-      : project.promptHistory,
+      : upscaleSettings
+        ? addPromptHistoryItem(project.promptHistory, {
+            negativePrompt: upscaleSettings.negativePromptEnabled ? upscaleSettings.negativePrompt : null,
+            positivePrompt: upscaleSettings.positivePrompt,
+          })
+        : project.promptHistory,
     invocation: {
       ...project.invocation,
       destination: route.destination,
@@ -1614,7 +1730,9 @@ const enqueueCompiledSnapshot = (
     },
     queue: { items: [queueItem, ...project.queue.items] },
     widgetGraphs:
-      route.sourceId === 'generate' ? { ...project.widgetGraphs, generate: cloneGraph(graph) } : project.widgetGraphs,
+      route.sourceId === 'generate' || route.sourceId === 'upscale'
+        ? { ...project.widgetGraphs, [route.sourceId]: cloneGraph(graph) }
+        : project.widgetGraphs,
   };
 };
 
@@ -1959,6 +2077,11 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchReducer
     case 'patchGenerateSettings': {
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
         updateProjectWidgetValues(project, 'generate', (values) => patchRecord(values, action.values))
+      );
+    }
+    case 'patchProjectPromptDraft': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetValues(project, 'generate', (values) => applyProjectPromptDraft(values, action.values))
       );
     }
     case 'setGenerateBatchCount': {
@@ -2422,8 +2545,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchReducer
     }
     case 'removeGalleryImages': {
       const removedImageNames = new Set(action.imageNames);
-
-      return updateGalleryValues(
+      const nextState = updateGalleryValues(
         state,
         (values) => {
           const selectedImage = values.selectedImage as GeneratedImageContract | null | undefined;
@@ -2440,6 +2562,18 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchReducer
           };
         },
         action.projectId
+      );
+
+      return updateProjectById(nextState, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetValues(project, 'upscale', (rawValues) => {
+          const values = normalizeUpscaleWidgetValues(rawValues);
+
+          if (!values?.inputImage || !removedImageNames.has(values.inputImage.image_name)) {
+            return rawValues;
+          }
+
+          return { ...clearDeletedUpscaleInput(values, removedImageNames) };
+        })
       );
     }
     case 'setGalleryProjectBoardId': {

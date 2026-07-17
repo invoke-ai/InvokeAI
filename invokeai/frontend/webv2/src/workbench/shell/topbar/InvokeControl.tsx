@@ -4,6 +4,7 @@ import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@wo
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
 import { Button, IconButton, Tooltip } from '@workbench/components/ui';
 import { sanitizeBatchCount } from '@workbench/generation/batch';
+import { useMountEffect } from '@workbench/hooks/useMountEffect';
 import {
   formatRoute,
   createInvocationRouteInputSelector,
@@ -26,7 +27,7 @@ import {
 } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 const CONTROL_WIDTH = '10rem';
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
@@ -50,19 +51,19 @@ const compactBlockingReason = (reason: string): string => {
 
 const InvokeTooltipContent = ({
   blockingReasons,
-  generateValues,
+  sourceValues,
   invocation,
   isValid,
 }: {
   blockingReasons: string[];
-  generateValues: Record<string, unknown>;
+  sourceValues: Record<string, unknown>;
   invocation: InvocationRoute;
   isValid: boolean;
 }) => {
-  const batchCount = getBatchCount(generateValues);
+  const batchCount = getBatchCount(sourceValues);
   const destination = getDestinationLabel(invocation.destination);
   const summary =
-    invocation.sourceId === 'generate'
+    invocation.sourceId === 'generate' || invocation.sourceId === 'upscale'
       ? `1 prompt × ${batchCount} iteration${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`
       : `Workflow × ${batchCount} run${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`;
 
@@ -130,9 +131,9 @@ export const InvokeControl = () => {
 
   modelsRef.current = availabilityModels;
 
-  useEffect(() => {
+  useMountEffect(() => {
     ensureModelsLoaded();
-  }, []);
+  });
 
   const onInvoke = useCallback(() => {
     flushGenerateDrafts();
@@ -160,12 +161,21 @@ export const InvokeControl = () => {
     () => (
       <InvokeTooltipContent
         blockingReasons={blockingReasons}
-        generateValues={routeInput.generateValues}
+        sourceValues={
+          routeInput.invocation.sourceId === 'upscale' ? routeInput.upscaleValues : routeInput.generateValues
+        }
         invocation={invocation}
         isValid={isValid}
       />
     ),
-    [blockingReasons, invocation, isValid, routeInput.generateValues]
+    [
+      blockingReasons,
+      invocation,
+      isValid,
+      routeInput.generateValues,
+      routeInput.invocation.sourceId,
+      routeInput.upscaleValues,
+    ]
   );
   const handleSourceChange = useCallback(
     (event: { value: string }) =>
@@ -212,7 +222,13 @@ export const InvokeControl = () => {
             </Button>
           </Tooltip>
           <Menu.Trigger asChild>
-            <IconButton colorPalette="brand" size="sm" minW="0" w="7">
+            <IconButton
+              aria-label="Choose invocation source and destination"
+              colorPalette="brand"
+              minW="0"
+              size="sm"
+              w="7"
+            >
               <ChevronDownIcon />
             </IconButton>
           </Menu.Trigger>
