@@ -16,5 +16,6 @@ export {
   type ImageRecallResult,
 } from './imageRecall';
 export { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
+export { RecallActionButtons } from './RecallActionButtons';
 export { getSelectedGalleryImage, getSelectedGalleryImageFromValues } from './selectedImage';
 export { saveBlobToDisk, useImageActions, type ImageActions } from './useImageActions';

@@ -1,10 +1,11 @@
 import type { GalleryImage, GalleryImageMetadata } from '@workbench/gallery/api';
 
 import { Box, DataList, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { Button, IconButton, Tooltip } from '@workbench/components/ui';
+import { IconButton, Tooltip } from '@workbench/components/ui';
 import { getGalleryImageMetadata } from '@workbench/gallery/api';
 import {
   EMPTY_IMAGE_RECALL_CAPABILITIES,
+  RecallActionButtons,
   type ImageActions,
   type ImageRecallCapabilities,
   type ImageRecallKind,
@@ -24,15 +25,6 @@ import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetada
  */
 
 const GROUP_HOVER_VISIBLE = { opacity: 1 };
-
-const RECALL_ITEMS: { capability: keyof ImageRecallCapabilities; kind: ImageRecallKind; label: string }[] = [
-  { capability: 'all', kind: 'all', label: 'Recall All' },
-  { capability: 'remix', kind: 'remix', label: 'Remix' },
-  { capability: 'prompts', kind: 'prompts', label: 'Use Prompt' },
-  { capability: 'seed', kind: 'seed', label: 'Use Seed' },
-  { capability: 'dimensions', kind: 'dimensions', label: 'Use Size' },
-  { capability: 'clipSkip', kind: 'clipSkip', label: 'Use CLIP Skip' },
-];
 
 export const PreviewMetadataPanel = ({
   actions,
@@ -82,7 +74,11 @@ export const PreviewMetadataPanel = ({
   }, [actions, image, isOpen, loaded?.imageName]);
 
   const entries = parsePreviewMetadata(loaded?.metadata ?? null);
-  const recallItems = loaded && isCurrent ? RECALL_ITEMS.filter((item) => loaded.capabilities[item.capability]) : [];
+  const handleRecall = useCallback(
+    (kind: ImageRecallKind) => void actions.recallImageData(image, kind),
+    [actions, image]
+  );
+  const hasAnyRecall = loaded !== null && isCurrent && Object.values(loaded.capabilities).some(Boolean);
 
   return (
     <Stack gap="2">
@@ -125,12 +121,8 @@ export const PreviewMetadataPanel = ({
                   <MetadataRow key={entry.key} entry={entry} />
                 ))}
               </DataList.Root>
-              {recallItems.length > 0 ? (
-                <HStack flexWrap="wrap" gap="1">
-                  {recallItems.map((item) => (
-                    <RecallButton key={item.kind} actions={actions} image={image} kind={item.kind} label={item.label} />
-                  ))}
-                </HStack>
+              {hasAnyRecall && loaded ? (
+                <RecallActionButtons capabilities={loaded.capabilities} onRecall={handleRecall} />
               ) : null}
             </>
           )}
@@ -173,25 +165,5 @@ const MetadataRow = ({ entry }: { entry: PreviewMetadataEntry }) => {
         </Box>
       </DataList.ItemValue>
     </DataList.Item>
-  );
-};
-
-const RecallButton = ({
-  actions,
-  image,
-  kind,
-  label,
-}: {
-  actions: ImageActions;
-  image: GalleryImage;
-  kind: ImageRecallKind;
-  label: string;
-}) => {
-  const handleClick = useCallback(() => void actions.recallImageData(image, kind), [actions, image, kind]);
-
-  return (
-    <Button size="2xs" variant="outline" onClick={handleClick}>
-      {label}
-    </Button>
   );
 };
