@@ -12,12 +12,7 @@ import {
   type GalleryView,
 } from '@workbench/gallery/api';
 import { getGallerySettings } from '@workbench/gallery/settings';
-import {
-  ImageContextMenu,
-  useImageActions,
-  type ImageActions,
-  type ImageContextMenuTarget,
-} from '@workbench/image-actions';
+import { ImageContextMenu, useImageActions, type ImageContextMenuTarget } from '@workbench/image-actions';
 import { imageUrlToStreamingSource, progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
 import { useStreamingImageSource } from '@workbench/images/useStreamingImageSource';
 import {
@@ -34,8 +29,10 @@ import {
   useWidgetValuesSelector,
   useWorkbenchDispatch,
 } from '@workbench/WorkbenchContext';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type { PreviewLoupeControls } from './usePreviewLoupe';
 
 import { PreviewCompare } from './PreviewCompare';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
@@ -164,6 +161,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const selectedImageRef = useRef(selectedImage);
   const boardImagesRef = useRef(boardImages);
+  const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
 
   selectedImageRef.current = selectedImage;
   boardImagesRef.current = boardImages;
@@ -368,15 +366,18 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
   const selectedImageName = selectedImage?.imageName ?? null;
 
-  // Publish the header label context ("[board] / [image]") for the widget
-  // frame; the frame chrome renders outside this view, so an external store is
-  // the sync channel. Cleared on unmount so a stale title never outlives us.
+  // Publish the header chrome context (the "[board] / [image]" label and the
+  // action strip's image + actions) for the widget frame; the chrome renders
+  // outside this view, so an external store is the sync channel. Cleared on
+  // unmount so stale chrome never outlives us.
   useEffect(() => {
     previewHeaderStore.set({
+      actionImage: contextMenuImage,
+      actions: imageActions,
       boardName: selectedImageName === null ? null : boardName,
       imageName: selectedImageName,
     });
-  }, [boardName, selectedImageName]);
+  }, [boardName, contextMenuImage, imageActions, selectedImageName]);
 
   useEffect(() => () => previewHeaderStore.clear(), []);
 
@@ -406,6 +407,16 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
     if (commandId === 'viewer.deleteImage' && selectedImage) {
       void imageActions.deleteImages([selectedImage.imageName]);
+      return;
+    }
+
+    if (commandId === 'viewer.zoomToActual') {
+      loupeControlsRef.current?.zoomToActual();
+      return;
+    }
+
+    if (commandId === 'viewer.zoomToFit') {
+      loupeControlsRef.current?.reset();
     }
   });
 
@@ -414,6 +425,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       ['viewer.toggleViewer', t('widgets.preview.commands.togglePreview'), ['z']],
       ['viewer.swapImages', t('widgets.preview.commands.swapComparisonImages'), ['c']],
       ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
+      ['viewer.zoomToActual', t('widgets.preview.commands.zoomToActual'), ['1']],
+      ['viewer.zoomToFit', t('widgets.preview.commands.zoomToFit'), ['f']],
     ] as const;
     const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeViewerHotkey(id), id, title }),
@@ -441,8 +454,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             />
           ) : (
             <SelectedImagePreview
-              actionImage={contextMenuImage}
-              actions={imageActions}
+              loupeControlsRef={loupeControlsRef}
               boardImageCount={boardImages.length}
               boardName={boardName}
               density={density}
@@ -474,13 +486,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 };
 
 const SelectedImagePreview = ({
-  actionImage,
-  actions,
   boardImageCount,
   boardName,
   density,
   image,
   isLoadingBoard,
+  loupeControlsRef,
   progressImage,
   selectedIndex,
   shouldAntialiasProgressImage,
@@ -488,13 +499,12 @@ const SelectedImagePreview = ({
   onNext,
   onPrevious,
 }: {
-  actionImage: GalleryImage | null;
-  actions: ImageActions;
   boardImageCount: number;
   boardName: string;
   density: PreviewDensity;
   image: GeneratedImageContract;
   isLoadingBoard: boolean;
+  loupeControlsRef?: Ref<PreviewLoupeControls>;
   progressImage: LatestProgressImageSnapshot | null;
   selectedIndex: number;
   shouldAntialiasProgressImage: boolean;
@@ -535,11 +545,13 @@ const SelectedImagePreview = ({
   return (
     <Stack gap="3" h="full" minH="0" outline="none" tabIndex={0} w="full" onKeyDown={handleKeyDown}>
       <PreviewFrame
+        key={`${image.imageName}:${isProgressImage ? 'live' : 'still'}`}
         frameHeight={previewHeight}
         frameWidth={previewWidth}
         isLive={isProgressImage}
         liveBadgeLabel={t('common.generating')}
         liveQueueItemId={liveQueueItemId}
+        loupeControlsRef={loupeControlsRef}
         padding={density === 'full' ? '6' : '3'}
         shouldAntialiasLiveImage={shouldAntialiasProgressImage}
         source={previewImage}
@@ -547,8 +559,6 @@ const SelectedImagePreview = ({
         onContextMenu={onContextMenu}
       />
       <PreviewFooter
-        actionImage={actionImage}
-        actions={actions}
         boardImageCount={boardImageCount}
         boardName={boardName}
         density={density}

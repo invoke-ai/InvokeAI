@@ -805,7 +805,9 @@
         "deletePreviewImage": "Delete preview image",
         "nextComparisonMode": "Next comparison mode",
         "swapComparisonImages": "Swap comparison images",
-        "togglePreview": "Toggle preview"
+        "togglePreview": "Toggle preview",
+        "zoomToActual": "Zoom preview to 100%",
+        "zoomToFit": "Zoom preview to fit"
       },
       "compare": "Compare",
       "emptyDescription": "Generate to Gallery, then select a thumbnail in the Gallery widget to inspect it here.",
@@ -817,6 +819,7 @@
       "nextImageInBoard": "Next image in board",
       "noGallerySelection": "No gallery selection",
       "previousImageInBoard": "Previous image in board",
+      "resetZoom": "Reset zoom",
       "showInProgressDiffusion": "Show in-progress diffusion",
       "sideBySide": "Side by Side",
       "slider": "Slider",

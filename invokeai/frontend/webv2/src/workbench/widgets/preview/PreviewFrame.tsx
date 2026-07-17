@@ -1,9 +1,12 @@
+/* eslint-disable react/react-compiler */
 import type { StreamingImageSource } from '@workbench/images/streamingImageSource';
 
 import { Badge, Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
-import { useCallback, useMemo, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
+import { useCallback, useMemo, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { PreviewLiveOverlay } from './PreviewLiveReadout';
+import { usePreviewLoupe, type PreviewLoupeControls } from './usePreviewLoupe';
 
 /**
  * The preview's image surface: a dot-grid backdrop with an aspect-fitted,
@@ -34,6 +37,7 @@ export const PreviewFrame = ({
   isLive,
   liveBadgeLabel,
   liveQueueItemId,
+  loupeControlsRef,
   onContextMenu,
   padding,
   shouldAntialiasLiveImage,
@@ -48,6 +52,8 @@ export const PreviewFrame = ({
   liveBadgeLabel: string;
   /** When set, the static live badge is replaced by the live progress readout for this run. */
   liveQueueItemId?: string | null;
+  /** Imperative zoom controls, for hotkeys registered by the widget shell. */
+  loupeControlsRef?: Ref<PreviewLoupeControls>;
   onContextMenu?: (x: number, y: number) => void;
   padding?: string;
   shouldAntialiasLiveImage: boolean;
@@ -55,6 +61,12 @@ export const PreviewFrame = ({
   /** `framed` = bordered surface for a selected image; `inset` = flush surface for the empty state. */
   variant: 'framed' | 'inset';
 }) => {
+  const { t } = useTranslation();
+  const loupe = usePreviewLoupe({
+    controlsRef: loupeControlsRef,
+    enabled: variant === 'framed' && !isLive,
+    naturalWidth: frameWidth,
+  });
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (onContextMenu) {
@@ -139,20 +151,46 @@ export const PreviewFrame = ({
       w="full"
     >
       <Box
+        ref={loupe.frameRefCallback}
         bg="transparent"
         borderWidth="1px"
         borderColor={isLive ? 'accent.solid' : 'border.emphasized'}
         boxShadow="0 24px 80px rgba(0,0,0,0.42)"
         css={getFittedFrameCss(frameWidth, frameHeight)}
+        cursor={loupe.isZoomed ? 'grab' : undefined}
         overflow="hidden"
         position="relative"
         rounded="lg"
         onContextMenu={onContextMenu ? handleContextMenu : undefined}
+        {...loupe.frameProps}
       >
         {source ? (
-          <img alt={source.alt} height={frameHeight} src={source.src} style={imageStyle} width={frameWidth} />
+          <img
+            ref={loupe.imageRef}
+            alt={source.alt}
+            height={frameHeight}
+            src={source.src}
+            style={imageStyle}
+            width={frameWidth}
+          />
         ) : null}
         {liveBadge}
+        {loupe.zoomPercent !== null ? (
+          <Badge
+            aria-label={t('widgets.preview.resetZoom')}
+            as="button"
+            bottom="2"
+            cursor="pointer"
+            position="absolute"
+            right="2"
+            size="xs"
+            title={t('widgets.preview.resetZoom')}
+            variant="solid"
+            onClick={loupe.reset}
+          >
+            {loupe.zoomPercent}%
+          </Badge>
+        ) : null}
       </Box>
     </Flex>
   );
