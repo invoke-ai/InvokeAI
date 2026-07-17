@@ -71879,6 +71879,18 @@
             "const": "anima",
             "title": "Base",
             "default": "anima"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -71897,7 +71909,8 @@
           "config_path",
           "type",
           "format",
-          "base"
+          "base",
+          "cpu_only"
         ],
         "title": "VAE_Checkpoint_Anima_Config",
         "description": "Model config for Anima QwenImage VAE checkpoint models (AutoencoderKLQwenImage)."
@@ -72010,6 +72023,18 @@
             "title": "Format",
             "default": "checkpoint"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "flux",
@@ -72033,6 +72058,7 @@
           "config_path",
           "type",
           "format",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Checkpoint_FLUX_Config"
@@ -72150,6 +72176,18 @@
             "const": "flux2",
             "title": "Base",
             "default": "flux2"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -72168,7 +72206,8 @@
           "config_path",
           "type",
           "format",
-          "base"
+          "base",
+          "cpu_only"
         ],
         "title": "VAE_Checkpoint_Flux2_Config",
         "description": "Model config for FLUX.2 VAE checkpoint models (AutoencoderKLFlux2)."
@@ -72286,6 +72325,18 @@
             "const": "qwen-image",
             "title": "Base",
             "default": "qwen-image"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -72304,7 +72355,8 @@
           "config_path",
           "type",
           "format",
-          "base"
+          "base",
+          "cpu_only"
         ],
         "title": "VAE_Checkpoint_QwenImage_Config",
         "description": "Model config for Qwen Image VAE checkpoint models (AutoencoderKLQwenImage)."
@@ -72417,6 +72469,18 @@
             "title": "Format",
             "default": "checkpoint"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sd-1",
@@ -72440,6 +72504,7 @@
           "config_path",
           "type",
           "format",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Checkpoint_SD1_Config"
@@ -72552,6 +72617,18 @@
             "title": "Format",
             "default": "checkpoint"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sd-2",
@@ -72575,6 +72652,7 @@
           "config_path",
           "type",
           "format",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Checkpoint_SD2_Config"
@@ -72687,6 +72765,18 @@
             "title": "Format",
             "default": "checkpoint"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sdxl",
@@ -72710,6 +72800,7 @@
           "config_path",
           "type",
           "format",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Checkpoint_SDXL_Config"
@@ -72819,6 +72910,18 @@
             "const": "flux2",
             "title": "Base",
             "default": "flux2"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -72837,7 +72940,8 @@
           "format",
           "repo_variant",
           "type",
-          "base"
+          "base",
+          "cpu_only"
         ],
         "title": "VAE_Diffusers_Flux2_Config",
         "description": "Model config for FLUX.2 VAE models in diffusers format (AutoencoderKLFlux2)."
@@ -72942,6 +73046,18 @@
             "title": "Type",
             "default": "vae"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sd-1",
@@ -72965,6 +73081,7 @@
           "format",
           "repo_variant",
           "type",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Diffusers_SD1_Config"
@@ -73069,6 +73186,18 @@
             "title": "Type",
             "default": "vae"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sdxl",
@@ -73092,6 +73221,7 @@
           "format",
           "repo_variant",
           "type",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Diffusers_SDXL_Config"
