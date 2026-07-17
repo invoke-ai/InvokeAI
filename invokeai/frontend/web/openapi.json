@@ -7738,7 +7738,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Status",
-        "description": "Gets the status of the session queue. Returns global counts; non-admin users additionally\nget their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the\ncurrent item's identifiers unless they own it.",
+        "description": "Gets the status of the session queue. Returns global counts; every user additionally gets\ntheir own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI\nlike the progress bar to the user's own activity). Non-admin users cannot see the current\nitem's identifiers unless they own it.",
         "operationId": "get_queue_status",
         "security": [
           {
@@ -57112,9 +57112,15 @@
             ],
             "default": null,
             "description": "The submodel type, if any"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user whose action triggered the load",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "config", "submodel_type"],
+        "required": ["timestamp", "config", "submodel_type", "user_id"],
         "title": "ModelLoadCompleteEvent",
         "type": "object"
       },
@@ -57422,9 +57428,15 @@
             ],
             "default": null,
             "description": "The submodel type, if any"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user whose action triggered the load",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "config", "submodel_type"],
+        "required": ["timestamp", "config", "submodel_type", "user_id"],
         "title": "ModelLoadStartedEvent",
         "type": "object"
       },
@@ -60261,6 +60273,51 @@
           "session_id"
         ],
         "title": "QueueItemStatusChangedEvent",
+        "type": "object"
+      },
+      "QueueItemsCanceledEvent": {
+        "description": "Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in\nbulk (e.g. cancel/delete-all-except-current) without per-item status change events.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "queue_id": {
+            "description": "The ID of the queue",
+            "title": "Queue Id",
+            "type": "string"
+          },
+          "canceled_item_ids": {
+            "description": "The IDs of the queue items that were canceled or deleted",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Canceled Item Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "description": "The IDs of the users who own the canceled queue items",
+            "items": {
+              "type": "string"
+            },
+            "title": "User Ids",
+            "type": "array"
+          },
+          "canceled_item_ids_by_user": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "description": "The canceled queue item IDs keyed by owner user ID.",
+            "title": "Canceled Item Ids By User",
+            "type": "object"
+          }
+        },
+        "required": ["timestamp", "queue_id", "canceled_item_ids", "user_ids", "canceled_item_ids_by_user"],
+        "title": "QueueItemsCanceledEvent",
         "type": "object"
       },
       "QueueItemsRetriedEvent": {

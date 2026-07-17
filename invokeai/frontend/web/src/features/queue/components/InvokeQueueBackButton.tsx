@@ -1,10 +1,10 @@
 import { Button, Flex, Spacer, useShiftModifier } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { InvokeButtonIcon } from 'features/queue/components/InvokeButtonIcon';
 import { QueueIterationsNumberInput } from 'features/queue/components/QueueIterationsNumberInput';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { memo } from 'react';
-import { PiLightningFill, PiSparkleFill } from 'react-icons/pi';
 import { useAutoAddBoard } from 'services/api/hooks/useAutoAddBoard';
 import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 
@@ -28,7 +28,7 @@ export const InvokeButton = memo(() => {
           isLoading={queue.isLoading || isLoadingDynamicPrompts}
           loadingText={invoke}
           isDisabled={queue.isDisabled || !canWriteImages}
-          rightIcon={shift ? <PiLightningFill /> : <PiSparkleFill />}
+          rightIcon={<InvokeButtonIcon isDisabled={queue.isDisabled || !canWriteImages} boxSize={5} />}
           variant="solid"
           colorScheme="invokeYellow"
           size="lg"
