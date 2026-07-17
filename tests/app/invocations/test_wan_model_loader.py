@@ -35,6 +35,8 @@ def _invoke(
     main_config: SimpleNamespace,
     low_config: SimpleNamespace | None = None,
     component_config: SimpleNamespace | None = None,
+    *,
+    use_component_vae: bool = False,
 ):
     main = _model("main")
     low = _model("low") if low_config is not None else None
@@ -50,7 +52,7 @@ def _invoke(
         id="test",
         model=main,
         transformer_low_noise_model=low,
-        vae_model=_model("vae"),
+        vae_model=None if use_component_vae else _model("vae"),
         wan_t5_encoder_model=_model("t5"),
         component_source=component,
     )
@@ -148,3 +150,41 @@ def test_gguf_loader_ignores_mismatched_component_source_boundary() -> None:
     )
 
     assert output.transformer.boundary_ratio == 0.9
+
+
+@pytest.mark.parametrize(
+    "main_variant,component_variant",
+    [
+        (WanVariantType.TI2V_5B, WanVariantType.T2V_A14B),
+        (WanVariantType.T2V_A14B, WanVariantType.TI2V_5B),
+    ],
+)
+def test_gguf_loader_rejects_component_source_with_incompatible_vae_family(
+    main_variant: WanVariantType, component_variant: WanVariantType
+) -> None:
+    with pytest.raises(ValueError, match="VAE"):
+        _invoke(
+            _config("main", main_variant, "none" if main_variant == WanVariantType.TI2V_5B else "high"),
+            component_config=_config("component", component_variant, "none", format=ModelFormat.Diffusers),
+            use_component_vae=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "main_variant,component_variant",
+    [
+        (WanVariantType.TI2V_5B, WanVariantType.TI2V_5B),
+        (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B),
+        (WanVariantType.I2V_A14B, WanVariantType.T2V_A14B),
+    ],
+)
+def test_gguf_loader_accepts_component_source_with_compatible_vae_family(
+    main_variant: WanVariantType, component_variant: WanVariantType
+) -> None:
+    output = _invoke(
+        _config("main", main_variant, "none" if main_variant == WanVariantType.TI2V_5B else "high"),
+        component_config=_config("component", component_variant, "none", format=ModelFormat.Diffusers),
+        use_component_vae=True,
+    )
+
+    assert output.vae.vae.key == "component"

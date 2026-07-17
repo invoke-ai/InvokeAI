@@ -3,6 +3,7 @@ import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
 import { addImageToBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -151,11 +152,12 @@ const CoverImage = ({ board }: { board: BoardDTO }) => {
   );
 
   const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
+  const refreshedThumbnailUrl = useMediaUrl(thumbnailUrl);
 
-  if (thumbnailUrl) {
+  if (refreshedThumbnailUrl) {
     return (
       <Image
-        src={thumbnailUrl}
+        src={refreshedThumbnailUrl}
         draggable={false}
         objectFit="cover"
         w={10}

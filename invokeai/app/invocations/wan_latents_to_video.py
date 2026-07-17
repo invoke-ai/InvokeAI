@@ -11,13 +11,13 @@ The VAE expands the temporal dim by 4× during decode minus the initial offset:
 """
 
 import tempfile
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Callable, Protocol
 
 import numpy as np
 import torch
 from diffusers.models.autoencoders import AutoencoderKLWan
-from einops import rearrange
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -40,10 +40,22 @@ class _FrameWriter(Protocol):
     def append_data(self, frame: np.ndarray) -> None: ...
 
 
-def _write_video_frames(writer: _FrameWriter, frames: np.ndarray, is_canceled: Callable[[], bool]) -> None:
-    for frame in frames:
+def _iter_decoded_frames(decoded: torch.Tensor) -> Iterator[np.ndarray]:
+    for index in range(decoded.shape[1]):
+        frame = decoded[:, index]
+        frame = frame.clamp(-1, 1).permute(1, 2, 0).cpu().float()
+        yield (127.5 * (frame + 1.0)).round().clamp(0, 255).byte().numpy()
+
+
+def _write_video_frames(writer: _FrameWriter, frames: Iterable[np.ndarray], is_canceled: Callable[[], bool]) -> None:
+    frames_iter = iter(frames)
+    while True:
         if is_canceled():
             raise CanceledException
+        try:
+            frame = next(frames_iter)
+        except StopIteration:
+            return
         writer.append_data(np.ascontiguousarray(frame))
 
 
@@ -111,8 +123,8 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
 
                 # [B, C=3, T_pixel, H, W] in [-1, 1] (roughly).
                 decoded = vae.decode(latents, return_dict=False)[0]
+                del latents, latents_mean, latents_std
 
-            decoded = decoded.clamp(-1, 1)
             # Take batch 0 (we generate one video at a time).
             decoded = decoded[0]  # [C, T, H, W]
 
@@ -121,15 +133,11 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         if context.util.is_canceled():
             raise CanceledException
 
-        # Convert to a list of numpy uint8 frames [H, W, C].
-        decoded = rearrange(decoded, "c t h w -> t h w c")
-        # [-1, 1] -> [0, 255]
-        frames = (127.5 * (decoded.cpu().float() + 1.0)).round().clamp(0, 255).byte().numpy()
-        if frames.shape[0] == 0:
+        num_frames = decoded.shape[1]
+        if num_frames == 0:
             raise ValueError("Wan VAE decode produced zero frames.")
 
-        height, width = frames[0].shape[:2]
-        num_frames = frames.shape[0]
+        height, width = decoded.shape[2:]
         duration = num_frames / float(self.fps)
 
         # Encode to a temporary MP4 (libx264 + yuv420p, exact frame dimensions —
@@ -144,9 +152,11 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
             context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {self.fps} fps)")
             writer = make_mp4_writer(tmp_path, self.fps)
             try:
-                _write_video_frames(writer, frames, context.util.is_canceled)
+                _write_video_frames(writer, _iter_decoded_frames(decoded), context.util.is_canceled)
             finally:
                 writer.close()
+            del decoded
+            TorchDevice.empty_cache()
             encoded_bytes = tmp_path.stat().st_size
             context.logger.info(f"MP4 encode complete: {encoded_bytes / 1024:.1f} KB")
             video_dto = context.videos.save(

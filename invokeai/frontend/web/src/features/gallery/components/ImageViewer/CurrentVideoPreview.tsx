@@ -5,6 +5,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useClipboard } from 'common/hooks/useClipboard';
 import { useDownloadItem } from 'common/hooks/useDownloadImage';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
 import { firefoxDndFix } from 'features/dnd/util';
@@ -52,6 +53,7 @@ type Props = {
  * item (and the user only saw the static first-frame still until the new video finished).
  */
 export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
+  const videoUrl = useMediaUrl(videoDTO?.video_url);
   const { t } = useTranslation();
   const store = useAppStore();
   const videoName = videoDTO?.video_name ?? null;
@@ -297,7 +299,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         ref={videoRef}
         // Resolves to /api/v1/videos/i/{name}/full, which supports HTTP Range — used both
         // for first-frame decode (preload=metadata) and for scrub during playback.
-        src={videoDTO.video_url}
+        src={videoUrl}
         preload="metadata"
         muted={!isPlaying}
         playsInline

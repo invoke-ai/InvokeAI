@@ -1,5 +1,5 @@
 import { Box, Image } from '@invoke-ai/ui-library';
-import { useMediaCookieRefreshVersion } from 'features/auth/store/mediaCookieRefresh';
+import { getMediaUrl, useMediaCookieRefreshVersion } from 'features/auth/store/mediaCookieRefresh';
 import { memo, useCallback, useState } from 'react';
 
 type Props = {
@@ -26,6 +26,8 @@ export const getVideoThumbnailKey = (thumbnailUrl: string, mediaCookieVersion: n
 
 export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) => {
   const mediaCookieVersion = useMediaCookieRefreshVersion();
+  const refreshedThumbnailUrl = getMediaUrl(thumbnailUrl, mediaCookieVersion);
+  const refreshedVideoUrl = getMediaUrl(videoUrl, mediaCookieVersion);
   const [failedThumbnail, setFailedThumbnail] = useState<FailedThumbnail | null>(null);
   const onError = useCallback(
     () => setFailedThumbnail({ url: thumbnailUrl, mediaCookieVersion }),
@@ -37,7 +39,7 @@ export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) =>
       <Box
         as="video"
         pointerEvents="none"
-        src={videoUrl}
+        src={refreshedVideoUrl}
         preload="metadata"
         muted
         playsInline
@@ -53,7 +55,7 @@ export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) =>
     <Image
       key={getVideoThumbnailKey(thumbnailUrl, mediaCookieVersion)}
       pointerEvents="none"
-      src={thumbnailUrl}
+      src={refreshedThumbnailUrl}
       onError={onError}
       objectFit="contain"
       maxW="full"

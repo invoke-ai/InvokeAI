@@ -7,6 +7,7 @@ import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNewTab';
 import { uniq } from 'es-toolkit';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
 import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
@@ -84,6 +85,7 @@ const buildOnClick =
   };
 
 export const GalleryImage = memo(({ imageDTO }: Props) => {
+  const thumbnailUrl = useMediaUrl(imageDTO.thumbnail_url);
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
@@ -219,7 +221,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
       >
         <Image
           pointerEvents="none"
-          src={imageDTO.thumbnail_url}
+          src={thumbnailUrl}
           w={imageDTO.width}
           fallback={<GalleryImagePlaceholder />}
           objectFit="contain"

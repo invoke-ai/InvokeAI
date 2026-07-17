@@ -205,7 +205,7 @@ class WanModelLoaderInvocation(BaseInvocation):
         elif main_is_diffusers:
             vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
         elif self.component_source is not None:
-            self._validate_component_source_format(context, self.component_source)
+            self._validate_component_source_vae(context, self.component_source, main_variant)
             vae = self.component_source.model_copy(update={"submodel_type": SubModelType.VAE})
         else:
             raise ValueError(
@@ -248,4 +248,19 @@ class WanModelLoaderInvocation(BaseInvocation):
             raise ValueError(
                 f"The Component Source model must be in Diffusers format. "
                 f"The selected model '{source_config.name}' is in {source_config.format.value} format."
+            )
+
+    @staticmethod
+    def _validate_component_source_vae(
+        context: InvocationContext, model: ModelIdentifierField, main_variant: WanVariantType
+    ) -> None:
+        WanModelLoaderInvocation._validate_component_source_format(context, model)
+        source_config = context.models.get_config(model)
+        source_variant = getattr(source_config, "variant", None)
+        main_is_ti2v = main_variant == WanVariantType.TI2V_5B
+        source_is_ti2v = source_variant == WanVariantType.TI2V_5B
+        if main_is_ti2v != source_is_ti2v:
+            raise ValueError(
+                "The Component Source VAE is incompatible with the selected transformer. "
+                "TI2V-5B requires the 48-channel Wan 2.2 VAE; A14B models require the 16-channel Wan 2.1 VAE."
             )

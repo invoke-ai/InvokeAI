@@ -130,6 +130,26 @@ def test_staged_delete_can_be_committed(storage: DiskVideoFileStorage, tmp_path:
     assert _all_files(tmp_path / "videos") == []
 
 
+@pytest.mark.parametrize(
+    "video_name,video_subfolder",
+    [
+        ("../outside.mp4", ""),
+        (VIDEO_NAME, "../outside"),
+    ],
+)
+def test_invalid_staged_delete_does_not_create_staging_directory(
+    storage: DiskVideoFileStorage, tmp_path: Path, video_name: str, video_subfolder: str
+) -> None:
+    video_path = storage.get_path(VIDEO_NAME)
+    video_path.write_bytes(b"video")
+
+    with pytest.raises(ValueError):
+        storage.stage_delete(video_name, video_subfolder)
+
+    assert video_path.exists()
+    assert not list((tmp_path / "videos").glob(".delete_*"))
+
+
 def test_start_restores_staged_delete_when_record_still_exists(storage: DiskVideoFileStorage, tmp_path: Path):
     source = _make_source(tmp_path)
     storage.save(source_path=source, video_name=VIDEO_NAME, metadata='{"seed": 1}')

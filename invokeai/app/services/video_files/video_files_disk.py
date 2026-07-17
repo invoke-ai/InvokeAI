@@ -115,12 +115,12 @@ class DiskVideoFileStorage(VideoFileStorageBase):
         self.commit_delete(token)
 
     def stage_delete(self, video_name: str, video_subfolder: str = "") -> _StagedDelete:
-        staging_dir = Path(tempfile.mkdtemp(prefix=".delete_", dir=self.__output_folder))
         candidates = [
             self.get_path(video_name, video_subfolder=video_subfolder),
             self.get_path(video_name, thumbnail=True, video_subfolder=video_subfolder),
             self.__get_sidecar_path(video_name, video_subfolder=video_subfolder),
         ]
+        staging_dir = Path(tempfile.mkdtemp(prefix=".delete_", dir=self.__output_folder))
         staged: list[tuple[Path, Path]] = []
         try:
             with open(staging_dir / "manifest.json", "w", encoding="utf-8") as manifest:

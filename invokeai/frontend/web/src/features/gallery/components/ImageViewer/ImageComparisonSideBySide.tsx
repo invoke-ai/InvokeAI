@@ -1,4 +1,5 @@
 import { Flex, Image } from '@invoke-ai/ui-library';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import type { ComparisonProps } from 'features/gallery/components/ImageViewer/common';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { VerticalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
@@ -41,6 +42,8 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Comp
 ImageComparisonSideBySide.displayName = 'ImageComparisonSideBySide';
 
 const SideBySideImage = memo(({ imageDTO, type }: { imageDTO: ImageDTO; type: 'first' | 'second' }) => {
+  const imageUrl = useMediaUrl(imageDTO.image_url);
+  const thumbnailUrl = useMediaUrl(imageDTO.thumbnail_url);
   return (
     <Flex position="relative" w="full" h="full" alignItems="center" justifyContent="center">
       <Flex position="absolute" maxW="full" maxH="full" aspectRatio={imageDTO.width / imageDTO.height}>
@@ -50,8 +53,8 @@ const SideBySideImage = memo(({ imageDTO, type }: { imageDTO: ImageDTO; type: 'f
           h={imageDTO.height}
           maxW="full"
           maxH="full"
-          src={imageDTO.image_url}
-          fallbackSrc={imageDTO.thumbnail_url}
+          src={imageUrl}
+          fallbackSrc={thumbnailUrl}
           objectFit="contain"
           borderRadius="base"
         />

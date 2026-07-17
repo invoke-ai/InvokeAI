@@ -1,5 +1,6 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
@@ -23,12 +24,13 @@ export const BoardTooltip = ({ board, boardCounts }: Props) => {
     board?.cover_video_name ? skipToken : (board?.cover_image_name ?? skipToken)
   );
   const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
+  const refreshedThumbnailUrl = useMediaUrl(thumbnailUrl);
 
   return (
     <Flex flexDir="column" alignItems="center" gap={1}>
-      {thumbnailUrl && (
+      {refreshedThumbnailUrl && (
         <Image
-          src={thumbnailUrl}
+          src={refreshedThumbnailUrl}
           draggable={false}
           objectFit="cover"
           maxW={150}

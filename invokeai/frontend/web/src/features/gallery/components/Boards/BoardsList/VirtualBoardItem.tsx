@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
@@ -86,11 +87,12 @@ const CoverImage = ({
   const { currentData: coverImage } = useGetImageDTOQuery(coverVideoName ? skipToken : (coverImageName ?? skipToken));
 
   const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
+  const refreshedThumbnailUrl = useMediaUrl(thumbnailUrl);
 
-  if (thumbnailUrl) {
+  if (refreshedThumbnailUrl) {
     return (
       <Image
-        src={thumbnailUrl}
+        src={refreshedThumbnailUrl}
         draggable={false}
         objectFit="cover"
         w={10}
