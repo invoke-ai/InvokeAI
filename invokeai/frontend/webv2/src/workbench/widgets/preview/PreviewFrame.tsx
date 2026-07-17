@@ -81,11 +81,13 @@ export const PreviewFrame = ({
     },
     [onContextMenu]
   );
+  // `image-rendering` stays unset while the loupe is enabled so the loupe can
+  // toggle pixelated rendering on the content box (it inherits to the img).
   const imageStyle = useMemo<CSSProperties>(
     () => ({
       display: 'block',
       height: 'auto',
-      imageRendering: isLive && !shouldAntialiasLiveImage ? 'pixelated' : 'auto',
+      imageRendering: isLive && !shouldAntialiasLiveImage ? 'pixelated' : undefined,
       width: '100%',
     }),
     [isLive, shouldAntialiasLiveImage]
@@ -141,12 +143,14 @@ export const PreviewFrame = ({
 
   return (
     <Flex
+      ref={loupe.stageRefCallback}
       align="center"
       borderWidth="1px"
       borderColor="border.subtle"
       color="fg.grid"
       containerType="size"
       css={previewGridCss}
+      cursor={loupe.isZoomed ? 'grab' : undefined}
       flex="1"
       justify="center"
       minH="0"
@@ -155,50 +159,43 @@ export const PreviewFrame = ({
       position="relative"
       rounded="lg"
       w="full"
+      {...loupe.stageProps}
     >
       <PreviewCompareDropZone />
       <Box
-        ref={loupe.frameRefCallback}
+        ref={loupe.contentRef}
         bg="transparent"
         borderWidth="1px"
         borderColor={isLive ? 'accent.solid' : 'border.emphasized'}
         boxShadow="0 24px 80px rgba(0,0,0,0.42)"
         css={getFittedFrameCss(frameWidth, frameHeight)}
-        cursor={loupe.isZoomed ? 'grab' : undefined}
         overflow="hidden"
         position="relative"
         rounded="lg"
         onContextMenu={onContextMenu ? handleContextMenu : undefined}
-        {...loupe.frameProps}
       >
         {source ? (
-          <img
-            ref={loupe.imageRef}
-            alt={source.alt}
-            height={frameHeight}
-            src={source.src}
-            style={imageStyle}
-            width={frameWidth}
-          />
+          <img alt={source.alt} height={frameHeight} src={source.src} style={imageStyle} width={frameWidth} />
         ) : null}
         {liveBadge}
-        {loupe.zoomPercent !== null ? (
-          <Badge
-            aria-label={t('widgets.preview.resetZoom')}
-            as="button"
-            bottom="2"
-            cursor="pointer"
-            position="absolute"
-            right="2"
-            size="xs"
-            title={t('widgets.preview.resetZoom')}
-            variant="solid"
-            onClick={loupe.reset}
-          >
-            {loupe.zoomPercent}%
-          </Badge>
-        ) : null}
       </Box>
+      {loupe.zoomPercent !== null ? (
+        <Badge
+          aria-label={t('widgets.preview.resetZoom')}
+          as="button"
+          bottom="2"
+          cursor="pointer"
+          position="absolute"
+          right="2"
+          size="xs"
+          title={t('widgets.preview.resetZoom')}
+          variant="solid"
+          zIndex="1"
+          onClick={loupe.reset}
+        >
+          {loupe.zoomPercent}%
+        </Badge>
+      ) : null}
     </Flex>
   );
 };

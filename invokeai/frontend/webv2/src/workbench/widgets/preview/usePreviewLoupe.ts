@@ -9,13 +9,15 @@ import {
 } from 'react';
 
 /**
- * Lightweight zoom/pan for the preview frame: wheel zooms around the cursor,
- * left-drag pans, double-click toggles fit ⇄ 100%. Implemented as a CSS
- * transform applied imperatively (rAF-batched) to the img inside the fitted
- * frame — high-frequency pointer data never passes through React state; only
- * the rounded zoom percent does, for the corner chip. `scale === 1` is "fit"
- * (the frame's natural CSS size); the chip reports percent of the image's
- * actual pixels. Resets are handled by remounting the frame per image.
+ * Lightweight zoom/pan for the preview: wheel zooms around the cursor,
+ * left-drag pans, double-click toggles fit ⇄ 100%. The *stage* (the dot-grid
+ * area) is the viewport — the fitted, framed image scales and pans across the
+ * whole stage and clips at its edges, instead of being inspected through its
+ * own small wrapper. Implemented as a CSS transform applied imperatively
+ * (rAF-batched) to the fitted content box; high-frequency pointer data never
+ * passes through React state — only the rounded zoom percent does, for the
+ * corner chip. `scale === 1` is "fit"; the chip reports percent of the image's
+ * actual pixels.
  */
 
 /** Max zoom, as a fraction of the image's actual pixel size. */
@@ -32,12 +34,18 @@ export interface PreviewLoupeControls {
 
 interface LoupeTransform {
   scale: number;
+  /** Stage-space translation applied to the content box (origin 0 0). */
   tx: number;
   ty: number;
 }
 
-const clampAxis = (t: number, frameLen: number, contentLen: number): number =>
-  contentLen <= frameLen ? (frameLen - contentLen) / 2 : Math.min(0, Math.max(frameLen - contentLen, t));
+/**
+ * Clamp one axis of the translation: content smaller than the stage is
+ * centered; content larger may pan but never leaves a gap at either edge.
+ * `base` is the content's untransformed layout offset within the stage.
+ */
+const clampAxis = (t: number, stageLen: number, base: number, scaledLen: number): number =>
+  scaledLen <= stageLen ? (stageLen - scaledLen) / 2 - base : Math.min(-base, Math.max(stageLen - scaledLen - base, t));
 
 export const usePreviewLoupe = ({
   controlsRef,
@@ -48,8 +56,8 @@ export const usePreviewLoupe = ({
   enabled: boolean;
   naturalWidth: number;
 }) => {
-  const frameRef = useRef<HTMLDivElement | null>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const transformRef = useRef<LoupeTransform>({ scale: 1, tx: 0, ty: 0 });
   const rafRef = useRef<number | null>(null);
   const panPointerRef = useRef<{ pointerId: number; startX: number; startY: number; tx: number; ty: number } | null>(
@@ -57,6 +65,43 @@ export const usePreviewLoupe = ({
   );
   const lastSourceTokenRef = useRef<string | null | undefined>(undefined);
   const [zoomPercent, setZoomPercent] = useState<number | null>(null);
+
+  const getActualZoom = (scale: number): number => {
+    const renderedWidth = contentRef.current?.clientWidth ?? 0;
+
+    return renderedWidth > 0 && naturalWidth > 0 ? (scale * renderedWidth) / naturalWidth : scale;
+  };
+
+  const apply = useEffectEvent(() => {
+    if (rafRef.current !== null) {
+      return;
+    }
+
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const content = contentRef.current;
+      const transform = transformRef.current;
+
+      if (!content) {
+        return;
+      }
+
+      const isFit = transform.scale === 1;
+
+      content.style.transform = isFit
+        ? ''
+        : `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`;
+      content.style.transformOrigin = '0 0';
+
+      const actualZoom = getActualZoom(transform.scale);
+
+      // `image-rendering` is inherited, so setting it on the content box
+      // reaches the img (whose own style leaves it unset while the loupe is
+      // enabled).
+      content.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
+      setZoomPercent(isFit ? null : Math.round(actualZoom * 100));
+    });
+  });
 
   /**
    * Called during render with a token identifying the displayed image (or null
@@ -81,11 +126,11 @@ export const usePreviewLoupe = ({
     if (rafRef.current === null) {
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
-        const image = imageRef.current;
+        const content = contentRef.current;
 
-        if (image) {
-          image.style.transform = '';
-          image.style.imageRendering = '';
+        if (content) {
+          content.style.transform = '';
+          content.style.imageRendering = '';
         }
 
         setZoomPercent(null);
@@ -93,83 +138,59 @@ export const usePreviewLoupe = ({
     }
   };
 
-  const getActualZoom = (scale: number): number => {
-    const renderedWidth = frameRef.current?.clientWidth ?? 0;
-
-    return renderedWidth > 0 && naturalWidth > 0 ? (scale * renderedWidth) / naturalWidth : scale;
-  };
-
-  const apply = useEffectEvent(() => {
-    if (rafRef.current !== null) {
-      return;
-    }
-
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      const image = imageRef.current;
-      const transform = transformRef.current;
-
-      if (!image) {
-        return;
-      }
-
-      const isFit = transform.scale === 1;
-
-      image.style.transform = isFit ? '' : `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`;
-      image.style.transformOrigin = '0 0';
-
-      const actualZoom = getActualZoom(transform.scale);
-
-      image.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
-      setZoomPercent(isFit ? null : Math.round(actualZoom * 100));
-    });
-  });
-
   const setTransform = useEffectEvent((next: LoupeTransform) => {
-    const frame = frameRef.current;
+    const stage = stageRef.current;
+    const content = contentRef.current;
 
-    if (!frame) {
+    if (!stage || !content || content.clientWidth === 0) {
       return;
     }
 
-    const frameWidth = frame.clientWidth;
-    const frameHeight = frame.clientHeight;
-    const scale = Math.max(1, Math.min(next.scale, (MAX_ACTUAL_ZOOM * naturalWidth) / Math.max(1, frameWidth)));
+    const maxScale = Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidth) / content.clientWidth);
+    const scale = Math.max(1, Math.min(next.scale, maxScale));
 
     transformRef.current =
       scale === 1
         ? { scale: 1, tx: 0, ty: 0 }
         : {
             scale,
-            tx: clampAxis(next.tx, frameWidth, frameWidth * scale),
-            ty: clampAxis(next.ty, frameHeight, frameHeight * scale),
+            tx: clampAxis(next.tx, stage.clientWidth, content.offsetLeft, content.clientWidth * scale),
+            ty: clampAxis(next.ty, stage.clientHeight, content.offsetTop, content.clientHeight * scale),
           };
     apply();
   });
 
-  const zoomAroundPoint = useEffectEvent((pointX: number, pointY: number, nextScale: number) => {
+  /** Zoom keeping the content point under the given stage-space coordinates fixed. */
+  const zoomAroundPoint = useEffectEvent((stageX: number, stageY: number, nextScale: number) => {
+    const content = contentRef.current;
+
+    if (!content) {
+      return;
+    }
+
     const { scale, tx, ty } = transformRef.current;
     const ratio = nextScale / scale;
+    const anchorX = stageX - content.offsetLeft;
+    const anchorY = stageY - content.offsetTop;
 
     setTransform({
       scale: nextScale,
-      tx: pointX - (pointX - tx) * ratio,
-      ty: pointY - (pointY - ty) * ratio,
+      tx: anchorX - (anchorX - tx) * ratio,
+      ty: anchorY - (anchorY - ty) * ratio,
     });
   });
 
   const reset = useEffectEvent(() => setTransform({ scale: 1, tx: 0, ty: 0 }));
 
   const zoomToActual = useEffectEvent(() => {
-    const frame = frameRef.current;
+    const stage = stageRef.current;
+    const content = contentRef.current;
 
-    if (!frame || frame.clientWidth === 0) {
+    if (!stage || !content || content.clientWidth === 0) {
       return;
     }
 
-    const scale = Math.max(1, naturalWidth / frame.clientWidth);
-
-    zoomAroundPoint(frame.clientWidth / 2, frame.clientHeight / 2, scale);
+    zoomAroundPoint(stage.clientWidth / 2, stage.clientHeight / 2, Math.max(1, naturalWidth / content.clientWidth));
   });
 
   useImperativeHandle(controlsRef, () => ({ reset, zoomToActual }), []);
@@ -177,8 +198,8 @@ export const usePreviewLoupe = ({
   // The wheel listener must be attached manually with `passive: false` —
   // React's synthetic wheel events cannot preventDefault. Ref callback with
   // cleanup, so there is no effect to keep in sync.
-  const [frameRefCallback] = useState(() => (node: HTMLDivElement | null) => {
-    frameRef.current = node;
+  const [stageRefCallback] = useState(() => (node: HTMLDivElement | null) => {
+    stageRef.current = node;
 
     if (!node) {
       return;
@@ -254,9 +275,10 @@ export const usePreviewLoupe = ({
   };
 
   const handleDoubleClick = (event: MouseEvent<HTMLDivElement>): void => {
-    const frame = frameRef.current;
+    const stage = stageRef.current;
+    const content = contentRef.current;
 
-    if (!frame) {
+    if (!stage || !content || content.clientWidth === 0) {
       return;
     }
 
@@ -265,26 +287,32 @@ export const usePreviewLoupe = ({
       return;
     }
 
-    const rect = frame.getBoundingClientRect();
-    const scale = Math.max(1, naturalWidth / frame.clientWidth);
+    const rect = stage.getBoundingClientRect();
 
-    zoomAroundPoint(event.clientX - rect.left, event.clientY - rect.top, scale);
+    zoomAroundPoint(
+      event.clientX - rect.left,
+      event.clientY - rect.top,
+      Math.max(1, naturalWidth / content.clientWidth)
+    );
   };
 
   if (!enabled) {
     return {
-      frameProps: null,
-      frameRefCallback: null,
-      imageRef: null,
+      contentRef: null,
       isZoomed: false,
       reset,
+      stageProps: null,
+      stageRefCallback: null,
       syncDisplayedSource,
       zoomPercent: null,
     };
   }
 
   return {
-    frameProps: {
+    contentRef,
+    isZoomed: zoomPercent !== null,
+    reset,
+    stageProps: {
       onDoubleClick: handleDoubleClick,
       onLostPointerCapture: handlePointerEnd,
       onPointerCancel: handlePointerEnd,
@@ -292,10 +320,7 @@ export const usePreviewLoupe = ({
       onPointerMove: handlePointerMove,
       onPointerUp: handlePointerEnd,
     },
-    frameRefCallback,
-    imageRef,
-    isZoomed: zoomPercent !== null,
-    reset,
+    stageRefCallback,
     syncDisplayedSource,
     zoomPercent,
   };
