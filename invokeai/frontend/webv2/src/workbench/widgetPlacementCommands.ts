@@ -13,6 +13,8 @@ import type { WidgetDragEndResolution } from './widgetDnd';
 import type { WidgetPlacementMeta } from './widgetRegionViewModel';
 import type { WorkbenchAction } from './workbenchState';
 
+import { flushWorkbenchDrafts } from './widgets/draftRegistry';
+
 export interface WidgetPlacementProject {
   projectId?: string;
   widgetInstances: WidgetPlacementMeta;
@@ -141,6 +143,7 @@ export const closeWidgetPlacement = ({
     }
   }
 
+  flushWorkbenchDrafts();
   dispatch({ projectId: project.projectId, region, type: 'toggleRegionWidget', widgetId: instanceId });
 
   return { ok: true, region };

@@ -13,6 +13,7 @@ import { IconButton } from '@workbench/components/ui';
 import { GraphPreviewDialog } from '@workbench/graph-preview';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
+import { flushWorkbenchDrafts } from '@workbench/widgets/draftRegistry';
 import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { compileProjectGraph } from '@workbench/workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
@@ -116,7 +117,10 @@ export const WidgetActionsMenu = ({
     ? createGraphBearingSurface(manifest, region, label)
     : null;
   const surfaceSourceId = surface?.sourceId;
-  const handlePreview = useCallback(() => setIsPreviewOpen(true), []);
+  const handlePreview = useCallback(() => {
+    flushWorkbenchDrafts();
+    setIsPreviewOpen(true);
+  }, []);
   const positionHints =
     isPreviewOpen && surfaceSourceId === 'workflow'
       ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
