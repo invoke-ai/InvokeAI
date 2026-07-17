@@ -1,5 +1,6 @@
 """Tests for the TextLLMPipeline class."""
 
+import threading
 from unittest.mock import MagicMock, patch
 
 import torch
@@ -126,8 +127,13 @@ def test_pipeline_returns_joined_streamed_chunks():
     assert result == "hello world"
 
 
-def test_pipeline_invokes_progress_callback_per_chunk():
-    """Pipeline should call progress_callback once per non-empty streamed chunk."""
+def test_pipeline_invokes_progress_callback():
+    """Pipeline should report generation progress via progress_callback.
+
+    Emissions are throttled, so the callback is not guaranteed to fire once per chunk,
+    but it must fire at least once, always report the configured total, and its final
+    call must reflect the true accumulated token count.
+    """
     tokenizer = _make_mock_tokenizer(has_chat_template=True)
     model = _make_mock_model()
     pipeline = TextLLMPipeline(model, tokenizer)
@@ -142,8 +148,43 @@ def test_pipeline_invokes_progress_callback_per_chunk():
             progress_callback=lambda current, total: calls.append((current, total)),
         )
 
-    assert len(calls) == 3
+    assert len(calls) >= 1
     assert all(total == 50 for _, total in calls)
+    # The mock tokenizer reports 3 tokens for the accumulated text; the final emission
+    # must reflect that (clamped to max_new_tokens).
+    assert calls[-1] == (3, 50)
+
+
+def test_pipeline_reraises_generation_error_without_hanging():
+    """If model.generate() raises in the worker thread, run() must re-raise it promptly
+    rather than deadlock on the streamer.
+
+    Uses the real TextIteratorStreamer (not FakeStreamer) so the test exercises the
+    streamer.end()-on-exception path that unblocks the consumer loop. The generous
+    STREAM_TIMEOUT means a regression here would hang for two minutes, so the test is
+    wrapped in a hard timeout to fail fast instead.
+    """
+    tokenizer = _make_mock_tokenizer(has_chat_template=True)
+    model = _make_mock_model()
+    model.generate.side_effect = RuntimeError("CUDA out of memory")
+    pipeline = TextLLMPipeline(model, tokenizer)
+
+    result: list[BaseException] = []
+
+    def _run() -> None:
+        try:
+            pipeline.run(prompt="test", device=torch.device("cpu"), dtype=torch.float32)
+        except BaseException as e:  # noqa: BLE001 - capture whatever run() raises
+            result.append(e)
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    thread.join(timeout=10.0)
+
+    assert not thread.is_alive(), "pipeline.run() deadlocked when generate() raised"
+    assert len(result) == 1
+    assert isinstance(result[0], RuntimeError)
+    assert "CUDA out of memory" in str(result[0])
 
 
 def test_default_system_prompt_content():

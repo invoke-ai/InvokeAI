@@ -16,12 +16,13 @@ from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import assert_image_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.util.dynamicprompts import find_missing_wildcards
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
-from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
+from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, ProgressCallback, TextLLMPipeline
 from invokeai.backend.util.devices import TorchDevice
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,30 @@ def _resolve_model_path(model_config_path: str) -> Path:
     return (base_models_path / model_path).resolve()
 
 
+def _make_progress_callback(events: EventServiceBase, task_id: str | None, user_id: str) -> ProgressCallback | None:
+    """Build a progress callback that emits llm_task_progress events during generation.
+
+    Returns None when no task_id was supplied, since there is nothing to correlate the
+    events to. Shared by the text-LLM and image-to-prompt endpoints to keep the emitted
+    payloads identical.
+    """
+    if task_id is None:
+        return None
+
+    def progress_callback(current: int, total: int) -> None:
+        events.emit_llm_task_progress(
+            task_id=task_id,
+            user_id=user_id,
+            phase="generating",
+            message="Generating",
+            percentage=(current / total) if total > 0 else None,
+            current_tokens=current,
+            total_tokens=total,
+        )
+
+    return progress_callback
+
+
 def _run_expand_prompt(
     prompt: str,
     model_key: str,
@@ -135,19 +160,7 @@ def _run_expand_prompt(
         pipeline = TextLLMPipeline(model, tokenizer)
         model_device = next(model.parameters()).device
 
-        progress_callback = None
-        if task_id is not None:
-
-            def progress_callback(current: int, total: int) -> None:
-                events.emit_llm_task_progress(
-                    task_id=task_id,
-                    user_id=user_id,
-                    phase="generating",
-                    message="Generating",
-                    percentage=(current / total) if total > 0 else None,
-                    current_tokens=current,
-                    total_tokens=total,
-                )
+        progress_callback = _make_progress_callback(events, task_id, user_id)
 
         output = pipeline.run(
             prompt=prompt,
@@ -253,19 +266,7 @@ def _run_image_to_prompt(
         pipeline = LlavaOnevisionPipeline(model, processor)
         model_device = next(model.parameters()).device
 
-        progress_callback = None
-        if task_id is not None:
-
-            def progress_callback(current: int, total: int) -> None:
-                events.emit_llm_task_progress(
-                    task_id=task_id,
-                    user_id=user_id,
-                    phase="generating",
-                    message="Generating",
-                    percentage=(current / total) if total > 0 else None,
-                    current_tokens=current,
-                    total_tokens=total,
-                )
+        progress_callback = _make_progress_callback(events, task_id, user_id)
 
         output = pipeline.run(
             prompt=instruction,

@@ -14,16 +14,8 @@ export const LLMTaskProgressDisplay = memo(({ taskId }: Props) => {
   const allStates = useStore($llmTaskStates);
   const state = useMemo(() => (taskId ? allStates[taskId] : undefined), [allStates, taskId]);
 
-  if (!taskId || !state || state.status === 'complete') {
+  if (!taskId || !state) {
     return null;
-  }
-
-  if (state.status === 'error') {
-    return (
-      <Text fontSize="xs" color="error.300">
-        {state.error}
-      </Text>
-    );
   }
 
   const { phase, percentage, current_tokens, total_tokens } = state.payload;

@@ -10,28 +10,10 @@ type WorkflowUpdatedEvent = S['WorkflowUpdatedEvent'];
 type WorkflowDeletedEvent = S['WorkflowDeletedEvent'];
 type WorkflowAccessRevokedEvent = S['WorkflowAccessRevokedEvent'];
 
-// LLM utility task events (expand-prompt, image-to-prompt). Hand-typed until schema regen.
-export type LLMTaskProgressEventPayload = {
-  task_id: string;
-  user_id: string;
-  phase: 'loading_model' | 'generating';
-  message: string;
-  percentage: number | null;
-  current_tokens: number | null;
-  total_tokens: number | null;
-  timestamp: number;
-};
-type LLMTaskCompleteEventPayload = {
-  task_id: string;
-  user_id: string;
-  timestamp: number;
-};
-type LLMTaskErrorEventPayload = {
-  task_id: string;
-  user_id: string;
-  error: string;
-  timestamp: number;
-};
+// LLM utility task events (expand-prompt, image-to-prompt).
+export type LLMTaskProgressEventPayload = S['LLMTaskProgressEvent'];
+type LLMTaskCompleteEventPayload = S['LLMTaskCompleteEvent'];
+type LLMTaskErrorEventPayload = S['LLMTaskErrorEvent'];
 
 export type ServerToClientEvents = {
   invocation_progress: (payload: S['InvocationProgressEvent']) => void;

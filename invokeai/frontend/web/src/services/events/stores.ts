@@ -10,11 +10,10 @@ export const $loadingModelsCount = atom<number>(0);
 
 // LLM utility task progress (expand-prompt, image-to-prompt). Keyed by task_id so
 // concurrent tasks don't clobber each other. Components subscribe and read the
-// entry matching their current task.
-type LLMTaskState =
-  | { status: 'progress'; payload: LLMTaskProgressEventPayload }
-  | { status: 'complete' }
-  | { status: 'error'; error: string };
+// entry matching their current task. Only the in-flight progress state is tracked:
+// completion and error clear the entry (errors surface to the user via the RTK Query
+// toast), so a late socket event can never orphan an entry in the store.
+type LLMTaskState = { status: 'progress'; payload: LLMTaskProgressEventPayload };
 
 export const $llmTaskStates = atom<Record<string, LLMTaskState>>({});
 
