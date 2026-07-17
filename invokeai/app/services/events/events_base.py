@@ -29,6 +29,7 @@ from invokeai.app.services.events.events_common import (
     ModelLoadCompleteEvent,
     ModelLoadStartedEvent,
     QueueClearedEvent,
+    QueueItemsCanceledEvent,
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
@@ -123,6 +124,10 @@ class EventServiceBase:
         """Emitted when a list of queue items are retried"""
         self.dispatch(QueueItemsRetriedEvent.build(retry_result, user_ids, retried_item_ids_by_user))
 
+    def emit_queue_items_canceled(self, queue_id: str, canceled_item_ids_by_user: dict[str, list[int]]) -> None:
+        """Emitted when queue items are canceled or deleted in bulk without per-item status change events"""
+        self.dispatch(QueueItemsCanceledEvent.build(queue_id, canceled_item_ids_by_user))
+
     def emit_queue_cleared(self, queue_id: str, user_id: str | None = None) -> None:
         """Emitted when a queue is cleared. `user_id` scopes the clear to one user's items; None means all."""
         self.dispatch(QueueClearedEvent.build(queue_id, user_id))
@@ -186,15 +191,17 @@ class EventServiceBase:
 
     # region Model loading
 
-    def emit_model_load_started(self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None) -> None:
+    def emit_model_load_started(
+        self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None, user_id: str = "system"
+    ) -> None:
         """Emitted when a model load is started."""
-        self.dispatch(ModelLoadStartedEvent.build(config, submodel_type))
+        self.dispatch(ModelLoadStartedEvent.build(config, submodel_type, user_id))
 
     def emit_model_load_complete(
-        self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None
+        self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None, user_id: str = "system"
     ) -> None:
         """Emitted when a model load is complete."""
-        self.dispatch(ModelLoadCompleteEvent.build(config, submodel_type))
+        self.dispatch(ModelLoadCompleteEvent.build(config, submodel_type, user_id))
 
     # endregion
 
