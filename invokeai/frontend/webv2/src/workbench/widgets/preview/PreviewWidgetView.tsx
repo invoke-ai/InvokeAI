@@ -530,7 +530,6 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               filmstripImages={isFilmstripVisible && density !== 'minimal' ? boardImages : null}
               loupeControlsRef={loupeControlsRef}
               boardImageCount={boardImages.length}
-              boardName={boardName}
               density={density}
               image={selectedImage}
               isLoadingBoard={isLoadingBoard}
@@ -566,7 +565,6 @@ const SelectedImagePreview = ({
   actionImage,
   actions,
   boardImageCount,
-  boardName,
   density,
   filmstripImages,
   image,
@@ -585,7 +583,6 @@ const SelectedImagePreview = ({
   actionImage: GalleryImage | null;
   actions: ImageActions;
   boardImageCount: number;
-  boardName: string;
   density: PreviewDensity;
   /** Board thumbnails for the filmstrip, or null when the strip is hidden. */
   filmstripImages: PreviewImage[] | null;
@@ -659,8 +656,6 @@ const SelectedImagePreview = ({
         actionImage={actionImage}
         actions={actions}
         boardImageCount={boardImageCount}
-        boardName={boardName}
-        density={density}
         image={image}
         isLive={isProgressImage}
         isLoadingBoard={isLoadingBoard}

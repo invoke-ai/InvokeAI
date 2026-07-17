@@ -2,27 +2,24 @@ import type { GalleryImage } from '@workbench/gallery/api';
 import type { ImageActions } from '@workbench/image-actions';
 import type { GeneratedImageContract } from '@workbench/types';
 
-import { Badge, HStack, Stack, Text } from '@chakra-ui/react';
+import { HStack, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
-import type { PreviewDensity } from './previewDensity';
 
 import { PreviewLiveStatusLine } from './PreviewLiveReadout';
 import { PreviewMetadataPanel } from './PreviewMetadataPanel';
 
 /**
- * The preview's info card: board context ("N of M"), prev/next navigation and
- * the image identity rows. Image actions live in the widget header's actions
- * slot (`PreviewHeaderActions`), not here.
+ * The preview's slim status bar: board position and dimensions (or live
+ * progress) on one quiet row with prev/next, plus the Details expander.
+ * Identity (board / image name) lives in the widget header; image actions
+ * live in the header's actions slot — never here.
  */
 export const PreviewFooter = ({
   actionImage,
   actions,
   boardImageCount,
-  boardName,
-  density,
   image,
   isLive,
   isLoadingBoard,
@@ -37,13 +34,11 @@ export const PreviewFooter = ({
   actionImage: GalleryImage | null;
   actions: ImageActions;
   boardImageCount: number;
-  boardName: string;
-  density: PreviewDensity;
   image: GeneratedImageContract;
   isLive: boolean;
   isLoadingBoard: boolean;
   isMetadataOpen: boolean;
-  /** The live run's local queue item id, when a progress readout should replace the dimensions row. */
+  /** The live run's local queue item id, when a progress readout should replace the dimensions. */
   liveQueueItemId?: string | null;
   onNext: () => void;
   onPrevious: () => void;
@@ -51,21 +46,29 @@ export const PreviewFooter = ({
   selectedIndex: number;
 }) => {
   const { t } = useTranslation();
+  const positionLabel = isLoadingBoard
+    ? t('widgets.preview.loadingBoard')
+    : selectedIndex === -1
+      ? t('widgets.preview.imageCount', { count: boardImageCount })
+      : t('common.countOfTotal', { count: selectedIndex + 1, total: boardImageCount });
 
   return (
     <Stack borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
       <HStack align="center" justify="space-between">
-        <HStack gap="2" minW="0">
-          <Badge flexShrink={0} size="xs" variant="subtle">
-            {boardName}
-          </Badge>
+        <HStack gap="1" minW="0">
           <Text color="fg.subtle" fontSize="2xs" truncate>
-            {isLoadingBoard
-              ? t('widgets.preview.loadingBoard')
-              : selectedIndex === -1
-                ? t('widgets.preview.imageCount', { count: boardImageCount })
-                : t('common.countOfTotal', { count: selectedIndex + 1, total: boardImageCount })}
+            {positionLabel}
           </Text>
+          <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+            ·
+          </Text>
+          {isLive && typeof liveQueueItemId === 'string' ? (
+            <PreviewLiveStatusLine queueItemId={liveQueueItemId} />
+          ) : (
+            <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+              {isLive ? t('common.generating') : `${image.width} × ${image.height}`}
+            </Text>
+          )}
         </HStack>
         <HStack flexShrink={0} gap="1">
           <Button
@@ -88,21 +91,6 @@ export const PreviewFooter = ({
           </Button>
         </HStack>
       </HStack>
-      <Stack>
-        <Text fontSize="xs" fontWeight="800" truncate>
-          {image.imageName}
-        </Text>
-        <Text color="fg.subtle" fontSize="2xs">
-          {t('widgets.preview.sourceRun', { id: image.sourceQueueItemId })}
-        </Text>
-        {isLive && density === 'full' && typeof liveQueueItemId === 'string' ? (
-          <PreviewLiveStatusLine queueItemId={liveQueueItemId} />
-        ) : (
-          <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
-            {isLive ? t('common.generating') : `${image.width} x ${image.height}`}
-          </Text>
-        )}
-      </Stack>
       {actionImage ? (
         <PreviewMetadataPanel
           actions={actions}
