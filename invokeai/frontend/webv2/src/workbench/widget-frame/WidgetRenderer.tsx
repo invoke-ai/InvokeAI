@@ -7,6 +7,7 @@ import type {
 } from '@workbench/types';
 
 import { Box, Flex, Text } from '@chakra-ui/react';
+import { Scrollable } from '@workbench/components/ui';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
@@ -236,10 +237,14 @@ const HeaderSlot = memo(function HeaderSlot({
   );
 }, areSlotPropsEqual);
 
+// Grid content with minH="full" stretches fill-height widget views (gallery,
+// layers, preview) to the viewport while letting flowing views grow and scroll.
+const panelBodyContentProps = { display: 'grid', minH: 'full' } as const;
+
 const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
-  <Flex direction="column" flex="1" minH="0" minW="0" overflowX="hidden" overflowY="auto">
+  <Scrollable contentProps={panelBodyContentProps} flex="1" minH="0" minW="0" overflowX="hidden">
     {children}
-  </Flex>
+  </Scrollable>
 );
 
 const FooterSlot = memo(function FooterSlot({
