@@ -35,10 +35,14 @@ export const PreviewFilmstrip = ({
   }
 
   return (
-    // The ScrollArea root's recipe defaults to `height: 100%`, so the strip
-    // MUST get an explicit height or it swallows the widget (the frame's
-    // flex-1 collapses). Height = thumb size + scrollbar allowance.
+    // Two containment rules keep the strip honest: the ScrollArea root's
+    // recipe defaults to `height: 100%`, so it MUST get an explicit height or
+    // it swallows the widget; and `contain: inline-size` zeroes the strip's
+    // intrinsic width so a long board can never stretch the widget wider than
+    // its panel (side panels host widgets in a grid ScrollArea.Content that
+    // otherwise grows to max-content).
     <ScrollArea.Root
+      css={FILMSTRIP_CONTAIN_CSS}
       flexShrink={0}
       h={density === 'full' ? '3.75rem' : '2.75rem'}
       minW="0"
@@ -129,6 +133,8 @@ const FilmstripThumb = ({
     </Box>
   );
 };
+
+const FILMSTRIP_CONTAIN_CSS = { contain: 'inline-size' } as const;
 
 const FILMSTRIP_IMG_STYLE = {
   display: 'block',
