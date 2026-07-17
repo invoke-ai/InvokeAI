@@ -220,3 +220,99 @@ def test_get_bulk_download_image_image_deleted_after_response(
     client.get("/api/v1/images/download/test.zip")
 
     assert not (tmp_path / "test.zip").exists()
+
+
+# ── Transactional single-image deletion (DELETE /api/v1/images/i/{image_name}) ──
+
+
+def prepare_delete_image_test(monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path):
+    """Wire the delete route to a real ImageService + real DiskImageFileStorage + real SQLite records."""
+    from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+    mock_invoker.services.urls = MagicMock()
+    mock_invoker.services.urls.get_image_url.return_value = "http://localhost/img.png"
+
+    storage = DiskImageFileStorage(tmp_path / "outputs")
+    mock_invoker.services.image_files = storage
+    storage.start(mock_invoker)
+    mock_invoker.services.images.start(mock_invoker)
+    return storage
+
+
+def _save_deletable_image(mock_invoker: Invoker, storage, image_name: str) -> None:
+    from PIL import Image
+
+    from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+
+    mock_invoker.services.image_records.save(
+        image_name=image_name,
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=64,
+        height=64,
+        has_workflow=False,
+    )
+    storage.save(image=Image.new("RGB", (64, 64)), image_name=image_name)
+
+
+def test_delete_image_success_deletes_files_and_record(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
+
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+
+    response = client.delete("/api/v1/images/i/del.png")
+
+    assert response.status_code == 200
+    json_response = response.json()
+    assert json_response["deleted_images"] == ["del.png"]
+    assert json_response["affected_boards"] == ["none"]
+    assert not storage.get_path("del.png").exists()
+    assert not storage.get_path("del.png", thumbnail=True).exists()
+    with pytest.raises(ImageRecordNotFoundException):
+        mock_invoker.services.image_records.get("del.png")
+    assert list(storage.image_root.glob(".delete_*")) == []
+
+
+def test_delete_image_not_found_returns_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+
+    response = client.delete("/api/v1/images/i/does-not-exist.png")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Image not found"
+
+
+def test_delete_image_db_failure_returns_500_and_restores_files(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    from invokeai.app.services.image_records.image_records_common import ImageRecordDeleteException
+
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+
+    def failing_delete(image_name: str) -> None:
+        raise ImageRecordDeleteException()
+
+    monkeypatch.setattr(mock_invoker.services.image_records, "delete", failing_delete)
+
+    response = client.delete("/api/v1/images/i/del.png")
+
+    # The route must report the failure, not a success-shaped empty payload.
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to delete image"
+    # The staged files must be rolled back: image and thumbnail restored, record intact.
+    assert storage.get_path("del.png").exists()
+    assert storage.get_path("del.png", thumbnail=True).exists()
+    assert mock_invoker.services.image_records.get("del.png").image_name == "del.png"
+    assert list(storage.image_root.glob(".delete_*")) == []

@@ -70,8 +70,8 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def delete_intermediates(self) -> list[tuple[str, str]]:
-        """Deletes all intermediate image records, returning a list of (image_name, image_subfolder) tuples."""
+    def get_intermediates(self) -> list[tuple[str, str]]:
+        """Gets all intermediate image records as (image_name, image_subfolder) tuples, without deleting them."""
         pass
 
     @abstractmethod
