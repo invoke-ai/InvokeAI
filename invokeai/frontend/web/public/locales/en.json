@@ -448,6 +448,7 @@
         "credits": "Credits",
         "pending": "Pending",
         "in_progress": "In Progress",
+        "waiting": "Waiting On Child Workflow",
         "paused": "Paused",
         "completed": "Completed",
         "failed": "Failed",
@@ -1006,6 +1007,11 @@
     },
     "lora": {
         "weight": "Weight",
+        "startingWeight": "Starting Weight",
+        "weightMin": "Min Weight",
+        "weightMax": "Max Weight",
+        "weightMinMustBeLessThanMax": "Min weight must be less than max weight",
+        "weightOutOfRange": "Starting weight must be within the min/max range",
         "removeLoRA": "Remove LoRA"
     },
     "metadata": {
@@ -1136,6 +1142,7 @@
         "cpuOnly": "CPU Only",
         "fp8Storage": "FP8 Storage (Save VRAM)",
         "runOnCpu": "Run text encoder model on CPU only",
+        "runVaeOnCpu": "Run VAE model on CPU only",
         "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
         "defaultSettingsSaved": "Default Settings Saved",
@@ -1355,6 +1362,10 @@
         "animaVaePlaceholder": "Select Anima-compatible VAE",
         "animaQwen3Encoder": "Qwen3 0.6B Encoder",
         "animaQwen3EncoderPlaceholder": "Select Qwen3 0.6B encoder",
+        "animaInpaintAdapter": "Inpaint Adapter",
+        "animaInpaintAdapterPlaceholder": "Select inpaint adapter (optional)",
+        "animaInpaintAdapterHelper": "Only used when inpainting or outpainting on Canvas.",
+        "animaInpaintAdapterWeight": "Adapter Weight",
         "zImageVae": "VAE (optional)",
         "zImageVaePlaceholder": "From VAE source model",
         "zImageQwen3Encoder": "Qwen3 Encoder (optional)",
@@ -1486,6 +1497,12 @@
         "loadWorkflow": "Load Workflow",
         "noWorkflows": "No Workflows",
         "noMatchingWorkflows": "No Matching Workflows",
+        "savedWorkflowChoose": "Choose a workflow",
+        "savedWorkflowDefaultBadge": "Default",
+        "savedWorkflowMissing": "Missing or inaccessible workflow",
+        "savedWorkflowUnsupported": "Unsupported",
+        "savedWorkflowSelectExposedFields": "Select a workflow with exposed form fields",
+        "savedWorkflowUpdating": "Updating...",
         "noWorkflow": "No Workflow",
         "noWorkflowToSave": "No workflow to save",
         "unableToUpdateNode": "Node update failed: node {{node}} of type {{type}} (may require deleting and recreating)",
@@ -1844,6 +1861,26 @@
         "imageSubfolderStrategySaveFailed": "Failed to save Image Subfolder Strategy",
         "imageSubfolderStrategyType": "Type",
         "imageSubfolderStrategyUnknown": "Unknown ({{strategy}})",
+        "imageStorageMaintenance": "Image Storage Maintenance",
+        "imageStorageMaintenanceOperationMove": "Move Images",
+        "imageStorageMaintenanceOperationNone": "None",
+        "imageStorageMaintenanceOperationRecovery": "Recovery",
+        "imageStorageMaintenanceRecover": "Recover",
+        "imageStorageMaintenanceRecoveryFailed": "Failed to start Image Storage Maintenance recovery",
+        "imageStorageMaintenanceStart": "Start Move",
+        "imageStorageMaintenanceStartFailed": "Failed to start Image Storage Maintenance",
+        "imageStorageMaintenanceStateCommitted": "Committed",
+        "imageStorageMaintenanceStateError": "Error",
+        "imageStorageMaintenanceStateMoved": "Moved",
+        "imageStorageMaintenanceStateMoving": "Moving",
+        "imageStorageMaintenanceStateNone": "No jobs",
+        "imageStorageMaintenanceStatePlanned": "Planned",
+        "imageStorageMaintenanceStatusIncomplete_one": "{{count}} image still needs moving",
+        "imageStorageMaintenanceStatusIncomplete_other": "{{count}} images still need moving",
+        "imageStorageMaintenanceStatusIdle": "Status: {{state}}",
+        "imageStorageMaintenanceStatusNeedsRecovery": "Recovery needed for job {{jobId}}",
+        "imageStorageMaintenanceStatusRunning": "Running: {{operation}}",
+        "imageStorageMaintenanceStatusUnavailable": "Status unavailable",
         "maxQueueHistory": "Max Queue History",
         "maxQueueHistorySaveFailed": "Failed to save Max Queue History",
         "models": "Models",
@@ -1907,6 +1944,7 @@
         "layerSavedToAssets": "Layer Saved to Assets",
         "loadedWithWarnings": "Workflow Loaded with Warnings",
         "modelAddedSimple": "Model Added to Queue",
+        "modelDefaultsLoaded": "Model Defaults Loaded",
         "modelImportCanceled": "Model Import Canceled",
         "outOfMemoryError": "Out of Memory Error",
         "outOfMemoryErrorDescLocal": "Follow our <LinkComponent>Low VRAM guide</LinkComponent> to reduce OOMs.",
@@ -2427,6 +2465,13 @@
                 "This saves VRAM for the denoiser while only slightly impacting performance. The conditioning outputs are automatically moved to GPU for the denoiser."
             ]
         },
+        "cpuOnlyVae": {
+            "heading": "CPU Only",
+            "paragraphs": [
+                "When enabled, the VAE will run on CPU instead of GPU.",
+                "This saves VRAM during decoding, but VAE decoding will be slower. The decoded image is automatically moved back to the correct device."
+            ]
+        },
         "fp8Storage": {
             "heading": "FP8 Storage",
             "paragraphs": [
@@ -2457,6 +2502,17 @@
         "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
+        "callable": "Callable",
+        "savedWorkflowCompatibility": {
+            "missingWorkflowReturn": "The workflow must contain a Workflow Return node.",
+            "multipleWorkflowReturn": "The workflow may contain only one Workflow Return node.",
+            "unsupportedNode": "The workflow contains a node that Call Saved Workflow does not support.",
+            "unsupportedBatchInput": "The workflow contains batch input wiring that Call Saved Workflow does not support.",
+            "invalidGraph": "The workflow graph is invalid and cannot be called.",
+            "invalidInputs": "The workflow has invalid exposed inputs and cannot be called.",
+            "exceedsCapacity": "The workflow would create more child executions than the queue currently allows.",
+            "unknown": "The workflow cannot currently be used by Call Saved Workflow."
+        },
         "published": "Published",
         "browseWorkflows": "Browse Workflows",
         "deselectAll": "Deselect All",
@@ -2860,6 +2916,7 @@
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
             "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill",
+            "controlAdapterDuplicateAnimaLLLiteModel": "each Anima control model can only be used by one Control Layer",
             "bboxHidden": "Bounding box is hidden (shift+o to toggle)"
         },
         "errors": {

@@ -9,6 +9,7 @@ import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelH
 import { ModelSettingsExportButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelSettingsExportButton';
 import { ModelSettingsImportButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelSettingsImportButton';
 import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/TriggerPhrases';
+import { VAEModelSettings } from 'features/modelManagerV2/subpanels/ModelPanel/VAEModelSettings/VAEModelSettings';
 import { filesize } from 'filesize';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,6 +83,10 @@ export const ModelView = memo(({ modelConfig }: Props) => {
     if (isEncoderModel(modelConfig)) {
       return true;
     }
+    // VAE models (cpu_only toggle)
+    if (modelConfig.type === 'vae') {
+      return true;
+    }
 
     return false;
   }, [modelConfig]);
@@ -151,6 +156,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
               )}
               {modelConfig.type === 'main' && <TriggerPhrases modelConfig={modelConfig} />}
               {isEncoderModel(modelConfig) && <EncoderModelSettings modelConfig={modelConfig} />}
+              {modelConfig.type === 'vae' && <VAEModelSettings modelConfig={modelConfig} />}
             </Box>
           </>
         )}

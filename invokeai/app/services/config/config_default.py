@@ -30,8 +30,12 @@ ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
+SESSION_QUEUE_MODE = Literal["FIFO", "round_robin"]
 IMAGE_SUBFOLDER_STRATEGY = Literal["flat", "date", "type", "hash"]
 CONFIG_SCHEMA_VERSION = "4.0.3"
+# Path prefixes owned by real routes/mounts. A `base_url` starting with one of these would collide
+# with routing and silently brick the server, so it is rejected during validation.
+RESERVED_BASE_URL_PREFIXES = {"api", "ws", "static", "docs", "redoc", "openapi.json", "locales", "assets"}
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_alibabacloud_api_key",
     "external_alibabacloud_base_url",
@@ -114,6 +118,7 @@ class InvokeAIAppConfig(BaseSettings):
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
+        session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
         clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
         max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
         allow_nodes: List of nodes to allow. Omit to allow all.
@@ -134,6 +139,8 @@ class InvokeAIAppConfig(BaseSettings):
         external_openai_base_url: Base URL override for OpenAI image generation.
         external_seedream_api_key: API key for Seedream image generation.
         external_seedream_base_url: Base URL override for Seedream image generation.
+        base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
+        forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -155,6 +162,8 @@ class InvokeAIAppConfig(BaseSettings):
     allow_headers:            list[str] = Field(default=["*"],              description="Headers allowed for CORS.")
     ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
     ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
+    base_url:             Optional[str] = Field(default=None,               description="Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash.")
+    forwarded_allow_ips:            str = Field(default="127.0.0.1",        description="Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.")
 
     # MISC FEATURES
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
@@ -214,6 +223,7 @@ class InvokeAIAppConfig(BaseSettings):
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
+    session_queue_mode: SESSION_QUEUE_MODE = Field(default="round_robin",   description="Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.")
     clear_queue_on_startup:        bool = Field(default=False,              description="Empties session queue on startup. If true, disables `max_queue_history`.")
     max_queue_history:      Optional[int] = Field(default=None, ge=0,        description="Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.")
 
@@ -256,6 +266,28 @@ class InvokeAIAppConfig(BaseSettings):
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize the reverse-proxy base path: ensure a single leading slash, no trailing slash.
+
+        Empty values and a bare `/` normalize to `None` (feature disabled).
+
+        Reject base paths whose first segment collides with a real route prefix (`/api`, `/ws`, ...):
+        such a value silently bricks the server in both proxy styles (the sub-path rewrite and
+        Starlette's own `root_path` stripping fight over the same prefix), with no hint at the cause,
+        so we fail fast instead.
+        """
+        if v is None:
+            return None
+        v = v.strip().strip("/")
+        if not v:
+            return None
+        first_segment = v.split("/")[0]
+        if first_segment in RESERVED_BASE_URL_PREFIXES:
+            raise ValueError(f"base_url must not start with reserved path segment '/{first_segment}'")
+        return f"/{v}"
 
     def update_config(self, config: dict[str, Any] | InvokeAIAppConfig, clobber: bool = True) -> None:
         """Updates the config, overwriting existing values.

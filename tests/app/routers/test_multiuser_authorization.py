@@ -10,7 +10,7 @@ These tests verify the security fixes for:
 
 import logging
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import status
@@ -221,6 +221,31 @@ def _create_workflow(client: TestClient, token: str) -> str:
     r = client.post("/api/v1/workflows/", json={"workflow": WORKFLOW_BODY}, headers=_auth(token))
     assert r.status_code == 200
     return r.json()["workflow_id"]
+
+
+def _insert_pending_queue_item(session_queue: Any, user_id: str, queue_id: str = "default") -> int:
+    """Insert a pending queue item owned by ``user_id`` directly into the queue's database."""
+    import uuid
+
+    from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+    from tests.test_nodes import PromptTestInvocation
+
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
+    session = GraphExecutionState(graph=graph)
+    session_json = session.model_dump_json(warnings=False, exclude_none=True)
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, field_values, priority,
+                workflow, origin, destination, retried_from_item_id, user_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (queue_id, session_json, session.id, str(uuid.uuid4()), None, 0, None, None, None, None, user_id),
+        )
+        return cursor.lastrowid
 
 
 # ===========================================================================
@@ -1324,6 +1349,7 @@ class TestQueueStatusScoping:
             batch_id=None,
             pending=2,
             in_progress=0,
+            waiting=0,
             completed=1,
             failed=0,
             canceled=0,
@@ -1353,6 +1379,7 @@ class TestQueueStatusScoping:
             batch_id=None,
             pending=5,
             in_progress=1,
+            waiting=0,
             completed=0,
             failed=0,
             canceled=0,
@@ -1365,6 +1392,64 @@ class TestQueueStatusScoping:
         scoped = status_obj.model_copy(update={"user_pending": 2, "user_in_progress": 1})
         assert scoped.pending == 5  # global, unchanged
         assert scoped.user_pending == 2  # this user's share
+
+    def _setup_queue_router(self, mock_invoker: Invoker):
+        """Wire a real session queue and a stub processor into the invoker the router uses,
+        so GET /queue/{queue_id}/status exercises the real service contract."""
+        from unittest.mock import MagicMock
+
+        from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
+        from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+
+        db = mock_invoker.services.board_records._db
+        queue = SqliteSessionQueue(db=db)
+        queue.start(mock_invoker)
+        mock_invoker.services.session_queue = queue
+
+        processor = MagicMock()
+        processor.get_status.return_value = SessionProcessorStatus(is_started=True, is_processing=False)
+        mock_invoker.services.session_processor = processor
+        return queue
+
+    def test_get_queue_status_route_returns_global_and_user_counts(
+        self, setup_jwt_secret: None, enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
+    ):
+        """Regression test: GET /api/v1/queue/{queue_id}/status must return 200 (not 500) and the
+        expected global and per-user counts for both non-admin and admin callers. Previously the
+        router called get_queue_status() with a keyword the service did not accept, raising a
+        TypeError that the broad except turned into a 500 for every status request."""
+        queue = self._setup_queue_router(mock_invoker)
+
+        user1_id = _create_user(mock_invoker, "user1@test.com", "User One")
+        user2_id = _create_user(mock_invoker, "user2@test.com", "User Two")
+        _create_user(mock_invoker, "admin@test.com", "Admin", is_admin=True)
+        user1_tok = _login(client, "user1@test.com")
+        admin_tok = _login(client, "admin@test.com")
+
+        # Three pending jobs globally: two owned by user1, one by user2; none by the admin.
+        _insert_pending_queue_item(queue, user_id=user1_id)
+        _insert_pending_queue_item(queue, user_id=user1_id)
+        _insert_pending_queue_item(queue, user_id=user2_id)
+
+        # Non-admin caller sees the global total but only their own pending count.
+        r = client.get("/api/v1/queue/default/status", headers=_auth(user1_tok))
+        assert r.status_code == 200
+        queue_status = r.json()["queue"]
+        assert queue_status["pending"] == 3
+        assert queue_status["total"] == 3
+        assert queue_status["user_pending"] == 2
+        assert queue_status["user_in_progress"] == 0
+
+        # Admin caller sees the same global total plus their own per-user counts (zero here -
+        # the admin owns no items), so personal UI like the progress bar can distinguish the
+        # admin's own activity from other users'.
+        r = client.get("/api/v1/queue/default/status", headers=_auth(admin_tok))
+        assert r.status_code == 200
+        queue_status = r.json()["queue"]
+        assert queue_status["pending"] == 3
+        assert queue_status["total"] == 3
+        assert queue_status["user_pending"] == 0
+        assert queue_status["user_in_progress"] == 0
 
 
 # ===========================================================================
@@ -1599,11 +1684,15 @@ class TestWebSocketAuth:
         import asyncio
 
         mock_invoker.services.configuration.multiuser = False
+        socketio._sio.enter_room = AsyncMock()
 
         result = asyncio.run(socketio._handle_connect("sid-single-1", environ={}, auth=None))
         assert result is True
         assert socketio._socket_users["sid-single-1"]["user_id"] == "system"
         assert socketio._socket_users["sid-single-1"]["is_admin"] is True
+        socketio._sio.enter_room.assert_any_call("sid-single-1", "user:system")
+        socketio._sio.enter_room.assert_any_call("sid-single-1", "workflows:shared")
+        socketio._sio.enter_room.assert_any_call("sid-single-1", "admin")
 
     def test_connect_accepted_with_valid_token_in_multiuser_mode(
         self,
@@ -1618,6 +1707,7 @@ class TestWebSocketAuth:
         from invokeai.app.services.users.users_common import UserCreateRequest
 
         mock_invoker.services.configuration.multiuser = True
+        socketio._sio.enter_room = AsyncMock()
 
         # Create the user in the database so the active-user check passes
         user = mock_invoker.services.users.create(
@@ -1732,8 +1822,11 @@ class TestWebSocketAuth:
         assert event.queue_id == "default"
 
     def test_queue_item_status_changed_routed_privately(self, socketio: Any) -> None:
-        """Verify that _handle_queue_event emits QueueItemStatusChangedEvent ONLY to
-        user:{user_id} and admin rooms, never to the queue_id room."""
+        """_handle_queue_event must emit the FULL QueueItemStatusChangedEvent only to the
+        owner's user room and the admin room. A sanitized companion (user_id="redacted",
+        identifiers stripped) is also emitted to the queue_id room so other users' UIs can
+        refresh, with the owner's and admins' sids in skip_sid so they don't get a duplicate
+        that would clobber their cache."""
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -1763,6 +1856,7 @@ class TestWebSocketAuth:
                 destination="canvas",
                 pending=0,
                 in_progress=1,
+                waiting=0,
                 completed=0,
                 failed=0,
                 canceled=0,
@@ -1775,6 +1869,7 @@ class TestWebSocketAuth:
                 batch_id="batch-private",
                 pending=0,
                 in_progress=1,
+                waiting=0,
                 completed=0,
                 failed=0,
                 canceled=0,
@@ -1782,20 +1877,62 @@ class TestWebSocketAuth:
             ),
         )
 
+        # Track owner sid so we can verify skip_sid is honored
+        socketio._socket_users["sid-owner"] = {"user_id": "owner-xyz", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
         mock_emit = AsyncMock()
         socketio._sio.emit = mock_emit
 
         asyncio.run(socketio._handle_queue_event(("queue_item_status_changed", event)))
 
-        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "user:owner-xyz" in rooms_emitted_to
-        assert "admin" in rooms_emitted_to
-        # CRITICAL: must NOT emit to the queue_id room — that would leak to other users
-        assert "default" not in rooms_emitted_to
+        # Collect (room, payload, skip_sid) for each emit call
+        emits = [
+            (c.kwargs.get("room"), c.kwargs.get("data"), c.kwargs.get("skip_sid")) for c in mock_emit.call_args_list
+        ]
+
+        # Full event must go to owner + admin rooms with original sensitive fields, in a SINGLE
+        # emit to the room list — python-socketio dedups recipients across a room list, so an
+        # admin owner (or the single-user "system" user, which is in both rooms) receives
+        # exactly one copy instead of running the frontend handler twice.
+        full_emits = [(p, s) for r, p, s in emits if r == ["user:owner-xyz", "admin"]]
+        assert len(full_emits) == 1
+        for payload, _ in full_emits:
+            assert payload["user_id"] == "owner-xyz"
+            assert payload["batch_id"] == "batch-private"
+            assert payload["session_id"] == "sess-private"
+            assert payload["destination"] == "canvas"
+
+        # A sanitized companion event must go to the queue_id room with sensitive fields cleared
+        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        assert len(queue_emits) == 1, "expected exactly one sanitized emit to queue room"
+        sanitized_payload, skip_sid = queue_emits[0]
+        assert sanitized_payload["user_id"] == "redacted"
+        assert sanitized_payload["batch_id"] == "redacted"
+        assert sanitized_payload["session_id"] == "redacted"
+        assert sanitized_payload["origin"] is None
+        assert sanitized_payload["destination"] is None
+        assert sanitized_payload["error_type"] is None
+        assert sanitized_payload["batch_status"]["batch_id"] == "redacted"
+        assert sanitized_payload["batch_status"]["destination"] is None
+        assert sanitized_payload["queue_status"]["item_id"] is None
+        assert sanitized_payload["queue_status"]["batch_id"] is None
+        assert sanitized_payload["queue_status"]["user_pending"] is None
+        # Owner and admin sids must be skipped so they don't receive the duplicate
+        assert "sid-owner" in skip_sid
+        assert "sid-admin" in skip_sid
+        # Third-party user must NOT be skipped — they need the sanitized event
+        assert "sid-other" not in skip_sid
+        # Status (non-sensitive) is preserved so the non-owner UI knows what changed
+        assert sanitized_payload["status"] == "in_progress"
+        assert sanitized_payload["item_id"] == 1
 
     def test_batch_enqueued_routed_privately(self, socketio: Any) -> None:
-        """Verify that _handle_queue_event emits BatchEnqueuedEvent ONLY to
-        user:{user_id} and admin rooms, never to the queue_id room."""
+        """_handle_queue_event must emit the FULL BatchEnqueuedEvent only to the owner's
+        user room and the admin room. A sanitized companion (user_id="redacted", batch_id
+        and origin stripped) is also emitted to the queue_id room so other users' badge
+        totals refresh, with owner/admin sids in skip_sid."""
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -1816,19 +1953,303 @@ class TestWebSocketAuth:
         )
         event = BatchEnqueuedEvent.build(enqueue_result, user_id="owner-zzz")
 
+        socketio._socket_users["sid-owner"] = {"user_id": "owner-zzz", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
         mock_emit = AsyncMock()
         socketio._sio.emit = mock_emit
 
         asyncio.run(socketio._handle_queue_event(("batch_enqueued", event)))
 
-        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "user:owner-zzz" in rooms_emitted_to
-        assert "admin" in rooms_emitted_to
-        assert "default" not in rooms_emitted_to
+        emits = [
+            (c.kwargs.get("room"), c.kwargs.get("data"), c.kwargs.get("skip_sid")) for c in mock_emit.call_args_list
+        ]
 
-    def test_queue_cleared_still_broadcast(self, socketio: Any) -> None:
-        """QueueClearedEvent does not carry user identity and should still be broadcast
-        to all queue subscribers — this is a sanity check that we haven't over-scoped."""
+        # Full event to owner + admin contains the real batch_id and origin, in a single emit to
+        # the room list so a socket in both rooms receives exactly one copy
+        full_emits = [(p, s) for r, p, s in emits if r == ["user:owner-zzz", "admin"]]
+        assert len(full_emits) == 1
+        for payload, _ in full_emits:
+            assert payload["user_id"] == "owner-zzz"
+            assert payload["batch_id"] == "batch-pvt"
+            assert payload["origin"] == "workflows"
+
+        # Sanitized event to queue room: user/batch/origin redacted, owner+admin skipped
+        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        assert len(queue_emits) == 1
+        sanitized_payload, skip_sid = queue_emits[0]
+        assert sanitized_payload["user_id"] == "redacted"
+        assert sanitized_payload["batch_id"] == "redacted"
+        assert sanitized_payload["origin"] is None
+        assert sanitized_payload["enqueued"] == 5  # count is non-sensitive
+        assert "sid-owner" in skip_sid
+        assert "sid-admin" in skip_sid
+        assert "sid-other" not in skip_sid
+
+    def test_queue_items_retried_event_carries_user_ids(self) -> None:
+        """QueueItemsRetriedEvent must carry owner identity so retry notifications are
+        routed privately instead of broadcast to all queue subscribers."""
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        retry_result = RetryItemsResult(queue_id="default", retried_item_ids=[10])
+        event = QueueItemsRetriedEvent.build(
+            retry_result, user_ids=["owner-123"], retried_item_ids_by_user={"owner-123": [10]}
+        )
+
+        assert event.user_ids == ["owner-123"]
+        assert event.retried_item_ids == [10]
+        assert event.retried_item_ids_by_user == {"owner-123": [10]}
+        assert event.queue_id == "default"
+
+    def test_queue_items_retried_routed_privately(self, socketio: Any) -> None:
+        """The FULL queue_items_retried event, which carries owners' item ids, must reach only the
+        owner/admin rooms. A sanitized companion carrying no ids is broadcast to the queue room so
+        other users' badge totals refresh — see test_queue_items_retried_broadcasts_sanitized_companion.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        event = QueueItemsRetriedEvent.build(
+            RetryItemsResult(queue_id="default", retried_item_ids=[10]),
+            user_ids=["owner-123", "owner-456"],
+            retried_item_ids_by_user={"owner-123": [10], "owner-456": []},
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
+
+        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
+        assert "user:owner-123" in rooms_emitted_to
+        assert "user:owner-456" in rooms_emitted_to
+        assert "admin" in rooms_emitted_to
+
+        # CRITICAL: nothing identifying may reach the queue room. The only emit there is the
+        # sanitized companion, which must not name any owner or any retried item.
+        queue_room_payloads = [c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        assert len(queue_room_payloads) == 1
+        assert queue_room_payloads[0]["retried_item_ids"] == []
+        assert queue_room_payloads[0]["user_ids"] == []
+        assert queue_room_payloads[0]["retried_item_ids_by_user"] == {}
+
+    def test_queue_items_retried_broadcasts_sanitized_companion(self, socketio: Any) -> None:
+        """Retried items are re-enqueued and raise the queue's global total, but retrying emits no
+        per-item queue_item_status_changed. A sanitized companion must therefore reach every other
+        subscriber so their badge total refetches, while owners and admins — who already got the
+        full event — are skipped.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        event = QueueItemsRetriedEvent.build(
+            RetryItemsResult(queue_id="default", retried_item_ids=[10, 20]),
+            user_ids=["owner-123", "owner-456"],
+            retried_item_ids_by_user={"owner-123": [10], "owner-456": [20]},
+        )
+
+        # A retry batch can span several owners — every one of them must be skipped, not just the first.
+        socketio._socket_users["sid-owner-123"] = {"user_id": "owner-123", "is_admin": False}
+        socketio._socket_users["sid-owner-456"] = {"user_id": "owner-456", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
+
+        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        assert len(queue_emits) == 1, "expected exactly one sanitized emit to the queue room"
+        payload = queue_emits[0].kwargs["data"]
+        skip_sid = queue_emits[0].kwargs["skip_sid"]
+
+        # Non-sensitive: the queue_id is all a non-owner needs to refetch its redacted status.
+        assert payload["queue_id"] == "default"
+        assert payload["retried_item_ids"] == []
+        assert payload["user_ids"] == []
+        assert payload["retried_item_ids_by_user"] == {}
+
+        # Both owners and the admin already received the full event and must not get a second copy.
+        assert "sid-owner-123" in skip_sid
+        assert "sid-owner-456" in skip_sid
+        assert "sid-admin" in skip_sid
+        # The unrelated user is the whole point — they must receive it.
+        assert "sid-other" not in skip_sid
+
+    def test_queue_items_retried_payload_is_filtered_per_owner_room(self, socketio: Any) -> None:
+        """Each owner room should only receive retry payload for that owner."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        event = QueueItemsRetriedEvent.build(
+            RetryItemsResult(queue_id="default", retried_item_ids=[10, 20]),
+            user_ids=["owner-123", "owner-456"],
+            retried_item_ids_by_user={"owner-123": [10], "owner-456": [20]},
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
+
+        owner_123_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "user:owner-123"]
+        owner_456_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "user:owner-456"]
+        admin_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "admin"]
+
+        assert len(owner_123_calls) == 1
+        assert len(owner_456_calls) == 1
+        assert len(admin_calls) == 1
+        assert owner_123_calls[0].kwargs["data"]["retried_item_ids"] == [10]
+        assert owner_123_calls[0].kwargs["data"]["user_ids"] == ["owner-123"]
+        assert owner_123_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-123": [10]}
+        assert owner_456_calls[0].kwargs["data"]["retried_item_ids"] == [20]
+        assert owner_456_calls[0].kwargs["data"]["user_ids"] == ["owner-456"]
+        assert owner_456_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-456": [20]}
+        assert admin_calls[0].kwargs["data"]["retried_item_ids"] == [10, 20]
+        assert admin_calls[0].kwargs["data"]["user_ids"] == ["owner-123", "owner-456"]
+        assert admin_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-123": [10], "owner-456": [20]}
+
+    def test_queue_items_canceled_routed_privately_per_owner(self, socketio: Any) -> None:
+        """The FULL queue_items_canceled event, which carries owners' item ids, must reach only the
+        owner/admin rooms, and each owner room may only see that owner's own item ids. A bulk
+        cancel emits no per-item queue_item_status_changed, so this event is each owner's only
+        signal that their pending items were canceled (e.g. by an admin's cancel-all-except-current).
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
+
+        event = QueueItemsCanceledEvent.build(
+            queue_id="default",
+            canceled_item_ids_by_user={"owner-123": [10, 11], "owner-456": [20]},
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_canceled", event)))
+
+        owner_123_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "user:owner-123"]
+        owner_456_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "user:owner-456"]
+        admin_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "admin"]
+
+        assert len(owner_123_calls) == 1
+        assert len(owner_456_calls) == 1
+        assert len(admin_calls) == 1
+        assert owner_123_calls[0].kwargs["data"]["canceled_item_ids"] == [10, 11]
+        assert owner_123_calls[0].kwargs["data"]["user_ids"] == ["owner-123"]
+        assert owner_123_calls[0].kwargs["data"]["canceled_item_ids_by_user"] == {"owner-123": [10, 11]}
+        assert owner_456_calls[0].kwargs["data"]["canceled_item_ids"] == [20]
+        assert admin_calls[0].kwargs["data"]["canceled_item_ids"] == [10, 11, 20]
+        assert admin_calls[0].kwargs["data"]["canceled_item_ids_by_user"] == {
+            "owner-123": [10, 11],
+            "owner-456": [20],
+        }
+
+        # Nothing identifying may reach the queue room: the only emit there is the sanitized
+        # companion, which must not name any owner or any canceled item.
+        queue_room_payloads = [c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        assert len(queue_room_payloads) == 1
+        assert queue_room_payloads[0]["canceled_item_ids"] == []
+        assert queue_room_payloads[0]["user_ids"] == []
+        assert queue_room_payloads[0]["canceled_item_ids_by_user"] == {}
+
+    def test_queue_items_canceled_broadcasts_sanitized_companion(self, socketio: Any) -> None:
+        """Canceled items lower the queue's global total, so every other subscriber's badge must
+        refetch. The sanitized companion reaches them while owners and admins — who already got
+        the full event — are skipped.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
+
+        event = QueueItemsCanceledEvent.build(
+            queue_id="default",
+            canceled_item_ids_by_user={"owner-123": [10], "owner-456": [20]},
+        )
+
+        # A bulk cancel can span several owners — every one of them must be skipped, not just the first.
+        socketio._socket_users["sid-owner-123"] = {"user_id": "owner-123", "is_admin": False}
+        socketio._socket_users["sid-owner-456"] = {"user_id": "owner-456", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_canceled", event)))
+
+        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        assert len(queue_emits) == 1, "expected exactly one sanitized emit to the queue room"
+        payload = queue_emits[0].kwargs["data"]
+        skip_sid = queue_emits[0].kwargs["skip_sid"]
+
+        # Non-sensitive: the queue_id is all a non-owner needs to refetch its redacted status.
+        assert payload["queue_id"] == "default"
+        assert payload["canceled_item_ids"] == []
+        assert payload["user_ids"] == []
+        assert payload["canceled_item_ids_by_user"] == {}
+
+        # Both owners and the admin already received the full event and must not get a second copy.
+        assert "sid-owner-123" in skip_sid
+        assert "sid-owner-456" in skip_sid
+        assert "sid-admin" in skip_sid
+        # The unrelated user is the whole point — they must receive it.
+        assert "sid-other" not in skip_sid
+
+    def test_bulk_event_admin_owner_receives_exactly_one_copy(self, socketio: Any) -> None:
+        """An admin who also owns affected items is in both their user room and the admin room.
+        The owner-room emit must skip admin sids so such a socket receives only the full
+        admin-room copy — two copies would double-refetch every queue endpoint (single-user
+        mode hits this on every bulk cancel, since the "system" user is an admin)."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
+
+        event = QueueItemsCanceledEvent.build(
+            queue_id="default",
+            canceled_item_ids_by_user={"admin-1": [10], "owner-456": [20]},
+        )
+
+        socketio._socket_users["sid-admin-owner"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-owner-456"] = {"user_id": "owner-456", "is_admin": False}
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_canceled", event)))
+
+        # The admin-owner's user-room emit skips their sid; the admin-room emit is their one copy.
+        owner_room_calls = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "user:admin-1"]
+        assert len(owner_room_calls) == 1
+        assert "sid-admin-owner" in owner_room_calls[0].kwargs["skip_sid"]
+
+        # The non-admin owner's room emit must not skip their sid.
+        other_owner_calls = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "user:owner-456"]
+        assert len(other_owner_calls) == 1
+        assert "sid-owner-456" not in other_owner_calls[0].kwargs["skip_sid"]
+
+        admin_calls = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "admin"]
+        assert len(admin_calls) == 1
+
+    def test_unscoped_queue_cleared_still_broadcast(self, socketio: Any) -> None:
+        """An unscoped QueueClearedEvent (user_id=None — an admin or single-user clear that
+        deleted every user's items) should still be broadcast to all queue subscribers."""
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -1841,8 +2262,50 @@ class TestWebSocketAuth:
 
         asyncio.run(socketio._handle_queue_event(("queue_cleared", event)))
 
-        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "default" in rooms_emitted_to
+        assert len(mock_emit.call_args_list) == 1
+        assert mock_emit.call_args_list[0].kwargs.get("room") == "default"
+        assert mock_emit.call_args_list[0].kwargs.get("data")["user_id"] is None
+
+    def test_user_scoped_queue_cleared_routed_privately(self, socketio: Any) -> None:
+        """A user-scoped QueueClearedEvent only deleted that user's rows. The full event must
+        go to the owner + admin rooms; the rest of the queue room gets a sanitized companion
+        (user_id="redacted") so their queue lists refresh without treating the clear as their
+        own — otherwise another user's clear would abort their in-flight reconciliations and
+        mark their tracked items canceled."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueClearedEvent
+
+        event = QueueClearedEvent.build(queue_id="default", user_id="owner-xyz")
+
+        socketio._socket_users["sid-owner"] = {"user_id": "owner-xyz", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_cleared", event)))
+
+        emits = [
+            (c.kwargs.get("room"), c.kwargs.get("data"), c.kwargs.get("skip_sid")) for c in mock_emit.call_args_list
+        ]
+
+        # Full event goes to owner + admin rooms in a single emit (room list deduplicates a
+        # socket that is in both rooms)
+        private_emits = [(p, s) for r, p, s in emits if r == ["user:owner-xyz", "admin"]]
+        assert len(private_emits) == 1
+        assert private_emits[0][0]["user_id"] == "owner-xyz"
+
+        # Sanitized companion goes to the queue room, skipping the owner's and admins' sids
+        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        assert len(queue_emits) == 1, "expected exactly one sanitized emit to queue room"
+        sanitized_payload, skip_sid = queue_emits[0]
+        assert sanitized_payload["user_id"] == "redacted"
+        assert "sid-owner" in skip_sid
+        assert "sid-admin" in skip_sid
+        assert "sid-other" not in skip_sid
 
     def test_recall_parameters_emitted_once_to_owner_and_admin_rooms(self, socketio: Any) -> None:
         """RecallParametersUpdatedEvent must be delivered to the owner + admin rooms
@@ -1995,3 +2458,128 @@ class TestCustomNodesAuthorization:
         data = r.json()
         assert data["success"] is True
         assert data["name"] == "test-pack"
+
+
+# ===========================================================================
+# Image list/names ownership isolation (omitted board_id)
+# ===========================================================================
+
+
+class TestImageListOwnershipIsolation:
+    """/api/v1/images/ and /api/v1/images/names must not leak other users' images
+    when board_id is omitted.
+
+    Without the omitted-board ownership predicate, a non-admin could enumerate every
+    user's image names, dimensions, timestamps, and board associations simply by
+    leaving off the board_id query parameter.
+    """
+
+    @pytest.fixture
+    def seeded_boards(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ) -> dict[str, str]:
+        """user1: private board with one image + one uncategorized image + a shared board
+        with one image. user2: one uncategorized image."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+
+        _save_image(mock_invoker, "u1-private-boarded", user1.user_id)
+        _save_image(mock_invoker, "u1-uncat", user1.user_id)
+        _save_image(mock_invoker, "u1-shared-boarded", user1.user_id)
+        _save_image(mock_invoker, "u2-uncat", user2.user_id)
+
+        private_board_id = _create_board(client, user1_token, "User1 Private List Board")
+        shared_board_id = _create_board(client, user1_token, "User1 Shared List Board")
+        _share_board(client, user1_token, shared_board_id)
+
+        # Associate via the record storage directly — the board_images *service* is
+        # replaced with a MagicMock by the enable_multiuser fixture.
+        mock_invoker.services.board_image_records.add_image_to_board(private_board_id, "u1-private-boarded")
+        mock_invoker.services.board_image_records.add_image_to_board(shared_board_id, "u1-shared-boarded")
+
+        # The DTO list route resolves URLs through the urls service, which is None in
+        # the test harness.
+        mock_urls = MagicMock()
+        mock_urls.get_image_url.return_value = "http://test/image.png"
+        mock_invoker.services.urls = mock_urls
+
+        return {"private_board_id": private_board_id, "shared_board_id": shared_board_id}
+
+    def _list_names(self, client: TestClient, token: str, **params: str) -> list[str]:
+        r = client.get("/api/v1/images/", params=params, headers=_auth(token))
+        assert r.status_code == status.HTTP_200_OK
+        return [item["image_name"] for item in r.json()["items"]]
+
+    def _image_names(self, client: TestClient, token: str, **params: str) -> list[str]:
+        r = client.get("/api/v1/images/names", params=params, headers=_auth(token))
+        assert r.status_code == status.HTTP_200_OK
+        return r.json()["image_names"]
+
+    def test_list_omitted_board_excludes_other_users(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        assert self._list_names(client, user2_token) == ["u2-uncat"]
+
+    def test_list_omitted_board_owner_sees_own_boarded_and_uncategorized(
+        self, client: TestClient, seeded_boards: dict[str, str], user1_token: str
+    ) -> None:
+        assert set(self._list_names(client, user1_token)) == {"u1-private-boarded", "u1-uncat", "u1-shared-boarded"}
+
+    def test_list_omitted_board_admin_sees_all(
+        self, client: TestClient, seeded_boards: dict[str, str], admin_token: str
+    ) -> None:
+        assert set(self._list_names(client, admin_token)) == {
+            "u1-private-boarded",
+            "u1-uncat",
+            "u1-shared-boarded",
+            "u2-uncat",
+        }
+
+    def test_list_none_board_scopes_to_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user1_token: str
+    ) -> None:
+        assert self._list_names(client, user1_token, board_id="none") == ["u1-uncat"]
+
+    def test_list_private_board_forbidden_for_non_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        r = client.get(
+            "/api/v1/images/", params={"board_id": seeded_boards["private_board_id"]}, headers=_auth(user2_token)
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_list_shared_board_readable_by_non_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        assert self._list_names(client, user2_token, board_id=seeded_boards["shared_board_id"]) == ["u1-shared-boarded"]
+
+    def test_names_omitted_board_excludes_other_users(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        assert self._image_names(client, user2_token) == ["u2-uncat"]
+
+    def test_names_omitted_board_admin_sees_all(
+        self, client: TestClient, seeded_boards: dict[str, str], admin_token: str
+    ) -> None:
+        assert set(self._image_names(client, admin_token)) == {
+            "u1-private-boarded",
+            "u1-uncat",
+            "u1-shared-boarded",
+            "u2-uncat",
+        }
+
+    def test_names_none_board_scopes_to_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        assert self._image_names(client, user2_token, board_id="none") == ["u2-uncat"]
+
+    def test_names_private_board_forbidden_for_non_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        r = client.get(
+            "/api/v1/images/names",
+            params={"board_id": seeded_boards["private_board_id"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN

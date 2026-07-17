@@ -5,6 +5,7 @@ import { addStorageListeners } from 'app/store/enhancers/reduxRemember/driver';
 import { $store } from 'app/store/nanostores/store';
 import { createStore } from 'app/store/store';
 import Loading from 'common/components/Loading/Loading';
+import { getBasePath } from 'common/util/baseUrl';
 import React, { lazy, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
@@ -48,7 +49,7 @@ const InvokeAIUI = () => {
   return (
     <React.StrictMode>
       <Provider store={store}>
-        <BrowserRouter>
+        <BrowserRouter basename={getBasePath() || undefined}>
           <React.Suspense fallback={<Loading />}>
             <App />
           </React.Suspense>
