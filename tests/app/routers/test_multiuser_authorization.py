@@ -2458,3 +2458,128 @@ class TestCustomNodesAuthorization:
         data = r.json()
         assert data["success"] is True
         assert data["name"] == "test-pack"
+
+
+# ===========================================================================
+# Image list/names ownership isolation (omitted board_id)
+# ===========================================================================
+
+
+class TestImageListOwnershipIsolation:
+    """/api/v1/images/ and /api/v1/images/names must not leak other users' images
+    when board_id is omitted.
+
+    Without the omitted-board ownership predicate, a non-admin could enumerate every
+    user's image names, dimensions, timestamps, and board associations simply by
+    leaving off the board_id query parameter.
+    """
+
+    @pytest.fixture
+    def seeded_boards(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ) -> dict[str, str]:
+        """user1: private board with one image + one uncategorized image + a shared board
+        with one image. user2: one uncategorized image."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+
+        _save_image(mock_invoker, "u1-private-boarded", user1.user_id)
+        _save_image(mock_invoker, "u1-uncat", user1.user_id)
+        _save_image(mock_invoker, "u1-shared-boarded", user1.user_id)
+        _save_image(mock_invoker, "u2-uncat", user2.user_id)
+
+        private_board_id = _create_board(client, user1_token, "User1 Private List Board")
+        shared_board_id = _create_board(client, user1_token, "User1 Shared List Board")
+        _share_board(client, user1_token, shared_board_id)
+
+        # Associate via the record storage directly — the board_images *service* is
+        # replaced with a MagicMock by the enable_multiuser fixture.
+        mock_invoker.services.board_image_records.add_image_to_board(private_board_id, "u1-private-boarded")
+        mock_invoker.services.board_image_records.add_image_to_board(shared_board_id, "u1-shared-boarded")
+
+        # The DTO list route resolves URLs through the urls service, which is None in
+        # the test harness.
+        mock_urls = MagicMock()
+        mock_urls.get_image_url.return_value = "http://test/image.png"
+        mock_invoker.services.urls = mock_urls
+
+        return {"private_board_id": private_board_id, "shared_board_id": shared_board_id}
+
+    def _list_names(self, client: TestClient, token: str, **params: str) -> list[str]:
+        r = client.get("/api/v1/images/", params=params, headers=_auth(token))
+        assert r.status_code == status.HTTP_200_OK
+        return [item["image_name"] for item in r.json()["items"]]
+
+    def _image_names(self, client: TestClient, token: str, **params: str) -> list[str]:
+        r = client.get("/api/v1/images/names", params=params, headers=_auth(token))
+        assert r.status_code == status.HTTP_200_OK
+        return r.json()["image_names"]
+
+    def test_list_omitted_board_excludes_other_users(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        assert self._list_names(client, user2_token) == ["u2-uncat"]
+
+    def test_list_omitted_board_owner_sees_own_boarded_and_uncategorized(
+        self, client: TestClient, seeded_boards: dict[str, str], user1_token: str
+    ) -> None:
+        assert set(self._list_names(client, user1_token)) == {"u1-private-boarded", "u1-uncat", "u1-shared-boarded"}
+
+    def test_list_omitted_board_admin_sees_all(
+        self, client: TestClient, seeded_boards: dict[str, str], admin_token: str
+    ) -> None:
+        assert set(self._list_names(client, admin_token)) == {
+            "u1-private-boarded",
+            "u1-uncat",
+            "u1-shared-boarded",
+            "u2-uncat",
+        }
+
+    def test_list_none_board_scopes_to_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user1_token: str
+    ) -> None:
+        assert self._list_names(client, user1_token, board_id="none") == ["u1-uncat"]
+
+    def test_list_private_board_forbidden_for_non_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        r = client.get(
+            "/api/v1/images/", params={"board_id": seeded_boards["private_board_id"]}, headers=_auth(user2_token)
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_list_shared_board_readable_by_non_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        assert self._list_names(client, user2_token, board_id=seeded_boards["shared_board_id"]) == ["u1-shared-boarded"]
+
+    def test_names_omitted_board_excludes_other_users(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        assert self._image_names(client, user2_token) == ["u2-uncat"]
+
+    def test_names_omitted_board_admin_sees_all(
+        self, client: TestClient, seeded_boards: dict[str, str], admin_token: str
+    ) -> None:
+        assert set(self._image_names(client, admin_token)) == {
+            "u1-private-boarded",
+            "u1-uncat",
+            "u1-shared-boarded",
+            "u2-uncat",
+        }
+
+    def test_names_none_board_scopes_to_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        assert self._image_names(client, user2_token, board_id="none") == ["u2-uncat"]
+
+    def test_names_private_board_forbidden_for_non_owner(
+        self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
+    ) -> None:
+        r = client.get(
+            "/api/v1/images/names",
+            params={"board_id": seeded_boards["private_board_id"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
