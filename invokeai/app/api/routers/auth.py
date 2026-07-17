@@ -528,11 +528,31 @@ async def update_user(
         The updated user
 
     Raises:
-        HTTPException: 400 if password is weak
+        HTTPException: 400 if password is weak, or if the change would remove the
+            last administrator
         HTTPException: 404 if user not found
     """
     user_service = ApiDependencies.invoker.services.users
     config = ApiDependencies.invoker.services.configuration
+    before = user_service.get(user_id)
+
+    # Demoting or deactivating the last administrator is irreversible: authorization is
+    # derived from the database on every request, so the caller loses admin access
+    # immediately and no authenticated path back exists. It would also drop `has_admin()`
+    # to zero, which re-opens the unauthenticated `/auth/setup` endpoint to any caller.
+    # `delete_user` guards the same invariant.
+    if (
+        before is not None
+        and before.is_admin
+        and before.is_active
+        and (request.is_admin is False or request.is_active is False)
+        and user_service.count_admins() <= 1
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot remove the last administrator",
+        )
+
     try:
         changes = UserUpdateRequest(
             display_name=request.display_name,
@@ -540,9 +560,18 @@ async def update_user(
             is_admin=request.is_admin,
             is_active=request.is_active,
         )
-        return user_service.update(user_id, changes, strict_password_checking=config.strict_password_checking)
+        updated = user_service.update(user_id, changes, strict_password_checking=config.strict_password_checking)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+    # Authorization state changed — notify live connections (open sockets, the
+    # session processor) so demotion/deactivation takes effect immediately
+    # instead of persisting until reconnect or token expiry.
+    if before is not None and (before.is_admin != updated.is_admin or before.is_active != updated.is_active):
+        ApiDependencies.invoker.services.events.emit_user_access_changed(
+            user_id=updated.user_id, is_admin=updated.is_admin, is_active=updated.is_active
+        )
+    return updated
 
 
 @auth_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -578,6 +607,9 @@ async def delete_user(
         user_service.delete(user_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+    # A deleted user must lose live access just like a deactivated one.
+    ApiDependencies.invoker.services.events.emit_user_access_changed(user_id=user_id, is_admin=False, is_active=False)
 
 
 @auth_router.patch("/me", response_model=UserDTO)

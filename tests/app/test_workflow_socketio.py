@@ -13,7 +13,9 @@ def anyio_backend() -> str:
 
 
 def _patch_multiuser_context(monkeypatch: pytest.MonkeyPatch, *, user_id: str, is_admin: bool) -> None:
-    user = SimpleNamespace(user_id=user_id, is_active=True)
+    # The connect handler derives is_admin from the database record, not the token,
+    # so the mocked user record carries the role.
+    user = SimpleNamespace(user_id=user_id, is_active=True, is_admin=is_admin)
     invoker = SimpleNamespace(
         services=SimpleNamespace(
             configuration=SimpleNamespace(multiuser=True),

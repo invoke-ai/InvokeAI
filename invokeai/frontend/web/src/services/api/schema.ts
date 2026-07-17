@@ -318,7 +318,8 @@ export type paths = {
          *         The updated user
          *
          *     Raises:
-         *         HTTPException: 400 if password is weak
+         *         HTTPException: 400 if password is weak, or if the change would remove the
+         *             last administrator
          *         HTTPException: 404 if user not found
          */
         patch: operations["update_user_api_v1_auth_users__user_id__patch"];
