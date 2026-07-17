@@ -13,6 +13,7 @@ that embedded tokenizer directly; otherwise we fall back to fetching the
 tokenizer from ``black-forest-labs/FLUX.2-dev`` via HuggingFace.
 """
 
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -360,25 +361,75 @@ class _TekkenRawTextAdapter:
     _BOS_ID = 1  # <s>
     _PAD_ID = 11  # <pad>
 
+    # FLUX.2 [dev]'s template structural markers. These are Tekken *special
+    # tokens* (single ids), but mistral_common's raw ``Tekkenizer.encode`` runs
+    # with ``SpecialTokenPolicy.IGNORE``, so it BPE-encodes them as literal text
+    # (e.g. ``[SYSTEM_PROMPT]`` → ``['[','SY','STEM','_PRO','MP','T',']']``). We
+    # resolve their ids up front and splice them in during ``_encode`` so the
+    # sequence matches the reference PixtralProcessor byte-for-byte.
+    _SPECIAL_MARKERS = ("[SYSTEM_PROMPT]", "[/SYSTEM_PROMPT]", "[INST]", "[/INST]")
+
     def __init__(self, mistral_tokenizer: Any):
         self._tok = mistral_tokenizer
         self.pad_token_id = self._PAD_ID
+        self._inner = getattr(getattr(mistral_tokenizer, "instruct_tokenizer", None), "tokenizer", None)
+        self._special_ids = self._resolve_special_ids()
+
+    def _resolve_special_ids(self) -> dict[str, int]:
+        """Map each FLUX.2 structural marker to its Tekken special-token id.
+
+        Returns an empty dict if the inner tokenizer doesn't expose a special
+        vocab, in which case ``_encode`` falls back to the plain raw encode.
+        """
+        inner = self._inner
+        if inner is None:
+            return {}
+        rev = getattr(inner, "_special_tokens_reverse_vocab", None)
+        out: dict[str, int] = {}
+        for marker in self._SPECIAL_MARKERS:
+            mid: Any = None
+            if isinstance(rev, dict):
+                mid = rev.get(marker)
+            if mid is None:
+                try:
+                    tok = inner.get_special_token(marker)
+                    mid = getattr(tok, "id", tok)
+                except Exception:
+                    mid = None
+            if isinstance(mid, int):
+                out[marker] = mid
+        return out
 
     def _encode(self, text: str) -> list[int]:
-        """Encode raw text via the underlying Tekkenizer (adds BOS, no EOS).
+        """Encode the FLUX.2 template, emitting structural markers as their Tekken
+        special-token ids (not literal BPE) so the ids match ComfyUI / the BFL
+        PixtralProcessor. Adds BOS, no EOS.
 
         ``mistral_common`` exposes the BPE under
         ``MistralTokenizer.instruct_tokenizer.tokenizer`` (the inner Tekkenizer).
-        Different mistral-common versions name the encode entrypoint slightly
-        differently; we try the documented one first and fall back to the
-        wrapper's own encode method.
         """
-        inner = getattr(getattr(self._tok, "instruct_tokenizer", None), "tokenizer", None)
-        if inner is not None and hasattr(inner, "encode"):
-            # Tekkenizer.encode(text, bos: bool, eos: bool) → list[int]
+        inner = self._inner
+        if inner is None or not hasattr(inner, "encode"):
+            # Older mistral-common releases expose .encode on the top-level wrapper.
+            return list(self._tok.encode(text, add_bos=True, add_eos=False))
+        if not self._special_ids:
+            # No special vocab available — raw encode (markers become literal BPE).
             return list(inner.encode(text, bos=True, eos=False))
-        # Older mistral-common releases expose .encode on the top-level wrapper.
-        return list(self._tok.encode(text, add_bos=True, add_eos=False))
+
+        # Split on the markers (longest-first so `[/SYSTEM_PROMPT]` wins over
+        # `[SYSTEM_PROMPT]`), splice special ids, BPE-encode the plain segments.
+        markers = sorted(self._special_ids, key=len, reverse=True)
+        pattern = "(" + "|".join(re.escape(m) for m in markers) + ")"
+        ids: list[int] = [self._BOS_ID]
+        for part in re.split(pattern, text):
+            if not part:
+                continue
+            special = self._special_ids.get(part)
+            if special is not None:
+                ids.append(special)
+            else:
+                ids.extend(inner.encode(part, bos=False, eos=False))
+        return ids
 
     def __call__(
         self,
