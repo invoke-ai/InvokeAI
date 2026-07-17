@@ -85,6 +85,7 @@ export const addRegions = async ({
 }: AddRegionsArg): Promise<AddedRegionResult[]> => {
   const isSDXL = model.base === 'sdxl';
   const isFLUX = model.base === 'flux';
+  const isFlux2 = model.base === 'flux2';
   const isZImage = model.base === 'z-image';
   const isAnima = model.base === 'anima';
 
@@ -128,7 +129,12 @@ export const addRegions = async ({
       // The main positive conditioning node
       result.addedPositivePrompt = true;
       let regionalPosCond: Invocation<
-        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder' | 'anima_text_encoder'
+        | 'compel'
+        | 'sdxl_compel_prompt'
+        | 'flux_text_encoder'
+        | 'flux2_klein_text_encoder'
+        | 'z_image_text_encoder'
+        | 'anima_text_encoder'
       >;
       if (isSDXL) {
         regionalPosCond = g.addNode({
@@ -140,6 +146,12 @@ export const addRegions = async ({
       } else if (isFLUX) {
         regionalPosCond = g.addNode({
           type: 'flux_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isFlux2) {
+        regionalPosCond = g.addNode({
+          type: 'flux2_klein_text_encoder',
           id: getPrefixedId('prompt_region_positive_cond'),
           prompt: region.positivePrompt,
         });
@@ -185,6 +197,12 @@ export const addRegions = async ({
           clone.destination.node_id = regionalPosCond.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (posCond.type === 'flux2_klein_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'max_seq_len', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
       } else if (posCond.type === 'z_image_text_encoder') {
         for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'mask'])) {
           const clone = deepClone(edge);
@@ -203,6 +221,9 @@ export const addRegions = async ({
     }
 
     if (region.negativePrompt) {
+      // FLUX.2 regions with negative prompts are filtered out by getRegionalGuidanceWarnings; fail
+      // loudly if that ever changes, because there is no flux2 branch below.
+      assert(!isFlux2, 'Regional negative prompts are not supported for FLUX.2 Klein');
       assert(negCond, 'Negative conditioning node is required if there is a negative prompt');
       assert(negCondCollect, 'Negative conditioning collector is required if there is a negative prompt');
 
@@ -286,6 +307,8 @@ export const addRegions = async ({
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
     if (region.autoNegative && region.positivePrompt) {
+      // See note on the negative prompt branch above — unreachable for FLUX.2 via validators.
+      assert(!isFlux2, 'Auto-negative is not supported for FLUX.2 Klein');
       assert(negCondCollect, 'Negative conditioning collector is required if there is an auto-negative setting');
 
       result.addedAutoNegativePositivePrompt = true;

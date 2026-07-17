@@ -80,6 +80,8 @@ def build_migration_7() -> Migration:
     - TODO(MM2): Migrates model names and descriptions from `models.yaml` to the new table (?).
     """
     migration_7 = Migration(
+        id="migration_7",
+        depends_on="migration_6",
         from_version=6,
         to_version=7,
         callback=Migration7Callback(),

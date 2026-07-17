@@ -15,12 +15,19 @@ class ModelLoadServiceBase(ABC):
     """Wrapper around AnyModelLoader."""
 
     @abstractmethod
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(
+        self,
+        model_config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+        user_id: Optional[str] = None,
+    ) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 
         :param model_config: Model configuration record (as returned by ModelRecordBase.get_model())
         :param submodel: For main (pipeline models), the submodel to fetch.
+        :param user_id: The user whose action triggered the load, threaded into the model load
+            events so they can be routed to that user's UI (defaults to the system user).
         """
 
     @property

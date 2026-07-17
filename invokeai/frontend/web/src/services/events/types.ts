@@ -5,6 +5,10 @@ type ClientEmitSubscribeQueue = { queue_id: string };
 type ClientEmitUnsubscribeQueue = ClientEmitSubscribeQueue;
 type ClientEmitSubscribeBulkDownload = { bulk_download_id: string };
 type ClientEmitUnsubscribeBulkDownload = ClientEmitSubscribeBulkDownload;
+type WorkflowCreatedEvent = S['WorkflowCreatedEvent'];
+type WorkflowUpdatedEvent = S['WorkflowUpdatedEvent'];
+type WorkflowDeletedEvent = S['WorkflowDeletedEvent'];
+type WorkflowAccessRevokedEvent = S['WorkflowAccessRevokedEvent'];
 
 // LLM utility task events (expand-prompt, image-to-prompt). Hand-typed until schema regen.
 export type LLMTaskProgressEventPayload = {
@@ -52,6 +56,7 @@ export type ServerToClientEvents = {
   queue_cleared: (payload: S['QueueClearedEvent']) => void;
   batch_enqueued: (payload: S['BatchEnqueuedEvent']) => void;
   queue_items_retried: (payload: S['QueueItemsRetriedEvent']) => void;
+  queue_items_canceled: (payload: S['QueueItemsCanceledEvent']) => void;
   recall_parameters_updated: (payload: S['RecallParametersUpdatedEvent']) => void;
   bulk_download_started: (payload: S['BulkDownloadStartedEvent']) => void;
   bulk_download_complete: (payload: S['BulkDownloadCompleteEvent']) => void;
@@ -59,6 +64,10 @@ export type ServerToClientEvents = {
   llm_task_progress: (payload: LLMTaskProgressEventPayload) => void;
   llm_task_complete: (payload: LLMTaskCompleteEventPayload) => void;
   llm_task_error: (payload: LLMTaskErrorEventPayload) => void;
+  workflow_created: (payload: WorkflowCreatedEvent) => void;
+  workflow_updated: (payload: WorkflowUpdatedEvent) => void;
+  workflow_deleted: (payload: WorkflowDeletedEvent) => void;
+  workflow_access_revoked: (payload: WorkflowAccessRevokedEvent) => void;
 };
 
 export type ClientToServerEvents = {
