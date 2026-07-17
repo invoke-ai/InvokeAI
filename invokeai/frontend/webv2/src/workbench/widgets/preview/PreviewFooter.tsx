@@ -1,18 +1,27 @@
+import type { GalleryImage } from '@workbench/gallery/api';
+import type { ImageActions } from '@workbench/image-actions';
 import type { GeneratedImageContract } from '@workbench/types';
 
-import { Badge, HStack, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import type { PreviewDensity } from './previewDensity';
+
+import { PreviewActionStrip } from './PreviewActionStrip';
+
 /**
- * The preview's info card: board context ("N of M"), prev/next navigation and
- * the image identity rows. Later phases add the action strip, step message and
- * metadata rail here — never in the widget shell.
+ * The preview's info card: board context ("N of M"), the action strip,
+ * prev/next navigation and the image identity rows. Later phases add the step
+ * message and metadata rail here — never in the widget shell.
  */
 export const PreviewFooter = ({
+  actionImage,
+  actions,
   boardImageCount,
   boardName,
+  density,
   image,
   isLive,
   isLoadingBoard,
@@ -20,8 +29,11 @@ export const PreviewFooter = ({
   onPrevious,
   selectedIndex,
 }: {
+  actionImage: GalleryImage | null;
+  actions: ImageActions;
   boardImageCount: number;
   boardName: string;
+  density: PreviewDensity;
   image: GeneratedImageContract;
   isLive: boolean;
   isLoadingBoard: boolean;
@@ -47,6 +59,12 @@ export const PreviewFooter = ({
           </Text>
         </HStack>
         <HStack flexShrink={0} gap="1">
+          {actionImage ? (
+            <>
+              <PreviewActionStrip actions={actions} density={density} image={actionImage} />
+              <Box bg="border.subtle" flexShrink={0} h="4" mx="0.5" w="1px" />
+            </>
+          ) : null}
           <Button
             aria-label={t('widgets.preview.previousImageInBoard')}
             disabled={selectedIndex <= 0}

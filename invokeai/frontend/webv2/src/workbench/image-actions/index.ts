@@ -1,5 +1,6 @@
 export {
   ImageContextMenu,
+  getGalleryCanvasImportMenuItems,
   getImageContextMenuImages,
   getImageContextMenuRecallRequestKey,
   type ImageContextMenuTarget,

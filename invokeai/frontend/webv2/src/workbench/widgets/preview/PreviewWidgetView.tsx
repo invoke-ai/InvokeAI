@@ -11,7 +11,12 @@ import {
   type GalleryView,
 } from '@workbench/gallery/api';
 import { getGallerySettings } from '@workbench/gallery/settings';
-import { ImageContextMenu, useImageActions, type ImageContextMenuTarget } from '@workbench/image-actions';
+import {
+  ImageContextMenu,
+  useImageActions,
+  type ImageActions,
+  type ImageContextMenuTarget,
+} from '@workbench/image-actions';
 import { imageUrlToStreamingSource, progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
 import { useStreamingImageSource } from '@workbench/images/useStreamingImageSource';
 import {
@@ -418,6 +423,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             />
           ) : (
             <SelectedImagePreview
+              actionImage={contextMenuImage}
+              actions={imageActions}
               boardImageCount={boardImages.length}
               boardName={boardName}
               density={density}
@@ -449,6 +456,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 };
 
 const SelectedImagePreview = ({
+  actionImage,
+  actions,
   boardImageCount,
   boardName,
   density,
@@ -461,6 +470,8 @@ const SelectedImagePreview = ({
   onNext,
   onPrevious,
 }: {
+  actionImage: GalleryImage | null;
+  actions: ImageActions;
   boardImageCount: number;
   boardName: string;
   density: PreviewDensity;
@@ -516,8 +527,11 @@ const SelectedImagePreview = ({
         onContextMenu={onContextMenu}
       />
       <PreviewFooter
+        actionImage={actionImage}
+        actions={actions}
         boardImageCount={boardImageCount}
         boardName={boardName}
+        density={density}
         image={image}
         isLive={isProgressImage}
         isLoadingBoard={isLoadingBoard}
