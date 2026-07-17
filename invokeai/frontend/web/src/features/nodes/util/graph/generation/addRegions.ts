@@ -221,6 +221,9 @@ export const addRegions = async ({
     }
 
     if (region.negativePrompt) {
+      // FLUX.2 regions with negative prompts are filtered out by getRegionalGuidanceWarnings; fail
+      // loudly if that ever changes, because there is no flux2 branch below.
+      assert(!isFlux2, 'Regional negative prompts are not supported for FLUX.2 Klein');
       assert(negCond, 'Negative conditioning node is required if there is a negative prompt');
       assert(negCondCollect, 'Negative conditioning collector is required if there is a negative prompt');
 
@@ -304,6 +307,8 @@ export const addRegions = async ({
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
     if (region.autoNegative && region.positivePrompt) {
+      // See note on the negative prompt branch above — unreachable for FLUX.2 via validators.
+      assert(!isFlux2, 'Auto-negative is not supported for FLUX.2 Klein');
       assert(negCondCollect, 'Negative conditioning collector is required if there is an auto-negative setting');
 
       result.addedAutoNegativePositivePrompt = true;

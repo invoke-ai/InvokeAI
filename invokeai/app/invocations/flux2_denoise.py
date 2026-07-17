@@ -57,7 +57,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="latents",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
@@ -503,9 +503,14 @@ class Flux2DenoiseInvocation(BaseInvocation):
             # Regional attention mask is shaped against (txt_len + img_seq_len). When
             # reference images are concatenated to the image stream their tokens are not
             # represented in the mask, so SDPA would error. Skip masking in that case.
-            pos_joint_attention_kwargs = (
-                regional_extension.get_joint_attention_kwargs(dtype=inference_dtype) if img_cond_seq is None else None
-            )
+            pos_joint_attention_kwargs = None
+            if img_cond_seq is None:
+                pos_joint_attention_kwargs = regional_extension.get_joint_attention_kwargs(dtype=inference_dtype)
+            elif regional_extension.restricted_attn_mask is not None:
+                context.logger.warning(
+                    "FLUX.2 regional prompting is not supported together with reference images. "
+                    "Regional masks will be ignored for this generation."
+                )
 
             x = denoise(
                 model=transformer,
