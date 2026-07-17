@@ -781,11 +781,18 @@ class TestImageMutationAuth:
         _save_image(mock_invoker, "user1-public-delete", user1.user_id)
         mock_invoker.services.board_image_records.add_image_to_board(public_board_id, "user1-public-delete")
 
+        # The delete route no longer swallows service failures, so the test env needs
+        # working urls/image_files services for the deletion to actually succeed.
+        mock_invoker.services.urls = MagicMock()
+        mock_invoker.services.urls.get_image_url.return_value = "http://localhost/img.png"
+        mock_invoker.services.image_files = MagicMock()
+
         r = client.delete(
             "/api/v1/images/i/user1-public-delete",
             headers=_auth(user2_token),
         )
         assert r.status_code == status.HTTP_200_OK
+        assert r.json()["deleted_images"] == ["user1-public-delete"]
 
     def test_clear_intermediates_non_admin_forbidden(self, client: TestClient, user1_token: str):
         r = client.delete("/api/v1/images/intermediates", headers=_auth(user1_token))

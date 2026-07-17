@@ -206,22 +206,24 @@ async def delete_image(
     _assert_image_owner(image_name, current_user)
     assert_image_move_maintenance_inactive()
 
-    deleted_images: set[str] = set()
-    affected_boards: set[str] = set()
-
+    # Let service-level failures surface as errors rather than swallowing them and returning
+    # a success-shaped response. A previous version of this handler caught everything and
+    # returned an empty ``deleted_images`` list with HTTP 200; the frontend treated that as
+    # success and dropped the item from its cache even though the record was still live.
     try:
         image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
-        board_id = image_dto.board_id or "none"
-        ApiDependencies.invoker.services.images.delete(image_name)
-        deleted_images.add(image_name)
-        affected_boards.add(board_id)
     except Exception:
-        # TODO: Does this need any exception handling at all?
-        pass
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    board_id = image_dto.board_id or "none"
+    try:
+        ApiDependencies.invoker.services.images.delete(image_name)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to delete image")
 
     return DeleteImagesResult(
-        deleted_images=list(deleted_images),
-        affected_boards=list(affected_boards),
+        deleted_images=[image_name],
+        affected_boards=[board_id],
     )
 
 
