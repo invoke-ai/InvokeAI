@@ -1,6 +1,6 @@
 import type { GalleryImage, GalleryImageMetadata } from '@workbench/gallery/api';
 
-import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, DataList, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton, Tooltip } from '@workbench/components/ui';
 import { getGalleryImageMetadata } from '@workbench/gallery/api';
 import {
@@ -109,11 +109,11 @@ export const PreviewMetadataPanel = ({
             </Text>
           ) : (
             <>
-              <Stack gap="1">
+              <DataList.Root gap="1.5" orientation="horizontal" size="sm">
                 {entries.map((entry) => (
                   <MetadataRow key={entry.key} entry={entry} />
                 ))}
-              </Stack>
+              </DataList.Root>
               {recallItems.length > 0 ? (
                 <HStack flexWrap="wrap" gap="1">
                   {recallItems.map((item) => (
@@ -129,38 +129,39 @@ export const PreviewMetadataPanel = ({
   );
 };
 
+/** A DataList item extended with a hover-revealed copy button on the value. */
 const MetadataRow = ({ entry }: { entry: PreviewMetadataEntry }) => {
   const { t } = useTranslation();
   const copyValue = useCallback(() => void navigator.clipboard.writeText(entry.value), [entry.value]);
 
   return (
-    <HStack align="start" className="group" gap="2">
-      <Text color="fg.subtle" flexShrink={0} fontSize="2xs" minW="16" pt="0.5">
-        {entry.label}
-      </Text>
-      <Text
-        flex="1"
-        fontSize="2xs"
-        minW="0"
-        whiteSpace={entry.isMultiline ? 'pre-wrap' : undefined}
-        truncate={!entry.isMultiline}
-      >
-        {entry.value}
-      </Text>
-      <Box
-        flexShrink={0}
-        opacity={0}
-        transitionDuration="var(--wb-motion-duration-fast)"
-        transitionProperty="opacity"
-        _groupHover={GROUP_HOVER_VISIBLE}
-      >
-        <Tooltip content={t('common.copy')}>
-          <IconButton aria-label={t('common.copy')} color="fg.muted" size="2xs" variant="ghost" onClick={copyValue}>
-            <Icon as={CopyIcon} boxSize="3" />
-          </IconButton>
-        </Tooltip>
-      </Box>
-    </HStack>
+    <DataList.Item alignItems="start" className="group">
+      <DataList.ItemLabel fontSize="2xs">{entry.label}</DataList.ItemLabel>
+      <DataList.ItemValue fontSize="2xs" minW="0">
+        <Text
+          flex="1"
+          fontSize="2xs"
+          minW="0"
+          whiteSpace={entry.isMultiline ? 'pre-wrap' : undefined}
+          truncate={!entry.isMultiline}
+        >
+          {entry.value}
+        </Text>
+        <Box
+          flexShrink={0}
+          opacity={0}
+          transitionDuration="var(--wb-motion-duration-fast)"
+          transitionProperty="opacity"
+          _groupHover={GROUP_HOVER_VISIBLE}
+        >
+          <Tooltip content={t('common.copy')}>
+            <IconButton aria-label={t('common.copy')} color="fg.muted" size="2xs" variant="ghost" onClick={copyValue}>
+              <Icon as={CopyIcon} boxSize="3" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </DataList.ItemValue>
+    </DataList.Item>
   );
 };
 
