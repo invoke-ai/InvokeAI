@@ -167,8 +167,15 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
         if hasattr(tokenizer, "padding_side"):
             tokenizer.padding_side = "left"
 
+        # Pass the prompt as the `text=` keyword, NOT positionally: the diffusers
+        # FLUX.2-dev encoder loads a `PixtralProcessor`, whose first positional
+        # parameter is `images` (`__call__(self, images=None, text=None, ...)`).
+        # A positional `proc(text, ...)` would route the prompt string into
+        # `images` and process it as an image. The `text` keyword is correct for
+        # all three processors we can land on (PixtralProcessor, a plain HF
+        # tokenizer, and our `_TekkenRawTextAdapter`).
         inputs = proc(
-            text,
+            text=text,
             return_tensors="pt",
             padding="max_length",
             padding_side="left",
