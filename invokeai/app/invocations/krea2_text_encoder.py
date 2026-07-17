@@ -108,19 +108,24 @@ class Krea2TextEncoderInvocation(BaseInvocation):
                 body_text,
                 max_length=body_max_length,
                 truncation=True,
+                padding="max_length",
                 return_tensors="pt",
             )
-            # Append the suffix AFTER truncation so it can never be cut. add_special_tokens=False keeps it
-            # to exactly the assistant-turn tokens (no extra BOS), matching the reference token layout.
-            suffix_inputs = tokenizer(_KREA2_SUFFIX, add_special_tokens=False, return_tensors="pt")
+            # Append the suffix AFTER truncation so it can never be cut, matching the reference layout.
+            suffix_inputs = tokenizer(_KREA2_SUFFIX, return_tensors="pt")
             input_ids = torch.cat([body_inputs.input_ids, suffix_inputs.input_ids], dim=1).to(device=device)
             attention_mask = torch.cat([body_inputs.attention_mask, suffix_inputs.attention_mask], dim=1).to(
-                device=device
+                device=device, dtype=torch.bool
             )
+            # Padding sits between the prompt body and assistant suffix. Count only valid tokens when
+            # assigning positions so the suffix receives the same mRoPE phase as it did during training.
+            position_ids = (attention_mask.long().cumsum(dim=-1) - 1).clamp(min=0)
+            position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
 
             outputs = text_encoder(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
+                position_ids=position_ids,
                 output_hidden_states=True,
                 use_cache=False,
                 return_dict=True,
@@ -144,10 +149,6 @@ class Krea2TextEncoderInvocation(BaseInvocation):
             # Match the device-safe compute dtype used by the denoise loop (falls back from bf16 to
             # fp16/fp32 on devices without bf16 support) rather than forcing bfloat16.
             prompt_embeds = prompt_embeds.to(dtype=TorchDevice.choose_bfloat16_safe_dtype(device))
-
-        # If every token is valid (no padding), the mask is unnecessary.
-        if prompt_mask is not None and bool(prompt_mask.all()):
-            prompt_mask = None
 
         return prompt_embeds, prompt_mask
 

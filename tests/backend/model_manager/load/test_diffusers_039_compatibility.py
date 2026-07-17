@@ -1,9 +1,13 @@
 from inspect import signature
+from types import SimpleNamespace
 
 import accelerate
 import diffusers
 import pytest
+import torch
 from packaging.version import Version
+
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 
 
 def test_pinned_diffusers_exposes_existing_and_krea_model_contracts() -> None:
@@ -29,6 +33,31 @@ def test_flow_match_scheduler_keeps_custom_sigma_and_shift_api() -> None:
     assert "sigmas" in parameters
     assert "mu" in parameters
     assert "device" in parameters
+
+
+def test_invoke_generic_diffusers_loader_smoke(tmp_path) -> None:
+    source_model = diffusers.AutoencoderKL(
+        in_channels=3,
+        out_channels=3,
+        down_block_types=("DownEncoderBlock2D",),
+        up_block_types=("UpDecoderBlock2D",),
+        block_out_channels=(4,),
+        layers_per_block=1,
+        latent_channels=2,
+        norm_num_groups=1,
+        sample_size=8,
+    )
+    source_model.save_pretrained(tmp_path)
+
+    loader = object.__new__(GenericDiffusersLoader)
+    loader._torch_dtype = torch.float32
+    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+
+    loaded_model = loader._load_model(SimpleNamespace(path=str(tmp_path)))
+    latents = loaded_model.encode(torch.zeros(1, 3, 8, 8)).latent_dist.mode()
+
+    assert isinstance(loaded_model, diffusers.AutoencoderKL)
+    assert latents.shape == (1, 2, 8, 8)
 
 
 @pytest.mark.parametrize(

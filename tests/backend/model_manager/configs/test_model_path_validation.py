@@ -43,8 +43,35 @@ def test_large_directory_with_unrecognized_model_markers_is_rejected(tmp_path: P
         ModelConfigFactory._validate_path_looks_like_model(tmp_path)
 
 
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"_class_name": "set_seed"},
+        {"_class_name": "AutoTokenizer"},
+        {"_class_name": "ModelMixin"},
+        {"_class_name": "DiffusionPipeline"},
+        {"_class_name": "PretrainedConfig"},
+        {"architectures": ["set_seed"]},
+        {"architectures": ["PreTrainedModel"]},
+    ],
+)
+def test_large_directory_with_non_model_library_export_is_rejected(tmp_path: Path, config: dict) -> None:
+    (tmp_path / "config.json").write_text(json.dumps(config))
+    _fill_directory(tmp_path)
+
+    with pytest.raises(ValueError, match="general-purpose directory"):
+        ModelConfigFactory._validate_path_looks_like_model(tmp_path)
+
+
 def test_large_directory_with_transformers_config_is_accepted(tmp_path: Path) -> None:
     (tmp_path / "config.json").write_text(json.dumps({"architectures": ["Qwen3VLModel"]}))
+    _fill_directory(tmp_path)
+
+    ModelConfigFactory._validate_path_looks_like_model(tmp_path)
+
+
+def test_large_directory_with_diffusers_model_config_is_accepted(tmp_path: Path) -> None:
+    (tmp_path / "config.json").write_text(json.dumps({"_class_name": "AutoencoderKL"}))
     _fill_directory(tmp_path)
 
     ModelConfigFactory._validate_path_looks_like_model(tmp_path)

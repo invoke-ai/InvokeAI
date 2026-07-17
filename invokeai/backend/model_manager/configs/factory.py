@@ -179,35 +179,45 @@ def _is_known_model_marker(config_name: str, config: Any) -> bool:
     """Return whether a root config names a class/model type provided by our model libraries."""
     import diffusers
     import transformers
+    from diffusers.models.modeling_utils import ModelMixin
+    from diffusers.pipelines.pipeline_utils import DiffusionPipeline
+    from transformers import PretrainedConfig, PreTrainedModel
     from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
 
     if not isinstance(config, dict):
         return False
 
-    def has_export(module: Any, name: Any) -> bool:
+    def has_model_export(module: Any, name: Any, expected_bases: tuple[type, ...]) -> bool:
         if not isinstance(name, str) or not name:
             return False
         try:
-            return getattr(module, name, None) is not None
+            exported = getattr(module, name, None)
+            return (
+                isinstance(exported, type) and exported not in expected_bases and issubclass(exported, expected_bases)
+            )
         except Exception:
             return False
 
     if config_name == "model_index.json":
         class_name = config.get("_class_name")
-        return class_name in _PINNED_MODEL_CLASS_MARKERS or has_export(diffusers, class_name)
+        return class_name in _PINNED_MODEL_CLASS_MARKERS or has_model_export(
+            diffusers, class_name, (DiffusionPipeline,)
+        )
 
     class_name = config.get("_class_name")
     if (
         class_name in _PINNED_MODEL_CLASS_MARKERS
-        or has_export(diffusers, class_name)
-        or has_export(transformers, class_name)
+        or has_model_export(diffusers, class_name, (ModelMixin, DiffusionPipeline))
+        or has_model_export(transformers, class_name, (PreTrainedModel, PretrainedConfig))
     ):
         return True
     model_type = config.get("model_type")
     if isinstance(model_type, str) and model_type in CONFIG_MAPPING_NAMES:
         return True
     architectures = config.get("architectures")
-    return isinstance(architectures, list) and any(has_export(transformers, name) for name in architectures)
+    return isinstance(architectures, list) and any(
+        has_model_export(transformers, name, (PreTrainedModel,)) for name in architectures
+    )
 
 
 # The types are listed explicitly because IDEs/LSPs can't identify the correct types
