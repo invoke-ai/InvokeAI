@@ -2197,9 +2197,10 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue. Returns global counts; non-admin users additionally
-         *     get their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the
-         *     current item's identifiers unless they own it.
+         * @description Gets the status of the session queue. Returns global counts; every user additionally gets
+         *     their own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI
+         *     like the progress bar to the user's own activity). Non-admin users cannot see the current
+         *     item's identifiers unless they own it.
          */
         get: operations["get_queue_status"];
         put?: never;
@@ -24168,6 +24169,12 @@ export type components = {
              * @default null
              */
             submodel_type: components["schemas"]["SubModelType"] | null;
+            /**
+             * User Id
+             * @description The ID of the user whose action triggered the load
+             * @default system
+             */
+            user_id: string;
         };
         /**
          * ModelLoadStartedEvent
@@ -24189,6 +24196,12 @@ export type components = {
              * @default null
              */
             submodel_type: components["schemas"]["SubModelType"] | null;
+            /**
+             * User Id
+             * @description The ID of the user whose action triggered the load
+             * @default system
+             */
+            user_id: string;
         };
         /**
          * ModelLoaderOutput
@@ -25533,6 +25546,40 @@ export type components = {
              * @description The ID of the session (aka graph execution state)
              */
             session_id: string;
+        };
+        /**
+         * QueueItemsCanceledEvent
+         * @description Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in
+         *     bulk (e.g. cancel/delete-all-except-current) without per-item status change events.
+         */
+        QueueItemsCanceledEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * Canceled Item Ids
+             * @description The IDs of the queue items that were canceled or deleted
+             */
+            canceled_item_ids: number[];
+            /**
+             * User Ids
+             * @description The IDs of the users who own the canceled queue items
+             */
+            user_ids: string[];
+            /**
+             * Canceled Item Ids By User
+             * @description The canceled queue item IDs keyed by owner user ID.
+             */
+            canceled_item_ids_by_user: {
+                [key: string]: number[];
+            };
         };
         /**
          * QueueItemsRetriedEvent
