@@ -845,7 +845,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     const layerNumber = i + 1;
     const layerType = i18n.t(LAYER_TYPE_TO_TKEY['control_layer']);
     const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-    const problems = getControlLayerWarnings(controlLayer, model);
+    const problems = getControlLayerWarnings(controlLayer, model, enabledControlLayers);
 
     if (problems.length) {
       const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
