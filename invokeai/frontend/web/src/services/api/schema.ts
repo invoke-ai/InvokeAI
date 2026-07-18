@@ -16771,7 +16771,7 @@ export type components = {
             outputs_dir?: string;
             /**
              * Image Subfolder Strategy
-             * @description Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.
+             * @description Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance. Disk backend only: has no effect when storage_backend="s3" (S3 always stores images flat, since object storage cannot be reorganized in place).
              * @default flat
              * @enum {string}
              */
@@ -16799,7 +16799,7 @@ export type components = {
             workflow_thumbnails_dir?: string;
             /**
              * Storage Backend
-             * @description Backend for storing generated images. "disk" uses the local filesystem; "s3" uses any S3-compatible object store (AWS S3, Backblaze B2, etc.).
+             * @description Backend for storing generated images. "disk" uses the local filesystem; "s3" uses any S3-compatible object store (AWS S3, Backblaze B2, etc.). Choose this once at deploy time: there is no migration between backends, and images written to one are not visible to the other.
              * @default disk
              * @enum {string}
              */
