@@ -185,7 +185,15 @@ class TestValidateSubfolder:
             ("a/./b", "Current directory references not allowed"),
             ("C:/x", "Drive-qualified or absolute"),
         ],
-        ids=["parent_traversal", "mid_traversal", "absolute", "double_slash", "backslash", "current_dir", "windows_drive"],
+        ids=[
+            "parent_traversal",
+            "mid_traversal",
+            "absolute",
+            "double_slash",
+            "backslash",
+            "current_dir",
+            "windows_drive",
+        ],
     )
     def test_invalid_subfolders(self, tmp_path: Path, subfolder: str, error_match: str):
         storage = DiskImageFileStorage(tmp_path)

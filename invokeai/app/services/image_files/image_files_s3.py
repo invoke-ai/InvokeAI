@@ -133,6 +133,30 @@ class S3CompatibleImageFileStorage(ImageFileStorageBase):
         # region, pil_compress_level), so it does not retain the invoker.
         pass
 
+    @property
+    def image_root(self) -> Path:
+        """Synthetic ``s3://`` root for full-size images (identification only).
+
+        There is no local filesystem root for this backend; this mirrors the
+        prefix used by :meth:`get_path` so callers that reason about the root
+        (e.g. directory cleanup in the image-move service) get a consistent,
+        non-filesystem URI rather than a real path.
+        """
+        return Path(f"s3://{self._bucket}/{_IMAGES_PREFIX.rstrip('/')}")
+
+    @property
+    def thumbnail_root(self) -> Path:
+        """Synthetic ``s3://`` root for thumbnails (identification only). See :meth:`image_root`."""
+        return Path(f"s3://{self._bucket}/{_THUMBNAILS_PREFIX.rstrip('/')}")
+
+    def evict_cache_paths(self, paths: list[Path]) -> None:
+        """No-op: this backend keeps no in-memory image cache to evict.
+
+        Unlike the disk backend, S3 reads are not cached locally, so there is
+        nothing to invalidate when objects are moved or deleted.
+        """
+        pass
+
     def get(self, image_name: str, image_subfolder: str = "") -> PILImageType:
         body = self.get_bytes(image_name, image_subfolder=image_subfolder)
         image = Image.open(io.BytesIO(body))
