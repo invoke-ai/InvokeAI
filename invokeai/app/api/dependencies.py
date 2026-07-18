@@ -142,7 +142,16 @@ class ApiDependencies:
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
         image_records = SqliteImageRecordStorage(db=db)
-        image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
+        # The image-move / subfolder-reorganize service is filesystem-only
+        # (os.replace, fsync, empty-dir cleanup) and has no meaning for object
+        # storage, so it is not created for the S3 backend. The image_moves API
+        # then reports unavailable (503) and subfoldering is forced flat at write
+        # time (see ImageService._create_and_store), so nothing ever needs moving.
+        image_moves: "ImageMoveService | None"
+        if config.storage_backend == "s3":
+            image_moves = None
+        else:
+            image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
