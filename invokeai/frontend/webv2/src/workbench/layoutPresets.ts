@@ -30,6 +30,7 @@ const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   'gallery:bottom': 'gallery',
   'gallery:center': 'gallery',
   generate: 'generate',
+  upscale: 'upscale',
   layers: 'layers',
   notifications: 'notifications',
   preview: 'preview',
@@ -127,7 +128,11 @@ export const layoutPresets: LayoutPreset[] = [
         instanceIds: ['preview', 'canvas', 'gallery:center', 'workflow:center'],
         sizePx: 0,
       }),
-      left: createRegion({ activeInstanceId: 'generate', instanceIds: ['generate', 'workflow'], sizePx: 450 }),
+      left: createRegion({
+        activeInstanceId: 'generate',
+        instanceIds: ['generate', 'workflow', 'upscale'],
+        sizePx: 450,
+      }),
       right: createRegion({
         activeInstanceId: 'gallery',
         instanceIds: ['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
@@ -152,7 +157,11 @@ export const layoutPresets: LayoutPreset[] = [
         instanceIds: ['workflow:center', 'canvas', 'preview', 'gallery:center'],
         sizePx: 0,
       }),
-      left: createRegion({ activeInstanceId: 'workflow', instanceIds: ['workflow', 'generate'], sizePx: 450 }),
+      left: createRegion({
+        activeInstanceId: 'workflow',
+        instanceIds: ['workflow', 'generate', 'upscale'],
+        sizePx: 450,
+      }),
       right: createRegion({
         activeInstanceId: 'queue',
         instanceIds: ['queue', 'gallery', 'layers', 'preview', 'diagnostics', 'project'],
@@ -177,7 +186,11 @@ export const layoutPresets: LayoutPreset[] = [
         instanceIds: ['canvas', 'preview', 'gallery:center', 'workflow:center'],
         sizePx: 0,
       }),
-      left: createRegion({ activeInstanceId: 'generate', instanceIds: ['generate', 'workflow'], sizePx: 450 }),
+      left: createRegion({
+        activeInstanceId: 'generate',
+        instanceIds: ['generate', 'workflow', 'upscale'],
+        sizePx: 450,
+      }),
       right: createRegion({
         activeInstanceId: 'layers',
         instanceIds: ['layers', 'gallery', 'queue', 'preview', 'diagnostics', 'project'],
@@ -204,7 +217,7 @@ export const layoutPresets: LayoutPreset[] = [
       }),
       left: createRegion({
         activeInstanceId: 'generate',
-        instanceIds: ['generate', 'workflow', 'gallery'],
+        instanceIds: ['generate', 'workflow', 'upscale', 'gallery'],
         isCollapsed: true,
         sizePx: 450,
       }),

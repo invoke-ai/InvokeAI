@@ -16,6 +16,7 @@ import {
   isSupportedGenerateModel,
 } from './generation/baseGenerationPolicies';
 import { normalizeGenerateWidgetValues } from './generation/settings';
+import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from './upscale/settings';
 import { getProjectWidgetValues } from './widgetState';
 import { areArraysEqual, createStableSelector } from './workbenchSelectors';
 import { getProjectGraphReadiness } from './workflows/buildGraph';
@@ -44,7 +45,7 @@ export interface ResultDestinationMeta {
 export const invocationSources: InvocationSourceMeta[] = [
   { id: 'generate', label: 'Generate', available: true },
   { id: 'workflow', label: 'Workflow', available: true },
-  { id: 'upscale', label: 'Upscale', available: false },
+  { id: 'upscale', label: 'Upscale', available: true },
   { id: 'canvas', label: 'Canvas', available: true },
 ];
 
@@ -78,11 +79,13 @@ const validDestinationIds = new Set(resultDestinations.map((destination) => dest
 const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
   canvas: 'canvas',
   generate: 'generate',
+  upscale: 'upscale',
   workflow: 'workflow',
 };
 
 export interface InvocationRouteInput {
   generateValues: Record<string, unknown>;
+  upscaleValues: Record<string, unknown>;
   invocation: InvocationRoute;
   mountedWidgetIds: readonly WidgetId[];
   projectGraph: ProjectGraphState;
@@ -113,6 +116,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
     width: project.canvas.document.bbox.width,
   },
   generateValues: getProjectWidgetValues(project, 'generate'),
+  upscaleValues: getProjectWidgetValues(project, 'upscale'),
   invocation: project.invocation,
   mountedWidgetIds: getMountedWidgetIds(project),
   projectGraph: project.projectGraph,
@@ -124,6 +128,7 @@ export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right:
   left.invocation === right.invocation &&
   left.projectGraph === right.projectGraph &&
   left.generateValues === right.generateValues &&
+  left.upscaleValues === right.upscaleValues &&
   left.canvasBbox.width === right.canvasBbox.width &&
   left.canvasBbox.height === right.canvasBbox.height &&
   areArraysEqual(left.mountedWidgetIds, right.mountedWidgetIds);
@@ -184,6 +189,14 @@ export const resolveInvocationRouteInput = (
 
   if (sourceId === 'generate') {
     validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models));
+  }
+
+  if (sourceId === 'upscale') {
+    const values = normalizeUpscaleWidgetValues(input.upscaleValues);
+
+    validationReasons.push(
+      ...(values ? getUpscaleValidationReasons(values, models) : ['Upscale settings are incomplete.'])
+    );
   }
 
   if (sourceId === 'canvas') {

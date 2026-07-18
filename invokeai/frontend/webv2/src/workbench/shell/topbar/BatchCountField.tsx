@@ -1,6 +1,6 @@
 import { NumberInput } from '@chakra-ui/react';
 import { MIN_BATCH_COUNT, sanitizeBatchCount } from '@workbench/generation/batch';
-import { useWidgetValuesSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
 
 const getBatchCount = (values: Record<string, unknown>): number => {
@@ -10,15 +10,28 @@ const getBatchCount = (values: Record<string, unknown>): number => {
 };
 
 export const BatchCountField = () => {
-  const batchCount = useWidgetValuesSelector('generate', getBatchCount);
+  const { batchCount, sourceId } = useActiveProjectSelector(
+    (project) => {
+      const sourceId = project.invocation.sourceId;
+      const typeId = sourceId === 'upscale' ? 'upscale' : 'generate';
+      const instance = Object.values(project.widgetInstances).find((candidate) => candidate.typeId === typeId);
+
+      return { batchCount: getBatchCount(instance?.state.values ?? {}), sourceId };
+    },
+    (left, right) => left.batchCount === right.batchCount && left.sourceId === right.sourceId
+  );
   const dispatch = useWorkbenchDispatch();
   const handleValueChange = useCallback(
     ({ valueAsNumber }: { valueAsNumber: number }) => {
       if (Number.isFinite(valueAsNumber)) {
-        dispatch({ batchCount: valueAsNumber, type: 'setGenerateBatchCount' });
+        if (sourceId === 'upscale') {
+          dispatch({ type: 'patchWidgetValues', values: { batchCount: valueAsNumber }, widgetId: 'upscale' });
+        } else {
+          dispatch({ batchCount: valueAsNumber, type: 'setGenerateBatchCount' });
+        }
       }
     },
-    [dispatch]
+    [dispatch, sourceId]
   );
 
   return (

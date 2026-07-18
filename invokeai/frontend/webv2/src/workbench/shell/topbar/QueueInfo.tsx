@@ -6,6 +6,7 @@ import { useModelLoads, type ModelLoadInfo } from '@workbench/backend/modelLoadS
 import { useQueueItemProgress, type QueueItemProgress } from '@workbench/backend/progressStore';
 import { Button, Tooltip } from '@workbench/components/ui';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
+import { getQueueItemSourceWidgetValues } from '@workbench/queueSnapshot';
 import { getQueueItemExpectedImageCount, getQueueProgressBarState, getQueueSummary } from '@workbench/queueSummary';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
@@ -138,8 +139,8 @@ const QueueInfoTooltip = ({
     );
   }
 
-  const generateValues = item.snapshot.widgetStates.generate.values;
-  const prompt = typeof generateValues.positivePrompt === 'string' ? generateValues.positivePrompt.trim() : '';
+  const sourceValues = getQueueItemSourceWidgetValues(item);
+  const prompt = typeof sourceValues.positivePrompt === 'string' ? sourceValues.positivePrompt.trim() : '';
   const expectedCount = getQueueItemExpectedImageCount(item);
   const activeItemIndex = Math.min(expectedCount, Math.max(1, progress?.activeItemIndex ?? 1));
   const activeBackendItemId = item.backendItemIds?.[activeItemIndex - 1];

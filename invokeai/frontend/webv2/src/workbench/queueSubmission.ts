@@ -19,8 +19,8 @@
  * graph is compiled ahead of time, but prompt/seed batch data still has to ride
  * along so repeated invokes are not silently run with backend primitive defaults.
  *
- * `upscale` is intentionally excluded: it is not yet an available source
- * (`invocation.ts` marks it `available: false`), so it never produces a snapshot.
+ * Upscale uses the same prompt/seed batch path as Generate after compiling its
+ * own immutable widget snapshot.
  */
 
 import type { InvocationSourceId, QueueItem } from './types';
@@ -29,6 +29,7 @@ import type { InvocationSourceId, QueueItem } from './types';
 export const BACKEND_SUBMITTABLE_SOURCE_IDS = [
   'generate',
   'workflow',
+  'upscale',
   'canvas',
 ] as const satisfies readonly InvocationSourceId[];
 

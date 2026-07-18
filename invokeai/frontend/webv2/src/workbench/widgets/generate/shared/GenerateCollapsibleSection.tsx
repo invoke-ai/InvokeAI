@@ -11,9 +11,9 @@ type Props = {
 
 const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
 
-export const GenerateCollapsibleSection = ({ label, defaultOpen, isOpen, children, badges }: Props) => {
+export const GenerateCollapsibleSection = ({ badges, children, defaultOpen, isOpen, label }: Props) => {
   return (
-    <Collapsible.Root defaultOpen={defaultOpen} open={isOpen} bg="bg.muted/50" rounded="md" overflow="hidden">
+    <Collapsible.Root bg="bg.muted/50" defaultOpen={defaultOpen} open={isOpen} overflow="hidden" rounded="md">
       <Collapsible.Trigger display="flex" gap={2} w="full" px={2} h="8" alignItems="center">
         <Collapsible.Indicator
           _open={COLLAPSIBLE_INDICATOR_OPEN_STYLES}

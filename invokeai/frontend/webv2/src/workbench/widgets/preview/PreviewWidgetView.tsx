@@ -614,6 +614,10 @@ const SelectedImagePreview = ({
   const previewWidth = previewImage?.width ?? image.width;
   const previewHeight = previewImage?.height ?? image.height;
   const liveQueueItemId = progressImage?.target?.queueItemId ?? null;
+  const dragImage = useMemo(
+    () => ({ boardId: actionImage?.boardId ?? 'none', imageName: image.imageName }),
+    [actionImage?.boardId, image.imageName]
+  );
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key === 'ArrowLeft') {
@@ -632,6 +636,7 @@ const SelectedImagePreview = ({
   return (
     <Stack gap="3" h="full" minH="0" outline="none" tabIndex={0} w="full" onKeyDown={handleKeyDown}>
       <PreviewFrame
+        dragImage={dragImage}
         frameHeight={previewHeight}
         frameWidth={previewWidth}
         isLive={isProgressImage}

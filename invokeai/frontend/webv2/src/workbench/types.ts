@@ -29,6 +29,7 @@ export type FirstPartyWidgetTypeId =
   | 'project'
   | 'queue'
   | 'server-status'
+  | 'upscale'
   | 'users'
   | 'version-status'
   | 'workflow';

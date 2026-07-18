@@ -1,7 +1,11 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import {
+  adjustFocusedPromptAttention,
+  PROMPT_ATTENTION_TARGET_PROPS,
+} from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
 import { PromptTextarea } from '@workbench/widgets/generate/promptFields/PromptTextarea';
-import { act } from 'react';
+import { act, useCallback, useState, type ChangeEvent } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -122,5 +126,50 @@ describe('ResizableTextarea', () => {
 
     expect(getComputedStyle(textarea).fontSize).toBe('13.12px');
     expect(getComputedStyle(underlay).fontSize).toBe('13.12px');
+  });
+
+  it('participates in the shared Ctrl+Up/Down prompt-attention system', async () => {
+    const PromptHarness = () => {
+      const [value, setValue] = useState('hello world');
+      const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
+        setValue(event.currentTarget.value);
+      }, []);
+
+      return (
+        <PromptTextarea
+          {...PROMPT_ATTENTION_TARGET_PROPS}
+          aria-label="Prompt"
+          defaultHeightPx={96}
+          minHeightPx={56}
+          resizeHandleAriaLabel="Resize prompt"
+          showSyntaxHighlighting
+          value={value}
+          onChange={handleChange}
+        />
+      );
+    };
+
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <PromptHarness />
+        </ChakraProvider>
+      );
+    });
+
+    const textarea = host.querySelector<HTMLTextAreaElement>('textarea')!;
+
+    textarea.focus();
+    textarea.setSelectionRange(0, 5);
+
+    await act(() => {
+      expect(adjustFocusedPromptAttention('increment', false)).toBe(true);
+    });
+
+    await expect.poll(() => textarea.value).toBe('hello+ world');
   });
 });

@@ -30,8 +30,8 @@ describe('isBackendSubmittableSourceId', () => {
     expect(isBackendSubmittableSourceId('workflow')).toBe(true);
   });
 
-  it('excludes upscale (not yet an available source)', () => {
-    expect(isBackendSubmittableSourceId('upscale')).toBe(false);
+  it('includes upscale', () => {
+    expect(isBackendSubmittableSourceId('upscale')).toBe(true);
   });
 
   it('exposes canvas in the exported allow-list', () => {
@@ -54,7 +54,7 @@ describe('shouldSubmitPendingQueueItem', () => {
     expect(shouldSubmitPendingQueueItem(makeQueueItem('canvas', 'cancelled'))).toBe(false);
   });
 
-  it('does not submit a pending item whose source is not submittable', () => {
-    expect(shouldSubmitPendingQueueItem(makeQueueItem('upscale', 'pending'))).toBe(false);
+  it('submits a pending upscale item', () => {
+    expect(shouldSubmitPendingQueueItem(makeQueueItem('upscale', 'pending'))).toBe(true);
   });
 });

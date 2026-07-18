@@ -17,10 +17,11 @@ import { createCanvasDimsSync } from './canvasDimsSync';
 import { configureDiagnostics } from './diagnostics/logger';
 import { addImagesToGalleryBoard } from './gallery/api';
 import { getQueueItemResultImages, resumeQueueProcessor, type QueueItemResultImageOptions } from './generation/api';
-import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
+import { getQueueItemSnapshotBatchCount } from './queueSnapshot';
 import { shouldSubmitPendingQueueItem } from './queueSubmission';
 import { useWorkbenchPreferenceSelector } from './settings/store';
+import { normalizeUpscaleWidgetValues } from './upscale/settings';
 import {
   useWorkbenchDispatch,
   useWorkbenchHasHydrated,
@@ -39,22 +40,20 @@ const getSnapshotGalleryBoardId = (queueItem: QueueItem): string | null => {
 const toErrorMessage = (error: unknown): string =>
   getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
 
-const getSnapshotBatchCount = (queueItem: QueueItem): number => {
-  const batchCount = queueItem.snapshot.widgetStates.generate?.values.batchCount;
-
-  return sanitizeBatchCount(batchCount);
-};
-
 type QueueItemBackendSubmission =
   | { kind: 'generate'; request: EnqueueGenerateRequest }
   | { kind: 'workflow'; request: EnqueueWorkflowRequest }
   | { error: string; kind: 'invalid' };
 
 const COMPILED_GENERATE_RESULT_NODE_ID = 'canvas_output';
+const COMPILED_UPSCALE_RESULT_NODE_ID = 'upscale_output';
 
 export const getQueueItemResultImageOptions = (queueItem: QueueItem): QueueItemResultImageOptions | undefined => {
   if (queueItem.snapshot.sourceId === 'generate' || queueItem.snapshot.sourceId === 'canvas') {
     return { resultNodeIds: [COMPILED_GENERATE_RESULT_NODE_ID] };
+  }
+  if (queueItem.snapshot.sourceId === 'upscale') {
+    return { resultNodeIds: [COMPILED_UPSCALE_RESULT_NODE_ID] };
   }
 
   return undefined;
@@ -128,10 +127,36 @@ export const createQueueItemBackendSubmission = (
     };
   }
 
+  if (queueItem.snapshot.sourceId === 'upscale') {
+    const upscaleValues = normalizeUpscaleWidgetValues(queueItem.snapshot.widgetStates.upscale?.values);
+
+    if (!upscaleValues) {
+      return { error: 'upscale queue item is missing upscale submission metadata.', kind: 'invalid' };
+    }
+
+    return {
+      kind: 'generate',
+      request: {
+        batchCount: upscaleValues.batchCount,
+        destination: queueItem.snapshot.destination,
+        graph,
+        negativePrompt: upscaleValues.negativePromptEnabled ? upscaleValues.negativePrompt : '',
+        negativePromptNodeId: 'negative_prompt',
+        positivePrompt: upscaleValues.positivePrompt,
+        positivePromptNodeId: 'positive_prompt',
+        projectId: project.id,
+        seed: upscaleValues.seed,
+        seedNodeId: 'seed',
+        shouldRandomizeSeed: upscaleValues.shouldRandomizeSeed,
+        sourceQueueItemId: queueItem.id,
+      },
+    };
+  }
+
   return {
     kind: 'workflow',
     request: {
-      batchCount: getSnapshotBatchCount(queueItem),
+      batchCount: getQueueItemSnapshotBatchCount(queueItem),
       destination: queueItem.snapshot.destination,
       graph,
       projectId: project.id,

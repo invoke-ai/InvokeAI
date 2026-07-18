@@ -1,7 +1,10 @@
 /* eslint-disable react/react-compiler */
 import type { StreamingImageSource } from '@workbench/images/streamingImageSource';
+import type { GalleryImageDragImage } from '@workbench/widgets/gallery/galleryDnd';
 
 import { Badge, Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
+import { useDraggable } from '@dnd-kit/core';
+import { getGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
 import { useCallback, useMemo, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,6 +36,7 @@ export const getFittedFrameCss = (width: number, height: number): SystemStyleObj
 
 export const PreviewFrame = ({
   children,
+  dragImage,
   frameHeight,
   frameWidth,
   isLive,
@@ -47,6 +51,8 @@ export const PreviewFrame = ({
 }: {
   /** Rendered instead of the fitted frame when there is no image source (inset variant only). */
   children?: ReactNode;
+  /** Saved gallery image represented by this frame. Live progress frames are never draggable. */
+  dragImage?: GalleryImageDragImage;
   frameHeight: number;
   frameWidth: number;
   isLive: boolean;
@@ -68,6 +74,27 @@ export const PreviewFrame = ({
     enabled: variant === 'framed' && !isLive,
     naturalWidth: frameWidth,
   });
+  const dragData = useMemo(() => (dragImage ? getGalleryImageDragData([dragImage]) : undefined), [dragImage]);
+  const isDragDisabled = !dragImage || isLive || loupe.isZoomed;
+  const {
+    isDragging,
+    listeners,
+    setNodeRef: setDragNodeRef,
+  } = useDraggable({
+    data: dragData,
+    disabled: isDragDisabled,
+    id: `preview-image:${dragImage?.imageName ?? 'none'}`,
+  });
+  const setContentRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      setDragNodeRef(element);
+
+      if (loupe.contentRef) {
+        loupe.contentRef.current = element;
+      }
+    },
+    [loupe.contentRef, setDragNodeRef]
+  );
 
   // Reset zoom in place when the displayed image changes (or goes live) — a
   // remount would flash the frame on every selection.
@@ -163,19 +190,30 @@ export const PreviewFrame = ({
     >
       <PreviewCompareDropZone />
       <Box
-        ref={loupe.contentRef}
+        ref={setContentRef}
+        {...listeners}
         bg="transparent"
         borderWidth="1px"
         borderColor={isLive ? 'accent.solid' : 'border.emphasized'}
         boxShadow="0 24px 80px rgba(0,0,0,0.42)"
         css={getFittedFrameCss(frameWidth, frameHeight)}
+        cursor={isDragDisabled ? undefined : isDragging ? 'grabbing' : 'grab'}
+        opacity={isDragging ? 0.55 : undefined}
         overflow="hidden"
         position="relative"
         rounded="lg"
+        touchAction={isDragDisabled ? undefined : 'none'}
         onContextMenu={onContextMenu ? handleContextMenu : undefined}
       >
         {source ? (
-          <img alt={source.alt} height={frameHeight} src={source.src} style={imageStyle} width={frameWidth} />
+          <img
+            alt={source.alt}
+            draggable={false}
+            height={frameHeight}
+            src={source.src}
+            style={imageStyle}
+            width={frameWidth}
+          />
         ) : null}
         {liveBadge}
       </Box>

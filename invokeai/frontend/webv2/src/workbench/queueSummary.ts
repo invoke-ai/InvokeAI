@@ -1,7 +1,7 @@
 import type { QueueItemProgress } from './backend/progressStore';
 import type { QueueItem } from './types';
 
-import { sanitizeBatchCount } from './generation/batch';
+import { getQueueItemSnapshotBatchCount } from './queueSnapshot';
 
 export interface QueueSummary {
   current: number;
@@ -60,9 +60,7 @@ export const getQueueItemExpectedImageCount = (item: QueueItem): number => {
     return item.backendItemIds.length;
   }
 
-  const batchCount = item.snapshot.widgetStates.generate?.values.batchCount;
-
-  return sanitizeBatchCount(batchCount);
+  return getQueueItemSnapshotBatchCount(item);
 };
 
 const compareQueuePosition = (a: QueueItem, b: QueueItem): number => {

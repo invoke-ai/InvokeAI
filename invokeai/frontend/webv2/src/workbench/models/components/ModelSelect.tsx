@@ -258,7 +258,7 @@ export const ModelSelect = ({
                     <Input
                       ref={searchInputRef}
                       aria-label={`Search ${scopeLabel}`}
-                      placeholder={`Search ${scopeLabel}...`}
+                      placeholder={`Search ${scopeLabel}…`}
                       size="xs"
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.currentTarget.value)}
@@ -451,7 +451,7 @@ const BaseChip = ({
 
 const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
   <HStack as="span" flex="1" gap="2" minW="0">
-    <Text as="span" fontSize="xs" minW="0" truncate>
+    <Text as="span" fontSize="xs" minW="0" title={model.name} truncate>
       {model.name}
     </Text>
     <Badge
