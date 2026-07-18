@@ -57,6 +57,21 @@ INVOKEAI_STORAGE_BACKEND=s3
 
 When `s3` is selected, the variables in the next section are required.
 
+<Aside type="caution" title="Pick one backend at deploy time — there is no migration">
+`storage_backend` is a deployment-level decision, not a setting you
+toggle on a live install. **There is no migration between `disk` and
+`s3`**: images written to one backend are invisible to the other, so
+switching an existing instance orphans its entire gallery (the database
+still lists the images, but their files live in the backend you left
+behind). Choose the backend before generating images, and keep it fixed
+for the life of the deployment.
+
+The S3 backend exists for **hosted and multi-replica deployments** that
+want their image output decoupled from any single server's local
+filesystem — ephemeral containers, autoscaled instances, shared storage
+across replicas. A single-user desktop install should stay on `disk`.
+</Aside>
+
 <Aside type="note" title="Install the s3 extra">
   The S3 backend depends on `boto3`, which is an optional dependency. Install it with the `s3` extra: `pip install "invokeai[s3]"` (or `uv pip install "invokeai[s3]"`). Without it, selecting `storage_backend=s3` raises an `ImportError` at startup.
 </Aside>
@@ -144,10 +159,14 @@ unambiguously:
   thumbnails/<image-name>.webp
 ```
 
-When `image_subfolder_strategy` is configured (e.g. `date`, `type`, or
-`hash`), the S3 backend mirrors the on-disk layout and inserts the same
-subfolder into both prefixes, e.g. `images/<subfolder>/<image-name>.png`
-and `thumbnails/<subfolder>/<image-name>.webp`.
+Images are always stored **flat** under these two prefixes. The
+[`image_subfolder_strategy`](/configuration/invokeai-yaml/#image-subfolder-strategy)
+setting (`date`, `type`, `hash`) is a disk-only feature and has no effect
+on S3: object storage has no directory structure to organize, and the
+strategy cannot be changed after the fact because there is no in-place
+move/reorganize operation for object stores. Accordingly, the subfolder
+strategy selector and the Image Storage Maintenance panel are hidden in
+the app's Settings when the S3 backend is active.
 
 InvokeAI also writes per-object user-metadata (`invokeai-metadata`,
 `invokeai-workflow`, `invokeai-graph`) so workflow and graph lookups
