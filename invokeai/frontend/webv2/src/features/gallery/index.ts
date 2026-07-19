@@ -16,8 +16,6 @@ import {
   getGalleryImageByName,
   getGalleryImageMetadata,
   getGalleryImagesByNames,
-  getImageFullUrl,
-  getImageThumbnailUrl,
   isDateBoardId,
   listGalleryBoards,
   makeImageDurable,
@@ -30,11 +28,9 @@ import {
 
 /** Resolve backend Gallery images without exposing transport DTOs or endpoints. */
 export const galleryImages = {
-  fullUrl: getImageFullUrl,
   metadata: getGalleryImageMetadata,
   resolve: getGalleryImageByName,
   resolveMany: getGalleryImagesByNames,
-  thumbnailUrl: getImageThumbnailUrl,
 } as const;
 
 /** Import/export intents shared by image-producing and image-consuming features. */

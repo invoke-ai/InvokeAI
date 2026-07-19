@@ -8,7 +8,7 @@ import type {
 import type { CSSProperties } from 'react';
 
 import { Box, Icon, IconButton } from '@chakra-ui/react';
-import { galleryImages } from '@features/gallery';
+import { galleryImageUrls } from '@features/gallery/utility';
 import {
   getLayerThumbnailFallbackRenderState,
   nextLayerThumbnailFallbackStage,
@@ -85,8 +85,8 @@ const LayerThumbnailContent = ({
   const fallbackUrl =
     fallbackImage && fallbackStage !== 'failed'
       ? fallbackStage === 'thumbnail'
-        ? galleryImages.thumbnailUrl(fallbackImage.imageName)
-        : galleryImages.fullUrl(fallbackImage.imageName)
+        ? galleryImageUrls.thumbnail(fallbackImage.imageName)
+        : galleryImageUrls.full(fallbackImage.imageName)
       : null;
   const { showFallback, showRetry } = getLayerThumbnailFallbackRenderState(drawn, fallbackStage, status === 'error');
 

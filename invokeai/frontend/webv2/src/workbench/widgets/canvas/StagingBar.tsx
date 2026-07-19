@@ -14,7 +14,8 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { galleryDurability, galleryImages } from '@features/gallery';
+import { galleryDurability } from '@features/gallery';
+import { galleryImageUrls } from '@features/gallery/utility';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
 import { Button, IconButton, MenuContent, toaster, Tooltip } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
@@ -357,7 +358,7 @@ const StagingThumbnail = ({
       {slot.kind === 'candidate' ? (
         <img
           alt={slot.candidate.imageName}
-          src={slot.candidate.thumbnailUrl || galleryImages.thumbnailUrl(slot.candidate.imageName)}
+          src={slot.candidate.thumbnailUrl || galleryImageUrls.thumbnail(slot.candidate.imageName)}
           style={{ display: 'block', height: '100%', objectFit: 'cover', width: '100%' }}
         />
       ) : (

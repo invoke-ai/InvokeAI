@@ -8,7 +8,7 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
-import { getGalleryImageFullUrl, getGalleryImageThumbnailUrl } from '@features/gallery/core/imageUrls';
+import { getGalleryImageThumbnailUrl } from '@features/gallery/core/imageUrls';
 import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
 
 interface BackendBoardDTO {
@@ -56,11 +56,6 @@ interface ListImagesResponse {
 const imageCategories = ['general'];
 const assetCategories = ['control', 'mask', 'user', 'other'];
 
-export const getImageThumbnailUrl = getGalleryImageThumbnailUrl;
-
-/** The full-resolution image URL for an image referenced only by name (e.g. a v2 canvas layer's `CanvasImageRef`). */
-export const getImageFullUrl = getGalleryImageFullUrl;
-
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
 
@@ -86,7 +81,7 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   archived: board.archived,
   assetCount: board.asset_count,
   coverImageName: board.cover_image_name,
-  coverThumbnailUrl: board.cover_image_name ? getImageThumbnailUrl(board.cover_image_name) : undefined,
+  coverThumbnailUrl: board.cover_image_name ? getGalleryImageThumbnailUrl(board.cover_image_name) : undefined,
   id: board.board_id,
   imageCount: board.image_count,
   kind: 'board',
@@ -178,7 +173,7 @@ export const listGalleryDateBoards = async (): Promise<GalleryBoard[]> => {
     archived: false,
     assetCount: board.asset_count,
     coverImageName: board.cover_image_name,
-    coverThumbnailUrl: board.cover_image_name ? getImageThumbnailUrl(board.cover_image_name) : undefined,
+    coverThumbnailUrl: board.cover_image_name ? getGalleryImageThumbnailUrl(board.cover_image_name) : undefined,
     id: board.virtual_board_id,
     imageCount: board.image_count,
     kind: 'date',
