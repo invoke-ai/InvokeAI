@@ -41,6 +41,9 @@ def denoise(
     # Reference image conditioning (multi-reference image editing)
     img_cond_seq: torch.Tensor | None = None,
     img_cond_seq_ids: torch.Tensor | None = None,
+    # Optional joint_attention_kwargs (e.g. {"attention_mask": ...}) applied to positive forward
+    # passes only. Negative forwards always run unmasked.
+    pos_joint_attention_kwargs: dict[str, Any] | None = None,
 ) -> torch.Tensor:
     """Denoise latents using a FLUX.2 Klein transformer model.
 
@@ -137,6 +140,7 @@ def denoise(
                 img_ids=img_ids,
                 txt_ids=txt_ids,
                 guidance=guidance_vec,
+                joint_attention_kwargs=pos_joint_attention_kwargs,
                 return_dict=False,
             )
 
@@ -245,6 +249,7 @@ def denoise(
                 img_ids=img_ids,
                 txt_ids=txt_ids,
                 guidance=guidance_vec,
+                joint_attention_kwargs=pos_joint_attention_kwargs,
                 return_dict=False,
             )
 

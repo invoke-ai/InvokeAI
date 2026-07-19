@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
@@ -8,6 +8,7 @@ import { type Atom, atom, computed, map, type MapStore, type WritableAtom } from
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { S } from 'services/api/types';
+import { getEventScope } from 'services/events/eventScope';
 import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -41,6 +42,7 @@ const log = logger('events');
 
 export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   const socket = useStore($socket);
+  const store = useAppStore();
   const autoSwitch = useAppSelector(selectAutoSwitch);
   const $progressEvent = useState(() => atom<S['InvocationProgressEvent'] | null>(null))[0];
   const $progressImage = useState(() => atom<ProgressImageType | null>(null))[0];
@@ -67,6 +69,11 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     }
 
     const onInvocationProgress = (data: S['InvocationProgressEvent']) => {
+      // The backend routes progress events to the owner's room only; this check is defense in
+      // depth, mirroring the invocation_progress listener in setEventListeners.
+      if (getEventScope(store.getState, data) !== 'own') {
+        return;
+      }
       if (finishedQueueItemIds.has(data.item_id)) {
         log.trace(
           { data } as JsonObject,
@@ -93,7 +100,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('invocation_progress', onInvocationProgress);
     };
-  }, [$isProgressImageResolving, $progressData, $progressEvent, $progressImage, finishedQueueItemIds, socket]);
+  }, [$isProgressImageResolving, $progressData, $progressEvent, $progressImage, finishedQueueItemIds, socket, store]);
 
   useEffect(() => {
     if (!socket) {
@@ -101,6 +108,14 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     }
 
     const onQueueItemStatusChanged = (data: S['QueueItemStatusChangedEvent']) => {
+      // Other users' terminal status changes must not clear this client's live progress
+      // preview. Both the sanitized companion (user_id="redacted", broadcast to every queue
+      // subscriber) and foreign full events (received by admins via the admin room) carry a
+      // real top-level item_id and terminal status, so without this guard they would drive
+      // the terminal branch below and blank the viewer mid-generation.
+      if (getEventScope(store.getState, data) !== 'own') {
+        return;
+      }
       if (finishedQueueItemIds.has(data.item_id)) {
         log.trace(
           { data } as JsonObject,
@@ -155,6 +170,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     autoSwitch,
     finishedQueueItemIds,
     socket,
+    store,
   ]);
 
   const onLoadImage = useCallback(() => {

@@ -1143,6 +1143,7 @@
         "cpuOnly": "CPU Only",
         "fp8Storage": "FP8 Storage (Save VRAM)",
         "runOnCpu": "Run text encoder model on CPU only",
+        "runVaeOnCpu": "Run VAE model on CPU only",
         "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
         "defaultSettingsSaved": "Default Settings Saved",
@@ -2468,6 +2469,13 @@
             "paragraphs": [
                 "When enabled, only the text encoder component will run on CPU instead of GPU.",
                 "This saves VRAM for the denoiser while only slightly impacting performance. The conditioning outputs are automatically moved to GPU for the denoiser."
+            ]
+        },
+        "cpuOnlyVae": {
+            "heading": "CPU Only",
+            "paragraphs": [
+                "When enabled, the VAE will run on CPU instead of GPU.",
+                "This saves VRAM during decoding, but VAE decoding will be slower. The decoded image is automatically moved back to the correct device."
             ]
         },
         "fp8Storage": {

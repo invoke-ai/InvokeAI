@@ -8,7 +8,7 @@ import type {
   ExternalProviderStatus,
 } from 'services/api/types';
 
-import { api, buildV1Url } from '..';
+import { api, buildV1Url, getBaseUrl } from '..';
 
 /**
  * Builds an endpoint URL for the app router
@@ -148,7 +148,7 @@ export const appInfoApi = api.injectEndpoints({
       invalidatesTags: ['InvocationCacheStatus'],
     }),
     getOpenAPISchema: build.query<OpenAPIV3_1.Document, void>({
-      query: () => `${window.location.origin}/openapi.json`,
+      query: () => `${getBaseUrl()}/openapi.json`,
       providesTags: ['Schema'],
     }),
   }),

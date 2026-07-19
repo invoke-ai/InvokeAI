@@ -1,6 +1,7 @@
 import type { FlexProps, ProgressProps } from '@invoke-ai/ui-library';
 import { Flex, Progress } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { getUserScopedQueueCounts } from 'features/queue/store/userScopedQueueCounts';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
@@ -34,6 +35,9 @@ const ProgressBar = ({ containerProps, fitHeightPx, ...props }: ProgressBarProps
   const isConnected = useStore($isConnected);
   const activeProgressEvents = useStore($activeProgressEvents);
   const loadingModelsCount = useStore($loadingModelsCount);
+  // The progress bar reflects the user's own activity, not other users' generations. (Per-session
+  // progress events are already scoped to the user's own items in setEventListeners.)
+  const inProgressCount = queueStatus ? getUserScopedQueueCounts(queueStatus.queue).inProgress : undefined;
 
   const bars = useMemo<BarDescriptor[]>(() => {
     // One bar per in-flight session (multi-GPU). Each session's progress is tracked independently, so
@@ -49,11 +53,11 @@ const ProgressBar = ({ containerProps, fitHeightPx, ...props }: ProgressBarProps
     // Fallback single bar: idle, or generation has started but no progress event has arrived yet (e.g.
     // while models are loading). Mirrors the previous single-bar indeterminate behavior.
     let isIndeterminate = false;
-    if (isConnected && (loadingModelsCount > 0 || Boolean(queueStatus?.queue.in_progress))) {
+    if (isConnected && (loadingModelsCount > 0 || Boolean(inProgressCount))) {
       isIndeterminate = true;
     }
     return [{ key: 'idle', value: 0, isIndeterminate }];
-  }, [activeProgressEvents, isConnected, loadingModelsCount, queueStatus?.queue.in_progress]);
+  }, [activeProgressEvents, isConnected, loadingModelsCount, inProgressCount]);
 
   // In fit mode, cap the whole stack to the available strip and let the bars flex to share it. When the
   // bars fit at their natural height the stack is shorter than the cap; once they don't, they shrink.
