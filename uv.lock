@@ -1,6 +1,6 @@
 version = 1
 revision = 3
-requires-python = ">=3.14, <=3.14.5"
+requires-python = ">=3.14, <=3.14.6"
 resolution-markers = [
     "platform_machine == 'aarch64' and sys_platform == 'linux'",
     "(platform_machine != 's390x' and sys_platform == 'darwin') or (platform_machine != 's390x' and sys_platform == 'win32') or (platform_machine == 'x86_64' and sys_platform == 'linux')",
