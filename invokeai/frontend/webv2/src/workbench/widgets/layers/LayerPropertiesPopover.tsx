@@ -1,10 +1,10 @@
+import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasLayerContract } from '@workbench/types';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch } from 'react';
 
 import { Box, Popover, Portal, Stack, Switch, Text } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui';
+import { IconButton } from '@platform/ui';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { SlidersHorizontalIcon } from 'lucide-react';
@@ -28,7 +28,7 @@ import { RegionalGuidanceSettings } from './RegionalGuidanceSettings';
 
 export type LayerPropertiesEngine = Pick<
   CanvasEngineHandle,
-  'document' | 'exports' | 'layers' | 'projectId' | 'stores'
+  'document' | 'exports' | 'interaction' | 'layers' | 'projectId'
 >;
 
 const POPOVER_POSITIONING = { placement: 'left-start' } as const;

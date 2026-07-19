@@ -1,28 +1,4 @@
-/**
- * Pure raster-adjustment math (no DOM, no engine, no React).
- *
- * Turns a {@link CanvasAdjustmentsContract} into per-channel 256-entry lookup
- * tables and applies them (plus saturation) to raw `ImageData`. Kept pure and
- * allocation-conscious so it can drive BOTH the non-destructive display cache
- * (`adjustedSurfaceCache.ts`) and the generation composite
- * (`export/compositeForGeneration.ts`), and so its correctness is exhaustively
- * node-testable without any canvas.
- *
- * ## Composition order (documented, tested)
- *
- * Per channel, a single LUT is built as `contrast(brightness(curve(i)))`:
- *  1. **Curve** — the per-channel monotone-cubic curve remaps the raw value.
- *  2. **Brightness** — additive offset (`+ brightness * 255`).
- *  3. **Contrast** — linear scale about mid-grey (`(v - 128) * (1 + contrast) + 128`).
- * The LUT is applied to R/G/B; alpha is never touched. **Saturation** is applied
- * last, per pixel, on the post-LUT values (a luminance lerp), since it mixes
- * channels and cannot be expressed as an independent per-channel LUT.
- *
- * All scalar params are in `[-1, 1]` with `0` = identity; curve control points
- * are `[input, output]` pairs in `[0, 255]`.
- */
-
-import type { CanvasAdjustmentsContract } from '@workbench/types';
+import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
 
 /** The identity adjustment (no brightness/contrast/saturation, no curves). */
 export const DEFAULT_ADJUSTMENTS: CanvasAdjustmentsContract = { brightness: 0, contrast: 0, saturation: 0 };

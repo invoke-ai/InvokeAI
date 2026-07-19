@@ -1,6 +1,8 @@
-import type { WorkbenchPersistenceSnapshot, WorkbenchState } from './types';
+import type { HydratedWorkbenchSnapshot, PersistedWorkbenchSnapshotV1 } from '@workbench/persistenceContracts';
+import type { WorkbenchState } from '@workbench/projectContracts';
 
-import { getUserStorageScope } from './auth/session';
+import { getUserStorageScope } from '@features/identity';
+
 import { timeWorkbenchPerf } from './performanceMarks';
 
 const BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
@@ -14,8 +16,8 @@ const WORKBENCH_SCHEMA_VERSION = 1;
 const getStorageKey = (): string => `${BASE_STORAGE_KEY}${getUserStorageScope()}`;
 
 export interface WorkbenchPersistenceService {
-  loadWorkbench(): Promise<WorkbenchPersistenceSnapshot | null>;
-  saveWorkbench(state: WorkbenchState): Promise<WorkbenchPersistenceSnapshot>;
+  loadWorkbench(): Promise<HydratedWorkbenchSnapshot | null>;
+  saveWorkbench(state: WorkbenchState): Promise<HydratedWorkbenchSnapshot>;
   clearWorkbench(): Promise<void>;
 }
 
@@ -30,7 +32,7 @@ export const stripTransientWorkbenchState = (state: WorkbenchState): WorkbenchSt
   };
 };
 
-const createSnapshot = (state: WorkbenchState): WorkbenchPersistenceSnapshot => ({
+const createSnapshot = (state: WorkbenchState): HydratedWorkbenchSnapshot => ({
   savedAt: new Date().toISOString(),
   state: stripTransientWorkbenchState(state),
   version: WORKBENCH_SCHEMA_VERSION,
@@ -46,12 +48,12 @@ const isWorkbenchState = (value: unknown): value is WorkbenchState => {
   return Array.isArray(record.projects) && typeof record.activeProjectId === 'string';
 };
 
-export const migrateWorkbenchPersistenceSnapshot = (value: unknown): WorkbenchPersistenceSnapshot | null => {
+export const hydratePersistedWorkbenchSnapshot = (value: unknown): HydratedWorkbenchSnapshot | null => {
   if (!value || typeof value !== 'object') {
     return null;
   }
 
-  const record = value as Partial<WorkbenchPersistenceSnapshot> & { schemaVersion?: number };
+  const record = value as Partial<PersistedWorkbenchSnapshotV1> & { schemaVersion?: number };
   const version = record.version ?? record.schemaVersion;
 
   if (version !== WORKBENCH_SCHEMA_VERSION || !isWorkbenchState(record.state)) {
@@ -64,6 +66,14 @@ export const migrateWorkbenchPersistenceSnapshot = (value: unknown): WorkbenchPe
     version: WORKBENCH_SCHEMA_VERSION,
   };
 };
+
+export const serializeWorkbenchPersistenceSnapshot = (
+  snapshot: HydratedWorkbenchSnapshot
+): PersistedWorkbenchSnapshotV1 => ({
+  savedAt: snapshot.savedAt,
+  state: snapshot.state,
+  version: WORKBENCH_SCHEMA_VERSION,
+});
 
 export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
   clearWorkbench() {
@@ -87,7 +97,7 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
     }
 
     try {
-      return Promise.resolve(migrateWorkbenchPersistenceSnapshot(JSON.parse(value)));
+      return Promise.resolve(hydratePersistedWorkbenchSnapshot(JSON.parse(value)));
     } catch {
       window.localStorage.removeItem(getStorageKey());
 
@@ -107,7 +117,7 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
         timeWorkbenchPerf(
           'workbench:persistence-localstorage-stringify',
           { area: 'persistence', kind: 'workbench', projectId: state.activeProjectId },
-          () => JSON.stringify(snapshot)
+          () => JSON.stringify(serializeWorkbenchPersistenceSnapshot(snapshot))
         )
       );
     } catch {

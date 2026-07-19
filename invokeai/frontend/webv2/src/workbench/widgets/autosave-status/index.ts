@@ -1,8 +1,6 @@
-import type { WidgetManifest } from '@workbench/types';
+import type { WidgetManifest } from '@workbench/widgetContracts';
 
 import { CloudCheckIcon } from 'lucide-react';
-
-import { AutosaveStatusWidgetView } from './AutosaveStatusWidgetView';
 
 export const autosaveStatusWidgetManifest: WidgetManifest = {
   allowMultiple: false,
@@ -12,6 +10,6 @@ export const autosaveStatusWidgetManifest: WidgetManifest = {
   icon: CloudCheckIcon,
   id: 'autosave-status',
   label: (t) => t('widgets.labels.autosaveStatus'),
+  load: () => import('./implementation').then((module) => module.widgetImplementation),
   version: 1,
-  view: AutosaveStatusWidgetView,
 };

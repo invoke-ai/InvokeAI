@@ -1,13 +1,8 @@
-import type {
-  RegisteredWidget,
-  WidgetIconComponent,
-  WidgetInstanceId,
-  WidgetRegion,
-  WidgetTypeId,
-} from '@workbench/types';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { RegisteredWidget, WidgetIconComponent, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui';
+import { IconButton } from '@platform/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';

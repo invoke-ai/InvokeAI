@@ -1,3 +1,13 @@
+import type {
+  CanvasControlLayerContract,
+  CanvasDocumentContractV2,
+  CanvasInpaintMaskLayerContract,
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+  CanvasRasterLayerContractV2,
+  CanvasStagingCandidateContract,
+  CanvasStateContractV2,
+} from '@workbench/canvas-engine/contracts';
 import type * as ImagePatchModule from '@workbench/canvas-engine/history/imagePatch';
 import type * as LayerSnapshotModule from '@workbench/canvas-engine/history/layerSnapshot';
 import type * as AdjustedSurfaceCacheModule from '@workbench/canvas-engine/render/adjustedSurfaceCache';
@@ -9,19 +19,8 @@ import type {
 } from '@workbench/canvas-engine/render/raster.testStub';
 import type { ToolId } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
-import type {
-  CanvasControlLayerContract,
-  CanvasDocumentContractV2,
-  CanvasInpaintMaskLayerContract,
-  CanvasLayerContract,
-  CanvasLayerSourceContract,
-  CanvasRasterLayerContractV2,
-  CanvasStagingCandidateContract,
-  CanvasStateContractV2,
-  Project,
-  WorkbenchState,
-} from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
+import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 
 import {
   applyCanvasProjectMutation,
@@ -36,12 +35,12 @@ import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/ras
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
 import {
   createCanvasEngine as createApplicationCanvasEngine,
-  getCanvasOperations,
   type CanvasEngine,
   type CanvasEngineOptions,
 } from '@workbench/canvas-operations/createCanvasEngine';
 import { FILTER_AUTO_PROCESS_DEBOUNCE_MS } from '@workbench/canvas-operations/filterOperationSession';
-import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
+import { getCanvasOperationImplementation as getCanvasOperations } from '@workbench/canvas-operations/operationAccess';
+import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import type { BitmapStore } from './document/bitmapStore';

@@ -1,7 +1,13 @@
+import type {
+  NormalizedWidgetManifest,
+  RegisteredWidget,
+  WidgetInstanceContract,
+  WidgetTypeId,
+} from '@workbench/widgetContracts';
+
 import { describe, expect, it, vi } from 'vitest';
 
-import type { NormalizedWidgetManifest, RegisteredWidget, WidgetInstanceContract, WidgetTypeId } from './types';
-
+import { createWidgetImplementationResource } from './widgetImplementationResource';
 import {
   canRemoveItem,
   createWidgetRegionViewModel,
@@ -15,15 +21,16 @@ const TestView = () => null;
 const createWidget = (
   overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'label'>
 ): RegisteredWidget => ({
+  implementation: createWidgetImplementationResource(overrides.id, () => Promise.resolve({ view: TestView })),
   manifest: {
     apiVersion: 1,
     allowMultiple: false,
     allowedRegions: ['left', 'center', 'bottom'],
     failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
     icon: TestIcon,
+    load: () => Promise.resolve({ view: TestView }),
     state: { createInitial: () => ({}), persistence: 'project', version: 1 },
     version: 1,
-    view: TestView,
     ...overrides,
   },
   status: 'enabled',

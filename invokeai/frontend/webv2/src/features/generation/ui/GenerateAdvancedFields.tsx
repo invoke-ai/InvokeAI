@@ -1,0 +1,227 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
+import type { GenerateModelConfig, GenerateSettings, VaePrecision } from '@features/generation/core/types';
+import type { ChangeEvent } from 'react';
+
+import { Badge, HStack, InputGroup, NativeSelect, NumberInput, Switch } from '@chakra-ui/react';
+import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@features/generation/core/baseGenerationPolicies';
+import { isVaeModelConfig } from '@features/generation/core/settings';
+import { Field } from '@platform/ui';
+import { useTranslation } from 'react-i18next';
+
+import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
+import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
+import { ModelDefaultButton } from './shared/ModelDefaultButton';
+
+interface GenerateAdvancedFieldsProps {
+  settings: GenerateSettings;
+  selectedModel: GenerateModelConfig | undefined;
+  onCommit: (patch: Partial<GenerateSettings>) => void;
+  onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
+}
+
+const SeamlessSwitch = ({
+  checked,
+  label,
+  onCheckedChange,
+}: {
+  checked: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+}) => (
+  <Switch.Root checked={checked} flex="1" size="sm" onCheckedChange={(event) => onCheckedChange(event.checked)}>
+    <Switch.HiddenInput />
+    <Switch.Control _checked={{ bg: 'accent.solid' }}>
+      <Switch.Thumb />
+    </Switch.Control>
+    <Switch.Label fontSize="xs">{label}</Switch.Label>
+  </Switch.Root>
+);
+
+export const GenerateAdvancedFields = ({
+  onCommit,
+  onCommitImmediate,
+  selectedModel,
+  settings,
+}: GenerateAdvancedFieldsProps) => {
+  const { t } = useTranslation();
+  const modelBase = selectedModel?.base;
+  const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
+  const policy = getGenerationUiPolicy(selectedModel, settings);
+  const clipSkipMax = policy.clipSkipMax ?? 0;
+
+  const updateNumber =
+    (key: 'cfgRescaleMultiplier' | 'clipSkip', max: number) =>
+    ({ valueAsNumber }: NumberInput.ValueChangeDetails) => {
+      if (!Number.isFinite(valueAsNumber)) {
+        return;
+      }
+
+      onCommit({ [key]: Math.min(max, Math.max(0, valueAsNumber)) });
+    };
+
+  const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
+
+  if (
+    !policy.sdVaeVisible &&
+    !policy.vaePrecisionVisible &&
+    !policy.colorCompensationVisible &&
+    !policy.seamlessVisible &&
+    !policy.clipSkipMax &&
+    !policy.cfgRescaleVisible
+  ) {
+    return null;
+  }
+
+  const badges = (
+    <>
+      {settings.seamlessXAxis && <Badge size="xs">{t('widgets.generate.tileX')}</Badge>}
+      {settings.seamlessYAxis && <Badge size="xs">{t('widgets.generate.tileY')}</Badge>}
+      {settings.colorCompensation && <Badge size="xs">{t('widgets.generate.colorCompensation')}</Badge>}
+      {customVae && (
+        <Badge maxW="32" size="xs" truncate>
+          {settings.vae?.name}
+        </Badge>
+      )}
+    </>
+  );
+
+  return (
+    <GenerateCollapsibleSection label={t('widgets.generate.advanced')} defaultOpen={false} badges={badges}>
+      {policy.sdVaeVisible || policy.vaePrecisionVisible ? (
+        <HStack alignItems="flex-start" gap="2" p="2">
+          {policy.sdVaeVisible ? (
+            <Field
+              flex="2"
+              label={t('widgets.generate.vae')}
+              helpText={settings.vae ? undefined : t('widgets.generate.usingBundledVae')}
+            >
+              <HStack gap="1">
+                <ModelSelect
+                  filter={(model) => model.base === modelBase}
+                  modelTypes={['vae']}
+                  size="xs"
+                  placeholder={t('widgets.generate.modelDefault')}
+                  value={settings.vae?.key ?? null}
+                  onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}
+                />
+                <ModelDefaultButton
+                  disabled={!settings.vae}
+                  label={t('widgets.generate.useModelDefaultVae')}
+                  onClick={() => onCommitImmediate({ vae: null })}
+                />
+              </HStack>
+            </Field>
+          ) : null}
+          {policy.vaePrecisionVisible ? (
+            <Field flex="1" label={t('widgets.generate.vaePrecision')}>
+              <HStack gap="1">
+                <NativeSelect.Root flex="1" size="xs">
+                  <NativeSelect.Field
+                    aria-label={t('widgets.generate.vaePrecision')}
+                    value={settings.vaePrecision}
+                    onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                      onCommit({ vaePrecision: event.currentTarget.value as VaePrecision })
+                    }
+                  >
+                    <option value="fp16">FP16</option>
+                    <option value="fp32">FP32</option>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+                <ModelDefaultButton
+                  disabled={!modelDefaults || settings.vaePrecision === modelDefaults.vaePrecision}
+                  label={t('widgets.generate.useModelDefaultVaePrecision')}
+                  onClick={() => {
+                    if (modelDefaults) {
+                      onCommit({ vaePrecision: modelDefaults.vaePrecision });
+                    }
+                  }}
+                />
+              </HStack>
+            </Field>
+          ) : null}
+        </HStack>
+      ) : null}
+
+      {policy.clipSkipMax || policy.cfgRescaleVisible ? (
+        <HStack gap="2" p="2">
+          {policy.clipSkipMax ? (
+            <Field label={t('widgets.generate.clipSkip')}>
+              <NumberInput.Root
+                max={clipSkipMax}
+                min={0}
+                size="xs"
+                value={String(settings.clipSkip)}
+                onValueChange={updateNumber('clipSkip', clipSkipMax)}
+              >
+                <NumberInput.Control />
+                <NumberInput.Input />
+              </NumberInput.Root>
+            </Field>
+          ) : null}
+          {policy.cfgRescaleVisible ? (
+            <Field label={t('widgets.generate.cfgRescale')}>
+              <NumberInput.Root
+                max={0.99}
+                min={0}
+                size="xs"
+                step={0.05}
+                value={String(settings.cfgRescaleMultiplier)}
+                onValueChange={updateNumber('cfgRescaleMultiplier', 0.99)}
+              >
+                <InputGroup
+                  endElement={
+                    <ModelDefaultButton
+                      disabled={!modelDefaults || settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier}
+                      label={t('widgets.generate.useModelDefaultCfgRescale')}
+                      onClick={() => {
+                        if (modelDefaults) {
+                          onCommit({ cfgRescaleMultiplier: modelDefaults.cfgRescaleMultiplier });
+                        }
+                      }}
+                    />
+                  }
+                  endElementProps={{ pointerEvents: 'auto' }}
+                >
+                  <NumberInput.Input />
+                </InputGroup>
+              </NumberInput.Root>
+            </Field>
+          ) : null}
+        </HStack>
+      ) : null}
+
+      {policy.colorCompensationVisible ? (
+        <Field label={t('widgets.generate.colorCompensation')} p="2">
+          <Switch.Root
+            checked={settings.colorCompensation}
+            size="sm"
+            onCheckedChange={(event) => onCommit({ colorCompensation: event.checked })}
+          >
+            <Switch.HiddenInput />
+            <Switch.Control _checked={{ bg: 'accent.solid' }}>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch.Root>
+        </Field>
+      ) : null}
+
+      {policy.seamlessVisible ? (
+        <Field label={t('widgets.generate.seamlessTiling')} p="2">
+          <HStack gap="4">
+            <SeamlessSwitch
+              checked={settings.seamlessXAxis}
+              label={t('widgets.generate.xAxis')}
+              onCheckedChange={(checked) => onCommit({ seamlessXAxis: checked })}
+            />
+            <SeamlessSwitch
+              checked={settings.seamlessYAxis}
+              label={t('widgets.generate.yAxis')}
+              onCheckedChange={(checked) => onCommit({ seamlessYAxis: checked })}
+            />
+          </HStack>
+        </Field>
+      ) : null}
+    </GenerateCollapsibleSection>
+  );
+};

@@ -1,5 +1,6 @@
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
-import type { CanvasLayerContract, Project } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -21,7 +22,7 @@ const { activeProject, buttons } = vi.hoisted(() => ({
   buttons: new Map<string, CapturedButton>(),
 }));
 
-vi.mock('@workbench/components/ui', () => ({
+vi.mock('@platform/ui', () => ({
   Button: (props: CapturedButton) => {
     buttons.set(String(props.children), props);
     return <button disabled={props.disabled}>{props.children}</button>;

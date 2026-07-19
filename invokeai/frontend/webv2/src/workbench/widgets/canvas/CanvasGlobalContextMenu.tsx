@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Menu, Portal } from '@chakra-ui/react';
-import { MenuContent } from '@workbench/components/ui';
+import { MenuContent } from '@platform/ui';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

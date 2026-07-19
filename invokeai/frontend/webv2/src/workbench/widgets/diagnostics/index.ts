@@ -1,19 +1,15 @@
-import type { WidgetManifest } from '@workbench/types';
+import type { WidgetManifest } from '@workbench/widgetContracts';
 
 import { BugIcon } from 'lucide-react';
-
-import { DiagnosticsHeaderActions } from './DiagnosticsHeaderActions';
-import { DiagnosticsWidgetView } from './DiagnosticsWidgetView';
 
 export const diagnosticsWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['bottom', 'right'],
   bottomPanel: 'expandable',
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
-  headerActions: DiagnosticsHeaderActions,
   icon: BugIcon,
   id: 'diagnostics',
   label: (t) => t('widgets.labels.diagnostics'),
+  load: () => import('./implementation').then((module) => module.widgetImplementation),
   version: 1,
-  view: DiagnosticsWidgetView,
 };

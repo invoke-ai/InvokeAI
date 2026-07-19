@@ -1,4 +1,4 @@
-import type { CanvasDocumentContractV2, CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { CanvasDocumentContractV2, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it, vi } from 'vitest';
 

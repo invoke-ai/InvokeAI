@@ -1,10 +1,10 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { GeneratedImageContract, WidgetRuntimeApi } from '@workbench/types';
+import type { GeneratedImageContract } from '@features/gallery';
+import type { WidgetRuntimeApi } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act, useState } from 'react';
+import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -14,6 +14,16 @@ import type { PreviewComparisonMode } from './previewSettings';
 import { PreviewCompare } from './PreviewCompare';
 
 const i18n = createInstance();
+const commandHandlers = new Map<string, () => void>();
+const previewRuntime = {
+  commands: {
+    register: ({ handler, id }: { handler: () => void; id: string }) => {
+      commandHandlers.set(id, handler);
+      return () => commandHandlers.delete(id);
+    },
+  },
+  hotkeys: { register: () => () => undefined },
+} as unknown as WidgetRuntimeApi;
 void i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   initImmediate: false,
@@ -75,34 +85,26 @@ const renderComparison = async ({
   baseImage?: GeneratedImageContract;
   initialMode?: PreviewComparisonMode;
 } = {}) => {
-  const commandHandlers = new Map<string, () => void>();
+  commandHandlers.clear();
   const onExit = vi.fn();
   const onModeChange = vi.fn();
   const onSwap = vi.fn();
-  const runtime = {
-    commands: {
-      register: ({ handler, id }: { handler: () => void; id: string }) => {
-        commandHandlers.set(id, handler);
-        return () => commandHandlers.delete(id);
-      },
-    },
-    hotkeys: { register: () => () => undefined },
-  } as unknown as WidgetRuntimeApi;
   const compareImage = createImage('compare', 800, 1200);
   const Harness = () => {
     const [mode, setMode] = useState(initialMode);
+    const handleModeChange = useCallback((nextMode: PreviewComparisonMode) => {
+      setMode(nextMode);
+      onModeChange(nextMode);
+    }, []);
 
     return (
       <PreviewCompare
         baseImage={baseImage}
         compareImage={compareImage}
         mode={mode}
-        runtime={runtime}
+        runtime={previewRuntime}
         onExit={onExit}
-        onModeChange={(nextMode) => {
-          setMode(nextMode);
-          onModeChange(nextMode);
-        }}
+        onModeChange={handleModeChange}
         onSwap={onSwap}
       />
     );

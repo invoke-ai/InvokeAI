@@ -150,8 +150,8 @@
     "createNewProject": "Create new project",
     "deleteFailed": "Delete failed",
     "deleteProject": "Delete project",
-    "deleteProjectQuestion": "Delete project?",
     "deleteProjectCardBody": "Delete \"{{name}}\"? The project is removed from the server permanently.",
+    "deleteProjectQuestion": "Delete project?",
     "deleteProjectTabBody": "Delete \"{{name}}\"? The project and its saved copy on the server are removed permanently. To keep it in your library, close the tab instead.",
     "deleteProjectWithEllipsis": "Delete project…",
     "duplicateFailed": "Duplicate failed",
@@ -164,11 +164,12 @@
     "noSavedProjects": "No saved projects yet.",
     "openProject": "Open project",
     "openProjectLabel": "Open {{name}}",
+    "openProjects": "Open projects",
     "projectDetails": "Project details",
-    "renameFailed": "Rename failed",
-    "renameWithEllipsis": "Rename…",
     "projectDuplicated": "Project duplicated",
-    "projectDuplicatedDescription": "\"{{name}}\" was created."
+    "projectDuplicatedDescription": "\"{{name}}\" was created.",
+    "renameFailed": "Rename failed",
+    "renameWithEllipsis": "Rename…"
   },
   "users": {
     "accountCount_one": "{{count}} account in this workspace.",

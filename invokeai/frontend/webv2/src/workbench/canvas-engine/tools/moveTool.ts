@@ -20,8 +20,8 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasLayerContract } from '@workbench/types';
 
 import type { Tool, ToolContext } from './tool';
 

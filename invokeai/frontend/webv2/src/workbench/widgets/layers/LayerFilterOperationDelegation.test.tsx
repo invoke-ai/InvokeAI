@@ -1,5 +1,8 @@
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
-import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
+import type {
+  CanvasControlLayerContract,
+  CanvasEngine,
+  CanvasRasterLayerContractV2,
+} from '@workbench/canvas-engine/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
@@ -17,8 +20,7 @@ interface SharedLaunchProps {
   operations: unknown;
 }
 
-const { dispatch, operations, renderSharedLaunch } = vi.hoisted(() => ({
-  dispatch: vi.fn(),
+const { operations, renderSharedLaunch } = vi.hoisted(() => ({
   operations: { startFilterOperation: vi.fn() },
   renderSharedLaunch: vi.fn(),
 }));
@@ -33,17 +35,16 @@ vi.mock('./LayerFilterOperationButton', () => ({
     return <span>shared filter launch</span>;
   },
 }));
-vi.mock('@workbench/canvas-operations/createCanvasEngine', () => ({
+vi.mock('@workbench/canvas-operations/api', () => ({
   getCanvasOperations: () => operations,
 }));
-vi.mock('@workbench/models/modelsStore', () => ({
+vi.mock('@features/models', () => ({
   useModelsSelector: (selector: (snapshot: { models: never[] }) => unknown) => selector({ models: [] }),
 }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project',
   useActiveProjectSelector: () => null,
-  useWorkbenchDispatch: () => dispatch,
-  useWorkbenchStore: () => ({ dispatch, getState: vi.fn() }),
+  useWorkbenchCommands: () => ({ canvas: { apply: vi.fn() } }),
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

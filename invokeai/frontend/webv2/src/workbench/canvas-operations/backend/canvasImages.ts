@@ -15,7 +15,7 @@
 
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 
-import { buildApiUrl, getAuthToken } from '@workbench/backend/http';
+import { buildApiUrl, getHttpAuthToken } from '@platform/transport/http';
 
 export type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 
@@ -88,7 +88,7 @@ export const uploadCanvasImage = async (
   }
 
   const headers = new Headers();
-  const token = getAuthToken();
+  const token = getHttpAuthToken();
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }

@@ -1,9 +1,8 @@
-import type { CanvasCoreStoreCapability, CanvasSelectionCapability } from '@workbench/canvas-engine/api';
-import type { SelectionOp } from '@workbench/canvas-engine/types';
+import type { CanvasCoreStoreCapability, CanvasSelectionCapability, SelectionOp } from '@workbench/canvas-engine/api';
 
 import { HStack, Text } from '@chakra-ui/react';
-import { isLayerPixelEditEligible } from '@workbench/canvas-engine/editing/controlPixelEdit';
-import { Button } from '@workbench/components/ui';
+import { Button } from '@platform/ui';
+import { isLayerPixelEditEligible } from '@workbench/canvas-engine/api';
 import { useCanvasHasSelection, useLassoOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
@@ -25,7 +24,7 @@ type LassoEngine = CanvasCoreStoreCapability & { readonly selection: CanvasSelec
 /** One op-mode button with a stable click handler (avoids a per-render closure in the map). */
 const OpModeButton = ({ engine, mode, active }: { engine: LassoEngine; mode: SelectionOp; active: boolean }) => {
   const { t } = useTranslation();
-  const onClick = useCallback(() => engine.stores.lassoOptions.set({ mode }), [engine, mode]);
+  const onClick = useCallback(() => engine.interaction.set('lassoOptions', { mode }), [engine, mode]);
   return (
     <Button aria-pressed={active} size="xs" variant={active ? 'solid' : 'ghost'} onClick={onClick}>
       {t(OP_MODE_LABEL_KEYS[mode])}

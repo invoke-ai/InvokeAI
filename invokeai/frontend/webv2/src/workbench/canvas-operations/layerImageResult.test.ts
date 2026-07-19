@@ -1,5 +1,5 @@
+import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { LayerExportGuard } from '@workbench/canvas-engine/engine';
-import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { describe, expect, it, vi } from 'vitest';
 

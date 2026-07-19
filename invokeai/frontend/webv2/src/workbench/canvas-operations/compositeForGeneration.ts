@@ -28,11 +28,15 @@
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
-import type { CompositeEntry, CompositeMaskLayerRef, CompositePlan } from '@workbench/generation/canvas/types';
+import type {
+  CompositeEntry,
+  CompositeMaskLayerRef,
+  CompositePlan,
+} from '@workbench/canvas-operations/generationContracts';
 
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { renderRasterComposite } from '@workbench/canvas-engine/render/rasterComposite';
-import { getCompositeLayerBounds } from '@workbench/generation/canvas/compositePlan';
+import { getCompositeLayerBounds } from '@workbench/canvas-operations/generationCompositePlan';
 
 type Ctx = RasterSurface['ctx'];
 
@@ -80,6 +84,28 @@ export interface CompositeCacheEntry {
 export const createCompositeDedupeCache = (): CompositeDedupeCache => ({
   byHash: new Map(),
   byKey: new Map(),
+});
+
+class BoundedMap<K, V> extends Map<K, V> {
+  constructor(private readonly capacity: number) {
+    super();
+  }
+
+  override set(key: K, value: V): this {
+    if (!this.has(key) && this.size >= this.capacity) {
+      const oldest = this.keys().next().value;
+      if (oldest !== undefined) {
+        this.delete(oldest);
+      }
+    }
+    return super.set(key, value);
+  }
+}
+
+/** Canvas-owned bounded cache used across generation transactions. */
+export const createBoundedCompositeDedupeCache = (capacity = 16): CompositeDedupeCache => ({
+  byHash: new BoundedMap(capacity),
+  byKey: new BoundedMap(capacity),
 });
 
 /** Injected dependencies for {@link executeCompositePlan}. */

@@ -28,9 +28,9 @@
  * zero import-time side effects.
  */
 
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerTransform, TransformRect, TransformTarget } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasLayerContract } from '@workbench/types';
 
 import {
   applyMove,

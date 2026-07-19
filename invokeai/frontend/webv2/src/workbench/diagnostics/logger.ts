@@ -1,4 +1,5 @@
-import type { DeveloperLogLevel, DeveloperLogNamespace, WidgetContributionSource } from '@workbench/types';
+import type { DeveloperLogLevel, DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
+import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
 import { useSyncExternalStore } from 'react';
 

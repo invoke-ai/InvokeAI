@@ -1,15 +1,4 @@
-/**
- * Pure helpers for layer thumbnails.
- *
- * A layer's cache surface can be any size (up to the document dimensions); a
- * thumbnail must fit within a small square box while preserving aspect ratio
- * and never upscaling past the source. Extracted from the engine's
- * `drawLayerThumbnail` so the arithmetic is unit-testable without a canvas.
- *
- * Zero React, zero DOM, zero import-time side effects.
- */
-
-import type { CanvasImageRef, CanvasLayerContract } from '@workbench/types';
+import type { CanvasImageRef, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 
 import { renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 

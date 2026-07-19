@@ -1,9 +1,9 @@
-import type { Mat2d } from '@workbench/canvas-engine/types';
 import type {
   CanvasDocumentContractV2,
   CanvasLayerSourceContract,
   CanvasRasterLayerContractV2,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
+import type { Mat2d } from '@workbench/canvas-engine/types';
 
 import { executePsdExport, planPsdExport } from '@workbench/canvas-engine/export/psdExport';
 import { createHistory } from '@workbench/canvas-engine/history/history';

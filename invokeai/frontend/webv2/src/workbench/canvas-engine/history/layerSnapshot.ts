@@ -1,5 +1,5 @@
+import type { CanvasControlLayerContract } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasControlLayerContract } from '@workbench/types';
 
 import type { HistoryEntry } from './history';
 

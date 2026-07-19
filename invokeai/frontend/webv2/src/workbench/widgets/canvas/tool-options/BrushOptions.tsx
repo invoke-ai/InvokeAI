@@ -1,8 +1,8 @@
 import type { NumberInput as ChakraNumberInput, SliderValueChangeDetails } from '@chakra-ui/react';
 
 import { HStack, NumberInput } from '@chakra-ui/react';
-import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/engineStores';
-import { ColorPicker, Slider, ToggleDot } from '@workbench/components/ui';
+import { ColorPicker, Slider, ToggleDot } from '@platform/ui';
+import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/api';
 import { useBrushOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,7 +31,7 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
   const numberInputValue = useMemo(() => String(Math.round(options.size)), [options.size]);
 
   const setSize = useCallback(
-    (size: number) => engine.stores.brushOptions.set({ ...options, size }),
+    (size: number) => engine.interaction.set('brushOptions', { ...options, size }),
     [engine, options]
   );
 
@@ -58,19 +58,19 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
     ({ value }: SliderValueChangeDetails) => {
       const next = value[0];
       if (next !== undefined && Number.isFinite(next)) {
-        engine.stores.brushOptions.set({ ...options, opacity: next / 100 });
+        engine.interaction.set('brushOptions', { ...options, opacity: next / 100 });
       }
     },
     [engine, options]
   );
 
   const onColorChange = useCallback(
-    (hex: string) => engine.stores.brushOptions.set({ ...options, color: hex }),
+    (hex: string) => engine.interaction.set('brushOptions', { ...options, color: hex }),
     [engine, options]
   );
 
   const onPressureToggle = useCallback(
-    (checked: boolean) => engine.stores.brushOptions.set({ ...options, pressureSensitivity: checked }),
+    (checked: boolean) => engine.interaction.set('brushOptions', { ...options, pressureSensitivity: checked }),
     [engine, options]
   );
 

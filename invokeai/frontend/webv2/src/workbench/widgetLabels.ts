@@ -1,6 +1,5 @@
+import type { WidgetManifest, WidgetTypeId } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
-
-import type { WidgetManifest, WidgetTypeId } from './types';
 
 type WidgetLabelSource = Pick<WidgetManifest, 'id' | 'label'>;
 

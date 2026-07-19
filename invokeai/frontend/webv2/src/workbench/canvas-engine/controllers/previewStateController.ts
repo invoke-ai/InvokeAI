@@ -1,4 +1,4 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 

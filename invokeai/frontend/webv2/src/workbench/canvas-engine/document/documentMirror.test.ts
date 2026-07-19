@@ -5,7 +5,7 @@ import type {
   CanvasRasterLayerContractV2,
   CanvasStagingAreaContractV2,
   CanvasStateContractV2,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it, vi } from 'vitest';
 

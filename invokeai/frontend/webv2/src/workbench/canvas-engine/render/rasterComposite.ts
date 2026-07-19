@@ -1,5 +1,3 @@
-import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type {
   CanvasAdjustmentsContract,
   CanvasBlendMode,
@@ -7,7 +5,9 @@ import type {
   CanvasLayerContract,
   CanvasLayerSourceContract,
   CanvasRasterLayerContractV2,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';

@@ -1,10 +1,10 @@
-import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type {
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasLayerSourceContract,
   CanvasRasterLayerContractV2,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 
 import { createBitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
@@ -75,29 +75,19 @@ const getPaintSource = (
 const setupProjects = (originLayer: CanvasLayerContract, otherLayer: CanvasLayerContract) => {
   const store = createWorkbenchStore();
   const originProjectId = store.getState().activeProjectId;
-  store.dispatch({
-    mutation: { document: createEmptyCanvasDocumentV2(), type: 'replaceCanvasDocument' },
-    projectId: originProjectId,
-    type: 'applyCanvasProjectMutation',
+  store.commands.canvas.apply(originProjectId, {
+    document: createEmptyCanvasDocumentV2(),
+    type: 'replaceCanvasDocument',
   });
-  store.dispatch({
-    mutation: { layer: originLayer, type: 'addCanvasLayer' },
-    projectId: originProjectId,
-    type: 'applyCanvasProjectMutation',
-  });
-  store.dispatch({ type: 'createProject' });
+  store.commands.canvas.apply(originProjectId, { layer: originLayer, type: 'addCanvasLayer' });
+  store.commands.projects.create();
   const otherProjectId = store.getState().activeProjectId;
-  store.dispatch({
-    mutation: { document: createEmptyCanvasDocumentV2(), type: 'replaceCanvasDocument' },
-    projectId: otherProjectId,
-    type: 'applyCanvasProjectMutation',
+  store.commands.canvas.apply(otherProjectId, {
+    document: createEmptyCanvasDocumentV2(),
+    type: 'replaceCanvasDocument',
   });
-  store.dispatch({
-    mutation: { layer: otherLayer, type: 'addCanvasLayer' },
-    projectId: otherProjectId,
-    type: 'applyCanvasProjectMutation',
-  });
-  store.dispatch({ projectId: originProjectId, type: 'switchProject' });
+  store.commands.canvas.apply(otherProjectId, { layer: otherLayer, type: 'addCanvasLayer' });
+  store.commands.projects.switchTo(originProjectId);
   return { originProjectId, otherProjectId, store };
 };
 
@@ -146,7 +136,7 @@ describe('project-bound bitmap persistence', () => {
     const upload = beginUpload(h.store, h.originProjectId, 'origin-layer');
     await drainUntil(() => upload.uploadImage.mock.calls.length === 1);
 
-    h.store.dispatch({ projectId: h.otherProjectId, type: 'switchProject' });
+    h.store.commands.projects.switchTo(h.otherProjectId);
     upload.uploaded.resolve({ height: 8, imageName: 'origin-upload.png', width: 8 });
     await upload.flush;
 
@@ -162,7 +152,7 @@ describe('project-bound bitmap persistence', () => {
     const upload = beginUpload(h.store, h.originProjectId, 'shared-layer');
     await drainUntil(() => upload.uploadImage.mock.calls.length === 1);
 
-    h.store.dispatch({ projectId: h.otherProjectId, type: 'switchProject' });
+    h.store.commands.projects.switchTo(h.otherProjectId);
     upload.uploaded.resolve({ height: 8, imageName: 'origin-shared.png', width: 8 });
     await upload.flush;
 
@@ -178,7 +168,7 @@ describe('project-bound bitmap persistence', () => {
     const upload = beginUpload(h.store, h.originProjectId, 'shared-mask', true);
     await drainUntil(() => upload.uploadImage.mock.calls.length === 1);
 
-    h.store.dispatch({ projectId: h.otherProjectId, type: 'switchProject' });
+    h.store.commands.projects.switchTo(h.otherProjectId);
     upload.uploaded.resolve({ height: 8, imageName: 'origin-mask.png', width: 8 });
     await upload.flush;
 
@@ -194,8 +184,8 @@ describe('project-bound bitmap persistence', () => {
     const upload = beginUpload(h.store, h.originProjectId, 'reacquired');
     await drainUntil(() => upload.uploadImage.mock.calls.length === 1);
 
-    h.store.dispatch({ projectId: h.otherProjectId, type: 'switchProject' });
-    h.store.dispatch({ projectId: h.originProjectId, type: 'switchProject' });
+    h.store.commands.projects.switchTo(h.otherProjectId);
+    h.store.commands.projects.switchTo(h.originProjectId);
     upload.uploaded.resolve({ height: 8, imageName: 'reacquired.png', width: 8 });
     await upload.flush;
 
@@ -241,8 +231,8 @@ describe('project-bound bitmap persistence', () => {
     const upload = beginUpload(h.store, h.originProjectId, 'deleted-project-layer');
     await drainUntil(() => upload.uploadImage.mock.calls.length === 1);
 
-    h.store.dispatch({ projectId: h.otherProjectId, type: 'switchProject' });
-    h.store.dispatch({ projectId: h.originProjectId, type: 'closeProject' });
+    h.store.commands.projects.switchTo(h.otherProjectId);
+    h.store.commands.projects.close(h.originProjectId);
     upload.uploaded.resolve({ height: 8, imageName: 'orphaned.png', width: 8 });
     await upload.flush;
     await upload.bitmapStore.flushPendingUploads();

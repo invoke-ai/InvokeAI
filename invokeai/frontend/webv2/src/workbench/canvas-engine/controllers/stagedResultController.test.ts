@@ -1,5 +1,5 @@
+import type { CanvasStagingCandidateContract, CanvasStateContractV2 } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasStagingCandidateContract, CanvasStateContractV2 } from '@workbench/types';
 
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { describe, expect, it, vi } from 'vitest';

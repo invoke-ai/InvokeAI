@@ -1,8 +1,6 @@
-import type { WidgetManifest } from '@workbench/types';
+import type { WidgetManifest } from '@workbench/widgetContracts';
 
 import { PlugZapIcon } from 'lucide-react';
-
-import { ServerStatusWidgetView } from './ServerStatusWidgetView';
 
 export const serverStatusWidgetManifest: WidgetManifest = {
   allowMultiple: false,
@@ -12,6 +10,6 @@ export const serverStatusWidgetManifest: WidgetManifest = {
   icon: PlugZapIcon,
   id: 'server-status',
   label: (t) => t('widgets.labels.serverStatus'),
+  load: () => import('./implementation').then((module) => module.widgetImplementation),
   version: 1,
-  view: ServerStatusWidgetView,
 };

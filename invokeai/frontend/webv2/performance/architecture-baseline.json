@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-18",
+  "build": {
+    "launchpad": {
+      "source": "index.html",
+      "owner": "app",
+      "remediationTicket": "set-performance-budgets",
+      "baselineOwnedRawBytes": 346465,
+      "baselineInitialRawBytes": 1863260,
+      "baselineGzipBytes": 541484,
+      "baselineBrotliBytes": 538329,
+      "initialChunkNames": [
+        "Tooltip",
+        "WorkflowUiContext",
+        "baseGenerationPolicies",
+        "chakra",
+        "externalStore",
+        "graph",
+        "http",
+        "imageUrls",
+        "index",
+        "react",
+        "rolldown-runtime",
+        "selectors",
+        "settings",
+        "socketHub",
+        "ui",
+        "utility",
+        "validation",
+        "vendor"
+      ],
+      "maxGrowthPercent": 0.02,
+      "maxGrowthRawBytes": 20480
+    },
+    "editor": {
+      "source": "src/app/WorkbenchApp.tsx",
+      "owner": "workbench",
+      "remediationTicket": "deepen-widget-registry-loading",
+      "baselineOwnedRawBytes": 1212185,
+      "baselineInitialRawBytes": 3093833,
+      "baselineGzipBytes": 921612,
+      "baselineBrotliBytes": 889327,
+      "initialChunkNames": [
+        "GalleryUiContext",
+        "GenerationUiContext",
+        "QueueUiContext",
+        "Tooltip",
+        "WorkbenchApp",
+        "WorkbenchWidgetRegistryContext",
+        "WorkflowUiContext",
+        "baseGenerationPolicies",
+        "bboxGrid",
+        "canvasCompositing",
+        "canvasStrength",
+        "chakra",
+        "contracts",
+        "draftRegistry",
+        "drafts",
+        "externalStore",
+        "galleryStateView",
+        "generateDraftRegistry",
+        "graph",
+        "http",
+        "imageUrls",
+        "index",
+        "queueMenuActions",
+        "react",
+        "react",
+        "react",
+        "rolldown-runtime",
+        "selectors",
+        "settings",
+        "socketHub",
+        "submissionApi",
+        "ui",
+        "useNotify",
+        "useOpenWorkbenchWidget",
+        "useProjectActions",
+        "utility",
+        "validation",
+        "vendor",
+        "widget-frame"
+      ],
+      "maxGrowthPercent": 0.02,
+      "maxGrowthRawBytes": 20480,
+      "finalOwnedRawBytesTarget": 848529,
+      "finalReductionPercent": 0.3
+    }
+  },
+  "structural": {
+    "launchpadForbiddenInitialSources": [
+      "src/app/WorkbenchApp.tsx",
+      "src/features/models/ui/ModelManagerView.tsx",
+      "src/features/nodes/ui/NodeManagerView.tsx",
+      "_ag-psd"
+    ],
+    "editorForbiddenInitialChunkNames": ["ag-psd"],
+    "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
+  },
+  "developmentInvalidation": {
+    "platformUiBarrel": {
+      "specifier": "@platform/ui",
+      "owner": "platform-ui",
+      "remediationTicket": "return-contracts-to-owners",
+      "maxDirectImporters": 151
+    },
+    "retiredWorkbenchTypeHub": {
+      "specifier": "@workbench/types",
+      "owner": "workbench",
+      "remediationTicket": "return-contracts-to-owners",
+      "maxDirectImporters": 0
+    },
+    "canvasContracts": {
+      "specifier": "@workbench/canvas-engine/contracts",
+      "owner": "canvas",
+      "remediationTicket": "seal-canvas-engine-seam",
+      "maxDirectImporters": 120
+    },
+    "queuePublicInterface": {
+      "specifier": "@features/queue",
+      "owner": "queue",
+      "remediationTicket": "finish-queue-ownership",
+      "maxDirectImporters": 24
+    },
+    "isolatedGalleryView": {
+      "specifier": "./GalleryWidgetView",
+      "owner": "gallery",
+      "remediationTicket": "define-gallery-feature",
+      "maxDirectImporters": 1
+    }
+  }
+}

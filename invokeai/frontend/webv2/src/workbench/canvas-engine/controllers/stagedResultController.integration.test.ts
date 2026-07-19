@@ -1,6 +1,6 @@
+import type { CanvasStagingCandidateContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasStagingCandidateContract } from '@workbench/types';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
@@ -59,8 +59,8 @@ describe('staged result project-port integration', () => {
     const projectId = store.getState().activeProjectId;
     const first = { ...candidate, placement: { ...candidate.placement, x: 10 } };
     const selected = { ...candidate, placement: { ...candidate.placement, x: 90 } };
-    store.dispatch({ candidate: first, projectId, type: 'appendCanvasStagingCandidate' });
-    store.dispatch({ candidate: selected, projectId, type: 'appendCanvasStagingCandidate' });
+    store.commands.canvas.appendStagingCandidate({ candidate: first, projectId });
+    store.commands.canvas.appendStagingCandidate({ candidate: selected, projectId });
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
@@ -79,7 +79,7 @@ describe('staged result project-port integration', () => {
   it('rolls back the exact layer, event, selection, and staging when initial mirror acceptance fails', () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
-    store.dispatch({ candidate, projectId, type: 'appendCanvasStagingCandidate' });
+    store.commands.canvas.appendStagingCandidate({ candidate, projectId });
     const before = structuredClone(store.getState().projects.find((project) => project.id === projectId)!);
     const rejectingPort = createMirrorRejectingPort(store, projectId);
     rejectingPort.arm('commitStagedImage');
@@ -103,7 +103,7 @@ describe('staged result project-port integration', () => {
   it('compensates a reducer-accepted undo when mirror acceptance fails and keeps history retryable', () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
-    store.dispatch({ candidate, projectId, type: 'appendCanvasStagingCandidate' });
+    store.commands.canvas.appendStagingCandidate({ candidate, projectId });
     const rejectingPort = createMirrorRejectingPort(store, projectId);
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -127,7 +127,7 @@ describe('staged result project-port integration', () => {
   it('compensates a reducer-accepted redo when mirror acceptance fails and keeps history retryable', () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
-    store.dispatch({ candidate, projectId, type: 'appendCanvasStagingCandidate' });
+    store.commands.canvas.appendStagingCandidate({ candidate, projectId });
     const rejectingPort = createMirrorRejectingPort(store, projectId);
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),

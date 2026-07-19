@@ -1,4 +1,4 @@
-import type { WidgetViewProps } from '@workbench/types';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@workbench/widget-frame';

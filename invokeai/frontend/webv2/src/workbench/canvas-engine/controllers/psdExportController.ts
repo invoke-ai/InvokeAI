@@ -1,11 +1,10 @@
+import type { CanvasDocumentSnapshot, PsdExportResult } from '@workbench/canvas-engine/capabilities';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type {
   CanvasDetachedLayerSurface,
-  CanvasDocumentSnapshot,
   CaptureRasterSnapshotResult,
-  PsdExportResult,
-} from '@workbench/canvas-engine/api';
+} from '@workbench/canvas-engine/rasterTransactions';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
-import type { CanvasLayerContract } from '@workbench/types';
 
 import {
   executePsdExport,

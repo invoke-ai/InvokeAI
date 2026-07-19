@@ -20,8 +20,14 @@
       "@/*": ["./src/*"],
       "@assets": ["./src/assets"],
       "@assets/*": ["./src/assets/*"],
-      "@theme": ["./src/theme"],
-      "@theme/*": ["./src/theme/*"],
+      "@app": ["./src/app"],
+      "@app/*": ["./src/app/*"],
+      "@features": ["./src/features"],
+      "@features/*": ["./src/features/*"],
+      "@platform": ["./src/platform"],
+      "@platform/*": ["./src/platform/*"],
+      "@theme": ["./src/platform/ui/theme"],
+      "@theme/*": ["./src/platform/ui/theme/*"],
       "@workbench": ["./src/workbench"],
       "@workbench/*": ["./src/workbench/*"]
     }

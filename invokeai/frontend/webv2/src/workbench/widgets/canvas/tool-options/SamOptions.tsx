@@ -1,11 +1,4 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { CanvasOperationCapability, SelectObjectSaveTarget } from '@workbench/canvas-operations/api';
-import type {
-  SamSessionError,
-  SamSessionErrorCode,
-  SamSessionSnapshot,
-} from '@workbench/canvas-operations/operationTypes';
-import type { SamModel } from '@workbench/generation/canvas/samGraph';
 import type { ChangeEvent } from 'react';
 
 import {
@@ -23,9 +16,17 @@ import {
   Text,
   VisuallyHidden,
 } from '@chakra-ui/react';
-import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
-import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
-import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
+import { Button, MenuContent, Tooltip } from '@platform/ui';
+import {
+  getCanvasOperations,
+  isSamDocumentInputValid,
+  type CanvasOperationCapability,
+  type SamSessionError,
+  type SamSessionErrorCode,
+  type SamSessionSnapshot,
+  type SamModel,
+  type SelectObjectSaveTarget,
+} from '@workbench/canvas-operations/api';
 import { CanvasFloatingBar, CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
 import { useSamSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { ChevronDownIcon, SettingsIcon } from 'lucide-react';

@@ -1,4 +1,4 @@
-import type { CanvasDocumentContractV2 } from '@workbench/types';
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';

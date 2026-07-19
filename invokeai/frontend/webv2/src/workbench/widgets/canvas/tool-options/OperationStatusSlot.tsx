@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
 import { Flex, IconButton, Spinner } from '@chakra-ui/react';
-import { Tooltip } from '@workbench/components/ui';
+import { Tooltip } from '@platform/ui';
 import { InfoIcon } from 'lucide-react';
 
 const ERROR_CLAMP_STYLE: CSSProperties = {

@@ -1,6 +1,7 @@
-import type { CanvasStagingCandidateContract, CanvasStateContractV2, QueueItem } from './types';
+import type { CanvasStagingCandidateContract, CanvasStateContractV2 } from '@workbench/canvas-engine/api';
+import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 
-import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from './queueSnapshot';
+import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
 export interface CanvasQueuePlaceholderSlot {
   height: number;

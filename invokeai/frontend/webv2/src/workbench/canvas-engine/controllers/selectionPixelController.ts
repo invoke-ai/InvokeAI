@@ -1,3 +1,4 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -5,7 +6,6 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { ControlPixelEditTransaction } from '@workbench/canvas-engine/tools/tool';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { getSourceBounds } from '@workbench/canvas-engine/document/sources';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';

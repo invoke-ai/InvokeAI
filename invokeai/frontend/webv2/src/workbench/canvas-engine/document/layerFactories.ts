@@ -1,11 +1,11 @@
-import type { Rect } from '@workbench/canvas-engine/types';
 import type {
   CanvasControlLayerContract,
   CanvasImageRef,
   CanvasInpaintMaskLayerContract,
   CanvasMaskFillContract,
   CanvasRegionalGuidanceLayerContract,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
+import type { Rect } from '@workbench/canvas-engine/types';
 
 import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
 

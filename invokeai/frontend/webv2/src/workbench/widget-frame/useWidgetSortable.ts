@@ -1,4 +1,5 @@
-import type { WidgetInstanceId, WidgetRegion, WidgetTypeId } from '@workbench/types';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 import type { CSSProperties } from 'react';
 
 import { useSortable } from '@dnd-kit/sortable';

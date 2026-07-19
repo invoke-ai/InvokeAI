@@ -1,9 +1,9 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 import { isMergeableRasterLayer } from '@workbench/canvas-engine/document/sources';
 import { isEmpty, roundOut, union } from '@workbench/canvas-engine/math/rect';

@@ -1,7 +1,7 @@
-import type { PanelProps } from '@workbench/components/ui';
+import type { PanelProps } from '@platform/ui';
 
 import { Box } from '@chakra-ui/react';
-import { Panel } from '@workbench/components/ui';
+import { Panel } from '@platform/ui';
 
 /**
  * Shared floating-panel chrome for the canvas: the raised, rounded, shadowed

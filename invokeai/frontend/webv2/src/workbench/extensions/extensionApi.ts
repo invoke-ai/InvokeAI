@@ -12,9 +12,9 @@ import type {
   WidgetSearchProvider,
   WidgetToolbarApi,
   WidgetToolbarContribution,
-} from '@workbench/types';
+} from '@workbench/widgetContracts';
 
-import { createCollectionStore } from '@workbench/externalStore';
+import { createCollectionStore } from '@platform/state/externalStore';
 
 import { areWidgetContributionSourcesEqual, getWidgetContributionRegistrationKey } from './contributionSource';
 

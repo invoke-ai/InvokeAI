@@ -1,8 +1,8 @@
 import type { NumberInput as ChakraNumberInput } from '@chakra-ui/react';
-import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
+import type { LayerTransform } from '@workbench/canvas-engine/api';
 
 import { HStack, NumberInput, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui';
+import { Button } from '@platform/ui';
 import { useTransformSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

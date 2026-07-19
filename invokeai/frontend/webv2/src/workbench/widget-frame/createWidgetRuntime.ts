@@ -1,19 +1,18 @@
-/* eslint-disable react/react-compiler */
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { Project } from '@workbench/projectContracts';
 import type {
-  Project,
   WidgetHotkeyApi,
   OpenWorkbenchWidgetOptions,
   RegisteredWidget,
   WidgetContributionSource,
   WidgetInstanceRuntimeMeta,
-  WidgetRegion,
   WidgetRuntimeStateApi,
   WidgetRuntimeApi,
   WidgetTypeId,
   WorkbenchRegion,
-} from '@workbench/types';
+} from '@workbench/widgetContracts';
 import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 
 import { createProjectLogger } from '@workbench/diagnostics/logger';
 import {
@@ -25,8 +24,8 @@ import {
   toolbarApi,
 } from '@workbench/extensions/extensionApi';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
-import { useProjectWidgetInstanceValuesSelector, useWorkbenchStore } from '@workbench/WorkbenchContext';
-import { useMemo, type Dispatch } from 'react';
+import { useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
+import { useMemo } from 'react';
 
 const WIDGET_REGIONS = new Set<WidgetRegion>(['bottom', 'center', 'left', 'right']);
 
@@ -72,21 +71,21 @@ export const getProjectWidgetRuntimeState = <State extends Record<string, unknow
   );
 
 export const createWidgetRuntime = ({
-  dispatch,
   getWidgetsForRegion,
   getWidgetById,
   instance,
   project,
   region,
   state,
+  widgets,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
   getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined;
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
   instance: WidgetInstanceRuntimeMeta;
   project: WidgetPlacementProject;
   region: WorkbenchRegion;
   state: WidgetRuntimeStateApi;
+  widgets: WorkbenchWidgetCommands;
 }): WidgetRuntimeApi => {
   const sourceProjectId = project.projectId ?? '';
   const source: WidgetContributionSource = {
@@ -133,67 +132,48 @@ export const createWidgetRuntime = ({
           return { ok: false, reason: 'unsupported' };
         }
 
-        return closeWidgetPlacement({ dispatch, getWidgetById, instanceId, project, region });
+        return closeWidgetPlacement({ getWidgetById, instanceId, project, region, widgets });
       },
       openWidget: (typeId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) =>
-        openWidgetPlacement({ dispatch, getWidgetsForRegion, options, projectId: project.projectId, typeId }),
+        openWidgetPlacement({ getWidgetsForRegion, options, projectId: project.projectId, typeId, widgets }),
       revealWidgetInstance: (instanceId) => {
         if (!isWidgetRegion(region)) {
           return { ok: false, reason: 'unsupported' };
         }
 
-        return revealWidgetPlacement({ dispatch, instanceId, project, region });
+        return revealWidgetPlacement({ instanceId, project, region, widgets });
       },
     },
   };
 };
 
 export const useWidgetRuntime = ({
-  dispatch,
   getWidgetsForRegion,
   getWidgetById,
   instance,
   project,
   region,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
   getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined;
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
   instance: WidgetInstanceRuntimeMeta;
   project: WidgetPlacementProject;
   region: WorkbenchRegion;
 }): WidgetRuntimeApi => {
-  const store = useWorkbenchStore();
+  const store = useWorkbenchInternalStore();
+  const { widgets } = store.commands;
   const projectId = project.projectId ?? store.getSnapshot().activeProject.id;
   const state = useMemo<WidgetRuntimeStateApi>(
     () => ({
       getSnapshot: () => getProjectWidgetRuntimeState(store.getState().projects, projectId, instance.id),
-      patch: (values) =>
-        dispatch({
-          instanceId: instance.id,
-          projectId,
-          type: 'patchWidgetInstanceValues',
-          values: cloneWidgetRuntimeState(values),
-        }),
-      set: (values) =>
-        dispatch({
-          instanceId: instance.id,
-          projectId,
-          type: 'setWidgetInstanceValues',
-          values: cloneWidgetRuntimeState(values),
-        }),
-      useSelector<Selected>(
-        selector: (state: Record<string, unknown>) => Selected,
-        isEqual?: (left: Selected, right: Selected) => boolean
-      ): Selected {
-        return useProjectWidgetInstanceValuesSelector(projectId, instance.id, selector, isEqual);
-      },
+      patch: (values) => widgets.patchInstanceValues(instance.id, cloneWidgetRuntimeState(values), projectId),
+      set: (values) => widgets.setInstanceValues(instance.id, cloneWidgetRuntimeState(values), projectId),
     }),
-    [dispatch, instance.id, projectId, store]
+    [instance.id, projectId, store, widgets]
   );
 
   return useMemo(
-    () => createWidgetRuntime({ dispatch, getWidgetById, getWidgetsForRegion, instance, project, region, state }),
-    [dispatch, getWidgetById, getWidgetsForRegion, instance, project, region, state]
+    () => createWidgetRuntime({ getWidgetById, getWidgetsForRegion, instance, project, region, state, widgets }),
+    [getWidgetById, getWidgetsForRegion, instance, project, region, state, widgets]
   );
 };

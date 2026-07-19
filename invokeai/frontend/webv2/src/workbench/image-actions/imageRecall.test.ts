@@ -1,10 +1,10 @@
-import type { GalleryImage } from '@workbench/gallery/api';
+import type { GalleryImage } from '@features/gallery';
 import type {
   ComponentModelConfig,
   GenerateWidgetValues,
   MainModelConfig,
   VaeModelConfig,
-} from '@workbench/generation/types';
+} from '@features/generation/contracts';
 
 import { describe, expect, it } from 'vitest';
 

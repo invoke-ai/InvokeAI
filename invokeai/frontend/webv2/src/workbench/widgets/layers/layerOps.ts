@@ -5,10 +5,6 @@
  * attached) or as a plain reducer dispatch (when it is not).
  */
 
-import type { CanvasLayerCapability } from '@workbench/canvas-engine/api';
-import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { RegionalGuidanceReferenceImage } from '@workbench/generation/types';
 import type {
   CanvasBlendMode,
   CanvasControlLayerContract,
@@ -16,18 +12,22 @@ import type {
   CanvasImageRef,
   CanvasInpaintMaskLayerContract,
   CanvasLayerBaseContract,
+  CanvasLayerCapability,
   CanvasLayerContract,
   CanvasLayerSourceContract,
   CanvasMaskContract,
   CanvasMaskFillContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
-} from '@workbench/types';
+  RegionalGuidanceReferenceImage,
+  Rect,
+} from '@workbench/canvas-engine/api';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Dispatch } from 'react';
 
 export type CanvasStructuralEngine = { readonly layers: CanvasLayerCapability };
 
-import { getSourceContentRect, isMergeableRasterLayer } from '@workbench/canvas-engine/document/sources';
+import { getSourceContentRect, isMergeableRasterLayer } from '@workbench/canvas-engine/api';
 import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];

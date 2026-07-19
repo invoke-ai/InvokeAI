@@ -4,12 +4,11 @@ import type {
   CanvasLifecycleCapability,
 } from '@workbench/canvas-engine/api';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { Project } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 
-import { isDateBoardId } from '@workbench/gallery/api';
-import { isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
-import { toModelIdentifier } from '@workbench/generation/graphBuilder';
-import { normalizeGenerateWidgetValues } from '@workbench/generation/settings';
+import { isGalleryVirtualBoard } from '@features/gallery';
+import { toModelIdentifier } from '@features/generation/graph';
+import { isSupportedGenerateModel, normalizeGenerateWidgetValues } from '@features/generation/settings';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
 import { uploadCanvasImage } from './backend/canvasImages';
@@ -46,7 +45,7 @@ const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, u
 const getCanvasSaveBoardId = (project: Project): string | undefined => {
   const selectedBoardId = getProjectWidgetValues(project, 'gallery').selectedBoardId;
 
-  return typeof selectedBoardId === 'string' && selectedBoardId !== 'none' && !isDateBoardId(selectedBoardId)
+  return typeof selectedBoardId === 'string' && selectedBoardId !== 'none' && !isGalleryVirtualBoard(selectedBoardId)
     ? selectedBoardId
     : undefined;
 };

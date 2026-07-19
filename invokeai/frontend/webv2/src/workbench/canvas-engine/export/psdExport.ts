@@ -32,9 +32,9 @@
  *   user sees. Opacity/blend stay as PSD layer properties (not baked).
  */
 
+import type { CanvasAdjustmentsContract, CanvasBlendMode } from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
-import type { CanvasAdjustmentsContract, CanvasBlendMode } from '@workbench/types';
 import type { BlendMode, Layer as AgPsdLayer, Psd } from 'ag-psd';
 
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';

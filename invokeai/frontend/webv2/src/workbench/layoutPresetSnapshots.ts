@@ -2,11 +2,11 @@ import type {
   LayoutPreset,
   LayoutPresetSnapshot,
   LayoutPresetWidgetInstanceSnapshot,
-  Project,
-  WidgetInstanceId,
   WidgetRegion,
   WidgetRegionState,
-} from './types';
+} from '@workbench/layoutContracts';
+import type { Project } from '@workbench/projectContracts';
+import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
 const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
 

@@ -1,6 +1,6 @@
 import { Icon } from '@chakra-ui/react';
+import { IconButton, Tooltip } from '@platform/ui';
 import { Link } from '@tanstack/react-router';
-import { IconButton, Tooltip } from '@workbench/components/ui';
 import { BlocksIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 

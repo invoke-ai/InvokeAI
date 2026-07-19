@@ -2,7 +2,7 @@ import type {
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it } from 'vitest';
 

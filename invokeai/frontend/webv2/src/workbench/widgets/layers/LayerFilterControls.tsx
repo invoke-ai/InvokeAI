@@ -3,19 +3,19 @@ import type {
   SelectValueChangeDetails,
   SliderValueChangeDetails,
 } from '@chakra-ui/react';
-import type { FilterParamSpec } from '@workbench/generation/canvas/filterGraphs';
-import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
+import type { ModelConfig, ModelTaxonomyType } from '@features/models';
+import type { FilterParamSpec } from '@workbench/canvas-operations/api';
 import type { ChangeEvent } from 'react';
 
 import { Box, createListCollection, HStack, Input, NumberInput, Switch, Text } from '@chakra-ui/react';
-import { Field, Select, Slider } from '@workbench/components/ui';
+import { ModelSelect } from '@features/models/react';
+import { Field, Select, Slider } from '@platform/ui';
 import {
   CONTROL_FILTERS,
   getFilterDefinition,
   getFilterNumberBounds,
   isSpandrelModelIdentifier,
-} from '@workbench/generation/canvas/filterGraphs';
-import { ModelSelect } from '@workbench/models/components/ModelSelect';
+} from '@workbench/canvas-operations/api';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

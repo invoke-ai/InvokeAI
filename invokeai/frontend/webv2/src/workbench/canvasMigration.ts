@@ -1,19 +1,3 @@
-import { z } from 'zod';
-
-/**
- * Canvas v1 -> v2 document migration.
- *
- * `CanvasStateContract` (v1) only ever produced a flat stack of single-image
- * raster layers positioned by an absolute `placement` rect. `CanvasStateContractV2`
- * (see `types.ts`) generalizes the document into a typed layer union (raster,
- * control, regional guidance, inpaint mask) positioned by a `transform`, with
- * bitmaps referenced by `imageName` rather than by resolved URL.
- *
- * `migrateCanvasStateToV2` accepts genuinely unknown input (as read from
- * localStorage) so it doubles as both the v1->v2 converter and the
- * garbage/undefined-input fallback used when normalizing a loaded project.
- * Already-v2 input passes through normalized, not double-migrated.
- */
 import type {
   CanvasDocumentContractV2,
   CanvasImageRef,
@@ -22,7 +6,9 @@ import type {
   CanvasRasterLayerContractV2,
   CanvasStagingAreaContractV2,
   CanvasStateContractV2,
-} from './types';
+} from '@workbench/canvas-engine/api';
+
+import { z } from 'zod';
 
 import { normalizeControlAdapter } from './controlAdapters';
 

@@ -1,6 +1,6 @@
-import type { CanvasLayerContract } from '@workbench/types';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 
-import { createExternalStore } from '@workbench/externalStore';
+import { createExternalStore } from '@platform/state/externalStore';
 
 export type LayerPropertiesSection = 'filter' | 'adjustments';
 

@@ -1,9 +1,9 @@
+import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
 import { roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';

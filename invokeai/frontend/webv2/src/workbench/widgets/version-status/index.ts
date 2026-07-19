@@ -1,8 +1,6 @@
-import type { WidgetManifest } from '@workbench/types';
+import type { WidgetManifest } from '@workbench/widgetContracts';
 
 import { InfoIcon } from 'lucide-react';
-
-import { VersionStatusWidgetView } from './VersionStatusWidgetView';
 
 export const versionStatusWidgetManifest: WidgetManifest = {
   allowMultiple: false,
@@ -12,6 +10,6 @@ export const versionStatusWidgetManifest: WidgetManifest = {
   icon: InfoIcon,
   id: 'version-status',
   label: (t) => t('widgets.labels.versionStatus'),
+  load: () => import('./implementation').then((module) => module.widgetImplementation),
   version: 1,
-  view: VersionStatusWidgetView,
 };

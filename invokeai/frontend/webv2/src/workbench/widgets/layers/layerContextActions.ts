@@ -1,8 +1,11 @@
-import type { BooleanRasterOperation } from '@workbench/canvas-engine/engine';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
+import type {
+  BooleanRasterOperation,
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+} from '@workbench/canvas-engine/api';
 import type { LucideIcon } from 'lucide-react';
 
-import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
+import { getSourceContentRect } from '@workbench/canvas-engine/api';
 import {
   ArrowDownIcon,
   ArrowDownToLineIcon,

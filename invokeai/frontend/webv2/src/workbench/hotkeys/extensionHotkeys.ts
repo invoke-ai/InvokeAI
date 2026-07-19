@@ -1,4 +1,5 @@
-import type { WidgetHotkeyContribution, WidgetRegion, WorkbenchRegion } from '@workbench/types';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { WidgetHotkeyContribution, WorkbenchRegion } from '@workbench/widgetContracts';
 
 import { extensionContributionStores } from '@workbench/extensions/extensionApi';
 import { useMemo } from 'react';

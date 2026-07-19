@@ -9,8 +9,8 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasImageRef } from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { CanvasImageRef } from '@workbench/types';
 
 import type { RasterizeDeps, RasterizeResult } from './types';
 

@@ -1,11 +1,11 @@
 import type { SliderValueChangeDetails } from '@chakra-ui/react';
-import type { CanvasAdjustmentsContract, CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { CanvasAdjustmentsContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import { createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
-import { DEFAULT_ADJUSTMENTS, buildCurveLut } from '@workbench/canvas-engine/render/adjustments';
-import { Button, Field, Select, Slider } from '@workbench/components/ui';
+import { Button, Field, Select, Slider } from '@platform/ui';
+import { DEFAULT_ADJUSTMENTS, buildCurveLut } from '@workbench/canvas-engine/api';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';

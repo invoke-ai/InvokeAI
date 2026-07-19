@@ -4,19 +4,17 @@
  * These are the narrow, imperative channels React subscribes to (in the widget
  * task) to observe engine-owned interaction state — active tool, zoom,
  * readiness, cursor, and per-layer thumbnail versions — without the engine ever
- * importing React. They follow the `externalStore.ts` pattern (a listener
- * channel plus a snapshot getter, `useSyncExternalStore`-compatible) but
- * deliberately do NOT import it: `externalStore.ts` pulls in React, and this
- * module must stay node-safe and React-free. The React hooks live with the
- * widget shell.
+ * importing React. They follow Platform's React-free external-store core (a
+ * listener channel plus a snapshot getter, `useSyncExternalStore`-compatible).
+ * The React hooks live with the widget shell.
  *
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasLayerSourceContract } from '@workbench/types';
 
 import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 

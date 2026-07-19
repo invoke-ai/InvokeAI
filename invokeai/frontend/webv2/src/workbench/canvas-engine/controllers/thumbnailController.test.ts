@@ -1,4 +1,4 @@
-import type { CanvasDocumentContractV2 } from '@workbench/types';
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';

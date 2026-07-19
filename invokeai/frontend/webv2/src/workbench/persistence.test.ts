@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { localStorageWorkbenchPersistence, migrateWorkbenchPersistenceSnapshot } from './persistence';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
+import {
+  hydratePersistedWorkbenchSnapshot,
+  localStorageWorkbenchPersistence,
+  serializeWorkbenchPersistenceSnapshot,
+} from './persistence';
+import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
 
 const storage = new Map<string, string>();
 
@@ -24,14 +28,14 @@ beforeEach(() => {
 describe('workbench persistence migration', () => {
   it('accepts current versioned workbench snapshots', () => {
     const state = createInitialWorkbenchState();
-    const snapshot = migrateWorkbenchPersistenceSnapshot({ savedAt: '2026-06-09T00:00:00.000Z', state, version: 1 });
+    const snapshot = hydratePersistedWorkbenchSnapshot({ savedAt: '2026-06-09T00:00:00.000Z', state, version: 1 });
 
     expect(snapshot).toEqual({ savedAt: '2026-06-09T00:00:00.000Z', state, version: 1 });
   });
 
   it('migrates legacy schemaVersion snapshots to the authoritative version field', () => {
     const state = createInitialWorkbenchState();
-    const snapshot = migrateWorkbenchPersistenceSnapshot({
+    const snapshot = hydratePersistedWorkbenchSnapshot({
       savedAt: '2026-06-09T00:00:00.000Z',
       schemaVersion: 1,
       state,
@@ -43,14 +47,26 @@ describe('workbench persistence migration', () => {
 
   it('drops legacy error logs from persisted snapshots', () => {
     const state = { ...createInitialWorkbenchState(), errorLog: ['old error'] };
-    const snapshot = migrateWorkbenchPersistenceSnapshot({ savedAt: '2026-06-09T00:00:00.000Z', state, version: 1 });
+    const snapshot = hydratePersistedWorkbenchSnapshot({ savedAt: '2026-06-09T00:00:00.000Z', state, version: 1 });
 
     expect(snapshot?.state).not.toHaveProperty('errorLog');
   });
 
   it('rejects unsupported persistence snapshots', () => {
-    expect(migrateWorkbenchPersistenceSnapshot({ state: createInitialWorkbenchState(), version: 999 })).toBeNull();
-    expect(migrateWorkbenchPersistenceSnapshot({ state: { projects: [] }, version: 1 })).toBeNull();
+    expect(hydratePersistedWorkbenchSnapshot({ state: createInitialWorkbenchState(), version: 999 })).toBeNull();
+    expect(hydratePersistedWorkbenchSnapshot({ state: { projects: [] }, version: 1 })).toBeNull();
+  });
+
+  it('maps the trusted live snapshot to a versioned untrusted storage contract', () => {
+    const state = createInitialWorkbenchState();
+    const persisted = serializeWorkbenchPersistenceSnapshot({
+      savedAt: '2026-06-09T00:00:00.000Z',
+      state,
+      version: 1,
+    });
+
+    expect(persisted).toEqual({ savedAt: '2026-06-09T00:00:00.000Z', state, version: 1 });
+    expect(hydratePersistedWorkbenchSnapshot(persisted)?.state).toEqual(state);
   });
 
   it('drops corrupt localStorage snapshots instead of throwing', async () => {

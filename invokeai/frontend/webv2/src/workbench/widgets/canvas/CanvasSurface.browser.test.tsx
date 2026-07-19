@@ -1,7 +1,7 @@
+import type { CanvasStateContractV2 } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { EngineDeps, EngineRegistry } from '@workbench/canvas-operations/engineRegistry';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
-import type { CanvasStateContractV2 } from '@workbench/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';

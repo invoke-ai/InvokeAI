@@ -1,13 +1,16 @@
-import type { GalleryImage } from '@workbench/gallery/api';
-import type { GenerateModelConfig, GenerateWidgetValues, VaeModelConfig } from '@workbench/generation/types';
-import type { ModelConfig } from '@workbench/models/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
-import type { Dispatch } from 'react';
+import type { GalleryImage } from '@features/gallery';
+import type { GenerateModelConfig, GenerateWidgetValues, VaeModelConfig } from '@features/generation/contracts';
+import type { ModelConfig } from '@features/models';
+import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
-import { getGalleryImageMetadata, getGalleryImagesByNames } from '@workbench/gallery/api';
-import { getDefaultGenerateSettings, isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
-import { getEffectiveReferenceImage } from '@workbench/generation/referenceImage';
-import { isVaeModelConfig, normalizeGenerateWidgetValues } from '@workbench/generation/settings';
+import { galleryImages } from '@features/gallery';
+import {
+  getDefaultGenerateSettings,
+  isSupportedGenerateModel,
+  isVaeModelConfig,
+  normalizeGenerateWidgetValues,
+} from '@features/generation/settings';
+import { getEffectiveReferenceImage } from '@features/generation/utility';
 
 import {
   buildImageRecallSettings,
@@ -27,7 +30,7 @@ const loadImageMetadata = (imageName: string): Promise<unknown> => {
     return cachedRequest;
   }
 
-  const request = getGalleryImageMetadata(imageName).catch((error: unknown) => {
+  const request = galleryImages.metadata(imageName).catch((error: unknown) => {
     imageMetadataRequests.delete(imageName);
     throw error;
   });
@@ -64,7 +67,7 @@ export const getCurrentGenerateValues = ({
 };
 
 export const executeImageRecall = async ({
-  dispatch,
+  commands,
   generateValues,
   getGenerateValues,
   image,
@@ -72,7 +75,7 @@ export const executeImageRecall = async ({
   models,
   projectId,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
+  commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   generateValues: Record<string, unknown>;
   getGenerateValues?: () => Record<string, unknown>;
   image: GalleryImage;
@@ -89,11 +92,10 @@ export const executeImageRecall = async ({
 
   try {
     if (!currentGenerateValues) {
-      dispatch({
+      commands.notifications.add({
         kind: 'info',
         message: 'Select a supported Generate model first.',
         title: 'Cannot recall image data',
-        type: 'recordNotice',
       });
       return false;
     }
@@ -110,11 +112,10 @@ export const executeImageRecall = async ({
     });
 
     if (!result) {
-      dispatch({
+      commands.notifications.add({
         kind: 'info',
         message: 'This image does not include supported Generate metadata.',
         title: 'No recallable image data',
-        type: 'recordNotice',
       });
       return false;
     }
@@ -124,7 +125,9 @@ export const executeImageRecall = async ({
         referenceImage.config.image ? [getEffectiveReferenceImage(referenceImage.config.image).image_name] : []
       );
       const availableNames = new Set(
-        (await getGalleryImagesByNames([...new Set(effectiveNames)])).map((availableImage) => availableImage.imageName)
+        (await galleryImages.resolveMany([...new Set(effectiveNames)])).map(
+          (availableImage) => availableImage.imageName
+        )
       );
       result.values.referenceImages = result.values.referenceImages.filter((referenceImage) => {
         const referenceAsset = referenceImage.config.image;
@@ -137,30 +140,27 @@ export const executeImageRecall = async ({
     }
 
     if (result.fields.length === 0) {
-      dispatch({
+      commands.notifications.add({
         kind: 'info',
         message: 'This image does not include supported Generate metadata.',
         title: 'No recallable image data',
-        type: 'recordNotice',
       });
       return false;
     }
 
-    dispatch({ projectId, type: 'setGenerateSettings', values: result.values });
-    dispatch({
+    commands.generation.setSettings(result.values, projectId);
+    commands.notifications.add({
       kind: 'success',
       message: getImageRecallMessage(result.fields),
       title: getImageRecallTitle(kind),
-      type: 'recordNotice',
     });
     return true;
   } catch (error: unknown) {
-    dispatch({
+    commands.notifications.reportError({
       area: 'image-recall',
       message: toErrorMessage(error),
       namespace: 'generation',
       projectId,
-      type: 'recordError',
     });
     return false;
   }

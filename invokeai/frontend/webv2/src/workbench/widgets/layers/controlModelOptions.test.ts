@@ -1,4 +1,4 @@
-import type { ModelConfig } from '@workbench/models/types';
+import type { ModelConfig } from '@features/models';
 
 import { describe, expect, it } from 'vitest';
 

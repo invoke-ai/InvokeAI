@@ -1,4 +1,5 @@
-import { createExternalStore } from '@workbench/externalStore';
+import { createExternalStore } from '@platform/state/externalStore';
+import { createSingleFlight } from '@platform/state/singleFlight';
 
 import {
   createProject as apiCreateProject,
@@ -78,26 +79,22 @@ export const seedProjectLibrary = (dtos: ProjectSummaryDTO[]): void => {
   store.setSnapshot({ status: 'ready', summaries: sortSummaries(dtos.map(toSummary)) });
 };
 
-let pendingRefresh: Promise<void> | null = null;
+const refreshFlight = createSingleFlight<void>();
 
 /** Re-list from the server; concurrent calls share one request. */
-export const refreshProjectLibrary = (): Promise<void> => {
-  pendingRefresh ??= listProjects()
-    .then((dtos) => {
-      seedProjectLibrary(dtos);
-    })
-    .catch((error: unknown) => {
-      store.patchSnapshot({
-        error: error instanceof Error ? error.message : 'Failed to load projects.',
-        status: 'error',
-      });
-    })
-    .finally(() => {
-      pendingRefresh = null;
-    });
-
-  return pendingRefresh;
-};
+export const refreshProjectLibrary = (): Promise<void> =>
+  refreshFlight.run('project-library', () =>
+    listProjects()
+      .then((dtos) => {
+        seedProjectLibrary(dtos);
+      })
+      .catch((error: unknown) => {
+        store.patchSnapshot({
+          error: error instanceof Error ? error.message : 'Failed to load projects.',
+          status: 'error',
+        });
+      })
+  );
 
 /**
  * Reflect a save the editor just pushed, so the library stays current without

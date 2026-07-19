@@ -5,8 +5,7 @@
  * so the candidate-vs-progress decision is unit-testable in node.
  */
 
-import type { StagedPreviewInput } from '@workbench/canvas-engine/engine';
-import type { CanvasPlacementContract } from '@workbench/types';
+import type { CanvasPlacementContract, StagedPreviewInput } from '@workbench/canvas-engine/api';
 
 /** Inputs to {@link selectStagedPreviewSource}. */
 export interface StagedPreviewSelection {

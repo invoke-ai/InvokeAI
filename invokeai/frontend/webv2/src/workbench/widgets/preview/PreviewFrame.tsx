@@ -1,10 +1,10 @@
+import type { GalleryImageDragImage } from '@features/gallery/utility';
 /* eslint-disable react/react-compiler */
-import type { StreamingImageSource } from '@workbench/images/streamingImageSource';
-import type { GalleryImageDragImage } from '@workbench/widgets/gallery/galleryDnd';
+import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
 import { Badge, Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
-import { getGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { getGalleryImageDragData } from '@features/gallery/utility';
 import { useCallback, useMemo, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 

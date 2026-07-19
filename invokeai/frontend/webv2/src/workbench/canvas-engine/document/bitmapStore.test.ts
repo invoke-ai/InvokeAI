@@ -1,7 +1,7 @@
+import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/types';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

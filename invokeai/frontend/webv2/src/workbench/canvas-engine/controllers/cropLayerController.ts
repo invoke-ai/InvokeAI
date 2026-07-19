@@ -1,9 +1,13 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+} from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/types';
 
 import { renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { intersect, isEmpty, roundOut } from '@workbench/canvas-engine/math/rect';

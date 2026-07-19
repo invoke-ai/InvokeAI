@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { IconButton, MenuContent } from '@workbench/components/ui';
+import { IconButton, MenuContent } from '@platform/ui';
 import {
   BrushIcon,
   ImagePlusIcon,

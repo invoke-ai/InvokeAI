@@ -1,20 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import type {
   ComponentModelConfig,
   GenerateModelConfig,
   GenerateWidgetValues,
   MainModelConfig,
   VaeModelConfig,
-} from './generation/types';
-import type { ModelConfig } from './models/types';
-import type { InvocationRoute, WidgetId } from './types';
+} from '@features/generation/contracts';
+import type { ModelConfig } from '@features/models';
+import type { InvocationRoute } from '@workbench/invocationContracts';
+import type { WidgetId } from '@workbench/widgetContracts';
 
-import { getDefaultGenerateSettings } from './generation/baseGenerationPolicies';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { createDefaultUpscaleWidgetValues } from '@features/upscale';
+import { describe, expect, it, vi } from 'vitest';
+
 import { getInvocationRouteInput, resolveInvocationRoute, resolveInvocationRouteInput } from './invocation';
 import { submitResolvedInvocation } from './invocationSubmit';
-import { createDefaultUpscaleWidgetValues } from './upscale/settings';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
+import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
+import { createWorkbenchStore } from './workbenchStore';
 
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
 const animaVae: VaeModelConfig = { base: 'qwen-image', key: 'anima-vae', name: 'Anima VAE', type: 'vae' };
@@ -280,13 +282,14 @@ describe('submitResolvedInvocation', () => {
     const project = getActiveProject(
       createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
     );
-    const dispatch = vi.fn();
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
     const prepareCanvasInvocation = vi.fn();
     const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'canvas' });
 
-    submitResolvedInvocation({ dispatch, models: undefined, prepareCanvasInvocation, project, route });
+    submitResolvedInvocation({ commands, models: undefined, prepareCanvasInvocation, project, route });
 
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(submitResolved).not.toHaveBeenCalled();
     expect(prepareCanvasInvocation).toHaveBeenCalledTimes(1);
     // The resolved destination rides through so a Canvas source can target the Gallery.
     expect(prepareCanvasInvocation.mock.calls[0]?.[0]).toMatchObject({
@@ -299,17 +302,17 @@ describe('submitResolvedInvocation', () => {
     const project = getActiveProject(
       createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
     );
-    const dispatch = vi.fn();
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
     const prepareCanvasInvocation = vi.fn();
     const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
 
-    submitResolvedInvocation({ dispatch, models: undefined, prepareCanvasInvocation, project, route });
+    submitResolvedInvocation({ commands, models: undefined, prepareCanvasInvocation, project, route });
 
     expect(prepareCanvasInvocation).not.toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(dispatch.mock.calls[0]?.[0]).toMatchObject({
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
       route: expect.objectContaining({ destination: 'gallery', sourceId: 'generate' }),
-      type: 'submitResolvedInvocationSnapshot',
     });
   });
 });

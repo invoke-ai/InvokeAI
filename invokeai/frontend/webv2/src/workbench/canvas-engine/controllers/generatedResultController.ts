@@ -2,7 +2,8 @@ import type {
   CommitGeneratedImageOptions,
   CommitGeneratedImageResult,
   LayerExportGuard,
-} from '@workbench/canvas-engine/api';
+} from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentContractV2, CanvasImageRef, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CapturedLayerCache } from '@workbench/canvas-engine/controllers/layerMutationController';
 import type { DecodeImageResult } from '@workbench/canvas-engine/controllers/rasterController';
 import type { History } from '@workbench/canvas-engine/history/history';
@@ -11,7 +12,6 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasImageRef, CanvasLayerContract } from '@workbench/types';
 
 import { createControlLayer, nextControlLayerName } from '@workbench/canvas-engine/document/layerFactories';
 

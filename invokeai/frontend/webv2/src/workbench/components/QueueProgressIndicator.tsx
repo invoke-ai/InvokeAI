@@ -1,4 +1,4 @@
-import type { QueueProgressBarState } from '@workbench/queueSummary';
+import type { QueueProgressBarState } from '@features/queue/contracts';
 import type { ComponentProps } from 'react';
 
 import { Progress, ProgressCircle } from '@chakra-ui/react';

@@ -1,15 +1,15 @@
+import type { RunUtilityGraphOptions, UtilityGraphResult } from '@features/queue/utility';
 import type { ExportBakedLayerBlobResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { RunUtilityGraphOptions, UtilityGraphResult } from '@workbench/canvas-operations/backend/utilityQueue';
 import type {
   CanvasOperationController,
   CanvasOperationRunResult,
   CanvasOperationSession,
 } from '@workbench/canvas-operations/operationController';
 import type { SamSessionError, SamSessionErrorCode } from '@workbench/canvas-operations/operationTypes';
-import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
+import type { SamInput, SamModel } from '@workbench/canvas-operations/samGraph';
 
-import { isSamDocumentInputValid } from '@workbench/generation/canvas/samGraph';
+import { isSamDocumentInputValid } from '@workbench/canvas-operations/samGraph';
 
 import type { SelectObjectPreparedSource, SelectObjectReadyResult } from './layerImageResult';
 

@@ -1,5 +1,5 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { TransformSession } from '@workbench/canvas-engine/engineStores';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';

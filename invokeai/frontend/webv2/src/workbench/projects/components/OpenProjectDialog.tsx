@@ -1,18 +1,30 @@
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
-import { Button, CloseButton, Row, Scrollable } from '@workbench/components/ui';
+import { flushGenerateDrafts } from '@features/generation/drafts';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { areArraysEqual } from '@platform/state/selectors';
+import { Button, CloseButton, Row, Scrollable } from '@platform/ui';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { refreshProjectLibrary, useProjectLibrarySelector, type ProjectSummary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
-import { adoptProjectRecord, hydrateProjectFromServer } from '@workbench/projects/syncedPersistence';
 import { useNotify } from '@workbench/useNotify';
-import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
-import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { areArraysEqual } from '@workbench/workbenchSelectors';
+import {
+  useWorkbenchCommands,
+  useWorkbenchPersistenceService,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
 import { ArrowRightIcon, FileUpIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const disabledRowStyles = { opacity: 0.6 } as const;
+
+const ProjectLibraryRefresh = () => {
+  useMountEffect(() => {
+    void refreshProjectLibrary();
+  });
+
+  return null;
+};
 
 /**
  * "Open project…" from the tab bar: the saved projects that are not already
@@ -20,21 +32,13 @@ const disabledRowStyles = { opacity: 0.6 } as const;
  * library and opens it in place — no navigation, the editor stays mounted.
  */
 export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-  const projectIds = useWorkbenchSelector(
-    (snapshot) => snapshot.state.projects.map((project) => project.id),
-    areArraysEqual
-  );
-  const dispatch = useWorkbenchDispatch();
+  const projectIds = useWorkbenchSelector((snapshot) => snapshot.projects.map((project) => project.id), areArraysEqual);
+  const { projects } = useWorkbenchCommands();
+  const persistence = useWorkbenchPersistenceService();
   const notify = useNotify();
   const { t } = useTranslation();
   const summaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      void refreshProjectLibrary();
-    }
-  }, [isOpen]);
 
   const openProjectIds = useMemo(() => new Set(projectIds), [projectIds]);
   const available = useMemo(
@@ -46,7 +50,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
     async (summary: ProjectSummary) => {
       setBusyProjectId(summary.id);
 
-      const project = await hydrateProjectFromServer(summary.id);
+      const project = await persistence.hydrateProjectFromServer(summary.id);
 
       setBusyProjectId(null);
 
@@ -58,10 +62,10 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
       }
 
       flushGenerateDrafts();
-      dispatch({ project, type: 'openProject' });
+      projects.open(project);
       onClose();
     },
-    [dispatch, notify, onClose, t]
+    [notify, onClose, persistence, projects, t]
   );
 
   const handleImport = useCallback(async () => {
@@ -73,17 +77,17 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
 
     try {
       const record = await importProjectFile(file);
-      const project = adoptProjectRecord(record);
+      const project = persistence.adoptProjectRecord(record);
 
       if (project) {
         flushGenerateDrafts();
-        dispatch({ project, type: 'openProject' });
+        projects.open(project);
         onClose();
       }
     } catch (error) {
       notify.error(t('projects.importFailed'), error instanceof Error ? error.message : undefined);
     }
-  }, [dispatch, notify, onClose, t]);
+  }, [notify, onClose, persistence, projects, t]);
 
   const handleOpenChange = useCallback(
     (event: { open: boolean }) => {
@@ -98,6 +102,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
 
   return (
     <Dialog.Root lazyMount open={isOpen} placement="center" size="sm" unmountOnExit onOpenChange={handleOpenChange}>
+      {isOpen ? <ProjectLibraryRefresh /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

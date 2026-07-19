@@ -1,5 +1,7 @@
+import type { CanvasStagingCandidateContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
-import type { CanvasStagingCandidateContract, Project, WidgetViewProps } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
@@ -14,16 +16,21 @@ const harness = vi.hoisted(() => ({ engine: null as CanvasEngine | null, project
 vi.mock('@dnd-kit/core', () => ({ useDndMonitor: () => undefined }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project!),
-  useWorkbenchDispatch: () => () => undefined,
-  useWorkbenchStore: () => ({
+  useWorkbenchCommands: () => ({
+    canvas: { apply: vi.fn() },
+    notifications: { add: vi.fn(), reportError: vi.fn() },
+    queue: { cancel: vi.fn() },
+  }),
+  useWorkbenchQueries: () => ({
+    getProject: (projectId: string) => (harness.project?.id === projectId ? harness.project : null),
     getSnapshot: () => ({ activeProject: harness.project }),
-    getState: () => ({ projects: harness.project ? [harness.project] : [] }),
+    isActiveProject: (projectId: string) => harness.project?.id === projectId,
   }),
 }));
 vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => undefined,
 }));
-vi.mock('@workbench/backend/progressImageStore', () => ({ useQueueItemProgressImage: () => null }));
+vi.mock('@features/queue', () => ({ useQueueItemProgressImage: () => null }));
 vi.mock('./engineStoreHooks', () => ({ useCanvasOperation: () => null }));
 vi.mock('./useCanvasEngine', () => ({ useCanvasEngine: () => harness.engine }));
 vi.mock('./useCanvasGallerySave', () => ({
@@ -81,7 +88,7 @@ describe('CanvasWidgetView staged acceptance eligibility', () => {
   it('drives the rendered Chakra Accept button disabled state from interaction capabilities', () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
-    store.dispatch({ candidate, projectId, type: 'appendCanvasStagingCandidate' });
+    store.commands.canvas.appendStagingCandidate({ candidate, projectId });
     harness.project = store.getState().projects[0]!;
 
     harness.engine = null;

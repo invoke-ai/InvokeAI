@@ -1,4 +1,4 @@
-import type { CanvasLayerCapability, CanvasPreviewCapability } from '@workbench/canvas-engine/api';
+import type { CanvasLayerCapability, CanvasPreviewCapability } from '@workbench/canvas-engine/capabilities';
 
 import type { MaskLayerControllerOptions } from './maskLayerController';
 import type { StructuralLayerController } from './structuralLayerController';

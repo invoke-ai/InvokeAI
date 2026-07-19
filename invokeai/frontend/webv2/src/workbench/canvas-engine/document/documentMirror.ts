@@ -1,42 +1,8 @@
-/**
- * The document mirror: the one-way bridge from the reducer-owned canvas
- * document into the engine.
- *
- * The reducer owns the document; the engine only reads it. External changes
- * (layer edits, undo/redo, staging accept, project switch) arrive via a plain
- * `store.subscribe`, and the mirror translates a new state into the narrowest
- * possible set of callbacks by diffing against the last-seen references:
- *
- * - document object identical → nothing happened (fast path; this is what makes
- *   unrelated-project changes free, since the reducer preserves identity).
- * - `documentRevision` changed → `onDocumentReplaced` (a full invalidate). This
- *   is bumped by the reducer on wholesale document swaps (snapshot restore,
- *   `replaceCanvasDocument`) that reuse the same dimensions and layer ids, which
- *   a reference/dimension diff alone cannot tell apart from an ordinary edit.
- * - dimensions / background changed, or the document appeared/disappeared →
- *   `onDocumentReplaced` (a full invalidate).
- * - otherwise diff the layer array element-wise by reference (id-keyed) →
- *   `onLayersChanged(changedIds, sourceChangedIds)`. The second argument is the
- *   subset of ids whose *rasterization source* reference changed (an image/paint
- *   swap, or a newly added layer) — as opposed to a prop/transform-only edit
- *   (opacity, blend, lock, visibility, rename, nudge) that replaces the layer
- *   object but keeps its `source`/`mask` reference. The engine invalidates a
- *   layer's raster cache ONLY for a source change: re-rasterizing on a prop edit
- *   is wasteful for image layers and destructive for an unflushed paint layer
- *   (a `bitmap: null` source rasterizes to a cleared surface, wiping cached
- *   strokes that have not been persisted yet).
- * - layers array reference changed but every id kept the same element
- *   reference, just in a different order (a pure reorder) →
- *   `onLayerOrderChanged` (recomposite only; nothing to re-rasterize).
- * - bbox value changed → `onBboxChanged`.
- * - stagingArea reference changed → `onStagingChanged`.
- *
- * A missing/deleted project is a no-op safe: the mirror simply reports `null`.
- *
- * Zero React, zero import-time side effects.
- */
-
-import type { CanvasDocumentContractV2, CanvasStagingAreaContractV2, CanvasStateContractV2 } from '@workbench/types';
+import type {
+  CanvasDocumentContractV2,
+  CanvasStagingAreaContractV2,
+  CanvasStateContractV2,
+} from '@workbench/canvas-engine/contracts';
 
 /** The minimal store shape the mirror depends on (a superset of `WorkbenchStore`). */
 export interface DocumentMirrorStore {

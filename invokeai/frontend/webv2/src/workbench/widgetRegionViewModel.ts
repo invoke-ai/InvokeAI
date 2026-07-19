@@ -1,13 +1,12 @@
+import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type {
   NormalizedWidgetManifest,
   RegisteredWidget,
   WidgetIconComponent,
   WidgetInstanceContract,
   WidgetInstanceId,
-  WidgetRegion,
-  WidgetRegionState,
   WidgetTypeId,
-} from './types';
+} from '@workbench/widgetContracts';
 
 export interface WidgetPlacementInstanceMeta {
   id: WidgetInstanceId;

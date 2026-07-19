@@ -1,7 +1,7 @@
 import type { HotkeyCategory, HotkeyDefinition } from '@workbench/hotkeys';
 
 import { Badge, Box, Flex, HStack, Icon, Input, InputGroup, Kbd, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import { Button, IconButton } from '@workbench/components/ui';
+import { Button, IconButton } from '@platform/ui';
 import {
   firstPartyHotkeyCatalog,
   formatHotkeyForPlatform,

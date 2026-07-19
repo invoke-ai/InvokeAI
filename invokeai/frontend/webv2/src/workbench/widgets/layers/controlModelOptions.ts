@@ -1,5 +1,5 @@
-import type { ControlAdapterKind } from '@workbench/generation/canvas/controlValidation';
-import type { ModelConfig } from '@workbench/models/types';
+import type { ControlAdapterKind } from '@features/generation/canvas';
+import type { ModelConfig } from '@features/models';
 
 export const getCompatibleControlModels = (
   models: readonly ModelConfig[],

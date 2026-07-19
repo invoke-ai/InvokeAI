@@ -1,15 +1,15 @@
-import type { Project } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 
 import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { Button, IconButton, ConfirmDialog, Field, FieldLabel, Panel } from '@workbench/components/ui';
+import { flushGenerateDrafts } from '@features/generation/drafts';
+import { Button, IconButton, ConfirmDialog, Field, FieldLabel, Panel } from '@platform/ui';
 import { useProjectSyncSelector } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useNotify } from '@workbench/useNotify';
-import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import {
   shallowEqual,
   useActiveProjectSelector,
-  useWorkbenchDispatch,
+  useWorkbenchCommands,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
 import { ArrowRightIcon, CopyIcon, History as HistoryIcon, Trash2Icon } from 'lucide-react';
@@ -55,17 +55,17 @@ type ProjectPanelViewModel = Pick<
 
 const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const { projects } = useWorkbenchCommands();
 
   const commitName = useCallback(
     (value: string) => {
       const name = value.trim();
 
       if (name && name !== project.name) {
-        dispatch({ name, projectId: project.id, type: 'renameProject' });
+        projects.rename(project.id, name);
       }
     },
-    [dispatch, project.id, project.name]
+    [project.id, project.name, projects]
   );
   const handleBlur = useCallback(
     (event: React.FocusEvent<HTMLInputElement>) => commitName(event.currentTarget.value),
@@ -105,8 +105,8 @@ const formatTimestamp = (timestamp: string | undefined, unknownTime: string): st
 
 const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
   const { t } = useTranslation();
-  const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
-  const dispatch = useWorkbenchDispatch();
+  const projects = useWorkbenchSelector((snapshot) => snapshot.projects);
+  const { projects: projectCommands } = useWorkbenchCommands();
   const { deleteProject } = useProjectActions();
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const rootId = getRecoveryRootId(project);
@@ -117,9 +117,9 @@ const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
   const handleOpenOriginal = useCallback(() => {
     if (original) {
       flushGenerateDrafts();
-      dispatch({ projectId: original.id, type: 'switchProject' });
+      projectCommands.switchTo(original.id);
     }
-  }, [dispatch, original]);
+  }, [original, projectCommands]);
   const handleCloseDeleteDialog = useCallback(() => setDeleteTarget(null), []);
   const handleConfirmDelete = useCallback(async () => {
     if (deleteTarget) {
@@ -180,11 +180,11 @@ const RecoveryRow = ({
   onDelete: React.Dispatch<React.SetStateAction<Project | null>>;
 }) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const { projects } = useWorkbenchCommands();
   const handleOpen = useCallback(() => {
     flushGenerateDrafts();
-    dispatch({ projectId: recovery.id, type: 'switchProject' });
-  }, [dispatch, recovery.id]);
+    projects.switchTo(recovery.id);
+  }, [projects, recovery.id]);
   const handleDelete = useCallback(() => onDelete(recovery), [onDelete, recovery]);
 
   return (
@@ -222,8 +222,8 @@ const RecoveryRow = ({
 
 const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
   const { t } = useTranslation();
-  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
-  const lastSavedAt = useWorkbenchSelector((snapshot) => snapshot.state.autosave.lastSavedAt);
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
+  const lastSavedAt = useWorkbenchSelector((snapshot) => snapshot.autosave.lastSavedAt);
   const projectSync = useProjectSyncSelector((snapshot) => snapshot.projects[project.id]);
   const notify = useNotify();
 

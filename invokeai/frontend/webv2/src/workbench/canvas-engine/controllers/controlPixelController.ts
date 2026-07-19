@@ -1,3 +1,4 @@
+import type { CanvasControlLayerContract, CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { BitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
@@ -11,7 +12,6 @@ import type {
 } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasControlLayerContract, CanvasDocumentContractV2 } from '@workbench/types';
 
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
 import {

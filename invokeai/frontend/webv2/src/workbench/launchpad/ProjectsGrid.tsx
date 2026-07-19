@@ -1,5 +1,5 @@
 import { Alert, SimpleGrid, Skeleton, Stack } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui';
+import { Button } from '@platform/ui';
 import { refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

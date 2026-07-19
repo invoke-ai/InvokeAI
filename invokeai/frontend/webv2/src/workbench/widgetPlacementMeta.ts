@@ -1,4 +1,7 @@
-import type { Project, WidgetInstanceId, WidgetRegion, WidgetRegionState } from './types';
+import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
+import type { Project } from '@workbench/projectContracts';
+import type { WidgetInstanceId } from '@workbench/widgetContracts';
+
 import type { WidgetPlacementProject } from './widgetPlacementCommands';
 import type { WidgetPlacementMeta } from './widgetRegionViewModel';
 

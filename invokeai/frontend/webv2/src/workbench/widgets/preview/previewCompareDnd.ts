@@ -1,4 +1,4 @@
-import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { isGalleryImageDragData } from '@features/gallery/utility';
 
 /**
  * dnd-kit contract for the preview's drop-to-compare target: dropping any

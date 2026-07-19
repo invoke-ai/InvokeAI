@@ -1,4 +1,4 @@
-import type { WidgetViewProps } from '@workbench/types';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@workbench/widget-frame';
@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ServerStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   const { t } = useTranslation();
-  const backendConnection = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection);
+  const backendConnection = useWorkbenchSelector((snapshot) => snapshot.backendConnection);
   const isConnected = backendConnection.status === 'connected';
   const isDisconnected = backendConnection.status === 'disconnected';
   const label = isConnected

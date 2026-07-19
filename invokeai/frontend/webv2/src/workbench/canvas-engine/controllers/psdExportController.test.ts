@@ -1,6 +1,11 @@
-import type { CanvasDocumentSnapshot, CanvasRasterSnapshot } from '@workbench/canvas-engine/api';
+import type { CanvasDocumentSnapshot } from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasDocumentContractV2,
+  CanvasRasterLayerContractV2,
+  CanvasStateContractV2,
+} from '@workbench/canvas-engine/contracts';
 import type { ExecutePsdExportDeps, PsdExportPlan } from '@workbench/canvas-engine/export/psdExport';
-import type { CanvasDocumentContractV2, CanvasRasterLayerContractV2, CanvasStateContractV2 } from '@workbench/types';
+import type { CanvasRasterSnapshot } from '@workbench/canvas-engine/rasterTransactions';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';

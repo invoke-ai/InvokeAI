@@ -1,9 +1,9 @@
 import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
-import type { CanvasInpaintMaskLayerContract, CanvasMaskFillContract } from '@workbench/types';
+import type { CanvasInpaintMaskLayerContract, CanvasMaskFillContract } from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
 import { createListCollection, HStack, Stack } from '@chakra-ui/react';
-import { Button, ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
+import { Button, ColorPicker, Field, Select, Slider } from '@platform/ui';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -1,4 +1,4 @@
-import type { Project } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 
 import { createProject as apiCreateProject, getProject as apiGetProject, type ProjectRecordDTO } from './api';
 import { createProjectId } from './ids';

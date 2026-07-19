@@ -1,4 +1,4 @@
-import type { GraphBearingSurfaceContract, WidgetManifest, WorkbenchRegion } from './types';
+import type { GraphBearingSurfaceContract, WidgetManifest, WorkbenchRegion } from '@workbench/widgetContracts';
 
 import { isInvocationSourceAvailable } from './invocation';
 

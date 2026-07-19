@@ -13,9 +13,13 @@
  * Zero React, zero import-time side effects.
  */
 
+import type {
+  CanvasBlendMode,
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+} from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasBlendMode, CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 import { LAYER_GROUP_COUNT, layerGroupRank } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';

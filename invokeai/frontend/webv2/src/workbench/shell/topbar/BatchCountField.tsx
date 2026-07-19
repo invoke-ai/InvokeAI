@@ -1,6 +1,6 @@
 import { NumberInput } from '@chakra-ui/react';
-import { MIN_BATCH_COUNT, sanitizeBatchCount } from '@workbench/generation/batch';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { MIN_BATCH_COUNT, sanitizeBatchCount } from '@features/generation/batch';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
 
 const getBatchCount = (values: Record<string, unknown>): number => {
@@ -20,18 +20,18 @@ export const BatchCountField = () => {
     },
     (left, right) => left.batchCount === right.batchCount && left.sourceId === right.sourceId
   );
-  const dispatch = useWorkbenchDispatch();
+  const { generation, widgets } = useWorkbenchCommands();
   const handleValueChange = useCallback(
     ({ valueAsNumber }: { valueAsNumber: number }) => {
       if (Number.isFinite(valueAsNumber)) {
         if (sourceId === 'upscale') {
-          dispatch({ type: 'patchWidgetValues', values: { batchCount: valueAsNumber }, widgetId: 'upscale' });
+          widgets.patchValues('upscale', { batchCount: valueAsNumber });
         } else {
-          dispatch({ batchCount: valueAsNumber, type: 'setGenerateBatchCount' });
+          generation.setBatchCount(valueAsNumber);
         }
       }
     },
-    [dispatch, sourceId]
+    [generation, sourceId, widgets]
   );
 
   return (

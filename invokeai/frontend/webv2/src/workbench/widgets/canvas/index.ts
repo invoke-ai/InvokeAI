@@ -1,19 +1,15 @@
-import type { WidgetManifest } from '@workbench/types';
+import type { WidgetManifest } from '@workbench/widgetContracts';
 
 import { WandSparklesIcon } from 'lucide-react';
-
-import { CanvasHeaderActions } from './CanvasHeaderActions';
-import { CanvasWidgetView } from './CanvasWidgetView';
 
 export const canvasWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['center'],
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   graphBearing: { defaultGraphId: 'canvas-graph', sourceId: 'canvas', surfaces: ['center'] },
-  headerActions: CanvasHeaderActions,
   icon: WandSparklesIcon,
   id: 'canvas',
   label: (t) => t('widgets.labels.canvas'),
+  load: () => import('./implementation').then((module) => module.widgetImplementation),
   version: 1,
-  view: CanvasWidgetView,
 };

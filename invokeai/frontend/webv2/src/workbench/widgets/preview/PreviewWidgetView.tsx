@@ -1,40 +1,42 @@
-/* eslint-disable react/react-compiler */
-import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Box, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
-import { useProgressImage, type LatestProgressImageSnapshot } from '@workbench/backend/progressImageStore';
-import { useRevealHold } from '@workbench/backend/revealHoldStore';
 import {
-  getGalleryImageByName,
-  listGalleryBoards,
-  listGalleryImages,
+  galleryImages,
   type GalleryBoard,
   type GalleryImage,
   type GalleryView,
-} from '@workbench/gallery/api';
-import { getGallerySettings } from '@workbench/gallery/settings';
+  type GeneratedImageContract,
+} from '@features/gallery';
+import {
+  getGalleryCompareImage,
+  getGalleryImagesRefreshToken,
+  getGalleryRecentImagesKey,
+  getGalleryRefreshToken,
+  getGallerySettings,
+} from '@features/gallery/contracts';
+import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/queries';
+import { createGenerateFormValuesSelector } from '@features/generation/form';
+import { useProgressImage, useRevealHold, type LatestProgressImageSnapshot } from '@features/queue/react';
+import {
+  imageUrlToStreamingSource,
+  progressImageToStreamingSource,
+} from '@platform/ui/streaming-image/streamingImageSource';
+import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
+import { useQuery } from '@tanstack/react-query';
 import {
   ImageContextMenu,
   useImageActions,
   type ImageActions,
   type ImageContextMenuTarget,
 } from '@workbench/image-actions';
-import { imageUrlToStreamingSource, progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
-import { useStreamingImageSource } from '@workbench/images/useStreamingImageSource';
-import {
-  getGalleryCompareImage,
-  getGalleryImagesRefreshToken,
-  getGalleryRecentImagesKey,
-  getGalleryRefreshToken,
-} from '@workbench/widgets/gallery/galleryStateView';
-import { createGenerateFormValuesSelector } from '@workbench/widgets/generate/generateFormViewModel';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
   useActiveProjectSelector,
   useWidgetValuesSelector,
-  useWorkbenchDispatch,
+  useWorkbenchCommands,
 } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -56,6 +58,7 @@ import {
 } from './previewSettings';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
+const EMPTY_PREVIEW_IMAGES: PreviewImage[] = [];
 
 const fallbackBoards: GalleryBoard[] = [
   { archived: false, assetCount: 0, id: 'none', imageCount: 0, kind: 'uncategorized', name: 'Uncategorized' },
@@ -144,7 +147,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     (project) => project.settings
   );
   const progressImage = useProgressImage();
-  const dispatch = useWorkbenchDispatch();
+  const { gallery, notifications, widgets } = useWorkbenchCommands();
   const { density, rootRef } = usePreviewDensity(region);
   const selectedImage = useMemo(() => getSelectedImage(galleryValues), [galleryValues]);
   const compareImage = getGalleryCompareImage(galleryValues);
@@ -160,10 +163,37 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const boardRefreshToken = getGalleryRefreshToken(galleryValues);
   const imageRefreshToken = getGalleryImagesRefreshToken(galleryValues);
   const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
-  const [boards, setBoards] = useState<GalleryBoard[]>(fallbackBoards);
-  const [boardImages, setBoardImages] = useState<PreviewImage[]>(localImages);
-  const [isLoadingBoard, setIsLoadingBoard] = useState(false);
   const { t } = useTranslation();
+  const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
+
+  const boardsRequestKey = getPreviewBoardsRequestKey({
+    hasSelectedImage,
+    isBackendImage,
+    refreshToken: boardRefreshToken,
+  });
+  const boardImagesRequestKey = `${imageBoardId}:${selectedGalleryView}:${imageOrderDir}:${starredFirst}:${imageRefreshToken}:${recentImagesKey}`;
+  const boardsQuery = useQuery({
+    ...galleryBoardsOptions({ revision: boardsRequestKey ?? undefined }),
+    enabled: boardsRequestKey !== null,
+  });
+  const boardImagesQuery = useQuery({
+    ...galleryImagesOptions({
+      boardId: imageBoardId,
+      galleryView: selectedGalleryView,
+      orderDir: imageOrderDir,
+      revision: boardImagesRequestKey,
+      searchTerm: '',
+      starredFirst,
+    }),
+    enabled: hasSelectedImage && isBackendImage,
+  });
+  const boards = boardsQuery.data ?? fallbackBoards;
+  const boardImages = !hasSelectedImage
+    ? EMPTY_PREVIEW_IMAGES
+    : !isBackendImage
+      ? localImages
+      : (boardImagesQuery.data?.images ?? EMPTY_PREVIEW_IMAGES);
+  const isLoadingBoard = isBackendImage && boardImagesQuery.isFetching;
   const selectedIndex = selectedImage
     ? boardImages.findIndex((image) => image.imageName === selectedImage.imageName)
     : -1;
@@ -173,114 +203,6 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     t('widgets.gallery.uncategorized'),
     t('widgets.gallery.unknownBoard')
   );
-  const selectedImageRef = useRef(selectedImage);
-  const boardImagesRef = useRef(boardImages);
-  const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
-
-  selectedImageRef.current = selectedImage;
-  boardImagesRef.current = boardImages;
-
-  const boardsRequestKey = getPreviewBoardsRequestKey({
-    hasSelectedImage,
-    isBackendImage,
-    refreshToken: boardRefreshToken,
-  });
-
-  useEffect(() => {
-    if (boardsRequestKey === null) {
-      setBoards(fallbackBoards);
-      return;
-    }
-
-    let isStale = false;
-
-    listGalleryBoards()
-      .then((nextBoards) => {
-        if (!isStale) {
-          setBoards(nextBoards);
-        }
-      })
-      .catch(() => {
-        if (!isStale) {
-          setBoards(fallbackBoards);
-        }
-      });
-
-    return () => {
-      isStale = true;
-    };
-  }, [boardsRequestKey]);
-
-  // Deliberately NOT keyed on the selected image object or the gallery's
-  // board selection/sort: the board context only refetches when the image's
-  // own board, the view, the image ordering, or backend contents change.
-  useEffect(() => {
-    if (!hasSelectedImage) {
-      setBoardImages([]);
-      setIsLoadingBoard(false);
-      return;
-    }
-
-    if (!isBackendImage) {
-      setBoardImages(localImages);
-      setIsLoadingBoard(false);
-      return;
-    }
-
-    let isStale = false;
-
-    setIsLoadingBoard(true);
-    listGalleryImages({
-      boardId: imageBoardId,
-      galleryView: selectedGalleryView,
-      orderDir: imageOrderDir,
-      searchTerm: '',
-      starredFirst,
-    })
-      .then((nextImagesPage) => {
-        if (isStale) {
-          return;
-        }
-
-        const fallbackImage = selectedImageRef.current;
-
-        setBoardImages(nextImagesPage.images.length ? nextImagesPage.images : fallbackImage ? [fallbackImage] : []);
-      })
-      .catch((error: unknown) => {
-        if (!isStale) {
-          dispatch({
-            area: 'preview-board-images',
-            message: error instanceof Error ? error.message : String(error),
-            namespace: 'gallery',
-            type: 'recordError',
-          });
-
-          const fallbackImage = selectedImageRef.current;
-
-          setBoardImages(fallbackImage ? [fallbackImage] : []);
-        }
-      })
-      .finally(() => {
-        if (!isStale) {
-          setIsLoadingBoard(false);
-        }
-      });
-
-    return () => {
-      isStale = true;
-    };
-  }, [
-    dispatch,
-    hasSelectedImage,
-    imageBoardId,
-    imageOrderDir,
-    imageRefreshToken,
-    isBackendImage,
-    localImages,
-    recentImagesKey,
-    selectedGalleryView,
-    starredFirst,
-  ]);
 
   const selectByOffset = useCallback(
     (offset: -1 | 1) => {
@@ -291,45 +213,41 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       const nextImage = boardImages[selectedIndex + offset];
 
       if (nextImage) {
-        dispatch({ image: nextImage, type: 'selectGalleryImage' });
+        gallery.selectImage(nextImage);
       }
     },
-    [boardImages, dispatch, selectedIndex]
+    [boardImages, gallery, selectedIndex]
   );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
-  const onImagesDeleted = useCallback(
-    (imageNames: string[]) => {
-      const deletedNames = new Set(imageNames);
-      const images = boardImagesRef.current;
-      const anchorName = selectedImageRef.current?.imageName ?? null;
+  const onImagesDeleted = useEffectEvent((imageNames: string[]) => {
+    const deletedNames = new Set(imageNames);
+    const images = boardImages;
+    const anchorName = selectedImage?.imageName ?? null;
 
-      if (!anchorName || !deletedNames.has(anchorName)) {
-        return;
-      }
+    if (!anchorName || !deletedNames.has(anchorName)) {
+      return;
+    }
 
-      const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
+    const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
 
-      if (anchorIndex === -1) {
-        return;
-      }
+    if (anchorIndex === -1) {
+      return;
+    }
 
-      const remaining = images.filter((image) => !deletedNames.has(image.imageName));
-      const remainingBeforeAnchor = images
-        .slice(0, anchorIndex)
-        .filter((image) => !deletedNames.has(image.imageName)).length;
-      const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
+    const remaining = images.filter((image) => !deletedNames.has(image.imageName));
+    const remainingBeforeAnchor = images
+      .slice(0, anchorIndex)
+      .filter((image) => !deletedNames.has(image.imageName)).length;
+    const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
 
-      if (nextImage) {
-        dispatch({ image: nextImage, type: 'selectGalleryImage' });
-      }
-    },
-    [dispatch]
-  );
+    if (nextImage) {
+      gallery.selectImage(nextImage);
+    }
+  });
   const projectId = useActiveProjectId();
   const imageActions = useImageActions({
     boards,
-    dispatch,
     generateValues,
     onImagesDeleted,
     projectId,
@@ -355,28 +273,24 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const isRevealHolding = useRevealHold();
   const shouldShowProgressImage =
     showProgressImagesInViewer && progressImage !== null && !isComparing && !isRevealHolding;
-  const exitCompare = useCallback(() => dispatch({ image: null, type: 'setGalleryCompareImage' }), [dispatch]);
+  const exitCompare = useCallback(() => gallery.setCompareImage(null), [gallery]);
   const swapCompareImages = useCallback(() => {
     if (selectedImage && compareImage) {
-      dispatch({ image: compareImage, type: 'selectGalleryImage' });
-      dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
+      gallery.selectImage(compareImage);
+      gallery.setCompareImage(selectedImage);
     }
-  }, [compareImage, dispatch, selectedImage]);
+  }, [compareImage, gallery, selectedImage]);
   const setComparisonMode = useCallback(
-    (comparisonMode: PreviewComparisonMode) =>
-      dispatch({ type: 'patchWidgetValues', values: { comparisonMode }, widgetId: 'preview' }),
-    [dispatch]
+    (comparisonMode: PreviewComparisonMode) => widgets.patchValues('preview', { comparisonMode }),
+    [widgets]
   );
   const isMetadataOpen = getPreviewMetadataOpen(previewValues);
   const toggleMetadata = useCallback(
-    () => dispatch({ type: 'patchWidgetValues', values: { metadataOpen: !isMetadataOpen }, widgetId: 'preview' }),
-    [dispatch, isMetadataOpen]
+    () => widgets.patchValues('preview', { metadataOpen: !isMetadataOpen }),
+    [isMetadataOpen, widgets]
   );
   const isFilmstripVisible = getPreviewFilmstripVisible(previewValues);
-  const selectImage = useCallback(
-    (image: GeneratedImageContract) => dispatch({ image, type: 'selectGalleryImage' }),
-    [dispatch]
-  );
+  const selectImage = useCallback((image: GeneratedImageContract) => gallery.selectImage(image), [gallery]);
 
   // Drop-to-compare: any gallery-image drag dropped on the frame's drop zone
   // arms that image for comparison. The drag payload only carries names, so
@@ -391,28 +305,26 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     // Prefer images we already hold (board context includes fresh local
     // generations that would 404 on a backend by-name fetch).
     const localImage =
-      boardImagesRef.current.find((image) => image.imageName === resolution.imageName) ??
-      (selectedImageRef.current?.imageName === resolution.imageName ? selectedImageRef.current : null);
+      boardImages.find((image) => image.imageName === resolution.imageName) ??
+      (selectedImage?.imageName === resolution.imageName ? selectedImage : null);
 
     if (localImage) {
-      dispatch({ image: localImage, type: 'setGalleryCompareImage' });
+      gallery.setCompareImage(localImage);
       return;
     }
 
-    getGalleryImageByName(resolution.imageName)
-      .then((image) => dispatch({ image, type: 'setGalleryCompareImage' }))
+    galleryImages
+      .resolve(resolution.imageName)
+      .then((image) => gallery.setCompareImage(image))
       .catch((error: unknown) => {
-        dispatch({
+        notifications.reportError({
           area: 'preview-compare-drop',
           message: error instanceof Error ? error.message : String(error),
           namespace: 'gallery',
-          type: 'recordError',
         });
       });
   });
-  const onCompareDragEnd = useCallback((event: DragEndEvent) => handleCompareDrop(event), []);
-
-  useDndMonitor({ onDragEnd: onCompareDragEnd });
+  useDndMonitor({ onDragEnd: handleCompareDrop });
   const openImageContextMenu = useCallback(
     (x: number, y: number) => {
       if (contextMenuImage) {
@@ -461,8 +373,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     }
 
     if (commandId === 'viewer.swapImages' && selectedImage && compareImage) {
-      dispatch({ image: compareImage, type: 'selectGalleryImage' });
-      dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
+      gallery.selectImage(compareImage);
+      gallery.setCompareImage(selectedImage);
       return;
     }
 
@@ -482,11 +394,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     }
 
     if (commandId === 'viewer.toggleFilmstrip') {
-      dispatch({
-        type: 'patchWidgetValues',
-        values: { filmstripVisible: !getPreviewFilmstripVisible(previewValues) },
-        widgetId: 'preview',
-      });
+      widgets.patchValues('preview', { filmstripVisible: !getPreviewFilmstripVisible(previewValues) });
     }
   });
 

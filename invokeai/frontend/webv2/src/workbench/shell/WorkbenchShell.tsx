@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { FocusRegionProvider } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { WidgetBar } from '@workbench/widget-frame';
@@ -32,9 +33,8 @@ import {
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { createWidgetRegionViewModelFromState, getWidgetRegionItems } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion, widgetRegistrationFailures } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { BottomPanel } from './BottomPanel';
@@ -47,7 +47,7 @@ import { TopBar } from './topbar';
 const DND_MODIFIERS = [restrictToWindowEdges];
 
 export const WorkbenchShell = () => {
-  const dispatch = useWorkbenchDispatch();
+  const { notifications, widgets } = useWorkbenchCommands();
   const { t } = useTranslation();
   const panels = useActiveProjectSelector((project) => project.layout.panels);
   const leftRegion = useActiveProjectSelector((project) => project.widgetRegions.left);
@@ -113,11 +113,11 @@ export const WorkbenchShell = () => {
     [activeDrag, placementProject]
   );
 
-  useEffect(() => {
+  useMountEffect(() => {
     for (const failure of widgetRegistrationFailures) {
-      dispatch({ failure, type: 'recordWidgetFailure' });
+      notifications.recordWidgetFailure(failure);
     }
-  }, [dispatch]);
+  });
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
@@ -162,108 +162,106 @@ export const WorkbenchShell = () => {
         return;
       }
 
-      dispatchWidgetDragEndPlacement({ dispatch, resolution });
+      dispatchWidgetDragEndPlacement({ resolution, widgets });
     },
-    [dispatch, placementProject]
+    [placementProject, widgets]
   );
   const handleDragCancel = useCallback(() => setActiveDrag(null), []);
   const handleSelectLeft = useCallback(
-    (instanceId: string) => revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'left' }),
-    [dispatch, placementProject]
+    (instanceId: string) => revealWidgetPlacement({ instanceId, project: placementProject, region: 'left', widgets }),
+    [placementProject, widgets]
   );
   const handleSelectRight = useCallback(
-    (instanceId: string) => revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'right' }),
-    [dispatch, placementProject]
+    (instanceId: string) => revealWidgetPlacement({ instanceId, project: placementProject, region: 'right', widgets }),
+    [placementProject, widgets]
   );
   const handleToggleLeft = useCallback(
     (item: (typeof leftMenuItems)[number]) =>
       item.isEnabled
         ? closeWidgetPlacement({
-            dispatch,
+            widgets,
             getWidgetById,
             instanceId: item.id,
             project: placementProject,
             region: 'left',
           })
         : openWidgetPlacement({
-            dispatch,
+            widgets,
             getWidgetsForRegion,
             options: { createNew: item.allowMultiple, preferredRegions: ['left'] },
             typeId: item.typeId,
           }),
-    [dispatch, placementProject]
+    [placementProject, widgets]
   );
   const handleToggleRight = useCallback(
     (item: (typeof rightMenuItems)[number]) =>
       item.isEnabled
         ? closeWidgetPlacement({
-            dispatch,
+            widgets,
             getWidgetById,
             instanceId: item.id,
             project: placementProject,
             region: 'right',
           })
         : openWidgetPlacement({
-            dispatch,
+            widgets,
             getWidgetsForRegion,
             options: { createNew: item.allowMultiple, preferredRegions: ['right'] },
             typeId: item.typeId,
           }),
-    [dispatch, placementProject]
+    [placementProject, widgets]
   );
 
   return (
-    <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
-      <FocusRegionProvider>
-        <DndContext
-          collisionDetection={widgetCollisionDetection}
-          modifiers={DND_MODIFIERS}
-          sensors={sensors}
-          onDragCancel={handleDragCancel}
-          onDragEnd={handleDragEnd}
-          onDragStart={handleDragStart}
-        >
-          <Flex direction="column" h="100vh" w="100vw">
-            <WorkbenchNotificationToaster />
-            <TopBar />
+    <FocusRegionProvider>
+      <DndContext
+        collisionDetection={widgetCollisionDetection}
+        modifiers={DND_MODIFIERS}
+        sensors={sensors}
+        onDragCancel={handleDragCancel}
+        onDragEnd={handleDragEnd}
+        onDragStart={handleDragStart}
+      >
+        <Flex direction="column" h="100vh" w="100vw">
+          <WorkbenchNotificationToaster />
+          <TopBar />
 
-            <Flex as="main" flex="1" minH="0" overflow="hidden">
-              <WidgetBar
-                activeId={panels.isLeftOpen && !leftRegion.isCollapsed ? leftRegion.activeInstanceId : null}
-                dropState={leftDropState}
-                menuItems={leftMenuItems}
-                railItems={leftRailItems}
-                region="left"
-                side="left"
-                onSelect={handleSelectLeft}
-                onToggle={handleToggleLeft}
-              />
-              {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
-                <LeftPanel instanceId={leftRegion.activeInstanceId} />
-              ) : null}
-              <CenterArea dropState={centerDropState} />
-              {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
-                <RightPanel instanceId={rightRegion.activeInstanceId} />
-              ) : null}
-              <WidgetBar
-                activeId={panels.isRightOpen && !rightRegion.isCollapsed ? rightRegion.activeInstanceId : null}
-                dropState={rightDropState}
-                menuItems={rightMenuItems}
-                railItems={rightRailItems}
-                region="right"
-                side="right"
-                onSelect={handleSelectRight}
-                onToggle={handleToggleRight}
-              />
-            </Flex>
-
-            <BottomPanel />
-            <StatusBar dropState={bottomDropState} />
+          <Flex as="main" flex="1" minH="0" overflow="hidden">
+            <WidgetBar
+              activeId={panels.isLeftOpen && !leftRegion.isCollapsed ? leftRegion.activeInstanceId : null}
+              dropState={leftDropState}
+              menuItems={leftMenuItems}
+              railItems={leftRailItems}
+              region="left"
+              side="left"
+              onSelect={handleSelectLeft}
+              onToggle={handleToggleLeft}
+            />
+            {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
+              <LeftPanel instanceId={leftRegion.activeInstanceId} />
+            ) : null}
+            <CenterArea dropState={centerDropState} />
+            {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
+              <RightPanel instanceId={rightRegion.activeInstanceId} />
+            ) : null}
+            <WidgetBar
+              activeId={panels.isRightOpen && !rightRegion.isCollapsed ? rightRegion.activeInstanceId : null}
+              dropState={rightDropState}
+              menuItems={rightMenuItems}
+              railItems={rightRailItems}
+              region="right"
+              side="right"
+              onSelect={handleSelectRight}
+              onToggle={handleToggleRight}
+            />
           </Flex>
-          <DragOverlay>{activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}</DragOverlay>
-        </DndContext>
-      </FocusRegionProvider>
-    </WorkbenchWidgetRegistryProvider>
+
+          <BottomPanel />
+          <StatusBar dropState={bottomDropState} />
+        </Flex>
+        <DragOverlay>{activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}</DragOverlay>
+      </DndContext>
+    </FocusRegionProvider>
   );
 };
 

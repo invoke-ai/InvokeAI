@@ -1,25 +1,23 @@
-import type { WorkbenchAction } from '@workbench/workbenchState';
-import type { Dispatch } from 'react';
+import type { WorkbenchNotificationCommands } from '@workbench/workbenchStore';
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export const recordCanvasImportError = ({
-  dispatch,
+  notifications,
   error,
   localizedMessage,
   projectId,
 }: {
-  dispatch: Dispatch<WorkbenchAction>;
+  notifications: WorkbenchNotificationCommands;
   error: unknown;
   localizedMessage: string;
   projectId?: string;
 }): void => {
-  dispatch({
+  notifications.reportError({
     area: 'image-actions',
     context: { error: toErrorMessage(error) },
     message: localizedMessage,
     namespace: 'gallery',
     projectId,
-    type: 'recordError',
   });
 };

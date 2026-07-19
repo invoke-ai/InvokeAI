@@ -1,7 +1,7 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { CanvasEditGate, CanvasEditGateController } from '@workbench/canvas-engine/editGate';
 import type { SelectionState, SelectionStateDeps } from '@workbench/canvas-engine/selection/selectionState';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { getSourceBounds, isRenderableLayer } from '@workbench/canvas-engine/document/sources';
 import { createCanvasEditGate } from '@workbench/canvas-engine/editGate';

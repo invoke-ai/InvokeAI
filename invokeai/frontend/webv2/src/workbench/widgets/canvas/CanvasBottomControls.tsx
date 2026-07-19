@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
-import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
+import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { ReactNode } from 'react';
 
 import { Box } from '@chakra-ui/react';

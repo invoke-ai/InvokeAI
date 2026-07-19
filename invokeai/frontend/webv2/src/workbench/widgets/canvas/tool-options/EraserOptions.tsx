@@ -1,8 +1,8 @@
 import type { NumberInput as ChakraNumberInput, SliderValueChangeDetails } from '@chakra-ui/react';
 
 import { HStack, NumberInput } from '@chakra-ui/react';
-import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/engineStores';
-import { Slider } from '@workbench/components/ui';
+import { Slider } from '@platform/ui';
+import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/api';
 import { useEraserOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +27,7 @@ export const EraserOptions = ({ engine }: ToolOptionsComponentProps) => {
   const numberInputValue = useMemo(() => String(Math.round(options.size)), [options.size]);
 
   const setSize = useCallback(
-    (size: number) => engine.stores.eraserOptions.set({ ...options, size }),
+    (size: number) => engine.interaction.set('eraserOptions', { ...options, size }),
     [engine, options]
   );
 
@@ -54,7 +54,7 @@ export const EraserOptions = ({ engine }: ToolOptionsComponentProps) => {
     ({ value }: SliderValueChangeDetails) => {
       const next = value[0];
       if (next !== undefined && Number.isFinite(next)) {
-        engine.stores.eraserOptions.set({ ...options, opacity: next / 100 });
+        engine.interaction.set('eraserOptions', { ...options, opacity: next / 100 });
       }
     },
     [engine, options]

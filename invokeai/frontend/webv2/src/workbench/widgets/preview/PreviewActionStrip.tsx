@@ -1,8 +1,8 @@
-import type { GalleryImage } from '@workbench/gallery/api';
+import type { GalleryImage } from '@features/gallery';
 import type { ImageActions } from '@workbench/image-actions';
 
 import { HStack, Icon } from '@chakra-ui/react';
-import { IconButton, Tooltip } from '@workbench/components/ui';
+import { IconButton, Tooltip } from '@platform/ui';
 import { CopyIcon, DownloadIcon, EllipsisVerticalIcon, ImagesIcon, StarIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, type MouseEvent } from 'react';
 

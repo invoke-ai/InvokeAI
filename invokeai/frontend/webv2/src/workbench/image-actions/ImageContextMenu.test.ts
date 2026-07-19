@@ -1,4 +1,4 @@
-import type { GalleryImage } from '@workbench/gallery/api';
+import type { GalleryImage } from '@features/gallery';
 
 import { describe, expect, it } from 'vitest';
 

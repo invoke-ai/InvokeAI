@@ -1,13 +1,14 @@
+import type { WidgetManifest } from '@workbench/widgetContracts';
+
 import { ImageUpscaleIcon } from 'lucide-react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import type { WidgetManifest } from './types';
-
+import { upscaleWidgetManifest } from './upscaleWidgetManifest';
 import { getWidgetHosts, registerFirstPartyWidgets, registerWidgets } from './widgetRegistry';
-import { upscaleWidgetManifest } from './widgets/upscale';
 
 const TestIcon = () => null;
 const TestView = () => null;
+const load = () => Promise.resolve({ view: TestView });
 
 const createManifest = (overrides: Partial<WidgetManifest> = {}): WidgetManifest => ({
   allowMultiple: false,
@@ -16,8 +17,8 @@ const createManifest = (overrides: Partial<WidgetManifest> = {}): WidgetManifest
   icon: TestIcon,
   id: 'vendor.widget',
   label: 'Test Widget',
+  load,
   version: 1,
-  view: TestView,
   ...overrides,
 });
 
@@ -35,12 +36,14 @@ describe('widget registry', () => {
   });
 
   it('normalizes default state and api version', () => {
-    const [widget] = registerWidgets([createManifest({ state: undefined })]);
+    const loader = vi.fn(load);
+    const [widget] = registerWidgets([createManifest({ load: loader, state: undefined })]);
 
     expect(widget.status).toBe('enabled');
     expect(widget.manifest.apiVersion).toBe(1);
     expect(widget.manifest.state).toMatchObject({ persistence: 'project', version: 1 });
     expect(widget.manifest.state.createInitial()).toEqual({});
+    expect(loader).not.toHaveBeenCalled();
   });
 
   it('exposes enabled widget singleton hosts', () => {
@@ -61,18 +64,26 @@ describe('widget registry', () => {
     expect(widget.failure?.message).toContain('must declare at least one allowed region');
   });
 
-  it('fails closed for renderable regions without a view', () => {
-    const [widget] = registerWidgets([createManifest({ view: undefined })]);
+  it('validates descriptors without loading their implementation', () => {
+    const loader = vi.fn(load);
+    const [widget] = registerWidgets([createManifest({ load: loader })]);
+
+    expect(widget.status).toBe('enabled');
+    expect(loader).not.toHaveBeenCalled();
+  });
+
+  it('fails closed without a deferred implementation loader', () => {
+    const [widget] = registerWidgets([createManifest({ load: undefined as unknown as WidgetManifest['load'] })]);
 
     expect(widget.status).toBe('disabled');
-    expect(widget.failure?.message).toContain('does not include manifest.view');
+    expect(widget.failure?.message).toContain('must provide a deferred implementation loader');
   });
 
   it('honors hidden failure policy for invalid manifests', () => {
     const [widget] = registerWidgets([
       createManifest({
         failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'hide' },
-        view: undefined,
+        load: undefined as unknown as WidgetManifest['load'],
       }),
     ]);
 

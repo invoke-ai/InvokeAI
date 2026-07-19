@@ -1,4 +1,4 @@
-import type { CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';

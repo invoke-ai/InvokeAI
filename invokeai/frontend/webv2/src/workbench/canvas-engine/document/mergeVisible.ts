@@ -1,12 +1,4 @@
-/**
- * Pure contributor selection for the raster group's "merge visible" action.
- *
- * Legacy merge-visible composites every visible raster entity with content into
- * a new raster layer. Source kind and lock state do not affect participation:
- * locks prevent editing a source, not reading its rendered pixels.
- */
-
-import type { CanvasLayerContract } from '@workbench/types';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 
 export type HasMergeVisibleContent = (layerId: string) => boolean;
 

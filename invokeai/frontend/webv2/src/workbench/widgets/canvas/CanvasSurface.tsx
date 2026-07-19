@@ -7,7 +7,10 @@ import { shouldFocusCanvasSurface } from '@workbench/widgets/canvas/surfaceFocus
 import { TextEditPortal } from '@workbench/widgets/canvas/TextEditPortal';
 import { useRef } from 'react';
 
-export type CanvasSurfaceEngine = Pick<CanvasEngineHandle, 'document' | 'layers' | 'stores' | 'surface' | 'viewport'>;
+export type CanvasSurfaceEngine = Pick<
+  CanvasEngineHandle,
+  'document' | 'interaction' | 'layers' | 'surface' | 'viewport'
+>;
 
 /**
  * Give the canvas widget hotkey focus on a pointerdown on the surface, so tool

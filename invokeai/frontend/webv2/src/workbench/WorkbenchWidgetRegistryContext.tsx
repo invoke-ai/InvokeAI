@@ -1,6 +1,7 @@
-import { createContext, use, useMemo, type ReactNode } from 'react';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { RegisteredWidget, WidgetTypeId } from '@workbench/widgetContracts';
 
-import type { RegisteredWidget, WidgetRegion, WidgetTypeId } from './types';
+import { createContext, use, useMemo, type ReactNode } from 'react';
 
 interface WorkbenchWidgetRegistryContextValue {
   getWidgetById: (widgetId: WidgetTypeId) => RegisteredWidget | undefined;

@@ -1,9 +1,9 @@
+import type { MainModelConfig } from '@features/generation/contracts';
+import type { WorkbenchState } from '@workbench/projectContracts';
+
 import { describe, expect, it } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
-import type { MainModelConfig } from './generation/types';
-import type { WorkbenchState } from './types';
-import type { WorkbenchAction } from './workbenchState';
 
 import { type CanvasDimsSnapshot, createCanvasDimsSync, reconcileCanvasDims } from './canvasDimsSync';
 import { getProjectWidgetValues } from './widgetState';
@@ -12,7 +12,7 @@ import { createWorkbenchStore } from './workbenchStore';
 const bbox = (width: number, height: number, x = 0, y = 0) => ({ height, width, x, y });
 
 const dispatchCanvas = (store: ReturnType<typeof createWorkbenchStore>, mutation: CanvasProjectMutation): void => {
-  store.dispatch({ mutation, projectId: store.getState().activeProjectId, type: 'applyCanvasProjectMutation' });
+  store.commands.canvas.apply(store.getState().activeProjectId, mutation);
 };
 
 const snapshot = (bboxW: number, bboxH: number, dimsW: number, dimsH: number): CanvasDimsSnapshot => ({
@@ -209,17 +209,26 @@ const setupCanvasStore = () => {
   const store = createWorkbenchStore();
 
   // Put the active project into canvas mode with concrete generate dims/model.
-  store.dispatch({ type: 'setInvocationSource', sourceId: 'canvas' });
-  store.dispatch({
-    type: 'patchGenerateSettings',
-    values: { height: 1024, model, modelKey: model.key, width: 1024 },
-  });
+  store.commands.generation.setSource('canvas');
+  store.commands.generation.patchSettings({ height: 1024, model, modelKey: model.key, width: 1024 });
 
   let syncDispatches = 0;
   const countingStore = {
-    dispatch: (action: WorkbenchAction) => {
-      syncDispatches += 1;
-      store.dispatch(action);
+    commands: {
+      canvas: {
+        apply: (...args: Parameters<typeof store.commands.canvas.apply>) => {
+          syncDispatches += 1;
+          return store.commands.canvas.apply(...args);
+        },
+        appendStagingCandidate: store.commands.canvas.appendStagingCandidate,
+      },
+      generation: {
+        ...store.commands.generation,
+        patchSettings: (...args: Parameters<typeof store.commands.generation.patchSettings>) => {
+          syncDispatches += 1;
+          store.commands.generation.patchSettings(...args);
+        },
+      },
     },
     getState: store.getState,
     subscribe: store.subscribe,
@@ -289,7 +298,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 32, y: 48 }, type: 'setCanvasBbox' });
     const before = getSyncDispatches();
 
-    store.dispatch({ type: 'patchGenerateSettings', values: { width: 512 } });
+    store.commands.generation.patchSettings({ width: 512 });
 
     const { bbox: nextBbox } = getActiveGenerate(store.getState());
     expect(nextBbox).toEqual({ height: 1024, width: 512, x: 32, y: 48 });
@@ -309,7 +318,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     // another round of reconciliation (the snapped bbox and the still-501-wide
     // dims disagree by construction, but the sync's re-entrancy guard must
     // still hold the total dispatch count for this one external change to 1).
-    store.dispatch({ type: 'patchGenerateSettings', values: { width: 501 } });
+    store.commands.generation.patchSettings({ width: 501 });
 
     const { bbox: nextBbox } = getActiveGenerate(store.getState());
     expect(nextBbox.width).toBe(504); // snapped up to the nearest multiple of 8
@@ -331,17 +340,26 @@ describe('createCanvasDimsSync (wiring)', () => {
 
   it('stays inert when the project is not invoking into the canvas', () => {
     const store = createWorkbenchStore();
-    store.dispatch({ type: 'setInvocationSource', sourceId: 'generate' });
-    store.dispatch({
-      type: 'patchGenerateSettings',
-      values: { height: 1024, model, modelKey: model.key, width: 1024 },
-    });
+    store.commands.generation.setSource('generate');
+    store.commands.generation.patchSettings({ height: 1024, model, modelKey: model.key, width: 1024 });
 
     let syncDispatches = 0;
     const countingStore = {
-      dispatch: (action: WorkbenchAction) => {
-        syncDispatches += 1;
-        store.dispatch(action);
+      commands: {
+        canvas: {
+          apply: (...args: Parameters<typeof store.commands.canvas.apply>) => {
+            syncDispatches += 1;
+            return store.commands.canvas.apply(...args);
+          },
+          appendStagingCandidate: store.commands.canvas.appendStagingCandidate,
+        },
+        generation: {
+          ...store.commands.generation,
+          patchSettings: (...args: Parameters<typeof store.commands.generation.patchSettings>) => {
+            syncDispatches += 1;
+            store.commands.generation.patchSettings(...args);
+          },
+        },
       },
       getState: store.getState,
       subscribe: store.subscribe,
@@ -361,15 +379,12 @@ describe('createCanvasDimsSync (wiring)', () => {
   it('aligns dims to the bbox when a project enters canvas mode', () => {
     const store = createWorkbenchStore();
     // Diverge the frame from the dims while still in generate mode.
-    store.dispatch({
-      type: 'patchGenerateSettings',
-      values: { height: 1024, model, modelKey: model.key, width: 1024 },
-    });
+    store.commands.generation.patchSettings({ height: 1024, model, modelKey: model.key, width: 1024 });
     dispatchCanvas(store, { bbox: { height: 640, width: 896, x: 0, y: 0 }, type: 'setCanvasBbox' });
 
     const sync = createCanvasDimsSync(store);
     // Switching into canvas mode should let the bbox win and drive the dims.
-    store.dispatch({ type: 'setInvocationSource', sourceId: 'canvas' });
+    store.commands.generation.setSource('canvas');
 
     const { values } = getActiveGenerate(store.getState());
     expect(values.width).toBe(896);

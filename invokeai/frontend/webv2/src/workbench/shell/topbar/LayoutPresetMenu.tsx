@@ -1,11 +1,12 @@
-import type { LayoutPreset } from '@workbench/types';
+import type { LayoutPreset } from '@workbench/layoutContracts';
 import type { MouseEvent } from 'react';
 
 import { HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
-import { Button, ConfirmDialog, IconButton, MenuContent, RenameDialog } from '@workbench/components/ui';
+import { Button, ConfirmDialog, IconButton, MenuContent, RenameDialog } from '@platform/ui';
 import { layoutPresets } from '@workbench/layoutPresets';
 import { areLayoutPresetSnapshotsEqual, createLayoutPresetSnapshot } from '@workbench/layoutPresetSnapshots';
-import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { preloadWidget } from '@workbench/widgetRegistry';
+import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, EllipsisVerticalIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -24,11 +25,21 @@ const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 const TRIGGER_HOVER_PROPS = { bg: 'bg.muted' };
 const DISABLED_PROPS = { opacity: 0.45 };
 
+const preloadLayoutPreset = (preset: LayoutPreset): void => {
+  for (const region of Object.values(preset.snapshot.widgetRegions)) {
+    const typeId = preset.snapshot.widgetInstances[region.activeInstanceId]?.typeId;
+
+    if (typeId) {
+      preloadWidget(typeId);
+    }
+  }
+};
+
 /** Global layout preset registry surfaced as a menu. */
 export const LayoutPresetMenu = () => {
   const activeLayoutSnapshot = useActiveProjectSelector(createLayoutPresetSnapshot, areLayoutPresetSnapshotsEqual);
-  const customPresets = useWorkbenchSelector((snapshot) => snapshot.state.account.customLayoutPresets ?? []);
-  const dispatch = useWorkbenchDispatch();
+  const customPresets = useWorkbenchSelector((snapshot) => snapshot.account.customLayoutPresets ?? []);
+  const { layout } = useWorkbenchCommands();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<LayoutPreset | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LayoutPreset | null>(null);
@@ -42,27 +53,30 @@ export const LayoutPresetMenu = () => {
 
   const addPreset = useCallback(
     (label: string) => {
-      dispatch({ label, presetId: createCustomPresetId(), type: 'addLayoutPreset' });
+      layout.createPreset(createCustomPresetId(), label);
     },
-    [dispatch]
+    [layout]
   );
 
   const renamePreset = useCallback(
     (preset: LayoutPreset, label: string) => {
-      dispatch({ label, presetId: preset.id, type: 'renameLayoutPreset' });
+      layout.renamePreset(preset.id, label);
     },
-    [dispatch]
+    [layout]
   );
 
   const deletePreset = useCallback(
     (preset: LayoutPreset) => {
-      dispatch({ presetId: preset.id, type: 'deleteLayoutPreset' });
+      layout.deletePreset(preset.id);
     },
-    [dispatch]
+    [layout]
   );
   const applyPreset = useCallback(
-    (preset: LayoutPreset) => dispatch({ presetId: preset.id, type: 'applyPreset' }),
-    [dispatch]
+    (preset: LayoutPreset) => {
+      preloadLayoutPreset(preset);
+      layout.applyPreset(preset.id);
+    },
+    [layout]
   );
   const openActionMenu = useCallback((preset: LayoutPreset, event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
@@ -123,6 +137,7 @@ export const LayoutPresetMenu = () => {
                 matchingPreset={matchingPreset}
                 presets={layoutPresets}
                 onApply={applyPreset}
+                onPreload={preloadLayoutPreset}
               />
               {customPresets.length ? (
                 <>
@@ -135,6 +150,7 @@ export const LayoutPresetMenu = () => {
                     onAction={openActionMenu}
                     onApply={applyPreset}
                     onContextMenu={openActionMenu}
+                    onPreload={preloadLayoutPreset}
                   />
                 </>
               ) : null}
@@ -202,6 +218,7 @@ const PresetGroup = ({
   onAction,
   onApply,
   onContextMenu,
+  onPreload,
   presets,
 }: {
   isCustom?: boolean;
@@ -210,6 +227,7 @@ const PresetGroup = ({
   onAction?: (preset: LayoutPreset, event: MouseEvent<HTMLElement>) => void;
   onApply: (preset: LayoutPreset) => void;
   onContextMenu?: (preset: LayoutPreset, event: MouseEvent<HTMLElement>) => void;
+  onPreload: (preset: LayoutPreset) => void;
   presets: LayoutPreset[];
 }) => (
   <Menu.ItemGroup>
@@ -225,6 +243,7 @@ const PresetGroup = ({
         onAction={onAction}
         onApply={onApply}
         onContextMenu={onContextMenu}
+        onPreload={onPreload}
       />
     ))}
   </Menu.ItemGroup>
@@ -236,6 +255,7 @@ const PresetMenuItem = ({
   onAction,
   onApply,
   onContextMenu,
+  onPreload,
   preset,
 }: {
   isCustom: boolean;
@@ -244,6 +264,7 @@ const PresetMenuItem = ({
   onAction?: (preset: LayoutPreset, event: MouseEvent<HTMLElement>) => void;
   onApply: (preset: LayoutPreset) => void;
   onContextMenu?: (preset: LayoutPreset, event: MouseEvent<HTMLElement>) => void;
+  onPreload: (preset: LayoutPreset) => void;
 }) => {
   const handleApply = useCallback(() => onApply(preset), [onApply, preset]);
   const handleContextMenu = useCallback(
@@ -251,9 +272,16 @@ const PresetMenuItem = ({
     [onContextMenu, preset]
   );
   const handleAction = useCallback((event: MouseEvent<HTMLElement>) => onAction?.(preset, event), [onAction, preset]);
+  const handlePreload = useCallback(() => onPreload(preset), [onPreload, preset]);
 
   return (
-    <Menu.Item value={preset.id} onClick={handleApply} onContextMenu={handleContextMenu}>
+    <Menu.Item
+      value={preset.id}
+      onClick={handleApply}
+      onContextMenu={handleContextMenu}
+      onFocus={handlePreload}
+      onPointerEnter={handlePreload}
+    >
       <Stack gap="0" flex="1" minW="0">
         <Text fontSize="xs" fontWeight="600">
           {preset.label}

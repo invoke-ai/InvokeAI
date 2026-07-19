@@ -1,5 +1,5 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';

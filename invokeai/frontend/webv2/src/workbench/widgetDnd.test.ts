@@ -1,8 +1,9 @@
 import type { CollisionDetection, DroppableContainer } from '@dnd-kit/core';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
+import type { WidgetTypeId } from '@workbench/widgetContracts';
 
+import { getGalleryImageDragData } from '@features/gallery/utility';
 import { describe, expect, it } from 'vitest';
-
-import type { Project, WidgetTypeId, WorkbenchState } from './types';
 
 import {
   getRegionDropState,
@@ -13,7 +14,6 @@ import {
   widgetCollisionDetection,
 } from './widgetDnd';
 import { getCanvasImageDropData } from './widgets/canvas/canvasImageDnd';
-import { getGalleryImageDragData } from './widgets/gallery/galleryDnd';
 import { createInitialWorkbenchState } from './workbenchState';
 
 type CollisionArgs = Parameters<CollisionDetection>[0];

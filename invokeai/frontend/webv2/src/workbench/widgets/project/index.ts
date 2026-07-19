@@ -1,8 +1,6 @@
-import type { WidgetManifest } from '@workbench/types';
+import type { WidgetManifest } from '@workbench/widgetContracts';
 
 import { FolderCogIcon } from 'lucide-react';
-
-import { ProjectWidgetView } from './ProjectWidgetView';
 
 export const projectWidgetManifest: WidgetManifest = {
   allowMultiple: false,
@@ -11,6 +9,6 @@ export const projectWidgetManifest: WidgetManifest = {
   icon: FolderCogIcon,
   id: 'project',
   label: (t) => t('widgets.labels.project'),
+  load: () => import('./implementation').then((module) => module.widgetImplementation),
   version: 1,
-  view: ProjectWidgetView,
 };

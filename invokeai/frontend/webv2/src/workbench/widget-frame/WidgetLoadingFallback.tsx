@@ -1,4 +1,4 @@
-import type { WidgetViewProps } from '@workbench/types';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Flex, HStack, Spinner, Text } from '@chakra-ui/react';
 

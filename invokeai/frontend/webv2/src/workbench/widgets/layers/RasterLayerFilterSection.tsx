@@ -1,7 +1,7 @@
-import type { CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/api';
 import type { LayerFilterOperationEngine } from '@workbench/widgets/layers/LayerFilterOperationButton';
 
-import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
+import { getCanvasOperations } from '@workbench/canvas-operations/api';
 
 import { LayerFilterOperationButton } from './LayerFilterOperationButton';
 

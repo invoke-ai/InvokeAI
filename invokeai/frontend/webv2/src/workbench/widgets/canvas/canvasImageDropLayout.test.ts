@@ -1,8 +1,9 @@
+import type { GalleryImage } from '@features/gallery';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
-import type { GalleryImage } from '@workbench/gallery/api';
-import type { Project, WorkbenchState } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
+import type { WorkbenchCanvasCommands } from '@workbench/workbenchStore';
 
-import { getGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { getGalleryImageDragData } from '@features/gallery/utility';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -97,19 +98,22 @@ describe('executeCanvasImageDropImport', () => {
     const extra = { imageName: 'extra.png' } as GalleryImage;
     const project = { id: 'captured-project' } as Project;
     const engine = { projectId: project.id } as CanvasEngine;
-    const getState = () => ({ activeProjectId: project.id }) as WorkbenchState;
+    const queries = {
+      getProject: (projectId: string) => (projectId === project.id ? project : null),
+      isActiveProject: (projectId: string) => projectId === project.id,
+    };
     const lookupCalls: string[][] = [];
     const importCalls: unknown[] = [];
 
     const result = await executeCanvasImageDropImport({
+      canvas: { apply: () => false } as unknown as WorkbenchCanvasCommands,
       destination: 'control',
-      dispatch: () => undefined,
       engine,
       getGalleryImages: (imageNames) => {
         lookupCalls.push([...imageNames]);
         return Promise.resolve([second, extra, first]);
       },
-      getState,
+      queries,
       imageNames: ['first.png', 'second.png'],
       importGalleryImages: (options) => {
         importCalls.push(options);
@@ -123,8 +127,9 @@ describe('executeCanvasImageDropImport', () => {
     expect(importCalls[0]).toMatchObject({
       destination: 'control',
       engine,
-      getState,
+      getProject: queries.getProject,
       images: [first, second],
+      isActiveProject: queries.isActiveProject,
       project,
     });
     expect(result).toEqual({ failedImageNames: [], layerIds: ['layer-1', 'layer-2'], status: 'imported' });

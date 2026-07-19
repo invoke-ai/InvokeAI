@@ -27,13 +27,12 @@
 
 import type {
   CanvasHistoryCapability,
-  CanvasEditCapability,
-  CanvasCompositeExecutorDeps,
+  CanvasEngine,
+  CanvasInteractionState,
+  CanvasInteractionStateCapability,
   CanvasDocumentCapability,
   CanvasDocumentSnapshot,
   CanvasExportCapability,
-  CanvasRasterSnapshot,
-  CaptureRasterSnapshotResult,
   CanvasLifecycleCapability,
   CanvasLayerCapability,
   CanvasPreviewCapability,
@@ -41,12 +40,21 @@ import type {
   CanvasSurfaceCapability,
   CanvasToolCapability,
   CanvasViewportCapability,
+  BooleanRasterOperation,
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
   LayerExportGuard,
   PsdExportResult,
-} from '@workbench/canvas-engine/api';
+  StagedPreviewInput,
+  StagedPreviewPlacement,
+} from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasCompositeExecutorDeps,
+  CanvasRasterSnapshot,
+  CaptureRasterSnapshotResult,
+} from '@workbench/canvas-engine/rasterTransactions';
 export type {
+  CanvasEngine,
   CommitGeneratedImageOptions,
   CommitGeneratedImageResult,
   CommitStagedImageOptions,
@@ -59,7 +67,7 @@ export type {
   LayerThumbnailRequestResult,
   PsdExportResult,
   ReplaceSelectionFromImageResult,
-} from '@workbench/canvas-engine/api';
+} from '@workbench/canvas-engine/capabilities';
 export type {
   CommitMaskImageResult,
   CommitMaskImageResultOptions,
@@ -70,6 +78,12 @@ export type {
   CommitRasterFilterResult,
 } from '@workbench/canvas-engine/controllers/filterResultController';
 import type { CanvasApplicationHost, SelectObjectStartContext } from '@workbench/canvas-engine/applicationHost';
+import type {
+  CanvasImageRef,
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+} from '@workbench/canvas-engine/contracts';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { FontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -79,12 +93,6 @@ import type { SamVisualInput } from '@workbench/canvas-engine/samInteraction';
 import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type {
-  CanvasImageRef,
-  CanvasDocumentContractV2,
-  CanvasLayerContract,
-  CanvasLayerSourceContract,
-} from '@workbench/types';
 
 import { ControlPixelController } from '@workbench/canvas-engine/controllers/controlPixelController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
@@ -111,7 +119,12 @@ import { RenderController } from '@workbench/canvas-engine/controllers/renderCon
 import { StagedResultController } from '@workbench/canvas-engine/controllers/stagedResultController';
 import { StructuralLayerController } from '@workbench/canvas-engine/controllers/structuralLayerController';
 import { createCanvasDiagnostics, type CanvasDiagnosticsSnapshot } from '@workbench/canvas-engine/diagnostics';
-import { createEngineStores, type EngineStores, type TextToolOptions } from '@workbench/canvas-engine/engineStores';
+import {
+  createEngineStores,
+  type EngineStores,
+  type ScalarStore,
+  type TextToolOptions,
+} from '@workbench/canvas-engine/engineStores';
 import {
   exportRasterComposite as exportRasterCompositeWithDeps,
   RasterCompositeOverBudgetError,
@@ -170,14 +183,6 @@ import { createViewTool } from './tools/viewTool';
  * inline data-URL with explicit document-space dimensions (a live
  * denoise-progress frame, scaled to fill those dims at the current bbox).
  */
-export interface StagedPreviewPlacement extends Rect {
-  opacity: number;
-}
-
-export type StagedPreviewInput =
-  | { imageName: string; placement?: StagedPreviewPlacement }
-  | { dataUrl: string; width: number; height: number };
-
 export interface FilterPreviewInput {
   imageName: string;
   rect: Rect;
@@ -192,7 +197,6 @@ export interface FilterPreviewInput {
  */
 export type MergeVisibleResult = 'merged' | 'not-ready' | 'busy' | 'nothing';
 
-export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclude';
 export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty';
 
 export type ExtractMaskedAreaResult =
@@ -340,6 +344,11 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
 }
 
 export interface CanvasEngineExportCapability extends CanvasExportCapability {
+  captureRasterSnapshot(
+    documentSnapshot: CanvasDocumentSnapshot,
+    layerIds: readonly string[],
+    options?: { signal?: AbortSignal; includeDisabled?: boolean }
+  ): Promise<CaptureRasterSnapshotResult>;
   exportBakedLayerPixels(
     layerId: string,
     options?: ExportBakedLayerPixelsOptions
@@ -347,6 +356,7 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
   exportLayerPixels(layerId: string, options?: ExportLayerPixelsOptions): Promise<ExportLayerPixelsResult>;
   exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
   extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
+  getCompositeExecutorDeps(): CanvasCompositeExecutorDeps;
 }
 
 export interface CanvasEngineSelectionCapability extends CanvasSelectionCapability {}
@@ -366,27 +376,14 @@ export interface CanvasDiagnosticsCapability {
   logDebugInfo(): void;
 }
 
-/** The public engine handle. */
-export interface CanvasEngine {
-  readonly projectId: string;
-  readonly surface: CanvasSurfaceCapability;
-  readonly viewport: CanvasViewportCapability;
-  readonly tools: CanvasEngineToolCapability;
-  readonly history: CanvasHistoryCapability;
-  readonly lifecycle: CanvasLifecycleCapability;
-  readonly layers: CanvasEngineLayerCapability;
-  readonly previews: CanvasEnginePreviewCapability;
-  readonly selection: CanvasEngineSelectionCapability;
-  readonly edits: CanvasEditCapability;
-  readonly document: CanvasDocumentCapability;
+/** Private engine composition shape used only inside the Canvas implementation and its tests. */
+export interface CanvasEngineImplementation extends CanvasEngine {
   readonly exports: CanvasEngineExportCapability;
-  readonly diagnostics: CanvasDiagnosticsCapability;
-  /** The transient stores React subscribes to. */
   readonly stores: EngineStores;
 }
 
 export interface CanvasEngineCoreComposition {
-  readonly engine: CanvasEngine;
+  readonly engine: CanvasEngineImplementation;
   readonly applicationHost: CanvasApplicationHost;
 }
 
@@ -462,6 +459,42 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const layerCache = rasterController.layers;
   const stores = createEngineStores();
+  const interactionStores: { [K in keyof CanvasInteractionState]: ScalarStore<CanvasInteractionState[K]> } = {
+    activeTool: stores.activeTool,
+    bboxGrid: stores.bboxGrid,
+    bboxOptions: stores.bboxOptions,
+    bboxOverlay: stores.bboxOverlay,
+    brushOptions: stores.brushOptions,
+    canRedo: stores.canRedo,
+    canUndo: stores.canUndo,
+    checkerboard: stores.checkerboard,
+    checkerColors: stores.checkerColors,
+    documentEditingLocked: stores.documentEditingLocked,
+    eraserOptions: stores.eraserOptions,
+    gradientOptions: stores.gradientOptions,
+    hasSelection: stores.hasSelection,
+    invertBrushSizeScroll: stores.invertBrushSizeScroll,
+    lassoOptions: stores.lassoOptions,
+    ruleOfThirds: stores.ruleOfThirds,
+    shapeOptions: stores.shapeOptions,
+    showBbox: stores.showBbox,
+    showGrid: stores.showGrid,
+    snapToGrid: stores.snapToGrid,
+    textEditSession: stores.textEditSession,
+    textOptions: stores.textOptions,
+    transformSession: stores.transformSession,
+    viewportReady: stores.viewportReady,
+    zoom: stores.zoom,
+  };
+  const interaction: CanvasInteractionStateCapability = {
+    get: (key) => interactionStores[key].get(),
+    getLayerThumbnailStatus: (layerId) => stores.thumbnailStatus.get(layerId) ?? 'idle',
+    getLayerThumbnailVersion: (layerId) => stores.thumbnailVersion.get(layerId),
+    set: (key, value) => interactionStores[key].set(value),
+    subscribe: (key, listener) => interactionStores[key].subscribe(listener),
+    subscribeLayerThumbnailStatus: (layerId, listener) => stores.thumbnailStatus.subscribeKey(layerId, listener),
+    subscribeLayerThumbnailVersion: (layerId, listener) => stores.thumbnailVersion.subscribeKey(layerId, listener),
+  };
   // Web-font readiness for text layers: re-rasterizes a text layer once its font
   // resolves (a no-op in node / when `document.fonts` is absent). `undefined`
   // opts.fonts falls back to the DOM api; an explicit `null` forces the no-op.
@@ -3400,12 +3433,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
   };
 
-  const engine: CanvasEngine = {
+  const engine: CanvasEngineImplementation = {
     diagnostics: diagnosticsCapability,
     document: documentCapability,
     edits: editingController.edits,
     exports: exportCapability,
     history: historyCapability,
+    interaction,
     lifecycle,
     layers: layersCapability,
     projectId,

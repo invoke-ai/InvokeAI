@@ -1,5 +1,5 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/api';
-import type { CanvasRasterLayerContractV2 } from '@workbench/types';
+import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 
 import { createCanvasEditGate } from '@workbench/canvas-engine/editGate';
 import { describe, expect, it, vi } from 'vitest';

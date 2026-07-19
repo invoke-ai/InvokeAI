@@ -1,7 +1,10 @@
-import type { CanvasCoreStoreCapability, CanvasLayerCapability } from '@workbench/canvas-engine/api';
-import type { Rect } from '@workbench/canvas-engine/types';
-
-import { bboxEquals, roundBbox } from '@workbench/canvas-engine/tools/bboxHitTest';
+import {
+  bboxEquals,
+  roundBbox,
+  type CanvasCoreStoreCapability,
+  type CanvasLayerCapability,
+  type Rect,
+} from '@workbench/canvas-engine/api';
 import { useBboxGrid, useBboxOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';

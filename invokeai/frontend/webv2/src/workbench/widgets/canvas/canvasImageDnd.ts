@@ -1,7 +1,7 @@
+import type { GalleryImage } from '@features/gallery';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
-import type { GalleryImage } from '@workbench/gallery/api';
 
-import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { isGalleryImageDragData } from '@features/gallery/utility';
 
 export interface CanvasImageDropData {
   kind: 'canvas-image-target';

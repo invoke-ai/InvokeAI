@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 import { Box, Icon, Stack, Text } from '@chakra-ui/react';
-import { Tabs } from '@workbench/components/ui';
+import { Tabs } from '@platform/ui';
 
 import { ResourceLinks } from './ResourceLinks';
 

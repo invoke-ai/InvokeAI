@@ -20,11 +20,15 @@
  * Zero React, zero engine/DOM state — unit-tested in node.
  */
 
-import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
-
-import { getSourceBounds, isRenderableLayer } from '@workbench/canvas-engine/document/sources';
-import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
+import {
+  getSourceBounds,
+  isEmpty,
+  isRenderableLayer,
+  union,
+  type CanvasDocumentContractV2,
+  type CanvasLayerContract,
+  type Rect,
+} from '@workbench/canvas-engine/api';
 
 /** Fixed outward padding (document px) applied to the mask union before grid-fitting. */
 const MASK_FIT_PADDING = 8;

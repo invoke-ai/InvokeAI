@@ -1,5 +1,5 @@
-import type { ToolId } from '@workbench/canvas-engine/types';
-import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
+import type { ToolId } from '@workbench/canvas-engine/api';
+import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { ComponentType } from 'react';
 
@@ -23,7 +23,7 @@ import { TransformOptions } from './TransformOptions';
 
 export type CanvasToolOptionsEngine = Pick<
   CanvasEngineHandle,
-  'document' | 'layers' | 'projectId' | 'selection' | 'stores' | 'tools' | 'viewport'
+  'document' | 'interaction' | 'layers' | 'projectId' | 'selection' | 'tools' | 'viewport'
 >;
 
 /** Props every per-tool options component receives — just the shared engine handle. */
@@ -64,7 +64,7 @@ export const resolveCanvasOptionsContent = (
  * dimensions / zoom read-out on the right (absorbed from the former floating HUD).
  * Tool options read and write the engine's
  * transient option stores directly (`useBrushOptions` / `useEraserOptions` +
- * `engine.stores.*.set(...)`) — there is no React state mirror. Positioned by
+ * `engine.interaction.set(...)`) — there is no React state mirror. Positioned by
  * {@link CanvasWidgetView}; shares its look with the staging bar via
  * {@link CanvasFloatingBar}.
  */

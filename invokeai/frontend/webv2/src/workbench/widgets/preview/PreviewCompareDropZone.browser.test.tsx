@@ -9,9 +9,9 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import { getGalleryImageDragData, getGalleryImageDragId } from '@features/gallery/utility';
 import { system } from '@theme/system';
 import { widgetCollisionDetection } from '@workbench/widgetDnd';
-import { getGalleryImageDragData, getGalleryImageDragId } from '@workbench/widgets/gallery/galleryDnd';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

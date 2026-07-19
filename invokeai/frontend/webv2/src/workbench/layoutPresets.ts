@@ -5,11 +5,10 @@ import type {
   LayoutPresetSnapshot,
   LayoutPresetWidgetInstanceSnapshot,
   PanelState,
-  WidgetInstanceId,
   WidgetRegion,
   WidgetRegionState,
-  WidgetTypeId,
-} from './types';
+} from '@workbench/layoutContracts';
+import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 const defaultBottomInstanceIds: WidgetInstanceId[] = [
   'server-status',

@@ -1,73 +1,100 @@
-import type { GallerySettings } from './gallery/settings';
-import type { GenerateWidgetValues } from './generation/types';
-import type { ModelConfig } from './models/types';
+import type { GallerySettings, GeneratedImageContract } from '@features/gallery/contracts';
+import type { GenerateWidgetValues } from '@features/generation/contracts';
+import type { ModelConfig } from '@features/models';
+import type { QueueCompiledSubmission, QueueHistoryItemStatus } from '@features/queue/contracts';
+import type { ProjectGraphState } from '@features/workflow/contracts';
 import type {
   CanvasDocumentContractV2,
   CanvasPlacementContract,
   CanvasStateContractV2,
-  CenterViewId,
   CanvasStagingCandidateContract,
-  DeveloperLogNamespace,
-  GeneratedImageContract,
-  GraphContract,
-  GraphHistorySnapshot,
-  InvocationRoute,
-  InvocationSourceId,
+} from '@workbench/canvas-engine/api';
+import type { DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
+import type { GraphContract } from '@workbench/graphContracts';
+import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
+import type {
+  CenterViewId,
   LayoutPreset,
   LayoutPresetId,
   LayoutPresetSnapshot,
-  Project,
   ProjectLayoutState,
-  ProjectSettings,
+  WidgetRegion,
+  WidgetRegionState,
+} from '@workbench/layoutContracts';
+import type {
+  GraphHistorySnapshot,
+  Project,
   ProjectUndoSnapshot,
   PromptHistoryItem,
-  QueueItem,
-  QueueItemStatus,
-  ResultDestination,
+  WorkbenchNotification,
+  WorkbenchNotificationKind,
+  WorkbenchState,
+} from '@workbench/projectContracts';
+import type { ProjectSettings } from '@workbench/settings/contracts';
+import type {
   WidgetFailure,
   WidgetId,
   WidgetInstanceContract,
   WidgetInstanceId,
-  WidgetRegion,
-  WidgetRegionState,
   WidgetStateContract,
   WidgetStateMap,
   WidgetTypeId,
-  WorkbenchNotification,
-  WorkbenchNotificationKind,
-  WorkbenchState,
-} from './types';
-import type { UpscaleWidgetValues } from './upscale/types';
-import type { ProjectGraphState } from './workflows/types';
+} from '@workbench/widgetContracts';
+
+import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
 import { createNewCanvasStateV2, migrateCanvasStateToV2 } from './canvasMigration';
 import { applyCanvasProjectMutation, type CanvasProjectMutation } from './canvasProjectMutations';
+import { getProjectWidgetValues } from './widgetState';
 export { nextLayerName } from './canvasProjectMutations';
+import { sanitizeBatchCount } from '@features/generation/batch';
+import { compileGenerateGraph, resolveGenerateSeed } from '@features/generation/graph';
+import {
+  addPromptHistoryItem,
+  getPromptHistoryItemFromGenerateSettings,
+  removePromptHistoryItem,
+} from '@features/generation/prompt';
+import {
+  cloneGenerateWidgetValues,
+  getGenerationModelAvailabilityReasons,
+  normalizeGenerateSettings,
+  normalizeGenerateWidgetValues,
+  syncGenerateWidgetValuesWithModels,
+} from '@features/generation/settings';
+import {
+  applyProjectPromptDraft,
+  getPromptDraftFromValues,
+  migrateProjectPromptDraft,
+  type ProjectPromptDraftPatch,
+} from '@features/generation/utility';
+import {
+  clearDeletedUpscaleInput,
+  cloneUpscaleWidgetValues,
+  compileUpscaleGraph,
+  getUpscaleOutputDimensions,
+  getUpscaleValidationReasons,
+  normalizeUpscaleWidgetValues,
+  resolveUpscaleSeed,
+  syncUpscaleWidgetValuesWithModels,
+  type UpscaleWidgetValues,
+} from '@features/upscale';
+import { compileProjectGraph } from '@features/workflow/graph';
+import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
+import {
+  cloneProjectGraph,
+  createProjectGraph,
+  getProjectGraphUndoLabel,
+  isHighConfidenceGraphEdit,
+  normalizeProjectGraph,
+  projectGraphReducer,
+  type ProjectGraphAction,
+} from '@features/workflow/utility';
+
 import {
   getCanvasStagingSlotCount,
   getCanvasStagingSlots,
   getFirstCanvasPlaceholderSlotIndex,
 } from './canvasStagingView';
-import { getGenerationModelAvailabilityReasons } from './generation/baseGenerationPolicies';
-import { sanitizeBatchCount } from './generation/batch';
-import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
-import {
-  applyProjectPromptDraft,
-  getProjectPromptDraft,
-  migrateProjectPromptDraft,
-  type ProjectPromptDraftPatch,
-} from './generation/projectPromptDraft';
-import {
-  addPromptHistoryItem,
-  getPromptHistoryItemFromGenerateSettings,
-  removePromptHistoryItem,
-} from './generation/promptHistory';
-import {
-  cloneGenerateWidgetValues,
-  normalizeGenerateSettings,
-  normalizeGenerateWidgetValues,
-  syncGenerateWidgetValuesWithModels,
-} from './generation/settings';
 import {
   defaultInvocationRoute,
   isInvocationRouteValid,
@@ -77,26 +104,6 @@ import {
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
 import { cloneLayoutPresetWidgetRegions, createLayoutPresetSnapshot } from './layoutPresetSnapshots';
 import { normalizeProjectSettings } from './settings/store';
-import { compileUpscaleGraph } from './upscale/graph';
-import {
-  clearDeletedUpscaleInput,
-  cloneUpscaleWidgetValues,
-  getUpscaleValidationReasons,
-  normalizeUpscaleWidgetValues,
-  resolveUpscaleSeed,
-  syncUpscaleWidgetValuesWithModels,
-} from './upscale/settings';
-import { compileProjectGraph } from './workflows/buildGraph';
-import {
-  cloneProjectGraph,
-  createProjectGraph,
-  getProjectGraphUndoLabel,
-  isHighConfidenceGraphEdit,
-  normalizeProjectGraph,
-  projectGraphReducer,
-  type ProjectGraphAction,
-} from './workflows/document';
-import { getInvocationTemplatesSnapshot } from './workflows/templates';
 
 type QueueGenerateSnapshot = NonNullable<QueueItem['snapshot']['generate']>;
 
@@ -185,7 +192,7 @@ type WorkbenchReducerAction =
       type: 'setQueueItemStatus';
       projectId: string;
       queueItemId: string;
-      status: QueueItemStatus;
+      status: QueueHistoryItemStatus;
       error?: string;
       notify?: boolean;
     }
@@ -1407,7 +1414,10 @@ const compileInvocationSnapshot = (
     }
 
     const syncedValues = models ? syncUpscaleWidgetValuesWithModels(values, models) : values;
-    const currentValues: UpscaleWidgetValues = { ...syncedValues, ...getProjectPromptDraft(project) };
+    const currentValues: UpscaleWidgetValues = {
+      ...syncedValues,
+      ...getPromptDraftFromValues(getProjectWidgetValues(project, 'generate')),
+    };
 
     if (getUpscaleValidationReasons(currentValues, models).length > 0) {
       return null;
@@ -1563,7 +1573,7 @@ const mergeBackendItemId = (ids: number[] | undefined, backendItemId: number): n
 const getQueueItemStatusAfterBackendCancellation = (
   item: QueueItem,
   cancelledBackendItemIds: number[]
-): QueueItemStatus => {
+): QueueHistoryItemStatus => {
   if (!item.backendItemIds?.length) {
     return item.status;
   }
@@ -1685,15 +1695,69 @@ const enqueueCompiledSnapshot = (
     route.sourceId === 'generate' ? normalizeGenerateSettings(widgetStates.generate.values) : null;
   const upscaleSettings =
     route.sourceId === 'upscale' ? normalizeUpscaleWidgetValues(widgetStates.upscale.values) : null;
+  const backendGraph = graph.backendGraph;
+  const sourceGenerateSettings =
+    route.sourceId === 'canvas'
+      ? normalizeGenerateSettings(generate?.values)
+      : route.sourceId === 'generate'
+        ? generateSettings
+        : route.sourceId === 'upscale'
+          ? upscaleSettings
+          : null;
+  const backendSubmission: QueueCompiledSubmission = !backendGraph
+    ? { error: `${route.sourceId} queue item is missing a compiled backend graph.`, kind: 'invalid' }
+    : route.sourceId === 'workflow'
+      ? {
+          batchCount: sanitizeBatchCount(widgetStates.generate?.values.batchCount),
+          graph: backendGraph,
+          kind: 'workflow',
+        }
+      : sourceGenerateSettings
+        ? {
+            batchCount: sourceGenerateSettings.batchCount,
+            graph: backendGraph,
+            kind: 'generate',
+            negativePrompt: sourceGenerateSettings.negativePromptEnabled ? sourceGenerateSettings.negativePrompt : '',
+            negativePromptNodeId: generate?.negativePromptNodeId ?? 'negative_prompt',
+            positivePrompt: sourceGenerateSettings.positivePrompt,
+            positivePromptNodeId: generate?.positivePromptNodeId ?? 'positive_prompt',
+            seed: sourceGenerateSettings.seed,
+            seedNodeId: generate?.seedNodeId ?? 'seed',
+            shouldRandomizeSeed: sourceGenerateSettings.shouldRandomizeSeed,
+          }
+        : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
+  const selectedGalleryBoardId = widgetStates.gallery?.values.selectedBoardId;
+  const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
+  const presentationDimensions =
+    route.sourceId === 'upscale' && upscaleSettings?.inputImage
+      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale)
+      : {
+          height: generatePresentationSettings?.height ?? project.canvas.document.height,
+          width: generatePresentationSettings?.width ?? project.canvas.document.width,
+        };
   const queueItem: QueueItem = {
     cancellable: backendSupportsCancellation,
     id: queueItemId,
     snapshot: {
+      backendSubmission,
       canvas: canvasSnapshot ? structuredClone(canvasSnapshot) : cloneCanvas(project.canvas),
       destination: route.destination,
+      filterIntermediateResults: route.sourceId === 'workflow',
+      galleryBoardId: typeof selectedGalleryBoardId === 'string' ? selectedGalleryBoardId : null,
       ...(generate ? { generate: cloneQueueGenerateSnapshot(generate) } : {}),
       graph,
+      presentation: {
+        batchCount: backendSubmission.kind === 'invalid' ? 1 : backendSubmission.batchCount,
+        height: presentationDimensions.height,
+        ...(sourceGenerateSettings?.positivePrompt ? { positivePrompt: sourceGenerateSettings.positivePrompt } : {}),
+        width: presentationDimensions.width,
+      },
       sourceId: route.sourceId,
+      ...(route.sourceId === 'generate' || route.sourceId === 'canvas'
+        ? { resultNodeIds: ['canvas_output'] }
+        : route.sourceId === 'upscale'
+          ? { resultNodeIds: ['upscale_output'] }
+          : {}),
       submittedAt,
       widgetInstances: cloneWidgetInstances(project.widgetInstances),
       widgetStates,
@@ -1769,7 +1833,7 @@ export const createInitialWorkbenchState = (): WorkbenchState => {
   };
 };
 
-export const workbenchReducer = (state: WorkbenchState, action: WorkbenchReducerAction): WorkbenchState => {
+export const __workbenchReducerInternal = (state: WorkbenchState, action: WorkbenchReducerAction): WorkbenchState => {
   switch (action.type) {
     case 'createProject': {
       const project = createDraftProject(state.projects);
@@ -2919,5 +2983,4 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchReducer
   }
 };
 
-export type WorkbenchAction = WorkbenchReducerAction;
-export type { WorkbenchReducerAction };
+export type __WorkbenchReducerActionInternal = WorkbenchReducerAction;

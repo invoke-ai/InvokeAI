@@ -1,4 +1,4 @@
-import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
+import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 
 import type { CanvasOperationUIEngine } from './operationUIEngine';
 

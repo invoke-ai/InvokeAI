@@ -3,13 +3,15 @@ import type {
   SelectValueChangeDetails,
   SliderValueChangeDetails,
 } from '@chakra-ui/react';
+import type { CanvasBlendMode, CanvasLayerContract, CanvasMaskFillContract } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasBlendMode, CanvasLayerContract, CanvasMaskFillContract } from '@workbench/types';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch } from 'react';
 
 import { Box, createListCollection, Flex, HStack, NumberInput, Stack } from '@chakra-ui/react';
-import { ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
+import { useDebouncedDraftValue } from '@features/generation/draft-values';
+import { useRegisterGenerateDraftFlusher } from '@features/generation/drafts';
+import { ColorPicker, Field, Select, Slider } from '@platform/ui';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import {
@@ -20,17 +22,15 @@ import {
   readCanvasDenoisingStrength,
 } from '@workbench/widgets/canvas/invoke/canvasStrength';
 import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
-import { useRegisterGenerateDraftFlusher } from '@workbench/widgets/generate/generateDraftRegistry';
-import { useDebouncedDraftValue } from '@workbench/widgets/generate/useDebouncedDraftValue';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DenoisingStrengthWave } from './DenoisingStrengthWave';
 import { applyStructural, applyStructuralPreview, CANVAS_BLEND_MODES } from './layerOps';
 
-type LayersPanelHeaderEngine = Pick<CanvasEngineHandle, 'layers' | 'stores'>;
+type LayersPanelHeaderEngine = Pick<CanvasEngineHandle, 'interaction' | 'layers'>;
 
 const STRENGTH_DEBOUNCE_MS = 250;
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
@@ -357,19 +357,15 @@ const selectCanvasStrength = (project: Parameters<typeof getProjectWidgetValues>
 
 const DenoisingStrengthControl = () => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const { widgets } = useWorkbenchCommands();
   const projectId = useActiveProjectSelector((project) => project.id);
   const strength = useActiveProjectSelector(selectCanvasStrength);
 
   const commitStrength = useCallback(
     (value: number) => {
-      dispatch({
-        type: 'patchWidgetValues',
-        values: { [CANVAS_DENOISING_STRENGTH_KEY]: clampCanvasDenoisingStrength(value) },
-        widgetId: 'canvas',
-      });
+      widgets.patchValues('canvas', { [CANVAS_DENOISING_STRENGTH_KEY]: clampCanvasDenoisingStrength(value) });
     },
-    [dispatch]
+    [widgets]
   );
 
   const {

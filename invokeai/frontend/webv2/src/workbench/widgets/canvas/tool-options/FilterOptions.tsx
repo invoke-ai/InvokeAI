@@ -1,15 +1,15 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { FilterOperationSessionState } from '@workbench/canvas-operations/filterOperationSession';
 
 import { Flex, Group, HStack, IconButton, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
-import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
-import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
-import { makeImageDurable } from '@workbench/gallery/api';
+import { galleryDurability } from '@features/gallery';
+import { Button, MenuContent, Tooltip } from '@platform/ui';
 import {
   buildFilterDefaults,
+  getCanvasOperations,
   getFilterDefinition,
   isFilterConfigValid,
-} from '@workbench/generation/canvas/filterGraphs';
+  type FilterOperationSessionState,
+} from '@workbench/canvas-operations/api';
 import { CanvasFloatingBar, CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
 import { useFilterSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { LayerFilterControls } from '@workbench/widgets/layers/LayerFilterControls';
@@ -86,13 +86,13 @@ export const FilterOptionsBar = ({
     });
   };
   const setSettings = (settings: Record<string, unknown>) => {
-    const current = getCanvasOperations(engine).stores.filterSession.get();
+    const current = getCanvasOperations(engine).getFilterSessionState();
     if (current) {
       getCanvasOperations(engine).updateFilterOperation({ settings, type: current.draft.type });
     }
   };
   const reset = () => {
-    const current = getCanvasOperations(engine).stores.filterSession.get();
+    const current = getCanvasOperations(engine).getFilterSessionState();
     if (!current) {
       return;
     }
@@ -170,7 +170,9 @@ export const FilterOptionsBar = ({
                 loading={session.status === 'committing'}
                 roundedEnd="none"
                 size="xs"
-                onClick={() => void getCanvasOperations(engine).commitFilterOperation('apply', makeImageDurable)}
+                onClick={() =>
+                  void getCanvasOperations(engine).commitFilterOperation('apply', galleryDurability.makeDurable)
+                }
               >
                 {t('common.apply')}
               </Button>
@@ -194,14 +196,18 @@ export const FilterOptionsBar = ({
                   <Menu.Item
                     disabled={!saveTargetEligibility.raster}
                     value="raster"
-                    onClick={() => void getCanvasOperations(engine).commitFilterOperation('raster', makeImageDurable)}
+                    onClick={() =>
+                      void getCanvasOperations(engine).commitFilterOperation('raster', galleryDurability.makeDurable)
+                    }
                   >
                     <Menu.ItemText>{t('widgets.layers.selectObject.saveAs_raster')}</Menu.ItemText>
                   </Menu.Item>
                   <Menu.Item
                     disabled={!saveTargetEligibility.control}
                     value="control"
-                    onClick={() => void getCanvasOperations(engine).commitFilterOperation('control', makeImageDurable)}
+                    onClick={() =>
+                      void getCanvasOperations(engine).commitFilterOperation('control', galleryDurability.makeDurable)
+                    }
                   >
                     <Menu.ItemText>{t('widgets.layers.selectObject.saveAs_control')}</Menu.ItemText>
                   </Menu.Item>

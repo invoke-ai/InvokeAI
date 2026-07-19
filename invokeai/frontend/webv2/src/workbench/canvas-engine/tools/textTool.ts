@@ -32,8 +32,12 @@
  * Zero React, zero import-time side effects.
  */
 
+import type {
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+} from '@workbench/canvas-engine/contracts';
 import type { Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/types';
 
 import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 import { estimateTextExtent } from '@workbench/canvas-engine/render/rasterizers/textRasterizer';

@@ -1,17 +1,16 @@
 import { Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
+import { useCapabilities, UsersPage } from '@features/identity';
+import { ModelsPage } from '@features/models';
+import { NodesPage } from '@features/nodes';
+import { Tabs } from '@platform/ui';
 import { useLocation, useNavigate } from '@tanstack/react-router';
-import { useCapabilities } from '@workbench/auth/capabilities';
-import { Tabs } from '@workbench/components/ui';
 import { BoxIcon, BlocksIcon, FolderIcon, UsersIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LaunchpadNav } from './LaunchpadNav';
 import { LaunchpadTopBar } from './LaunchpadTopBar';
-import { ModelsPage } from './pages/ModelsPage';
-import { NodesPage } from './pages/NodesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
-import { UsersPage } from './pages/UsersPage';
 
 /**
  * The landing surface at `/`: a full-height shell with a slim section rail and

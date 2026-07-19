@@ -31,7 +31,6 @@ describe('getCanvasGallerySaveErrorAction', () => {
       message: "Couldn't save to gallery",
       namespace: 'canvas',
       projectId: 'project-1',
-      type: 'recordError',
     });
   });
 });

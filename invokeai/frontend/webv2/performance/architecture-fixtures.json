@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "samples": 5,
+  "warmups": 1,
+  "routes": [
+    {
+      "id": "launchpad",
+      "owner": "app",
+      "path": "/#/",
+      "remediationTicket": "set-performance-budgets"
+    },
+    {
+      "id": "editor-minimal",
+      "owner": "workbench",
+      "path": "/#/app?new=true",
+      "expectedScriptPattern": "WorkbenchApp-",
+      "measureProjectSwitch": true,
+      "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:generate", "widget:preview", "widget:gallery"],
+      "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
+      "remediationTicket": "deepen-widget-registry-loading"
+    },
+    {
+      "id": "editor-canvas",
+      "owner": "canvas",
+      "path": "/#/app?new=true",
+      "expectedScriptPattern": "WorkbenchApp-",
+      "layoutPreset": "Canvas",
+      "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:canvas", "widget:layers"],
+      "forbiddenWidgetRequests": ["widget:project", "widget:upscale"],
+      "remediationTicket": "deepen-widget-registry-loading"
+    },
+    {
+      "id": "editor-workflow",
+      "owner": "workflow",
+      "path": "/#/app?new=true",
+      "expectedScriptPattern": "WorkbenchApp-",
+      "layoutPreset": "Workflow",
+      "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:workflow", "widget:queue"],
+      "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
+      "remediationTicket": "deepen-widget-registry-loading"
+    },
+    {
+      "id": "editor-gallery",
+      "owner": "gallery",
+      "path": "/#/app?new=true",
+      "expectedScriptPattern": "WorkbenchApp-",
+      "layoutPreset": "Gallery",
+      "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:gallery", "widget:preview"],
+      "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
+      "remediationTicket": "deepen-widget-registry-loading"
+    }
+  ]
+}

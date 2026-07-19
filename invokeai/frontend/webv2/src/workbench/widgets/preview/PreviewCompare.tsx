@@ -1,7 +1,8 @@
-import type { GeneratedImageContract, WidgetRuntimeApi } from '@workbench/types';
+import type { GeneratedImageContract } from '@features/gallery';
+import type { WidgetRuntimeApi } from '@workbench/widgetContracts';
 
 import { Badge, Box, Flex, HStack, SegmentGroup, Stack, type SystemStyleObject } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui';
+import { Button } from '@platform/ui';
 import { ArrowLeftRightIcon, XIcon } from 'lucide-react';
 import {
   useCallback,

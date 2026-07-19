@@ -1,13 +1,13 @@
-import type { CommitStagedImageOptions, CommitStagedImageResult } from '@workbench/canvas-engine/api';
-import type { History } from '@workbench/canvas-engine/history/history';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type { CommitStagedImageOptions, CommitStagedImageResult } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasDocumentContractV2,
   CanvasRasterLayerContractV2,
   CanvasStagingCandidateContract,
   CanvasStateContractV2,
-  ProjectEvent,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
+import type { History } from '@workbench/canvas-engine/history/history';
+import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type { ProjectEvent } from '@workbench/projectContracts';
 
 import { getCanvasStagingCandidateFingerprint } from '@workbench/canvasStagingView';
 

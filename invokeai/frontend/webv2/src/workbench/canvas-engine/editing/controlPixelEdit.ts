@@ -1,6 +1,6 @@
+import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/types';
 
 import { roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { bakeMatrix, IDENTITY_TRANSFORM, type LayerTransform } from '@workbench/canvas-engine/transform/transformMath';

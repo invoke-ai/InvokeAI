@@ -1,8 +1,8 @@
-import type { LayerExportGuard, ReplaceSelectionFromImageResult } from '@workbench/canvas-engine/api';
+import type { LayerExportGuard, ReplaceSelectionFromImageResult } from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentContractV2, CanvasImageRef } from '@workbench/canvas-engine/contracts';
 import type { DecodeImageResult } from '@workbench/canvas-engine/controllers/rasterController';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2, CanvasImageRef } from '@workbench/types';
 
 export interface SelectionImageControllerOptions<Permit, Owner = symbol> {
   readonly capturePermit: (owner?: Owner) => Permit | null;

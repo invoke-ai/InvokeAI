@@ -13,8 +13,8 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { isRenderableLayer } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';

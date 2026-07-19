@@ -1,4 +1,14 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type {
+  CommitRasterFilterOptions,
+  CommitRasterFilterResult,
+  LayerExportGuard,
+} from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasDocumentContractV2,
+  CanvasImageRef,
+  CanvasLayerContract,
+  CanvasRasterLayerContractV2,
+} from '@workbench/canvas-engine/contracts';
 import type { CapturedLayerCache } from '@workbench/canvas-engine/controllers/layerMutationController';
 import type { DecodeImageResult } from '@workbench/canvas-engine/controllers/rasterController';
 import type { History } from '@workbench/canvas-engine/history/history';
@@ -6,35 +16,16 @@ import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/ren
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type {
-  CanvasDocumentContractV2,
-  CanvasImageRef,
-  CanvasLayerContract,
-  CanvasRasterLayerContractV2,
-} from '@workbench/types';
 
 import { createControlLayer } from '@workbench/canvas-engine/document/layerFactories';
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
 
-export type CommitRasterFilterResult =
-  | { status: 'committed'; layerId: string }
-  | { status: 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' | 'aborted' }
-  | { status: 'failed'; message: string };
-export interface RasterFilterSettings {
-  type: string;
-  settings: Record<string, unknown>;
-}
-export type RasterFilterCommitTarget = 'apply' | 'raster' | 'control';
-export interface CommitRasterFilterOptions {
-  guard: LayerExportGuard;
-  image: CanvasImageRef;
-  rect: Rect;
-  mode: 'replace' | 'copy';
-  filter?: RasterFilterSettings;
-  target?: RasterFilterCommitTarget;
-  requireExactImageDimensions?: boolean;
-  signal?: AbortSignal;
-}
+export type {
+  CommitRasterFilterOptions,
+  CommitRasterFilterResult,
+  RasterFilterCommitTarget,
+  RasterFilterSettings,
+} from '@workbench/canvas-engine/capabilities';
 
 export interface FilterResultControllerOptions<Permit, Owner = symbol> {
   readonly captureCache: (layer: CanvasLayerContract, document: CanvasDocumentContractV2) => CapturedLayerCache;

@@ -1,9 +1,9 @@
-import { toaster } from '@workbench/components/ui';
+import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
+
+import { toaster } from '@platform/ui';
 import { useMemo } from 'react';
 
-import type { WorkbenchNotificationKind } from './types';
-
-import { useOptionalWorkbenchDispatch } from './WorkbenchContext';
+import { useOptionalWorkbenchCommands } from './WorkbenchContext';
 
 /**
  * Notification helper: records into the workbench shell when present, and
@@ -22,19 +22,19 @@ const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' 
 };
 
 export const useNotify = (): Notify => {
-  const dispatch = useOptionalWorkbenchDispatch();
+  const commands = useOptionalWorkbenchCommands();
 
   return useMemo(() => {
     const record =
       (kind: WorkbenchNotificationKind) =>
       (title: string, message?: string): void => {
-        if (dispatch) {
-          dispatch({ kind, message, title, type: 'recordNotice' });
+        if (commands) {
+          commands.notifications.add({ kind, message, title });
         } else {
           toaster.create({ description: message, title, type: notificationToastType[kind] });
         }
       };
 
     return { error: record('error'), info: record('info'), success: record('success') };
-  }, [dispatch]);
+  }, [commands]);
 };

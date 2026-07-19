@@ -1,16 +1,16 @@
-import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
-import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
-import type { Rect } from '@workbench/generation/canvas/types';
 import type {
   CanvasDocumentContractV2,
   CanvasImageRef,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
+import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
+import type { Rect } from '@workbench/canvas-operations/generationContracts';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
-import { planComposites } from '@workbench/generation/canvas/compositePlan';
+import { planComposites } from '@workbench/canvas-operations/generationCompositePlan';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ExecuteCompositePlanDeps } from './compositeForGeneration';

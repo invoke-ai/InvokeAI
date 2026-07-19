@@ -1,15 +1,11 @@
 import type { SelectValueChangeDetails } from '@chakra-ui/react';
+import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { CanvasExportCapability, CanvasLayerCapability } from '@workbench/canvas-engine/api';
-import type { ProjectGraphState } from '@workbench/workflows/types';
 import type { FormEvent } from 'react';
 
 import { chakra, createListCollection, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
-import { socketHub } from '@workbench/backend/socketHub';
-import { runUtilityGraph } from '@workbench/canvas-operations/backend/utilityQueue';
-import { Button, CloseButton, Field, Select } from '@workbench/components/ui';
-import { getGalleryImageByName, makeImageDurable, saveImageToGallery } from '@workbench/gallery/api';
-import { useNotify } from '@workbench/useNotify';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { galleryDurability, galleryImages } from '@features/gallery';
+import { runUtilityGraph } from '@features/queue/utility';
 import {
   buildLayerWorkflowGraph,
   getDefaultLayerWorkflowSelection,
@@ -20,8 +16,13 @@ import {
   type GetRunnableLayerWorkflowInputs,
   type LayerWorkflowSelection,
   type WorkflowImageBinding,
-} from '@workbench/workflows/layerWorkflow';
-import { useInvocationTemplatesSnapshot, type InvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+} from '@features/workflow/graph';
+import { useInvocationTemplatesSnapshot, type InvocationTemplatesSnapshot } from '@features/workflow/react';
+import { socketHub } from '@platform/transport/socketHub';
+import { Button, CloseButton, Field, Select } from '@platform/ui';
+import { getCanvasOperations } from '@workbench/canvas-operations/api';
+import { useNotify } from '@workbench/useNotify';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -189,7 +190,7 @@ export const RunLayerWorkflowDialog = ({
 }: RunLayerWorkflowDialogProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
-  const dispatch = useWorkbenchDispatch();
+  const { canvas, gallery } = useWorkbenchCommands();
   const projectId = useActiveProjectSelector((project) => project.id);
   const [session] = useState(createLayerActionSession);
   const [selectionState, setSelectionState] = useState<SelectionState>(() => ({
@@ -318,20 +319,22 @@ export const RunLayerWorkflowDialog = ({
     () => ({
       availability,
       close,
-      dispatch,
+      canvas,
       engine,
       layerId,
       notify,
+      gallery,
       projectId,
       selection,
       session,
       t,
     }),
-    [availability, close, dispatch, engine, layerId, notify, projectId, selection, session, t]
+    [availability, canvas, close, engine, gallery, layerId, notify, projectId, selection, session, t]
   );
 
   const run = useCallback(async (): Promise<void> => {
-    const { availability, close, dispatch, engine, layerId, notify, projectId, selection, session, t } = runContext;
+    const { availability, canvas, close, engine, gallery, layerId, notify, projectId, selection, session, t } =
+      runContext;
     const { input, output } = selection;
 
     if (!engine || !input || !output) {
@@ -349,31 +352,26 @@ export const RunLayerWorkflowDialog = ({
     setIsRunning(true);
 
     try {
-      const executorDeps = engine.exports.getCompositeExecutorDeps();
+      const operations = getCanvasOperations(engine);
       const result = await runLayerWorkflow({
         deps: {
           appendStaging: (targetProjectId, candidate) =>
-            dispatch({ candidate, projectId: targetProjectId, type: 'appendCanvasStagingCandidate' }),
+            canvas.appendStagingCandidate({ candidate, projectId: targetProjectId }),
           buildGraph: buildLayerWorkflowGraph,
           commitGenerated: (options) => engine.layers.commitGeneratedImageResult(options),
           createRequestId: () => crypto.randomUUID(),
           exportLayer: (targetLayerId) => engine.exports.exportBakedLayerBlob(targetLayerId, { includeDisabled: true }),
-          getImage: getGalleryImageByName,
+          getImage: galleryImages.resolve,
           isGuardCurrent: (guard) => engine.exports.isLayerExportGuardCurrent(guard),
-          makeDurable: makeImageDurable,
+          makeDurable: galleryDurability.makeDurable,
           runGraph: (options) => runUtilityGraph({ ...options, hub: socketHub }),
-          saveToGallery: saveImageToGallery,
-          touchGallery: (targetProjectId) =>
-            dispatch({ projectId: targetProjectId, type: 'touchGalleryImagesRefresh' }),
-          uploadIntermediate: async (blob, signal) => {
+          saveToGallery: galleryDurability.save,
+          touchGallery: (targetProjectId) => gallery.touchImages(targetProjectId),
+          uploadIntermediate: (blob, signal) => {
             if (signal?.aborted) {
               throw new DOMException('Layer workflow aborted', 'AbortError');
             }
-            const uploaded = await executorDeps.uploadImage(blob);
-            if (signal?.aborted) {
-              throw new DOMException('Layer workflow aborted', 'AbortError');
-            }
-            return { imageName: uploaded.imageName };
+            return operations.uploadIntermediate(blob, signal);
           },
         },
         destination,

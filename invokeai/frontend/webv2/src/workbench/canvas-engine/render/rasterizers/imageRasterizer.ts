@@ -8,9 +8,9 @@
  * with fakes. Zero React, zero import-time side effects.
  */
 
+import type { CanvasImageRef } from '@workbench/canvas-engine/contracts';
 import type { DecodedBitmapLease } from '@workbench/canvas-engine/render/decodedBitmapPool';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { CanvasImageRef } from '@workbench/types';
 
 import { createDecodedBitmapPool } from '@workbench/canvas-engine/render/decodedBitmapPool';
 

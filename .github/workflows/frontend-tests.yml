@@ -88,17 +88,20 @@ jobs:
         with:
           working-directory: invokeai/frontend/webv2
 
-      - name: vitest
-        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm test'
-        shell: bash
-
       - name: install Chromium
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
         run: 'pnpm exec playwright install chromium'
         shell: bash
 
-      - name: vitest browser
+      - name: architecture completion gates
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm test:browser'
+        run: 'pnpm check:architecture'
         shell: bash
+
+      - name: upload architecture performance artifacts
+        if: ${{ always() && (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: webv2-architecture-performance
+          path: invokeai/frontend/webv2/artifacts/architecture-performance
+          if-no-files-found: ignore

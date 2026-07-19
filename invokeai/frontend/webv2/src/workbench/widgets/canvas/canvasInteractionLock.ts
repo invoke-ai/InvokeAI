@@ -1,5 +1,5 @@
-import type { ToolId } from '@workbench/canvas-engine/types';
-import type { CanvasStateContractV2, QueueItem } from '@workbench/types';
+import type { CanvasStateContractV2, ToolId } from '@workbench/canvas-engine/api';
+import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 

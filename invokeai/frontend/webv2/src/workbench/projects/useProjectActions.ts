@@ -1,19 +1,17 @@
-import type { Project } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 
+import { flushGenerateDrafts } from '@features/generation/drafts';
 import { useNavigate } from '@tanstack/react-router';
 import { useNotify } from '@workbench/useNotify';
-import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
-import { useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
+import {
+  useWorkbenchCommands,
+  useWorkbenchPersistenceAdapter,
+  useWorkbenchPersistenceService,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
 import { useTranslation } from 'react-i18next';
 
 import { deleteLibraryProject } from './library';
-import {
-  flushProjectToServer,
-  markProjectDeleted,
-  persistEmptySession,
-  releaseProjectSync,
-  unmarkProjectDeleted,
-} from './syncedPersistence';
 
 /**
  * Close and delete for projects that are open in the editor, shared by the
@@ -29,21 +27,21 @@ export const useProjectActions = (): {
   closeProject: (project: Project) => void;
   deleteProject: (project: Project) => Promise<void>;
 } => {
-  const store = useWorkbenchStore();
-  const dispatch = useWorkbenchDispatch();
+  const queries = useWorkbenchQueries();
+  const persistence = useWorkbenchPersistenceAdapter();
+  const persistenceService = useWorkbenchPersistenceService();
+  const commands = useWorkbenchCommands();
   const navigate = useNavigate();
   const notify = useNotify();
   const { t } = useTranslation();
 
   /** When the last tab goes, the session empties and Home takes over. */
   const leaveEditorIfLast = (projectId: string): boolean => {
-    const state = store.getState();
-
-    if (state.projects.some((project) => project.id !== projectId)) {
+    if (queries.getSnapshot().projects.some((project) => project.id !== projectId)) {
       return false;
     }
 
-    void persistEmptySession(state);
+    void persistenceService.persistEmptySession(persistence.getState());
     void navigate({ to: '/' });
 
     return true;
@@ -52,29 +50,29 @@ export const useProjectActions = (): {
   const closeProject = (project: Project): void => {
     flushGenerateDrafts();
 
-    const projectToFlush = store.getState().projects.find((candidate) => candidate.id === project.id) ?? project;
+    const projectToFlush = queries.getProject(project.id) ?? project;
 
-    void flushProjectToServer(projectToFlush).finally(() => {
-      releaseProjectSync(project.id);
+    void persistenceService.flushProjectToServer(projectToFlush).finally(() => {
+      persistenceService.releaseProjectSync(project.id);
     });
 
     if (leaveEditorIfLast(project.id)) {
       return;
     }
 
-    dispatch({ projectId: project.id, type: 'closeProject' });
+    commands.projects.close(project.id);
   };
 
   const deleteProject = async (project: Project): Promise<void> => {
     flushGenerateDrafts();
     // Marked before the request so an in-flight autosave cannot recreate the
     // project server-side between the DELETE and the tab closing.
-    markProjectDeleted(project.id);
+    persistenceService.markProjectDeleted(project.id);
 
     try {
       await deleteLibraryProject(project.id);
     } catch (error) {
-      unmarkProjectDeleted(project.id);
+      persistenceService.unmarkProjectDeleted(project.id);
       notify.error(t('projects.deleteFailed'), error instanceof Error ? error.message : undefined);
 
       return;
@@ -84,7 +82,7 @@ export const useProjectActions = (): {
       return;
     }
 
-    dispatch({ projectId: project.id, type: 'closeProject' });
+    commands.projects.close(project.id);
   };
 
   return { closeProject, deleteProject };

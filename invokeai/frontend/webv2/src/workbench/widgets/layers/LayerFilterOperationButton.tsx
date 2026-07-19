@@ -1,9 +1,9 @@
+import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/api';
 import type { CanvasOperationCapability } from '@workbench/canvas-operations/api';
-import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
 import { Box } from '@chakra-ui/react';
-import { Button, Tooltip } from '@workbench/components/ui';
+import { Button, Tooltip } from '@platform/ui';
 import { useNotify } from '@workbench/useNotify';
 import { useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCallback } from 'react';
@@ -16,7 +16,7 @@ import {
   runLayerFilterOperation,
 } from './layerPropertiesOperation';
 
-export type LayerFilterOperationEngine = Pick<CanvasEngineHandle, 'exports' | 'projectId' | 'stores'>;
+export type LayerFilterOperationEngine = Pick<CanvasEngineHandle, 'exports' | 'interaction' | 'projectId'>;
 
 interface LayerFilterOperationButtonProps {
   engine: LayerFilterOperationEngine | null;

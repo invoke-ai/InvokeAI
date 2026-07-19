@@ -1,22 +1,22 @@
-import { describe, expect, it } from 'vitest';
-
-import type { CanvasProjectMutation } from './canvasProjectMutations';
-import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
+import type { GeneratedImageContract } from '@features/gallery';
+import type { GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type {
   CanvasControlLayerContract,
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
   CanvasStagingCandidateContract,
-  GeneratedImageContract,
-  GraphContract,
-  Project,
-  WorkbenchState,
-} from './types';
+} from '@workbench/canvas-engine/contracts';
+import type { GraphContract } from '@workbench/graphContracts';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
+
+import { MAX_PROMPT_HISTORY } from '@features/generation/prompt';
+import { describe, expect, it } from 'vitest';
+
+import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { createEmptyCanvasDocumentV2 } from './canvasMigration';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
-import { MAX_PROMPT_HISTORY } from './generation/promptHistory';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 import {
@@ -24,7 +24,7 @@ import {
   nextLayerName,
   type WorkbenchAction,
   workbenchReducer as reduceWorkbench,
-} from './workbenchState';
+} from './workbenchState.testing';
 
 type LegacyCanvasMutation = CanvasProjectMutation & { projectId?: string };
 const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
@@ -2914,6 +2914,7 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
 
   it('submitCanvasInvocationSnapshot enqueues a pre-compiled graph bound for the canvas', () => {
     const graph: GraphContract = {
+      backendGraph: { edges: [], id: 'canvas-backend-graph', nodes: {} },
       edges: [],
       id: 'canvas-graph',
       label: 'Canvas',
@@ -2960,6 +2961,18 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
       seed: 42,
       shouldRandomizeSeed: false,
     });
+    expect(queueItem?.snapshot.backendSubmission).toMatchObject({
+      batchCount: 1,
+      kind: 'generate',
+      negativePrompt: 'avoid blur',
+      negativePromptNodeId: 'negative_prompt',
+      positivePrompt: 'inpaint prompt',
+      positivePromptNodeId: 'positive_prompt',
+      seed: 42,
+      seedNodeId: 'seed',
+      shouldRandomizeSeed: false,
+    });
+    expect(queueItem?.snapshot.resultNodeIds).toEqual(['canvas_output']);
     expect(getActiveProject(state).invocation.sourceId).toBe('canvas');
   });
 

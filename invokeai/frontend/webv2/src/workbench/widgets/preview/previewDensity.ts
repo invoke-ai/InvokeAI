@@ -1,4 +1,4 @@
-import type { WorkbenchRegion } from '@workbench/types';
+import type { WorkbenchRegion } from '@workbench/widgetContracts';
 
 import { useEffectEvent, useState, type Ref } from 'react';
 

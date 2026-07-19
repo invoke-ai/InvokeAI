@@ -1,8 +1,8 @@
 import type { CanvasApplicationPort } from '@workbench/canvas-operations/contracts';
 
-import { socketHub } from '@workbench/backend/socketHub';
+import { runUtilityGraph } from '@features/queue/utility';
+import { socketHub } from '@platform/transport/socketHub';
 import { uploadCanvasImage } from '@workbench/canvas-operations/backend/canvasImages';
-import { runUtilityGraph } from '@workbench/canvas-operations/backend/utilityQueue';
 import {
   createFilterOperationCoordinator,
   type FilterOperationCoordinatorDeps,

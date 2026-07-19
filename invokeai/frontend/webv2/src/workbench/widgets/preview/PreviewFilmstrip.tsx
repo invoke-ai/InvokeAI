@@ -1,8 +1,8 @@
-import type { GeneratedImageContract } from '@workbench/types';
+import type { GeneratedImageContract } from '@features/gallery';
 
 import { Box, HStack, ScrollArea } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
-import { getGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { getGalleryImageDragData } from '@features/gallery/utility';
 import { useCallback, useMemo } from 'react';
 
 import type { PreviewDensity } from './previewDensity';

@@ -1,34 +1,33 @@
-import type { VaeModelConfig } from '@workbench/generation/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { VaeModelConfig } from '@features/generation/contracts';
 
-import { importGalleryImagesToCanvas, type GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
-import { getCanvasImportNotice } from '@workbench/canvas-operations/canvasImportNotice';
-import { getEngine } from '@workbench/canvas-operations/engineRegistry';
 import {
-  addImagesToGalleryBoard,
-  deleteGalleryImages,
-  downloadGalleryArchive,
-  getGalleryImageMetadata,
-  removeImagesFromGalleryBoard,
-  starGalleryImages,
-  unstarGalleryImages,
+  galleryImages,
+  galleryOrganization,
+  galleryTransfers,
   type GalleryBoard,
   type GalleryImage,
-} from '@workbench/gallery/api';
+} from '@features/gallery';
 import {
   createReferenceImageId,
   getDefaultReferenceImageConfig,
   getMaxReferenceImages,
+  isVaeModelConfig,
   isReferenceImageSupported,
   isSupportedGenerateModel,
-} from '@workbench/generation/baseGenerationPolicies';
-import { generatedImageToReferenceImage } from '@workbench/generation/referenceImage';
-import { isVaeModelConfig } from '@workbench/generation/settings';
-import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
+} from '@features/generation/settings';
+import { generatedImageToReferenceImage } from '@features/generation/utility';
+import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  getCanvasImportNotice,
+  getCanvasEngine,
+  importGalleryImagesToCanvas,
+  type GalleryCanvasImportDestination,
+} from '@workbench/canvas-operations/api';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useWorkbenchStore } from '@workbench/WorkbenchContext';
-import { useEffect, useMemo, type Dispatch } from 'react';
+import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { recordCanvasImportError } from './canvasImportError';
@@ -92,14 +91,12 @@ const toPngBlob = async (blob: Blob): Promise<Blob> => {
 
 export const useImageActions = ({
   boards,
-  dispatch,
   generateValues,
   onImagesDeleted,
   onStarredChange,
   projectId,
 }: {
   boards: GalleryBoard[];
-  dispatch: Dispatch<WorkbenchAction>;
   generateValues: Record<string, unknown>;
   projectId?: string;
   /** Called after a successful deletion so the host can select a neighboring image. */
@@ -108,7 +105,9 @@ export const useImageActions = ({
   onStarredChange?: (imageNames: string[], starred: boolean) => void;
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const store = useWorkbenchStore();
+  const commands = useWorkbenchCommands();
+  const { gallery, generation, notifications } = commands;
+  const queries = useWorkbenchQueries();
   const { t } = useTranslation();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
@@ -117,28 +116,26 @@ export const useImageActions = ({
     return getCurrentGenerateValues({ generateValues, supportedModels });
   }, [generateValues, supportedModels]);
 
-  useEffect(() => {
+  useMountEffect(() => {
     ensureModelsLoaded();
-  }, []);
+  });
 
   return useMemo<ImageActions>(() => {
     const recordError = (error: unknown) =>
-      dispatch({
+      notifications.reportError({
         area: 'image-actions',
         message: toErrorMessage(error),
         namespace: 'gallery',
         projectId,
-        type: 'recordError',
       });
-    const recordSuccess = (title: string, message?: string) =>
-      dispatch({ kind: 'success', message, title, type: 'recordNotice' });
-    const refreshGallery = () => dispatch({ projectId, type: 'touchGalleryRefresh' });
-    const refreshGalleryImages = () => dispatch({ projectId, type: 'touchGalleryImagesRefresh' });
+    const recordSuccess = (title: string, message?: string) => notifications.add({ kind: 'success', message, title });
+    const refreshGallery = () => gallery.touch(projectId);
+    const refreshGalleryImages = () => gallery.touchImages(projectId);
     const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
     const getLatestGenerateValues = () => {
-      const snapshot = store.getSnapshot();
+      const snapshot = queries.getSnapshot();
       const project = projectId
-        ? snapshot.state.projects.find((candidate) => candidate.id === projectId)
+        ? snapshot.projects.find((candidate) => candidate.id === projectId)
         : snapshot.activeProject;
 
       return project ? getProjectWidgetValues(project, 'generate') : {};
@@ -158,8 +155,8 @@ export const useImageActions = ({
       },
       deleteImages: async (imageNames) => {
         try {
-          await deleteGalleryImages(imageNames);
-          dispatch({ imageNames, projectId, type: 'removeGalleryImages' });
+          await galleryOrganization.deleteImages(imageNames);
+          gallery.removeImages(imageNames, projectId);
           onImagesDeleted?.(imageNames);
           recordSuccess(imageNames.length === 1 ? 'Deleted image' : `Deleted ${imageNames.length} images`);
           refreshGallery();
@@ -183,14 +180,13 @@ export const useImageActions = ({
       },
       downloadImages: async (imageNames) => {
         try {
-          dispatch({
+          notifications.add({
             kind: 'info',
             message: `Preparing an archive of ${imageNames.length} images.`,
             title: 'Preparing download',
-            type: 'recordNotice',
           });
 
-          const { blob, fileName } = await downloadGalleryArchive({ imageNames });
+          const { blob, fileName } = await galleryTransfers.downloadArchive({ imageNames });
 
           saveBlobToDisk(blob, fileName);
           recordSuccess('Download ready');
@@ -204,7 +200,7 @@ export const useImageActions = ({
         }
 
         try {
-          const metadata = await getGalleryImageMetadata(image.imageName);
+          const metadata = await galleryImages.metadata(image.imageName);
 
           return getImageRecallCapabilities({
             currentValues: currentGenerateValues,
@@ -225,9 +221,9 @@ export const useImageActions = ({
       moveImagesToBoard: async (imageNames, boardId) => {
         try {
           if (boardId === 'none') {
-            await removeImagesFromGalleryBoard(imageNames);
+            await galleryOrganization.removeFromBoard(imageNames);
           } else {
-            await addImagesToGalleryBoard(boardId, imageNames);
+            await galleryOrganization.addToBoard(boardId, imageNames);
           }
 
           recordSuccess(
@@ -241,12 +237,12 @@ export const useImageActions = ({
         }
       },
       openImageInPreview: (image) => {
-        dispatch({ image, projectId, type: 'selectGalleryImage' });
+        gallery.selectImage(image, projectId);
         openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
       },
       recallImageData: async (image, kind) => {
         const didRecall = await executeImageRecall({
-          dispatch,
+          commands,
           generateValues,
           getGenerateValues: getLatestGenerateValues,
           image,
@@ -255,44 +251,44 @@ export const useImageActions = ({
           projectId,
         });
 
-        if (didRecall && (!projectId || store.getSnapshot().activeProject.id === projectId)) {
+        if (didRecall && (!projectId || queries.isActiveProject(projectId))) {
           openWorkbenchWidget('generate', { preferredRegions: ['left'] });
         }
       },
       selectForCompare: (image) => {
-        dispatch({ image, projectId, type: 'setGalleryCompareImage' });
+        gallery.setCompareImage(image, projectId);
       },
       sendToCanvas: async (images, destination) => {
         try {
-          const state = store.getState();
-          const targetProjectId = projectId ?? state.activeProjectId;
-          const project = state.projects.find((candidate) => candidate.id === targetProjectId);
+          const targetProjectId = projectId ?? queries.getSnapshot().activeProject.id;
+          const project = queries.getProject(targetProjectId);
 
           if (!project) {
             const notice = getCanvasImportNotice({ status: 'stale-project' });
-            dispatch({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}), type: 'recordNotice' });
+            notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
             return;
           }
 
           const result = await importGalleryImagesToCanvas({
+            applyCanvasMutation: commands.canvas.apply,
             destination,
-            dispatch,
-            engine: getEngine(project.id) ?? null,
-            getState: store.getState,
+            engine: getCanvasEngine(project.id) ?? null,
+            getProject: queries.getProject,
             images,
+            isActiveProject: queries.isActiveProject,
             project,
           });
           const notice = getCanvasImportNotice(result);
-          dispatch({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}), type: 'recordNotice' });
+          notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
 
-          if (result.status === 'imported' && store.getState().activeProjectId === project.id) {
+          if (result.status === 'imported' && queries.isActiveProject(project.id)) {
             openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
           }
         } catch (error: unknown) {
           recordCanvasImportError({
-            dispatch,
             error,
             localizedMessage: t('widgets.canvas.import.failed'),
+            notifications,
             projectId,
           });
         }
@@ -301,7 +297,7 @@ export const useImageActions = ({
         onStarredChange?.(imageNames, starred);
 
         try {
-          await (starred ? starGalleryImages : unstarGalleryImages)(imageNames);
+          await galleryOrganization.setStarred(imageNames, starred);
           refreshGalleryImages();
         } catch (error: unknown) {
           onStarredChange?.(imageNames, !starred);
@@ -330,25 +326,24 @@ export const useImageActions = ({
           isEnabled: true,
         };
 
-        dispatch({
-          projectId,
-          type: 'patchGenerateSettings',
-          values: { referenceImages: [...currentValues.referenceImages, referenceImage] },
-        });
+        generation.patchSettings({ referenceImages: [...currentValues.referenceImages, referenceImage] }, projectId);
         openWorkbenchWidget('generate', { preferredRegions: ['left'] });
       },
     };
   }, [
     boards,
     currentGenerateValues,
-    dispatch,
+    commands,
+    gallery,
     generateValues,
+    generation,
     models,
+    notifications,
     onImagesDeleted,
     onStarredChange,
     openWorkbenchWidget,
     projectId,
-    store,
+    queries,
     supportedModels,
     t,
     vaeModels,

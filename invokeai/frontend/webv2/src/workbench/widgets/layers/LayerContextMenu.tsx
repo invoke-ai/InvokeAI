@@ -1,21 +1,25 @@
-import type { BooleanRasterOperation } from '@workbench/canvas-engine/engine';
+import type {
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+  CanvasMaskContract,
+  BooleanRasterOperation,
+  RegionalGuidanceReferenceImage,
+} from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { RegionalGuidanceReferenceImage } from '@workbench/generation/types';
-import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasMaskContract } from '@workbench/types';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, Dispatch, ReactNode } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
-import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
+import { galleryTransfers } from '@features/gallery';
+import { IconButton, MenuContent, RenameDialog, Tooltip } from '@platform/ui';
+import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/api';
+import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { deleteLayerActions, duplicateLayerActions } from '@workbench/canvasLayerOps';
-import { IconButton, MenuContent, RenameDialog, Tooltip } from '@workbench/components/ui';
-import { uploadGalleryImage } from '@workbench/gallery/api';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import { useCanvasDocumentEditingLocked, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
   ArrowUpDownIcon,
@@ -28,7 +32,10 @@ import {
 import { Fragment, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export type LayerContextMenuEngine = Pick<CanvasEngineHandle, 'exports' | 'layers' | 'projectId' | 'stores' | 'tools'>;
+export type LayerContextMenuEngine = Pick<
+  CanvasEngineHandle,
+  'exports' | 'interaction' | 'layers' | 'projectId' | 'tools'
+>;
 
 import type {
   LayerContextMenuItem,
@@ -202,7 +209,7 @@ const LayerMenu = ({
   showGroupLabels,
 }: LayerMenuProps) => {
   const { t } = useTranslation();
-  const workbenchDispatch = useWorkbenchDispatch();
+  const { widgets } = useWorkbenchCommands();
   const notify = useNotify();
   const base = useSelectedModelBase();
   const workflowAvailability = useLayerWorkflowAvailability();
@@ -462,7 +469,7 @@ const LayerMenu = ({
       throw makeStatusError(result.status);
     }
     const file = new File([result.blob], `layer-${layer.id}.png`, { type: result.blob.type || 'image/png' });
-    await uploadGalleryImage(file, 'none');
+    await galleryTransfers.upload(file, 'none');
   }, [engine, layer.id, makeStatusError]);
 
   const handleCopyToClipboard = useCallback(async () => {
@@ -514,10 +521,10 @@ const LayerMenu = ({
 
   const handleOpenProperties = useCallback(
     (section: LayerPropertiesSection) => {
-      workbenchDispatch({ region: 'right', type: 'openRegionWidget', widgetId: 'layers' });
+      widgets.open({ region: 'right', widgetId: 'layers' });
       requestLayerProperties(layer.id, section);
     },
-    [layer.id, workbenchDispatch]
+    [layer.id, widgets]
   );
 
   const handleBooleanRaster = useCallback(

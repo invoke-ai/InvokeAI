@@ -1,14 +1,13 @@
-import type { Project, WorkbenchState } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
-import type { WorkbenchAction } from '@workbench/workbenchState';
-import type { Dispatch } from 'react';
+import type { WorkbenchCanvasCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 
+import { galleryImages } from '@features/gallery';
 import {
   importGalleryImagesToCanvas,
   type GalleryCanvasImportDestination,
   type ImportGalleryImagesResult,
 } from '@workbench/canvas-operations/api';
-import { getGalleryImagesByNames } from '@workbench/gallery/api';
 
 import { orderCanvasImageDropImages } from './canvasImageDnd';
 
@@ -16,19 +15,19 @@ type CanvasImageDropEngine = Pick<CanvasEngineHandle, 'layers' | 'projectId'>;
 
 export const executeCanvasImageDropImport = async ({
   destination,
-  dispatch,
+  canvas,
   engine,
-  getGalleryImages = getGalleryImagesByNames,
-  getState,
+  getGalleryImages = galleryImages.resolveMany,
+  queries,
   imageNames,
   importGalleryImages = importGalleryImagesToCanvas,
   project,
 }: {
   destination: GalleryCanvasImportDestination;
-  dispatch: Dispatch<WorkbenchAction>;
+  canvas: WorkbenchCanvasCommands;
   engine: CanvasImageDropEngine | null;
-  getGalleryImages?: typeof getGalleryImagesByNames;
-  getState: () => WorkbenchState;
+  getGalleryImages?: typeof galleryImages.resolveMany;
+  queries: Pick<WorkbenchQueries, 'getProject' | 'isActiveProject'>;
   imageNames: readonly string[];
   importGalleryImages?: typeof importGalleryImagesToCanvas;
   project: Project;
@@ -36,5 +35,13 @@ export const executeCanvasImageDropImport = async ({
   const fetchedImages = await getGalleryImages([...imageNames]);
   const images = orderCanvasImageDropImages(imageNames, fetchedImages);
 
-  return importGalleryImages({ destination, dispatch, engine, getState, images, project });
+  return importGalleryImages({
+    applyCanvasMutation: canvas.apply,
+    destination,
+    engine,
+    getProject: queries.getProject,
+    images,
+    isActiveProject: queries.isActiveProject,
+    project,
+  });
 };

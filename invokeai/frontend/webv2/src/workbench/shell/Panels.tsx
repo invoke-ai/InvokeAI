@@ -1,4 +1,4 @@
-import type { WidgetInstanceId, WorkbenchRegion } from '@workbench/types';
+import type { WidgetInstanceId, WorkbenchRegion } from '@workbench/widgetContracts';
 
 import { MissingWidgetFrame, WidgetRendererById } from '@workbench/widget-frame';
 import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
@@ -29,10 +29,9 @@ const WidgetPanelSlot = ({ instanceId, panel }: { instanceId: WidgetInstanceId; 
     areWidgetRenderInstancesEqual
   );
   const widget = instance ? getWidgetById(instance.typeId) : undefined;
-  const View = widget?.manifest.view;
   const region = panelRegions[panel];
 
-  if (!instance || !widget || widget.status !== 'enabled' || !View) {
+  if (!instance || !widget || widget.status !== 'enabled') {
     return <MissingWidgetFrame label={widget ? resolveWidgetLabel(widget.manifest, t) : instanceId} region={region} />;
   }
 

@@ -6,7 +6,7 @@
  * snapping always agree. No React, no side effects — unit-testable in node.
  */
 
-import { ZOOM_SNAP_CANDIDATES } from '@workbench/canvas-engine/math/snapping';
+import { ZOOM_SNAP_CANDIDATES } from '@workbench/canvas-engine/api';
 
 /** Formats a zoom factor as a rounded whole-percent label (e.g. `1` → `"100%"`). */
 export const formatZoomPercent = (zoom: number): string => `${Math.round(zoom * 100)}%`;

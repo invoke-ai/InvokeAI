@@ -1,14 +1,23 @@
 import type {
-  CanvasEngine as CoreCanvasEngine,
+  CanvasEngineImplementation as CoreCanvasEngineImplementation,
   CanvasEngineOptions as CoreCanvasEngineOptions,
 } from '@workbench/canvas-engine/engine';
 import type { CanvasUtilityGraphResult } from '@workbench/canvas-operations/contracts';
-import type { BackendGraphContract } from '@workbench/types';
+import type { BackendGraphContract } from '@workbench/graphContracts';
 
 import { createCanvasEngine as createCanvasEngineCore } from '@workbench/canvas-engine/engine';
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
+import {
+  createBoundedCompositeDedupeCache,
+  executeCompositePlan,
+  executeControlComposite,
+  executeMaskComposite,
+  executeRegionalMaskComposite,
+} from '@workbench/canvas-operations/compositeForGeneration';
 
-import type { CanvasOperationCapability } from './api';
+import type { CanvasOperationCapability, CanvasOperationImplementation } from './contracts';
+
+import { attachCanvasOperations } from './operationAccess';
 
 export interface CanvasEngineOptions extends Omit<CoreCanvasEngineOptions, 'uploadImage' | 'getMainModelBase'> {
   getMainModelBase?: () => string | null;
@@ -31,17 +40,8 @@ export interface CanvasEngineOptions extends Omit<CoreCanvasEngineOptions, 'uplo
 }
 
 export type CanvasOperationsCapability = CanvasOperationCapability;
-export type CanvasEngine = CoreCanvasEngine;
-
-const operationsByEngine = new WeakMap<object, CanvasOperationCapability>();
-
-export const getCanvasOperations = (engine: object): CanvasOperationCapability => {
-  const operations = operationsByEngine.get(engine);
-  if (!operations) {
-    throw new Error('Canvas application operations are unavailable for this engine.');
-  }
-  return operations;
-};
+/** Private application composition shape; public callers receive the capability-only handle from the registry API. */
+export type CanvasEngine = CoreCanvasEngineImplementation;
 
 /** Application composition root: owns SAM/filter sessions, queues, uploads, and their core capability adapters. */
 export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine => {
@@ -203,12 +203,57 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   syncEditingLock();
   syncSamInteraction();
 
-  const operations: CanvasOperationCapability = {
+  const compositeDedupe = createBoundedCompositeDedupeCache();
+
+  const operations: CanvasOperationImplementation = {
     applySelectObjectSession: selectObjectCoordinator.apply,
     cancelFilterOperation: filterCoordinator.cancel,
     cancelSelectObjectSession: selectObjectCoordinator.cancel,
+    captureCompositeTransaction: async (snapshot, layerIds, captureOptions) => {
+      const capture = await core.exports.captureRasterSnapshot(snapshot, layerIds, captureOptions);
+      if (capture.status !== 'ok') {
+        return capture;
+      }
+      const rasterSnapshot = capture.snapshot;
+      const transactionDedupe = {
+        byHash: new Map(compositeDedupe.byHash),
+        byKey: new Map(compositeDedupe.byKey),
+      };
+      const deps = {
+        ...core.exports.getCompositeExecutorDeps(),
+        dedupe: transactionDedupe,
+        getLayerSurface: (layerId: string) => {
+          const detached = rasterSnapshot.layerSurfaces.get(layerId);
+          return detached
+            ? Promise.resolve(detached)
+            : Promise.reject(new Error(`Canvas raster snapshot is missing layer ${layerId}.`));
+        },
+      };
+      return {
+        status: 'ok',
+        transaction: {
+          canvas: rasterSnapshot.canvas,
+          commit: () => {
+            for (const [key, value] of transactionDedupe.byHash) {
+              compositeDedupe.byHash.set(key, value);
+            }
+            for (const [key, value] of transactionDedupe.byKey) {
+              compositeDedupe.byKey.set(key, value);
+            }
+          },
+          executeControl: (entry) => executeControlComposite(entry, deps),
+          executeMask: (entry) => executeMaskComposite(entry, deps),
+          executePlan: (plan) => executeCompositePlan(plan, deps),
+          executeRegionalMask: (entry) => executeRegionalMaskComposite(entry, deps),
+          release: rasterSnapshot.release,
+        },
+      };
+    },
     commitFilterOperation: filterCoordinator.commit,
     controller,
+    getFilterSessionState: stores.filterSession.get,
+    getOperationState: controller.getSnapshot,
+    getSamSessionState: stores.samSession.get,
     processFilterOperation: filterCoordinator.process,
     processSelectObjectSession: selectObjectCoordinator.process,
     resetFilterOperation: filterCoordinator.reset,
@@ -218,8 +263,21 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     startFilterOperation: filterCoordinator.start,
     startSelectObject: selectObjectCoordinator.start,
     stores,
+    subscribeFilterSession: stores.filterSession.subscribe,
+    subscribeOperation: controller.subscribe,
+    subscribeSamSession: stores.samSession.subscribe,
     updateFilterOperation: filterCoordinator.updateDraft,
     updateSelectObjectSession: selectObjectCoordinator.update,
+    uploadIntermediate: async (blob, signal) => {
+      if (signal?.aborted) {
+        throw new DOMException('Canvas upload aborted', 'AbortError');
+      }
+      const uploaded = await canvasApplicationPort.uploadImage(blob, { isIntermediate: true });
+      if (signal?.aborted) {
+        throw new DOMException('Canvas upload aborted', 'AbortError');
+      }
+      return { imageName: uploaded.imageName };
+    },
   };
 
   const coreSetInteractionLocked = core.tools.setInteractionLocked;
@@ -277,6 +335,6 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   };
 
   const engine: CanvasEngine = { ...core, diagnostics, lifecycle, tools };
-  operationsByEngine.set(engine, operations);
+  attachCanvasOperations(engine, operations);
   return engine;
 };

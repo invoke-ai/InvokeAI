@@ -1,4 +1,5 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type {
   CanvasOperationActionResult,
@@ -14,14 +15,14 @@ import type {
   FilterOperationSession,
 } from '@workbench/canvas-operations/contracts';
 import type { FilterCommitTarget, LayerFilterSettings } from '@workbench/canvas-operations/operationTypes';
-import type { BackendGraphContract, CanvasDocumentContractV2 } from '@workbench/types';
+import type { BackendGraphContract } from '@workbench/graphContracts';
 
 import {
   buildFilterDefaults,
   DEFAULT_CONTROL_FILTER_TYPE,
   getFilterDefinition,
   isFilterConfigValid,
-} from '@workbench/generation/canvas/filterGraphs';
+} from '@workbench/canvas-operations/filterGraphs';
 
 import { createFilterOperationSession } from './filterOperationSession';
 import { runLayerFilter } from './layerFilterRunner';

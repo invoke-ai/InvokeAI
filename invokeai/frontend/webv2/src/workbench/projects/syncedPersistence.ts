@@ -1,6 +1,7 @@
-import type { Project, WorkbenchPersistenceSnapshot, WorkbenchState } from '@workbench/types';
+import type { HydratedWorkbenchSnapshot } from '@workbench/persistenceContracts';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
-import { getUserStorageScope } from '@workbench/auth/session';
+import { getUserStorageScope } from '@features/identity';
 import { timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '@workbench/persistence';
 import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
@@ -60,7 +61,7 @@ export interface ProjectConflictResolution {
 }
 
 export interface WorkbenchSaveResult {
-  snapshot: WorkbenchPersistenceSnapshot;
+  snapshot: HydratedWorkbenchSnapshot;
   conflicts: ProjectConflictResolution[];
   /** True when changes are cached locally but could not reach the backend. */
   hasPendingChanges: boolean;
@@ -73,16 +74,23 @@ export interface WorkbenchLoadOptions {
   createNew?: boolean;
 }
 
-/** Server-known projects, keyed by project id. */
-const syncEntries = new Map<string, SyncEntry>();
-/**
- * Ids deleted this page session. An autosave that raced the delete must not
- * resurrect the project through the not-found-recreate path.
- */
-const deletedProjectIds = new Set<string>();
-let lastPushedAccount: string | null = null;
-let hasPending = false;
-const projectDocumentJsonCache = new WeakMap<Project, { document: Record<string, unknown>; json: string }>();
+interface SyncedPersistenceState {
+  /** Ids deleted in this runtime lifetime, guarding against racing saves. */
+  deletedProjectIds: Set<string>;
+  hasPending: boolean;
+  lastPushedAccount: string | null;
+  projectDocumentJsonCache: WeakMap<Project, { document: Record<string, unknown>; json: string }>;
+  /** Server-known projects, keyed by project id. */
+  syncEntries: Map<string, SyncEntry>;
+}
+
+const createSyncedPersistenceState = (): SyncedPersistenceState => ({
+  deletedProjectIds: new Set(),
+  hasPending: false,
+  lastPushedAccount: null,
+  projectDocumentJsonCache: new WeakMap(),
+  syncEntries: new Map(),
+});
 
 /**
  * Undo/redo stacks are session-only (each entry is a full project snapshot,
@@ -95,8 +103,11 @@ export const serializeProjectDocument = (project: Project): Record<string, unkno
   return document;
 };
 
-const getSerializedProjectDocument = (project: Project): { document: Record<string, unknown>; json: string } => {
-  const cached = projectDocumentJsonCache.get(project);
+const getSerializedProjectDocument = (
+  syncState: SyncedPersistenceState,
+  project: Project
+): { document: Record<string, unknown>; json: string } => {
+  const cached = syncState.projectDocumentJsonCache.get(project);
 
   if (cached) {
     return cached;
@@ -110,7 +121,7 @@ const getSerializedProjectDocument = (project: Project): { document: Record<stri
   );
   const serialized = { document, json };
 
-  projectDocumentJsonCache.set(project, serialized);
+  syncState.projectDocumentJsonCache.set(project, serialized);
 
   return serialized;
 };
@@ -187,11 +198,11 @@ const getSyncMapStorageKey = (): string => `${SYNC_MAP_BASE_KEY}${getUserStorage
  * elsewhere — drop it)" apart from "this local project was created offline
  * (push it)".
  */
-const persistSyncMap = (): void => {
+const persistSyncMap = (syncState: SyncedPersistenceState): void => {
   try {
     const revisions: Record<string, number> = {};
 
-    for (const [projectId, entry] of syncEntries) {
+    for (const [projectId, entry] of syncState.syncEntries) {
       revisions[projectId] = entry.revision;
     }
 
@@ -212,20 +223,20 @@ const loadPersistedRevisions = (): Record<string, number> => {
   }
 };
 
-const createSnapshot = (state: WorkbenchState): WorkbenchPersistenceSnapshot => ({
+const createSnapshot = (state: WorkbenchState): HydratedWorkbenchSnapshot => ({
   savedAt: new Date().toISOString(),
   state: stripTransientWorkbenchState(state),
   version: 1,
 });
 
 /** Import a never-synced project to the server; returns false when it could not reach it. */
-const pushNewProject = async (project: Project): Promise<boolean> => {
+const pushNewProject = async (syncState: SyncedPersistenceState, project: Project): Promise<boolean> => {
   const document = serializeProjectDocument(project);
 
   try {
     const created = await apiCreateProject({ data: document, name: project.name, project_id: project.id });
 
-    syncEntries.set(project.id, { pushedDoc: JSON.stringify(document), revision: created.revision });
+    syncState.syncEntries.set(project.id, { pushedDoc: JSON.stringify(document), revision: created.revision });
 
     return true;
   } catch (error) {
@@ -235,7 +246,10 @@ const pushNewProject = async (project: Project): Promise<boolean> => {
       try {
         const existing = await apiGetProject(project.id);
 
-        syncEntries.set(project.id, { pushedDoc: JSON.stringify(existing.data), revision: existing.revision });
+        syncState.syncEntries.set(project.id, {
+          pushedDoc: JSON.stringify(existing.data),
+          revision: existing.revision,
+        });
 
         return true;
       } catch {
@@ -294,6 +308,7 @@ type ConflictOutcome =
  *   into a "(recovered)" project so nothing is lost
  */
 const recoverConflictingProject = async (
+  syncState: SyncedPersistenceState,
   project: Project,
   document: Record<string, unknown>,
   documentJson: string,
@@ -303,7 +318,7 @@ const recoverConflictingProject = async (
     const server = await apiGetProject(project.id);
     const serverDocJson = JSON.stringify(server.data);
 
-    syncEntries.set(project.id, { pushedDoc: serverDocJson, revision: server.revision });
+    syncState.syncEntries.set(project.id, { pushedDoc: serverDocJson, revision: server.revision });
 
     if (serverDocJson === documentJson) {
       return { kind: 'adopted' };
@@ -328,7 +343,10 @@ const recoverConflictingProject = async (
 
     const created = await apiCreateProject({ data: recoveredDocument, name: recoveredName, project_id: recoveredId });
 
-    syncEntries.set(recoveredId, { pushedDoc: JSON.stringify(recoveredDocument), revision: created.revision });
+    syncState.syncEntries.set(recoveredId, {
+      pushedDoc: JSON.stringify(recoveredDocument),
+      revision: created.revision,
+    });
 
     return { kind: 'forked', resolution: { projectId: project.id, recoveredProject, serverProject } };
   } catch {
@@ -336,17 +354,21 @@ const recoverConflictingProject = async (
   }
 };
 
-const pushProject = async (project: Project, conflicts: ProjectConflictResolution[]): Promise<string> => {
-  const { document, json: documentJson } = getSerializedProjectDocument(project);
-  const entry = syncEntries.get(project.id);
+const pushProject = async (
+  syncState: SyncedPersistenceState,
+  project: Project,
+  conflicts: ProjectConflictResolution[]
+): Promise<string> => {
+  const { document, json: documentJson } = getSerializedProjectDocument(syncState, project);
+  const entry = syncState.syncEntries.get(project.id);
 
-  if (deletedProjectIds.has(project.id) || entry?.pushedDoc === documentJson) {
+  if (syncState.deletedProjectIds.has(project.id) || entry?.pushedDoc === documentJson) {
     return documentJson;
   }
 
   if (!entry) {
-    if (!(await pushNewProject(project))) {
-      hasPending = true;
+    if (!(await pushNewProject(syncState, project))) {
+      syncState.hasPending = true;
     }
 
     return documentJson;
@@ -359,65 +381,66 @@ const pushProject = async (project: Project, conflicts: ProjectConflictResolutio
       name: project.name,
     });
 
-    syncEntries.set(project.id, { pushedDoc: documentJson, revision: updated.revision });
+    syncState.syncEntries.set(project.id, { pushedDoc: documentJson, revision: updated.revision });
   } catch (error) {
     if (isProjectConflictError(error)) {
-      const outcome = await recoverConflictingProject(project, document, documentJson, entry.pushedDoc);
+      const outcome = await recoverConflictingProject(syncState, project, document, documentJson, entry.pushedDoc);
 
       if (outcome.kind === 'retry') {
         try {
-          const baseRevision = syncEntries.get(project.id)?.revision ?? entry.revision;
+          const baseRevision = syncState.syncEntries.get(project.id)?.revision ?? entry.revision;
           const retried = await apiUpdateProject(project.id, {
             data: document,
             expected_revision: baseRevision,
             name: project.name,
           });
 
-          syncEntries.set(project.id, { pushedDoc: documentJson, revision: retried.revision });
+          syncState.syncEntries.set(project.id, { pushedDoc: documentJson, revision: retried.revision });
         } catch {
           // A genuinely concurrent writer; the next save re-evaluates.
-          hasPending = true;
+          syncState.hasPending = true;
         }
       } else if (outcome.kind === 'forked') {
         conflicts.push(outcome.resolution);
       } else if (outcome.kind === 'failed') {
-        hasPending = true;
+        syncState.hasPending = true;
       }
     } else if (isProjectNotFoundError(error)) {
       // Deleted on another device while we held local edits: recreate rather
       // than drop the user's work.
-      syncEntries.delete(project.id);
+      syncState.syncEntries.delete(project.id);
 
-      if (!(await pushNewProject(project))) {
-        hasPending = true;
+      if (!(await pushNewProject(syncState, project))) {
+        syncState.hasPending = true;
       }
     } else {
-      hasPending = true;
+      syncState.hasPending = true;
     }
   }
 
   return documentJson;
 };
 
-const pushSessionState = async (state: WorkbenchState): Promise<void> => {
+const pushSessionState = async (syncState: SyncedPersistenceState, state: WorkbenchState): Promise<void> => {
   const blob = serializeSessionBlob(state);
 
-  if (blob === lastPushedAccount) {
+  if (blob === syncState.lastPushedAccount) {
     return;
   }
 
   try {
     await setClientStateValue(SESSION_STATE_KEY, blob);
-    lastPushedAccount = blob;
+    syncState.lastPushedAccount = blob;
   } catch {
-    hasPending = true;
+    syncState.hasPending = true;
   }
 };
 
 const loadFromBackend = async (
-  local: WorkbenchPersistenceSnapshot | null,
+  syncState: SyncedPersistenceState,
+  local: HydratedWorkbenchSnapshot | null,
   options?: WorkbenchLoadOptions
-): Promise<WorkbenchPersistenceSnapshot> => {
+): Promise<HydratedWorkbenchSnapshot> => {
   const [summaries, sessionBlob] = await Promise.all([listProjects(), fetchSessionBlob()]);
   const persistedRevisions = loadPersistedRevisions();
 
@@ -427,17 +450,17 @@ const loadFromBackend = async (
   // workbench (one-time import of the pre-backend localStorage data).
   if (summaries.length === 0 && local && local.state.projects.length > 0) {
     for (const project of local.state.projects) {
-      if (!(await pushNewProject(project))) {
-        hasPending = true;
+      if (!(await pushNewProject(syncState, project))) {
+        syncState.hasPending = true;
       }
 
-      const entry = syncEntries.get(project.id);
+      const entry = syncState.syncEntries.get(project.id);
 
       upsertProjectSummary({ id: project.id, name: project.name, revision: entry?.revision ?? null });
     }
 
-    await pushSessionState(local.state);
-    persistSyncMap();
+    await pushSessionState(syncState, local.state);
+    persistSyncMap(syncState);
 
     return local;
   }
@@ -471,7 +494,10 @@ const loadFromBackend = async (
 
     if (project) {
       serverProjects.push(project);
-      syncEntries.set(record.project_id, { pushedDoc: JSON.stringify(record.data), revision: record.revision });
+      syncState.syncEntries.set(record.project_id, {
+        pushedDoc: JSON.stringify(record.data),
+        revision: record.revision,
+      });
     }
   }
 
@@ -484,13 +510,13 @@ const loadFromBackend = async (
   );
 
   if (offlineCreated.length > 0) {
-    hasPending = true;
+    syncState.hasPending = true;
   }
 
   let projects = [...serverProjects, ...offlineCreated];
 
   if (sessionBlob) {
-    lastPushedAccount = JSON.stringify(sessionBlob);
+    syncState.lastPushedAccount = JSON.stringify(sessionBlob);
   }
 
   const base = local?.state ?? createInitialWorkbenchState();
@@ -523,22 +549,22 @@ const loadFromBackend = async (
     projects,
   };
 
-  if (serializeSessionBlob(state) !== lastPushedAccount) {
-    hasPending = true;
+  if (serializeSessionBlob(state) !== syncState.lastPushedAccount) {
+    syncState.hasPending = true;
   }
 
   reportProjectSync({
-    hasPendingChanges: hasPending,
+    hasPendingChanges: syncState.hasPending,
     projects: Object.fromEntries(
       projects.map((project) => {
-        const entry = syncEntries.get(project.id);
+        const entry = syncState.syncEntries.get(project.id);
 
         return [project.id, { isPendingPush: entry === undefined, revision: entry?.revision ?? null }];
       })
     ),
   });
 
-  persistSyncMap();
+  persistSyncMap(syncState);
 
   const snapshot = createSnapshot(state);
 
@@ -548,203 +574,203 @@ const loadFromBackend = async (
   return snapshot;
 };
 
-export const syncedWorkbenchPersistence = {
-  /**
-   * Load from the backend, falling back to the localStorage cache when it is
-   * unreachable. Returns null when there is nothing anywhere (first run with
-   * no backend); the caller then keeps its default boot state.
-   */
-  async loadWorkbench(options?: WorkbenchLoadOptions): Promise<WorkbenchPersistenceSnapshot | null> {
-    let local: WorkbenchPersistenceSnapshot | null = null;
-
-    try {
-      local = await localStorageWorkbenchPersistence.loadWorkbench();
-    } catch {
-      local = null;
-    }
-
-    try {
-      return await loadFromBackend(local, options);
-    } catch {
-      // Backend unreachable: run from the cache; saves queue up locally and
-      // replay on reconnect.
-      hasPending = true;
-
-      const persistedRevisions = loadPersistedRevisions();
-
-      for (const [projectId, revision] of Object.entries(persistedRevisions)) {
-        syncEntries.set(projectId, { pushedDoc: null, revision });
-      }
-
-      reportProjectSync({
-        hasPendingChanges: true,
-        projects: Object.fromEntries(
-          (local?.state.projects ?? []).map((project) => [
-            project.id,
-            { isPendingPush: true, revision: persistedRevisions[project.id] ?? null },
-          ])
-        ),
-      });
-
-      // A cache holding an empty session (last tab closed offline) cannot
-      // hydrate the editor; boot a fresh draft instead.
-      return local && local.state.projects.length > 0 ? local : null;
-    }
-  },
-
-  /**
-   * Write-through save: localStorage cache always, then every dirty open
-   * project and the session blob to the backend. Revision conflicts come
-   * back as resolutions for the caller to apply to workbench state. Saving
-   * never deletes anything: a project absent from state is merely closed,
-   * and removal happens only through the library's explicit delete.
-   */
-  async saveWorkbench(state: WorkbenchState): Promise<WorkbenchSaveResult> {
-    const snapshot = createSnapshot(state);
-
-    await localStorageWorkbenchPersistence.saveWorkbench(state);
-
-    hasPending = false;
-
-    const conflicts: ProjectConflictResolution[] = [];
-    const projectSyncInfos: Record<string, ProjectSyncInfo> = {};
-
-    await pushSessionState(state);
-
-    for (const project of state.projects) {
-      const lastAckedDoc = syncEntries.get(project.id)?.pushedDoc ?? null;
-      const documentJson = await pushProject(project, conflicts);
-      const entry = syncEntries.get(project.id);
-
-      projectSyncInfos[project.id] = {
-        isPendingPush: entry?.pushedDoc !== documentJson,
-        revision: entry?.revision ?? null,
-      };
-
-      // The server acknowledged new content for this project — keep the
-      // library summary current without a refetch.
-      if (entry && entry.pushedDoc === documentJson && lastAckedDoc !== documentJson) {
-        upsertProjectSummary({ id: project.id, name: project.name, revision: entry.revision });
-      }
-    }
-
-    persistSyncMap();
-    reportProjectSync({ hasPendingChanges: hasPending, projects: projectSyncInfos });
-
-    return { conflicts, hasPendingChanges: hasPending, snapshot };
-  },
-
-  /** True when local changes have not reached the backend yet. */
-  hasPendingChanges(): boolean {
-    return hasPending;
-  },
-
-  /** Clear everywhere: server projects + session blob, local cache, sync map. */
-  async clearWorkbench(): Promise<void> {
-    try {
-      const summaries = await listProjects();
-
-      await Promise.all(summaries.map((summary) => apiDeleteProject(summary.project_id)));
-      await deleteClientStateValue(SESSION_STATE_KEY);
-    } catch {
-      // Backend unreachable; at least reset this browser.
-    }
-
-    syncEntries.clear();
-    deletedProjectIds.clear();
-    seedProjectLibrary([]);
-    lastPushedAccount = null;
-    hasPending = false;
-
-    try {
-      window.localStorage.removeItem(getSyncMapStorageKey());
-    } catch {
-      // Nothing to clear if storage is unavailable.
-    }
-
-    await localStorageWorkbenchPersistence.clearWorkbench();
-  },
-};
+export interface SyncedWorkbenchPersistence {
+  adoptProjectRecord(record: ProjectRecordDTO): Project | null;
+  clearWorkbench(): Promise<void>;
+  flushProjectToServer(project: Project): Promise<void>;
+  hasPendingChanges(): boolean;
+  hydrateProjectFromServer(projectId: string): Promise<Project | null>;
+  loadWorkbench(options?: WorkbenchLoadOptions): Promise<HydratedWorkbenchSnapshot | null>;
+  markProjectDeleted(projectId: string): void;
+  persistEmptySession(state: WorkbenchState): Promise<void>;
+  releaseProjectSync(projectId: string): void;
+  saveWorkbench(state: WorkbenchState): Promise<WorkbenchSaveResult>;
+  unmarkProjectDeleted(projectId: string): void;
+}
 
 /**
- * Adopt a full project record fetched (or just created) on the server into
- * the sync layer, returning the hydrated project ready to open as a tab.
+ * One-shot maintenance operation: deletes server projects and the session
+ * blob, then clears the local cache, project library, and persisted sync map.
+ * Independent of any mounted Workbench lifetime; callers are expected to
+ * reload afterwards.
  */
-export const adoptProjectRecord = (record: ProjectRecordDTO): Project | null => {
-  const project = deserializeProjectDocument(record.data);
-
-  if (!project) {
-    return null;
-  }
-
-  syncEntries.set(record.project_id, { pushedDoc: JSON.stringify(record.data), revision: record.revision });
-  persistSyncMap();
-
-  return project;
-};
-
-/** Hydrate one library project into an openable document; null when it cannot be fetched. */
-export const hydrateProjectFromServer = async (projectId: string): Promise<Project | null> => {
+export const clearAllWorkbenchData = async (): Promise<void> => {
   try {
-    return adoptProjectRecord(await apiGetProject(projectId));
+    const summaries = await listProjects();
+
+    await Promise.all(summaries.map((summary) => apiDeleteProject(summary.project_id)));
+    await deleteClientStateValue(SESSION_STATE_KEY);
   } catch {
-    return null;
+    // Backend unreachable; at least reset this browser.
   }
-};
 
-/**
- * Push one project's document immediately — used when its tab closes, so the
- * final edits land on the server even though the project is about to leave
- * the autosaved state.
- */
-export const flushProjectToServer = async (project: Project): Promise<void> => {
-  const conflicts: ProjectConflictResolution[] = [];
-
-  await pushProject(project, conflicts);
-  persistSyncMap();
-};
-
-/** Forget a project's sync entry once its tab is closed. */
-export const releaseProjectSync = (projectId: string): void => {
-  syncEntries.delete(projectId);
-  persistSyncMap();
-};
-
-/**
- * Make an explicit delete safe against in-flight autosaves: pushes for this
- * id become no-ops, so a save that started before the delete cannot recreate
- * the project on the server.
- */
-export const markProjectDeleted = (projectId: string): void => {
-  deletedProjectIds.add(projectId);
-  syncEntries.delete(projectId);
-  persistSyncMap();
-};
-
-/**
- * The delete failed server-side: let pushes flow again. The dropped sync
- * entry rebuilds itself on the next save (create → conflict → adopt), so no
- * edits are lost.
- */
-export const unmarkProjectDeleted = (projectId: string): void => {
-  deletedProjectIds.delete(projectId);
-};
-
-/**
- * Persist "no tabs open" — the last tab was closed and the editor is about
- * to navigate Home, unmounting the autosave loop before it could run.
- */
-export const persistEmptySession = async (state: WorkbenchState): Promise<void> => {
-  const emptied: WorkbenchState = { ...state, activeProjectId: '', projects: [] };
-
-  await localStorageWorkbenchPersistence.saveWorkbench(emptied);
+  seedProjectLibrary([]);
 
   try {
-    const blob = serializeSessionBlob(emptied);
-
-    await setClientStateValue(SESSION_STATE_KEY, blob);
-    lastPushedAccount = blob;
+    window.localStorage.removeItem(getSyncMapStorageKey());
   } catch {
-    hasPending = true;
+    // Nothing to clear if storage is unavailable.
   }
+
+  await localStorageWorkbenchPersistence.clearWorkbench();
+};
+
+/** Construct one synchronization lifetime per mounted Workbench. */
+export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence => {
+  const syncState = createSyncedPersistenceState();
+
+  const adoptProjectRecord = (record: ProjectRecordDTO): Project | null => {
+    const project = deserializeProjectDocument(record.data);
+
+    if (!project) {
+      return null;
+    }
+
+    syncState.syncEntries.set(record.project_id, {
+      pushedDoc: JSON.stringify(record.data),
+      revision: record.revision,
+    });
+    persistSyncMap(syncState);
+
+    return project;
+  };
+
+  return {
+    adoptProjectRecord,
+    /** Clear everywhere: server projects + session blob, local cache, sync map, and this lifetime's sync state. */
+    async clearWorkbench(): Promise<void> {
+      await clearAllWorkbenchData();
+
+      syncState.syncEntries.clear();
+      syncState.deletedProjectIds.clear();
+      syncState.lastPushedAccount = null;
+      syncState.hasPending = false;
+    },
+    async flushProjectToServer(project): Promise<void> {
+      const conflicts: ProjectConflictResolution[] = [];
+
+      await pushProject(syncState, project, conflicts);
+      persistSyncMap(syncState);
+    },
+    hasPendingChanges(): boolean {
+      return syncState.hasPending;
+    },
+    async hydrateProjectFromServer(projectId): Promise<Project | null> {
+      try {
+        return adoptProjectRecord(await apiGetProject(projectId));
+      } catch {
+        return null;
+      }
+    },
+    /**
+     * Load from the backend, falling back to the localStorage cache when it is
+     * unreachable. Returns null when there is nothing anywhere (first run with
+     * no backend); the caller then keeps its default boot state.
+     */
+    async loadWorkbench(options?: WorkbenchLoadOptions): Promise<HydratedWorkbenchSnapshot | null> {
+      let local: HydratedWorkbenchSnapshot | null = null;
+
+      try {
+        local = await localStorageWorkbenchPersistence.loadWorkbench();
+      } catch {
+        local = null;
+      }
+
+      try {
+        return await loadFromBackend(syncState, local, options);
+      } catch {
+        // Backend unreachable: run from the cache; saves queue up locally and
+        // replay on reconnect.
+        syncState.hasPending = true;
+
+        const persistedRevisions = loadPersistedRevisions();
+
+        for (const [projectId, revision] of Object.entries(persistedRevisions)) {
+          syncState.syncEntries.set(projectId, { pushedDoc: null, revision });
+        }
+
+        reportProjectSync({
+          hasPendingChanges: true,
+          projects: Object.fromEntries(
+            (local?.state.projects ?? []).map((project) => [
+              project.id,
+              { isPendingPush: true, revision: persistedRevisions[project.id] ?? null },
+            ])
+          ),
+        });
+
+        // A cache holding an empty session (last tab closed offline) cannot
+        // hydrate the editor; boot a fresh draft instead.
+        return local && local.state.projects.length > 0 ? local : null;
+      }
+    },
+
+    /**
+     * Write-through save: localStorage cache always, then every dirty open
+     * project and the session blob to the backend. Revision conflicts come
+     * back as resolutions for the caller to apply to workbench state. Saving
+     * never deletes anything: a project absent from state is merely closed,
+     * and removal happens only through the library's explicit delete.
+     */
+    markProjectDeleted(projectId): void {
+      syncState.deletedProjectIds.add(projectId);
+      syncState.syncEntries.delete(projectId);
+      persistSyncMap(syncState);
+    },
+    async persistEmptySession(state): Promise<void> {
+      const emptied: WorkbenchState = { ...state, activeProjectId: '', projects: [] };
+
+      await localStorageWorkbenchPersistence.saveWorkbench(emptied);
+
+      try {
+        const blob = serializeSessionBlob(emptied);
+
+        await setClientStateValue(SESSION_STATE_KEY, blob);
+        syncState.lastPushedAccount = blob;
+      } catch {
+        syncState.hasPending = true;
+      }
+    },
+    releaseProjectSync(projectId): void {
+      syncState.syncEntries.delete(projectId);
+      persistSyncMap(syncState);
+    },
+    async saveWorkbench(state: WorkbenchState): Promise<WorkbenchSaveResult> {
+      const snapshot = createSnapshot(state);
+
+      await localStorageWorkbenchPersistence.saveWorkbench(state);
+
+      syncState.hasPending = false;
+
+      const conflicts: ProjectConflictResolution[] = [];
+      const projectSyncInfos: Record<string, ProjectSyncInfo> = {};
+
+      await pushSessionState(syncState, state);
+
+      for (const project of state.projects) {
+        const lastAckedDoc = syncState.syncEntries.get(project.id)?.pushedDoc ?? null;
+        const documentJson = await pushProject(syncState, project, conflicts);
+        const entry = syncState.syncEntries.get(project.id);
+
+        projectSyncInfos[project.id] = {
+          isPendingPush: entry?.pushedDoc !== documentJson,
+          revision: entry?.revision ?? null,
+        };
+
+        // The server acknowledged new content for this project — keep the
+        // library summary current without a refetch.
+        if (entry && entry.pushedDoc === documentJson && lastAckedDoc !== documentJson) {
+          upsertProjectSummary({ id: project.id, name: project.name, revision: entry.revision });
+        }
+      }
+
+      persistSyncMap(syncState);
+      reportProjectSync({ hasPendingChanges: syncState.hasPending, projects: projectSyncInfos });
+
+      return { conflicts, hasPendingChanges: syncState.hasPending, snapshot };
+    },
+    unmarkProjectDeleted(projectId): void {
+      syncState.deletedProjectIds.delete(projectId);
+    },
+  };
 };

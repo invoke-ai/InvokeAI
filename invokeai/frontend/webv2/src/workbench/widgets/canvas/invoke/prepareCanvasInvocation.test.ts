@@ -1,27 +1,32 @@
-import type { CanvasRasterSnapshot } from '@workbench/canvas-engine/api';
-import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
-import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { Rect } from '@workbench/canvas-engine/types';
-import type {
-  GenerateModelConfig,
-  MainModelConfig,
-  RegionalGuidanceReferenceImage,
-  RegionalGuidanceReferenceImageAsset,
-} from '@workbench/generation/types';
+import type { GenerateModelConfig, MainModelConfig } from '@features/generation/contracts';
 import type {
   CanvasDocumentContractV2,
   CanvasControlLayerContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
   CanvasStateContractV2,
-  WorkbenchState,
-} from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+  RegionalGuidanceReferenceImage,
+  RegionalGuidanceReferenceImageAsset,
+} from '@workbench/canvas-engine/contracts';
+import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { Rect } from '@workbench/canvas-engine/types';
+import type { CanvasCompositeTransaction } from '@workbench/canvas-operations/api';
+import type { WorkbenchState } from '@workbench/projectContracts';
+import type { WorkbenchAction } from '@workbench/workbenchState.testing';
+import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
-import { createCompositeDedupeCache } from '@workbench/canvas-operations/compositeForGeneration';
-import { getDefaultGenerateSettings } from '@workbench/generation/baseGenerationPolicies';
-import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
+import {
+  createCompositeDedupeCache,
+  executeCompositePlan,
+  executeControlComposite,
+  executeMaskComposite,
+  executeRegionalMaskComposite,
+  type ExecuteCompositePlanDeps,
+} from '@workbench/canvas-operations/compositeForGeneration';
+import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RunCanvasInvocationDeps } from './prepareCanvasInvocation';
@@ -88,6 +93,8 @@ interface Harness {
   events: string[];
   surfaceIds: string[];
   releaseRasterSnapshot: ReturnType<typeof vi.fn>;
+  dedupe: ReturnType<typeof createCompositeDedupeCache>;
+  executorDeps: Omit<ExecuteCompositePlanDeps, 'dedupe' | 'getLayerSurface'>;
   submittedGraphs: () => Extract<WorkbenchAction, { type: 'submitCanvasInvocationSnapshot' }>[];
   notices: () => { message?: string }[];
 }
@@ -158,6 +165,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
 
   const dispatch = options.dispatch ?? vi.fn((_action: WorkbenchAction) => {});
   const releaseRasterSnapshot = vi.fn();
+  const dedupe = createCompositeDedupeCache();
 
   const makeCanvas = (document: CanvasDocumentContractV2): CanvasStateContractV2 => ({
     document: structuredClone(document),
@@ -174,33 +182,65 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     version: 2,
   });
 
+  const executorDeps: Omit<ExecuteCompositePlanDeps, 'dedupe' | 'getLayerSurface'> = {
+    backend,
+    hashBlob: (blob: Blob) => blob.text(),
+    readImageData: (_surface, rect) => uniformImageData(rect.width, rect.height, alpha),
+    uploadImage: uploadImage as (blob: Blob) => Promise<CanvasImageUploadResult>,
+  };
+
   const deps: RunCanvasInvocationDeps = {
     captureDocumentSnapshot: () => ({
       canvas: makeCanvas(options.document ?? makeDoc([rasterLayer('layer-a')])),
       documentGeneration: 0,
     }),
-    captureRasterSnapshot: async (documentSnapshot, layerIds) => {
+    captureCompositeTransaction: async (documentSnapshot, layerIds) => {
       const layerSurfaces = new Map<string, { surface: RasterSurface; rect: Rect }>();
       for (const layerId of layerIds) {
         layerSurfaces.set(layerId, await getLayerSurface(layerId));
       }
-      const snapshot: CanvasRasterSnapshot = {
-        ...documentSnapshot,
-        emptyLayerIds: new Set<string>(),
-        layerSurfaces,
+      const transactionDedupe = createCompositeDedupeCache();
+      for (const [key, value] of dedupe.byHash) {
+        transactionDedupe.byHash.set(key, value);
+      }
+      for (const [key, value] of dedupe.byKey) {
+        transactionDedupe.byKey.set(key, value);
+      }
+      const compositeDeps: ExecuteCompositePlanDeps = {
+        ...executorDeps,
+        dedupe: transactionDedupe,
+        getLayerSurface: (layerId) => {
+          const detached = layerSurfaces.get(layerId);
+          return detached ? Promise.resolve(detached) : Promise.reject(new Error(`Missing ${layerId}`));
+        },
+      };
+      const transaction: CanvasCompositeTransaction = {
+        canvas: documentSnapshot.canvas,
+        commit: () => {
+          for (const [key, value] of transactionDedupe.byHash) {
+            dedupe.byHash.set(key, value);
+          }
+          for (const [key, value] of transactionDedupe.byKey) {
+            dedupe.byKey.set(key, value);
+          }
+        },
+        executeControl: (entry) => executeControlComposite(entry, compositeDeps),
+        executeMask: (entry) => executeMaskComposite(entry, compositeDeps),
+        executePlan: (plan) => executeCompositePlan(plan, compositeDeps),
+        executeRegionalMask: (entry) => executeRegionalMaskComposite(entry, compositeDeps),
         release: releaseRasterSnapshot,
       };
-      return { snapshot, status: 'ok' };
+      return { status: 'ok', transaction };
     },
     compositing: DEFAULT_CANVAS_COMPOSITING,
-    dedupe: createCompositeDedupeCache(),
     destination: options.destination ?? 'canvas',
-    dispatch,
-    executorDeps: {
-      backend,
-      hashBlob: (blob: Blob) => blob.text(),
-      readImageData: (_surface, rect) => uniformImageData(rect.width, rect.height, alpha),
-      uploadImage: uploadImage as (blob: Blob) => Promise<CanvasImageUploadResult>,
+    commands: {
+      generation: {
+        submitCanvas: (payload) => dispatch({ ...payload, type: 'submitCanvasInvocationSnapshot' }),
+      } as WorkbenchCommands['generation'],
+      notifications: {
+        add: (notice) => dispatch({ ...notice, type: 'recordNotice' }),
+      } as WorkbenchCommands['notifications'],
     },
     flushPendingUploads: flushPendingUploads as () => Promise<void>,
     generateValues: generateValuesFor(model),
@@ -218,8 +258,10 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     dispatch.mock.calls.map(([action]) => action).filter((action) => action.type === 'recordNotice');
 
   return {
+    dedupe,
     deps,
     dispatch,
+    executorDeps,
     events,
     flushPendingUploads,
     notices,
@@ -440,42 +482,42 @@ describe('runCanvasInvocation', () => {
     };
     Object.assign(harness.deps, {
       captureDocumentSnapshot: vi.fn(() => snapshot),
-      captureRasterSnapshot: vi.fn(() => Promise.resolve({ status: 'stale' as const })),
+      captureCompositeTransaction: vi.fn(() => Promise.resolve({ status: 'stale' as const })),
     });
 
     await runCanvasInvocation(harness.deps);
 
     expect(harness.submittedGraphs()).toHaveLength(0);
     expect(harness.notices()).toHaveLength(1);
-    expect(harness.deps.dedupe.byKey).toHaveLength(0);
-    expect(harness.deps.dedupe.byHash).toHaveLength(0);
+    expect(harness.dedupe.byKey).toHaveLength(0);
+    expect(harness.dedupe.byHash).toHaveLength(0);
   });
 
   it.each(['aborted', 'not-ready', 'over-budget'] as const)(
     'does not submit when raster capture returns the typed %s outcome',
     async (status) => {
       const harness = makeHarness();
-      harness.deps.captureRasterSnapshot = vi.fn(() => Promise.resolve({ status }));
+      harness.deps.captureCompositeTransaction = vi.fn(() => Promise.resolve({ status }));
 
       await runCanvasInvocation(harness.deps);
 
       expect(harness.submittedGraphs()).toHaveLength(0);
       expect(harness.notices()).toHaveLength(1);
-      expect(harness.deps.dedupe.byKey).toHaveLength(0);
-      expect(harness.deps.dedupe.byHash).toHaveLength(0);
+      expect(harness.dedupe.byKey).toHaveLength(0);
+      expect(harness.dedupe.byHash).toHaveLength(0);
     }
   );
 
   it('passes the orchestration AbortSignal into raster snapshot capture', async () => {
     const harness = makeHarness();
     const controller = new AbortController();
-    const captureRasterSnapshot = vi.fn(() => Promise.resolve({ status: 'aborted' as const }));
-    Object.assign(harness.deps, { captureRasterSnapshot, signal: controller.signal });
+    const captureCompositeTransaction = vi.fn(() => Promise.resolve({ status: 'aborted' as const }));
+    Object.assign(harness.deps, { captureCompositeTransaction, signal: controller.signal });
     controller.abort(new DOMException('invoke cancelled', 'AbortError'));
 
     await runCanvasInvocation(harness.deps);
 
-    expect(captureRasterSnapshot).toHaveBeenCalledWith(
+    expect(captureCompositeTransaction).toHaveBeenCalledWith(
       expect.any(Object),
       ['layer-a'],
       expect.objectContaining({ signal: controller.signal })
@@ -507,9 +549,9 @@ describe('runCanvasInvocation', () => {
       },
       documentGeneration: 9,
     });
-    const captureRasterSnapshot = harness.deps.captureRasterSnapshot;
-    harness.deps.captureRasterSnapshot = async (snapshot, layerIds) => {
-      const result = await captureRasterSnapshot(snapshot, layerIds, { signal: harness.deps.signal });
+    const captureCompositeTransaction = harness.deps.captureCompositeTransaction;
+    harness.deps.captureCompositeTransaction = async (snapshot, layerIds) => {
+      const result = await captureCompositeTransaction(snapshot, layerIds, { signal: harness.deps.signal });
       // The transaction is fully detached at this boundary. Subsequent edits
       // must not alter any composite/upload/compile/dispatch input.
       liveDocument = {
@@ -528,7 +570,7 @@ describe('runCanvasInvocation', () => {
     expect(harness.submittedGraphs()[0]?.canvas.document.bbox).toEqual({ height: 64, width: 64, x: 7, y: 11 });
     expect(harness.submittedGraphs()[0]?.canvas.document.layers[0]?.id).toBe('frozen-layer');
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
-    expect(harness.deps.dedupe.byKey.size).toBeGreaterThan(0);
+    expect(harness.dedupe.byKey.size).toBeGreaterThan(0);
   });
 
   it.each(['coverage-scan', 'encode', 'upload'] as const)(
@@ -557,20 +599,20 @@ describe('runCanvasInvocation', () => {
         liveDocument = { ...liveDocument, bbox: { height: 64, width: 64, x: 88, y: 99 } };
       };
       if (boundary === 'coverage-scan') {
-        const readImageData = harness.deps.executorDeps.readImageData!;
-        harness.deps.executorDeps.readImageData = (...args) => {
+        const readImageData = harness.executorDeps.readImageData!;
+        harness.executorDeps.readImageData = (...args) => {
           editLiveBbox();
           return readImageData(...args);
         };
       } else if (boundary === 'encode') {
-        const encodeSurface = harness.deps.executorDeps.backend.encodeSurface;
-        harness.deps.executorDeps.backend.encodeSurface = (...args) => {
+        const encodeSurface = harness.executorDeps.backend.encodeSurface;
+        harness.executorDeps.backend.encodeSurface = (...args) => {
           editLiveBbox();
           return encodeSurface(...args);
         };
       } else {
-        const uploadImage = harness.deps.executorDeps.uploadImage;
-        harness.deps.executorDeps.uploadImage = (...args) => {
+        const uploadImage = harness.executorDeps.uploadImage;
+        harness.executorDeps.uploadImage = (...args) => {
           editLiveBbox();
           return uploadImage(...args);
         };
@@ -594,8 +636,8 @@ describe('runCanvasInvocation', () => {
     const notices = harness.notices();
     expect(notices).toHaveLength(1);
     expect(notices[0]?.message).toContain('does not support canvas generation');
-    expect(harness.deps.dedupe.byKey).toHaveLength(0);
-    expect(harness.deps.dedupe.byHash).toHaveLength(0);
+    expect(harness.dedupe.byKey).toHaveLength(0);
+    expect(harness.dedupe.byHash).toHaveLength(0);
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
@@ -609,8 +651,8 @@ describe('runCanvasInvocation', () => {
     const notices = harness.notices();
     expect(notices).toHaveLength(1);
     expect(notices[0]?.message).toBe('upload exploded');
-    expect(harness.deps.dedupe.byKey).toHaveLength(0);
-    expect(harness.deps.dedupe.byHash).toHaveLength(0);
+    expect(harness.dedupe.byKey).toHaveLength(0);
+    expect(harness.dedupe.byHash).toHaveLength(0);
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 

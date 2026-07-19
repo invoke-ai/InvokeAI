@@ -12,8 +12,12 @@
  * Zero React, zero import-time side effects.
  */
 
+import type {
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+} from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/types';
 
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { transformBounds } from '@workbench/canvas-engine/math/rect';

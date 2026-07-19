@@ -1,12 +1,12 @@
+import type { RunUtilityGraphOptions, UtilityGraphResult } from '@features/queue/utility';
+import type { CanvasImageRef } from '@workbench/canvas-engine/contracts';
 import type { ExportBakedLayerBlobResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { RunUtilityGraphOptions, UtilityGraphResult } from '@workbench/canvas-operations/backend/utilityQueue';
 import type { SamSessionErrorCode } from '@workbench/canvas-operations/operationTypes';
-import type { SamInput, SamModel } from '@workbench/generation/canvas/samGraph';
-import type { CanvasImageRef } from '@workbench/types';
+import type { SamInput, SamModel } from '@workbench/canvas-operations/samGraph';
 
-import { UtilityQueueError } from '@workbench/canvas-operations/backend/utilityQueue';
-import { buildSamGraph, documentToExportLocalSamInput, isSamInputValid } from '@workbench/generation/canvas/samGraph';
+import { UtilityQueueError } from '@features/queue/utility';
+import { buildSamGraph, documentToExportLocalSamInput, isSamInputValid } from '@workbench/canvas-operations/samGraph';
 
 export interface SelectObjectReadyResult {
   status: 'ready';

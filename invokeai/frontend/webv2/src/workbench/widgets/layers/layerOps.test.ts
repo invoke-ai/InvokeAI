@@ -1,5 +1,5 @@
+import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { describe, expect, it, vi } from 'vitest';
 

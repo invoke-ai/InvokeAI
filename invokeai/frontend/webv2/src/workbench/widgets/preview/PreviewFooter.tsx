@@ -1,9 +1,8 @@
-import type { GalleryImage } from '@workbench/gallery/api';
+import type { GalleryImage, GeneratedImageContract } from '@features/gallery';
 import type { ImageActions } from '@workbench/image-actions';
-import type { GeneratedImageContract } from '@workbench/types';
 
 import { HStack, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui';
+import { Button } from '@platform/ui';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
