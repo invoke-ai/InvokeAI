@@ -33,7 +33,9 @@ from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.video_encoding import make_mp4_writer
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_wan
 
 
 class _FrameWriter(Protocol):
@@ -95,38 +97,81 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         if not isinstance(vae_info.model, AutoencoderKLWan):
             raise TypeError(f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}.")
 
-        with vae_info.model_on_device() as (_, vae):
+        if latents.shape[1] != vae_info.model.config.z_dim:
+            raise ValueError(
+                f"Latent channel mismatch: these latents have {latents.shape[1]} channels but the "
+                f"selected VAE expects {vae_info.model.config.z_dim}. A14B models need the 16-channel Wan 2.1 VAE; "
+                "TI2V-5B needs the 48-channel Wan 2.2 VAE."
+            )
+
+        _, _, t_lat, h_lat, w_lat = latents.shape
+        spatial_scale = getattr(vae_info.model.config, "scale_factor_spatial", None) or 8
+        temporal_scale = getattr(vae_info.model.config, "scale_factor_temporal", None) or 4
+        t_pixel = (t_lat - 1) * temporal_scale + 1
+        h_pixel, w_pixel = h_lat * spatial_scale, w_lat * spatial_scale
+
+        estimated_working_memory = estimate_vae_working_memory_wan(
+            operation="decode",
+            vae=vae_info.model,
+            pixel_height=h_pixel,
+            pixel_width=w_pixel,
+            pixel_frames=t_pixel,
+        )
+        # Long/high-res clips can need a working set no card fits. When the full-frame
+        # estimate exceeds the execution device's total VRAM, fall back to spatial tiling
+        # and budget for the tiled working set instead. (A cpu_only VAE runs in system
+        # RAM, where the working set is not the constraint.)
+        use_tiling = False
+        if not getattr(vae_info.config, "cpu_only", None):
+            exec_device = TorchDevice.choose_torch_device()
+            if exec_device.type == "cuda":
+                total_vram = torch.cuda.get_device_properties(exec_device).total_memory
+                if estimated_working_memory > 0.9 * total_vram:
+                    use_tiling = True
+                    tile_size = int(getattr(vae_info.model, "tile_sample_min_height", 256))
+                    estimated_working_memory = estimate_vae_working_memory_wan(
+                        operation="decode",
+                        vae=vae_info.model,
+                        pixel_height=h_pixel,
+                        pixel_width=w_pixel,
+                        pixel_frames=t_pixel,
+                        tile_size=tile_size,
+                    )
+
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKLWan)
-            if latents.shape[1] != vae.config.z_dim:
-                raise ValueError(
-                    f"Latent channel mismatch: these latents have {latents.shape[1]} channels but the "
-                    f"selected VAE expects {vae.config.z_dim}. A14B models need the 16-channel Wan 2.1 VAE; "
-                    "TI2V-5B needs the 48-channel Wan 2.2 VAE."
-                )
-            _, _, t_lat, h_lat, w_lat = latents.shape
-            t_pixel = (t_lat - 1) * 4 + 1
             context.logger.info(
-                f"Running Wan VAE decode: {t_lat} latent frames -> {t_pixel} pixel frames at {w_lat * 8}x{h_lat * 8}"
+                f"Running Wan VAE decode: {t_lat} latent frames -> {t_pixel} pixel frames at {w_pixel}x{h_pixel}"
+                + (" (tiled)" if use_tiling else "")
             )
             context.util.signal_progress("Running Wan VAE decode (video)")
 
             vae_dtype = next(iter(vae.parameters())).dtype
-            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+            latents = latents.to(device=get_effective_device(vae), dtype=vae_dtype)
 
             TorchDevice.empty_cache()
 
-            with torch.inference_mode():
-                # Denormalise from denoiser space back to VAE space.
-                latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents)
-                latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents)
-                latents = latents * latents_std + latents_mean
+            if use_tiling:
+                vae.enable_tiling()
+            try:
+                with torch.inference_mode():
+                    # Denormalise from denoiser space back to VAE space.
+                    latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents)
+                    latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents)
+                    latents = latents * latents_std + latents_mean
 
-                # [B, C=3, T_pixel, H, W] in [-1, 1] (roughly).
-                decoded = vae.decode(latents, return_dict=False)[0]
-                del latents, latents_mean, latents_std
+                    # [B, C=3, T_pixel, H, W] in [-1, 1] (roughly).
+                    decoded = vae.decode(latents, return_dict=False)[0]
+                    del latents, latents_mean, latents_std
+            finally:
+                if use_tiling:
+                    # The VAE instance is cached and shared; don't leak tiling into other nodes.
+                    vae.disable_tiling()
 
-            # Take batch 0 (we generate one video at a time).
-            decoded = decoded[0]  # [C, T, H, W]
+            # Take batch 0 (we generate one video at a time) and move the clip off the
+            # accelerator now — MP4 encoding can take a while, and holding the full
+            # decoded clip in VRAM for its duration starves the next node's model load.
+            decoded = decoded[0].cpu()  # [C, T, H, W]
 
         TorchDevice.empty_cache()
 

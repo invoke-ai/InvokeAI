@@ -125,6 +125,42 @@ def estimate_vae_working_memory_anima(
     return int(working_memory)
 
 
+def estimate_vae_working_memory_wan(
+    operation: Literal["encode", "decode"],
+    vae: AutoencoderKLWan,
+    pixel_height: int,
+    pixel_width: int,
+    pixel_frames: int,
+    tile_size: int | None = None,
+) -> int:
+    """Estimate the working memory required to encode or decode with a Wan VAE.
+
+    Generalizes the single-frame Wan 2.1 calibration (see
+    estimate_vae_working_memory_anima) to multi-frame clips and to the TI2V-5B VAE's
+    16x spatial compression — callers pass *pixel-space* dimensions, so the VAE's
+    spatial scale factor is already applied. The Wan VAE processes the clip causally,
+    one latent frame at a time with cached features, so the conv working set scales
+    with a single frame's pixels; what grows with clip length is the full RGB clip,
+    which diffusers keeps resident on the execution device for the whole operation.
+    """
+    element_size = next(vae.parameters()).element_size()
+
+    # Per-frame conv working set: ~2900 bytes per output pixel per element byte for a
+    # full-frame decode, encode ~50% (calibrated empirically on a Wan 2.1 fp16 decode).
+    scaling_constant = 2900 if operation == "decode" else 1450
+    if tile_size is not None:
+        # Add 25% for tile overlap.
+        per_frame = tile_size * tile_size * element_size * scaling_constant * 1.25
+    else:
+        per_frame = pixel_height * pixel_width * element_size * scaling_constant
+
+    # The full RGB clip stays on the execution device regardless of tiling (decode
+    # output / encode input).
+    clip_bytes = 3 * pixel_frames * pixel_height * pixel_width * element_size
+
+    return int(per_frame + clip_bytes)
+
+
 def estimate_vae_working_memory_qwen_image(
     operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoencoderKLQwenImage
 ) -> int:
