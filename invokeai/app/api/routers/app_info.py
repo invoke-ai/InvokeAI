@@ -145,9 +145,9 @@ REDACTED_SECRET = "**********"
 def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
     """Return a copy of the config with credential fields masked.
 
-    The runtime config is readable by every authenticated user, but it carries provider API keys and model-download
-    bearer tokens. Those are never needed by the client - the UI only cares whether a credential is configured - so
-    they are masked here rather than shipped to the browser.
+    The runtime config carries provider API keys and model-download bearer tokens. The route is admin-only, but no
+    client - not even an admin's browser - has any use for the raw values; the UI only cares whether a credential is
+    configured. Masking here means a future secret added to the config is not automatically served to a browser.
     """
     updates: dict[str, Any] = {}
 
@@ -168,7 +168,7 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
 @app_router.get(
     "/runtime_config", operation_id="get_runtime_config", status_code=200, response_model=InvokeAIAppConfigWithSetFields
 )
-async def get_runtime_config(current_user: CurrentUserOrDefault) -> InvokeAIAppConfigWithSetFields:
+async def get_runtime_config(current_admin: AdminUserOrDefault) -> InvokeAIAppConfigWithSetFields:
     config = get_config()
     return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=_redact_config_secrets(config))
 
