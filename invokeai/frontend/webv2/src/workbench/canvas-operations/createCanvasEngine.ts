@@ -3,17 +3,13 @@ import type {
   CanvasEngineOptions as CoreCanvasEngineOptions,
 } from '@workbench/canvas-engine/engine';
 import type { CanvasUtilityGraphResult } from '@workbench/canvas-operations/contracts';
+import type { GenerationCompositeHost } from '@workbench/canvas-operations/generationComposite';
 import type { BackendGraphContract } from '@workbench/graphContracts';
 
 import { createCanvasEngine as createCanvasEngineCore } from '@workbench/canvas-engine/engine';
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
-import {
-  createBoundedCompositeDedupeCache,
-  executeCompositePlan,
-  executeControlComposite,
-  executeMaskComposite,
-  executeRegionalMaskComposite,
-} from '@workbench/canvas-operations/compositeForGeneration';
+import { createBoundedCompositeDedupeCache } from '@workbench/canvas-operations/compositeForGeneration';
+import { composeForGeneration } from '@workbench/canvas-operations/generationComposite';
 
 import type { CanvasOperationCapability, CanvasOperationImplementation } from './contracts';
 
@@ -204,52 +200,20 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   syncSamInteraction();
 
   const compositeDedupe = createBoundedCompositeDedupeCache();
+  const generationCompositeHost: GenerationCompositeHost = {
+    captureDocumentSnapshot: () => core.document.captureSnapshot(),
+    captureRasterSnapshot: (snapshot, layerIds, captureOptions) =>
+      core.exports.captureRasterSnapshot(snapshot, layerIds, captureOptions),
+    dedupe: compositeDedupe,
+    getCompositeExecutorDeps: () => core.exports.getCompositeExecutorDeps(),
+  };
 
   const operations: CanvasOperationImplementation = {
     applySelectObjectSession: selectObjectCoordinator.apply,
     cancelFilterOperation: filterCoordinator.cancel,
     cancelSelectObjectSession: selectObjectCoordinator.cancel,
-    captureCompositeTransaction: async (snapshot, layerIds, captureOptions) => {
-      const capture = await core.exports.captureRasterSnapshot(snapshot, layerIds, captureOptions);
-      if (capture.status !== 'ok') {
-        return capture;
-      }
-      const rasterSnapshot = capture.snapshot;
-      const transactionDedupe = {
-        byHash: new Map(compositeDedupe.byHash),
-        byKey: new Map(compositeDedupe.byKey),
-      };
-      const deps = {
-        ...core.exports.getCompositeExecutorDeps(),
-        dedupe: transactionDedupe,
-        getLayerSurface: (layerId: string) => {
-          const detached = rasterSnapshot.layerSurfaces.get(layerId);
-          return detached
-            ? Promise.resolve(detached)
-            : Promise.reject(new Error(`Canvas raster snapshot is missing layer ${layerId}.`));
-        },
-      };
-      return {
-        status: 'ok',
-        transaction: {
-          canvas: rasterSnapshot.canvas,
-          commit: () => {
-            for (const [key, value] of transactionDedupe.byHash) {
-              compositeDedupe.byHash.set(key, value);
-            }
-            for (const [key, value] of transactionDedupe.byKey) {
-              compositeDedupe.byKey.set(key, value);
-            }
-          },
-          executeControl: (entry) => executeControlComposite(entry, deps),
-          executeMask: (entry) => executeMaskComposite(entry, deps),
-          executePlan: (plan) => executeCompositePlan(plan, deps),
-          executeRegionalMask: (entry) => executeRegionalMaskComposite(entry, deps),
-          release: rasterSnapshot.release,
-        },
-      };
-    },
     commitFilterOperation: filterCoordinator.commit,
+    composeForGeneration: (composeOptions) => composeForGeneration(generationCompositeHost, composeOptions),
     controller,
     getFilterSessionState: stores.filterSession.get,
     getOperationState: controller.getSnapshot,

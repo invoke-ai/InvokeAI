@@ -1,7 +1,5 @@
 export type {
   CanvasOperationActionResult,
-  CanvasCompositeTransaction,
-  CanvasCompositeTransactionResult,
   CanvasOperationCapability,
   CanvasOperationMutationResult,
   CanvasOperationState,
@@ -29,22 +27,17 @@ export type {
 export { getCanvasOperations } from './operationAccess';
 export { getCanvasEngine } from './engineRegistry';
 export { saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
-export { computeCompositeContentBounds } from './compositeForGeneration';
 export {
-  getBaseRasterContentBounds,
-  getCompositeLayerBounds,
-  planBaseRasterComposite,
-  planComposites,
-  planControlComposites,
-  planRegionalMaskComposites,
-} from './generationCompositePlan';
-export type {
-  CompositeEntry,
-  CompositeLayerRef,
-  CompositeMaskLayerRef,
-  CompositePlan,
-  Rect,
-} from './generationContracts';
+  composeForGeneration,
+  type ComposeForGenerationOptions,
+  type ComposeForGenerationResult,
+  type GenerationCompositeExecutorDeps,
+  type GenerationCompositeHost,
+  type GenerationCompositeMode,
+  type GenerationComposites,
+  type GenerationModeFacts,
+} from './generationComposite';
+export { createCompositeDedupeCache, type CompositeDedupeCache } from './compositeForGeneration';
 export {
   CONTROL_FILTERS,
   buildFilterGraph,

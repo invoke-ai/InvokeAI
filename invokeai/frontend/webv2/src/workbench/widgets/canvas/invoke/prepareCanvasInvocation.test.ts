@@ -11,7 +11,6 @@ import type {
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasCompositeTransaction } from '@workbench/canvas-operations/api';
 import type { WorkbenchState } from '@workbench/projectContracts';
 import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
@@ -19,13 +18,11 @@ import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import {
+  composeForGeneration,
   createCompositeDedupeCache,
-  executeCompositePlan,
-  executeControlComposite,
-  executeMaskComposite,
-  executeRegionalMaskComposite,
-  type ExecuteCompositePlanDeps,
-} from '@workbench/canvas-operations/compositeForGeneration';
+  type GenerationCompositeExecutorDeps,
+  type GenerationCompositeHost,
+} from '@workbench/canvas-operations/api';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -94,7 +91,9 @@ interface Harness {
   surfaceIds: string[];
   releaseRasterSnapshot: ReturnType<typeof vi.fn>;
   dedupe: ReturnType<typeof createCompositeDedupeCache>;
-  executorDeps: Omit<ExecuteCompositePlanDeps, 'dedupe' | 'getLayerSurface'>;
+  executorDeps: GenerationCompositeExecutorDeps;
+  /** The fake engine seam the REAL `composeForGeneration` operation runs against. */
+  host: GenerationCompositeHost;
   submittedGraphs: () => Extract<WorkbenchAction, { type: 'submitCanvasInvocationSnapshot' }>[];
   notices: () => { message?: string }[];
 }
@@ -182,56 +181,43 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     version: 2,
   });
 
-  const executorDeps: Omit<ExecuteCompositePlanDeps, 'dedupe' | 'getLayerSurface'> = {
+  const executorDeps: GenerationCompositeExecutorDeps = {
     backend,
     hashBlob: (blob: Blob) => blob.text(),
     readImageData: (_surface, rect) => uniformImageData(rect.width, rect.height, alpha),
     uploadImage: uploadImage as (blob: Blob) => Promise<CanvasImageUploadResult>,
   };
 
-  const deps: RunCanvasInvocationDeps = {
+  // The fake engine seam behind the REAL `composeForGeneration` operation — the
+  // same fakes the hand-rolled transaction used to wire (stub raster backend,
+  // counting uploader, spy-able release, harness-scoped dedupe cache).
+  const host: GenerationCompositeHost = {
     captureDocumentSnapshot: () => ({
       canvas: makeCanvas(options.document ?? makeDoc([rasterLayer('layer-a')])),
       documentGeneration: 0,
     }),
-    captureCompositeTransaction: async (documentSnapshot, layerIds) => {
+    captureRasterSnapshot: async (documentSnapshot, layerIds) => {
       const layerSurfaces = new Map<string, { surface: RasterSurface; rect: Rect }>();
       for (const layerId of layerIds) {
         layerSurfaces.set(layerId, await getLayerSurface(layerId));
       }
-      const transactionDedupe = createCompositeDedupeCache();
-      for (const [key, value] of dedupe.byHash) {
-        transactionDedupe.byHash.set(key, value);
-      }
-      for (const [key, value] of dedupe.byKey) {
-        transactionDedupe.byKey.set(key, value);
-      }
-      const compositeDeps: ExecuteCompositePlanDeps = {
-        ...executorDeps,
-        dedupe: transactionDedupe,
-        getLayerSurface: (layerId) => {
-          const detached = layerSurfaces.get(layerId);
-          return detached ? Promise.resolve(detached) : Promise.reject(new Error(`Missing ${layerId}`));
+      return {
+        status: 'ok',
+        snapshot: {
+          canvas: documentSnapshot.canvas,
+          documentGeneration: documentSnapshot.documentGeneration,
+          emptyLayerIds: new Set<string>(),
+          layerSurfaces,
+          release: releaseRasterSnapshot,
         },
       };
-      const transaction: CanvasCompositeTransaction = {
-        canvas: documentSnapshot.canvas,
-        commit: () => {
-          for (const [key, value] of transactionDedupe.byHash) {
-            dedupe.byHash.set(key, value);
-          }
-          for (const [key, value] of transactionDedupe.byKey) {
-            dedupe.byKey.set(key, value);
-          }
-        },
-        executeControl: (entry) => executeControlComposite(entry, compositeDeps),
-        executeMask: (entry) => executeMaskComposite(entry, compositeDeps),
-        executePlan: (plan) => executeCompositePlan(plan, compositeDeps),
-        executeRegionalMask: (entry) => executeRegionalMaskComposite(entry, compositeDeps),
-        release: releaseRasterSnapshot,
-      };
-      return { status: 'ok', transaction };
     },
+    dedupe,
+    getCompositeExecutorDeps: () => executorDeps,
+  };
+
+  const deps: RunCanvasInvocationDeps = {
+    composeForGeneration: (composeOptions) => composeForGeneration(host, composeOptions),
     compositing: DEFAULT_CANVAS_COMPOSITING,
     destination: options.destination ?? 'canvas',
     commands: {
@@ -264,6 +250,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     executorDeps,
     events,
     flushPendingUploads,
+    host,
     notices,
     releaseRasterSnapshot,
     submittedGraphs,
@@ -436,7 +423,7 @@ describe('runCanvasInvocation', () => {
         }),
     });
     // Return the stale doc until the flush resolves, the fresh doc afterwards.
-    harness.deps.captureDocumentSnapshot = () => ({
+    harness.host.captureDocumentSnapshot = () => ({
       canvas: {
         document: structuredClone(flushed ? postDoc : preDoc),
         documentRevision: 0,
@@ -480,9 +467,9 @@ describe('runCanvasInvocation', () => {
       },
       documentGeneration: 0,
     };
-    Object.assign(harness.deps, {
+    Object.assign(harness.host, {
       captureDocumentSnapshot: vi.fn(() => snapshot),
-      captureCompositeTransaction: vi.fn(() => Promise.resolve({ status: 'stale' as const })),
+      captureRasterSnapshot: vi.fn(() => Promise.resolve({ status: 'stale' as const })),
     });
 
     await runCanvasInvocation(harness.deps);
@@ -497,7 +484,7 @@ describe('runCanvasInvocation', () => {
     'does not submit when raster capture returns the typed %s outcome',
     async (status) => {
       const harness = makeHarness();
-      harness.deps.captureCompositeTransaction = vi.fn(() => Promise.resolve({ status }));
+      harness.host.captureRasterSnapshot = vi.fn(() => Promise.resolve({ status }));
 
       await runCanvasInvocation(harness.deps);
 
@@ -511,13 +498,14 @@ describe('runCanvasInvocation', () => {
   it('passes the orchestration AbortSignal into raster snapshot capture', async () => {
     const harness = makeHarness();
     const controller = new AbortController();
-    const captureCompositeTransaction = vi.fn(() => Promise.resolve({ status: 'aborted' as const }));
-    Object.assign(harness.deps, { captureCompositeTransaction, signal: controller.signal });
+    const captureRasterSnapshot = vi.fn(() => Promise.resolve({ status: 'aborted' as const }));
+    harness.host.captureRasterSnapshot = captureRasterSnapshot;
+    harness.deps.signal = controller.signal;
     controller.abort(new DOMException('invoke cancelled', 'AbortError'));
 
     await runCanvasInvocation(harness.deps);
 
-    expect(captureCompositeTransaction).toHaveBeenCalledWith(
+    expect(captureRasterSnapshot).toHaveBeenCalledWith(
       expect.any(Object),
       ['layer-a'],
       expect.objectContaining({ signal: controller.signal })
@@ -532,7 +520,7 @@ describe('runCanvasInvocation', () => {
       liveDocument = { ...liveDocument, bbox: { height: 96, width: 96, x: 303, y: 404 } };
     });
     const harness = makeHarness({ dispatch, document: liveDocument });
-    harness.deps.captureDocumentSnapshot = () => ({
+    harness.host.captureDocumentSnapshot = () => ({
       canvas: {
         document: structuredClone(liveDocument),
         documentRevision: 4,
@@ -549,11 +537,11 @@ describe('runCanvasInvocation', () => {
       },
       documentGeneration: 9,
     });
-    const captureCompositeTransaction = harness.deps.captureCompositeTransaction;
-    harness.deps.captureCompositeTransaction = async (snapshot, layerIds) => {
-      const result = await captureCompositeTransaction(snapshot, layerIds, { signal: harness.deps.signal });
-      // The transaction is fully detached at this boundary. Subsequent edits
-      // must not alter any composite/upload/compile/dispatch input.
+    const captureRasterSnapshot = harness.host.captureRasterSnapshot;
+    harness.host.captureRasterSnapshot = async (snapshot, layerIds, captureOptions) => {
+      const result = await captureRasterSnapshot(snapshot, layerIds, captureOptions);
+      // The composite inputs are fully detached at this boundary. Subsequent
+      // edits must not alter any composite/upload/compile/dispatch input.
       liveDocument = {
         ...liveDocument,
         bbox: { height: 64, width: 64, x: 101, y: 202 },
@@ -578,7 +566,7 @@ describe('runCanvasInvocation', () => {
     async (boundary) => {
       let liveDocument = makeDoc([rasterLayer('layer-a')]);
       const harness = makeHarness({ document: liveDocument });
-      harness.deps.captureDocumentSnapshot = () => ({
+      harness.host.captureDocumentSnapshot = () => ({
         canvas: {
           document: structuredClone(liveDocument),
           documentRevision: 2,

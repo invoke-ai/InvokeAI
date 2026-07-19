@@ -1,7 +1,5 @@
 import type {
   CommitGeneratedImageResult,
-  CanvasDocumentSnapshot,
-  CanvasStateContractV2,
   LayerExportGuard,
   ReplaceSelectionFromImageResult,
 } from '@workbench/canvas-engine/api';
@@ -16,11 +14,9 @@ import type { ExportBakedLayerBlobResult, ExportLayerPixelsResult } from '@workb
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type {
-  CompositeEntryResult,
-  CompositeResult,
-  MaskCompositeResult,
-} from '@workbench/canvas-operations/compositeForGeneration';
-import type { CompositeEntry, CompositePlan } from '@workbench/canvas-operations/generationContracts';
+  ComposeForGenerationOptions,
+  ComposeForGenerationResult,
+} from '@workbench/canvas-operations/generationComposite';
 import type {
   FilterCommitTarget,
   FilterOperationSessionState,
@@ -61,11 +57,8 @@ export interface SelectObjectSessionUpdate {
 
 /** Intent-oriented application operations attached to one Canvas engine. */
 export interface CanvasOperationCapability {
-  captureCompositeTransaction(
-    snapshot: CanvasDocumentSnapshot,
-    layerIds: readonly string[],
-    options: { signal: AbortSignal }
-  ): Promise<CanvasCompositeTransactionResult>;
+  /** Runs the complete canvas → generation composite pipeline (see `composeForGeneration`). */
+  composeForGeneration(options: ComposeForGenerationOptions): Promise<ComposeForGenerationResult>;
   uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
   getOperationState(): CanvasOperationState;
   subscribeOperation(listener: () => void): () => void;
@@ -94,21 +87,6 @@ export interface CanvasOperationCapability {
   resetSelectObjectSession(): CanvasOperationMutationResult;
   cancelSelectObjectSession(): void;
 }
-
-/** Opaque generation transaction; pixels, surfaces, caches, and reservations remain Canvas-owned. */
-export interface CanvasCompositeTransaction {
-  readonly canvas: CanvasStateContractV2;
-  executePlan(plan: CompositePlan): Promise<CompositeResult>;
-  executeControl(entry: CompositeEntry): Promise<CompositeEntryResult>;
-  executeMask(entry: CompositeEntry): Promise<MaskCompositeResult>;
-  executeRegionalMask(entry: CompositeEntry): Promise<CompositeEntryResult>;
-  commit(): void;
-  release(): void;
-}
-
-export type CanvasCompositeTransactionResult =
-  | { status: 'ok'; transaction: CanvasCompositeTransaction }
-  | { status: 'stale' | 'aborted' | 'not-ready' | 'over-budget' };
 
 /** Private composition shape; mutable stores and controller never cross the Canvas interface. */
 export interface CanvasOperationImplementation extends CanvasOperationCapability {
