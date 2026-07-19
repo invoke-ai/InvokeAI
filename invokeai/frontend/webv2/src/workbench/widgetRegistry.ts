@@ -8,22 +8,22 @@ import type {
 } from '@workbench/widgetContracts';
 
 import { getAuthSession } from '@features/identity';
-import { queueWidgetManifest } from '@workbench/queueWidgetManifest';
 
-import { galleryWidgetManifest } from './galleryWidgetManifest';
-import { generateWidgetManifest } from './generationWidgetManifest';
-import { upscaleWidgetManifest } from './upscaleWidgetManifest';
 import { createWidgetImplementationResource } from './widgetImplementationResource';
-import { autosaveStatusWidgetManifest } from './widgets/autosave-status';
-import { canvasWidgetManifest } from './widgets/canvas';
-import { diagnosticsWidgetManifest } from './widgets/diagnostics';
-import { layersWidgetManifest } from './widgets/layers';
-import { notificationsWidgetManifest } from './widgets/notifications';
-import { previewWidgetManifest } from './widgets/preview';
-import { projectWidgetManifest } from './widgets/project';
-import { serverStatusWidgetManifest } from './widgets/server-status';
-import { versionStatusWidgetManifest } from './widgets/version-status';
-import { workflowWidgetManifest } from './workflowWidgetManifest';
+import { autosaveStatusWidgetManifest } from './widgets/autosave-status/manifest';
+import { canvasWidgetManifest } from './widgets/canvas/manifest';
+import { diagnosticsWidgetManifest } from './widgets/diagnostics/manifest';
+import { galleryWidgetManifest } from './widgets/gallery/manifest';
+import { generateWidgetManifest } from './widgets/generate/manifest';
+import { layersWidgetManifest } from './widgets/layers/manifest';
+import { notificationsWidgetManifest } from './widgets/notifications/manifest';
+import { previewWidgetManifest } from './widgets/preview/manifest';
+import { projectWidgetManifest } from './widgets/project/manifest';
+import { queueWidgetManifest } from './widgets/queue/manifest';
+import { serverStatusWidgetManifest } from './widgets/server-status/manifest';
+import { upscaleWidgetManifest } from './widgets/upscale/manifest';
+import { versionStatusWidgetManifest } from './widgets/version-status/manifest';
+import { workflowWidgetManifest } from './widgets/workflow/manifest';
 
 export const firstPartyWidgetManifests: WidgetManifest[] = [
   generateWidgetManifest,

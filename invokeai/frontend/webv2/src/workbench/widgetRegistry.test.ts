@@ -3,8 +3,8 @@ import type { WidgetManifest } from '@workbench/widgetContracts';
 import { ImageUpscaleIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { upscaleWidgetManifest } from './upscaleWidgetManifest';
 import { getWidgetHosts, registerFirstPartyWidgets, registerWidgets } from './widgetRegistry';
+import { upscaleWidgetManifest } from './widgets/upscale/manifest';
 
 const TestIcon = () => null;
 const TestView = () => null;
