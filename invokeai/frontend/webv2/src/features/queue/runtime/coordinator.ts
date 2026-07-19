@@ -10,7 +10,6 @@ import type {
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
-import { modelLoadActivitySink } from '@features/models';
 import {
   isTerminalBackendStatus,
   parseQueueItemOrigin,
@@ -32,6 +31,17 @@ import { ApiError } from '@platform/transport/http';
 const GALLERY_REFRESH_COALESCE_MS = 400;
 const SAFETY_SWEEP_INTERVAL_MS = 30_000;
 const TERMINAL_EVENT_BUFFER_LIMIT = 256;
+
+/**
+ * Queue's view of model-load activity derived from socket events. The
+ * production adapter is Models' modelLoadActivitySink, injected by the App
+ * composition root (see app/QueueRuntimeAdapter); tests inject a double.
+ */
+export interface QueueModelLoadPort {
+  completed(payload: unknown): void;
+  reset(): void;
+  started(payload: unknown): void;
+}
 
 export interface QueueNodeExecutionPort {
   clearAll(): void;
@@ -166,6 +176,7 @@ export const createQueueCoordinator = (
     /** One adapter owns Queue HTTP commands and realtime events. */
     backend: QueueCoordinatorBackendPort;
     galleryRefreshCoalesceMs?: number;
+    modelLoads: QueueModelLoadPort;
     nodeExecution: QueueNodeExecutionPort;
     progress?: QueueItemProgressSink;
     progressImage?: ProgressImageSink;
@@ -175,6 +186,7 @@ export const createQueueCoordinator = (
 ): QueueCoordinator => {
   const backend = options.backend;
   const progress = options.progress ?? queueItemProgressStore;
+  const modelLoads = options.modelLoads;
   const nodeExecution = options.nodeExecution;
   const progressImage = options.progressImage ?? progressImageStore;
   const revealHold = options.revealHold ?? revealHoldStore;
@@ -436,7 +448,7 @@ export const createQueueCoordinator = (
   const handleConnectionChange = (status: BackendConnectionStatus): void => {
     progress.clearAll?.();
     nodeExecution.clearAll();
-    modelLoadActivitySink.reset();
+    modelLoads.reset();
 
     if (status === 'connected') {
       scheduleGalleryRefresh();
@@ -477,10 +489,10 @@ export const createQueueCoordinator = (
         nodeExecution.failed(event);
       }),
       backend.on('model_load_started', (payload: never) => {
-        modelLoadActivitySink.started(payload);
+        modelLoads.started(payload);
       }),
       backend.on('model_load_complete', (payload: never) => {
-        modelLoadActivitySink.completed(payload);
+        modelLoads.completed(payload);
       })
     );
 

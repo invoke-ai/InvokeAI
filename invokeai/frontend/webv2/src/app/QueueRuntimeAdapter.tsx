@@ -1,10 +1,11 @@
+import { modelLoadActivitySink } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { createProductionQueueRuntime } from '@features/queue';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSubscription } from '@workbench/WorkbenchContext';
 
-/** App-owned production composition of Queue, Workbench, Gallery, and Workflow adapters. */
+/** App-owned production composition of Queue, Workbench, Gallery, Workflow, Nodes, and Models adapters. */
 export const QueueRuntimeAdapter = () => {
   const { notifications, queue } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
@@ -33,6 +34,7 @@ export const QueueRuntimeAdapter = () => {
         },
         subscribe,
       },
+      modelLoads: modelLoadActivitySink,
       nodeExecution: nodeExecutionStore,
     });
 

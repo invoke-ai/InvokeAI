@@ -1,7 +1,7 @@
 import type { QueueFeatureCommands, QueueQueryScope, QueueReadModel } from './core/types';
 import type { QueueItemProgressPort, QueueRealtimeRuntime } from './data/realtimeRuntime';
 import type { QueueHistoryPort, QueueResultDestinationPort, QueueRuntime } from './runtime';
-import type { QueueNodeExecutionPort } from './runtime/coordinator';
+import type { QueueModelLoadPort, QueueNodeExecutionPort } from './runtime/coordinator';
 
 import { queueBackend } from './data/httpRealtimeQueueBackend';
 import { queueReadModelOptions } from './data/queries';
@@ -44,11 +44,20 @@ export const createProductionQueueRuntime = ({
   destinations,
   ensureTemplatesLoaded,
   history,
+  modelLoads,
   nodeExecution,
 }: {
   destinations: QueueResultDestinationPort;
   ensureTemplatesLoaded: () => void;
   history: QueueHistoryPort;
+  modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
 }): QueueRuntime =>
-  createQueueRuntime({ backend: queueBackend, destinations, ensureTemplatesLoaded, history, nodeExecution });
+  createQueueRuntime({
+    backend: queueBackend,
+    destinations,
+    ensureTemplatesLoaded,
+    history,
+    modelLoads,
+    nodeExecution,
+  });

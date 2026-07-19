@@ -21,6 +21,7 @@ import {
   type QueueCoordinator,
   type QueueCoordinatorBackendPort,
   type QueueCoordinatorCallbacks,
+  type QueueModelLoadPort,
   type QueueNodeExecutionPort,
 } from './coordinator';
 
@@ -115,6 +116,7 @@ interface Harness {
   callbacks: { [Key in keyof QueueCoordinatorCallbacks]: ReturnType<typeof vi.fn> };
   coordinator: QueueCoordinator;
   hub: ReturnType<typeof createSocketHub>;
+  modelLoads: { [Key in keyof QueueModelLoadPort]: ReturnType<typeof vi.fn> };
   nodeExecution: { [Key in keyof QueueNodeExecutionPort]: ReturnType<typeof vi.fn> };
   progressImage: { clear: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn> };
   progressEntries: Map<string, QueueItemProgress>;
@@ -146,6 +148,11 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
   const callbacks = {
     onGalleryRefresh: vi.fn(),
   };
+  const modelLoads = {
+    completed: vi.fn(),
+    reset: vi.fn(),
+    started: vi.fn(),
+  };
   const nodeExecution = {
     clearAll: vi.fn(),
     completed: vi.fn(),
@@ -167,12 +174,13 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
       onConnectionChange: hub.onConnectionChange,
     },
     galleryRefreshCoalesceMs: options.galleryRefreshCoalesceMs ?? 1,
+    modelLoads,
     nodeExecution,
     progress,
     progressImage,
   });
 
-  return { api, callbacks, coordinator, hub, nodeExecution, progressImage, progressEntries, socket };
+  return { api, callbacks, coordinator, hub, modelLoads, nodeExecution, progressImage, progressEntries, socket };
 };
 
 describe('queueCoordinator', () => {
@@ -471,6 +479,25 @@ describe('queueCoordinator', () => {
       { dataUrl: 'data:image/png;base64,abc', height: 32, width: 64 },
       { itemIndex: 2, queueItemId: 'local-1' }
     );
+  });
+
+  it('routes model load socket events to the model-load port', () => {
+    harness.coordinator.connect();
+
+    harness.socket.fire('model_load_started', { config: { name: 'model-a' } });
+    harness.socket.fire('model_load_complete', { config: { name: 'model-a' } });
+
+    expect(harness.modelLoads.started).toHaveBeenCalledWith({ config: { name: 'model-a' } });
+    expect(harness.modelLoads.completed).toHaveBeenCalledWith({ config: { name: 'model-a' } });
+  });
+
+  it('resets model-load activity when the connection status changes', () => {
+    harness.coordinator.connect();
+    harness.modelLoads.reset.mockClear();
+
+    harness.hub.disconnect();
+
+    expect(harness.modelLoads.reset).toHaveBeenCalled();
   });
 
   it('ignores untracked queue events before mutating local execution state', () => {

@@ -98,6 +98,11 @@ describe('queue runtime', () => {
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
         subscribe: vi.fn(() => vi.fn()),
       },
+      modelLoads: {
+        completed: vi.fn(),
+        reset: vi.fn(),
+        started: vi.fn(),
+      },
       nodeExecution: {
         clearAll: vi.fn(),
         completed: vi.fn(),

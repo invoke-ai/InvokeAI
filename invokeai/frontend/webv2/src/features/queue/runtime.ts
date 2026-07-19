@@ -13,6 +13,7 @@ import {
   createQueueCoordinator,
   QueueItemCancelledError,
   type QueueCoordinator,
+  type QueueModelLoadPort,
   type QueueNodeExecutionPort,
   type ReconcileInput,
 } from '@features/queue/runtime/coordinator';
@@ -130,12 +131,14 @@ export const createQueueRuntime = ({
   destinations,
   ensureTemplatesLoaded,
   history,
+  modelLoads,
   nodeExecution,
 }: {
   backend: QueueBackendPort;
   destinations: QueueResultDestinationPort;
   ensureTemplatesLoaded: () => void;
   history: QueueHistoryPort;
+  modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
 }): QueueRuntime => {
   const commands = history.commands;
@@ -280,7 +283,7 @@ export const createQueueRuntime = ({
       },
       onGalleryRefresh: commands.refreshBackendData,
     },
-    { backend, nodeExecution }
+    { backend, modelLoads, nodeExecution }
   );
 
   const submitQueueItem = (project: QueueHistoryProject, queueItem: QueueItem): void => {
