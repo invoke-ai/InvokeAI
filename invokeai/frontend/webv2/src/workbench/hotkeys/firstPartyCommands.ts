@@ -11,13 +11,12 @@ import { queueCommands } from '@features/queue';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getConnectionStatus } from '@platform/transport/connectionStore';
-import { commandApi } from '@workbench/extensions/extensionApi';
 import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
 import { submitResolvedInvocation } from '@workbench/invocationSubmit';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useEffect, useEffectEvent } from 'react';
 
 const imageRecallCommands: Record<string, ImageRecallKind> = {
@@ -61,6 +60,7 @@ const getAvailableModels = () => {
 
 export const useRegisterFirstPartyCommands = () => {
   const commands = useWorkbenchCommands();
+  const { commands: commandApi } = useWorkbenchExtensions();
   const queries = useWorkbenchQueries();
   const { layout, notifications, queue, widgets } = commands;
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
@@ -306,5 +306,5 @@ export const useRegisterFirstPartyCommands = () => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [commands, layout, notifications, queries, queue, widgets]);
+  }, [commandApi, commands, layout, notifications, queries, queue, widgets]);
 };

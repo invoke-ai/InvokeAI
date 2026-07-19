@@ -10,6 +10,7 @@ import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 
 import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } from '@workbench/diagnostics/logger';
+import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -126,6 +127,7 @@ describe('createWidgetRuntime', () => {
     const { actions, widgets } = createDispatch();
     const state = createStateApi();
     const runtime = createWidgetRuntime({
+      extensions: createExtensionRegistry(),
       widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
@@ -147,6 +149,7 @@ describe('createWidgetRuntime', () => {
   it('binds diagnostics to the current widget source', () => {
     const { widgets } = createDispatch();
     const runtime = createWidgetRuntime({
+      extensions: createExtensionRegistry(),
       widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
@@ -178,6 +181,7 @@ describe('createWidgetRuntime', () => {
     const { actions, widgets } = createDispatch();
     const createInitial = vi.fn(() => ({ seeded: true }));
     const runtime = createWidgetRuntime({
+      extensions: createExtensionRegistry(),
       widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({
@@ -230,6 +234,7 @@ describe('createWidgetRuntime', () => {
   it('dispatches own-region close and reveal actions', () => {
     const { actions, widgets } = createDispatch();
     const runtime = createWidgetRuntime({
+      extensions: createExtensionRegistry(),
       widgets,
       getWidgetById: (typeId) => createWidget({ id: typeId, label: typeId }),
       getWidgetsForRegion: createRegistry({}),
@@ -257,6 +262,7 @@ describe('createWidgetRuntime', () => {
   it('returns unsupported for cross-region close and reveal', () => {
     const { actions, widgets } = createDispatch();
     const runtime = createWidgetRuntime({
+      extensions: createExtensionRegistry(),
       widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
@@ -273,7 +279,9 @@ describe('createWidgetRuntime', () => {
 
   it('executes commands registered by the current widget source', async () => {
     const { widgets } = createDispatch();
+    const extensions = createExtensionRegistry();
     const alphaRuntime = createWidgetRuntime({
+      extensions,
       widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
@@ -283,6 +291,7 @@ describe('createWidgetRuntime', () => {
       state: createStateApi(),
     });
     const betaRuntime = createWidgetRuntime({
+      extensions,
       widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
@@ -311,7 +320,9 @@ describe('createWidgetRuntime', () => {
 
   it('does not execute commands registered by the same widget instance in another project', async () => {
     const { widgets } = createDispatch();
+    const extensions = createExtensionRegistry();
     const projectOneRuntime = createWidgetRuntime({
+      extensions,
       widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
@@ -321,6 +332,7 @@ describe('createWidgetRuntime', () => {
       state: createStateApi(),
     });
     const projectTwoRuntime = createWidgetRuntime({
+      extensions,
       widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
@@ -345,5 +357,29 @@ describe('createWidgetRuntime', () => {
 
     disposeOne();
     disposeTwo();
+  });
+
+  it('scopes palette, search, and toolbar registrations to the widget source', () => {
+    const { widgets } = createDispatch();
+    const extensions = createExtensionRegistry();
+    const runtime = createWidgetRuntime({
+      extensions,
+      widgets,
+      getWidgetById: () => undefined,
+      getWidgetsForRegion: createRegistry({}),
+      instance: createInstance('alpha', 'test-widget'),
+      project: createPlacementProject(),
+      region: 'right',
+      state: createStateApi(),
+    });
+
+    runtime.palette.register({ commandId: 'test-widget.palette-command', title: 'Palette entry' });
+    runtime.search.registerProvider({ id: 'test-widget.search', label: 'Search', search: () => [] });
+    runtime.toolbars.register({ id: 'test-widget.toolbar', items: [], location: 'status.left' });
+
+    const expectedSource = expect.objectContaining({ instanceId: 'alpha', typeId: 'test-widget' });
+    expect(extensions.stores.palette.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
+    expect(extensions.stores.search.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
+    expect(extensions.stores.toolbars.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
   });
 });

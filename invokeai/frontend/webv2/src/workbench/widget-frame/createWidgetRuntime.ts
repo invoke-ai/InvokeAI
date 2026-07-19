@@ -1,3 +1,4 @@
+import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type {
@@ -15,16 +16,8 @@ import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands'
 import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 
 import { createProjectLogger } from '@workbench/diagnostics/logger';
-import {
-  commandApi as sharedCommandApi,
-  commandPaletteApi,
-  hotkeyApi,
-  menuApi,
-  searchApi,
-  toolbarApi,
-} from '@workbench/extensions/extensionApi';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
-import { useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
+import { useWorkbenchExtensions, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
 
 const WIDGET_REGIONS = new Set<WidgetRegion>(['bottom', 'center', 'left', 'right']);
@@ -71,6 +64,7 @@ export const getProjectWidgetRuntimeState = <State extends Record<string, unknow
   );
 
 export const createWidgetRuntime = ({
+  extensions,
   getWidgetsForRegion,
   getWidgetById,
   instance,
@@ -79,6 +73,7 @@ export const createWidgetRuntime = ({
   state,
   widgets,
 }: {
+  extensions: ExtensionRegistry;
   getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined;
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
   instance: WidgetInstanceRuntimeMeta;
@@ -95,20 +90,20 @@ export const createWidgetRuntime = ({
     typeId: instance.typeId,
   };
   const commands = {
-    execute: (commandId, ...args) => sharedCommandApi.executeForSource(commandId, source, ...args),
-    executeForSource: sharedCommandApi.executeForSource,
-    register: (command) => sharedCommandApi.register({ ...command, source }),
+    execute: (commandId, ...args) => extensions.commands.executeForSource(commandId, source, ...args),
+    executeForSource: extensions.commands.executeForSource,
+    register: (command) => extensions.commands.register({ ...command, source }),
   } satisfies WidgetRuntimeApi['commands'];
   const hotkeys: WidgetHotkeyApi = {
     register: (hotkey) =>
-      hotkeyApi.register({
+      extensions.hotkeys.register({
         ...hotkey,
         scope: hotkey.scope ?? 'widget',
         source,
       }),
   };
   const menus = {
-    register: (menu) => menuApi.register({ ...menu, source }),
+    register: (menu) => extensions.menus.register({ ...menu, source }),
   } satisfies WidgetRuntimeApi['menus'];
   const diagnostics = {
     logger: (namespace) => createProjectLogger(namespace, { ...source, kind: 'widget' }),
@@ -120,11 +115,17 @@ export const createWidgetRuntime = ({
     hotkeys,
     instanceId: instance.id,
     menus,
-    palette: commandPaletteApi,
+    palette: {
+      register: (entry) => extensions.palette.register({ ...entry, source }),
+    },
     region,
-    search: searchApi,
+    search: {
+      registerProvider: (provider) => extensions.search.registerProvider({ ...provider, source }),
+    },
     state,
-    toolbars: toolbarApi,
+    toolbars: {
+      register: (toolbar) => extensions.toolbars.register({ ...toolbar, source }),
+    },
     typeId: instance.typeId,
     workbench: {
       closeWidgetInstance: (instanceId) => {
@@ -161,6 +162,7 @@ export const useWidgetRuntime = ({
   region: WorkbenchRegion;
 }): WidgetRuntimeApi => {
   const store = useWorkbenchInternalStore();
+  const extensions = useWorkbenchExtensions();
   const { widgets } = store.commands;
   const projectId = project.projectId ?? store.getSnapshot().activeProject.id;
   const state = useMemo<WidgetRuntimeStateApi>(
@@ -173,7 +175,17 @@ export const useWidgetRuntime = ({
   );
 
   return useMemo(
-    () => createWidgetRuntime({ getWidgetById, getWidgetsForRegion, instance, project, region, state, widgets }),
-    [getWidgetById, getWidgetsForRegion, instance, project, region, state, widgets]
+    () =>
+      createWidgetRuntime({
+        extensions,
+        getWidgetById,
+        getWidgetsForRegion,
+        instance,
+        project,
+        region,
+        state,
+        widgets,
+      }),
+    [extensions, getWidgetById, getWidgetsForRegion, instance, project, region, state, widgets]
   );
 };

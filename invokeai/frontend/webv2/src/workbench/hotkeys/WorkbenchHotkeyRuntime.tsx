@@ -1,10 +1,9 @@
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
-import { commandApi } from '@workbench/extensions/extensionApi';
 import { getFocusedRegionSnapshot } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
 import { useEffect, useEffectEvent, useMemo } from 'react';
 import { tinykeys } from 'tinykeys';
 
@@ -39,6 +38,7 @@ export const shouldPreventHotkeyDefault = (hotkey: RegisteredHotkey | null): boo
 export const WorkbenchHotkeyRuntime = () => {
   useRegisterFirstPartyCommands();
 
+  const { commands: commandApi } = useWorkbenchExtensions();
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();

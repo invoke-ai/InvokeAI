@@ -8,6 +8,7 @@ import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '
 import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
 
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
+import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
 import { createWorkbenchPersistenceRuntime } from './persistenceRuntime';
 import {
   createSyncedWorkbenchPersistence,
@@ -32,6 +33,7 @@ type WorkbenchSelector<T> = (snapshot: WorkbenchSnapshot) => T;
 
 const WorkbenchStoreContext = createContext<WorkbenchInternalStore | null>(null);
 const WorkbenchPersistenceContext = createContext<SyncedWorkbenchPersistence | null>(null);
+const WorkbenchExtensionsContext = createContext<ExtensionRegistry | null>(null);
 const subscribeToNothing = (): (() => void) => () => {};
 const getNullSnapshot = (): null => null;
 
@@ -47,6 +49,7 @@ export const WorkbenchProvider = ({
 }) => {
   const [store] = useState(() => createWorkbenchStore());
   const [persistence] = useState(createSyncedWorkbenchPersistence);
+  const [extensions] = useState(createExtensionRegistry);
   const hasHydrated = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot).hasHydrated;
 
   // The runtime is created inside the effect: disposal is terminal, so each
@@ -76,9 +79,11 @@ export const WorkbenchProvider = ({
 
   return (
     <WorkbenchPersistenceContext value={persistence}>
-      <WorkbenchStoreContext value={store}>
-        {hasHydrated ? children : <WorkbenchSplashScreen messageKey="splash.openingProject" />}
-      </WorkbenchStoreContext>
+      <WorkbenchExtensionsContext value={extensions}>
+        <WorkbenchStoreContext value={store}>
+          {hasHydrated ? children : <WorkbenchSplashScreen messageKey="splash.openingProject" />}
+        </WorkbenchStoreContext>
+      </WorkbenchExtensionsContext>
     </WorkbenchPersistenceContext>
   );
 };
@@ -203,6 +208,14 @@ export const useWorkbenchPersistenceService = (): SyncedWorkbenchPersistence => 
 
 export const useOptionalWorkbenchPersistenceService = (): SyncedWorkbenchPersistence | null =>
   use(WorkbenchPersistenceContext);
+
+export const useWorkbenchExtensions = (): ExtensionRegistry => {
+  const extensions = use(WorkbenchExtensionsContext);
+  if (!extensions) {
+    throw new Error('useWorkbenchExtensions must be used within a WorkbenchProvider.');
+  }
+  return extensions;
+};
 
 export const useOptionalWorkbenchCommands = () => useOptionalWorkbenchStore()?.commands ?? null;
 

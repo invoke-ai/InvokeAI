@@ -217,6 +217,7 @@ export interface WidgetCommandPaletteContribution {
   commandId: string;
   title: string;
   keywords?: string[];
+  source?: WidgetContributionSource;
 }
 
 export interface WidgetSearchApi {
@@ -227,6 +228,7 @@ export interface WidgetSearchProvider {
   id: string;
   label: string;
   search: (query: string) => Promise<WidgetSearchResult[]> | WidgetSearchResult[];
+  source?: WidgetContributionSource;
 }
 
 export interface WidgetSearchResult {
@@ -248,6 +250,7 @@ export interface WidgetToolbarContribution {
     icon?: WidgetIconComponent;
     label?: string;
   }>;
+  source?: WidgetContributionSource;
 }
 
 export interface OpenWorkbenchWidgetOptions {
