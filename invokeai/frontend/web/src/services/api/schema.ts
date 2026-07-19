@@ -2521,9 +2521,10 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue. Returns global counts; non-admin users additionally
-         *     get their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the
-         *     current item's identifiers unless they own it.
+         * @description Gets the status of the session queue. Returns global counts; every user additionally gets
+         *     their own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI
+         *     like the progress bar to the user's own activity). Non-admin users cannot see the current
+         *     item's identifiers unless they own it.
          */
         get: operations["get_queue_status"];
         put?: never;
@@ -11024,7 +11025,9 @@ export type components = {
          * @description Run denoising process with a FLUX.2 Klein transformer model.
          *
          *     This node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.
-         *     It does not support ControlNet, IP-Adapters, or regional prompting.
+         *     Regional prompting is supported via per-conditioning masks (single mask is applied
+         *     to every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters
+         *     are not supported. Regional masking is skipped when reference images are attached.
          */
         Flux2DenoiseInvocation: {
             /**
@@ -11084,10 +11087,11 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * Positive Text Conditioning
              * @description Positive conditioning tensor
              * @default null
              */
-            positive_text_conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            positive_text_conditioning?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
             /**
              * @description Negative conditioning tensor. Can be None if cfg_scale is 1.0.
              * @default null
@@ -17300,6 +17304,8 @@ export type components = {
          *         external_openai_base_url: Base URL override for OpenAI image generation.
          *         external_seedream_api_key: API key for Seedream image generation.
          *         external_seedream_base_url: Base URL override for Seedream image generation.
+         *         base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
+         *         forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
          */
         InvokeAIAppConfig: {
             /**
@@ -17363,6 +17369,17 @@ export type components = {
              * @description SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
              */
             ssl_keyfile?: string | null;
+            /**
+             * Base Url
+             * @description Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash.
+             */
+            base_url?: string | null;
+            /**
+             * Forwarded Allow Ips
+             * @description Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+             * @default 127.0.0.1
+             */
+            forwarded_allow_ips?: string;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.
@@ -25143,6 +25160,12 @@ export type components = {
              * @default null
              */
             submodel_type: components["schemas"]["SubModelType"] | null;
+            /**
+             * User Id
+             * @description The ID of the user whose action triggered the load
+             * @default system
+             */
+            user_id: string;
         };
         /**
          * ModelLoadStartedEvent
@@ -25164,6 +25187,12 @@ export type components = {
              * @default null
              */
             submodel_type: components["schemas"]["SubModelType"] | null;
+            /**
+             * User Id
+             * @description The ID of the user whose action triggered the load
+             * @default system
+             */
+            user_id: string;
         };
         /**
          * ModelLoaderOutput
@@ -26554,6 +26583,40 @@ export type components = {
              * @description The ID of the session (aka graph execution state)
              */
             session_id: string;
+        };
+        /**
+         * QueueItemsCanceledEvent
+         * @description Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in
+         *     bulk (e.g. cancel/delete-all-except-current) without per-item status change events.
+         */
+        QueueItemsCanceledEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * Canceled Item Ids
+             * @description The IDs of the queue items that were canceled or deleted
+             */
+            canceled_item_ids: number[];
+            /**
+             * User Ids
+             * @description The IDs of the users who own the canceled queue items
+             */
+            user_ids: string[];
+            /**
+             * Canceled Item Ids By User
+             * @description The canceled queue item IDs keyed by owner user ID.
+             */
+            canceled_item_ids_by_user: {
+                [key: string]: number[];
+            };
         };
         /**
          * QueueItemsRetriedEvent
@@ -32743,6 +32806,11 @@ export type components = {
              * @constant
              */
             base: "anima";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Checkpoint_FLUX_Config */
         VAE_Checkpoint_FLUX_Config: {
@@ -32815,6 +32883,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default flux
@@ -32902,6 +32975,11 @@ export type components = {
              * @constant
              */
             base: "flux2";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * VAE_Checkpoint_QwenImage_Config
@@ -32983,6 +33061,11 @@ export type components = {
              * @constant
              */
             base: "qwen-image";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Checkpoint_SD1_Config */
         VAE_Checkpoint_SD1_Config: {
@@ -33055,6 +33138,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sd-1
@@ -33134,6 +33222,11 @@ export type components = {
              */
             format: "checkpoint";
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Base
              * @default sd-2
              * @constant
@@ -33211,6 +33304,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sdxl
@@ -33302,6 +33400,11 @@ export type components = {
              */
             base: "wan";
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Latent Channels
              * @description VAE latent channel count: 16 for A14B (standard Wan VAE) or 48 for TI2V-5B (Wan2.2-VAE).
              * @enum {integer}
@@ -33385,6 +33488,11 @@ export type components = {
              * @constant
              */
             base: "flux2";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Diffusers_SD1_Config */
         VAE_Diffusers_SD1_Config: {
@@ -33454,6 +33562,11 @@ export type components = {
              * @constant
              */
             type: "vae";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sd-1
@@ -33529,6 +33642,11 @@ export type components = {
              * @constant
              */
             type: "vae";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sdxl
@@ -33613,6 +33731,11 @@ export type components = {
              * @constant
              */
             base: "wan";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Latent Channels
              * @description VAE latent channel count: 16 for A14B or 48 for TI2V-5B's Wan2.2-VAE.

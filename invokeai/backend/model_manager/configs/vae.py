@@ -109,6 +109,7 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
 
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -200,6 +201,7 @@ class VAE_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Config_Base):
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
     base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -238,6 +240,7 @@ class VAE_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Config_Base):
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
     base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -268,6 +271,7 @@ class VAE_Checkpoint_Wan_Config(Checkpoint_Config_Base, Config_Base):
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
     base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
     latent_channels: Literal[16, 48] = Field(
         description="VAE latent channel count: 16 for A14B (standard Wan VAE) or 48 for TI2V-5B (Wan2.2-VAE)."
     )
@@ -306,6 +310,7 @@ class VAE_Diffusers_Wan_Config(Diffusers_Config_Base, Config_Base):
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
     format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
     base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
     latent_channels: Literal[16, 48] = Field(
         default=16,
         description="VAE latent channel count: 16 for A14B or 48 for TI2V-5B's Wan2.2-VAE.",
@@ -362,6 +367,7 @@ class VAE_Checkpoint_Anima_Config(Checkpoint_Config_Base, Config_Base):
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
     base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -381,6 +387,7 @@ class VAE_Diffusers_Config_Base(Diffusers_Config_Base):
 
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
     format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -449,6 +456,7 @@ class VAE_Diffusers_Flux2_Config(Diffusers_Config_Base, Config_Base):
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
     format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
     base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:

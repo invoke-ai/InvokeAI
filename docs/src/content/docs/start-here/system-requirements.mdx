@@ -2,7 +2,7 @@
 title: Hardware Requirements
 sidebar:
   order: 1
-lastUpdated: 2026-05-11
+lastUpdated: 2026-07-14
 ---
 
 import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
@@ -17,6 +17,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
 - AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
+- Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
 
 ### Windows/Linux
 
