@@ -6023,6 +6023,31 @@
         ]
       }
     },
+    "/api/v1/videos/uncategorized": {
+      "delete": {
+        "tags": ["videos"],
+        "summary": "Delete Uncategorized Videos",
+        "description": "Deletes all uncategorized videos owned by the current user (or all if admin).\n\nMirrors ``delete_uncategorized_images`` so the \"Delete All Uncategorized\nImages/Videos\" board action covers both media kinds.",
+        "operationId": "delete_uncategorized_videos",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteVideosResult"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/videos/i/{video_name}/metadata": {
       "get": {
         "tags": ["videos"],
@@ -6061,6 +6086,54 @@
                     }
                   ],
                   "title": "Response Get Video Metadata"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/videos/i/{video_name}/workflow": {
+      "get": {
+        "tags": ["videos"],
+        "summary": "Get Video Workflow",
+        "description": "Gets the workflow and graph saved with a generated video (mirrors the image route).",
+        "operationId": "get_video_workflow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "video_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The name of video whose workflow to get",
+              "title": "Video Name"
+            },
+            "description": "The name of video whose workflow to get"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowAndGraphResponse"
                 }
               }
             }
@@ -79156,6 +79229,18 @@
             "const": "wan_t5_encoder",
             "title": "Format",
             "default": "wan_t5_encoder"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -79173,7 +79258,8 @@
           "cover_image",
           "base",
           "type",
-          "format"
+          "format",
+          "cpu_only"
         ],
         "title": "WanT5Encoder_WanT5Encoder_Config",
         "description": "UMT5-XXL encoder in diffusers folder layout.\n\nAccepts either:\n- A directory containing ``text_encoder/`` (and typically ``tokenizer/``) \u2500 the\n  shape produced by ``Wan-AI/Wan2.2-T2V-A14B::text_encoder+tokenizer``.\n- A bare ``text_encoder/`` directory whose own ``config.json`` declares\n  ``model_type: umt5``."

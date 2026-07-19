@@ -669,3 +669,114 @@ def test_remove_video_from_board_rejects_third_party(
         )
     assert response.status_code == status.HTTP_403_FORBIDDEN
     mock_invoker.services.board_video_records.remove_video_from_board.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# GET /videos/i/{video_name}/workflow (PR #9163 review fix — generated video
+# workflows were persisted but had no retrieval endpoint)
+# ---------------------------------------------------------------------------
+
+
+def test_get_video_workflow_returns_workflow_and_graph_for_owner(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
+    mock_invoker.services.videos.get_workflow.return_value = '{"nodes": []}'
+    mock_invoker.services.videos.get_graph.return_value = '{"edges": []}'
+
+    response = client.get(
+        "/api/v1/videos/i/mine_a.mp4/workflow",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {"workflow": '{"nodes": []}', "graph": '{"edges": []}'}
+
+
+def test_get_video_workflow_returns_nulls_when_video_has_none(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
+    mock_invoker.services.videos.get_workflow.return_value = None
+    mock_invoker.services.videos.get_graph.return_value = None
+
+    response = client.get(
+        "/api/v1/videos/i/mine_a.mp4/workflow",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {"workflow": None, "graph": None}
+
+
+def test_get_video_workflow_missing_video_returns_404(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
+    mock_invoker.services.videos.get_workflow.side_effect = Exception("video file not found")
+
+    response = client.get(
+        "/api/v1/videos/i/mine_a.mp4/workflow",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_get_video_workflow_forbidden_for_foreign_private_video(
+    client: TestClient, mock_invoker: Invoker, user2_token: str
+):
+    mock_invoker.services.video_records.get_user_id.return_value = "other-user-id"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = None
+
+    response = client.get(
+        "/api/v1/videos/i/not_mine.mp4/workflow",
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    mock_invoker.services.videos.get_workflow.assert_not_called()
+
+
+def test_get_video_workflow_requires_auth(enable_multiuser_for_videos: Any, client: TestClient):
+    response = client.get("/api/v1/videos/i/a.mp4/workflow")
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+# ---------------------------------------------------------------------------
+# DELETE /videos/uncategorized (PR #9163 review fix — "Delete All Uncategorized
+# Images/Videos" previously deleted only images)
+# ---------------------------------------------------------------------------
+
+
+def test_delete_uncategorized_videos_deletes_only_owned(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    _setup_mixed_ownership_batch(mock_invoker, user1.user_id)
+
+    names_result = MagicMock()
+    names_result.video_names = ["mine_a.mp4", "foreign.mp4", "mine_b.mp4"]
+    mock_invoker.services.videos.get_video_names.return_value = names_result
+
+    response = client.delete(
+        "/api/v1/videos/uncategorized",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert set(body["deleted_videos"]) == {"mine_a.mp4", "mine_b.mp4"}
+    # The service must be scoped to the caller's uncategorized bucket.
+    assert mock_invoker.services.videos.get_video_names.call_args.kwargs["board_id"] == "none"
+    assert mock_invoker.services.videos.get_video_names.call_args.kwargs["user_id"] == user1.user_id
+    delete_calls = {call.args[0] for call in mock_invoker.services.videos.delete.call_args_list}
+    assert delete_calls == {"mine_a.mp4", "mine_b.mp4"}
+
+
+def test_delete_uncategorized_videos_requires_auth(enable_multiuser_for_videos: Any, client: TestClient):
+    response = client.delete("/api/v1/videos/uncategorized")
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED

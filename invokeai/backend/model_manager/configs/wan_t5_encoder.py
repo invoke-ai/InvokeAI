@@ -63,6 +63,8 @@ class WanT5Encoder_WanT5Encoder_Config(Config_Base):
     type: Literal[ModelType.WanT5Encoder] = Field(default=ModelType.WanT5Encoder)
     format: Literal[ModelFormat.WanT5Encoder] = Field(default=ModelFormat.WanT5Encoder)
 
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
         raise_if_not_dir(mod)

@@ -1504,6 +1504,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/videos/uncategorized": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Uncategorized Videos
+         * @description Deletes all uncategorized videos owned by the current user (or all if admin).
+         *
+         *     Mirrors ``delete_uncategorized_images`` so the "Delete All Uncategorized
+         *     Images/Videos" board action covers both media kinds.
+         */
+        delete: operations["delete_uncategorized_videos"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/videos/i/{video_name}/metadata": {
         parameters: {
             query?: never;
@@ -1513,6 +1536,26 @@ export type paths = {
         };
         /** Get Video Metadata */
         get: operations["get_video_metadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/i/{video_name}/workflow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Workflow
+         * @description Gets the workflow and graph saved with a generated video (mirrors the image route).
+         */
+        get: operations["get_video_workflow"];
         put?: never;
         post?: never;
         delete?: never;
@@ -35034,6 +35077,11 @@ export type components = {
              * @constant
              */
             format: "wan_t5_encoder";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * Wan 2.2 TI2V Ideal Dimensions (5B)
@@ -39888,6 +39936,26 @@ export interface operations {
             };
         };
     };
+    delete_uncategorized_videos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteVideosResult"];
+                };
+            };
+        };
+    };
     get_video_metadata: {
         parameters: {
             query?: never;
@@ -39907,6 +39975,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetadataField"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_workflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of video whose workflow to get */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowAndGraphResponse"];
                 };
             };
             /** @description Validation Error */

@@ -207,3 +207,68 @@ class TestListItemNamesByCreatedDate:
         result = services["gallery"].list_item_names(user_id="alice", is_admin=False, created_date="2026-01-07")
 
         assert [(item.kind, item.name) for item in result.items] == [(GalleryItemKind.VIDEO, "alice-day.mp4")]
+
+
+class TestOrderingTieBreakers:
+    """PR #9163 review fix: ordering only by (starred, created_at) left images and videos
+    created within the same timestamp granularity with no defined relative order — rows
+    could reorder across refetches or shift between offset pages, and the virtual-board
+    cover could flicker between equally-new items."""
+
+    SAME_TS = "2026-01-05 12:00:00"
+
+    def _seed_same_timestamp(self, services) -> None:
+        _save_image(services["images"], "b.png", user_id="alice")
+        _save_image(services["images"], "a.png", user_id="alice")
+        _save_video(services["videos"], "b.mp4", user_id="alice")
+        _save_video(services["videos"], "a.mp4", user_id="alice")
+        for table, col, name in [
+            ("images", "image_name", "a.png"),
+            ("images", "image_name", "b.png"),
+            ("videos", "video_name", "a.mp4"),
+            ("videos", "video_name", "b.mp4"),
+        ]:
+            _backdate(services, table, col, name, self.SAME_TS)
+
+    def test_same_timestamp_order_is_deterministic(self, services) -> None:
+        self._seed_same_timestamp(services)
+        gallery = services["gallery"]
+
+        first = [(i.kind, i.name) for i in gallery.list_item_names(user_id="alice", is_admin=False).items]
+        for _ in range(5):
+            again = [(i.kind, i.name) for i in gallery.list_item_names(user_id="alice", is_admin=False).items]
+            assert again == first
+
+        # Descending: videos sort before images ('video' > 'image'), names descending.
+        assert first == [
+            (GalleryItemKind.VIDEO, "b.mp4"),
+            (GalleryItemKind.VIDEO, "a.mp4"),
+            (GalleryItemKind.IMAGE, "b.png"),
+            (GalleryItemKind.IMAGE, "a.png"),
+        ]
+
+    def test_ascending_is_mirror_of_descending(self, services) -> None:
+        from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+
+        self._seed_same_timestamp(services)
+        gallery = services["gallery"]
+
+        desc = [(i.kind, i.name) for i in gallery.list_item_names(user_id="alice", is_admin=False).items]
+        asc = [
+            (i.kind, i.name)
+            for i in gallery.list_item_names(user_id="alice", is_admin=False, order_dir=SQLiteDirection.Ascending).items
+        ]
+        assert asc == list(reversed(desc))
+
+    def test_same_timestamp_cover_is_deterministic(self, services) -> None:
+        self._seed_same_timestamp(services)
+        gallery = services["gallery"]
+
+        covers = set()
+        for _ in range(5):
+            boards = gallery.get_dates(user_id="alice", is_admin=False)
+            assert len(boards) == 1
+            covers.add((boards[0].cover_image_name, boards[0].cover_video_name))
+
+        # One stable choice across refetches: the kind/name-descending winner (b.mp4).
+        assert covers == {(None, "b.mp4")}

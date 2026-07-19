@@ -438,3 +438,75 @@ class TestRefreshMediaCookie:
         assert response.status_code == 200
         assert response.json()["success"] is True
         assert response.cookies.get("invokeai_media_token") is None
+
+
+class TestMediaCookieBehindSubPathProxy:
+    """The media cookie must be scoped to the *public* path when the app is served
+    under a reverse-proxy sub-path — browsers match cookie paths against the URL
+    they requested, so a cookie scoped to `/api/v1` is never sent to
+    `/invoke/api/v1/videos/...`."""
+
+    BASE_PATH = "/invoke"
+
+    def _proxied_client(self, preserve: bool) -> TestClient:
+        from invokeai.app.api_app import SubPathASGIMiddleware
+
+        wrapped = SubPathASGIMiddleware(app, self.BASE_PATH)
+        root = f"http://testserver{self.BASE_PATH}" if preserve else "http://testserver"
+        return TestClient(wrapped, base_url=root)
+
+    def _login(self, client: TestClient, email: str) -> tuple[str, Any]:
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "TestPass123", "remember_me": False},
+        )
+        assert response.status_code == 200
+        return response.json()["token"], response
+
+    @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+    def test_login_scopes_cookie_to_public_prefix(
+        self, preserve: bool, monkeypatch: Any, mock_invoker: Invoker
+    ) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        setup_test_user(mock_invoker, f"proxy-login-{preserve}@example.com", "TestPass123")
+        client = self._proxied_client(preserve)
+
+        _token, response = self._login(client, f"proxy-login-{preserve}@example.com")
+
+        assert f"Path={self.BASE_PATH}/api/v1" in response.headers["set-cookie"]
+
+    @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+    def test_media_cookie_endpoint_scopes_cookie_to_public_prefix(
+        self, preserve: bool, monkeypatch: Any, mock_invoker: Invoker
+    ) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        setup_test_user(mock_invoker, f"proxy-media-{preserve}@example.com", "TestPass123")
+        client = self._proxied_client(preserve)
+        token, _ = self._login(client, f"proxy-media-{preserve}@example.com")
+        client.cookies.clear()
+
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert f"Path={self.BASE_PATH}/api/v1" in response.headers["set-cookie"]
+
+    @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+    def test_logout_deletes_cookie_at_public_prefix_without_reminting(
+        self, preserve: bool, monkeypatch: Any, mock_invoker: Invoker
+    ) -> None:
+        """Logout must delete the cookie at the prefixed path, and the sliding-window
+        middleware must not mint a replacement token/cookie for the proxied logout URL."""
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+        setup_test_user(mock_invoker, f"proxy-logout-{preserve}@example.com", "TestPass123")
+        client = self._proxied_client(preserve)
+        token, _ = self._login(client, f"proxy-logout-{preserve}@example.com")
+
+        response = client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert "X-Refreshed-Token" not in response.headers
+        set_cookies = response.headers.get_list("set-cookie")
+        assert len(set_cookies) == 1
+        assert 'invokeai_media_token=""' in set_cookies[0]
+        assert f"Path={self.BASE_PATH}/api/v1" in set_cookies[0]

@@ -9,10 +9,11 @@ from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field, ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.images import _assert_board_read_access
+from invokeai.app.api.routers.images import WorkflowAndGraphResponse, _assert_board_read_access
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -49,6 +50,13 @@ RANGE_CHUNK_SIZE = 1024 * 1024
 # the goal is to prevent a single client from exhausting RAM, not to be a content policy.
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 MAX_UPLOAD_SIZE = 1024 * 1024 * 1024  # 1 GB
+# Pre-parse ingress cap enforced by VideoUploadLimitASGIMiddleware, applied to the whole
+# request body *before* the multipart parser spools it to temp storage. Slightly larger
+# than MAX_UPLOAD_SIZE to allow for multipart framing and the metadata form field.
+MAX_UPLOAD_REQUEST_SIZE = MAX_UPLOAD_SIZE + 10 * 1024 * 1024
+# Global bound on concurrent video uploads — each in-flight upload can hold up to two
+# copies of the file in temp storage (the multipart spool + the route's own tmp file).
+MAX_CONCURRENT_VIDEO_UPLOADS = 4
 
 
 def _get_video_cache_control() -> str:
@@ -228,7 +236,10 @@ async def upload_video(
 
     # Stream the upload to a tmp file so we can probe and then hand its path to the service.
     # Reading the full body into memory first risked exhausting RAM on multi-GB uploads;
-    # chunk-stream instead and enforce a hard size cap.
+    # chunk-stream instead and enforce a hard size cap. Filesystem writes, container
+    # validation, ffmpeg probing, and thumbnail extraction are all blocking — run them in
+    # the thread pool so a slow (or hostile) file can't stall the event loop and every
+    # other API request with it.
     tmp = tempfile.NamedTemporaryFile(prefix="invokeai_upload_", suffix=".mp4", delete=False)
     tmp_path = Path(tmp.name)
     try:
@@ -241,34 +252,36 @@ async def upload_video(
                     status_code=413,
                     detail=f"Video upload exceeds maximum size ({MAX_UPLOAD_SIZE} bytes)",
                 )
-            tmp.write(chunk)
+            await run_in_threadpool(tmp.write, chunk)
         tmp.close()
 
-        if not _is_mp4_file(tmp_path):
+        if not await run_in_threadpool(_is_mp4_file, tmp_path):
             raise HTTPException(status_code=415, detail="Not an MP4 video file")
 
         try:
-            width, height, duration, fps = probe_video(tmp_path)
+            width, height, duration, fps = await run_in_threadpool(probe_video, tmp_path)
         except Exception:
             ApiDependencies.invoker.services.logger.error(traceback.format_exc())
             raise HTTPException(status_code=415, detail="Failed to read video")
 
         try:
-            video_dto = ApiDependencies.invoker.services.videos.create(
-                source_path=tmp_path,
-                width=width,
-                height=height,
-                duration=duration,
-                fps=fps,
-                video_origin=ResourceOrigin.EXTERNAL,
-                video_category=video_category,
-                session_id=session_id,
-                board_id=board_id,
-                metadata=metadata,
-                workflow=None,
-                graph=None,
-                is_intermediate=is_intermediate,
-                user_id=current_user.user_id,
+            video_dto = await run_in_threadpool(
+                lambda: ApiDependencies.invoker.services.videos.create(
+                    source_path=tmp_path,
+                    width=width,
+                    height=height,
+                    duration=duration,
+                    fps=fps,
+                    video_origin=ResourceOrigin.EXTERNAL,
+                    video_category=video_category,
+                    session_id=session_id,
+                    board_id=board_id,
+                    metadata=metadata,
+                    workflow=None,
+                    graph=None,
+                    is_intermediate=is_intermediate,
+                    user_id=current_user.user_id,
+                )
             )
 
             response.status_code = 201
@@ -343,6 +356,39 @@ async def delete_videos_from_list(
     )
 
 
+@videos_router.delete("/uncategorized", operation_id="delete_uncategorized_videos", response_model=DeleteVideosResult)
+async def delete_uncategorized_videos(
+    current_user: CurrentUserOrDefault,
+) -> DeleteVideosResult:
+    """Deletes all uncategorized videos owned by the current user (or all if admin).
+
+    Mirrors ``delete_uncategorized_images`` so the "Delete All Uncategorized
+    Images/Videos" board action covers both media kinds.
+    """
+    names_result = ApiDependencies.invoker.services.videos.get_video_names(
+        board_id="none",
+        user_id=current_user.user_id,
+        is_admin=current_user.is_admin,
+    )
+    deleted_videos: set[str] = set()
+    affected_boards: set[str] = set()
+    for video_name in names_result.video_names:
+        try:
+            _assert_video_owner(video_name, current_user)
+            ApiDependencies.invoker.services.videos.delete(video_name)
+            deleted_videos.add(video_name)
+            affected_boards.add("none")
+        except HTTPException:
+            # Skip videos not owned by the current user
+            continue
+        except Exception:
+            pass
+    return DeleteVideosResult(
+        deleted_videos=list(deleted_videos),
+        affected_boards=list(affected_boards),
+    )
+
+
 @videos_router.patch("/i/{video_name}", operation_id="update_video", response_model=VideoDTO)
 async def update_video(
     current_user: CurrentUserOrDefault,
@@ -378,6 +424,23 @@ async def get_video_metadata(
     _assert_video_read_access(video_name, current_user)
     try:
         return ApiDependencies.invoker.services.videos.get_metadata(video_name)
+    except Exception:
+        raise HTTPException(status_code=404)
+
+
+@videos_router.get(
+    "/i/{video_name}/workflow", operation_id="get_video_workflow", response_model=WorkflowAndGraphResponse
+)
+async def get_video_workflow(
+    current_user: CurrentUserOrDefault,
+    video_name: str = PathParam(description="The name of video whose workflow to get"),
+) -> WorkflowAndGraphResponse:
+    """Gets the workflow and graph saved with a generated video (mirrors the image route)."""
+    _assert_video_read_access(video_name, current_user)
+    try:
+        workflow = ApiDependencies.invoker.services.videos.get_workflow(video_name)
+        graph = ApiDependencies.invoker.services.videos.get_graph(video_name)
+        return WorkflowAndGraphResponse(workflow=workflow, graph=graph)
     except Exception:
         raise HTTPException(status_code=404)
 
