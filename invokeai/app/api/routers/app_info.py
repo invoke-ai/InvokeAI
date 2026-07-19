@@ -11,7 +11,7 @@ from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field, model_validator
 
-from invokeai.app.api.auth_dependencies import AdminUserOrDefault
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
     EXTERNAL_PROVIDER_CONFIG_FIELDS,
@@ -55,7 +55,7 @@ async def get_version() -> AppVersion:
 
 
 @app_router.get("/app_deps", operation_id="get_app_deps", status_code=200, response_model=dict[str, str])
-async def get_app_deps() -> dict[str, str]:
+async def get_app_deps(current_user: CurrentUserOrDefault) -> dict[str, str]:
     deps: dict[str, str] = {dist.metadata["Name"]: dist.version for dist in distributions()}
     try:
         cuda = getattr(getattr(torch, "version", None), "cuda", None) or "N/A"  # pyright: ignore[reportAttributeAccessIssue]
@@ -70,7 +70,7 @@ async def get_app_deps() -> dict[str, str]:
 
 
 @app_router.get("/patchmatch_status", operation_id="get_patchmatch_status", status_code=200, response_model=bool)
-async def get_patchmatch_status() -> bool:
+async def get_patchmatch_status(current_user: CurrentUserOrDefault) -> bool:
     return PatchMatch.patchmatch_available()
 
 
@@ -139,12 +139,38 @@ class UpdateAppGenerationSettingsRequest(BaseModel):
         return self
 
 
+REDACTED_SECRET = "**********"
+
+
+def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
+    """Return a copy of the config with credential fields masked.
+
+    The runtime config is readable by every authenticated user, but it carries provider API keys and model-download
+    bearer tokens. Those are never needed by the client - the UI only cares whether a credential is configured - so
+    they are masked here rather than shipped to the browser.
+    """
+    updates: dict[str, Any] = {}
+
+    for field_name in EXTERNAL_PROVIDER_CONFIG_FIELDS:
+        if not field_name.endswith("_api_key"):
+            continue
+        if getattr(config, field_name, None):
+            updates[field_name] = REDACTED_SECRET
+
+    if config.remote_api_tokens:
+        updates["remote_api_tokens"] = [
+            pair.model_copy(update={"token": REDACTED_SECRET}) for pair in config.remote_api_tokens
+        ]
+
+    return config.model_copy(update=updates) if updates else config
+
+
 @app_router.get(
     "/runtime_config", operation_id="get_runtime_config", status_code=200, response_model=InvokeAIAppConfigWithSetFields
 )
-async def get_runtime_config() -> InvokeAIAppConfigWithSetFields:
+async def get_runtime_config(current_user: CurrentUserOrDefault) -> InvokeAIAppConfigWithSetFields:
     config = get_config()
-    return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
+    return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=_redact_config_secrets(config))
 
 
 @app_router.patch(
@@ -178,7 +204,7 @@ async def update_runtime_config(
     status_code=200,
     response_model=list[ExternalProviderStatusModel],
 )
-async def get_external_provider_statuses() -> list[ExternalProviderStatusModel]:
+async def get_external_provider_statuses(current_user: CurrentUserOrDefault) -> list[ExternalProviderStatusModel]:
     statuses = ApiDependencies.invoker.services.external_generation.get_provider_statuses()
     return [status_to_model(status) for status in statuses.values()]
 
@@ -189,7 +215,7 @@ async def get_external_provider_statuses() -> list[ExternalProviderStatusModel]:
     status_code=200,
     response_model=list[ExternalProviderConfigModel],
 )
-async def get_external_provider_configs() -> list[ExternalProviderConfigModel]:
+async def get_external_provider_configs(current_admin: AdminUserOrDefault) -> list[ExternalProviderConfigModel]:
     config = get_config()
     return [_build_external_provider_config(provider_id, config) for provider_id in EXTERNAL_PROVIDER_FIELDS]
 
@@ -340,7 +366,7 @@ def _remove_external_models_for_provider(provider_id: str) -> None:
     responses={200: {"description": "The operation was successful"}},
     response_model=LogLevel,
 )
-async def get_log_level() -> LogLevel:
+async def get_log_level(current_admin: AdminUserOrDefault) -> LogLevel:
     """Returns the log level"""
     return LogLevel(ApiDependencies.invoker.services.logger.level)
 
@@ -352,6 +378,7 @@ async def get_log_level() -> LogLevel:
     response_model=LogLevel,
 )
 async def set_log_level(
+    current_admin: AdminUserOrDefault,
     level: LogLevel = Body(description="New log verbosity level"),
 ) -> LogLevel:
     """Sets the log verbosity level"""
@@ -364,7 +391,7 @@ async def set_log_level(
     operation_id="clear_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def clear_invocation_cache() -> None:
+async def clear_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.clear()
 
@@ -374,7 +401,7 @@ async def clear_invocation_cache() -> None:
     operation_id="enable_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def enable_invocation_cache() -> None:
+async def enable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.enable()
 
@@ -384,7 +411,7 @@ async def enable_invocation_cache() -> None:
     operation_id="disable_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def disable_invocation_cache() -> None:
+async def disable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.disable()
 
@@ -394,6 +421,6 @@ async def disable_invocation_cache() -> None:
     operation_id="get_invocation_cache_status",
     responses={200: {"model": InvocationCacheStatus}},
 )
-async def get_invocation_cache_status() -> InvocationCacheStatus:
+async def get_invocation_cache_status(current_admin: AdminUserOrDefault) -> InvocationCacheStatus:
     """Clears the invocation cache"""
     return ApiDependencies.invoker.services.invocation_cache.get_status()
