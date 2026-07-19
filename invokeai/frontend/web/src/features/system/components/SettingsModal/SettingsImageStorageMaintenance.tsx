@@ -1,11 +1,10 @@
 import { Button, Flex, FormControl, FormLabel, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, LIST_TAG } from 'services/api';
-import { useGetRuntimeConfigQuery } from 'services/api/endpoints/appInfo';
 import {
   useGetImageMoveStatusQuery,
   useStartImageMoveMutation,
@@ -47,9 +46,7 @@ const invalidatedImageMoveJobIds = new Set<number>();
 export const SettingsImageStorageMaintenance = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const currentUser = useAppSelector(selectCurrentUser);
-  const { data: runtimeConfig } = useGetRuntimeConfigQuery();
-  const canAccess = runtimeConfig ? !runtimeConfig.config.multiuser || Boolean(currentUser?.is_admin) : false;
+  const canAccess = useIsAdmin();
   const [startImageMove, startImageMoveState] = useStartImageMoveMutation();
   const [startImageMoveRecovery, startImageMoveRecoveryState] = useStartImageMoveRecoveryMutation();
   const [shouldPollStatus, setShouldPollStatus] = useState(false);

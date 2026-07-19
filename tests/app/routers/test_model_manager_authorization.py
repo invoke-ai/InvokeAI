@@ -48,6 +48,7 @@ ADMIN_ONLY_ROUTES = [
     ("get", "/api/v2/models/stats"),
     ("get", "/api/v2/models/hf_login"),
     ("get", "/api/v1/app/external_providers/config"),
+    ("get", "/api/v1/app/runtime_config"),
     ("get", "/api/v1/app/logging"),
     ("delete", "/api/v1/app/invocation_cache"),
     ("put", "/api/v1/app/invocation_cache/enable"),
@@ -131,16 +132,16 @@ def test_runtime_config_redacts_secrets() -> None:
 
 
 def test_runtime_config_response_has_no_secrets(
-    enable_multiuser: Any, client: TestClient, user1_token: str, monkeypatch: Any
+    enable_multiuser: Any, client: TestClient, admin_token: str, monkeypatch: Any
 ) -> None:
-    """End-to-end: an authenticated non-admin gets the config, but with credentials masked."""
+    """End-to-end: even an admin's browser never receives the raw credentials."""
     config = InvokeAIAppConfig(
         external_openai_api_key="sk-super-secret",
         remote_api_tokens=[URLRegexTokenPair(url_regex="example.com", token="bearer-secret")],
     )
     monkeypatch.setattr("invokeai.app.api.routers.app_info.get_config", lambda: config)
 
-    response = client.get("/api/v1/app/runtime_config", headers=_auth(user1_token))
+    response = client.get("/api/v1/app/runtime_config", headers=_auth(admin_token))
     assert response.status_code == status.HTTP_200_OK
     assert "sk-super-secret" not in response.text
     assert "bearer-secret" not in response.text
