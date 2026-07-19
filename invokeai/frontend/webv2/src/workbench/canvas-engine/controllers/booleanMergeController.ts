@@ -1,6 +1,7 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
+import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
@@ -33,8 +34,8 @@ export interface BooleanMergeControllerOptions {
     expectedReducer: () => boolean,
     expectedMirror: () => boolean
   ) => void;
-  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => unknown;
-  readonly installPrepared: (prepared: unknown) => void;
+  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => PreparedLayerCacheReplacement;
+  readonly installPrepared: (prepared: PreparedLayerCacheReplacement) => void;
 }
 
 const modes: Record<BooleanRasterOperation, GlobalCompositeOperation> = {
