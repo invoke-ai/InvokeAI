@@ -21,7 +21,10 @@ const GalleryImageContextMenu = lazy(() =>
   import('./GalleryImageActionsBridge').then((module) => ({ default: module.GalleryImageContextMenu }))
 );
 
-/** App-owned translation between Gallery UI intents and the Workbench aggregate. */
+/**
+ * Production binding of Gallery's UI port: translates Gallery UI intents into
+ * the Workbench aggregate. No second adapter is expected.
+ */
 export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) => {
   const projectId = useActiveProjectId();
   const projectName = useActiveProjectName();

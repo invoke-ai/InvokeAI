@@ -48,7 +48,7 @@ export const GenerateReferenceImagesSection = ({
   settings,
 }: GenerateReferenceImagesSectionProps) => {
   const { t } = useTranslation();
-  const { notifications, touchGalleryImages } = useGenerationUi();
+  const { gallery, notifications } = useGenerationUi();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const referenceImages = settings.referenceImages;
   const isSupported = isReferenceImageSupported(selectedModel);
@@ -144,7 +144,7 @@ export const GenerateReferenceImagesSection = ({
         );
 
         appendReferenceImages(uploaded.map(generatedImageToReferenceImage));
-        touchGalleryImages();
+        gallery.touchImages();
       } catch (error) {
         notifications.reportError({
           area: 'reference-images',
@@ -153,7 +153,7 @@ export const GenerateReferenceImagesSection = ({
         });
       }
     },
-    [appendReferenceImages, canAdd, maxReferenceImages, notifications, referenceImageCount, touchGalleryImages]
+    [appendReferenceImages, canAdd, gallery, maxReferenceImages, notifications, referenceImageCount]
   );
 
   const handleUploadZoneClick = useCallback(() => {

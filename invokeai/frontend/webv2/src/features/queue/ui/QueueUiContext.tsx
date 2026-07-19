@@ -8,6 +8,10 @@ export interface QueueUiNotificationPort {
   success(title: string, description?: string): void;
 }
 
+/**
+ * Queue's UI port. The context is a dependency-direction port (the feature
+ * may not import workbench), not a test seam; no second adapter is expected.
+ */
 export interface QueueUiAdapter {
   ItemActions: ComponentType<{ item: QueueItemReadModel }>;
   activeProjectId: string | null;

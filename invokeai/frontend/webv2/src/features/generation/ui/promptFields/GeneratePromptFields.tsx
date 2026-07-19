@@ -40,7 +40,7 @@ export const GeneratePromptFields = ({
   selectedModel,
   settings,
 }: GeneratePromptFieldsProps) => {
-  const { generateValues, showPromptSyntaxHighlighting } = useGenerationUi();
+  const { generateValues, showPromptSyntaxHighlighting } = useGenerationUi().project;
   const promptValues = getPromptValues(generateValues);
   const promptPolicy = getPromptPolicy(selectedModel, settings);
 

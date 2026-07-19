@@ -3,6 +3,23 @@ import type { ProjectGraphState } from '@features/workflow/core/types';
 
 export type WorkflowRegion = 'left' | 'right' | 'bottom' | 'center' | 'dialog' | 'popover';
 
+/**
+ * Panel regions workflow surfaces may open/select widgets in. Structural
+ * mirror of workbench's `WidgetRegion` (`workbench/layoutContracts.ts`) —
+ * the feature may not import workbench, so drift is caught as a tsc error at
+ * the check site: the `widgets` wiring in `app/WorkflowUiAdapter.tsx`.
+ */
+export type WorkflowWidgetPanelRegion = 'left' | 'right' | 'bottom' | 'center';
+
+/**
+ * Invocation sources the graph preview can route. Structural mirror of
+ * workbench's `InvocationSourceId` (`workbench/invocationContracts.ts`) —
+ * drift is caught as a tsc error at the check sites: the `graphPreview`
+ * wiring in `app/WorkflowUiAdapter.tsx` and the `GraphPreviewDialog` mount in
+ * `workbench/widget-frame/WidgetActionsMenu.tsx`.
+ */
+export type WorkflowInvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'canvas';
+
 export interface WorkflowRuntimeApi {
   instanceId: string;
   typeId: string;
@@ -44,9 +61,9 @@ export interface WorkflowCommands {
 }
 
 export interface WorkflowWidgetCommands {
-  open(options: { region: WorkflowRegion; widgetId: string }): void;
+  open(options: { region: WorkflowWidgetPanelRegion; widgetId: string }): void;
   patchValues(widgetId: string, values: Record<string, unknown>): void;
-  select(options: { region: WorkflowRegion; widgetId: string }): void;
+  select(options: { region: WorkflowWidgetPanelRegion; widgetId: string }): void;
 }
 
 export interface WorkflowModel {

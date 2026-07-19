@@ -1,5 +1,5 @@
 import type { XYPosition } from '@features/workflow/contracts';
-import type { WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
+import type { WorkflowInvocationSourceId, WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
 
 import { Box, Dialog, Portal, SegmentGroup, Text } from '@chakra-ui/react';
 import { useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
@@ -15,7 +15,7 @@ interface GraphPreviewDialogProps {
   isOpen: boolean;
   /** Editor positions keyed by node id, when the graph mirrors an editable document. */
   positionHints?: Record<string, XYPosition>;
-  sourceId?: string;
+  sourceId?: WorkflowInvocationSourceId;
   title: string;
   onOpenChange: (isOpen: boolean) => void;
 }

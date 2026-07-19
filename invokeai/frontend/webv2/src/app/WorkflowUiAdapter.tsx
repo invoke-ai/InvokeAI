@@ -1,6 +1,4 @@
 import type { WorkflowModelSelectProps, WorkflowUiAdapter } from '@features/workflow/react';
-import type { DiagnosticSource } from '@workbench/diagnostics/logger';
-import type { InvocationSourceId } from '@workbench/invocationContracts';
 import type { ComponentType, ReactNode } from 'react';
 
 import { flushGenerateDrafts } from '@features/generation/drafts';
@@ -31,9 +29,13 @@ import {
 import { lazy, useMemo } from 'react';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
-const WorkflowModelSelect = ModelSelect as ComponentType<WorkflowModelSelectProps>;
+const WorkflowModelSelect: ComponentType<WorkflowModelSelectProps> = ModelSelect;
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
+/**
+ * Production binding of Workflow's UI port: wires Workbench commands, routes,
+ * diagnostics, and Models/Nodes state. No second adapter is expected.
+ */
 export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode }) => {
   const project = useActiveProjectSelector((activeProject) => ({
     activeProjectId: activeProject.id,
@@ -91,7 +93,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
           const route = resolveInvocationRouteInput(
             routeInput,
             'dialog',
-            { ...routeInput.invocation, sourceId: sourceId as InvocationSourceId, sourceLocked: true },
+            { ...routeInput.invocation, sourceId, sourceLocked: true },
             availabilityModels
           );
 
@@ -109,24 +111,23 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
             models: availabilityModels,
             prepareCanvasInvocation,
             project: queries.getSnapshot().activeProject,
-            sourceId: sourceId as InvocationSourceId | undefined,
+            sourceId,
           });
         },
       },
       notifications: { error: notify.error, info: notify.info, success: notify.success },
       performance: {
-        mark: (name, source) => markWorkbenchPerf(name, source as DiagnosticSource),
-        measure: (name, start, source, end) => measureWorkbenchPerf(name, start, source as DiagnosticSource, end),
-        time: (name, source, callback) => timeWorkbenchPerf(name, source as DiagnosticSource, callback),
+        mark: (name, source) => markWorkbenchPerf(name, source),
+        measure: (name, start, source, end) => measureWorkbenchPerf(name, start, source, end),
+        time: (name, source, callback) => timeWorkbenchPerf(name, source, callback),
       },
       preferences,
       registerModalHotkeyLayer: registerHotkeyModalLayer,
       nodeExecution: { get: nodeExecutionStore.get, subscribe: nodeExecutionStore.subscribe },
       widgets: {
-        open: (options) => commands.widgets.open(options as Parameters<typeof commands.widgets.open>[0]),
-        patchValues: (widgetId, values) =>
-          commands.widgets.patchValues(widgetId as Parameters<typeof commands.widgets.patchValues>[0], values),
-        select: (options) => commands.widgets.select(options as Parameters<typeof commands.widgets.select>[0]),
+        open: (options) => commands.widgets.open(options),
+        patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
+        select: (options) => commands.widgets.select(options),
       },
     }),
     [

@@ -10,7 +10,10 @@ const QueueItemActions = lazy(() =>
   import('@workbench/queue-integration/QueueItemActions').then((module) => ({ default: module.QueueItemActions }))
 );
 
-/** App-owned adapter for Queue UI concerns that belong to Workbench. */
+/**
+ * Production binding of Queue's UI port: adapts the Workbench-owned concerns
+ * Queue's UI depends on. No second adapter is expected.
+ */
 export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) => {
   const notify = useNotify();
   const activeProjectId = useActiveProjectSelector((project) => project.id);

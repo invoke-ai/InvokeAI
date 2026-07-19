@@ -40,14 +40,14 @@ const getSettingsWithAutoComponentSource = (
 
 export const GenerateWidgetView = () => {
   const ui = useGenerationUi();
-  const projectId = ui.activeProjectId;
-  const storedValues = ui.generateValues;
-  const error = ui.modelsError;
-  const models = ui.models;
-  const status = ui.modelsStatus;
+  const projectId = ui.project.activeProjectId;
+  const storedValues = ui.project.generateValues;
+  const error = ui.models.error;
+  const models = ui.models.catalog;
+  const status = ui.models.status;
 
   useMountEffect(() => {
-    ui.ensureModelsLoaded();
+    ui.models.ensureLoaded();
   });
 
   const supportedModels = useMemo<GenerateModelConfig[]>(() => models.filter(isSupportedGenerateModel), [models]);
@@ -86,7 +86,7 @@ export const GenerateWidgetView = () => {
       return;
     }
 
-    ui.patchGenerateSettings(getGenerateFormCommitPatch({ ...nextSettings, model }), projectId);
+    ui.settings.patchGenerateSettings(getGenerateFormCommitPatch({ ...nextSettings, model }), projectId);
   }, [models, projectId, selectedModel, settings, storedValues, supportedModels, ui]);
 
   const commitSettings = useCallback(
@@ -97,7 +97,7 @@ export const GenerateWidgetView = () => {
         return;
       }
 
-      ui.patchGenerateSettings(
+      ui.settings.patchGenerateSettings(
         getGenerateFormCommitPatch({
           ...getSettingsWithAutoComponentSource(nextSettings, model, models),
           model,
@@ -110,7 +110,7 @@ export const GenerateWidgetView = () => {
 
   const patchSettings = useCallback(
     (values: Partial<GenerateSettings>) => {
-      ui.patchGenerateSettings(values, projectId);
+      ui.settings.patchGenerateSettings(values, projectId);
     },
     [projectId, ui]
   );

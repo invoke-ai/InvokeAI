@@ -6,6 +6,7 @@ import { createContext, use, useCallback, useSyncExternalStore } from 'react';
 import type {
   WorkflowCommands,
   WorkflowGraphHistoryEntry,
+  WorkflowInvocationSourceId,
   WorkflowModelSelectProps,
   WorkflowNodeExecutionState,
   WorkflowPerfSource,
@@ -21,6 +22,10 @@ export interface WorkflowPreferences {
   workflowValidateConnections: boolean;
 }
 
+/**
+ * Workflow's UI port. The context is a dependency-direction port (the feature
+ * may not import workbench), not a test seam; no second adapter is expected.
+ */
 export interface WorkflowUiAdapter {
   ModelSelect: ComponentType<WorkflowModelSelectProps>;
   activeProjectId: string;
@@ -40,8 +45,10 @@ export interface WorkflowUiAdapter {
     success(title: string, message?: string): void;
   };
   graphPreview: {
-    getRoute(sourceId?: string): { canInvoke: boolean; label: string; validationMessage?: string } | null;
-    invoke(sourceId?: string): Promise<boolean>;
+    getRoute(
+      sourceId?: WorkflowInvocationSourceId
+    ): { canInvoke: boolean; label: string; validationMessage?: string } | null;
+    invoke(sourceId?: WorkflowInvocationSourceId): Promise<boolean>;
   };
   performance: {
     mark(name: string, source: WorkflowPerfSource): void;

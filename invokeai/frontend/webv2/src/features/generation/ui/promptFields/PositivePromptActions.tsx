@@ -187,7 +187,7 @@ export const PromptTriggerPopover = ({
   onSelect: (trigger: string) => void;
 }) => {
   const { t } = useTranslation();
-  const { ensureModelsLoaded, models } = useGenerationUi();
+  const { catalog: models, ensureLoaded: ensureModelsLoaded } = useGenerationUi().models;
   const [searchTerm, setSearchTerm] = useState('');
 
   const options = useMemo(
@@ -336,7 +336,11 @@ const ExpandPromptButton = ({
   onPositivePromptChange: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
-  const { activeProjectId, ensureModelsLoaded, models, notifications } = useGenerationUi();
+  const {
+    models: { catalog: models, ensureLoaded: ensureModelsLoaded },
+    notifications,
+    project: { activeProjectId },
+  } = useGenerationUi();
   const activeProjectIdRef = useRef(activeProjectId);
   const triggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
@@ -458,11 +462,10 @@ const ImageToPromptButton = ({
 }) => {
   const { t } = useTranslation();
   const {
-    activeProjectId,
-    ensureModelsLoaded,
-    models,
+    gallery: { selectedImage },
+    models: { catalog: models, ensureLoaded: ensureModelsLoaded },
     notifications,
-    selectedGalleryImage: selectedImage,
+    project: { activeProjectId },
   } = useGenerationUi();
   const activeProjectIdRef = useRef(activeProjectId);
   const triggerId = useId();
@@ -592,7 +595,7 @@ const ImageToPromptButton = ({
 
 const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActionsProps, 'onUsePrompt'>) => {
   const { t } = useTranslation();
-  const { clearPromptHistory, promptHistory } = useGenerationUi();
+  const { clear: clearPromptHistory, items: promptHistory } = useGenerationUi().promptHistory;
   const historyTriggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -705,7 +708,7 @@ const PromptHistoryItemRow = ({
   prompt: PromptHistoryItem;
 }) => {
   const { t } = useTranslation();
-  const { removePromptFromHistory } = useGenerationUi();
+  const { remove: removePromptFromHistory } = useGenerationUi().promptHistory;
   const handleUsePrompt = useCallback(() => onUsePrompt(prompt), [onUsePrompt, prompt]);
   const handleDelete = useCallback(() => removePromptFromHistory(prompt), [prompt, removePromptFromHistory]);
 

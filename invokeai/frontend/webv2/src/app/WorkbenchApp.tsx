@@ -12,13 +12,8 @@ import { WorkbenchSessionController } from '@workbench/WorkbenchSessionControlle
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useMemo } from 'react';
 
-import { GalleryUiAdapterProvider } from './GalleryUiAdapter';
-import { GenerationUiAdapterProvider } from './GenerationUiAdapter';
-import { ModelsUiAdapterProvider } from './ModelsUiAdapter';
 import { QueueRuntimeAdapter } from './QueueRuntimeAdapter';
-import { QueueUiAdapterProvider } from './QueueUiAdapter';
-import { UpscaleUiAdapterProvider } from './UpscaleUiAdapter';
-import { WorkflowUiAdapterProvider } from './WorkflowUiAdapter';
+import { WorkbenchUiPorts } from './workbenchPorts';
 
 /**
  * The authenticated editor: providers, editor-only runtimes, and the shell.
@@ -40,25 +35,15 @@ export const WorkbenchApp = () => {
   return (
     <WorkbenchProvider loadOptions={loadOptions}>
       <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
-        <ModelsUiAdapterProvider>
-          <QueueUiAdapterProvider>
-            <GalleryUiAdapterProvider>
-              <GenerationUiAdapterProvider>
-                <UpscaleUiAdapterProvider>
-                  <WorkflowUiAdapterProvider>
-                    <SessionExpiryGuard />
-                    <WorkbenchHotkeyRuntime />
-                    <QueueRuntimeAdapter />
-                    <WorkbenchRuntime />
-                    <WorkbenchSessionController search={search} />
-                    <WidgetHosts />
-                    <WorkbenchShell />
-                  </WorkflowUiAdapterProvider>
-                </UpscaleUiAdapterProvider>
-              </GenerationUiAdapterProvider>
-            </GalleryUiAdapterProvider>
-          </QueueUiAdapterProvider>
-        </ModelsUiAdapterProvider>
+        <WorkbenchUiPorts>
+          <SessionExpiryGuard />
+          <WorkbenchHotkeyRuntime />
+          <QueueRuntimeAdapter />
+          <WorkbenchRuntime />
+          <WorkbenchSessionController search={search} />
+          <WidgetHosts />
+          <WorkbenchShell />
+        </WorkbenchUiPorts>
       </WorkbenchWidgetRegistryProvider>
     </WorkbenchProvider>
   );

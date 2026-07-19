@@ -2,6 +2,10 @@ import type { ReactNode } from 'react';
 
 import { createContext, use } from 'react';
 
+/**
+ * Models' UI port. The context is a dependency-direction port (the feature
+ * may not import workbench), not a test seam; no second adapter is expected.
+ */
 export interface ModelsUiAdapter {
   enableModelDescriptions: boolean;
   managerProjectId: string | null;

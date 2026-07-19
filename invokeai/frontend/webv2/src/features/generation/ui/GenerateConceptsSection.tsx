@@ -167,7 +167,7 @@ const LoraRow = ({
   onWeightChange: (weight: number) => void;
 }) => {
   const { t } = useTranslation();
-  const { getModelBaseColorPalette, getModelBaseLabel } = useGenerationUi();
+  const { getBaseColorPalette, getBaseLabel } = useGenerationUi().models;
   const isActive = lora.isEnabled && isCompatible;
   const defaultWeight = getDefaultLoraWeight(lora.model);
 
@@ -200,8 +200,8 @@ const LoraRow = ({
             <Text color={isActive ? 'fg' : 'fg.muted'} fontSize="xs" fontWeight="medium" minW="0" truncate>
               {lora.model.name}
             </Text>
-            <Badge colorPalette={getModelBaseColorPalette(lora.model.base)} flexShrink={0} size="xs" variant="surface">
-              {getModelBaseLabel(lora.model.base)}
+            <Badge colorPalette={getBaseColorPalette(lora.model.base)} flexShrink={0} size="xs" variant="surface">
+              {getBaseLabel(lora.model.base)}
             </Badge>
             {!isCompatible ? (
               <Badge colorPalette="orange" flexShrink={0} size="xs" variant="surface">

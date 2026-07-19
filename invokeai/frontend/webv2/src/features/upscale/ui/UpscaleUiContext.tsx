@@ -4,6 +4,10 @@ import type { ReactNode } from 'react';
 
 import { createContext, use } from 'react';
 
+/**
+ * Upscale's UI port. The context is a dependency-direction port (the feature
+ * may not import workbench), not a test seam; no second adapter is expected.
+ */
 export interface UpscaleUiAdapter {
   patchPromptDraft(values: ProjectPromptDraftPatch): void;
   patchValues(values: Partial<UpscaleWidgetValues>): void;

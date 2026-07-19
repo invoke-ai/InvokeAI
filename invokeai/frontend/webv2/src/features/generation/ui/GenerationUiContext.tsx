@@ -26,32 +26,45 @@ export interface GenerationSelectedImage {
   thumbnailUrl: string;
 }
 
+/**
+ * Generation's UI port, grouped into sub-ports by backing concern. The context
+ * is a dependency-direction port (the feature may not import workbench), not a
+ * test seam; no second adapter is expected.
+ */
 export interface GenerationUiAdapter {
   CanvasCompositingSection: ComponentType;
-  ModelSelect: ComponentType<GenerationModelSelectProps>;
-  activeProjectId: string;
-  canvasValues: Record<string, unknown>;
-  ensureModelsLoaded(): void;
-  generateValues: Record<string, unknown>;
-  getModelBaseColorPalette(base: string): string;
-  getModelBaseLabel(base: string): string;
-  invocationSourceId: string;
-  models: readonly GenerationModelCatalogItem[];
-  modelsError: string | null;
-  modelsStatus: 'error' | 'idle' | 'loaded' | 'loading';
+  gallery: {
+    selectedImage: GenerationSelectedImage | null;
+    touchImages(): void;
+  };
+  models: {
+    ModelSelect: ComponentType<GenerationModelSelectProps>;
+    catalog: readonly GenerationModelCatalogItem[];
+    ensureLoaded(): void;
+    error: string | null;
+    getBaseColorPalette(base: string): string;
+    getBaseLabel(base: string): string;
+    status: 'error' | 'idle' | 'loaded' | 'loading';
+  };
   notifications: {
     error(title: string, message?: string): void;
     info(title: string, message?: string): void;
     reportError(error: { area: string; message: string; namespace: 'generation'; projectId?: string }): void;
   };
-  patchCanvasValues(values: Record<string, unknown>): void;
-  patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string): void;
-  promptHistory: readonly PromptHistoryItem[];
-  clearPromptHistory(): void;
-  removePromptFromHistory(prompt: PromptHistoryItem): void;
-  selectedGalleryImage: GenerationSelectedImage | null;
-  showPromptSyntaxHighlighting: boolean;
-  touchGalleryImages(): void;
+  project: {
+    activeProjectId: string;
+    generateValues: Record<string, unknown>;
+    invocationSourceId: string;
+    showPromptSyntaxHighlighting: boolean;
+  };
+  promptHistory: {
+    items: readonly PromptHistoryItem[];
+    clear(): void;
+    remove(prompt: PromptHistoryItem): void;
+  };
+  settings: {
+    patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string): void;
+  };
 }
 
 const GenerationUiContext = createContext<GenerationUiAdapter | null>(null);
@@ -71,6 +84,6 @@ export const useGenerationUi = (): GenerationUiAdapter => {
 };
 
 export const GenerationModelSelect = (props: GenerationModelSelectProps) => {
-  const { ModelSelect } = useGenerationUi();
+  const { ModelSelect } = useGenerationUi().models;
   return <ModelSelect {...props} />;
 };

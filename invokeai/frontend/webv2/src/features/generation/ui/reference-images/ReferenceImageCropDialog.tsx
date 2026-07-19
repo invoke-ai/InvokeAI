@@ -159,7 +159,7 @@ export const ReferenceImageCropDialog = ({
   onClose: () => void;
 }) => {
   const { t } = useTranslation();
-  const { notifications, touchGalleryImages } = useGenerationUi();
+  const { gallery, notifications } = useGenerationUi();
   const [cropBox, setCropBox] = useState<ReferenceImageCropBoxPct>(() => getReferenceImageCropBoxPct(image));
   const [isApplying, setIsApplying] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -249,7 +249,7 @@ export const ReferenceImageCropDialog = ({
     try {
       setIsApplying(true);
       const croppedImage = await applyReferenceImageCropSelection(image, cropBox);
-      touchGalleryImages();
+      gallery.touchImages();
       onApply(croppedImage);
       onClose();
     } catch (error) {
@@ -261,7 +261,7 @@ export const ReferenceImageCropDialog = ({
     } finally {
       setIsApplying(false);
     }
-  }, [close, cropBox, image, notifications, onApply, onClose, touchGalleryImages]);
+  }, [close, cropBox, gallery, image, notifications, onApply, onClose]);
 
   return (
     <Dialog.Root lazyMount open={isOpen} placement="center" size="lg" unmountOnExit onOpenChange={handleOpenChange}>

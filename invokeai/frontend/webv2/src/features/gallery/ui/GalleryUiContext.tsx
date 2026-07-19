@@ -66,6 +66,10 @@ export interface GalleryWidgetProps {
   runtime: GalleryWidgetRuntime;
 }
 
+/**
+ * Gallery's UI port. The context is a dependency-direction port (the feature
+ * may not import workbench), not a test seam; no second adapter is expected.
+ */
 export interface GalleryUiAdapter {
   ImageActionsProvider: ComponentType<GalleryImageActionsOptions & { children: ReactNode }>;
   ImageContextMenu: ComponentType<GalleryImageContextMenuProps>;

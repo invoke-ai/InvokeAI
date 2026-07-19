@@ -7,6 +7,10 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
 
+/**
+ * Production binding of Upscale's UI port: maps the upscale widget instance
+ * and prompt drafts out of the Workbench aggregate. No second adapter is expected.
+ */
 export const UpscaleUiAdapterProvider = ({ children }: { children: ReactNode }) => {
   const project = useActiveProjectSelector(
     (activeProject) => {
