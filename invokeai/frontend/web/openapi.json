@@ -585,6 +585,11 @@
         "summary": "List Model Records",
         "description": "Get a list of models.",
         "operationId": "list_model_records",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "base_models",
@@ -725,7 +730,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v2/models/get_by_attrs": {
@@ -734,6 +744,11 @@
         "summary": "Get Model Records By Attrs",
         "description": "Gets a model by its attributes. The main use of this route is to provide backwards compatibility with the old\nmodel manager, which identified models by a combination of name, base and type.",
         "operationId": "get_model_records_by_attrs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "name",
@@ -1078,6 +1093,11 @@
         "summary": "Get Model Records By Hash",
         "description": "Gets a model by its hash. This is useful for recalling models that were deleted and reinstalled,\nas the hash remains stable across reinstallations while the key (UUID) changes.",
         "operationId": "get_model_records_by_hash",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "hash",
@@ -1402,6 +1422,11 @@
         "summary": "Get Model Record",
         "description": "Get a model record",
         "operationId": "get_model_record",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "key",
@@ -2521,6 +2546,11 @@
         "tags": ["model_manager"],
         "summary": "Scan For Models",
         "operationId": "scan_for_models",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "scan_path",
@@ -2570,6 +2600,11 @@
         "tags": ["model_manager"],
         "summary": "Get Hugging Face Models",
         "operationId": "get_hugging_face_models",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "hugging_face_repo",
@@ -3753,7 +3788,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v2/models/stats": {
@@ -3781,7 +3821,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v2/models/empty_model_cache": {
@@ -3823,7 +3868,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": ["model_manager"],
@@ -6516,7 +6566,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/patchmatch_status": {
@@ -6536,7 +6591,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/runtime_config": {
@@ -6555,7 +6615,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "patch": {
         "tags": ["app"],
@@ -6621,7 +6686,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/external_providers/config": {
@@ -6644,7 +6714,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/external_providers/config/{provider_id}": {
@@ -6767,7 +6842,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": ["app"],
@@ -6806,7 +6886,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/invocation_cache": {
@@ -6824,7 +6909,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/invocation_cache/enable": {
@@ -6842,7 +6932,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/invocation_cache/disable": {
@@ -6860,7 +6955,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/invocation_cache/status": {
@@ -6880,7 +6980,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/queue/{queue_id}/enqueue_batch": {
