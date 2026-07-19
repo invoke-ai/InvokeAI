@@ -1,11 +1,11 @@
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
 
-import { flushGenerateDrafts } from '@features/generation/drafts';
 import {
   adjustFocusedPromptAttention,
+  flushGenerateDrafts,
   focusPositivePrompt,
   promptHistoryNavigation,
-} from '@features/generation/hotkeys';
+} from '@features/generation/react';
 import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
 import { queueCommands } from '@features/queue';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';

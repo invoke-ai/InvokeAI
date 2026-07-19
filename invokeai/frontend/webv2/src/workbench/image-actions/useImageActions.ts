@@ -9,13 +9,13 @@ import {
 } from '@features/gallery';
 import {
   createReferenceImageId,
+  generatedImageToReferenceImage,
   getDefaultReferenceImageConfig,
   getMaxReferenceImages,
   isVaeModelConfig,
   isReferenceImageSupported,
   isSupportedGenerateModel,
 } from '@features/generation/settings';
-import { generatedImageToReferenceImage } from '@features/generation/utility';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {

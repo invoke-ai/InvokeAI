@@ -1,8 +1,8 @@
 import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
-import { sanitizeBatchCount } from '@features/generation/batch';
-import { flushGenerateDrafts } from '@features/generation/drafts';
+import { flushGenerateDrafts } from '@features/generation/react';
+import { sanitizeBatchCount } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';

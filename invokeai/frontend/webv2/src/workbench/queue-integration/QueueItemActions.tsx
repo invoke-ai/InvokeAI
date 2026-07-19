@@ -1,7 +1,7 @@
 import type { QueueItemReadModel } from '@features/queue/contracts';
 
 import { Dialog, Icon, Portal } from '@chakra-ui/react';
-import { createGenerateFormValuesSelector } from '@features/generation/form';
+import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { extractGenerationMeta } from '@features/queue/contracts';

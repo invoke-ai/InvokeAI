@@ -16,7 +16,7 @@ import {
   getControlValidationReason,
   isControlKindSupportedForBase,
   type ControlAdapterKind,
-} from '@features/generation/canvas';
+} from '@features/generation/graph';
 import { useModelsSelector } from '@features/models';
 import { Field, Select, Slider } from '@platform/ui';
 import { getCanvasOperations, resolveDefaultFilterForModel } from '@workbench/canvas-operations/api';

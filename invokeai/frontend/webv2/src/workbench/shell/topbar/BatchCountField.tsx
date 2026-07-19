@@ -1,5 +1,5 @@
 import { NumberInput } from '@chakra-ui/react';
-import { MIN_BATCH_COUNT, sanitizeBatchCount } from '@features/generation/batch';
+import { MIN_BATCH_COUNT, sanitizeBatchCount } from '@features/generation/settings';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
 

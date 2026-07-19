@@ -1,7 +1,7 @@
 import type { Project } from '@workbench/projectContracts';
 
 import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { flushGenerateDrafts } from '@features/generation/drafts';
+import { flushGenerateDrafts } from '@features/generation/react';
 import { Button, IconButton, ConfirmDialog, Field, FieldLabel, Panel } from '@platform/ui';
 import { useProjectSyncSelector } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';

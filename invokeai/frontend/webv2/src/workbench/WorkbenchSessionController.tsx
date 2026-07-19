@@ -1,4 +1,4 @@
-import { flushGenerateDrafts } from '@features/generation/drafts';
+import { flushGenerateDrafts } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { useNavigate } from '@tanstack/react-router';

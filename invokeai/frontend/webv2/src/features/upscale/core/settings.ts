@@ -7,9 +7,9 @@ import type {
 } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
-import { sanitizeBatchCount } from '@features/generation/batch';
 import {
   DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
+  sanitizeBatchCount,
   DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
   isLoraCompatibleWithModel,
   isLoraModelConfig,

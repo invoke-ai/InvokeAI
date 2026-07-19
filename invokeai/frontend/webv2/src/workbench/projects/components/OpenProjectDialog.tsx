@@ -1,5 +1,5 @@
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
-import { flushGenerateDrafts } from '@features/generation/drafts';
+import { flushGenerateDrafts } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, Row, Scrollable } from '@platform/ui';

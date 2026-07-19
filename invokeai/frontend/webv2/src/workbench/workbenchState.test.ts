@@ -10,7 +10,7 @@ import type {
 import type { GraphContract } from '@workbench/graphContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
-import { MAX_PROMPT_HISTORY } from '@features/generation/prompt';
+import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
 import { describe, expect, it } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';

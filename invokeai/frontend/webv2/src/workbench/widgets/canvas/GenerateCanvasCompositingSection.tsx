@@ -15,7 +15,7 @@ import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from 
 import type { CanvasCoherenceMode, CanvasInfillMethod } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 
 import { createListCollection, NumberInput, Stack } from '@chakra-ui/react';
-import { GenerationSettingsSection } from '@features/generation/settings-ui';
+import { GenerationSettingsSection } from '@features/generation/components';
 import { Field, Select } from '@platform/ui';
 import {
   CANVAS_COHERENCE_EDGE_SIZE_MAX,

@@ -17,7 +17,7 @@ import {
   getGallerySettings,
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/queries';
-import { createGenerateFormValuesSelector } from '@features/generation/form';
+import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { useProgressImage, useRevealHold, type LatestProgressImageSnapshot } from '@features/queue/react';
 import {
   imageUrlToStreamingSource,

@@ -51,8 +51,8 @@ import {
   type ControlLayerGraphInput,
   type RegionalGuidanceInput,
   type RegionalReferenceImageInput,
-} from '@features/generation/canvas';
-import { resolveGenerateSeed } from '@features/generation/graph';
+  resolveGenerateSeed,
+} from '@features/generation/graph';
 import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@features/generation/settings';
 import { getCanvasEngine, getCanvasOperations } from '@workbench/canvas-operations/api';
 import {

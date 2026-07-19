@@ -6,11 +6,11 @@ import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import { galleryImages } from '@features/gallery';
 import {
   getDefaultGenerateSettings,
+  getEffectiveReferenceImage,
   isSupportedGenerateModel,
   isVaeModelConfig,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
-import { getEffectiveReferenceImage } from '@features/generation/utility';
 
 import {
   buildImageRecallSettings,

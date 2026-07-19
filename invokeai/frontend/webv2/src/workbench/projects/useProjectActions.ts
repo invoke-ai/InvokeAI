@@ -1,6 +1,6 @@
 import type { Project } from '@workbench/projectContracts';
 
-import { flushGenerateDrafts } from '@features/generation/drafts';
+import { flushGenerateDrafts } from '@features/generation/react';
 import { useNavigate } from '@tanstack/react-router';
 import { useNotify } from '@workbench/useNotify';
 import {

@@ -1,7 +1,7 @@
 import type { WorkflowModelSelectProps, WorkflowUiAdapter } from '@features/workflow/react';
 import type { ComponentType, ReactNode } from 'react';
 
-import { flushGenerateDrafts } from '@features/generation/drafts';
+import { flushGenerateDrafts } from '@features/generation/react';
 import { useAuthSession } from '@features/identity';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';

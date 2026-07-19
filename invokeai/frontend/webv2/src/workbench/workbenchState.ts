@@ -47,26 +47,22 @@ import { createNewCanvasStateV2, migrateCanvasStateToV2 } from './canvasMigratio
 import { applyCanvasProjectMutation, type CanvasProjectMutation } from './canvasProjectMutations';
 import { getProjectWidgetValues } from './widgetState';
 export { nextLayerName } from './canvasProjectMutations';
-import { sanitizeBatchCount } from '@features/generation/batch';
 import { compileGenerateGraph, resolveGenerateSeed } from '@features/generation/graph';
 import {
   addPromptHistoryItem,
-  getPromptHistoryItemFromGenerateSettings,
-  removePromptHistoryItem,
-} from '@features/generation/prompt';
-import {
+  applyProjectPromptDraft,
   cloneGenerateWidgetValues,
   getGenerationModelAvailabilityReasons,
+  getPromptDraftFromValues,
+  getPromptHistoryItemFromGenerateSettings,
+  migrateProjectPromptDraft,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
+  type ProjectPromptDraftPatch,
+  removePromptHistoryItem,
+  sanitizeBatchCount,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
-import {
-  applyProjectPromptDraft,
-  getPromptDraftFromValues,
-  migrateProjectPromptDraft,
-  type ProjectPromptDraftPatch,
-} from '@features/generation/utility';
 import {
   clearDeletedUpscaleInput,
   cloneUpscaleWidgetValues,

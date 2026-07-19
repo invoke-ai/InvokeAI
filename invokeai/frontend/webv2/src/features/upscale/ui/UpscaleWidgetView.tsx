@@ -1,6 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop */
 import type { GenerateLora, MainModelConfig, PromptHistoryItem, VaePrecision } from '@features/generation/contracts';
-import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/utility';
+import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { ModelConfig } from '@features/models';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 import type { ChangeEvent } from 'react';
@@ -24,8 +24,8 @@ import {
 } from '@chakra-ui/react';
 import { useDndMonitor, useDroppable } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
-import { isGalleryImageDragData } from '@features/gallery/utility';
-import { NegativePromptField, PositivePromptField } from '@features/generation/prompt-ui';
+import { galleryImageUrls, isGalleryImageDragData } from '@features/gallery/utility';
+import { GenerationSettingsSection, NegativePromptField, PositivePromptField } from '@features/generation/components';
 import {
   SCHEDULER_OPTIONS,
   getDefaultLoraWeight,
@@ -35,7 +35,6 @@ import {
   isVaeModelConfig,
   SEED_MAX,
 } from '@features/generation/settings';
-import { GenerateCollapsibleSection } from '@features/generation/settings-ui';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import {
@@ -443,7 +442,7 @@ const UpscaleImageField = ({
                 outline="1px solid rgba(0, 0, 0, 0.1)"
                 outlineOffset="-1px"
                 rounded="sm"
-                src={galleryImages.thumbnailUrl(inputImage.image_name)}
+                src={galleryImageUrls.thumbnail(inputImage.image_name)}
                 _dark={{ outlineColor: 'rgba(255, 255, 255, 0.1)' }}
               />
             </Box>
@@ -610,7 +609,7 @@ export const UpscaleWidgetView = () => {
         values={values}
       />
 
-      <GenerateCollapsibleSection label={t('widgets.upscale.sourceAndTreatment')} defaultOpen>
+      <GenerationSettingsSection label={t('widgets.upscale.sourceAndTreatment')} defaultOpen>
         <Stack gap="3" p="2">
           <UpscaleImageField inputImage={values.inputImage} onChange={(inputImage) => patch({ inputImage })} />
           <UpscaleOutputPreflight values={values} />
@@ -688,9 +687,9 @@ export const UpscaleWidgetView = () => {
             onChange={(structure) => patch({ structure })}
           />
         </Stack>
-      </GenerateCollapsibleSection>
+      </GenerationSettingsSection>
 
-      <GenerateCollapsibleSection badges={t('widgets.upscale.shared')} label={t('widgets.upscale.detailGuidance')}>
+      <GenerationSettingsSection badges={t('widgets.upscale.shared')} label={t('widgets.upscale.detailGuidance')}>
         <UpscalePromptFields
           promptDraft={selection.promptDraft}
           projectId={selection.projectId}
@@ -699,9 +698,9 @@ export const UpscaleWidgetView = () => {
           onPatchPromptDraft={patchPromptDraft}
           onPatchValues={patch}
         />
-      </GenerateCollapsibleSection>
+      </GenerationSettingsSection>
 
-      <GenerateCollapsibleSection label={t('widgets.upscale.generation')}>
+      <GenerationSettingsSection label={t('widgets.upscale.generation')}>
         <Stack gap="3" p="2">
           <Field
             error={values.model ? undefined : t('widgets.upscale.mainModelRequired')}
@@ -860,9 +859,9 @@ export const UpscaleWidgetView = () => {
             </HStack>
           ))}
         </Stack>
-      </GenerateCollapsibleSection>
+      </GenerationSettingsSection>
 
-      <GenerateCollapsibleSection label={t('widgets.upscale.advanced')}>
+      <GenerationSettingsSection label={t('widgets.upscale.advanced')}>
         <Stack gap="3" p="2">
           <Field
             error={values.tileControlnetModel ? undefined : t('widgets.upscale.tileControlNetRequired')}
@@ -948,7 +947,7 @@ export const UpscaleWidgetView = () => {
             </Field>
           ) : null}
         </Stack>
-      </GenerateCollapsibleSection>
+      </GenerationSettingsSection>
     </Stack>
   );
 };

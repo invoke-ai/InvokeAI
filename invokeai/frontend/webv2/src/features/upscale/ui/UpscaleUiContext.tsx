@@ -1,4 +1,4 @@
-import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/utility';
+import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 import type { ReactNode } from 'react';
 

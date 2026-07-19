@@ -1,4 +1,4 @@
-import type { ControlAdapterKind } from '@features/generation/canvas';
+import type { ControlAdapterKind } from '@features/generation/graph';
 import type { ModelConfig } from '@features/models';
 
 export const getCompatibleControlModels = (

@@ -9,8 +9,7 @@ import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngi
 import type { Dispatch } from 'react';
 
 import { Box, createListCollection, Flex, HStack, NumberInput, Stack } from '@chakra-ui/react';
-import { useDebouncedDraftValue } from '@features/generation/draft-values';
-import { useRegisterGenerateDraftFlusher } from '@features/generation/drafts';
+import { useDebouncedDraftValue, useRegisterGenerateDraftFlusher } from '@features/generation/react';
 import { ColorPicker, Field, Select, Slider } from '@platform/ui';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';

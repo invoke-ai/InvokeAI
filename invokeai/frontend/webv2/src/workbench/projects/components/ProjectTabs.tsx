@@ -2,7 +2,7 @@ import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 
 import { Flex, Icon, Menu, Portal, ScrollArea, Separator } from '@chakra-ui/react';
-import { flushGenerateDrafts } from '@features/generation/drafts';
+import { flushGenerateDrafts } from '@features/generation/react';
 import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState, type QueueItem } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';

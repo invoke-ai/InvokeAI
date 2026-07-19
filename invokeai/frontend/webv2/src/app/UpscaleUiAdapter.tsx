@@ -1,7 +1,7 @@
 import type { UpscaleUiAdapter } from '@features/upscale';
 import type { ReactNode } from 'react';
 
-import { areProjectPromptDraftsEqual, getPromptDraftFromValues } from '@features/generation/utility';
+import { areProjectPromptDraftsEqual, getPromptDraftFromValues } from '@features/generation/settings';
 import { UpscaleUiProvider } from '@features/upscale';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';

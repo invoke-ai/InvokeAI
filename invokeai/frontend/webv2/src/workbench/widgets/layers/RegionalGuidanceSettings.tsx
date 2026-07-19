@@ -15,8 +15,7 @@ import { Box, createListCollection, HStack, IconButton, Input, Stack, Switch, Te
 import { useDndMonitor, useDroppable } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
 import { isGalleryImageDragData } from '@features/gallery/utility';
-import { PROMPT_ATTENTION_TARGET_PROPS, PromptTextarea } from '@features/generation/prompt-ui';
-import { FluxReduxControls } from '@features/generation/reference-ui';
+import { FluxReduxControls, PROMPT_ATTENTION_TARGET_PROPS, PromptTextarea } from '@features/generation/components';
 import { useModelsSelector } from '@features/models';
 import { Button, ColorPicker, Field, Select, Slider } from '@platform/ui';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
