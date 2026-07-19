@@ -9,6 +9,7 @@ import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
 import { firefoxDndFix } from 'features/dnd/util';
+import VideoMetadataViewer from 'features/gallery/components/ImageMetadataViewer/VideoMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
 import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
@@ -16,7 +17,11 @@ import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { selectActiveTab, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import {
+  selectActiveTab,
+  selectShouldShowItemDetails,
+  selectShouldShowProgressInViewer,
+} from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
@@ -60,6 +65,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+  const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const activeTab = useAppSelector(selectActiveTab);
   const deleteVideoModal = useDeleteVideoModalApi();
   const { downloadItem } = useDownloadItem();
@@ -314,6 +320,11 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         }}
       />
       {!isPlaying && !withProgress && <VideoPlayButtonOverlay onClick={handlePlay} />}
+      {shouldShowItemDetails && !withProgress && (
+        <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
+          <VideoMetadataViewer video={videoDTO} />
+        </Box>
+      )}
       {withProgress && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
           <ProgressImage progressImage={progressImage} />

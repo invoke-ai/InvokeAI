@@ -57,6 +57,7 @@ export const getTagsToInvalidateForVideoMutation = (video_names: string[]): ApiT
   for (const video_name of video_names) {
     tags.push({ type: 'Video', id: video_name });
     tags.push({ type: 'VideoMetadata', id: video_name });
+    tags.push({ type: 'VideoWorkflow', id: video_name });
   }
 
   return tags;

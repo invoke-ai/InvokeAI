@@ -18,6 +18,7 @@ import { getListImagesUrl } from 'services/api/util';
 import {
   getTagsToInvalidateForBoardAffectingMutation,
   getTagsToInvalidateForImageMutation,
+  getTagsToInvalidateForVideoMutation,
 } from 'services/api/util/tagInvalidation';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
@@ -294,7 +295,7 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/boards/{board_id}']['delete']['parameters']['path']
     >({
       query: ({ board_id }) => ({ url: buildBoardsUrl(board_id), method: 'DELETE' }),
-      invalidatesTags: () => [
+      invalidatesTags: (result) => [
         { type: 'Board', id: LIST_TAG },
         // Both images and videos on the board cascade to the 'No Board' bucket on the
         // backend side; invalidate the 'none' caches for both kinds so the polymorphic
@@ -317,6 +318,10 @@ export const imagesApi = api.injectEndpoints({
         'VideoNameList',
         'GalleryItemList',
         'GalleryItemNameList',
+        // The orphaned media keep cached DTOs whose board_id still points at the deleted
+        // board; refetch them so drag/drop and context menus see the new 'none' board.
+        ...getTagsToInvalidateForImageMutation(result?.deleted_board_images ?? []),
+        ...getTagsToInvalidateForVideoMutation(result?.deleted_board_videos ?? []),
       ],
     }),
 
@@ -331,12 +336,17 @@ export const imagesApi = api.injectEndpoints({
       }),
       // The backend now also cascade-deletes videos on the board, so the unified gallery
       // and the video list both need invalidation in addition to the board tag.
-      invalidatesTags: () => [
+      invalidatesTags: (result) => [
         { type: 'Board', id: LIST_TAG },
         { type: 'VideoList', id: LIST_TAG },
         'VideoNameList',
         'GalleryItemList',
         'GalleryItemNameList',
+        // Deleted media must drop out of their per-item caches (so DTO queries become
+        // 404s instead of serving stale entries, e.g. to node inputs still referencing
+        // them). Only server-confirmed deletions are listed in the result.
+        ...getTagsToInvalidateForImageMutation(result?.deleted_images ?? []),
+        ...getTagsToInvalidateForVideoMutation(result?.deleted_videos ?? []),
       ],
     }),
     addImageToBoard: build.mutation<

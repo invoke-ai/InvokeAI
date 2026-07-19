@@ -8,6 +8,7 @@ import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadW
 import { useLoadWorkflowFromImage } from 'features/workflowLibrary/hooks/useLoadWorkflowFromImage';
 import { useLoadWorkflowFromLibrary } from 'features/workflowLibrary/hooks/useLoadWorkflowFromLibrary';
 import { useLoadWorkflowFromObject } from 'features/workflowLibrary/hooks/useLoadWorkflowFromObject';
+import { useLoadWorkflowFromVideo } from 'features/workflowLibrary/hooks/useLoadWorkflowFromVideo';
 import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,6 +39,11 @@ type LoadWorkflowFromImageData = LoadWorkflowOptions & {
   data: string;
 };
 
+type LoadWorkflowFromVideoData = LoadWorkflowOptions & {
+  type: 'video';
+  data: string;
+};
+
 type DialogStateExtra = {
   isOpen: boolean;
 };
@@ -47,6 +53,7 @@ const $dialogState = atom<
   | (LoadWorkflowFromObjectData & DialogStateExtra)
   | (LoadWorkflowFromFileData & DialogStateExtra)
   | (LoadWorkflowFromImageData & DialogStateExtra)
+  | (LoadWorkflowFromVideoData & DialogStateExtra)
   | null
 >(null);
 const cleanup = () => $dialogState.set(null);
@@ -56,6 +63,7 @@ const useLoadImmediate = () => {
   const loadWorkflowFromLibrary = useLoadWorkflowFromLibrary();
   const loadWorkflowFromFile = useLoadWorkflowFromFile();
   const loadWorkflowFromImage = useLoadWorkflowFromImage();
+  const loadWorkflowFromVideo = useLoadWorkflowFromVideo();
   const loadWorkflowFromObject = useLoadWorkflowFromObject();
 
   const loadImmediate = useCallback(async () => {
@@ -77,12 +85,15 @@ const useLoadImmediate = () => {
       await loadWorkflowFromLibrary(data, options);
     } else if (type === 'image') {
       await loadWorkflowFromImage(data, options);
+    } else if (type === 'video') {
+      await loadWorkflowFromVideo(data, options);
     }
     cleanup();
     workflowLibraryModal.close();
   }, [
     loadWorkflowFromFile,
     loadWorkflowFromImage,
+    loadWorkflowFromVideo,
     loadWorkflowFromLibrary,
     loadWorkflowFromObject,
     workflowLibraryModal,
@@ -113,7 +124,12 @@ export const useLoadWorkflowWithDialog = () => {
      * @param data.onCompleted - A callback to call when the loading process is completed (both success and error).
      */
     (
-      data: LoadLibraryWorkflowData | LoadWorkflowFromObjectData | LoadWorkflowFromFileData | LoadWorkflowFromImageData
+      data:
+        | LoadLibraryWorkflowData
+        | LoadWorkflowFromObjectData
+        | LoadWorkflowFromFileData
+        | LoadWorkflowFromImageData
+        | LoadWorkflowFromVideoData
     ) => {
       if (!doesWorkflowHaveUnsavedChanges) {
         $dialogState.set({ ...data, isOpen: false });

@@ -32,6 +32,7 @@ import {
   useDeleteBoardMutation,
   useDeleteUncategorizedImagesMutation,
 } from 'services/api/endpoints/images';
+import { useDeleteUncategorizedVideosMutation } from 'services/api/endpoints/videos';
 import type { BoardDTO } from 'services/api/types';
 
 export const $boardToDelete = atom<BoardDTO | 'none' | null>(null);
@@ -85,6 +86,9 @@ const DeleteBoardModal = () => {
   const [deleteUncategorizedImages, { isLoading: isDeleteUncategorizedImagesLoading }] =
     useDeleteUncategorizedImagesMutation();
 
+  const [deleteUncategorizedVideos, { isLoading: isDeleteUncategorizedVideosLoading }] =
+    useDeleteUncategorizedVideosMutation();
+
   const imageUsageSummary = useAppSelector(selectImageUsageSummary);
 
   const handleDeleteBoardOnly = useCallback(() => {
@@ -103,13 +107,17 @@ const DeleteBoardModal = () => {
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardAndImages]);
 
-  const handleDeleteUncategorizedImages = useCallback(() => {
+  const handleDeleteUncategorizedMedia = useCallback(() => {
     if (!boardToDelete || boardToDelete !== 'none') {
       return;
     }
+    // The uncategorized bucket is polymorphic (the button says "Images/Videos"), so both
+    // media kinds are deleted. The mutations are independent — a failure in one doesn't
+    // block the other.
     deleteUncategorizedImages();
+    deleteUncategorizedVideos();
     $boardToDelete.set(null);
-  }, [boardToDelete, deleteUncategorizedImages]);
+  }, [boardToDelete, deleteUncategorizedImages, deleteUncategorizedVideos]);
 
   const handleClose = useCallback(() => {
     $boardToDelete.set(null);
@@ -122,8 +130,15 @@ const DeleteBoardModal = () => {
       isDeleteBoardAndImagesLoading ||
       isDeleteBoardOnlyLoading ||
       isFetchingBoardNames ||
+      isDeleteUncategorizedImagesLoading ||
+      isDeleteUncategorizedVideosLoading,
+    [
+      isDeleteBoardAndImagesLoading,
+      isDeleteBoardOnlyLoading,
+      isFetchingBoardNames,
       isDeleteUncategorizedImagesLoading,
-    [isDeleteBoardAndImagesLoading, isDeleteBoardOnlyLoading, isFetchingBoardNames, isDeleteUncategorizedImagesLoading]
+      isDeleteUncategorizedVideosLoading,
+    ]
   );
 
   if (!boardToDelete) {
@@ -154,7 +169,7 @@ const DeleteBoardModal = () => {
               {boardToDelete !== 'none' ? (
                 <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
               ) : (
-                <Text>{t('gallery.deleteImagePermanent')}</Text>
+                <Text>{t('gallery.deleteMediaPermanent')}</Text>
               )}
             </Flex>
           </AlertDialogBody>
@@ -174,7 +189,7 @@ const DeleteBoardModal = () => {
                 </Button>
               )}
               {boardToDelete === 'none' && (
-                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedImages}>
+                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedMedia}>
                   {t('boards.deleteAllUncategorizedImages')}
                 </Button>
               )}

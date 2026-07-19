@@ -69,6 +69,7 @@ const tagTypes = [
   'Video',
   'VideoList',
   'VideoMetadata',
+  'VideoWorkflow',
   'VideoNameList',
   'BoardVideosTotal',
   // Polymorphic gallery list (images + videos interleaved by created_at).

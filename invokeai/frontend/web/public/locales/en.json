@@ -132,7 +132,7 @@
         "resumeRefused": "Resume refused by server. Restart required.",
         "changeBoard": "Change Board",
         "changeBoardImage_one": "Move Image to Board",
-        "changeBoardImage_other": "Move {{count}} Images/Videos to Board",
+        "changeBoardImage_other": "Move {{count}} Images to Board",
         "changeBoardVideo_one": "Move Video to Board",
         "changeBoardVideo_other": "Move {{count}} Videos to Board",
         "clearSearch": "Clear Search",
@@ -163,7 +163,7 @@
         "unarchiveBoard": "Unarchive Board",
         "uncategorized": "Uncategorized",
         "viewBoards": "View Boards",
-        "downloadBoard": "Download Board",
+        "downloadBoard": "Download Board Images",
         "imagesWithCount_one": "{{count}} image",
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
@@ -541,8 +541,8 @@
         "dropOrUpload": "Drop or Upload",
         "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage_one": "Delete Image",
-        "deleteImage_other": "Delete {{count}} Images/Videos",
-        "deleteImagePermanent": "Deleted images/videos cannot be restored.",
+        "deleteImage_other": "Delete {{count}} Images",
+        "deleteImagePermanent": "Deleted images cannot be restored.",
         "deleteVideo_one": "Delete Video",
         "deleteVideo_other": "Delete {{count}} Videos",
         "deleteVideoPermanent": "Deleted videos cannot be restored.",
@@ -550,10 +550,10 @@
         "closeVideoPlayer": "Close video player",
         "copyVideoFrame": "Copy Frame",
         "displayBoardSearch": "Board Search",
-        "displaySearch": "Image Search",
+        "displaySearch": "Gallery Search",
         "download": "Download",
         "exitBoardSearch": "Exit Board Search",
-        "exitSearch": "Exit Image Search",
+        "exitSearch": "Exit Gallery Search",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
         "galleryImageSize": "Image Size",
         "gallerySettings": "Gallery Settings",
@@ -575,16 +575,16 @@
         "noImagesInGallery": "No Images to Display",
         "starImage": "Star",
         "starImage_one": "Star Image",
-        "starImage_other": "Star {{count}} Images/Videos",
+        "starImage_other": "Star {{count}} Images",
         "unstarImage": "Unstar",
         "unstarImage_one": "Unstar Image",
-        "unstarImage_other": "Unstar {{count}} Images/Videos",
+        "unstarImage_other": "Unstar {{count}} Images",
         "starVideo_one": "Star Video",
         "starVideo_other": "Star {{count}} Videos",
         "unstarVideo_one": "Unstar Video",
         "unstarVideo_other": "Unstar {{count}} Videos",
         "downloadImage_one": "Download Image",
-        "downloadImage_other": "Download {{count}} Images/Videos",
+        "downloadImage_other": "Download {{count}} Images",
         "downloadVideo_one": "Download Video",
         "downloadVideo_other": "Download {{count}} Videos",
         "unableToLoad": "Unable to load Gallery",
@@ -617,7 +617,8 @@
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
         "move": "Move",
-        "useForPromptGeneration": "Use for Prompt Generation"
+        "useForPromptGeneration": "Use for Prompt Generation",
+        "deleteMediaPermanent": "Deleted images/videos cannot be restored."
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
@@ -1029,8 +1030,8 @@
                 "desc": "Delete all selected images/videos. By default, you will be prompted to confirm deletion. If the images/videos are currently in use in the app, you will be warned."
             },
             "starImage": {
-                "title": "Star/Unstar Image",
-                "desc": "Star or unstar the selected image."
+                "title": "Star/Unstar Image/Video",
+                "desc": "Star or unstar the selected image or video."
             }
         }
     },

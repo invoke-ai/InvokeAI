@@ -1,23 +1,26 @@
 /**
- * Regression tests for the post-delete selection logic in the video delete flow.
+ * Regression tests for the video delete flow.
  *
- * The bug (PR #9163 review): ``handleDeletions`` advanced the gallery selection as if every
- * requested video was deleted, even when individual ``deleteVideo`` calls failed (403/500).
- * The failed names were included in the "deleted" set passed to ``pickSelectionAfterDelete``,
- * so the Viewer could jump away from a video that still exists — and a surviving neighbour
- * could be skipped as a replacement candidate.
+ * Selection (PR #9163 review): ``handleDeletions`` must only treat server-confirmed
+ * deletions as deleted — the Viewer must not jump away from a video whose delete failed
+ * (403/500), and a surviving neighbour remains a valid replacement candidate.
  *
- * The fix tracks which deletions actually resolved and only treats those as deleted.
+ * Batching (PR #9163 review): deletion goes through the batch ``deleteVideos`` endpoint —
+ * one request per invocation, not one per video — and its ``deleted_videos`` result is the
+ * source of truth for partial failures.
+ *
+ * Node references (PR #9163 review): workflow nodes take VideoField inputs; references to
+ * confirmed-deleted videos are cleared, references to surviving videos are preserved.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('services/api/endpoints/videos', () => ({
   videosApi: {
     endpoints: {
-      deleteVideo: {
-        initiate: vi.fn((arg: { video_name: string }) => ({
-          type: 'videosApi/deleteVideo',
-          video_name: arg.video_name,
+      deleteVideos: {
+        initiate: vi.fn((arg: { video_names: string[] }) => ({
+          type: 'videosApi/deleteVideos',
+          video_names: arg.video_names,
         })),
       },
     },
@@ -30,6 +33,10 @@ vi.mock('features/gallery/store/gallerySelectors', () => ({
 
 vi.mock('features/gallery/store/gallerySlice', () => ({
   imageSelected: vi.fn((payload: string | null) => ({ type: 'gallery/imageSelected', payload })),
+}));
+
+vi.mock('features/nodes/store/nodesSlice', () => ({
+  fieldVideoValueChanged: vi.fn((payload: unknown) => ({ type: 'nodes/fieldVideoValueChanged', payload })),
 }));
 
 vi.mock('features/system/store/systemSlice', () => ({
@@ -47,25 +54,39 @@ import type { AppStore } from 'app/store/store';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
+import { videosApi } from 'services/api/endpoints/videos';
 
 import { handleDeletions } from './state';
 
-const buildStore = (selection: string[], failingNames: Set<string>) => {
+const buildVideoFieldNode = (nodeId: string, videoName: string) => ({
+  type: 'invocation',
+  data: {
+    id: nodeId,
+    inputs: {
+      video: { name: 'video', label: '', description: '', value: { video_name: videoName } },
+    },
+  },
+});
+
+const buildStore = (selection: string[], failingNames: Set<string>, nodes: unknown[] = [], rejectAll = false) => {
   const dispatched: unknown[] = [];
   const dispatch = vi.fn((action: unknown) => {
     dispatched.push(action);
-    const typed = action as { type?: string; video_name?: string };
-    if (typed?.type === 'videosApi/deleteVideo') {
+    const typed = action as { type?: string; video_names?: string[] };
+    if (typed?.type === 'videosApi/deleteVideos') {
       return {
         unwrap: () =>
-          typed.video_name && failingNames.has(typed.video_name)
+          rejectAll
             ? Promise.reject(new Error('delete failed'))
-            : Promise.resolve(undefined),
+            : Promise.resolve({
+                deleted_videos: (typed.video_names ?? []).filter((name) => !failingNames.has(name)),
+                affected_boards: ['none'],
+              }),
       };
     }
     return action;
   });
-  const getState = vi.fn(() => ({ gallery: { selection } }));
+  const getState = vi.fn(() => ({ gallery: { selection }, nodes: { present: { nodes } } }));
   return { store: { dispatch, getState } as unknown as AppStore, dispatched };
 };
 
@@ -74,6 +95,32 @@ const getSelectionChange = (dispatched: unknown[]) =>
     (action): action is { type: string; payload: string | null } =>
       !!action && typeof action === 'object' && (action as { type?: string }).type === 'gallery/imageSelected'
   );
+
+const getVideoFieldChanges = (dispatched: unknown[]) =>
+  dispatched.filter(
+    (action): action is { type: string; payload: { nodeId: string; fieldName: string; value: unknown } } =>
+      !!action && typeof action === 'object' && (action as { type?: string }).type === 'nodes/fieldVideoValueChanged'
+  );
+
+describe('handleDeletions batching', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(selectCachedGalleryItemNames).mockReturnValue(['a.mp4', 'b.mp4', 'c.png']);
+    vi.mocked(selectLastSelectedItem).mockReturnValue(undefined);
+  });
+
+  it('issues a single batch request for a multi-video deletion', async () => {
+    const { store } = buildStore([], new Set());
+
+    await handleDeletions(['a.mp4', 'b.mp4'], store);
+
+    expect(videosApi.endpoints.deleteVideos.initiate).toHaveBeenCalledTimes(1);
+    expect(videosApi.endpoints.deleteVideos.initiate).toHaveBeenCalledWith(
+      { video_names: ['a.mp4', 'b.mp4'] },
+      { track: false }
+    );
+  });
+});
 
 describe('handleDeletions selection behavior on partial failure', () => {
   beforeEach(() => {
@@ -88,6 +135,15 @@ describe('handleDeletions selection behavior on partial failure', () => {
     await handleDeletions(['a.mp4'], store);
 
     expect(getSelectionChange(dispatched), 'a failed delete must not advance the selection').toBeUndefined();
+  });
+
+  it('does not move the selection when the whole batch request fails', async () => {
+    vi.mocked(selectLastSelectedItem).mockReturnValue('a.mp4');
+    const { store, dispatched } = buildStore(['a.mp4'], new Set(), [], true);
+
+    await handleDeletions(['a.mp4'], store);
+
+    expect(getSelectionChange(dispatched)).toBeUndefined();
   });
 
   it('keeps a surviving (failed-delete) neighbour as the replacement candidate', async () => {
@@ -120,5 +176,44 @@ describe('handleDeletions selection behavior on partial failure', () => {
 
     expect(getSelectionChange(dispatched)?.payload).toBe('a.mp4');
     expect(imageSelected).toHaveBeenCalledWith('a.mp4');
+  });
+});
+
+describe('handleDeletions node VideoField cleanup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(selectCachedGalleryItemNames).mockReturnValue(['a.mp4', 'b.mp4']);
+    vi.mocked(selectLastSelectedItem).mockReturnValue(undefined);
+  });
+
+  it('clears VideoField inputs that reference a confirmed-deleted video', async () => {
+    const nodes = [buildVideoFieldNode('n1', 'a.mp4'), buildVideoFieldNode('n2', 'b.mp4')];
+    const { store, dispatched } = buildStore([], new Set(), nodes);
+
+    await handleDeletions(['a.mp4'], store);
+
+    const changes = getVideoFieldChanges(dispatched);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.payload).toEqual({ nodeId: 'n1', fieldName: 'video', value: undefined });
+  });
+
+  it('preserves VideoField inputs for videos whose deletion failed', async () => {
+    const nodes = [buildVideoFieldNode('n1', 'a.mp4'), buildVideoFieldNode('n2', 'b.mp4')];
+    const { store, dispatched } = buildStore([], new Set(['b.mp4']), nodes);
+
+    await handleDeletions(['a.mp4', 'b.mp4'], store);
+
+    const changes = getVideoFieldChanges(dispatched);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.payload.nodeId).toBe('n1');
+  });
+
+  it('preserves all VideoField inputs when the whole batch request fails', async () => {
+    const nodes = [buildVideoFieldNode('n1', 'a.mp4')];
+    const { store, dispatched } = buildStore([], new Set(), nodes, true);
+
+    await handleDeletions(['a.mp4'], store);
+
+    expect(getVideoFieldChanges(dispatched)).toHaveLength(0);
   });
 });

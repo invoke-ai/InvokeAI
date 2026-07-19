@@ -6,23 +6,26 @@ import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors'
 import { memo } from 'react';
 
 import { CurrentImageButtons } from './CurrentImageButtons';
+import { CurrentVideoButtons } from './CurrentVideoButtons';
 import { ToggleProgressButton } from './ToggleProgressButton';
 
 export const ImageViewerToolbar = memo(() => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const galleryItem = useGalleryItemDTO(lastSelectedItem);
 
-  // Videos don't carry workflows or recallable metadata yet — the action row + metadata viewer
-  // toggle are image-specific. We still show the progress button (it's media-agnostic).
+  // Images get the full action row; videos get their own trimmed row (load workflow). The
+  // metadata viewer toggle works for both kinds, and the progress button is media-agnostic.
   const showImageActions = galleryItem?.kind === 'image';
+  const showVideoActions = galleryItem?.kind === 'video';
 
   return (
     <Flex w="full" justifyContent="center" h={8}>
       <ToggleProgressButton />
       <Spacer />
       {showImageActions && <CurrentImageButtons imageDTO={galleryItem.dto} />}
+      {showVideoActions && <CurrentVideoButtons videoDTO={galleryItem.dto} />}
       <Spacer />
-      {showImageActions && <ToggleMetadataViewerButton />}
+      {(showImageActions || showVideoActions) && <ToggleMetadataViewerButton />}
     </Flex>
   );
 });
