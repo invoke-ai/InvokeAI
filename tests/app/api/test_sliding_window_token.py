@@ -219,3 +219,42 @@ class TestSlidingWindowTokenMiddleware:
         refreshed_data = verify_token(response.headers["X-Refreshed-Token"])
         assert refreshed_data is not None
         assert refreshed_data.remember_me is False
+
+
+class TestSlidingWindowBehindSubPathProxy:
+    """Behind a sub-path proxy the middleware sees prefixed public paths; the refreshed
+    media cookie must be scoped to the prefixed path and the auth-route exclusions must
+    still match."""
+
+    BASE_PATH = "/invoke"
+
+    def _proxied_client(self, preserve: bool) -> TestClient:
+        from invokeai.app.api_app import SubPathASGIMiddleware
+
+        wrapped = SubPathASGIMiddleware(_create_test_app(), self.BASE_PATH)
+        root = f"http://testserver{self.BASE_PATH}" if preserve else "http://testserver"
+        return TestClient(wrapped, base_url=root)
+
+    @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+    def test_refreshed_cookie_is_scoped_to_public_prefix(self, preserve: bool):
+        client = self._proxied_client(preserve)
+        token = _make_token(expires_delta=timedelta(minutes=5))
+
+        response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
+
+        refreshed_token = response.headers["X-Refreshed-Token"]
+        assert response.cookies.get("invokeai_media_token") == refreshed_token
+        assert f"Path={self.BASE_PATH}/api/v1" in response.headers["set-cookie"]
+
+    @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+    @pytest.mark.parametrize("path", ["/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/media-cookie"])
+    def test_auth_route_exclusions_match_under_prefix(self, preserve: bool, path: str):
+        """The exclusion list is unprefixed; the middleware must strip root_path before
+        matching or a proxied logout would mint a replacement token/cookie."""
+        client = self._proxied_client(preserve)
+        token = _make_token(expires_delta=timedelta(minutes=5))
+
+        response = client.post(path, headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert "X-Refreshed-Token" not in response.headers

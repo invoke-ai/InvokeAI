@@ -94,3 +94,16 @@ class TestWanT5EncoderProbe:
 
             with pytest.raises(NotAMatchError, match="no encoder config"):
                 WanT5Encoder_WanT5Encoder_Config.from_model_on_disk(_make_mod(root), _build_overrides(root, "empty"))
+
+
+class TestWanT5EncoderCpuOnly:
+    """The standalone UMT5 encoder must support the cpu_only placement setting like every
+    other standalone text-encoder config (the loader honors any config with the field)."""
+
+    def test_cpu_only_defaults_to_unset(self):
+        config = WanT5Encoder_WanT5Encoder_Config(**_build_overrides(Path("/tmp/x"), "wan-encoder"))
+        assert config.cpu_only is None
+
+    def test_cpu_only_round_trips_through_serialization(self):
+        config = WanT5Encoder_WanT5Encoder_Config(**_build_overrides(Path("/tmp/x"), "wan-encoder"), cpu_only=True)
+        assert WanT5Encoder_WanT5Encoder_Config.model_validate(config.model_dump()).cpu_only is True

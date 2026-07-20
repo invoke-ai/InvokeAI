@@ -117,9 +117,14 @@ vi.mock('services/events/stores', () => ({
 
 // Import AFTER the mocks above are declared (vi.mock is hoisted; explicit ordering here
 // is for the human reader).
+import { getImageDTOSafe } from 'services/api/endpoints/images';
 import { getVideoDTOSafe } from 'services/api/endpoints/videos';
 
-import { buildOnInvocationComplete } from './onInvocationComplete';
+import {
+  buildOnForeignInvocationComplete,
+  buildOnInvocationComplete,
+  FOREIGN_GALLERY_REFRESH_TAGS,
+} from './onInvocationComplete';
 
 // Build a synthetic InvocationCompleteEvent whose result contains a single ImageField output.
 // The runtime ``isImageField`` discriminator matches on ``type === 'image_output'``.
@@ -282,5 +287,95 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     expect(galleryInvalidation?.payload).toContainEqual({ type: 'Board', id: 'board-123' });
     expect(galleryInvalidation?.payload).toContainEqual({ type: 'BoardVideosTotal', id: 'board-123' });
     expect(galleryInvalidation?.payload).toContain('VirtualBoards');
+  });
+});
+
+describe('buildOnForeignInvocationComplete', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const buildForeignHandler = () => {
+    const dispatched: unknown[] = [];
+    const dispatch = vi.fn((action: unknown) => {
+      dispatched.push(action);
+    });
+    const handler = buildOnForeignInvocationComplete(dispatch as never);
+    return { handler, dispatch, dispatched };
+  };
+
+  it('refreshes gallery caches via tag invalidation only — no DTO fetches, no selection changes', () => {
+    const { handler, dispatch, dispatched } = buildForeignHandler();
+
+    handler(buildImageCompleteEvent());
+
+    // Exactly one dispatch: the tag invalidation. No optimistic cache edits, no board/image
+    // selection, no progress clear.
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const action = dispatched[0] as { payload?: unknown };
+    expect(action.payload).toEqual(FOREIGN_GALLERY_REFRESH_TAGS);
+    // The WAN gallery reads polymorphic (image+video) caches, so the foreign refresh must
+    // cover both media types plus board totals.
+    expect(FOREIGN_GALLERY_REFRESH_TAGS).toEqual(
+      expect.arrayContaining([
+        'ImageNameList',
+        'BoardImagesTotal',
+        'VideoNameList',
+        'BoardVideosTotal',
+        'GalleryItemList',
+        'GalleryItemNameList',
+        'VirtualBoards',
+      ])
+    );
+    expect(getImageDTOSafe).not.toHaveBeenCalled();
+    expect(getVideoDTOSafe).not.toHaveBeenCalled();
+  });
+
+  it('invalidates gallery caches for foreign video outputs', () => {
+    const { handler, dispatch } = buildForeignHandler();
+
+    const videoEvent = buildImageCompleteEvent();
+    videoEvent.invocation.type = 'wan_l2v';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (videoEvent as any).result = { video: { video_name: 'foreign-video.mp4' } };
+
+    handler(videoEvent);
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing for results without gallery outputs', () => {
+    const { handler, dispatch } = buildForeignHandler();
+
+    const latentsEvent = buildImageCompleteEvent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (latentsEvent as any).result = { latents: { latents_name: 'latents-1' } };
+
+    handler(latentsEvent);
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for denylisted passthrough node types', () => {
+    const { handler, dispatch } = buildForeignHandler();
+
+    const denylisted = buildImageCompleteEvent();
+    denylisted.invocation.type = 'image';
+
+    handler(denylisted);
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for intermediate outputs, which never appear in the gallery', () => {
+    const { handler, dispatch } = buildForeignHandler();
+
+    const intermediate = buildImageCompleteEvent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (intermediate.invocation as any).is_intermediate = true;
+
+    handler(intermediate);
+
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });

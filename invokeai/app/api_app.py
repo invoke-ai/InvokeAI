@@ -7,10 +7,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
+from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import invokeai.frontend.web as web_dir
 from invokeai.app.api.dependencies import ApiDependencies
@@ -100,10 +102,14 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
         # genuine user activity. GET requests are often background fetches (RTK Query
         # cache revalidation, refetch-on-focus, etc.) and should not reset the
         # inactivity timer.
+        # Behind a sub-path proxy the public path carries the prefix (see SubPathASGIMiddleware),
+        # so strip `root_path` before matching the auth-route exclusions — otherwise a proxied
+        # logout would mint a replacement token/cookie right after the route deleted them.
+        route_path = request.url.path.removeprefix(request.scope.get("root_path", ""))
         if (
             response.status_code < 400
             and request.method in ("POST", "PUT", "PATCH", "DELETE")
-            and request.url.path not in ("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/media-cookie")
+            and route_path not in ("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/media-cookie")
         ):
             auth_header = request.headers.get("authorization", "")
             if auth_header.startswith("Bearer "):
@@ -148,16 +154,127 @@ class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-        if request.url.path == "/" and request.url.query:
-            return RedirectResponse(url="/")
+        # Be root_path-aware: behind a sub-path proxy, `scope["path"]` retains the public prefix
+        # (see SubPathASGIMiddleware), so the app root is `<root_path>/`, not just `/`.
+        root_path = request.scope.get("root_path", "")
+        if request.url.path in ("/", root_path + "/") and request.url.query:
+            return RedirectResponse(url=root_path + "/")
 
         response = await call_next(request)
         return response
 
 
+class VideoUploadLimitASGIMiddleware:
+    """Bound video-upload ingress *before* FastAPI's multipart parser runs.
+
+    The upload route's own MAX_UPLOAD_SIZE check only fires after the multipart body has
+    been fully parsed (and spooled to temp storage), so oversized, chunked, or many
+    concurrent uploads could exhaust temp space before ever being rejected. This
+    middleware rejects oversized requests from the Content-Length header, aborts
+    chunked bodies that exceed the cap mid-stream, and bounds concurrent uploads
+    globally.
+    """
+
+    def __init__(self, app: ASGIApp, max_body_bytes: int, max_concurrent: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+        self.max_concurrent = max_concurrent
+        self._active = 0
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        # Behind a sub-path proxy the public path carries the prefix (see SubPathASGIMiddleware).
+        route_path: str = scope.get("path", "").removeprefix(scope.get("root_path", ""))
+        if not (scope.get("method") == "POST" and route_path == "/api/v1/videos/upload"):
+            return await self.app(scope, receive, send)
+
+        content_length = Headers(scope=scope).get("content-length")
+        if content_length is not None and content_length.isdigit() and int(content_length) > self.max_body_bytes:
+            response = JSONResponse(
+                {"detail": f"Video upload exceeds maximum request size ({self.max_body_bytes} bytes)"},
+                status_code=413,
+            )
+            return await response(scope, receive, send)
+
+        if self._active >= self.max_concurrent:
+            response = JSONResponse(
+                {"detail": "Too many concurrent video uploads; try again shortly"},
+                status_code=429,
+                headers={"Retry-After": "5"},
+            )
+            return await response(scope, receive, send)
+
+        self._active += 1
+        received = 0
+
+        async def limited_receive() -> Message:
+            # Backstop for clients that omit Content-Length (chunked transfer): count the
+            # streamed body and abort the request once it exceeds the cap, so the multipart
+            # parser stops spooling. A clean 413 isn't possible mid-parse; the aborted
+            # request surfaces to the client as a dropped connection.
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_body_bytes:
+                    return {"type": "http.disconnect"}
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        finally:
+            self._active -= 1
+
+
+class SubPathASGIMiddleware:
+    """Make the app work behind a reverse proxy that serves it under a sub-path (e.g. `/invoke`).
+
+    Handles both common proxy styles:
+      - The proxy STRIPS the sub-path: the incoming path is already `/api/...`. We restore the prefix
+        so `scope["path"]` is the public path, and advertise it via `root_path`.
+      - The proxy PRESERVES the sub-path: the incoming path is already `/invoke/api/...`. We leave the
+        path as-is and advertise the prefix via `root_path`.
+
+    Either way `scope["path"]` ends up holding the full public path (prefix included), as the ASGI
+    spec requires. Starlette's router strips `root_path` for route matching (via `get_route_path`)
+    and builds redirect/`url_for` URLs from the full path, so server-generated redirects keep the
+    prefix.
+
+    Note: we deliberately do NOT use uvicorn's `root_path`, because uvicorn also PREPENDS it to the
+    request path, which would double the prefix for the preserve-style proxy. Doing the rewrite here
+    covers both styles.
+    """
+
+    def __init__(self, app: ASGIApp, base_path: str) -> None:
+        self.app = app
+        self.base_path = base_path
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket"):
+            scope = dict(scope)
+            path: str = scope.get("path", "")
+            # Strip-style proxy: the prefix is missing, so restore it. Per the ASGI spec `scope["path"]`
+            # must include `root_path`; Starlette strips it again for matching and uses the full path
+            # for redirects/url_for, keeping the prefix on server-generated redirects.
+            if not (path == self.base_path or path.startswith(self.base_path + "/")):
+                scope["path"] = self.base_path + path
+                raw_path = scope.get("raw_path")
+                if raw_path is not None:
+                    scope["raw_path"] = self.base_path.encode("latin-1") + raw_path
+            # Advertise the public prefix for both styles (openapi servers, /docs, redirects).
+            scope["root_path"] = self.base_path
+        await self.app(scope, receive, send)
+
+
 # Add the middleware
 app.add_middleware(RedirectRootWithQueryStringMiddleware)
 app.add_middleware(SlidingWindowTokenMiddleware)
+app.add_middleware(
+    VideoUploadLimitASGIMiddleware,
+    max_body_bytes=videos.MAX_UPLOAD_REQUEST_SIZE,
+    max_concurrent=videos.MAX_CONCURRENT_VIDEO_UPLOADS,
+)
 
 
 # Add event handler
@@ -208,18 +325,22 @@ app.openapi = get_openapi_func(app)
 
 
 @app.get("/docs", include_in_schema=False)
-def overridden_swagger() -> HTMLResponse:
+def overridden_swagger(request: Request) -> HTMLResponse:
+    # Prefix with the proxy root_path (if any) so the schema resolves under a sub-path deployment.
+    root_path = request.scope.get("root_path", "")
     return get_swagger_ui_html(
-        openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
+        openapi_url=f"{root_path}{app.openapi_url}",  # type: ignore [arg-type] # this is always a string
         title=f"{app.title} - Swagger UI",
         swagger_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
 
 
 @app.get("/redoc", include_in_schema=False)
-def overridden_redoc() -> HTMLResponse:
+def overridden_redoc(request: Request) -> HTMLResponse:
+    # Prefix with the proxy root_path (if any) so the schema resolves under a sub-path deployment.
+    root_path = request.scope.get("root_path", "")
     return get_redoc_html(
-        openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
+        openapi_url=f"{root_path}{app.openapi_url}",  # type: ignore [arg-type] # this is always a string
         title=f"{app.title} - Redoc",
         redoc_favicon_url="static/docs/invoke-favicon-docs.svg",
     )

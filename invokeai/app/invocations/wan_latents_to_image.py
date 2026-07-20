@@ -27,8 +27,9 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_wan
 
 
 @invocation(
@@ -53,10 +54,13 @@ class WanLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         if not isinstance(vae_info.model, AutoencoderKLWan):
             raise TypeError(f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}.")
 
-        estimated_working_memory = estimate_vae_working_memory_flux(
+        spatial_scale = getattr(vae_info.model.config, "scale_factor_spatial", None) or 8
+        estimated_working_memory = estimate_vae_working_memory_wan(
             operation="decode",
-            image_tensor=latents,
             vae=vae_info.model,
+            pixel_height=latents.shape[-2] * spatial_scale,
+            pixel_width=latents.shape[-1] * spatial_scale,
+            pixel_frames=1,
         )
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
@@ -64,7 +68,7 @@ class WanLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             assert isinstance(vae, AutoencoderKLWan)
 
             vae_dtype = next(iter(vae.parameters())).dtype
-            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+            latents = latents.to(device=get_effective_device(vae), dtype=vae_dtype)
 
             TorchDevice.empty_cache()
 

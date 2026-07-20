@@ -74,6 +74,14 @@ export const videosApi = api.injectEndpoints({
       providesTags: (result, error, video_name) => [{ type: 'VideoMetadata', id: video_name }],
     }),
 
+    getVideoWorkflow: build.query<
+      paths['/api/v1/videos/i/{video_name}/workflow']['get']['responses']['200']['content']['application/json'],
+      string
+    >({
+      query: (video_name) => ({ url: buildVideosUrl(`i/${video_name}/workflow`) }),
+      providesTags: (result, error, video_name) => [{ type: 'VideoWorkflow', id: video_name }],
+    }),
+
     getVideoNames: build.query<GetVideoNamesResult, GetVideoNamesArgs>({
       query: (queryArgs) => ({
         url: buildVideosUrl('names', queryArgs),
@@ -98,7 +106,10 @@ export const videosApi = api.injectEndpoints({
         if (!result) {
           return [];
         }
+        // Per-video tags too, so the deleted video's DTO/metadata caches refetch and 404
+        // instead of serving a stale entry (e.g. to node inputs still referencing it).
         return [
+          ...getTagsToInvalidateForVideoMutation(result.deleted_videos),
           ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
           { type: 'VideoList', id: LIST_TAG },
         ];
@@ -118,7 +129,32 @@ export const videosApi = api.injectEndpoints({
         if (!result) {
           return [];
         }
+        // Only the server-confirmed deletions — videos that failed to delete keep their
+        // live cache entries.
         return [
+          ...getTagsToInvalidateForVideoMutation(result.deleted_videos),
+          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+          { type: 'VideoList', id: LIST_TAG },
+        ];
+      },
+    }),
+
+    /** Companion to deleteUncategorizedImages: the "Delete All Uncategorized Images/Videos"
+     * board action fires both so the polymorphic uncategorized bucket is fully cleared. */
+    deleteUncategorizedVideos: build.mutation<
+      paths['/api/v1/videos/uncategorized']['delete']['responses']['200']['content']['application/json'],
+      void
+    >({
+      query: () => ({
+        url: buildVideosUrl('uncategorized'),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result) => {
+        if (!result) {
+          return [];
+        }
+        return [
+          ...getTagsToInvalidateForVideoMutation(result.deleted_videos),
           ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
           { type: 'VideoList', id: LIST_TAG },
         ];
@@ -275,6 +311,7 @@ export const {
   useUnstarVideosMutation,
   useAddVideoToBoardMutation,
   useRemoveVideoFromBoardMutation,
+  useDeleteUncategorizedVideosMutation,
 } = videosApi;
 
 /** @knipignore Reserved for follow-up phases (bulk delete / intermediate toggle / video-only views).
@@ -283,6 +320,8 @@ export const {
 export const {
   useListVideosQuery,
   useGetVideoMetadataQuery,
+  useGetVideoWorkflowQuery,
+  useLazyGetVideoWorkflowQuery,
   useGetVideoNamesQuery,
   useDeleteVideoMutation,
   useDeleteVideosMutation,

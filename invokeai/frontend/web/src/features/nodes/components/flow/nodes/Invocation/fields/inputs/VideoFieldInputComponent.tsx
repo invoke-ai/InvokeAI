@@ -14,6 +14,7 @@ import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 import { $isConnected } from 'services/events/stores';
 
 import type { FieldComponentProps } from './types';
+import { isVideoMissingError } from './videoFieldErrors';
 
 /**
  * Counterpart to ImageFieldInputComponent for VideoField inputs. Shows the video's WebP
@@ -27,7 +28,7 @@ const VideoFieldInputComponent = (props: FieldComponentProps<VideoFieldInputInst
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
 
-  const { currentData: videoDTO, isError } = useGetVideoDTOQuery(field.value?.video_name ?? skipToken);
+  const { currentData: videoDTO, error } = useGetVideoDTOQuery(field.value?.video_name ?? skipToken);
 
   const handleReset = useCallback(() => {
     dispatch(
@@ -45,12 +46,13 @@ const VideoFieldInputComponent = (props: FieldComponentProps<VideoFieldInputInst
   );
 
   // If the referenced video was deleted while disconnected, drop the stale reference once
-  // we reconnect — mirrors the image-field behavior.
+  // we reconnect. Only a confirmed 404 means the video is gone — transient network, auth
+  // (401/403), or server (5xx) failures must not silently clear the user's input.
   useEffect(() => {
-    if (isConnected && isError) {
+    if (isConnected && isVideoMissingError(error)) {
       handleReset();
     }
-  }, [handleReset, isConnected, isError]);
+  }, [handleReset, isConnected, error]);
 
   return (
     <Flex position="relative" className={NO_DRAG_CLASS} w="full" h={32} alignItems="stretch">

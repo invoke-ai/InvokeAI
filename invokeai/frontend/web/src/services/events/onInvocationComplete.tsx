@@ -11,7 +11,8 @@ import {
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection, isVideoField } from 'features/nodes/types/common';
-import { LIST_ALL_TAG } from 'services/api';
+import type { ApiTagDescription } from 'services/api';
+import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { galleryApi } from 'services/api/endpoints/gallery';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
@@ -34,8 +35,10 @@ const log = logger('events');
 const nodeTypeDenylist = ['load_image', 'image'];
 
 /**
- * Builds the socket event handler for invocation complete events. Adds output images to the gallery and/or updates
- * node execution states for the workflow editor.
+ * Builds the socket event handler for the current user's own invocation complete events. Adds
+ * output images to the gallery and/or updates node execution states for the workflow editor.
+ * The listener routes other users' events to `buildOnForeignInvocationComplete` instead, so this
+ * handler never sees them.
  *
  * @param getState The Redux getState function.
  * @param dispatch The Redux dispatch function.
@@ -373,5 +376,55 @@ export const buildOnInvocationComplete = (
     await addVideosToGallery(data);
 
     $lastProgressEvent.set(null);
+  };
+};
+
+/**
+ * Tags that refresh gallery queries after another user's generation completes. Type-level tags
+ * because a foreign event's destination board isn't known without fetching image DTOs. RTK Query
+ * only refetches invalidated queries that have active subscribers, so an admin actively viewing
+ * another user's board stays fresh while idle clients do no work.
+ */
+export const FOREIGN_GALLERY_REFRESH_TAGS: ApiTagDescription[] = [
+  'ImageNameList',
+  'BoardImagesTotal',
+  'VideoNameList',
+  'BoardVideosTotal',
+  'GalleryItemList',
+  'GalleryItemNameList',
+  { type: 'Board', id: LIST_TAG },
+  'VirtualBoards',
+];
+
+/**
+ * Builds the handler for other users' invocation complete events, which admin clients receive via
+ * the "admin" socket room. Unlike the user's own completions, these must not fetch image DTOs,
+ * edit caches optimistically, auto-switch the gallery, or touch the progress indicator — they
+ * only mark gallery caches stale so subscribed queries refetch.
+ */
+export const buildOnForeignInvocationComplete = (dispatch: AppDispatch) => {
+  return (data: S['InvocationCompleteEvent']) => {
+    if (nodeTypeDenylist.includes(data.invocation.type)) {
+      return;
+    }
+
+    // Intermediate images never appear in the gallery, so they cannot change any of the
+    // invalidated queries. Saved images inherit this flag from the node, so checking it on the
+    // event's invocation payload is equivalent to the own-event path's DTO check — without the
+    // fetch. Canvas generations mark most outputs intermediate, so this skips the bulk of
+    // foreign completions.
+    if (data.invocation.is_intermediate) {
+      return;
+    }
+
+    const hasGalleryOutput = objectEntries(data.result).some(
+      ([_name, value]) => isImageField(value) || isImageFieldCollection(value) || isVideoField(value)
+    );
+    if (!hasGalleryOutput) {
+      return;
+    }
+
+    log.trace({ data } as JsonObject, `Foreign invocation complete (${data.invocation.type})`);
+    dispatch(api.util.invalidateTags(FOREIGN_GALLERY_REFRESH_TAGS));
   };
 };

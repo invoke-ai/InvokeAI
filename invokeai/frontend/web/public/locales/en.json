@@ -122,7 +122,7 @@
         "boards": "Boards",
         "byDate": "By Date",
         "selectedForAutoAdd": "Selected for Auto-Add",
-        "bottomMessage": "Deleting images will reset any features currently using them.",
+        "bottomMessage": "Deleting images/videos will reset any features currently using them.",
         "cancel": "Cancel",
         "pause": "Pause",
         "resume": "Resume",
@@ -142,8 +142,8 @@
         "deleteBoardOnly": "Delete Board Only",
         "deletedBoardsCannotbeRestored": "Deleted boards, images, and videos cannot be restored. Selecting 'Delete Board Only' will move images and videos to an uncategorized state.",
         "deletedPrivateBoardsCannotbeRestored": "Deleted boards, images, and videos cannot be restored. Selecting 'Delete Board Only' will move images and videos to a private uncategorized state for the original creator.",
-        "uncategorizedImages": "Uncategorized Images",
-        "deleteAllUncategorizedImages": "Delete All Uncategorized Images",
+        "uncategorizedImages": "Uncategorized Images/Videos",
+        "deleteAllUncategorizedImages": "Delete All Uncategorized Images/Videos",
         "deletedImagesCannotBeRestored": "Deleted images cannot be restored.",
         "hideBoards": "Hide Boards",
         "loading": "Loading...",
@@ -151,7 +151,7 @@
         "menuItemAutoAdd": "Auto-add to this Board",
         "move": "Move",
         "movingImagesToBoard_one": "Moving {{count}} image to board:",
-        "movingImagesToBoard_other": "Moving {{count}} images to board:",
+        "movingImagesToBoard_other": "Moving {{count}} images/videos to board:",
         "myBoard": "My Board",
         "noBoards": "No {{boardType}} Boards",
         "noMatching": "No matching Boards",
@@ -159,11 +159,11 @@
         "searchBoard": "Search Boards...",
         "selectBoard": "Select a Board",
         "shared": "Shared Boards",
-        "topMessage": "This selection contains images used in the following features:",
+        "topMessage": "This selection contains images/videos used in the following features:",
         "unarchiveBoard": "Unarchive Board",
         "uncategorized": "Uncategorized",
         "viewBoards": "View Boards",
-        "downloadBoard": "Download Board",
+        "downloadBoard": "Download Board Images",
         "imagesWithCount_one": "{{count}} image",
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
@@ -533,7 +533,7 @@
         "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
         "assetsTab": "Files you've uploaded for use in your projects.",
         "autoAssignBoardOnClick": "Auto-Assign Board",
-        "autoSwitchNewImages": "Auto-Switch to New Images",
+        "autoSwitchNewImages": "Auto-Switch to New Images/Videos",
         "boardsSettings": "Boards Settings",
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
@@ -550,26 +550,26 @@
         "closeVideoPlayer": "Close video player",
         "copyVideoFrame": "Copy Frame",
         "displayBoardSearch": "Board Search",
-        "displaySearch": "Image Search",
+        "displaySearch": "Gallery Search",
         "download": "Download",
         "exitBoardSearch": "Exit Board Search",
-        "exitSearch": "Exit Image Search",
+        "exitSearch": "Exit Gallery Search",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
         "galleryImageSize": "Image Size",
         "gallerySettings": "Gallery Settings",
         "go": "Go",
         "image": "image",
-        "imagesTab": "Images you've created and saved within Invoke.",
-        "imagesSettings": "Gallery Images Settings",
+        "imagesTab": "Images/Videos you've created and saved within Invoke.",
+        "imagesSettings": "Gallery Images/Videos Settings",
         "jump": "Jump",
         "loading": "Loading",
         "loadingGallery": "Loading gallery...",
         "loadingMetadata": "Loading metadata...",
         "newestFirst": "Newest First",
-        "noImagesFound": "No images found",
+        "noImagesFound": "No images/videos found",
         "oldestFirst": "Oldest First",
         "sortDirection": "Sort Direction",
-        "showStarredImagesFirst": "Show Starred Images First",
+        "showStarredImagesFirst": "Show Starred Images/Videos First",
         "usePagedGalleryView": "Use Paged Gallery View",
         "noImageSelected": "No Image Selected",
         "noImagesInGallery": "No Images to Display",
@@ -617,7 +617,8 @@
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
         "move": "Move",
-        "useForPromptGeneration": "Use for Prompt Generation"
+        "useForPromptGeneration": "Use for Prompt Generation",
+        "deleteMediaPermanent": "Deleted images/videos cannot be restored."
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
@@ -986,7 +987,7 @@
             "title": "Gallery",
             "selectAllOnPage": {
                 "title": "Select All On Page",
-                "desc": "Select all images on the current page."
+                "desc": "Select all images/videos on the current page."
             },
             "clearSelection": {
                 "title": "Clear Selection",
@@ -1026,11 +1027,11 @@
             },
             "deleteSelection": {
                 "title": "Delete",
-                "desc": "Delete all selected images. By default, you will be prompted to confirm deletion. If the images are currently in use in the app, you will be warned."
+                "desc": "Delete all selected images/videos. By default, you will be prompted to confirm deletion. If the images/videos are currently in use in the app, you will be warned."
             },
             "starImage": {
-                "title": "Star/Unstar Image",
-                "desc": "Star or unstar the selected image."
+                "title": "Star/Unstar Image/Video",
+                "desc": "Star or unstar the selected image or video."
             }
         }
     },
@@ -1171,6 +1172,7 @@
         "cpuOnly": "CPU Only",
         "fp8Storage": "FP8 Storage (Save VRAM)",
         "runOnCpu": "Run text encoder model on CPU only",
+        "runVaeOnCpu": "Run VAE model on CPU only",
         "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
         "defaultSettingsSaved": "Default Settings Saved",
@@ -1697,14 +1699,14 @@
         "guidance": "Guidance",
         "height": "Height",
         "imageFit": "Fit Initial Image To Output Size",
-        "images": "Images",
+        "images": "Images/Videos",
         "images_withCount_one": "Image",
-        "images_withCount_other": "Images",
+        "images_withCount_other": "Images/Videos",
         "infillMethod": "Infill Method",
         "infillColorValue": "Fill Color",
         "info": "Info",
         "invoke": {
-            "addingImagesTo": "Adding images to",
+            "addingImagesTo": "Adding images/videos to",
             "boardNotWritable": "You do not have write access to board \"{{boardName}}\". Select a board you own or switch to Uncategorized.",
             "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
             "invoke": "Invoke",
@@ -1889,7 +1891,7 @@
         "informationalPopoversDisabledDesc": "Informational popovers have been disabled. Enable them in Settings.",
         "enableModelDescriptions": "Enable Model Descriptions in Dropdowns",
         "enableHighlightFocusedRegions": "Highlight Focused Regions",
-        "middleClickOpenInNewTab": "Use Middle Click to Open Images in New Tab",
+        "middleClickOpenInNewTab": "Use Middle Click to Open Images/Videos in New Tab",
         "modelDescriptionsDisabled": "Model Descriptions in Dropdowns Disabled",
         "modelDescriptionsDisabledDesc": "Model descriptions in dropdowns have been disabled. Enable them in Settings.",
         "enableInvisibleWatermark": "Enable Invisible Watermark",
@@ -1930,8 +1932,8 @@
         "prompt": "Prompt",
         "resetComplete": "Web UI has been reset.",
         "resetWebUI": "Reset Web UI",
-        "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
-        "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
+        "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images/videos and remembered settings. It does not delete any images/videos from disk.",
+        "resetWebUIDesc2": "If images/videos aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
         "showDetailedInvocationProgress": "Show Progress Details",
         "showProgressInViewer": "Show Progress Images in Viewer",
         "ui": "User Interface",
@@ -2508,6 +2510,13 @@
             "paragraphs": [
                 "When enabled, only the text encoder component will run on CPU instead of GPU.",
                 "This saves VRAM for the denoiser while only slightly impacting performance. The conditioning outputs are automatically moved to GPU for the denoiser."
+            ]
+        },
+        "cpuOnlyVae": {
+            "heading": "CPU Only",
+            "paragraphs": [
+                "When enabled, the VAE will run on CPU instead of GPU.",
+                "This saves VRAM during decoding, but VAE decoding will be slower. The decoded image is automatically moved back to the correct device."
             ]
         },
         "fp8Storage": {
@@ -3551,10 +3560,10 @@
         }
     },
     "newUserExperience": {
-        "toGetStartedLocal": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
-        "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStartedLocal": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images/videos directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images/videos directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "toGetStartedWorkflow": "To get started, fill in the fields on the left and press <StrongComponent>Invoke</StrongComponent> to generate your image. Want to explore more workflows? Click the <StrongComponent>folder icon</StrongComponent> next to the workflow title to see a list of other templates you can try.",
-        "toGetStartedNonAdmin": "To get started, ask your InvokeAI administrator (<AdminEmailLink />) to install the AI models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStartedNonAdmin": "To get started, ask your InvokeAI administrator (<AdminEmailLink />) to install the AI models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images/videos directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio.",
         "lowVRAMMode": "For best performance, follow our <LinkComponent>Low VRAM guide</LinkComponent>.",
         "noModelsInstalled": "It looks like you don't have any models installed! You can <DownloadStarterModelsButton>download a starter model bundle</DownloadStarterModelsButton> or <ImportModelsButton>import models</ImportModelsButton>.",

@@ -86,6 +86,16 @@ class MediaCookieResponse(BaseModel):
     success: bool = Field(description="Whether the media cookie was set (always true in single-user mode)")
 
 
+def _media_cookie_path(request: Request) -> str:
+    """Public path prefix the media cookie is scoped to.
+
+    Behind a sub-path reverse proxy the browser sees routes under e.g. `/invoke/api/v1`,
+    so the cookie path must include the proxy prefix (advertised via `root_path` by
+    SubPathASGIMiddleware) or browsers will omit the cookie from media requests.
+    """
+    return request.scope.get("root_path", "") + "/api/v1"
+
+
 def _set_media_cookie(request: Request, response: Response, token: str, max_age_seconds: int) -> None:
     """Set the HttpOnly cookie that authenticates <video>/<img> media requests.
 
@@ -100,7 +110,7 @@ def _set_media_cookie(request: Request, response: Response, token: str, max_age_
         httponly=True,
         secure=request.url.scheme == "https",
         samesite="lax",
-        path="/api/v1",
+        path=_media_cookie_path(request),
     )
 
 
@@ -210,6 +220,7 @@ async def login(
 @auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(
     current_user: CurrentUser,
+    request: Request,
     response: Response,
 ) -> LogoutResponse:
     """Logout current user.
@@ -229,7 +240,7 @@ async def logout(
     """
     # TODO: Implement token invalidation when server-side session management is added
     # For now, this is a no-op since we use stateless JWT tokens
-    response.delete_cookie(MEDIA_TOKEN_COOKIE, path="/api/v1")
+    response.delete_cookie(MEDIA_TOKEN_COOKIE, path=_media_cookie_path(request))
     return LogoutResponse(success=True)
 
 

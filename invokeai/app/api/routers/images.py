@@ -480,6 +480,7 @@ async def list_image_dtos(
         board_id,
         search_term,
         current_user.user_id,
+        current_user.is_admin,
     )
 
     return image_dtos

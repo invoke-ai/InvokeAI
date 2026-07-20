@@ -24,7 +24,9 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import WanRefImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_wan
 from invokeai.backend.wan.extensions.wan_ref_image_extension import (
     encode_reference_image_to_condition,
     encode_reference_image_to_ti2v_condition,
@@ -102,12 +104,23 @@ class WanRefImageEncoderInvocation(BaseInvocation):
         end_pil_image = context.images.get_pil(self.end_image.image_name, "RGB") if self.end_image is not None else None
 
         vae_info = context.models.load(self.vae.vae)
-        device = TorchDevice.choose_torch_device()
-        target_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        if not isinstance(vae_info.model, AutoencoderKLWan):
+            raise TypeError(f"Reference-image encoder requires AutoencoderKLWan, got {type(vae_info.model).__name__}.")
 
-        with vae_info.model_on_device() as (_, vae):
-            if not isinstance(vae, AutoencoderKLWan):
-                raise TypeError(f"Reference-image encoder requires AutoencoderKLWan, got {type(vae).__name__}.")
+        estimated_working_memory = estimate_vae_working_memory_wan(
+            operation="encode",
+            vae=vae_info.model,
+            pixel_height=self.height,
+            pixel_width=self.width,
+            pixel_frames=self.num_frames,
+        )
+
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+            assert isinstance(vae, AutoencoderKLWan)
+            # A cpu_only VAE stays in system RAM even when an accelerator is selected —
+            # run the encode where the weights actually live.
+            device = get_effective_device(vae)
+            target_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
             context.util.signal_progress(
                 ("VAE-encoding FLF2V start+end images" if end_pil_image is not None else "VAE-encoding reference image")
                 + (f" ({self.num_frames} frames)" if self.num_frames > 1 else "")

@@ -68,10 +68,7 @@ class SqliteGalleryService(GalleryServiceABC):
             is_admin=is_admin,
         )
 
-        if starred_first:
-            order_clause = f"ORDER BY starred DESC, created_at {order_dir.value}"
-        else:
-            order_clause = f"ORDER BY created_at {order_dir.value}"
+        order_clause = self._build_order_clause(starred_first, order_dir)
 
         union_query = f"""--sql
         SELECT * FROM (
@@ -140,10 +137,7 @@ class SqliteGalleryService(GalleryServiceABC):
             created_date=created_date,
         )
 
-        if starred_first:
-            order_clause = f"ORDER BY starred DESC, created_at {order_dir.value}"
-        else:
-            order_clause = f"ORDER BY created_at {order_dir.value}"
+        order_clause = self._build_order_clause(starred_first, order_dir)
 
         union_query = f"""--sql
         SELECT * FROM (
@@ -211,17 +205,23 @@ class SqliteGalleryService(GalleryServiceABC):
         ORDER BY date DESC;
         """
 
-        # SQLite guarantees that bare columns in an aggregate query come from the row that
-        # matched MAX() — so `kind`/`name` here are the newest item of each date, which
-        # becomes the cover.
+        # The cover is the newest item of each date. ROW_NUMBER with kind/name tie-breakers
+        # (rather than a bare-column MAX() aggregate) keeps the choice deterministic when
+        # several items share the maximum timestamp — otherwise the cover could flicker
+        # between equally-new items across refetches.
         covers_query = f"""--sql
-        SELECT
-            DATE(created_at) AS date,
-            kind,
-            name,
-            MAX(created_at) AS newest
-        FROM ({union})
-        GROUP BY DATE(created_at);
+        SELECT date, kind, name FROM (
+            SELECT
+                DATE(created_at) AS date,
+                kind,
+                name,
+                ROW_NUMBER() OVER (
+                    PARTITION BY DATE(created_at)
+                    ORDER BY created_at DESC, kind DESC, name DESC
+                ) AS rn
+            FROM ({union})
+        )
+        WHERE rn = 1;
         """
 
         with self._db.transaction() as cursor:
@@ -249,6 +249,21 @@ class SqliteGalleryService(GalleryServiceABC):
                 )
             )
         return boards
+
+    @staticmethod
+    def _build_order_clause(starred_first: bool, order_dir: SQLiteDirection) -> str:
+        """Ordering with `kind` + `name` tie-breakers.
+
+        Images and videos created within the same timestamp granularity would otherwise
+        have no defined relative order — rows could reorder across refetches or shift
+        between offset pages. The tie-breakers follow `order_dir` so ascending and
+        descending remain exact mirror images.
+        """
+        direction = order_dir.value
+        tie_breakers = f"kind {direction}, name {direction}"
+        if starred_first:
+            return f"ORDER BY starred DESC, created_at {direction}, {tie_breakers}"
+        return f"ORDER BY created_at {direction}, {tie_breakers}"
 
     def _build_half(
         self,
