@@ -23,7 +23,7 @@ const IDEOGRAM4_COORD_MAX = 1000;
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
-export type Ideogram4Bbox = [number, number, number, number];
+type Ideogram4Bbox = [number, number, number, number];
 
 /**
  * Converts a region's rect (canvas/layer coordinates — the same space as the generation bbox) into an
@@ -50,7 +50,7 @@ export type Ideogram4RegionInput = {
 /** An `obj`-type element. Key order matches the training schema: `type`, `bbox`, `desc`. */
 type Ideogram4Element = { type: 'obj'; bbox: Ideogram4Bbox; desc: string } | { type: 'obj'; desc: string };
 
-export type Ideogram4PromptResult = {
+type Ideogram4PromptResult = {
   /** The final prompt string to feed to the text encoder. */
   prompt: string;
   /**
