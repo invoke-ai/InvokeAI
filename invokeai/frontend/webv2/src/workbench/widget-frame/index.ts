@@ -8,4 +8,5 @@ export { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from 
 export { WidgetRegionDropOverlay } from './WidgetRegionDropOverlay';
 export { WidgetStrip } from './WidgetStrip';
 export { MissingWidgetFrame, WidgetRenderer, WidgetRendererById } from './WidgetRenderer';
+export { useWidgetIntentPreloadProps } from './useWidgetIntentPreload';
 export { useWidgetSortable } from './useWidgetSortable';

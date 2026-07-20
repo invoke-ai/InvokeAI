@@ -8,6 +8,8 @@ import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useWidgetIntentPreloadProps } from './useWidgetIntentPreload';
+
 export interface WidgetEnableMenuItem {
   allowMultiple: boolean;
   failureMessage?: string;
@@ -150,6 +152,7 @@ const WidgetEnableMenuRow = ({
   onToggle: (item: WidgetEnableMenuItem) => void;
 }) => {
   const handleClick = useCallback(() => onToggle(item), [item, onToggle]);
+  const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, disabled);
 
   return (
     <Menu.Item
@@ -159,6 +162,7 @@ const WidgetEnableMenuRow = ({
       closeOnSelect={false}
       disabled={disabled}
       _disabled={MENU_ITEM_DISABLED_PROPS}
+      {...intentPreloadProps}
       onClick={handleClick}
     >
       <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />

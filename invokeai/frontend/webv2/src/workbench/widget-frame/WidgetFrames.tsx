@@ -14,7 +14,7 @@ import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@platform/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
-import { resolveWidgetLabel } from '@workbench/widgetLabels';
+import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { SettingsIcon } from 'lucide-react';
 import {
@@ -28,6 +28,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { WidgetActionsMenu } from './WidgetActionsMenu';
+import { WidgetIdentityIcon } from './WidgetIdentityIcon';
 
 const PANEL_SIZE_STEP_PX = 16;
 const MIN_PANEL_SIZE_PX = 180;
@@ -212,7 +213,7 @@ export const WidgetHeader = ({
   const { t } = useTranslation();
   // Manifests may provide a component label (e.g. Workflow's editable
   // `Workflow / [name]`); plain strings render as the standard title.
-  const label = resolveWidgetLabel(manifest, t);
+  const label = resolveWidgetInstanceLabel(instance, manifest, t);
   const handleSettingsClick = useCallback(
     () => openWorkbenchSettings(manifest.settingsSection),
     [manifest.settingsSection]
@@ -221,10 +222,11 @@ export const WidgetHeader = ({
   return (
     <HStack justify="space-between" borderBottomWidth={1} h={10} ps="3" pe="2">
       <HStack flex="1" gap="1.5" minW="0">
-        {HeaderLabel ? (
+        <WidgetIdentityIcon icon={manifest.icon} />
+        {HeaderLabel && !instance.title ? (
           <HeaderLabel region={region} />
         ) : (
-          <Text fontSize="xs" fontWeight="700">
+          <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
             {label}
           </Text>
         )}
@@ -255,6 +257,21 @@ export const WidgetHeader = ({
     </HStack>
   );
 };
+
+export const WidgetTooltipFrame = ({
+  children,
+  icon,
+  isLoading = false,
+}: {
+  children: ReactNode;
+  icon: WidgetManifest['icon'];
+  isLoading?: boolean;
+}) => (
+  <HStack align="start" gap="1.5" minW="9rem">
+    <WidgetIdentityIcon icon={icon} isLoading={isLoading} />
+    <Box minW="0">{children}</Box>
+  </HStack>
+);
 
 export const FieldPlaceholder = ({ label, h }: { label: string; h: string }) => (
   <Stack gap="1">

@@ -19,6 +19,7 @@ import {
   WidgetInstanceContextMenu,
   WidgetRendererById,
   WidgetStrip,
+  useWidgetIntentPreloadProps,
   useWidgetSortable,
   type WidgetEnableMenuItem,
   type WidgetInstanceContextMenuTarget,
@@ -257,6 +258,7 @@ const SortableCenterTab = ({
     typeId: item.instance.typeId,
   });
   const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
+  const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, item.status === 'disabled');
 
   return (
     <Tabs.Trigger
@@ -269,6 +271,7 @@ const SortableCenterTab = ({
       px="3"
       style={style}
       {...dragHandleProps}
+      {...intentPreloadProps}
       onContextMenu={handleContextMenu}
     >
       {showProgress ? <QueueTabBackgroundProgress state={progressState} zIndex="-1" /> : null}

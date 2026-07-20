@@ -16,7 +16,7 @@ import { memo, Suspense, use, useMemo } from 'react';
 
 import { useWidgetRuntime } from './createWidgetRuntime';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
-import { WidgetHeader, WidgetPanelFrame } from './WidgetFrames';
+import { WidgetHeader, WidgetPanelFrame, WidgetTooltipFrame } from './WidgetFrames';
 import { WidgetLoadingFallback } from './WidgetLoadingFallback';
 import { areProjectWidgetRenderInstancesEqual } from './widgetRenderInstance';
 
@@ -40,7 +40,10 @@ export const WidgetRendererById = ({ instanceId, widget, ...props }: WidgetRende
 };
 
 export const WidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
-  const loadingFallback = useMemo(() => <WidgetLoadingFallback presentation={presentation} />, [presentation]);
+  const loadingFallback = useMemo(
+    () => <WidgetLoadingFallback instance={instance} presentation={presentation} region={region} widget={widget} />,
+    [instance, presentation, region, widget]
+  );
   const content = (
     <Suspense fallback={loadingFallback}>
       <LoadedWidgetRenderer instance={instance} presentation={presentation} region={region} widget={widget} />
@@ -122,7 +125,11 @@ const WidgetShellFrame = ({
 }) => {
   const safeContent = children;
 
-  if (region === 'popover' || region === 'dialog' || presentation === 'compact' || presentation === 'tooltip') {
+  if (presentation === 'tooltip') {
+    return <WidgetTooltipFrame icon={widget.manifest.icon}>{safeContent}</WidgetTooltipFrame>;
+  }
+
+  if (region === 'popover' || region === 'dialog' || presentation === 'compact') {
     return safeContent;
   }
 

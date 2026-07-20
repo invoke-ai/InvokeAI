@@ -607,6 +607,7 @@
   },
   "widgets": {
     "actionsLabel": "{{label}} actions",
+    "loadingLabel": "Loading {{label}}",
     "removeWidget": "Remove {{label}}",
     "resizePanel": "Resize {{region}} widget panel",
     "settingsLabel": "{{label}} settings",

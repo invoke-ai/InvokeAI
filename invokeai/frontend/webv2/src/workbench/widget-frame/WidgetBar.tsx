@@ -10,6 +10,7 @@ import { WidgetIcon } from '@workbench/iconResolver';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useWidgetIntentPreloadProps } from './useWidgetIntentPreload';
 import { useWidgetSortable } from './useWidgetSortable';
 import { WidgetEnableMenu, type WidgetEnableMenuItem } from './WidgetEnableMenu';
 import { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';
@@ -162,6 +163,7 @@ const WidgetSlot = ({
       onSelect(item.id);
     }
   }, [isDisabled, item.id, onSelect]);
+  const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, isDisabled);
 
   const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
 
@@ -185,6 +187,7 @@ const WidgetSlot = ({
           as="button"
           data-disabled={isDisabled ? '' : undefined}
           tabIndex={isDisabled ? -1 : undefined}
+          {...intentPreloadProps}
           onClick={handleClick}
           onContextMenu={handleContextMenu}
         >
