@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import warnings
+from typing import TYPE_CHECKING
 
-import bitsandbytes as bnb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+if TYPE_CHECKING:
+    import bitsandbytes as bnb
 
 _BNB_SIBLING_SUFFIXES = (
     ".absmax",
@@ -36,6 +39,8 @@ def swap_linears_to_bnb4bit(
     quant_type: str = "nf4",
     compress_statistics: bool = False,
 ) -> None:
+    import bitsandbytes as bnb
+
     for name, child in list(module.named_children()):
         if isinstance(child, nn.Linear):
             new_linear = bnb.nn.Linear4bit(
@@ -62,6 +67,8 @@ def load_bnb4bit_state_dict(
     device: torch.device,
     dtype: torch.dtype,
 ) -> None:
+    import bitsandbytes as bnb
+
     consumed: set[str] = set()
     for full_name, tensor in state_dict.items():
         if ".quant_state." in full_name or full_name.endswith(_BNB_SIBLING_SUFFIXES):
