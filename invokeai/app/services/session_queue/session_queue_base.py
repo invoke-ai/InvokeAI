@@ -79,18 +79,25 @@ class SessionQueueBase(ABC):
         queue_id: str,
         user_id: Optional[str] = None,
         acting_user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> SessionQueueStatus:
         """Gets the status of the queue.
 
         Aggregate counts (pending/in_progress/.../total) are always global across all users.
         If user_id is provided, the requesting user's own counts are additionally returned in
-        the user_pending/user_in_progress fields (left None otherwise).
+        the user_pending/user_in_progress fields (left None otherwise). Admin callers should
+        also pass their user_id so personal UI (e.g. the progress bar) can distinguish their
+        own activity from other users'.
 
         acting_user_id is independent of user_id and controls only current-item redaction:
         when set, the returned status omits item_id/session_id/batch_id unless the
         currently-running item belongs to acting_user_id. The redaction is decided from the
         same get_current() snapshot used to embed those identifiers, so it cannot race against
         a concurrent state change.
+
+        is_admin disables current-item redaction entirely: admins may see the identifiers of
+        any user's current item. Redaction stays fail-closed - a caller that passes user_id
+        without is_admin gets the non-admin behavior.
         """
         pass
 
