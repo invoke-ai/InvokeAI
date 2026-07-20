@@ -9,6 +9,7 @@ import { nodeExecutionStore } from '@features/nodes';
 import { hasPendingWorkflowQueueItem } from '@features/queue';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
@@ -29,8 +30,6 @@ import {
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
-
-import { createCachedWorkflowReadPort } from './cachedWorkflowReadPort';
 
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
@@ -102,10 +101,9 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
 
   const project = useMemo(
     () =>
-      createCachedWorkflowReadPort(
-        store.subscribe,
-        store.getSnapshot,
-        (snapshot) => ({
+      createProjectedExternalStore({
+        source: store,
+        select: (snapshot) => ({
           galleryValues: getProjectWidgetValues(snapshot.activeProject, 'gallery'),
           graphHistory: snapshot.activeProject.graphHistory,
           id: snapshot.activeProject.id,
@@ -113,28 +111,26 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
           projectGraph: snapshot.activeProject.projectGraph,
           workflowValues: getProjectWidgetValues(snapshot.activeProject, 'workflow'),
         }),
-        shallowEqual
-      ),
+        isEqual: shallowEqual,
+      }),
     [store]
   );
   const preferences = useMemo(
     () =>
-      createCachedWorkflowReadPort(
-        (listener) => subscribeWorkbenchPreferences(listener),
-        getWorkbenchPreferences,
-        selectWorkflowPreferences,
-        shallowEqual
-      ),
+      createProjectedExternalStore({
+        source: { getSnapshot: getWorkbenchPreferences, subscribe: subscribeWorkbenchPreferences },
+        select: selectWorkflowPreferences,
+        isEqual: shallowEqual,
+      }),
     []
   );
   const capabilities = useMemo(
     () =>
-      createCachedWorkflowReadPort(
-        subscribeAuthSession,
-        getAuthSession,
-        (session) => ({ canUseCache: !session.multiuserEnabled || session.user?.is_admin === true }),
-        shallowEqual
-      ),
+      createProjectedExternalStore({
+        source: { getSnapshot: getAuthSession, subscribe: subscribeAuthSession },
+        select: (session) => ({ canUseCache: !session.multiuserEnabled || session.user?.is_admin === true }),
+        isEqual: shallowEqual,
+      }),
     []
   );
 
