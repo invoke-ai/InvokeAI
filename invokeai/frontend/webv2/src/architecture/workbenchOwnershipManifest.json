@@ -56,6 +56,7 @@
     "persistenceRuntime.ts": "workbench",
     "projectContracts.ts": "workbench",
     "queueHistoryContracts.ts": "workbench",
+    "queueHistoryNormalization.ts": "workbench",
     "useCanvasProjectMutationDispatch.ts": "workbench",
     "useNotify.ts": "workbench",
     "useOpenWorkbenchWidget.ts": "workbench",

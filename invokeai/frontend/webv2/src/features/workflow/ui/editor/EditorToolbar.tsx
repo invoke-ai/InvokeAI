@@ -1,5 +1,5 @@
 import { Box, Icon, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
-import { useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
+import { useWorkflowPreferencesSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { IconButton, Toolbar, ToolbarButton, ToolbarSeparator, Tooltip } from '@platform/ui';
 import { useReactFlow } from '@xyflow/react';
 import {
@@ -47,7 +47,7 @@ export const EditorToolbar = ({
   onToolChange: (tool: EditorTool) => void;
 }) => {
   const { fitView, zoomIn, zoomOut } = useReactFlow();
-  const reduceMotion = useWorkflowUi().preferences.reduceMotion;
+  const reduceMotion = useWorkflowPreferencesSelector((preferences) => preferences.reduceMotion);
   const opacityTriggerId = useId();
   const fitViewDuration = reduceMotion ? 0 : 300;
   const opacityIds = useMemo(() => ({ trigger: opacityTriggerId }), [opacityTriggerId]);

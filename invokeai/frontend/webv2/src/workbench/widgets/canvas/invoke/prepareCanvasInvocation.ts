@@ -21,7 +21,8 @@
  *    enabled nonempty control layer blocks the invoke), and regional-guidance
  *    rejection as a silent-skip predicate.
  * 4. Compile the base-appropriate graph and dispatch it to canvas staging.
- * 5. Any failure (validation throw, upload error, unsupported mode) records a
+ * 5. Publish the operation-local dedupe cache only after dispatch returns.
+ * 6. Any failure (validation throw, upload error, unsupported mode) records a
  *    notice — the app never gets stuck.
  *
  * A module-scoped in-flight guard drops an invoke while a prior prepare for the
@@ -377,6 +378,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       canvas: composites.canvas,
       projectId,
     });
+    composed.dedupeCommit.commit();
   } catch (error) {
     recordNotice(commands.notifications, 'error', error instanceof Error ? error.message : String(error));
   } finally {

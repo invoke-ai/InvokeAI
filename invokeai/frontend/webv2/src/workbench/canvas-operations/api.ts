@@ -32,6 +32,7 @@ export {
   type ComposeForGenerationOptions,
   type ComposeForGenerationResult,
   type GenerationCompositeExecutorDeps,
+  type GenerationCompositeDedupeCommit,
   type GenerationCompositeHost,
   type GenerationCompositeMode,
   type GenerationComposites,

@@ -1,13 +1,15 @@
-import type { WorkflowModelSelectProps, WorkflowUiAdapter } from '@features/workflow/react';
+import type { WorkflowGraphPreviewPort, WorkflowModelSelectProps, WorkflowUiAdapter } from '@features/workflow/react';
+import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { ComponentType, ReactNode } from 'react';
 
 import { flushGenerateDrafts } from '@features/generation/react';
-import { useAuthSession } from '@features/identity';
+import { getAuthSession, subscribeAuthSession } from '@features/identity';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { hasPendingWorkflowQueueItem } from '@features/queue';
-import { WorkflowUiProvider } from '@features/workflow/react';
+import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { shallowEqual } from '@platform/state/selectors';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
 import {
@@ -17,50 +19,81 @@ import {
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
-import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
-  shallowEqual,
   useActiveProjectSelector,
   useWorkbenchCommands,
+  useWorkbenchInternalStore,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
 import { lazy, useMemo } from 'react';
+
+import { createCachedWorkflowReadPort } from './cachedWorkflowReadPort';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
 const WorkflowModelSelect: ComponentType<WorkflowModelSelectProps> = ModelSelect;
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
-/**
- * Production binding of Workflow's UI port: wires Workbench commands, routes,
- * diagnostics, and Models/Nodes state. No second adapter is expected.
- */
-export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode }) => {
-  const project = useActiveProjectSelector((activeProject) => ({
-    activeProjectId: activeProject.id,
-    galleryValues: getProjectWidgetValues(activeProject, 'gallery'),
-    graphHistory: activeProject.graphHistory,
-    isWorkflowRunning: hasPendingWorkflowQueueItem(activeProject.queue.items),
-    projectGraph: activeProject.projectGraph,
-    workflowValues: getProjectWidgetValues(activeProject, 'workflow'),
-  }));
+const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
+  reduceMotion: preferences.reduceMotion,
+  themeId: preferences.themeId,
+  workflowEdgeStyle: preferences.workflowEdgeStyle,
+  workflowShowMinimap: preferences.workflowShowMinimap,
+  workflowSnapToGrid: preferences.workflowSnapToGrid,
+  workflowValidateConnections: preferences.workflowValidateConnections,
+});
+
+const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode }) => {
   const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
-  const preferences = useWorkbenchPreferenceSelector(
-    (value) => ({
-      reduceMotion: value.reduceMotion,
-      themeId: value.themeId,
-      workflowEdgeStyle: value.workflowEdgeStyle,
-      workflowShowMinimap: value.workflowShowMinimap,
-      workflowSnapToGrid: value.workflowSnapToGrid,
-      workflowValidateConnections: value.workflowValidateConnections,
-    }),
-    shallowEqual
-  );
-  const session = useAuthSession();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
+  const commands = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
+
+  const adapter = useMemo<WorkflowGraphPreviewPort>(
+    () => ({
+      getRoute: (sourceId) => {
+        if (!sourceId) {
+          return null;
+        }
+
+        const route = resolveInvocationRouteInput(
+          routeInput,
+          'dialog',
+          { ...routeInput.invocation, sourceId, sourceLocked: true },
+          availabilityModels
+        );
+
+        return {
+          canInvoke: isInvocationRouteValid(route),
+          label: formatRoute(route),
+          validationMessage: route.validationMessage,
+        };
+      },
+      invoke: async (sourceId) => {
+        flushGenerateDrafts();
+        const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
+        return resolveAndSubmitGraphPreviewInvocation({
+          commands,
+          models: availabilityModels,
+          prepareCanvasInvocation,
+          project: queries.getSnapshot().activeProject,
+          sourceId,
+        });
+      },
+    }),
+    [availabilityModels, commands, queries, routeInput]
+  );
+
+  return <WorkflowGraphPreviewProvider adapter={adapter}>{children}</WorkflowGraphPreviewProvider>;
+};
+
+/** Production binding of Workflow's stable services and narrow read ports. */
+export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode }) => {
+  const store = useWorkbenchInternalStore();
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const notify = useNotify();
@@ -69,11 +102,48 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
     ensureModelsLoaded();
   });
 
+  const project = useMemo(
+    () =>
+      createCachedWorkflowReadPort(
+        store.subscribe,
+        store.getSnapshot,
+        (snapshot) => ({
+          galleryValues: getProjectWidgetValues(snapshot.activeProject, 'gallery'),
+          graphHistory: snapshot.activeProject.graphHistory,
+          id: snapshot.activeProject.id,
+          isWorkflowRunning: hasPendingWorkflowQueueItem(snapshot.activeProject.queue.items),
+          projectGraph: snapshot.activeProject.projectGraph,
+          workflowValues: getProjectWidgetValues(snapshot.activeProject, 'workflow'),
+        }),
+        shallowEqual
+      ),
+    [store]
+  );
+  const preferences = useMemo(
+    () =>
+      createCachedWorkflowReadPort(
+        (listener) => subscribeWorkbenchPreferences(listener),
+        getWorkbenchPreferences,
+        selectWorkflowPreferences,
+        shallowEqual
+      ),
+    []
+  );
+  const capabilities = useMemo(
+    () =>
+      createCachedWorkflowReadPort(
+        subscribeAuthSession,
+        getAuthSession,
+        (session) => ({ canUseCache: !session.multiuserEnabled || session.user?.is_admin === true }),
+        shallowEqual
+      ),
+    []
+  );
+
   const adapter = useMemo<WorkflowUiAdapter>(
     () => ({
-      ...project,
       ModelSelect: WorkflowModelSelect,
-      canUseCache: !session.multiuserEnabled || session.user?.is_admin === true,
+      capabilities,
       commands: {
         bindLibraryWorkflow: commands.workflows.bindLibraryWorkflow,
         editGraph: commands.workflows.editGraph,
@@ -84,37 +154,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         undo: commands.workflows.undo,
       },
       getProjectGraph: () => queries.getSnapshot().activeProject.projectGraph,
-      graphPreview: {
-        getRoute: (sourceId) => {
-          if (!sourceId) {
-            return null;
-          }
-
-          const route = resolveInvocationRouteInput(
-            routeInput,
-            'dialog',
-            { ...routeInput.invocation, sourceId, sourceLocked: true },
-            availabilityModels
-          );
-
-          return {
-            canInvoke: isInvocationRouteValid(route),
-            label: formatRoute(route),
-            validationMessage: route.validationMessage,
-          };
-        },
-        invoke: async (sourceId) => {
-          flushGenerateDrafts();
-          const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
-          return resolveAndSubmitGraphPreviewInvocation({
-            commands,
-            models: availabilityModels,
-            prepareCanvasInvocation,
-            project: queries.getSnapshot().activeProject,
-            sourceId,
-          });
-        },
-      },
+      nodeExecution: { get: nodeExecutionStore.get, subscribe: nodeExecutionStore.subscribe },
       notifications: { error: notify.error, info: notify.info, success: notify.success },
       performance: {
         mark: (name, source) => markWorkbenchPerf(name, source),
@@ -122,27 +162,20 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         time: (name, source, callback) => timeWorkbenchPerf(name, source, callback),
       },
       preferences,
+      project,
       registerModalHotkeyLayer: registerHotkeyModalLayer,
-      nodeExecution: { get: nodeExecutionStore.get, subscribe: nodeExecutionStore.subscribe },
       widgets: {
         open: (options) => commands.widgets.open(options),
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
         select: (options) => commands.widgets.select(options),
       },
     }),
-    [
-      availabilityModels,
-      commands,
-      notify.error,
-      notify.info,
-      notify.success,
-      preferences,
-      project,
-      queries,
-      routeInput,
-      session,
-    ]
+    [capabilities, commands, notify.error, notify.info, notify.success, preferences, project, queries]
   );
 
-  return <WorkflowUiProvider adapter={adapter}>{children}</WorkflowUiProvider>;
+  return (
+    <WorkflowUiProvider adapter={adapter}>
+      <WorkflowGraphPreviewAdapterProvider>{children}</WorkflowGraphPreviewAdapterProvider>
+    </WorkflowUiProvider>
+  );
 };

@@ -4,7 +4,7 @@ import type { QueueBackendPort } from '@features/queue/core/types';
 import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createQueueRuntime, type QueueHistoryCommands } from './runtime';
+import { createQueueItemBackendSubmission, createQueueRuntime, type QueueHistoryCommands } from './runtime';
 
 const createPendingQueueItem = (): QueueItem => ({
   cancellable: true,
@@ -35,6 +35,16 @@ const createPendingQueueItem = (): QueueItem => ({
 });
 
 describe('queue runtime', () => {
+  it('turns a malformed legacy submission into a failed request instead of throwing', () => {
+    const queueItem = createPendingQueueItem();
+    delete (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
+
+    expect(createQueueItemBackendSubmission({ id: 'project-1' }, queueItem)).toEqual({
+      error: 'Queue item is missing a compiled backend submission.',
+      kind: 'invalid',
+    });
+  });
+
   it('adopts a persisted backend run before submission so reload cannot duplicate it', async () => {
     const queueItem = createPendingQueueItem();
     const project = { id: 'project-1', queue: { items: [queueItem] } };

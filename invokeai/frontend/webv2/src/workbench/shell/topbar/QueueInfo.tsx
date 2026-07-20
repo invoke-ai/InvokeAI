@@ -2,6 +2,7 @@ import { Badge, HStack, Icon, Progress, Stack, Text } from '@chakra-ui/react';
 import { useModelLoads, type ModelLoadInfo } from '@features/models';
 import {
   getQueueItemExpectedImageCount,
+  getQueueItemSnapshotPositivePrompt,
   getQueueProgressBarState,
   getQueueSummary,
   type QueueItem,
@@ -141,7 +142,7 @@ const QueueInfoTooltip = ({
     );
   }
 
-  const prompt = item.snapshot.presentation.positivePrompt?.trim() ?? '';
+  const prompt = getQueueItemSnapshotPositivePrompt(item).trim();
   const expectedCount = getQueueItemExpectedImageCount(item);
   const activeItemIndex = Math.min(expectedCount, Math.max(1, progress?.activeItemIndex ?? 1));
   const activeBackendItemId = item.backendItemIds?.[activeItemIndex - 1];

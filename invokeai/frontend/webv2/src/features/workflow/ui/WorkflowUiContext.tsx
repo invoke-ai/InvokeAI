@@ -1,6 +1,7 @@
 import type { ProjectGraphState } from '@features/workflow/core/types';
 import type { ComponentType, ReactNode } from 'react';
 
+import { useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
 import { createContext, use, useCallback, useSyncExternalStore } from 'react';
 
 import type {
@@ -22,20 +23,40 @@ export interface WorkflowPreferences {
   workflowValidateConnections: boolean;
 }
 
+export interface WorkflowProjectSnapshot {
+  galleryValues: Record<string, unknown>;
+  graphHistory: readonly WorkflowGraphHistoryEntry[];
+  id: string;
+  isWorkflowRunning: boolean;
+  projectGraph: ProjectGraphState;
+  workflowValues: Record<string, unknown>;
+}
+
+export interface WorkflowCapabilities {
+  canUseCache: boolean;
+}
+
+export interface WorkflowReadPort<Snapshot> {
+  getSnapshot(): Snapshot;
+  subscribe(listener: () => void): () => void;
+}
+
+export interface WorkflowGraphPreviewPort {
+  getRoute(
+    sourceId?: WorkflowInvocationSourceId
+  ): { canInvoke: boolean; label: string; validationMessage?: string } | null;
+  invoke(sourceId?: WorkflowInvocationSourceId): Promise<boolean>;
+}
+
 /**
  * Workflow's UI port. The context is a dependency-direction port (the feature
  * may not import workbench), not a test seam; no second adapter is expected.
  */
 export interface WorkflowUiAdapter {
   ModelSelect: ComponentType<WorkflowModelSelectProps>;
-  activeProjectId: string;
-  canUseCache: boolean;
-  galleryValues: Record<string, unknown>;
-  graphHistory: readonly WorkflowGraphHistoryEntry[];
-  isWorkflowRunning: boolean;
-  preferences: WorkflowPreferences;
-  projectGraph: ProjectGraphState;
-  workflowValues: Record<string, unknown>;
+  capabilities: WorkflowReadPort<WorkflowCapabilities>;
+  preferences: WorkflowReadPort<WorkflowPreferences>;
+  project: WorkflowReadPort<WorkflowProjectSnapshot>;
   commands: WorkflowCommands;
   widgets: WorkflowWidgetCommands;
   getProjectGraph(): ProjectGraphState;
@@ -43,12 +64,6 @@ export interface WorkflowUiAdapter {
     error(title: string, message?: string): void;
     info(title: string, message?: string): void;
     success(title: string, message?: string): void;
-  };
-  graphPreview: {
-    getRoute(
-      sourceId?: WorkflowInvocationSourceId
-    ): { canInvoke: boolean; label: string; validationMessage?: string } | null;
-    invoke(sourceId?: WorkflowInvocationSourceId): Promise<boolean>;
   };
   performance: {
     mark(name: string, source: WorkflowPerfSource): void;
@@ -63,10 +78,19 @@ export interface WorkflowUiAdapter {
 }
 
 const WorkflowUiContext = createContext<WorkflowUiAdapter | null>(null);
+const WorkflowGraphPreviewContext = createContext<WorkflowGraphPreviewPort | null>(null);
 
 export const WorkflowUiProvider = ({ adapter, children }: { adapter: WorkflowUiAdapter; children: ReactNode }) => (
   <WorkflowUiContext value={adapter}>{children}</WorkflowUiContext>
 );
+
+export const WorkflowGraphPreviewProvider = ({
+  adapter,
+  children,
+}: {
+  adapter: WorkflowGraphPreviewPort;
+  children: ReactNode;
+}) => <WorkflowGraphPreviewContext value={adapter}>{children}</WorkflowGraphPreviewContext>;
 
 export const useWorkflowUi = (): WorkflowUiAdapter => {
   const adapter = use(WorkflowUiContext);
@@ -79,24 +103,11 @@ export const useWorkflowUi = (): WorkflowUiAdapter => {
 };
 
 export const useWorkflowProjectSelector = <Selected,>(
-  selector: (project: {
-    id: string;
-    projectGraph: ProjectGraphState;
-    graphHistory: readonly WorkflowGraphHistoryEntry[];
-    galleryValues: Record<string, unknown>;
-    workflowValues: Record<string, unknown>;
-    isWorkflowRunning: boolean;
-  }) => Selected
+  selector: (project: WorkflowProjectSnapshot) => Selected,
+  isEqual?: EqualityFn<Selected>
 ): Selected => {
-  const ui = useWorkflowUi();
-  return selector({
-    galleryValues: ui.galleryValues,
-    graphHistory: ui.graphHistory,
-    id: ui.activeProjectId,
-    isWorkflowRunning: ui.isWorkflowRunning,
-    projectGraph: ui.projectGraph,
-    workflowValues: ui.workflowValues,
-  });
+  const { project } = useWorkflowUi();
+  return useExternalStoreSelector(project.subscribe, project.getSnapshot, selector, isEqual);
 };
 
 export const useWorkflowHostCommands = () => {
@@ -106,8 +117,27 @@ export const useWorkflowHostCommands = () => {
 
 export const useWorkflowPreferencesSelector = <Selected,>(
   selector: (preferences: WorkflowPreferences) => Selected,
-  _isEqual?: (left: Selected, right: Selected) => boolean
-): Selected => selector(useWorkflowUi().preferences);
+  isEqual?: EqualityFn<Selected>
+): Selected => {
+  const { preferences } = useWorkflowUi();
+  return useExternalStoreSelector(preferences.subscribe, preferences.getSnapshot, selector, isEqual);
+};
+
+export const useWorkflowCapabilitiesSelector = <Selected,>(
+  selector: (capabilities: WorkflowCapabilities) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected => {
+  const { capabilities } = useWorkflowUi();
+  return useExternalStoreSelector(capabilities.subscribe, capabilities.getSnapshot, selector, isEqual);
+};
+
+export const useWorkflowGraphPreview = (): WorkflowGraphPreviewPort => {
+  const graphPreview = use(WorkflowGraphPreviewContext);
+  if (!graphPreview) {
+    throw new Error('Workflow graph preview requires an App-composed WorkflowGraphPreviewProvider.');
+  }
+  return graphPreview;
+};
 
 export const useWorkflowNotifications = () => useWorkflowUi().notifications;
 

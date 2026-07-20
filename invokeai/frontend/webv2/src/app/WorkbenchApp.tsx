@@ -12,8 +12,11 @@ import { WorkbenchSessionController } from '@workbench/WorkbenchSessionControlle
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useMemo } from 'react';
 
+import { bindProductionPortBinding } from './productionPortBindings';
 import { QueueRuntimeAdapter } from './QueueRuntimeAdapter';
 import { WorkbenchUiPorts } from './workbenchPorts';
+
+const WorkbenchQueueRuntime = bindProductionPortBinding('queue.workbench-runtime', QueueRuntimeAdapter);
 
 /**
  * The authenticated editor: providers, editor-only runtimes, and the shell.
@@ -38,7 +41,7 @@ export const WorkbenchApp = () => {
         <WorkbenchUiPorts>
           <SessionExpiryGuard />
           <WorkbenchHotkeyRuntime />
-          <QueueRuntimeAdapter />
+          <WorkbenchQueueRuntime />
           <WorkbenchRuntime />
           <WorkbenchSessionController search={search} />
           <WidgetHosts />

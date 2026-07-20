@@ -46,9 +46,6 @@ export const ensureQueueLoaded = (scope: QueueQueryScope = {}): void => {
   void queryClient.ensureQueryData(getQueueReadModelOptions(scope, onQueueRead));
 };
 
-/** @deprecated Scope is now part of each feature-owned query key. */
-export const setQueueScope = (_scope: QueueQueryScope): void => undefined;
-
 export const useQueueCounts = (): QueueCounts => useQueueReadModel().data?.status.queue ?? EMPTY_COUNTS;
 
 /** The processor is "paused" when it has been stopped. */

@@ -98,10 +98,12 @@ jobs:
         run: 'pnpm check:architecture'
         shell: bash
 
-      - name: upload architecture performance artifacts
+      - name: upload architecture review artifacts
         if: ${{ always() && (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) }}
         uses: actions/upload-artifact@v6
         with:
-          name: webv2-architecture-performance
-          path: invokeai/frontend/webv2/artifacts/architecture-performance
+          name: webv2-architecture-review
+          path: |
+            invokeai/frontend/webv2/artifacts/architecture
+            invokeai/frontend/webv2/artifacts/architecture-performance
           if-no-files-found: ignore

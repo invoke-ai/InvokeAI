@@ -99,6 +99,7 @@ import {
 } from './invocation';
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
 import { cloneLayoutPresetWidgetRegions, createLayoutPresetSnapshot } from './layoutPresetSnapshots';
+import { normalizeWorkbenchQueueHistory } from './queueHistoryNormalization';
 import { normalizeProjectSettings } from './settings/store';
 
 type QueueGenerateSnapshot = NonNullable<QueueItem['snapshot']['generate']>;
@@ -639,7 +640,7 @@ const getGallerySelectedImageNames = (values: Record<string, unknown>): string[]
 /**
  * Deep-clones an already-v2 canvas state and normalizes staging candidate placements. Not a
  * migration boundary: callers with genuinely unknown/legacy input must run
- * `migrateCanvasStateToV2` first (see `ensureProjectWidgetContracts`).
+ * `migrateCanvasStateToV2` first (see `normalizeWorkbenchProject`).
  */
 const cloneCanvas = (canvas: CanvasStateContractV2): CanvasStateContractV2 => {
   const document = structuredClone(canvas.document);
@@ -1029,7 +1030,7 @@ const normalizePromptHistory = (value: unknown): PromptHistoryItem[] => {
   }, []);
 };
 
-const ensureProjectWidgetContracts = (project: Project): Project => {
+export const normalizeWorkbenchProject = (project: Project): Project => {
   const defaultWidgetRegions = createWidgetRegions();
   const legacyWidgetRegions = project.widgetRegions as
     | Partial<Record<WidgetRegion | 'left-panel' | 'right-panel' | 'status-bar', WidgetRegionState>>
@@ -1067,13 +1068,16 @@ const ensureProjectWidgetContracts = (project: Project): Project => {
     widgetInstances.upscale = createWidgetInstance('upscale');
   }
 
+  const canvas = cloneCanvas(migrateCanvasStateToV2(project.canvas));
+
   return {
     ...project,
     // `project` may come straight from persisted storage (an unsafe cast boundary), so its
     // canvas can still be v1-shaped, malformed, or missing — migrate before cloning.
-    canvas: cloneCanvas(migrateCanvasStateToV2(project.canvas)),
+    canvas,
     projectGraph: normalizeProjectGraph(project.projectGraph),
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
+    queue: normalizeWorkbenchQueueHistory(project.queue, { canvas, widgetInstances }),
     settings: normalizeProjectSettings(project.settings),
     widgetRegions: {
       left: leftRegion,
@@ -1293,7 +1297,7 @@ const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
   // (they live in the settings store now) and must not resurface here.
   account: normalizeAccount(state.account),
   notifications: [],
-  projects: state.projects.map(ensureProjectWidgetContracts),
+  projects: state.projects.map(normalizeWorkbenchProject),
 });
 
 const updateActiveLayout = (
@@ -1843,7 +1847,7 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
         return { ...state, activeProjectId: action.project.id };
       }
 
-      const project = ensureProjectWidgetContracts(action.project);
+      const project = normalizeWorkbenchProject(action.project);
 
       return { ...state, activeProjectId: project.id, projects: [...state.projects, project] };
     }
@@ -1908,7 +1912,7 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       const preset: LayoutPreset = {
         id: action.presetId,
         label: action.label.trim() || 'Custom layout',
-        snapshot: createLayoutPresetSnapshot(ensureProjectWidgetContracts(activeProject)),
+        snapshot: createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject)),
       };
       const customLayoutPresets = [
         ...(state.account.customLayoutPresets ?? []).filter((candidate) => candidate.id !== action.presetId),
@@ -2853,8 +2857,8 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       // version takes over the original project id, and the local edits
       // continue in the recovered fork — which stays the active project when
       // the user was looking at it.
-      const normalizedServerProject = ensureProjectWidgetContracts(action.serverProject);
-      const recoveredProject = ensureProjectWidgetContracts(action.recoveredProject);
+      const normalizedServerProject = normalizeWorkbenchProject(action.serverProject);
+      const recoveredProject = normalizeWorkbenchProject(action.recoveredProject);
       const localProject = state.projects.find((project) => project.id === action.projectId);
       const hasOriginal = localProject !== undefined;
       // The server document replaces the local one under the SAME project id, so a

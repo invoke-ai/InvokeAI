@@ -8,6 +8,7 @@ import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from 
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
+  useWorkflowCapabilitiesSelector,
   useWorkflowNotifications,
   useWorkflowPreferencesSelector,
   useWorkflowProjectSelector,
@@ -248,7 +249,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const invocationTemplates = templatesStatus === 'loaded' ? templates : undefined;
-  const canUseCache = ui.canUseCache;
+  const canUseCache = useWorkflowCapabilitiesSelector((capabilities) => capabilities.canUseCache);
   const edgeType: FlowEdgeType = workflowEdgeStyle === 'square' ? 'step' : 'default';
   const isLargeGraph = isLargeWorkflowGraph({
     edgeCount: projectGraph.edges.length,

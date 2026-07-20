@@ -41,6 +41,9 @@ export const useAuthSession = (): AuthSession => store.useSnapshot();
  */
 export const getAuthSession = (): AuthSession => store.getSnapshot();
 
+/** Stable subscription for App-composed capability read ports. */
+export const subscribeAuthSession = (listener: () => void): (() => void) => store.subscribe(listener);
+
 /**
  * Sticky across sign-out: a debounced autosave can still fire during the
  * logout transition, and it must land in the bucket of the user whose data

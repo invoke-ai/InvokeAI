@@ -413,7 +413,7 @@ describe('composeForGeneration', () => {
     expect(order).toEqual(['control:control-a', 'control:control-b', 'regional:region-a', 'regional:region-b']);
   });
 
-  it('commits the dedupe cache on success so a second compose reuses every upload', async () => {
+  it('publishes dedupe only through an idempotent success commit so a retry reuses every upload', async () => {
     const document = makeDoc([rasterLayer('base'), controlLayer('control-a')]);
     const harness = makeHost(document);
 
@@ -421,12 +421,20 @@ describe('composeForGeneration', () => {
     expect(first.status).toBe('ok');
     const uploadsAfterFirst = harness.uploadImage.mock.calls.length;
     expect(uploadsAfterFirst).toBe(2);
-    expect(harness.host.dedupe.byKey.size).toBeGreaterThan(0);
+    expect(harness.host.dedupe.byKey.size).toBe(0);
+    if (first.status !== 'ok') {
+      return;
+    }
+    first.dedupeCommit.commit();
+    const committedKeyCount = harness.host.dedupe.byKey.size;
+    expect(committedKeyCount).toBeGreaterThan(0);
+    first.dedupeCommit.commit();
+    expect(harness.host.dedupe.byKey.size).toBe(committedKeyCount);
 
     const second = await compose(harness.host);
     expect(second.status).toBe('ok');
     expect(harness.uploadImage.mock.calls.length).toBe(uploadsAfterFirst);
-    if (first.status === 'ok' && second.status === 'ok') {
+    if (second.status === 'ok') {
       expect(second.composites.baseImageName).toBe(first.composites.baseImageName);
       expect(second.composites.controlImages).toEqual(first.composites.controlImages);
     }

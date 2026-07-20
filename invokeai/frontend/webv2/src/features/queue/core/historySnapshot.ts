@@ -1,11 +1,22 @@
 import type { QueueItem } from './historyTypes';
 
-export const getQueueItemSnapshotBatchCount = (item: QueueItem): number => item.snapshot.presentation.batchCount;
+const getPresentation = (item: QueueItem): Partial<QueueItem['snapshot']['presentation']> =>
+  ((item as Partial<QueueItem>).snapshot as Partial<QueueItem['snapshot']> | undefined)?.presentation ?? {};
+
+export const getQueueItemSnapshotBatchCount = (item: QueueItem): number => {
+  const batchCount = getPresentation(item).batchCount;
+  return typeof batchCount === 'number' && Number.isFinite(batchCount) && batchCount > 0 ? batchCount : 1;
+};
+
+export const getQueueItemSnapshotPositivePrompt = (item: QueueItem): string => {
+  const positivePrompt = getPresentation(item).positivePrompt;
+  return typeof positivePrompt === 'string' ? positivePrompt : '';
+};
 
 export const getQueueItemSnapshotDimensions = (
   item: QueueItem,
   fallback: { height: number; width: number }
 ): { height: number; width: number } => ({
-  height: item.snapshot.presentation.height || fallback.height,
-  width: item.snapshot.presentation.width || fallback.width,
+  height: getPresentation(item).height || fallback.height,
+  width: getPresentation(item).width || fallback.width,
 });

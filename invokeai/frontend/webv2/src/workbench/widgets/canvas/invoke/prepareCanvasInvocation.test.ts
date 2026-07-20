@@ -325,6 +325,17 @@ describe('runCanvasInvocation', () => {
     // sd-1 is linear: denoising_start = 1 - 0.75.
     expect(nodes.denoise_latents.denoising_start).toBeCloseTo(0.25, 10);
     expect(harness.notices()).toHaveLength(0);
+    expect(harness.dedupe.byKey.size).toBeGreaterThan(0);
+  });
+
+  it('reuses committed composite uploads on a later successful invocation', async () => {
+    const harness = makeHarness();
+
+    await runCanvasInvocation(harness.deps);
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(2);
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
   });
 
   it('dispatches resolved prompt and seed metadata with the compiled canvas graph', async () => {
@@ -616,7 +627,7 @@ describe('runCanvasInvocation', () => {
 
   it('records a notice and dispatches no snapshot when the graph fails validation', async () => {
     // External image generators are rejected by the graph compiler.
-    const harness = makeHarness({ document: makeDoc([]), model: externalModel });
+    const harness = makeHarness({ model: externalModel });
 
     await runCanvasInvocation(harness.deps);
 
@@ -627,6 +638,24 @@ describe('runCanvasInvocation', () => {
     expect(harness.dedupe.byKey).toHaveLength(0);
     expect(harness.dedupe.byHash).toHaveLength(0);
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards provisional dedupe entries when synchronous queue dispatch fails', async () => {
+    const dispatch = vi.fn((action: WorkbenchAction) => {
+      if (action.type === 'submitCanvasInvocationSnapshot') {
+        throw new Error('queue dispatch failed');
+      }
+    });
+    const harness = makeHarness({ dispatch });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+    expect(harness.dedupe.byKey).toHaveLength(0);
+    expect(harness.dedupe.byHash).toHaveLength(0);
+    expect(harness.notices()).toEqual([
+      expect.objectContaining({ message: 'queue dispatch failed', type: 'recordNotice' }),
+    ]);
   });
 
   it('records a notice and dispatches no snapshot when the composite upload fails', async () => {

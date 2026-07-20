@@ -76,13 +76,47 @@ export const createQueueItemBackendSubmission = (
   project: Pick<QueueHistoryProject, 'id'>,
   queueItem: QueueItem
 ): QueueItemBackendSubmission => {
-  const submission = queueItem.snapshot.backendSubmission;
+  const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
+
+  if (!submission || typeof submission !== 'object' || !('kind' in submission)) {
+    return { error: 'Queue item is missing a compiled backend submission.', kind: 'invalid' };
+  }
+
+  if (submission.kind !== 'invalid' && submission.kind !== 'generate' && submission.kind !== 'workflow') {
+    return { error: 'Queue item has an unsupported compiled backend submission.', kind: 'invalid' };
+  }
 
   if (submission.kind === 'invalid') {
-    return submission;
+    return typeof submission.error === 'string'
+      ? submission
+      : { error: 'Queue item has an invalid compiled backend submission.', kind: 'invalid' };
+  }
+
+  if (!submission.graph || typeof submission.graph !== 'object') {
+    return { error: 'Queue item backend submission is missing its compiled graph.', kind: 'invalid' };
+  }
+
+  if (
+    typeof submission.batchCount !== 'number' ||
+    !Number.isFinite(submission.batchCount) ||
+    submission.batchCount < 1
+  ) {
+    return { error: 'Queue item backend submission has an invalid batch count.', kind: 'invalid' };
   }
 
   if (submission.kind === 'generate') {
+    if (
+      typeof submission.negativePrompt !== 'string' ||
+      typeof submission.negativePromptNodeId !== 'string' ||
+      typeof submission.positivePrompt !== 'string' ||
+      typeof submission.positivePromptNodeId !== 'string' ||
+      typeof submission.seed !== 'number' ||
+      !Number.isFinite(submission.seed) ||
+      typeof submission.seedNodeId !== 'string' ||
+      typeof submission.shouldRandomizeSeed !== 'boolean'
+    ) {
+      return { error: 'Queue item has malformed generate submission metadata.', kind: 'invalid' };
+    }
     const { kind: _, ...compiled } = submission;
     return {
       kind: 'generate',

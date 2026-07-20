@@ -23,11 +23,10 @@
  * - `shouldCompositeRegionalMask` vets each planned regional-guidance layer in
  *   z-order: `false` silently skips the region (no upload).
  *
- * Semantic delta vs. the old transaction (documented, intentional): the dedupe
- * commit happens when every composite has succeeded, not after the caller
- * submits the graph. The cache only enables reuse of correctly uploaded
- * content-hashed intermediates, so committing at composite-success is not
- * product-visible — a later submit failure never invalidates the uploads.
+ * Successful composition returns one opaque, idempotent dedupe commit. The
+ * caller publishes it only after graph compilation and synchronous queue
+ * dispatch both succeed; every earlier failure discards the operation-local
+ * cache while the uploaded intermediates remain safe to retry.
  */
 
 import type {
@@ -118,8 +117,16 @@ export interface GenerationCompositeHost {
   ): Promise<CaptureRasterSnapshotResult>;
   /** The engine's composite executor deps (backend, upload, reserve, ...). */
   getCompositeExecutorDeps(): GenerationCompositeExecutorDeps;
-  /** Engine-scoped dedupe cache, merged into only after every composite succeeds. */
+  /** Engine-scoped dedupe cache, merged into only by the returned commit. */
   dedupe: CompositeDedupeCache;
+}
+
+declare const generationCompositeDedupeCommitBrand: unique symbol;
+
+/** Opaque publication handle; callers may only commit the completed transaction. */
+export interface GenerationCompositeDedupeCommit {
+  readonly [generationCompositeDedupeCommitBrand]: true;
+  commit(): void;
 }
 
 /** Everything a canvas invoke needs from the composite pipeline. */
@@ -143,7 +150,7 @@ export interface GenerationComposites {
 }
 
 export type ComposeForGenerationResult =
-  | { status: 'ok'; composites: GenerationComposites }
+  | { status: 'ok'; composites: GenerationComposites; dedupeCommit: GenerationCompositeDedupeCommit }
   | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'over-budget' };
 
 /**
@@ -188,8 +195,8 @@ export const composeForGeneration = async (
   }
   const rasterSnapshot = capture.snapshot;
 
-  // Operation-scoped dedupe: composites read/write a copy, merged back into the
-  // host cache only after every composite succeeded (see the module doc).
+  // Operation-scoped dedupe: composites read/write a copy. Publication remains
+  // provisional until the caller successfully compiles and dispatches.
   const operationDedupe: CompositeDedupeCache = {
     byHash: new Map(host.dedupe.byHash),
     byKey: new Map(host.dedupe.byKey),
@@ -279,14 +286,21 @@ export const composeForGeneration = async (
       regionalMaskImages.push({ imageName: result.imageName, layerId });
     }
 
-    // Every composite succeeded: publish the operation's dedupe entries so the
-    // next invoke reuses the uploads (see the module doc for the timing note).
-    for (const [key, value] of operationDedupe.byHash) {
-      host.dedupe.byHash.set(key, value);
-    }
-    for (const [key, value] of operationDedupe.byKey) {
-      host.dedupe.byKey.set(key, value);
-    }
+    let isCommitted = false;
+    const dedupeCommit = {
+      commit: (): void => {
+        if (isCommitted) {
+          return;
+        }
+        isCommitted = true;
+        for (const [key, value] of operationDedupe.byHash) {
+          host.dedupe.byHash.set(key, value);
+        }
+        for (const [key, value] of operationDedupe.byKey) {
+          host.dedupe.byKey.set(key, value);
+        }
+      },
+    } as GenerationCompositeDedupeCommit;
 
     return {
       composites: {
@@ -299,6 +313,7 @@ export const composeForGeneration = async (
         noiseMaskImageName,
         regionalMaskImages,
       },
+      dedupeCommit,
       status: 'ok',
     };
   } finally {

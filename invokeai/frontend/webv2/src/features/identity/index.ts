@@ -6,6 +6,7 @@ export {
   getUserStorageScope,
   loginWithCredentials,
   logoutSession,
+  subscribeAuthSession,
   useAuthSession,
   type AuthSession,
 } from './session';

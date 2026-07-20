@@ -2,7 +2,7 @@ import type { XYPosition } from '@features/workflow/contracts';
 import type { WorkflowInvocationSourceId, WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
 
 import { Box, Dialog, Portal, SegmentGroup, Text } from '@chakra-ui/react';
-import { useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
+import { useWorkflowGraphPreview } from '@features/workflow/ui/WorkflowUiContext';
 import { Button, JsonPreview } from '@platform/ui';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,7 +43,7 @@ export const GraphPreviewDialog = ({
   onOpenChange,
 }: GraphPreviewDialogProps) => {
   const { t } = useTranslation();
-  const { graphPreview } = useWorkflowUi();
+  const graphPreview = useWorkflowGraphPreview();
   const [mode, setMode] = useState<PreviewMode>('nodes');
   const dialogRoute = graphPreview.getRoute(sourceId);
   const canInvoke = dialogRoute?.canInvoke === true;

@@ -1,4 +1,5 @@
 export type {
+  QueueBackendGraph,
   QueueCounts,
   QueueFeatureCommands,
   QueueItemIdsReadModel,
@@ -9,7 +10,9 @@ export type {
   QueueProcessorReadModel,
   QueueQueryScope,
   QueueReadModel,
+  QueueSourceId,
   QueueStatusReadModel,
+  QueueSubmissionPresentation,
   TerminalQueueItemStatus,
 } from './core/types';
 export type {
@@ -19,7 +22,11 @@ export type {
   QueueSubmissionSnapshot,
   RunRecord,
 } from './core/historyTypes';
-export { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from './core/historySnapshot';
+export {
+  getQueueItemSnapshotBatchCount,
+  getQueueItemSnapshotDimensions,
+  getQueueItemSnapshotPositivePrompt,
+} from './core/historySnapshot';
 export {
   getProjectQueueIndicatorState,
   getQueueItemExpectedImageCount,

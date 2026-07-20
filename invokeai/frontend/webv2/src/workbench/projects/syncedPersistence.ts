@@ -4,7 +4,7 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import { getUserStorageScope } from '@features/identity';
 import { timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '@workbench/persistence';
-import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createDraftProject, createInitialWorkbenchState, normalizeWorkbenchProject } from '@workbench/workbenchState';
 
 import {
   createProject as apiCreateProject,
@@ -187,7 +187,10 @@ export const deserializeProjectDocument = (data: Record<string, unknown>): Proje
     return null;
   }
 
-  return { ...normalizedData, undoRedo: { future: [], past: [] } } as unknown as Project;
+  return normalizeWorkbenchProject({
+    ...normalizedData,
+    undoRedo: { future: [], past: [] },
+  } as unknown as Project);
 };
 
 const getSyncMapStorageKey = (): string => `${SYNC_MAP_BASE_KEY}${getUserStorageScope()}`;
