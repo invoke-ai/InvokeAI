@@ -6,11 +6,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
-import { mountProductionPortBinding } from './productionPortBindings';
 
-// The only production binding that must exist before React mounts; all other
-// bindings are enumerated in `app/workbenchPorts.tsx`.
-mountProductionPortBinding('platform.http-auth', () => configureHttpAuth(identityTransportAuthAdapter));
+// HTTP auth must be configured before any React-owned transport consumer mounts.
+configureHttpAuth(identityTransportAuthAdapter);
 
 const rootElement = document.getElementById('root');
 

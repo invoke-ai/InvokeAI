@@ -14,10 +14,7 @@ import { Launchpad } from '@workbench/launchpad/Launchpad';
 import { peekOpenProjectIds, type WorkbenchSearch } from '@workbench/projects/session';
 import { loadWorkbenchSettings } from '@workbench/settings/store';
 
-import { bindProductionPortBinding } from './productionPortBindings';
 import { SocketHubRuntime } from './SocketHubRuntime';
-
-const AuthenticatedSocketRuntime = bindProductionPortBinding('platform.authenticated-socket', SocketHubRuntime);
 
 /**
  * Code-based route tree. The authenticated layout route owns the auth guard,
@@ -46,7 +43,7 @@ const rootRoute = createRootRoute({ component: Outlet });
  */
 const AuthenticatedLayout = () => (
   <>
-    <AuthenticatedSocketRuntime />
+    <SocketHubRuntime />
     <Outlet />
   </>
 );

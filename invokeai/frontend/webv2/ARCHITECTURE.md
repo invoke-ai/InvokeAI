@@ -7,7 +7,7 @@ Webv2 uses four top-level module groups:
 - `workbench/` owns the atomic project aggregate, layout, shell, widget runtime, and extension runtime.
 - `features/<domain>/` owns domain behavior behind a small set of public top-level entry modules (`features/<domain>/index.ts` first among them).
 
-Dependency direction is `app -> workbench/features -> platform`. Feature callers import only a feature's public entry modules — the top-level modules each feature registers in `src/architecture/featureInterfaces.ts` (`index` is implicitly public; an unregistered feature or module is private, fail-closed); everything under `core/`, `data/`, `ui/`, and runtime implementation is private. A feature may group substantial behavior under `core/`, `data/`, and `ui/`; pure cores do not import React, HTTP, or UI code. Production canvas callers use `canvas-engine/api.ts`, not the engine implementation root.
+Dependency direction is `app -> workbench/features -> platform`. Feature callers import only a feature's public entry modules — the top-level modules each feature registers in `src/architecture/featureInterfaces.ts` (`index` is implicitly public; an unregistered feature or module is private, fail-closed); everything under `core/`, `data/`, `ui/`, and runtime implementation is private. A feature may group substantial behavior under `core/`, `data/`, and `ui/`; pure cores do not import transport, Data, React, or UI modules, including through type-only imports. Production canvas callers use `canvas-engine/api.ts`, not the engine implementation root.
 
 ## App and Platform ownership
 
@@ -27,7 +27,9 @@ Ownership is based on invariants, not the first caller:
 
 The root of `src/` contains declaration files only. Runtime boot files live in App, the old root entry paths do not exist, and `index.html` names `src/app/main.tsx` directly. `@theme` resolves to Platform UI theme implementation; all other Platform callers use `@platform/*`. No compatibility path exists for moved App, HTTP, socket, external-store, selector, theme, i18n, or reusable-UI modules.
 
-Platform transport receives authentication through `app/configureDependencies.ts`: Auth owns token storage and unauthorized-session behavior, while Platform only requests a token and reports a 401. The Platform socket publishes raw events and connection transitions; Queue and other domains interpret those events. App constructs the production Queue runtime from Queue, Workbench, Gallery, and Workflow adapters.
+Platform transport receives authentication through `app/main.tsx`, before React mounts: Auth owns token storage and unauthorized-session behavior, while Platform only requests a token and reports a 401. The Platform socket publishes raw events and connection transitions; Queue and other domains interpret those events. Lifecycle-specific production composition remains explicit at its natural root: the authenticated socket in `app/router.tsx`, editor runtimes in `app/WorkbenchApp.tsx`, feature UI providers in `app/workbenchPorts.tsx`, and lazy editor bridges beside their lazy entry modules. App constructs the production Queue runtime from Queue, Workbench, Gallery, and Workflow adapters.
+
+Platform State also owns reusable projections of broad external stores into referentially stable read-only stores. App may construct those projections for a feature port, but the listener, caching, and equality mechanics remain domain-neutral Platform code.
 
 `pnpm architecture:check` is the executable source of truth for these dependency directions. It uses the TypeScript parser to classify static imports, type imports, dynamic imports, re-exports, and inline imported types after resolving aliases and relative paths. Temporary violations must be recorded in `src/architecture/migrationExceptions.ts` with an owner and a removal ticket; architecture completion requires that registry to be empty.
 

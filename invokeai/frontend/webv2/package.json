@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "architecture:check": "vitest run --config vitest.config.mts src/architecture/dependencyPolicy.test.ts src/architecture/workbenchOwnership.test.ts src/architecture/productionPortBindings.test.ts && node scripts/write-workbench-ownership-inventory.mjs && node scripts/write-contract-caller-matrix.mjs && node scripts/write-canvas-import-matrix.mjs",
+    "architecture:check": "vitest run --config vitest.config.mts src/architecture/dependencyPolicy.test.ts src/architecture/workbenchOwnership.test.ts src/architecture/architectureWorkflow.test.ts && node scripts/write-workbench-ownership-inventory.mjs && node scripts/write-contract-caller-matrix.mjs && node scripts/write-canvas-import-matrix.mjs",
     "build": "pnpm run lint && vite build",
     "check:architecture": "pnpm run lint && pnpm run test:all && pnpm run test:performance:architecture",
     "dev": "vite dev",
