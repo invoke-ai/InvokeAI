@@ -201,6 +201,7 @@ class WanModelLoaderInvocation(BaseInvocation):
 
         # VAE: standalone override > main (if Diffusers) > component source.
         if self.vae_model is not None:
+            self._validate_standalone_vae(context, self.vae_model, main_variant)
             vae = self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
         elif main_is_diffusers:
             vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
@@ -262,5 +263,17 @@ class WanModelLoaderInvocation(BaseInvocation):
         if main_is_ti2v != source_is_ti2v:
             raise ValueError(
                 "The Component Source VAE is incompatible with the selected transformer. "
+                "TI2V-5B requires the 48-channel Wan 2.2 VAE; A14B models require the 16-channel Wan 2.1 VAE."
+            )
+
+    @staticmethod
+    def _validate_standalone_vae(
+        context: InvocationContext, model: ModelIdentifierField, main_variant: WanVariantType
+    ) -> None:
+        vae_config = context.models.get_config(model)
+        expected_channels = 48 if main_variant == WanVariantType.TI2V_5B else 16
+        if vae_config.latent_channels != expected_channels:
+            raise ValueError(
+                "The standalone VAE is incompatible with the selected transformer. "
                 "TI2V-5B requires the 48-channel Wan 2.2 VAE; A14B models require the 16-channel Wan 2.1 VAE."
             )

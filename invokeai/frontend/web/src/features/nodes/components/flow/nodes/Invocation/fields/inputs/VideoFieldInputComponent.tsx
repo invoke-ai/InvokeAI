@@ -2,6 +2,7 @@ import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import type { SetNodeVideoFieldVideoDndTargetData } from 'features/dnd/dnd';
 import { setNodeVideoFieldVideoDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -29,6 +30,7 @@ const VideoFieldInputComponent = (props: FieldComponentProps<VideoFieldInputInst
   const isConnected = useStore($isConnected);
 
   const { currentData: videoDTO, error } = useGetVideoDTOQuery(field.value?.video_name ?? skipToken);
+  const thumbnailUrl = useMediaUrl(videoDTO?.thumbnail_url);
 
   const handleReset = useCallback(() => {
     dispatch(
@@ -74,7 +76,7 @@ const VideoFieldInputComponent = (props: FieldComponentProps<VideoFieldInputInst
       {videoDTO && (
         <>
           <Flex borderRadius="base" borderWidth={1} borderStyle="solid" overflow="hidden">
-            <Image src={videoDTO.thumbnail_url} objectFit="contain" maxW="full" maxH="full" />
+            <Image src={thumbnailUrl} objectFit="contain" maxW="full" maxH="full" />
           </Flex>
           <Text
             position="absolute"

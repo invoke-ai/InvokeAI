@@ -66,7 +66,7 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
                 JOIN board_videos ON videos.video_name = board_videos.video_name
                 WHERE board_videos.board_id = ?
                 AND videos.is_intermediate = FALSE
-                ORDER BY videos.starred DESC, videos.created_at DESC
+                ORDER BY videos.starred DESC, videos.created_at DESC, videos.video_name DESC
                 LIMIT 1;
                 """,
                 (board_id,),
@@ -190,10 +190,14 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
 
             if starred_first:
                 query_pagination = (
-                    f" ORDER BY videos.starred DESC, videos.created_at {order_dir.value} LIMIT ? OFFSET ? "
+                    f" ORDER BY videos.starred DESC, videos.created_at {order_dir.value}, "
+                    f"videos.video_name {order_dir.value} LIMIT ? OFFSET ? "
                 )
             else:
-                query_pagination = f" ORDER BY videos.created_at {order_dir.value} LIMIT ? OFFSET ? "
+                query_pagination = (
+                    f" ORDER BY videos.created_at {order_dir.value}, videos.video_name {order_dir.value} "
+                    "LIMIT ? OFFSET ? "
+                )
 
             videos_query += query_conditions + query_pagination + ";"
             videos_params = query_params.copy()
@@ -356,9 +360,10 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
                 starred_count = cast(int, cursor.fetchone()[0])
 
             order_clause = (
-                f" ORDER BY videos.starred DESC, videos.created_at {order_dir.value} "
+                f" ORDER BY videos.starred DESC, videos.created_at {order_dir.value}, "
+                f"videos.video_name {order_dir.value} "
                 if starred_first
-                else f" ORDER BY videos.created_at {order_dir.value} "
+                else f" ORDER BY videos.created_at {order_dir.value}, videos.video_name {order_dir.value} "
             )
             cursor.execute(
                 f"""--sql

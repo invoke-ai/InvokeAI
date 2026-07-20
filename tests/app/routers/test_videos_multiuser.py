@@ -96,6 +96,7 @@ def enable_multiuser_for_videos(monkeypatch: Any, mock_invoker: Invoker):
 
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api_app.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.boards.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.videos.ApiDependencies", mock_deps)

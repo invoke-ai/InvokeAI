@@ -1,6 +1,7 @@
 import { Badge, Flex, IconButton, Menu, MenuButton, MenuItem, MenuList, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { logout, selectCurrentUser } from 'features/auth/store/authSlice';
+import { logoutAfterServerConfirmation } from 'features/auth/store/logoutAfterServerConfirmation';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearBold, PiSignOutBold, PiUserBold, PiUsersBold } from 'react-icons/pi';
@@ -15,17 +16,13 @@ export const UserMenu = memo(() => {
   const [logoutMutation] = useLogoutMutation();
 
   const handleLogout = useCallback(() => {
-    // Call backend logout endpoint
-    logoutMutation()
-      .unwrap()
-      .catch(() => {
-        // Ignore errors - we'll log out locally anyway
-      })
-      .finally(() => {
-        // Clear local state regardless of backend response
+    void logoutAfterServerConfirmation(
+      () => logoutMutation().unwrap(),
+      () => {
         dispatch(logout());
         navigate('/login');
-      });
+      }
+    ).catch(() => undefined);
   }, [dispatch, navigate, logoutMutation]);
 
   const handleProfile = useCallback(() => {

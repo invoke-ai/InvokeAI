@@ -293,6 +293,10 @@ async def upload_video(
     finally:
         # If create() succeeded the file was moved; this unlink is a no-op then.
         try:
+            tmp.close()
+        except Exception:
+            pass
+        try:
             tmp_path.unlink(missing_ok=True)
         except Exception:
             pass

@@ -37,6 +37,7 @@ def _invoke(
     component_config: SimpleNamespace | None = None,
     *,
     use_component_vae: bool = False,
+    vae_latent_channels: int | None = None,
 ):
     main = _model("main")
     low = _model("low") if low_config is not None else None
@@ -47,6 +48,10 @@ def _invoke(
     component = _model("component") if component_config is not None else None
     if component_config is not None:
         configs["component"] = component_config
+    if not use_component_vae:
+        if vae_latent_channels is None:
+            vae_latent_channels = 48 if main_config.variant == WanVariantType.TI2V_5B else 16
+        configs["vae"] = SimpleNamespace(name="vae", latent_channels=vae_latent_channels)
     context.models.get_config.side_effect = lambda model: configs[model.key]
     invocation = WanModelLoaderInvocation(
         id="test",
@@ -188,3 +193,36 @@ def test_gguf_loader_accepts_component_source_with_compatible_vae_family(
     )
 
     assert output.vae.vae.key == "component"
+
+
+@pytest.mark.parametrize(
+    "main_variant,vae_latent_channels",
+    [
+        (WanVariantType.TI2V_5B, 16),
+        (WanVariantType.T2V_A14B, 48),
+        (WanVariantType.I2V_A14B, 48),
+    ],
+)
+def test_loader_rejects_incompatible_standalone_vae(main_variant: WanVariantType, vae_latent_channels: int) -> None:
+    with pytest.raises(ValueError, match="VAE"):
+        _invoke(
+            _config("main", main_variant, "none" if main_variant == WanVariantType.TI2V_5B else "high"),
+            vae_latent_channels=vae_latent_channels,
+        )
+
+
+@pytest.mark.parametrize(
+    "main_variant,vae_latent_channels",
+    [
+        (WanVariantType.TI2V_5B, 48),
+        (WanVariantType.T2V_A14B, 16),
+        (WanVariantType.I2V_A14B, 16),
+    ],
+)
+def test_loader_accepts_compatible_standalone_vae(main_variant: WanVariantType, vae_latent_channels: int) -> None:
+    output = _invoke(
+        _config("main", main_variant, "none" if main_variant == WanVariantType.TI2V_5B else "high"),
+        vae_latent_channels=vae_latent_channels,
+    )
+
+    assert output.vae.vae.key == "vae"

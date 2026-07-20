@@ -2,6 +2,7 @@ import { CompositeNumberInput, CompositeSlider, Flex, Text } from '@invoke-ai/ui
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { useIntegerField } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/useIntegerField';
 import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
@@ -53,6 +54,7 @@ export const VideoFrameIndexFieldInput = memo(
     );
     const videoName = useAppSelector(selectVideoName);
     const { currentData: videoDTO } = useGetVideoDTOQuery(videoName ?? skipToken);
+    const videoUrl = useMediaUrl(videoDTO?.video_url);
 
     // Frame count is the slider's upper bound. duration*fps can be off-by-one for VFR
     // containers, but that's tolerable here — the slider is for visual scrubbing, not
@@ -89,9 +91,9 @@ export const VideoFrameIndexFieldInput = memo(
           constrainValue={constrainValue}
           allowMath
         />
-        {videoDTO && frameCount && fps ? (
+        {videoDTO && videoUrl && frameCount && fps ? (
           <FrameScrubber
-            videoUrl={videoDTO.video_url}
+            videoUrl={videoUrl}
             resolvedIndex={resolvedIndex}
             fps={fps}
             frameCount={frameCount}

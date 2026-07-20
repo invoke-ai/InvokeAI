@@ -5,11 +5,27 @@ the entire multipart body, so oversized/chunked/concurrent requests could exhaus
 storage before rejection. The middleware bounds ingress before the parser runs.
 """
 
-import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+import asyncio
+import tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from invokeai.app.api_app import SubPathASGIMiddleware, VideoUploadLimitASGIMiddleware
+import pytest
+from fastapi import FastAPI, Response, UploadFile
+from fastapi.testclient import TestClient
+from starlette.datastructures import Headers
+
+from invokeai.app import api_app
+from invokeai.app.api.routers.videos import upload_video
+from invokeai.app.api_app import (
+    SubPathASGIMiddleware,
+    VideoUploadLimitASGIMiddleware,
+    _is_authenticated_video_upload,
+)
+from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
+from invokeai.app.services.image_records.image_records_common import ImageCategory
 
 MAX_BODY = 1024  # tiny cap for tests
 MAX_CONCURRENT = 2
@@ -30,6 +46,36 @@ def _build_app() -> tuple[FastAPI, list[str]]:
         return {"ok": True}
 
     return app, calls
+
+
+def _call_asgi(app: VideoUploadLimitASGIMiddleware, path: str, authorization: str | None = None) -> int:
+    headers = [(b"content-length", b"1")]
+    if authorization is not None:
+        headers.append((b"authorization", authorization.encode()))
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "headers": headers,
+        "client": ("testclient", 50000),
+        "server": ("testserver", 80),
+        "root_path": "",
+    }
+    messages: list[dict[str, Any]] = []
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"x", "more_body": False}
+
+    async def send(message: dict[str, Any]) -> None:
+        messages.append(message)
+
+    asyncio.run(app(scope, receive, send))  # type: ignore[arg-type]
+    return next(message["status"] for message in messages if message["type"] == "http.response.start")
 
 
 def _client(base_path: str | None = None) -> tuple[TestClient, list[str]]:
@@ -83,6 +129,119 @@ def test_active_count_released_after_request():
     client.post("/api/v1/videos/upload", content=b"x")
 
     assert middleware._active == 0
+
+
+def test_unauthenticated_upload_is_rejected_without_consuming_capacity():
+    app, calls = _build_app()
+    middleware = VideoUploadLimitASGIMiddleware(
+        app,
+        max_body_bytes=MAX_BODY,
+        max_concurrent=MAX_CONCURRENT,
+        is_authenticated=lambda scope: Headers(scope=scope).get("authorization") == "Bearer valid",
+    )
+    middleware._active = MAX_CONCURRENT
+
+    status_code = _call_asgi(middleware, "/api/v1/videos/upload")
+
+    assert status_code == 401
+    assert middleware._active == MAX_CONCURRENT
+    assert calls == []
+
+
+def test_authenticated_upload_still_obeys_concurrency_bound():
+    app, calls = _build_app()
+    middleware = VideoUploadLimitASGIMiddleware(
+        app,
+        max_body_bytes=MAX_BODY,
+        max_concurrent=MAX_CONCURRENT,
+        is_authenticated=lambda scope: Headers(scope=scope).get("authorization") == "Bearer valid",
+    )
+    middleware._active = MAX_CONCURRENT
+
+    status_code = _call_asgi(middleware, "/api/v1/videos/upload", authorization="Bearer valid")
+
+    assert status_code == 429
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    "multiuser,send_token,user_active,expected",
+    [
+        (False, False, False, True),
+        (True, False, True, False),
+        (True, True, False, False),
+        (True, True, True, True),
+    ],
+)
+def test_production_upload_authentication(
+    monkeypatch: pytest.MonkeyPatch,
+    multiuser: bool,
+    send_token: bool,
+    user_active: bool,
+    expected: bool,
+) -> None:
+    set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
+    token_data = TokenData(user_id="user", email="user@example.com", is_admin=False)
+    user = SimpleNamespace(is_active=user_active)
+    invoker = SimpleNamespace(
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(multiuser=multiuser),
+            users=SimpleNamespace(get=lambda _user_id: user),
+        )
+    )
+    monkeypatch.setattr(api_app.ApiDependencies, "invoker", invoker, raising=False)
+    headers = []
+    if send_token:
+        headers.append((b"authorization", f"Bearer {create_access_token(token_data)}".encode()))
+
+    assert _is_authenticated_video_upload({"headers": headers}) is expected  # type: ignore[arg-type]
+
+
+def test_upload_video_closes_tmp_handle_when_stream_copy_fails():
+    captured_handles: list[Any] = []
+    real_named_tmp = tempfile.NamedTemporaryFile
+
+    async def run_immediately(func: Any, *args: Any):
+        return func(*args)
+
+    def failing_named_tmp(*args: Any, **kwargs: Any):
+        handle = real_named_tmp(*args, **kwargs)
+        handle.write = MagicMock(side_effect=OSError("disk full"))
+        captured_handles.append(handle)
+        return handle
+
+    upload = MagicMock(spec=UploadFile)
+    upload.filename = "video.mp4"
+    upload.content_type = "video/mp4"
+    upload.read = AsyncMock(side_effect=[b"not-empty", b""])
+
+    try:
+        with (
+            patch("invokeai.app.api.routers.videos.tempfile.NamedTemporaryFile", side_effect=failing_named_tmp),
+            patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
+            pytest.raises(OSError, match="disk full"),
+        ):
+            asyncio.run(
+                upload_video(
+                    current_user=TokenData(user_id="user", email="user@example.com", is_admin=False),
+                    file=upload,
+                    request=MagicMock(),
+                    response=Response(),
+                    video_category=ImageCategory.GENERAL,
+                    is_intermediate=False,
+                    board_id=None,
+                    session_id=None,
+                    metadata=None,
+                )
+            )
+
+        assert len(captured_handles) == 1
+        assert captured_handles[0].closed
+        assert not Path(captured_handles[0].name).exists()
+    finally:
+        for handle in captured_handles:
+            handle.close()
+            Path(handle.name).unlink(missing_ok=True)
 
 
 @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])

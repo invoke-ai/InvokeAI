@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.security.utils import get_authorization_scheme_param
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.datastructures import Headers
@@ -164,6 +166,22 @@ class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def _is_authenticated_video_upload(scope: Scope) -> bool:
+    if not ApiDependencies.invoker.services.configuration.multiuser:
+        return True
+
+    scheme, token = get_authorization_scheme_param(Headers(scope=scope).get("authorization"))
+    if scheme.lower() != "bearer":
+        return False
+    from invokeai.app.services.auth.token_service import verify_token
+
+    token_data = verify_token(token)
+    if token_data is None:
+        return False
+    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+    return user is not None and user.is_active
+
+
 class VideoUploadLimitASGIMiddleware:
     """Bound video-upload ingress *before* FastAPI's multipart parser runs.
 
@@ -175,10 +193,17 @@ class VideoUploadLimitASGIMiddleware:
     globally.
     """
 
-    def __init__(self, app: ASGIApp, max_body_bytes: int, max_concurrent: int) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        max_body_bytes: int,
+        max_concurrent: int,
+        is_authenticated: Callable[[Scope], bool] | None = None,
+    ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
         self.max_concurrent = max_concurrent
+        self.is_authenticated = is_authenticated
         self._active = 0
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -188,6 +213,14 @@ class VideoUploadLimitASGIMiddleware:
         route_path: str = scope.get("path", "").removeprefix(scope.get("root_path", ""))
         if not (scope.get("method") == "POST" and route_path == "/api/v1/videos/upload"):
             return await self.app(scope, receive, send)
+
+        if self.is_authenticated is not None and not self.is_authenticated(scope):
+            response = JSONResponse(
+                {"detail": "Authentication required"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            return await response(scope, receive, send)
 
         content_length = Headers(scope=scope).get("content-length")
         if content_length is not None and content_length.isdigit() and int(content_length) > self.max_body_bytes:
@@ -274,6 +307,7 @@ app.add_middleware(
     VideoUploadLimitASGIMiddleware,
     max_body_bytes=videos.MAX_UPLOAD_REQUEST_SIZE,
     max_concurrent=videos.MAX_CONCURRENT_VIDEO_UPLOADS,
+    is_authenticated=_is_authenticated_video_upload,
 )
 
 

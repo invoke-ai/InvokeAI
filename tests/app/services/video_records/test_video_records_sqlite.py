@@ -9,8 +9,10 @@ behaviour so the regression cannot reappear.
 
 import pytest
 
+from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
@@ -92,6 +94,74 @@ class TestGetVideoNamesOmittedBoardIdMultiuser:
         # regression there too.
         result = seeded_store.get_video_names(board_id="none", user_id="alice", is_admin=False)
         assert set(result.video_names) == {"alice_1.mp4", "alice_2.mp4"}
+
+
+class TestDeterministicOrdering:
+    @staticmethod
+    def _set_same_timestamp(store: SqliteVideoRecordStorage) -> None:
+        with store._db.transaction() as cursor:
+            cursor.execute("UPDATE videos SET created_at = '2026-07-20 00:00:00.000'")
+
+    def test_same_timestamp_pages_have_stable_mirrored_order(self, seeded_store: SqliteVideoRecordStorage) -> None:
+        self._set_same_timestamp(seeded_store)
+
+        ascending = [
+            seeded_store.get_many(
+                offset=offset,
+                limit=1,
+                starred_first=False,
+                order_dir=SQLiteDirection.Ascending,
+                user_id="alice",
+            )
+            .items[0]
+            .video_name
+            for offset in range(2)
+        ]
+        descending = [
+            seeded_store.get_many(
+                offset=offset,
+                limit=1,
+                starred_first=False,
+                order_dir=SQLiteDirection.Descending,
+                user_id="alice",
+            )
+            .items[0]
+            .video_name
+            for offset in range(2)
+        ]
+
+        assert ascending == ["alice_1.mp4", "alice_2.mp4"]
+        assert descending == list(reversed(ascending))
+
+    def test_same_timestamp_name_list_has_stable_mirrored_order(self, seeded_store: SqliteVideoRecordStorage) -> None:
+        self._set_same_timestamp(seeded_store)
+
+        ascending = seeded_store.get_video_names(
+            starred_first=False,
+            order_dir=SQLiteDirection.Ascending,
+            user_id="alice",
+        ).video_names
+        descending = seeded_store.get_video_names(
+            starred_first=False,
+            order_dir=SQLiteDirection.Descending,
+            user_id="alice",
+        ).video_names
+
+        assert ascending == ["alice_1.mp4", "alice_2.mp4"]
+        assert descending == list(reversed(ascending))
+
+    def test_board_cover_uses_name_as_same_timestamp_tie_breaker(self, store: SqliteVideoRecordStorage) -> None:
+        board = SqliteBoardRecordStorage(store._db).save("Board", "system")
+        _save(store, "a.mp4", user_id="system")
+        _save(store, "b.mp4", user_id="system")
+        self._set_same_timestamp(store)
+        with store._db.transaction() as cursor:
+            cursor.executemany(
+                "INSERT INTO board_videos (board_id, video_name) VALUES (?, ?)",
+                [(board.board_id, "a.mp4"), (board.board_id, "b.mp4")],
+            )
+
+        assert store.get_most_recent_video_for_board(board.board_id).video_name == "b.mp4"
 
 
 class TestUserDeletionLifecycle:
