@@ -5,13 +5,12 @@ import { Badge, Box, Dialog, HStack, Icon, Input, Portal, ScrollArea, Stack, Tex
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { getCompatibleInputTemplate, getCompatibleOutputTemplate } from '@features/workflow/utility';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton, Tooltip } from '@platform/ui';
 import { ChevronDownIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, HammerIcon } from 'lucide-react';
 import {
   startTransition,
   useCallback,
-  useEffect,
-  useEffectEvent,
   useMemo,
   useState,
   type ChangeEvent,
@@ -220,7 +219,6 @@ export const AddNodeDialog = ({
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
-  const { registerModalHotkeyLayer } = useWorkflowUi();
   const onDialogOpenChange = useCallback(
     (event: { open: boolean }) => {
       if (!event.open) {
@@ -229,14 +227,6 @@ export const AddNodeDialog = ({
     },
     [onOpenChange]
   );
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    return registerModalHotkeyLayer('workflow-add-node');
-  }, [isOpen, registerModalHotkeyLayer]);
 
   return (
     <Dialog.Root
@@ -248,14 +238,16 @@ export const AddNodeDialog = ({
       unmountOnExit
       onOpenChange={onDialogOpenChange}
     >
-      <AddNodeDialogContent
-        connectionFilter={connectionFilter}
-        onAddCurrentImage={onAddCurrentImage}
-        onAddConnector={onAddConnector}
-        onAddNode={onAddNode}
-        onAddNote={onAddNote}
-        onOpenChange={onOpenChange}
-      />
+      {isOpen ? (
+        <AddNodeDialogContent
+          connectionFilter={connectionFilter}
+          onAddCurrentImage={onAddCurrentImage}
+          onAddConnector={onAddConnector}
+          onAddNode={onAddNode}
+          onAddNote={onAddNote}
+          onOpenChange={onOpenChange}
+        />
+      ) : null}
     </Dialog.Root>
   );
 };
@@ -275,6 +267,7 @@ const AddNodeDialogContent = ({
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
+  const { registerModalHotkeyLayer } = useWorkflowUi();
   const error = useInvocationTemplatesSelector((snapshot) => snapshot.error);
   const status = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
@@ -282,6 +275,8 @@ const AddNodeDialogContent = ({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+
+  useMountEffect(() => registerModalHotkeyLayer('workflow-add-node'));
   // While searching, every matching group is force-expanded regardless of the
   // manual expand/collapse state, so results are never hidden behind a header.
   const isSearching = searchTerm.trim().length > 0;
@@ -414,10 +409,6 @@ const AddNodeDialogContent = ({
     initialRect: VIRTUALIZER_INITIAL_RECT,
     overscan: 8,
   });
-  const measureVirtualizer = useEffectEvent(() => {
-    virtualizer.measure();
-  });
-
   const toggleCategory = useCallback((label: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
@@ -442,16 +433,6 @@ const AddNodeDialogContent = ({
     });
   }, [groups]);
 
-  useEffect(() => {
-    measureVirtualizer();
-  }, [resultRows.length]);
-
-  useEffect(() => {
-    if (effectiveActiveIndex !== null) {
-      virtualizer.scrollToIndex(effectiveActiveIndex, { align: 'auto' });
-    }
-  }, [effectiveActiveIndex, virtualizer]);
-
   const moveActiveIndex = useCallback(
     (direction: 1 | -1) => {
       setActiveIndex((prev) => {
@@ -459,14 +440,18 @@ const AddNodeDialogContent = ({
           return null;
         }
 
-        if (prev === null) {
-          return direction > 0 ? 0 : resultRows.length - 1;
-        }
+        const nextIndex =
+          prev === null
+            ? direction > 0
+              ? 0
+              : resultRows.length - 1
+            : (prev + direction + resultRows.length) % resultRows.length;
 
-        return (prev + direction + resultRows.length) % resultRows.length;
+        virtualizer.scrollToIndex(nextIndex, { align: 'auto' });
+        return nextIndex;
       });
     },
-    [resultRows.length]
+    [resultRows.length, virtualizer]
   );
 
   const activateResultRow = useCallback(
