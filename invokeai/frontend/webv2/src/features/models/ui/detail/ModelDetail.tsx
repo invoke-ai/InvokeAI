@@ -20,6 +20,7 @@ import { ModelImageUpload } from './ModelImageUpload';
 import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
 import { useModelActions } from './useModelActions';
+import { supportsVaeCpuOnlySetting, VaeCpuOnlySetting } from './VaeCpuOnlySetting';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
 const RELATED_MODEL_TYPES = new Set(['main', 'lora']);
@@ -28,6 +29,7 @@ const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'>;
 type DefaultSettingsModel = { default_settings?: AnyModelDefaultSettings | null; key: string; type: ModelTaxonomyType };
 type TriggerPhrasesModel = Pick<ModelConfig, 'key' | 'trigger_phrases'>;
+type VaeCpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 type ModelIdentityModel = Pick<
   ModelConfig,
   | 'base'
@@ -90,6 +92,12 @@ const selectTriggerPhrasesModel = (models: readonly ModelConfig[], modelKey: str
   return model ? { key: model.key, trigger_phrases: model.trigger_phrases } : null;
 };
 
+const selectVaeCpuOnlyModel = (models: readonly ModelConfig[], modelKey: string): VaeCpuOnlyModel | null => {
+  const model = findModel(models, modelKey);
+
+  return model ? { cpu_only: model.cpu_only, key: model.key, name: model.name, type: model.type } : null;
+};
+
 const areTriggerPhrasesModelsEqual = (left: TriggerPhrasesModel | null, right: TriggerPhrasesModel | null): boolean =>
   left?.key === right?.key && areArraysEqual(left?.trigger_phrases ?? [], right?.trigger_phrases ?? []);
 
@@ -128,6 +136,13 @@ export const ModelDetail = ({
       {onBack ? <BackButton onBack={onBack} /> : null}
 
       <ModelIdentitySectionContainer density={density} modelKey={model.key} onDeleted={onDeleted} />
+
+      {supportsVaeCpuOnlySetting(model) ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <VaeCpuOnlySettingContainer modelKey={model.key} />
+        </>
+      ) : null}
 
       {supportsDefaultSettings(model) ? (
         <>
@@ -347,6 +362,24 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
       model={model}
       onError={(message) => notify.error(t('models.defaultSettings'), message)}
       onSaved={() => notify.success(t('models.defaultSettingsSaved'))}
+    />
+  );
+});
+
+const VaeCpuOnlySettingContainer = memo(function VaeCpuOnlySettingContainer({ modelKey }: { modelKey: string }) {
+  const notify = useNotify();
+  const { t } = useTranslation();
+  const model = useModelsSelector((snapshot) => selectVaeCpuOnlyModel(snapshot.models, modelKey));
+
+  if (!model || !supportsVaeCpuOnlySetting(model)) {
+    return null;
+  }
+
+  return (
+    <VaeCpuOnlySetting
+      model={model}
+      onError={(message) => notify.error(t('models.failedToSaveVaeCpuSetting'), message)}
+      onSaved={() => notify.success(t('models.vaeCpuSettingSaved'), model.name)}
     />
   );
 });

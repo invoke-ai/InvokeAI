@@ -96,6 +96,13 @@ export const replaceModelInStore = (model: ModelConfig): void => {
   });
 };
 
+/** Apply a narrow optimistic model patch without replacing unrelated server fields. */
+export const patchModelInStore = (key: string, changes: Partial<ModelConfig>): void => {
+  store.patchSnapshot({
+    models: store.getSnapshot().models.map((model) => (model.key === key ? { ...model, ...changes } : model)),
+  });
+};
+
 export const removeModelsFromStore = (keys: string[]): void => {
   const removed = new Set(keys);
 
