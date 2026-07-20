@@ -1,6 +1,6 @@
 ---
 title: Development Environment
-lastUpdated: 2026-02-19
+lastUpdated: 2026-07-14
 ---
 
 import { LinkCard, Steps, Tabs, TabItem, FileTree, LinkButton } from '@astrojs/starlight/components'
@@ -34,7 +34,7 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
       Next, clone your fork to your local machine. You can use either HTTPS or SSH, depending on your git configuration.
 
   3. This repository uses Git LFS to manage large files. To ensure all assets are downloaded:
-        - Install git-lfs → [Download here](https://git-lfs.com/)
+        - Install git-lfs -> [Download here](https://git-lfs.com/)
         - Enable automatic LFS fetching for this repository:
           ```shell
           git config lfs.fetchinclude "*"
@@ -63,6 +63,10 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
           --extra cuda \
           --extra xformers
         ```
+
+      :::note[Linux ARM64 / aarch64]
+        On Linux ARM64 devices (e.g. Raspberry Pi 5), use `--extra cpu` and omit `--extra xformers`. torch and torchvision are installed from PyPI (CPU-only wheels) — CUDA and ROCm acceleration are not available on this platform.
+      :::
   6. At this point, you should have Invoke installed, a venv set up and activated, and the server running. But you will see a warning in the terminal that no UI was found. If you go to the URL for the server, you won't get a UI.
 
         This is because the UI build is not distributed with the source code. You need to build it manually. End the running server instance.
