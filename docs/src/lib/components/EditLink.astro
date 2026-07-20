@@ -1,7 +1,7 @@
 ---
 import { Icon } from '@astrojs/starlight/components';
 
-const crowdinProjectUrl = 'https://crowdin.com/project/invokeai-docs';
+const crowdinProjectUrl = 'https://crowdin.com/project/invoke';
 const { editUrl, locale } = Astro.locals.starlightRoute;
 const href = locale ? crowdinProjectUrl : editUrl;
 const label = locale ? Astro.locals.t('page.translateLink') : Astro.locals.t('page.editLink');

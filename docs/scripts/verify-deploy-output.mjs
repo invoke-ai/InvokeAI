@@ -55,7 +55,7 @@ for (const locale of ['de', 'es', 'hi']) {
       'lang="en" dir="ltr"',
       `hreflang="${locale}" href="${siteUrl(`/${locale}/start-here/installation/`)}`,
       `href="${withBase(`/${locale}/start-here/system-requirements/`)}`,
-      'href="https://crowdin.com/project/invokeai-docs"',
+      'href="https://crowdin.com/project/invoke"',
       'data-pagefind-body',
     ],
     excludes: [
