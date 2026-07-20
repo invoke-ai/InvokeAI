@@ -10,12 +10,12 @@ const NEG_COND_ID = 'neg_cond';
 const POS_COND_COLLECT_ID = 'pos_cond_collect';
 const NEG_COND_COLLECT_ID = 'neg_cond_collect';
 
-/** The base models regional guidance supports (legacy: sd-1 / sdxl / flux). */
-export type RegionalGuidanceBase = 'sd-1' | 'sdxl' | 'flux';
+/** The base models regional guidance supports. */
+export type RegionalGuidanceBase = 'sd-1' | 'sdxl' | 'flux' | 'flux2';
 
-/** True when `base` supports regional guidance at all (SD1 / SDXL / FLUX). */
+/** True when `base` supports regional guidance at all. */
 export const isRegionalGuidanceSupportedForBase = (base: string): base is RegionalGuidanceBase =>
-  base === 'sd-1' || base === 'sdxl' || base === 'flux';
+  base === 'sd-1' || base === 'sdxl' || base === 'flux' || base === 'flux2';
 
 /** Whether a base supports regional NEGATIVE prompts / autoNegative (SD family only, not FLUX). */
 const supportsRegionalNegative = (base: RegionalGuidanceBase): boolean => base === 'sd-1' || base === 'sdxl';
@@ -81,6 +81,8 @@ const conditioningNodeType = (base: RegionalGuidanceBase): string => {
       return 'sdxl_compel_prompt';
     case 'flux':
       return 'flux_text_encoder';
+    case 'flux2':
+      return 'flux2_klein_text_encoder';
     case 'sd-1':
       return 'compel';
   }
@@ -101,6 +103,8 @@ const copyEncoderFields = (base: RegionalGuidanceBase): readonly string[] => {
       return ['clip', 'clip2'];
     case 'flux':
       return ['clip', 't5_encoder', 't5_max_seq_len'];
+    case 'flux2':
+      return ['qwen3_encoder', 'max_seq_len'];
     case 'sd-1':
       return ['clip'];
   }
@@ -245,7 +249,7 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
 
     // Reference images (mask-scoped): ip_adapter on SD, flux_redux on FLUX.
     for (const ref of region.referenceImages) {
-      if (ref.type === 'ip_adapter' && base !== 'flux') {
+      if (ref.type === 'ip_adapter' && base !== 'flux' && base !== 'flux2') {
         if (!ipAdapterCollector) {
           ipAdapterCollector = resolveDenoiseCollector(graph, denoise, 'ip_adapter', 'regional_ip_adapter_collector');
         }
@@ -293,7 +297,8 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
  * - unsupported main base (sd-2 / sd-3 / cogview / …) → "unsupported model";
  * - no drawn mask content → "no region";
  * - no positive prompt, no negative prompt, and no reference images → "empty";
- * - FLUX with a negative prompt / autoNegative → those are unsupported on FLUX.
+ * - FLUX-family negative prompts / autoNegative are unsupported;
+ * - FLUX.2 regional reference images are unsupported.
  *
  * Per-reference-image model/image validity is resolved by the caller (which drops
  * incomplete reference images before building), matching how control layers work.
@@ -318,11 +323,14 @@ export const getRegionalGuidanceRejectionReason = (params: {
   if (!positivePrompt && !negativePrompt && referenceImageCount === 0) {
     return `Regional guidance "${layerName}" has no prompt or reference image.`;
   }
-  if (mainBase === 'flux' && negativePrompt) {
-    return `Regional guidance "${layerName}" negative prompts are not supported for FLUX.`;
+  if ((mainBase === 'flux' || mainBase === 'flux2') && negativePrompt) {
+    return `Regional guidance "${layerName}" negative prompts are not supported for ${mainBase === 'flux2' ? 'FLUX.2' : 'FLUX'}.`;
   }
-  if (mainBase === 'flux' && autoNegative) {
-    return `Regional guidance "${layerName}" auto-negative is not supported for FLUX.`;
+  if ((mainBase === 'flux' || mainBase === 'flux2') && autoNegative) {
+    return `Regional guidance "${layerName}" auto-negative is not supported for ${mainBase === 'flux2' ? 'FLUX.2' : 'FLUX'}.`;
+  }
+  if (mainBase === 'flux2' && referenceImageCount > 0) {
+    return `Regional guidance "${layerName}" reference images are not supported for FLUX.2.`;
   }
   return null;
 };

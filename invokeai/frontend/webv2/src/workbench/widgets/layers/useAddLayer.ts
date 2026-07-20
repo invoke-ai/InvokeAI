@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { AddLayerItemId } from './addLayerMenu';
 
+import { isAddLayerItemAvailable } from './addLayerMenu';
 import {
   applyStructural,
   createControlLayer,
@@ -41,6 +42,9 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
 
   return useCallback(
     (id: AddLayerItemId) => {
+      if (!isAddLayerItemAvailable(id, base)) {
+        return;
+      }
       switch (id) {
         case 'raster': {
           const layer = createEmptyPaintLayer(nextLayerName(layerNames));

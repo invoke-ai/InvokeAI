@@ -44,5 +44,9 @@ export const ADD_LAYER_MENU: readonly AddLayerMenuGroup[] = [
   },
 ];
 
+/** Whether an add action is supported by the selected model base. */
+export const isAddLayerItemAvailable = (id: AddLayerItemId, base: string | null): boolean =>
+  id !== 'regional_reference_image' || base !== 'flux2';
+
 /** The add-layer action a group-header "New" button triggers for its type. */
 export const groupAddItemId = (groupKey: LayerGroupKey): AddLayerItemId => groupKey;
