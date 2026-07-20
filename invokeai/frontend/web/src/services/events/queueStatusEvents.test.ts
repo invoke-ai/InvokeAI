@@ -65,6 +65,34 @@ describe(getUpdatedQueueStatusOnQueueItemStatusChanged.name, () => {
       processor: current.processor,
     });
   });
+
+  it('retains the cached per-user counts when the event queue status carries none', () => {
+    // e.g. a sanitized status (user counts nulled by the backend): the cached counts must not be
+    // lost, else personal UI falls back to the global counts and reacts to other users' activity.
+    const current = buildQueueStatus({ user_pending: 0, user_in_progress: 0 });
+    const event = buildQueueStatusChangedEvent();
+
+    const updated = getUpdatedQueueStatusOnQueueItemStatusChanged(current, event);
+
+    expect(updated.queue.user_pending).toBe(0);
+    expect(updated.queue.user_in_progress).toBe(0);
+    expect(updated.queue.completed).toBe(1);
+  });
+
+  it("prefers the event's per-user counts when it carries them", () => {
+    // The owner's full event embeds the owner's fresh per-user counts, so personal UI (progress
+    // bar, spinner, favicon) must update from the event immediately — e.g. the spinner stops the
+    // moment the user's last item completes, not a refetch round-trip later.
+    const current = buildQueueStatus({ user_pending: 1, user_in_progress: 1 });
+    const event = buildQueueStatusChangedEvent();
+    event.queue_status.user_pending = 0;
+    event.queue_status.user_in_progress = 0;
+
+    const updated = getUpdatedQueueStatusOnQueueItemStatusChanged(current, event);
+
+    expect(updated.queue.user_pending).toBe(0);
+    expect(updated.queue.user_in_progress).toBe(0);
+  });
 });
 
 describe(getQueueStatusWithObservedEvents.name, () => {
