@@ -15,9 +15,14 @@ export interface RasterSurface {
   resize(w: number, h: number): void;
 }
 
+export interface RasterSurfaceOptions {
+  /** Optimize the backing context for repeated pixel readback (for example brush-history caches). */
+  willReadFrequently?: boolean;
+}
+
 /** Injectable factory for raster surfaces and image bitmaps. */
 export interface RasterBackend {
-  createSurface(width: number, height: number): RasterSurface;
+  createSurface(width: number, height: number, options?: RasterSurfaceOptions): RasterSurface;
   createImageBitmap(source: ImageBitmapSource): Promise<ImageBitmap>;
   /**
    * Encodes a surface's pixels to an image `Blob` (PNG by default). Used by the
@@ -52,9 +57,9 @@ class OffscreenRasterSurface implements RasterSurface {
   width: number;
   height: number;
 
-  constructor(width: number, height: number) {
+  constructor(width: number, height: number, options?: RasterSurfaceOptions) {
     this.canvas = new OffscreenCanvas(width, height);
-    const ctx = this.canvas.getContext('2d');
+    const ctx = this.canvas.getContext('2d', { willReadFrequently: options?.willReadFrequently });
     if (!ctx) {
       throw new Error('Failed to acquire a 2D context from OffscreenCanvas');
     }
@@ -77,11 +82,11 @@ class DomCanvasRasterSurface implements RasterSurface {
   width: number;
   height: number;
 
-  constructor(width: number, height: number) {
+  constructor(width: number, height: number, options?: RasterSurfaceOptions) {
     this.canvas = document.createElement('canvas');
     this.canvas.width = width;
     this.canvas.height = height;
-    const ctx = this.canvas.getContext('2d');
+    const ctx = this.canvas.getContext('2d', { willReadFrequently: options?.willReadFrequently });
     if (!ctx) {
       throw new Error('Failed to acquire a 2D context from HTMLCanvasElement');
     }
@@ -106,8 +111,10 @@ class DomCanvasRasterSurface implements RasterSurface {
 export const createDomRasterBackend = (): RasterBackend => {
   const useOffscreen = isOffscreenCanvasSupported();
   return {
-    createSurface(width: number, height: number): RasterSurface {
-      return useOffscreen ? new OffscreenRasterSurface(width, height) : new DomCanvasRasterSurface(width, height);
+    createSurface(width: number, height: number, options?: RasterSurfaceOptions): RasterSurface {
+      return useOffscreen
+        ? new OffscreenRasterSurface(width, height, options)
+        : new DomCanvasRasterSurface(width, height, options);
     },
     createImageBitmap(source: ImageBitmapSource): Promise<ImageBitmap> {
       return createImageBitmap(source);

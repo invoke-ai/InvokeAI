@@ -67,7 +67,9 @@ export const sampleDocumentColor = (
       continue;
     }
     const entry = layers.get(layer.id);
-    if (!entry) {
+    // drawImage throws for zero-sized OffscreenCanvas sources in Chromium.
+    // Empty paint layers legitimately retain a 0x0 cache until their first stroke.
+    if (!entry || entry.surface.canvas.width === 0 || entry.surface.canvas.height === 0) {
       continue;
     }
 

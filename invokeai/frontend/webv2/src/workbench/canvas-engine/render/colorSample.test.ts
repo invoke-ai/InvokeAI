@@ -134,6 +134,15 @@ describe('sampleDocumentColor', () => {
     expect(scratch.drawnCanvases).toEqual([bottomEntry.surface.canvas, topEntry.surface.canvas]);
   });
 
+  it('skips zero-sized cached layer surfaces', () => {
+    const backend = createFixedPixelBackend([1, 2, 3, 0]);
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('empty', 0, 0);
+
+    expect(sampleDocumentColor(makeDoc([rasterLayer('empty')]), layers, backend, { x: 5, y: 5 })).toBeNull();
+    expect(backend.__surfaces.at(-1)?.drawnCanvases).toEqual([]);
+  });
+
   it('translates the view so the floored sample point lands at the scratch origin', () => {
     const backend = createFixedPixelBackend([1, 2, 3, 255]);
     const layers = createLayerCacheStore(backend);

@@ -8,11 +8,12 @@ import type { Mat2d } from '@workbench/canvas-engine/types';
 import { executePsdExport, planPsdExport } from '@workbench/canvas-engine/export/psdExport';
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
+import { sampleDocumentColor } from '@workbench/canvas-engine/render/colorSample';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
 import { rasterizeTextSource } from '@workbench/canvas-engine/render/rasterizers/textRasterizer';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const IDENTITY: Mat2d = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 
@@ -55,6 +56,33 @@ const documentWith = (layers: CanvasRasterLayerContractV2[]): CanvasDocumentCont
 });
 
 describe('real browser raster acceptance', () => {
+  it('samples safely with a real zero-sized cached layer surface', () => {
+    const backend = createDomRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('empty', 0, 0);
+
+    expect(() =>
+      sampleDocumentColor(documentWith([rasterLayer('empty')]), caches, backend, { x: 1, y: 1 })
+    ).not.toThrow();
+  });
+
+  it('uses readback-optimized layer caches for repeated brush-history reads', () => {
+    const warningSpy = vi.spyOn(console, 'warn');
+
+    try {
+      const backend = createDomRasterBackend();
+      const surface = createLayerCacheStore(backend).getOrCreate('paint', 16, 16).surface;
+
+      for (let index = 0; index < 16; index += 1) {
+        surface.ctx.getImageData(0, 0, 16, 16);
+      }
+
+      expect(warningSpy.mock.calls.flat().join(' ')).not.toContain('willReadFrequently');
+    } finally {
+      warningSpy.mockRestore();
+    }
+  });
+
   it('composites transformed layers through clipping, alpha, and multiply blend mode', () => {
     const backend = createDomRasterBackend();
     const caches = createLayerCacheStore(backend);
