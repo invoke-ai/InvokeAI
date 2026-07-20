@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 if TYPE_CHECKING:
-    import bitsandbytes as bnb
+    pass
 
 _BNB_SIBLING_SUFFIXES = (
     ".absmax",
