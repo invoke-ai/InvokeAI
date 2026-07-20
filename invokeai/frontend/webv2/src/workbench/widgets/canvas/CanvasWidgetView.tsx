@@ -238,14 +238,16 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     return () => engine?.tools.setInteractionLocked(false);
   }, [engine, isInteractionLocked]);
 
-  const acceptStagedImage = useEffectEvent(() => {
+  /* eslint-disable react/react-compiler -- imperative engine payload is mutable by design */
+  const acceptStagedImage = useCallback(() => {
     if (selectedSlot?.kind === 'candidate') {
       engine?.layers.commitStagedImage({
         candidate: selectedSlot.candidate,
         selectedImageIndex: stagingArea.selectedImageIndex,
       });
     }
-  });
+  }, [engine, selectedSlot, stagingArea.selectedImageIndex]);
+  /* eslint-enable react/react-compiler */
   const cancelQueueItem = useCallback((queueItemId: string) => queue.cancel(undefined, queueItemId), [queue]);
   const cycleStagedImage = useCallback(
     (direction: -1 | 1) => canvasDispatch({ direction, type: 'cycleStagedImage' }),

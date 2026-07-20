@@ -1,5 +1,5 @@
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { useEffectEvent } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 type DraftFlusher = () => void;
 
@@ -13,10 +13,13 @@ export const flushWorkbenchDrafts = (): void => {
 };
 
 export const useRegisterDraftFlusher = (flushDraft: DraftFlusher): void => {
-  const flushLatestDraft = useEffectEvent(flushDraft);
+  const flushDraftRef = useRef(flushDraft);
+  useLayoutEffect(() => {
+    flushDraftRef.current = flushDraft;
+  }, [flushDraft]);
 
   useMountEffect(() => {
-    const registeredFlushDraft = () => flushLatestDraft();
+    const registeredFlushDraft = () => flushDraftRef.current();
 
     draftFlushers.add(registeredFlushDraft);
 

@@ -220,31 +220,34 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
-  const onImagesDeleted = useEffectEvent((imageNames: string[]) => {
-    const deletedNames = new Set(imageNames);
-    const images = boardImages;
-    const anchorName = selectedImage?.imageName ?? null;
+  const onImagesDeleted = useCallback(
+    (imageNames: string[]) => {
+      const deletedNames = new Set(imageNames);
+      const images = boardImages;
+      const anchorName = selectedImage?.imageName ?? null;
 
-    if (!anchorName || !deletedNames.has(anchorName)) {
-      return;
-    }
+      if (!anchorName || !deletedNames.has(anchorName)) {
+        return;
+      }
 
-    const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
+      const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
 
-    if (anchorIndex === -1) {
-      return;
-    }
+      if (anchorIndex === -1) {
+        return;
+      }
 
-    const remaining = images.filter((image) => !deletedNames.has(image.imageName));
-    const remainingBeforeAnchor = images
-      .slice(0, anchorIndex)
-      .filter((image) => !deletedNames.has(image.imageName)).length;
-    const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
+      const remaining = images.filter((image) => !deletedNames.has(image.imageName));
+      const remainingBeforeAnchor = images
+        .slice(0, anchorIndex)
+        .filter((image) => !deletedNames.has(image.imageName)).length;
+      const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
 
-    if (nextImage) {
-      gallery.selectImage(nextImage);
-    }
-  });
+      if (nextImage) {
+        gallery.selectImage(nextImage);
+      }
+    },
+    [boardImages, gallery, selectedImage]
+  );
   const projectId = useActiveProjectId();
   const imageActions = useImageActions({
     boards,
@@ -295,35 +298,38 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   // Drop-to-compare: any gallery-image drag dropped on the frame's drop zone
   // arms that image for comparison. The drag payload only carries names, so
   // the full contract is fetched before dispatching.
-  const handleCompareDrop = useEffectEvent((event: DragEndEvent) => {
-    const resolution = resolvePreviewCompareDrop(event.active.data.current, event.over?.data.current ?? null);
+  const handleCompareDrop = useCallback(
+    (event: DragEndEvent) => {
+      const resolution = resolvePreviewCompareDrop(event.active.data.current, event.over?.data.current ?? null);
 
-    if (!resolution) {
-      return;
-    }
+      if (!resolution) {
+        return;
+      }
 
-    // Prefer images we already hold (board context includes fresh local
-    // generations that would 404 on a backend by-name fetch).
-    const localImage =
-      boardImages.find((image) => image.imageName === resolution.imageName) ??
-      (selectedImage?.imageName === resolution.imageName ? selectedImage : null);
+      // Prefer images we already hold (board context includes fresh local
+      // generations that would 404 on a backend by-name fetch).
+      const localImage =
+        boardImages.find((image) => image.imageName === resolution.imageName) ??
+        (selectedImage?.imageName === resolution.imageName ? selectedImage : null);
 
-    if (localImage) {
-      gallery.setCompareImage(localImage);
-      return;
-    }
+      if (localImage) {
+        gallery.setCompareImage(localImage);
+        return;
+      }
 
-    galleryImages
-      .resolve(resolution.imageName)
-      .then((image) => gallery.setCompareImage(image))
-      .catch((error: unknown) => {
-        notifications.reportError({
-          area: 'preview-compare-drop',
-          message: error instanceof Error ? error.message : String(error),
-          namespace: 'gallery',
+      galleryImages
+        .resolve(resolution.imageName)
+        .then((image) => gallery.setCompareImage(image))
+        .catch((error: unknown) => {
+          notifications.reportError({
+            area: 'preview-compare-drop',
+            message: error instanceof Error ? error.message : String(error),
+            namespace: 'gallery',
+          });
         });
-      });
-  });
+    },
+    [boardImages, gallery, notifications, selectedImage]
+  );
   useDndMonitor({ onDragEnd: handleCompareDrop });
   const openImageContextMenu = useCallback(
     (x: number, y: number) => {

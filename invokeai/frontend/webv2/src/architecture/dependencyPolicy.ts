@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
 

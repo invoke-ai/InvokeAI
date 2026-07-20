@@ -24,7 +24,7 @@ import { PreviewCompareDropZone } from './PreviewCompareDropZone';
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({
   fallbackLng: 'en',
-  initImmediate: false,
+  initAsync: false,
   lng: 'en',
   resources: {
     en: { translation: { widgets: { preview: { dropToCompare: 'Drop to compare' } } } },

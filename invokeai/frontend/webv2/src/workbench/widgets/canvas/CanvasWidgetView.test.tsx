@@ -53,7 +53,7 @@ const englishCatalogModules = import.meta.glob('../../../../public/locales/en.js
 const enCatalog = Object.values(englishCatalogModules)[0] as Record<string, unknown>;
 const testI18n = createInstance();
 await testI18n.init({
-  initImmediate: false,
+  initAsync: false,
   lng: 'en',
   resources: { en: { translation: enCatalog } },
 });

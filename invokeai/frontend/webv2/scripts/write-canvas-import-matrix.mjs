@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');

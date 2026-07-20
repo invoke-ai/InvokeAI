@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler -- test instrumentation intentionally records render counts */
 import type { ReactNode } from 'react';
 
 import { act, useState } from 'react';

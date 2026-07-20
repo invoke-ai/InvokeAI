@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 
 import { checkRouteBudget, measureRouteBuild } from './performance-budgets.mjs';
 import { WIDGET_IMPLEMENTATION_PATTERN, WIDGET_SOURCES } from './widget-sources.mjs';

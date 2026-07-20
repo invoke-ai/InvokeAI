@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 import { describe, expect, it } from 'vitest';
 
 import { collectImportReferences, getModuleOwner, resolveImportPath } from './dependencyPolicy';

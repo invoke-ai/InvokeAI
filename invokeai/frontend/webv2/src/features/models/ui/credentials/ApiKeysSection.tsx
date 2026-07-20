@@ -16,10 +16,10 @@ import { refreshInstalls } from '@features/models/data/installsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { Button } from '@platform/ui';
-import { HexagonIcon } from 'lucide-react';
+import { BotIcon, HexagonIcon } from 'lucide-react';
 import { useEffect, useState, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiHuggingface, SiOpenai } from 'react-icons/si';
+import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiHuggingface } from 'react-icons/si';
 
 /**
  * Credentials for every model source, as one uniform grid of key cards:
@@ -270,7 +270,7 @@ const CivitaiKeyCard = ({ onError }: { onError: (message: string) => void }) => 
 const EXTERNAL_PROVIDER_PRESENTATION: Record<string, { title: string; icon: ElementType; placeholder: string }> = {
   alibabacloud: { icon: SiAlibabacloud, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
   gemini: { icon: SiGooglegemini, placeholder: 'AIza…', title: 'Google Gemini' },
-  openai: { icon: SiOpenai, placeholder: 'sk-…', title: 'OpenAI' },
+  openai: { icon: BotIcon, placeholder: 'sk-…', title: 'OpenAI' },
   seedream: { icon: SiBytedance, placeholder: 'byteplus', title: 'Seedream' },
 };
 

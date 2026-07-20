@@ -85,31 +85,34 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
 
   // After a deletion that takes out the previewed image, move the selection to
   // the image that now occupies the old index, else the one before it.
-  const onImagesDeleted = useEffectEvent((imageNames: string[]) => {
-    const deletedNames = new Set(imageNames);
-    const images = gallery.images;
-    const anchorName = gallery.selectedImageName;
+  const onImagesDeleted = useCallback(
+    (imageNames: string[]) => {
+      const deletedNames = new Set(imageNames);
+      const images = gallery.images;
+      const anchorName = gallery.selectedImageName;
 
-    if (!anchorName || !deletedNames.has(anchorName)) {
-      return;
-    }
+      if (!anchorName || !deletedNames.has(anchorName)) {
+        return;
+      }
 
-    const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
+      const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
 
-    if (anchorIndex === -1) {
-      return;
-    }
+      if (anchorIndex === -1) {
+        return;
+      }
 
-    const remaining = images.filter((image) => !deletedNames.has(image.imageName));
-    const remainingBeforeAnchor = images
-      .slice(0, anchorIndex)
-      .filter((image) => !deletedNames.has(image.imageName)).length;
-    const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
+      const remaining = images.filter((image) => !deletedNames.has(image.imageName));
+      const remainingBeforeAnchor = images
+        .slice(0, anchorIndex)
+        .filter((image) => !deletedNames.has(image.imageName)).length;
+      const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
 
-    if (nextImage) {
-      galleryCommands.selectImage(nextImage);
-    }
-  });
+      if (nextImage) {
+        galleryCommands.selectImage(nextImage);
+      }
+    },
+    [gallery.images, gallery.selectedImageName, galleryCommands]
+  );
 
   const actions = useGalleryActions({
     boards: data.boards,
