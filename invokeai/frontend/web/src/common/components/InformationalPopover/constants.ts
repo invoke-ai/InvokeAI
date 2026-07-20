@@ -79,6 +79,7 @@ export type Feature =
   | 'optimizedDenoising'
   | 'fluxDevLicense'
   | 'cpuOnly'
+  | 'cpuOnlyVae'
   | 'fp8Storage';
 
 export type PopoverData = PopoverProps & {

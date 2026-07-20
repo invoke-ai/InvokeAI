@@ -66,7 +66,10 @@ WORKDIR ${INVOKEAI_SRC}
 # Install project's dependencies as a separate layer so they aren't rebuilt every commit.
 # bind-mount instead of copy to defer adding sources to the image until next layer.
 #
-# NOTE: there are no pytorch builds for arm64 + cuda, only cpu
+# NOTE: on arm64 (aarch64), torch/torchvision resolve to PyPI CPU wheels regardless of
+# GPU_DRIVER — the WHL indexes carry aarch64 torch wheels (+cpu/+cu128) but no aarch64
+# torchvision wheels, so the pinned pairs only apply on x86_64. Use GPU_DRIVER=cpu on arm64.
+# CUDA-on-arm64 (e.g. Grace/GH200) would need a torchvision-specific workaround; see pyproject.toml.
 # x86_64/CUDA is the default
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \

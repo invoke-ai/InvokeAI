@@ -193,6 +193,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       scheduler: fluxScheduler,
     });
 
+    posCondCollect = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('pos_cond_collect'),
+    });
+
     // Klein: Connect Qwen3 encoder outputs
     const kleinLoader = modelLoader as Invocation<'flux2_klein_model_loader'>;
     const kleinCond = posCond as Invocation<'flux2_klein_text_encoder'>;
@@ -202,7 +207,8 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     g.addEdge(kleinLoader, 'vae', denoise, 'vae'); // VAE needed for BN statistics
     g.addEdge(kleinLoader, 'vae', l2i, 'vae');
     g.addEdge(positivePrompt, 'value', kleinCond, 'prompt');
-    g.addEdge(kleinCond, 'conditioning', denoise, 'positive_text_conditioning');
+    g.addEdge(kleinCond, 'conditioning', posCondCollect, 'item');
+    g.addEdge(posCondCollect, 'collection', denoise, 'positive_text_conditioning');
   } else {
     // Standard FLUX: Use CLIP+T5 model loader and text encoder
     modelLoader = g.addNode({
@@ -458,6 +464,31 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g.upsertMetadata({ generation_mode: 'flux2_outpaint' });
     } else {
       assert<Equals<typeof generationMode, never>>(false);
+    }
+
+    // Regional guidance for FLUX.2 Klein. Backend applies a single attention mask via
+    // joint_attention_kwargs to all transformer blocks — no IP adapter / redux integration.
+    if (manager !== null && posCondCollect !== null) {
+      const ipAdapterCollect = g.addNode({
+        type: 'collect',
+        id: getPrefixedId('ip_adapter_collector'),
+      });
+      await addRegions({
+        manager,
+        regions: canvas.regionalGuidance.entities,
+        g,
+        bbox: canvas.bbox.rect,
+        model,
+        posCond: flux2Cond,
+        negCond: null,
+        posCondCollect,
+        negCondCollect: null,
+        ipAdapterCollect,
+        fluxReduxCollect: null,
+      });
+      // The collector exists only for type compatibility with addRegions; FLUX.2 Klein
+      // does not consume IP adapters, so drop the node if nothing connected to it.
+      g.deleteNode(ipAdapterCollect.id);
     }
   } else {
     // Standard FLUX path with all features

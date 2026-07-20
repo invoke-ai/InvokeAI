@@ -16,6 +16,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     ItemIdsResult,
+    NodeFieldValue,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -78,18 +79,25 @@ class SessionQueueBase(ABC):
         queue_id: str,
         user_id: Optional[str] = None,
         acting_user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> SessionQueueStatus:
         """Gets the status of the queue.
 
         Aggregate counts (pending/in_progress/.../total) are always global across all users.
         If user_id is provided, the requesting user's own counts are additionally returned in
-        the user_pending/user_in_progress fields (left None otherwise).
+        the user_pending/user_in_progress fields (left None otherwise). Admin callers should
+        also pass their user_id so personal UI (e.g. the progress bar) can distinguish their
+        own activity from other users'.
 
         acting_user_id is independent of user_id and controls only current-item redaction:
         when set, the returned status omits item_id/session_id/batch_id unless the
         currently-running item belongs to acting_user_id. The redaction is decided from the
         same get_current() snapshot used to embed those identifiers, so it cannot race against
         a concurrent state change.
+
+        is_admin disables current-item redaction entirely: admins may see the identifiers of
+        any user's current item. Redaction stays fail-closed - a caller that passes user_id
+        without is_admin gets the non-admin behavior.
         """
         pass
 
@@ -111,6 +119,16 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def suspend_queue_item(self, item_id: int) -> SessionQueueItem:
+        """Suspends a session queue item while waiting on a child workflow execution."""
+        pass
+
+    @abstractmethod
+    def resume_queue_item(self, item_id: int) -> SessionQueueItem:
+        """Resumes a suspended session queue item by returning it to pending state."""
+        pass
+
+    @abstractmethod
     def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
         """Cancels a session queue item"""
         pass
@@ -118,6 +136,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def delete_queue_item(self, item_id: int) -> None:
         """Deletes a session queue item"""
+        pass
+
+    @abstractmethod
+    def delete_queue_items_by_id(self, item_ids: list[int]) -> None:
+        """Deletes session queue items by ID."""
         pass
 
     @abstractmethod
@@ -203,6 +226,23 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         """Sets the session for a session queue item. Use this to update the session state."""
+        pass
+
+    @abstractmethod
+    def enqueue_workflow_call_child(
+        self,
+        parent_queue_item: SessionQueueItem,
+        child_session: GraphExecutionState,
+        field_values: list[NodeFieldValue] | None = None,
+    ) -> SessionQueueItem:
+        """Enqueues a child workflow execution linked to a suspended parent queue item."""
+        pass
+
+    @abstractmethod
+    def cancel_workflow_call_children(
+        self, workflow_call_id: str, exclude_item_ids: set[int] | None = None
+    ) -> list[int]:
+        """Cancels child workflow queue items for a workflow call without canceling the waiting parent chain."""
         pass
 
     @abstractmethod

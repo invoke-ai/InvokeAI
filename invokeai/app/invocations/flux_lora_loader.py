@@ -111,13 +111,17 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - FLUX",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.3.1",
+    version="1.3.2",
 )
 class FLUXLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to a FLUX transformer."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None,
+        description="LoRA models and weights. May be a single LoRA or collection.",
+        title="LoRAs",
+        ui_model_base=[BaseModelType.Flux],
+        ui_model_type=ModelType.LoRA,
     )
 
     transformer: Optional[TransformerField] = InputField(
@@ -162,7 +166,11 @@ class FLUXLoRACollectionLoader(BaseInvocation):
             if not context.models.exists(lora.lora.key):
                 raise Exception(f"Unknown lora: {lora.lora.key}!")
 
-            assert lora.lora.base in (BaseModelType.Flux, BaseModelType.Flux2)
+            if lora.lora.base is not BaseModelType.Flux:
+                raise ValueError(
+                    f"LoRA '{lora.lora.key}' is for {lora.lora.base.value if lora.lora.base else 'unknown'} models, "
+                    "not FLUX models. Ensure you are using a FLUX compatible LoRA."
+                )
 
             added_loras.append(lora.lora.key)
 
