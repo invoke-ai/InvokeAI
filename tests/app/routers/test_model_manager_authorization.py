@@ -5,7 +5,9 @@ routes carried no auth dependency at all, so an unauthenticated network attacker
 impact was `GET /api/v2/models/scan_folder`, which enumerates an attacker-chosen filesystem path.
 """
 
+from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import status
@@ -13,6 +15,15 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, URLRegexTokenPair
 from invokeai.app.services.invoker import Invoker
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelFormat,
+    ModelSourceType,
+    ModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+)
 from tests.app.routers.conftest import _auth
 
 # (method, path) for routes that must reject unauthenticated callers in multiuser mode.
@@ -42,7 +53,6 @@ PROTECTED_ROUTES = [
 # Routes that must additionally reject authenticated non-admin users.
 ADMIN_ONLY_ROUTES = [
     ("get", "/api/v2/models/scan_folder?scan_path=/etc"),
-    ("get", "/api/v2/models/missing"),
     ("get", "/api/v2/models/hugging_face?hugging_face_repo=x/y"),
     ("get", "/api/v2/models/starter_models"),
     ("get", "/api/v2/models/stats"),
@@ -109,6 +119,61 @@ def test_regular_user_can_still_list_models(
     assert response.json() == {"models": []}
 
 
+def _sd1_checkpoint(key: str, path: str) -> Main_Checkpoint_SD1_Config:
+    return Main_Checkpoint_SD1_Config(
+        key=key,
+        path=path,
+        name=key,
+        format=ModelFormat.Checkpoint,
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        config_path="/tmp/foo.yaml",
+        variant=ModelVariantType.Normal,
+        hash="111222333444",
+        file_size=8192,
+        source=path,
+        source_type=ModelSourceType.Path,
+        prediction_type=SchedulerPredictionType.Epsilon,
+    )
+
+
+def test_non_admin_can_filter_out_missing_models(
+    enable_multiuser: Any,
+    client: TestClient,
+    user1_token: str,
+    mock_invoker: Invoker,
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    """A non-admin must be able to read `/missing`, or missing models stay in their generation dropdowns.
+
+    The frontend's model hooks (`modelsByType.ts`) subtract `/missing` from `/`. If `/missing` 403s the
+    subtraction silently becomes a no-op and every missing model is offered for selection, failing only
+    when execution tries to load its absent files.
+    """
+    (tmp_path / "present.ckpt").write_text("weights")
+    present = _sd1_checkpoint("present-key", "present.ckpt")
+    absent = _sd1_checkpoint("absent-key", "absent.ckpt")
+
+    # models_path is a read-only derived property, so patch it on the class for the duration of the test.
+    monkeypatch.setattr(InvokeAIAppConfig, "models_path", property(lambda _self: tmp_path))
+    mock_invoker.services.model_images = MagicMock()
+    mock_invoker.services.model_manager.store.all_models.return_value = [present, absent]
+    mock_invoker.services.model_manager.store.search_by_attr.return_value = [present, absent]
+
+    missing = client.get("/api/v2/models/missing", headers=_auth(user1_token))
+    assert missing.status_code == status.HTTP_200_OK
+    missing_keys = {m["key"] for m in missing.json()["models"]}
+    assert missing_keys == {"absent-key"}
+
+    all_models = client.get("/api/v2/models/", headers=_auth(user1_token))
+    assert all_models.status_code == status.HTTP_200_OK
+
+    # This mirrors what the frontend hooks do with the two responses.
+    selectable = {m["key"] for m in all_models.json()["models"]} - missing_keys
+    assert selectable == {"present-key"}
+
+
 def test_runtime_config_redacts_secrets() -> None:
     """API keys and download bearer tokens must never be serialized to a client."""
     from invokeai.app.api.routers.app_info import REDACTED_SECRET, _redact_config_secrets
@@ -145,3 +210,27 @@ def test_runtime_config_response_has_no_secrets(
     assert response.status_code == status.HTTP_200_OK
     assert "sk-super-secret" not in response.text
     assert "bearer-secret" not in response.text
+
+
+def test_runtime_config_patch_response_has_no_secrets(
+    enable_multiuser: Any, client: TestClient, admin_token: str, monkeypatch: Any, tmp_path: Path
+) -> None:
+    """PATCH echoes the updated config back, so it must redact exactly as GET does.
+
+    Otherwise an admin changing an unrelated setting pulls the raw credentials into the browser's
+    RTK Query cache, defeating the server-side masking on GET.
+    """
+    config = InvokeAIAppConfig(
+        external_openai_api_key="sk-super-secret",
+        remote_api_tokens=[URLRegexTokenPair(url_regex="example.com", token="bearer-secret")],
+    )
+    config._config_file = tmp_path / "invokeai.yaml"
+    monkeypatch.setattr("invokeai.app.api.routers.app_info.get_config", lambda: config)
+
+    response = client.patch("/api/v1/app/runtime_config", json={"max_queue_history": 5}, headers=_auth(admin_token))
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["config"]["max_queue_history"] == 5
+    assert "sk-super-secret" not in response.text
+    assert "bearer-secret" not in response.text
+    # The in-memory config itself must keep the real values - masking is response-only.
+    assert config.external_openai_api_key == "sk-super-secret"
