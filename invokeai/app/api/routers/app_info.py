@@ -195,7 +195,7 @@ async def update_runtime_config(
 
         persisted_config.update_config(update_dict)
         persisted_config.write_file(config.config_file_path)
-        return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
+        return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=_redact_config_secrets(config))
 
 
 @app_router.get(

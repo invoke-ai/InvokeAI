@@ -200,11 +200,14 @@ async def list_model_records(
     operation_id="list_missing_models",
     responses={200: {"description": "List of models with missing files"}},
 )
-async def list_missing_models(current_admin: AdminUserOrDefault) -> ModelsList:
+async def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
     """Get models whose files are missing from disk.
 
     These are models that have database entries but their corresponding
     weight files have been deleted externally (not via Model Manager).
+
+    Available to any authenticated user, not just admins: the frontend's model hooks subtract this
+    set from the model list so unusable models are kept out of the generation dropdowns.
     """
     record_store = ApiDependencies.invoker.services.model_manager.store
     models_path = ApiDependencies.invoker.services.configuration.models_path
