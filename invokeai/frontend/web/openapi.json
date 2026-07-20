@@ -898,6 +898,9 @@
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                     },
                     {
@@ -1225,6 +1228,9 @@
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                     },
                     {
@@ -1550,6 +1556,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -1927,6 +1936,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -2328,6 +2340,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -3549,6 +3564,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -7756,7 +7774,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Status",
-        "description": "Gets the status of the session queue. Returns global counts; non-admin users additionally\nget their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the\ncurrent item's identifiers unless they own it.",
+        "description": "Gets the status of the session queue. Returns global counts; every user additionally gets\ntheir own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI\nlike the progress bar to the user's own activity). Non-admin users cannot see the current\nitem's identifiers unless they own it.",
         "operationId": "get_queue_status",
         "security": [
           {
@@ -8487,6 +8505,24 @@
               "title": "Is Public"
             },
             "description": "Filter by public/shared status"
+          },
+          {
+            "name": "callable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by whether workflows are callable by call_saved_workflow",
+              "title": "Callable"
+            },
+            "description": "Filter by whether workflows are callable by call_saved_workflow"
           }
         ],
         "responses": {
@@ -10747,6 +10783,29 @@
             "title": "Seed",
             "type": "integer"
           },
+          "control_lllite": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnimaLLLiteField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Anima ControlNet-LLLite conditioning (e.g. inpaint adapter, control layers). Adapters are applied in a deterministic order (sorted by model key); each model may be used at most once.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Control Lllite"
+          },
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
@@ -10778,7 +10837,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.8.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -10888,10 +10947,219 @@
         "tags": ["image", "latents", "vae", "i2l", "anima"],
         "title": "Image to Latents - Anima",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
+      },
+      "AnimaLLLiteField": {
+        "description": "An Anima ControlNet-LLLite conditioning field (e.g. inpaint adapter).",
+        "properties": {
+          "image_name": {
+            "description": "The name of the conditioning image (the initial/raster image)",
+            "title": "Image Name",
+            "type": "string"
+          },
+          "mask_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The name of the inpaint mask image (white = inpaint area)",
+            "title": "Mask Name"
+          },
+          "control_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Anima ControlNet-LLLite adapter model"
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "The strength of the LLLite adapter",
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Weight",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the adapter is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the adapter is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          }
+        },
+        "required": ["image_name", "control_model"],
+        "title": "AnimaLLLiteField",
+        "type": "object"
+      },
+      "AnimaLLLiteInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Configure an Anima ControlNet-LLLite adapter for model-level conditioning.\n\nTakes a conditioning image (the initial/raster image), an optional inpaint\nmask (white = area to inpaint), and a LLLite adapter model. Inpainting\nadapters (4-channel conditioning) require a mask; other adapters ignore it.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The conditioning image (the initial/raster image for inpainting)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The inpaint mask (white = area to inpaint). Required by inpainting adapters.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "control_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control Model",
+            "ui_model_base": ["anima"],
+            "ui_model_type": ["controlnet"]
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "Strength of the LLLite adapter.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the adapter is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the adapter is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "type": {
+            "const": "anima_lllite",
+            "default": "anima_lllite",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "anima", "control", "controlnet", "inpaint"],
+        "title": "Anima ControlNet-LLLite",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/AnimaLLLiteOutput"
+        }
+      },
+      "AnimaLLLiteOutput": {
+        "class": "output",
+        "description": "Anima ControlNet-LLLite output containing adapter configuration.",
+        "properties": {
+          "control": {
+            "$ref": "#/components/schemas/AnimaLLLiteField",
+            "description": "Anima ControlNet-LLLite conditioning",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "anima_lllite_output",
+            "default": "anima_lllite_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control", "type", "type"],
+        "title": "AnimaLLLiteOutput",
+        "type": "object"
       },
       "AnimaLatentsToImageInvocation": {
         "category": "latents",
@@ -10998,7 +11266,7 @@
         "tags": ["latents", "image", "vae", "l2i", "anima"],
         "title": "Latents to Image - Anima",
         "type": "object",
-        "version": "1.0.2",
+        "version": "1.0.3",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -11600,6 +11868,9 @@
           },
           {
             "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
           },
           {
             "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -17682,6 +17953,166 @@
         "required": ["model_name"],
         "title": "ControlNetRecallParameter",
         "description": "ControlNet configuration for recall"
+      },
+      "ControlNet_Checkpoint_Anima_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "controlnet",
+            "title": "Type",
+            "default": "controlnet"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "anima",
+            "title": "Base",
+            "default": "anima"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cond_in_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cond In Channels",
+            "description": "Number of conditioning image channels (3 = RGB control image, 4 = RGB + inpaint mask). None for models installed before this field was recorded."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "default_settings",
+          "cond_in_channels"
+        ],
+        "title": "ControlNet_Checkpoint_Anima_Config",
+        "description": "Model config for Anima ControlNet-LLLite adapter models (Safetensors checkpoint).\n\nAnima LLLite adapters are standalone adapters consisting of a shared conditioning trunk\n(lllite_conditioning1) that encodes a conditioning image, plus tiny per-Linear modules\n(lllite_dit_blocks_*) that perturb the inputs of target Linears in the Anima DiT."
       },
       "ControlNet_Checkpoint_FLUX_Config": {
         "properties": {
@@ -25051,7 +25482,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nIt does not support ControlNet, IP-Adapters, or regional prompting.",
+        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nRegional prompting is supported via per-conditioning masks (single mask is applied\nto every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters\nare not supported. Regional masking is skipped when reference images are attached.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -25182,6 +25613,12 @@
                 "$ref": "#/components/schemas/FluxConditioningField"
               },
               {
+                "items": {
+                  "$ref": "#/components/schemas/FluxConditioningField"
+                },
+                "type": "array"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -25189,7 +25626,8 @@
             "description": "Positive conditioning tensor",
             "field_kind": "input",
             "input": "connection",
-            "orig_required": true
+            "orig_required": true,
+            "title": "Positive Text Conditioning"
           },
           "negative_text_conditioning": {
             "anyOf": [
@@ -25337,7 +25775,7 @@
         "tags": ["image", "flux", "flux2", "klein", "denoise"],
         "title": "FLUX2 Denoise",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -29462,6 +29900,9 @@
                   "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
                 },
                 {
@@ -30291,6 +30732,9 @@
               "oneOf": [
                 {
                   "$ref": "#/components/schemas/AnimaConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/AnimaLLLiteOutput"
                 },
                 {
                   "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
@@ -37176,6 +37620,9 @@
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
               },
               {
@@ -37964,6 +38411,9 @@
                 "$ref": "#/components/schemas/AnimaConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteOutput"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
               },
               {
@@ -38342,6 +38792,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
@@ -39180,6 +39633,9 @@
           "anima_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "anima_lllite": {
+            "$ref": "#/components/schemas/AnimaLLLiteOutput"
+          },
           "anima_lora_collection_loader": {
             "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
           },
@@ -39959,6 +40415,7 @@
           "anima_denoise",
           "anima_i2l",
           "anima_l2i",
+          "anima_lllite",
           "anima_lora_collection_loader",
           "anima_lora_loader",
           "anima_model_loader",
@@ -40295,6 +40752,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
@@ -41208,6 +41668,9 @@
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaLLLiteInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLatentsToImageInvocation"
               },
               {
@@ -42097,6 +42560,24 @@
             "title": "Ssl Keyfile",
             "description": "SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https."
           },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url",
+            "description": "Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash."
+          },
+          "forwarded_allow_ips": {
+            "type": "string",
+            "title": "Forwarded Allow Ips",
+            "description": "Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.",
+            "default": "127.0.0.1"
+          },
           "log_tokenization": {
             "type": "boolean",
             "title": "Log Tokenization",
@@ -42637,7 +43118,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "InvokeAIAppConfig",
-        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation."
+        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set."
       },
       "InvokeAIAppConfigWithSetFields": {
         "properties": {
@@ -56542,6 +57023,9 @@
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
               },
               {
@@ -57120,6 +57604,9 @@
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
                   },
                   {
@@ -57583,6 +58070,9 @@
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
               },
               {
@@ -57755,9 +58245,15 @@
             ],
             "default": null,
             "description": "The submodel type, if any"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user whose action triggered the load",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "config", "submodel_type"],
+        "required": ["timestamp", "config", "submodel_type", "user_id"],
         "title": "ModelLoadCompleteEvent",
         "type": "object"
       },
@@ -57896,6 +58392,9 @@
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
               },
               {
@@ -58068,9 +58567,15 @@
             ],
             "default": null,
             "description": "The submodel type, if any"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user whose action triggered the load",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "config", "submodel_type"],
+        "required": ["timestamp", "config", "submodel_type", "user_id"],
         "title": "ModelLoadStartedEvent",
         "type": "object"
       },
@@ -58657,6 +59162,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -60723,9 +61231,22 @@
             "description": "The ID of the queue",
             "title": "Queue Id",
             "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The ID of the user whose queue items were cleared, or None if all users' items were cleared",
+            "title": "User Id"
           }
         },
-        "required": ["timestamp", "queue_id"],
+        "required": ["timestamp", "queue_id", "user_id"],
         "title": "QueueClearedEvent",
         "type": "object"
       },
@@ -60914,6 +61435,51 @@
           "session_id"
         ],
         "title": "QueueItemStatusChangedEvent",
+        "type": "object"
+      },
+      "QueueItemsCanceledEvent": {
+        "description": "Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in\nbulk (e.g. cancel/delete-all-except-current) without per-item status change events.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "queue_id": {
+            "description": "The ID of the queue",
+            "title": "Queue Id",
+            "type": "string"
+          },
+          "canceled_item_ids": {
+            "description": "The IDs of the queue items that were canceled or deleted",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Canceled Item Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "description": "The IDs of the users who own the canceled queue items",
+            "items": {
+              "type": "string"
+            },
+            "title": "User Ids",
+            "type": "array"
+          },
+          "canceled_item_ids_by_user": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "description": "The canceled queue item IDs keyed by owner user ID.",
+            "title": "Canceled Item Ids By User",
+            "type": "object"
+          }
+        },
+        "required": ["timestamp", "queue_id", "canceled_item_ids", "user_ids", "canceled_item_ids_by_user"],
+        "title": "QueueItemsCanceledEvent",
         "type": "object"
       },
       "QueueItemsRetriedEvent": {
@@ -72441,6 +73007,18 @@
             "const": "anima",
             "title": "Base",
             "default": "anima"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -72459,7 +73037,8 @@
           "config_path",
           "type",
           "format",
-          "base"
+          "base",
+          "cpu_only"
         ],
         "title": "VAE_Checkpoint_Anima_Config",
         "description": "Model config for Anima QwenImage VAE checkpoint models (AutoencoderKLQwenImage)."
@@ -72572,6 +73151,18 @@
             "title": "Format",
             "default": "checkpoint"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "flux",
@@ -72595,6 +73186,7 @@
           "config_path",
           "type",
           "format",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Checkpoint_FLUX_Config"
@@ -72712,6 +73304,18 @@
             "const": "flux2",
             "title": "Base",
             "default": "flux2"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -72730,7 +73334,8 @@
           "config_path",
           "type",
           "format",
-          "base"
+          "base",
+          "cpu_only"
         ],
         "title": "VAE_Checkpoint_Flux2_Config",
         "description": "Model config for FLUX.2 VAE checkpoint models (AutoencoderKLFlux2)."
@@ -72848,6 +73453,18 @@
             "const": "qwen-image",
             "title": "Base",
             "default": "qwen-image"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -72866,7 +73483,8 @@
           "config_path",
           "type",
           "format",
-          "base"
+          "base",
+          "cpu_only"
         ],
         "title": "VAE_Checkpoint_QwenImage_Config",
         "description": "Model config for Qwen Image VAE checkpoint models (AutoencoderKLQwenImage)."
@@ -72979,6 +73597,18 @@
             "title": "Format",
             "default": "checkpoint"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sd-1",
@@ -73002,6 +73632,7 @@
           "config_path",
           "type",
           "format",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Checkpoint_SD1_Config"
@@ -73114,6 +73745,18 @@
             "title": "Format",
             "default": "checkpoint"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sd-2",
@@ -73137,6 +73780,7 @@
           "config_path",
           "type",
           "format",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Checkpoint_SD2_Config"
@@ -73249,6 +73893,18 @@
             "title": "Format",
             "default": "checkpoint"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sdxl",
@@ -73272,6 +73928,7 @@
           "config_path",
           "type",
           "format",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Checkpoint_SDXL_Config"
@@ -73381,6 +74038,18 @@
             "const": "flux2",
             "title": "Base",
             "default": "flux2"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
           }
         },
         "type": "object",
@@ -73399,7 +74068,8 @@
           "format",
           "repo_variant",
           "type",
-          "base"
+          "base",
+          "cpu_only"
         ],
         "title": "VAE_Diffusers_Flux2_Config",
         "description": "Model config for FLUX.2 VAE models in diffusers format (AutoencoderKLFlux2)."
@@ -73504,6 +74174,18 @@
             "title": "Type",
             "default": "vae"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sd-1",
@@ -73527,6 +74209,7 @@
           "format",
           "repo_variant",
           "type",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Diffusers_SD1_Config"
@@ -73631,6 +74314,18 @@
             "title": "Type",
             "default": "vae"
           },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
           "base": {
             "type": "string",
             "const": "sdxl",
@@ -73654,6 +74349,7 @@
           "format",
           "repo_variant",
           "type",
+          "cpu_only",
           "base"
         ],
         "title": "VAE_Diffusers_SDXL_Config"
