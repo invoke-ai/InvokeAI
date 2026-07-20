@@ -253,6 +253,35 @@ def test_event_preserves_identifiers_when_current_item_is_the_changed_item(
     assert a_event.queue_status.batch_id == in_progress.batch_id
 
 
+def test_event_carries_owner_per_user_counts(session_queue: SqliteSessionQueue, mock_invoker: Invoker) -> None:
+    """The embedded queue_status carries the event owner's per-user counts so the owner's client
+    can update personal UI (progress bar, spinner, favicon) from the event immediately, without
+    waiting for a status refetch. The sanitized companion nulls these before reaching non-owners."""
+    user_a = "user-a"
+    user_b = "user-b"
+
+    b_item_id = _insert_queue_item(session_queue, user_id=user_b)
+    a_item_1 = _insert_queue_item(session_queue, user_id=user_a)
+    _a_item_2 = _insert_queue_item(session_queue, user_id=user_a)
+
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == b_item_id
+
+    event_bus: TestEventService = mock_invoker.services.events
+    event_bus.events.clear()
+
+    session_queue.cancel_queue_item(a_item_1)
+
+    a_event = _last_status_event_for_item(event_bus, a_item_1)
+    assert a_event.user_id == user_a
+    # Global counts: A's remaining pending item, B's in-progress item.
+    assert a_event.queue_status.pending == 1
+    assert a_event.queue_status.in_progress == 1
+    # Owner-scoped counts: A has one pending item left and nothing in progress.
+    assert a_event.queue_status.user_pending == 1
+    assert a_event.queue_status.user_in_progress == 0
+
+
 def test_workflow_call_child_enqueue_event_redacts_other_users_current_item_identifiers(
     session_queue: SqliteSessionQueue, mock_invoker: Invoker
 ) -> None:
