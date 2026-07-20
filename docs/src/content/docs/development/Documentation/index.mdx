@@ -198,27 +198,9 @@ To render the image, you'd just use a relative path in your markdown.
 
 ### Adding Translations
 
-Currently, the documentation is only available in English. If you wish to add translations for other languages, we've already laid the ground work for you to do so.
+Documentation translations are managed in the [InvokeAI Docs Crowdin project](https://crowdin.com/project/invokeai-docs). English Markdown and MDX files in `src/content/docs` are the source of truth. Crowdin exports German, Spanish, and Hindi pages into locale directories under that same collection, matching [Starlight's internationalized content layout](https://starlight.astro.build/guides/i18n/).
 
-Firstly, add a new folder within the `src/content/i18n` directory, and create your translated version of the markdown file into the same path as the original.
-
-For example:
-
-<FileTree>
-  - src/
-    - content/
-      - docs/
-        - start-here/
-          - installation.mdx
-      - i18n/
-        - zh-CN Country code here
-          - start-here/
-            - installation.mdx
-</FileTree>
-
-We recommend simply copy/pasting the file and rewriting the text from there.
-
-Learn more about the intricacies of translating Astro Starlight docs [here](https://starlight.astro.build/guides/i18n).
+Do not manually edit exported locale files. Make English documentation changes in GitHub and translation changes in Crowdin. Crowdin maintains a translation pull request, and the documentation workflow builds every locale before the PR is merged.
 
 ## Running a Build
 

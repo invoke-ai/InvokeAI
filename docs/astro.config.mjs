@@ -7,6 +7,7 @@ import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsText from 'starlight-llms-txt';
 import starlightChangelogs from 'starlight-changelogs';
 import { rehypePrefixBaseToRootLinks } from './plugins/rehype-prefix-base-to-root-links.mjs';
+import { remarkLocalizeContent } from './plugins/remark-localize-content.mjs';
 import starlightContextualMenu from 'starlight-contextual-menu';
 
 // Configs
@@ -34,6 +35,7 @@ export default defineConfig({
   site,
   base: base || undefined,
   markdown: {
+    remarkPlugins: [[remarkLocalizeContent, { locales: ['de', 'es', 'hi'] }]],
     rehypePlugins: [[rehypePrefixBaseToRootLinks, { base }]],
   },
   integrations: [
@@ -41,6 +43,9 @@ export default defineConfig({
       // Content
       title: {
         en: 'InvokeAI Documentation',
+        de: 'InvokeAI-Dokumentation',
+        es: 'Documentación de InvokeAI',
+        hi: 'InvokeAI दस्तावेज़',
       },
       logo: {
         src: './src/assets/invoke-icon-wide.svg',
@@ -58,6 +63,18 @@ export default defineConfig({
           label: 'English',
           lang: 'en',
         },
+        de: {
+          label: 'Deutsch',
+          lang: 'de',
+        },
+        es: {
+          label: 'Español',
+          lang: 'es',
+        },
+        hi: {
+          label: 'हिन्दी',
+          lang: 'hi',
+        },
       },
       social: socialConfig,
       tableOfContents: {
@@ -73,12 +90,16 @@ export default defineConfig({
         ThemeProvider: './src/lib/components/ForceDarkTheme.astro',
         ThemeSelect: './src/lib/components/EmptyComponent.astro',
         Footer: './src/lib/components/Footer.astro',
+        EditLink: './src/lib/components/EditLink.astro',
+        MarkdownContent: './src/lib/components/MarkdownContent.astro',
         PageFrame: './src/layouts/PageFrameExtended.astro',
       },
       plugins: [
         starlightLinksValidator({
           errorOnRelativeLinks: false,
           errorOnLocalLinks: false,
+          // The validator only knows content collection routes, not custom Astro pages.
+          exclude: ['/download/'],
         }),
         starlightLlmsText(),
         starlightChangelogs(),

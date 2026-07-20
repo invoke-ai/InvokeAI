@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
 const base = deployTarget === 'ghpages' ? '/InvokeAI' : '';
 const withBase = (path) => `${base}${path}`;
+const siteUrl = (path) =>
+  deployTarget === 'ghpages' ? `https://invoke-ai.github.io${base}${path}` : `https://invoke.ai${path}`;
 
 const expectations = [
   {
@@ -44,6 +46,24 @@ const expectations = [
         ],
   },
 ];
+
+for (const locale of ['de', 'es', 'hi']) {
+  expectations.push({
+    file: `${locale}/start-here/installation/index.html`,
+    includes: [
+      `<html lang="${locale}"`,
+      'lang="en" dir="ltr"',
+      `hreflang="${locale}" href="${siteUrl(`/${locale}/start-here/installation/`)}`,
+      `href="${withBase(`/${locale}/start-here/system-requirements/`)}`,
+      'href="https://crowdin.com/project/invokeai-docs"',
+      'data-pagefind-body',
+    ],
+    excludes: [
+      `href="${withBase(`/${locale}/${locale}/`)}`,
+      `href="${withBase('/start-here/system-requirements/')}"`,
+    ],
+  });
+}
 
 const errors = [];
 

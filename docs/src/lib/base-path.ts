@@ -4,3 +4,12 @@ export const withBase = (path: string, baseUrl: string) => {
 
   return `${normalizedBase}${normalizedPath}`;
 };
+
+export const localizePath = (path: string, locale?: string) => {
+  if (!locale) {
+    return path;
+  }
+
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `/${locale}${normalizedPath}`;
+};

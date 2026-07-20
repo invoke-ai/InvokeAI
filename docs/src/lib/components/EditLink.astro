@@ -1,0 +1,32 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+
+const crowdinProjectUrl = 'https://crowdin.com/project/invokeai-docs';
+const { editUrl, locale } = Astro.locals.starlightRoute;
+const href = locale ? crowdinProjectUrl : editUrl;
+const label = locale ? Astro.locals.t('page.translateLink') : Astro.locals.t('page.editLink');
+---
+
+{
+  href && (
+    <a href={href} class="sl-flex print:hidden">
+      <Icon name={locale ? 'translate' : 'pencil'} size="1.2em" />
+      {label}
+    </a>
+  )
+}
+
+<style>
+  @layer starlight.core {
+    a {
+      gap: 0.5rem;
+      align-items: center;
+      text-decoration: none;
+      color: var(--sl-color-gray-3);
+    }
+
+    a:hover {
+      color: var(--sl-color-white);
+    }
+  }
+</style>

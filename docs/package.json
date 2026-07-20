@@ -9,6 +9,7 @@
     "check-docs-data": "pnpm run generate-docs-data && git diff --exit-code -- src/generated",
     "check-deploy-output": "node ./scripts/verify-deploy-output.mjs",
     "check-redirects": "node ./scripts/validate-redirect-targets.mjs",
+    "test:localization": "node --test ./plugins/remark-localize-content.test.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
