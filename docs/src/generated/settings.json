@@ -93,6 +93,28 @@
       "validation": {}
     },
     {
+      "category": "WEB",
+      "default": null,
+      "description": "Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash.",
+      "env_var": "INVOKEAI_BASE_URL",
+      "literal_values": [],
+      "name": "base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "WEB",
+      "default": "127.0.0.1",
+      "description": "Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.",
+      "env_var": "INVOKEAI_FORWARDED_ALLOW_IPS",
+      "literal_values": [],
+      "name": "forwarded_allow_ips",
+      "required": false,
+      "type": "<class 'str'>",
+      "validation": {}
+    },
+    {
       "category": "MISC FEATURES",
       "default": false,
       "description": "Enable logging of parsed prompt tokens.",
