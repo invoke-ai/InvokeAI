@@ -46,7 +46,7 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
   const { widgets } = useWorkflowHostCommands();
   const rootChildren = getFormChildren(projectGraph.form);
   const onOpenWorkflowEditorClick = useCallback(
-    () => widgets.select({ region: 'center', widgetId: 'workflow' }),
+    () => widgets.open({ region: 'center', widgetId: 'workflow' }),
     [widgets]
   );
 

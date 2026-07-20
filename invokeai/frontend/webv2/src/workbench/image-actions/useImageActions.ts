@@ -117,7 +117,7 @@ export const useImageActions = ({
   }, [generateValues, supportedModels]);
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   return useMemo<ImageActions>(() => {

@@ -1,6 +1,6 @@
-import type { WorkflowGraphPreviewPort, WorkflowModelSelectProps, WorkflowUiAdapter } from '@features/workflow/react';
+import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/workflow/react';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { flushGenerateDrafts } from '@features/generation/react';
 import { getAuthSession, subscribeAuthSession } from '@features/identity';
@@ -28,12 +28,10 @@ import {
   useWorkbenchInternalStore,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
-import { lazy, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { createCachedWorkflowReadPort } from './cachedWorkflowReadPort';
 
-const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
-const WorkflowModelSelect: ComponentType<WorkflowModelSelectProps> = ModelSelect;
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
@@ -99,7 +97,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
   const notify = useNotify();
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   const project = useMemo(
@@ -142,7 +140,6 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
 
   const adapter = useMemo<WorkflowUiAdapter>(
     () => ({
-      ModelSelect: WorkflowModelSelect,
       capabilities,
       commands: {
         bindLibraryWorkflow: commands.workflows.bindLibraryWorkflow,
@@ -167,7 +164,6 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
       widgets: {
         open: (options) => commands.widgets.open(options),
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
-        select: (options) => commands.widgets.select(options),
       },
     }),
     [capabilities, commands, notify.error, notify.info, notify.success, preferences, project, queries]

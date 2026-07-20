@@ -1,5 +1,5 @@
 import type { ProjectGraphState } from '@features/workflow/core/types';
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
 import { createContext, use, useCallback, useSyncExternalStore } from 'react';
@@ -8,7 +8,6 @@ import type {
   WorkflowCommands,
   WorkflowGraphHistoryEntry,
   WorkflowInvocationSourceId,
-  WorkflowModelSelectProps,
   WorkflowNodeExecutionState,
   WorkflowPerfSource,
   WorkflowWidgetCommands,
@@ -53,7 +52,6 @@ export interface WorkflowGraphPreviewPort {
  * may not import workbench), not a test seam; no second adapter is expected.
  */
 export interface WorkflowUiAdapter {
-  ModelSelect: ComponentType<WorkflowModelSelectProps>;
   capabilities: WorkflowReadPort<WorkflowCapabilities>;
   preferences: WorkflowReadPort<WorkflowPreferences>;
   project: WorkflowReadPort<WorkflowProjectSnapshot>;
@@ -140,11 +138,6 @@ export const useWorkflowGraphPreview = (): WorkflowGraphPreviewPort => {
 };
 
 export const useWorkflowNotifications = () => useWorkflowUi().notifications;
-
-export const WorkflowModelSelect = (props: WorkflowModelSelectProps) => {
-  const { ModelSelect } = useWorkflowUi();
-  return <ModelSelect {...props} />;
-};
 
 export const useWorkflowNodeExecutionState = (nodeId: string): WorkflowNodeExecutionState | null => {
   const { nodeExecution } = useWorkflowUi();

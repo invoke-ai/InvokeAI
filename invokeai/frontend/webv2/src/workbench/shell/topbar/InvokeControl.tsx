@@ -127,7 +127,7 @@ export const InvokeControl = () => {
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected;
   const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   const onInvoke = useCallback(async () => {

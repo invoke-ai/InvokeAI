@@ -551,7 +551,7 @@ export const UpscaleWidgetView = () => {
   const replace = useCallback((next: UpscaleWidgetValues) => selection.patchValues({ ...next }), [selection]);
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   const selectMainModel = (model: ModelConfig | null) => {

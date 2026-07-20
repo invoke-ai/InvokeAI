@@ -50,7 +50,7 @@ export const QueueItemActions = ({ item }: { item: QueueItemReadModel }) => {
   );
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   const onRecall = useCallback(

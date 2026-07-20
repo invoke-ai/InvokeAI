@@ -47,6 +47,7 @@ export interface WorkflowGraphHistoryEntry {
   id: string;
   createdAt: string;
   label: string;
+  retainedBytes?: number;
   document?: ProjectGraphState;
 }
 
@@ -63,27 +64,6 @@ export interface WorkflowCommands {
 export interface WorkflowWidgetCommands {
   open(options: { region: WorkflowWidgetPanelRegion; widgetId: string }): void;
   patchValues(widgetId: string, values: Record<string, unknown>): void;
-  select(options: { region: WorkflowWidgetPanelRegion; widgetId: string }): void;
-}
-
-export interface WorkflowModel {
-  base: string;
-  hash?: string;
-  key: string;
-  name: string;
-  type: string;
-}
-
-export interface WorkflowModelSelectProps {
-  className?: string;
-  filter?: (model: WorkflowModel) => boolean;
-  id?: string;
-  invalid?: boolean;
-  isClearable?: boolean;
-  modelTypes: string[];
-  onChange(model: WorkflowModel | null): void;
-  size?: 'xs' | 'sm' | 'md';
-  value: string | null;
 }
 
 export interface WorkflowNodeExecutionState {

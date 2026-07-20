@@ -246,7 +246,7 @@ export const PromptTriggerPopover = ({
   }, []);
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   return (
@@ -352,7 +352,7 @@ const ExpandPromptButton = ({
   activeProjectIdRef.current = activeProjectId;
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   const runExpandPrompt = useCallback(async () => {
@@ -478,7 +478,7 @@ const ImageToPromptButton = ({
   activeProjectIdRef.current = activeProjectId;
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   const runImageToPrompt = useCallback(async () => {

@@ -66,7 +66,7 @@ export const useRegisterFirstPartyCommands = () => {
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   const submitInvocation = useEffectEvent(async () => {

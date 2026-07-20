@@ -339,7 +339,7 @@ const BuilderElement = ({
                 title="Zoom to node in the Workflow editor"
                 variant="ghost"
                 onClick={() => {
-                  widgets.select({ region: 'center', widgetId: 'workflow' });
+                  widgets.open({ region: 'center', widgetId: 'workflow' });
                   requestNodeSelection([element.data.fieldIdentifier.nodeId]);
                 }}
               >

@@ -1,15 +1,19 @@
+import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
-import type { WorkflowModel as ModelConfig } from '@features/workflow/ui/contracts';
 
-import { HStack, Input, NativeSelect, Switch, Text, Textarea } from '@chakra-ui/react';
+import { HStack, Input, NativeSelect, Switch, Text } from '@chakra-ui/react';
 import { galleryDestinations, type GalleryBoard, type GeneratedImageContract } from '@features/gallery';
 import { SCHEDULER_OPTIONS } from '@features/generation/settings';
-import {
-  WorkflowModelSelect as ModelSelect,
-  useWorkflowProjectSelector,
-} from '@features/workflow/ui/WorkflowUiContext';
-import { Button, Combobox } from '@platform/ui';
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import { Button, Combobox, ResizableTextarea } from '@platform/ui';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+
+const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
+const MODEL_SELECT_FALLBACK = (
+  <Button disabled size="xs" w="full">
+    Loading models…
+  </Button>
+);
 
 /**
  * Direct-input controls for workflow fields, shared between the node editor
@@ -50,13 +54,14 @@ const StringInput = ({ id, invalid, onChange, template, value }: WorkflowFieldIn
 
   if (template.uiComponent === 'textarea') {
     return (
-      <Textarea
+      <ResizableTextarea
         aria-label={template.title}
         className="nodrag nowheel"
+        defaultHeightPx={96}
         fontFamily="mono"
         id={id ? `${id}-textarea` : undefined}
-        minH="4.5rem"
-        resize="vertical"
+        minHeightPx={56}
+        resizeHandleAriaLabel={`Resize ${template.title}`}
         size="xs"
         value={text}
         w="full"
@@ -212,12 +217,12 @@ const EnumInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInpu
   );
 };
 
-const DEFAULT_MODEL_TYPES = ['main', 'vae', 'lora', 'controlnet', 't2i_adapter', 'ip_adapter'];
+const DEFAULT_MODEL_TYPES: ModelTaxonomyType[] = ['main', 'vae', 'lora', 'controlnet', 't2i_adapter', 'ip_adapter'];
 
 const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const selectedKey =
     typeof (value as { key?: unknown } | null)?.key === 'string' ? (value as { key: string }).key : null;
-  const modelTypes = template.uiModelType ?? DEFAULT_MODEL_TYPES;
+  const modelTypes = (template.uiModelType ?? DEFAULT_MODEL_TYPES) as ModelTaxonomyType[];
   const allowedBases = template.uiModelBase;
   const filter = useCallback(
     (model: ModelConfig) => (allowedBases ? allowedBases.includes(model.base) : true),
@@ -232,17 +237,19 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
   );
 
   return (
-    <ModelSelect
-      className="nodrag nowheel"
-      filter={allowedBases ? filter : undefined}
-      id={id ? `${id}-model-combobox` : undefined}
-      invalid={invalid}
-      isClearable={false}
-      modelTypes={modelTypes}
-      size="xs"
-      value={selectedKey}
-      onChange={onModelChange}
-    />
+    <Suspense fallback={MODEL_SELECT_FALLBACK}>
+      <ModelSelect
+        className="nodrag nowheel"
+        filter={allowedBases ? filter : undefined}
+        id={id ? `${id}-model-combobox` : undefined}
+        invalid={invalid}
+        isClearable={false}
+        modelTypes={modelTypes}
+        size="xs"
+        value={selectedKey}
+        onChange={onModelChange}
+      />
+    </Suspense>
   );
 };
 

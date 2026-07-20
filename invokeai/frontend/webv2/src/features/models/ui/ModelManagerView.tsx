@@ -9,7 +9,7 @@ import { LibraryColumn } from './manager/LibraryColumn';
 /** Full model manager: persistent library column plus right-side detail pane. */
 export const ModelManagerView = () => {
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   return (

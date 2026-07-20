@@ -79,7 +79,6 @@ describe('Workflow UI read-port isolation', () => {
     const counts = { capability: 0, graph: 0, preferences: 0, project: 0, projectEqual: 0, services: 0 };
     // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
     const adapter = {
-      ModelSelect: () => null,
       capabilities: capabilities.port,
       commands: {},
       getProjectGraph: () => project.port.getSnapshot().projectGraph,

@@ -70,6 +70,8 @@ export const ModelSelect = ({
 }) => {
   const { enableModelDescriptions } = useModelsUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
+  const loadError = useModelsSelector((snapshot) => snapshot.error);
+  const loadStatus = useModelsSelector((snapshot) => snapshot.status);
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBases, setSelectedBases] = useState<ReadonlySet<string>>(EMPTY_BASES);
@@ -79,7 +81,7 @@ export const ModelSelect = ({
   const optionRefs = useRef<HTMLElement[]>([]);
 
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
   if (disabled !== lastDisabled) {
@@ -309,7 +311,20 @@ export const ModelSelect = ({
               <ScrollArea.Root maxH="14rem" size="xs" variant="hover" w="full">
                 <ScrollArea.Viewport maxH="inherit" w="full">
                   <ScrollArea.Content py="1" role="listbox" aria-label={`Available ${scopeLabel}`}>
-                    {groups.length === 0 ? (
+                    {loadStatus === 'idle' || loadStatus === 'loading' ? (
+                      <Text color="fg.subtle" fontSize="2xs" p="2">
+                        Loading models…
+                      </Text>
+                    ) : loadStatus === 'error' ? (
+                      <Stack alignItems="start" gap="1.5" p="2">
+                        <Text color="fg.error" fontSize="2xs">
+                          {loadError ?? 'Failed to load models.'}
+                        </Text>
+                        <Button size="2xs" variant="outline" onClick={() => void ensureModelsLoaded()}>
+                          Retry
+                        </Button>
+                      </Stack>
+                    ) : groups.length === 0 ? (
                       <Text color="fg.subtle" fontSize="2xs" p="2">
                         {candidates.length === 0
                           ? `No compatible ${scopeLabel} installed.`
@@ -318,77 +333,79 @@ export const ModelSelect = ({
                             : `No ${scopeLabel} match your search.`}
                       </Text>
                     ) : null}
-                    {groups.map((group) => (
-                      <Stack key={group.type} gap="0">
-                        {modelTypes.length > 1 ? (
-                          <Text
-                            color="fg.subtle"
-                            fontSize="2xs"
-                            fontWeight="600"
-                            letterSpacing="0.02em"
-                            px="2"
-                            py="1"
-                            textTransform="uppercase"
-                          >
-                            {group.label}
-                          </Text>
-                        ) : null}
-                        {group.models.map((model) => {
-                          const currentOptionIndex = optionIndex;
-                          optionIndex += 1;
+                    {loadStatus === 'loaded'
+                      ? groups.map((group) => (
+                          <Stack key={group.type} gap="0">
+                            {modelTypes.length > 1 ? (
+                              <Text
+                                color="fg.subtle"
+                                fontSize="2xs"
+                                fontWeight="600"
+                                letterSpacing="0.02em"
+                                px="2"
+                                py="1"
+                                textTransform="uppercase"
+                              >
+                                {group.label}
+                              </Text>
+                            ) : null}
+                            {group.models.map((model) => {
+                              const currentOptionIndex = optionIndex;
+                              optionIndex += 1;
 
-                          return (
-                            <Button
-                              key={model.key}
-                              ref={(element) => {
-                                if (element) {
-                                  optionRefs.current[currentOptionIndex] = element;
-                                }
-                              }}
-                              aria-selected={value === model.key}
-                              borderRadius="0"
-                              gap="2"
-                              justifyContent="start"
-                              truncate
-                              role="option"
-                              size="2xs"
-                              variant="ghost"
-                              w="full"
-                              _highlighted={{ bg: 'bg.subtle' }}
-                              _focusVisible={{
-                                outline: '2px solid',
-                                outlineColor: 'accent.solid',
-                                outlineOffset: '-2px',
-                              }}
-                              onClick={() => selectModel(model)}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Escape') {
-                                  event.preventDefault();
-                                  closeAndReset();
-                                  return;
-                                }
+                              return (
+                                <Button
+                                  key={model.key}
+                                  ref={(element) => {
+                                    if (element) {
+                                      optionRefs.current[currentOptionIndex] = element;
+                                    }
+                                  }}
+                                  aria-selected={value === model.key}
+                                  borderRadius="0"
+                                  gap="2"
+                                  justifyContent="start"
+                                  truncate
+                                  role="option"
+                                  size="2xs"
+                                  variant="ghost"
+                                  w="full"
+                                  _highlighted={{ bg: 'bg.subtle' }}
+                                  _focusVisible={{
+                                    outline: '2px solid',
+                                    outlineColor: 'accent.solid',
+                                    outlineOffset: '-2px',
+                                  }}
+                                  onClick={() => selectModel(model)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Escape') {
+                                      event.preventDefault();
+                                      closeAndReset();
+                                      return;
+                                    }
 
-                                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                                  event.preventDefault();
-                                  focusAdjacentOption(currentOptionIndex, event.key === 'ArrowDown' ? 1 : -1);
-                                }
-                              }}
-                              transitionDuration="faster"
-                            >
-                              <Icon
-                                as={CheckIcon}
-                                aria-hidden
-                                boxSize="3"
-                                color="accent.solid"
-                                flexShrink={0}
-                                opacity={value === model.key ? 1 : 0}
-                              />
-                              <ModelOptionContent enableDescription={enableModelDescriptions} model={model} />
-                            </Button>
-                          );
-                        })}
-                      </Stack>
-                    ))}
+                                    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                                      event.preventDefault();
+                                      focusAdjacentOption(currentOptionIndex, event.key === 'ArrowDown' ? 1 : -1);
+                                    }
+                                  }}
+                                  transitionDuration="faster"
+                                >
+                                  <Icon
+                                    as={CheckIcon}
+                                    aria-hidden
+                                    boxSize="3"
+                                    color="accent.solid"
+                                    flexShrink={0}
+                                    opacity={value === model.key ? 1 : 0}
+                                  />
+                                  <ModelOptionContent enableDescription={enableModelDescriptions} model={model} />
+                                </Button>
+                              );
+                            })}
+                          </Stack>
+                        ))
+                      : null}
                   </ScrollArea.Content>
                 </ScrollArea.Viewport>
                 <ScrollArea.Scrollbar>

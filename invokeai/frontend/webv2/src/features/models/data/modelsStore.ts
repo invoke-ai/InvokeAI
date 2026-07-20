@@ -76,11 +76,15 @@ export const refreshModels = (): Promise<void> => {
   return inflightRefresh;
 };
 
-/** Fetch once on first use; later callers get the cached snapshot. */
-export const ensureModelsLoaded = (): void => {
-  if (store.getSnapshot().status === 'idle') {
-    void refreshModels();
+/** Fetch on first use or retry after an error; callers share and can await the request. */
+export const ensureModelsLoaded = (): Promise<void> => {
+  const { status } = store.getSnapshot();
+
+  if (status === 'idle' || status === 'error') {
+    return refreshModels();
   }
+
+  return inflightRefresh ?? Promise.resolve();
 };
 
 export const getModelsSnapshot = (): ModelsSnapshot => store.getSnapshot();
