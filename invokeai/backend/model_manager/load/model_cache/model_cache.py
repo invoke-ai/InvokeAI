@@ -451,11 +451,24 @@ class ModelCache:
             f"Locking model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
 
-        # Check if the model's specific compute_device is CPU, not just the cache's default execution_device
+        # A CPU compute_device means there's no VRAM load to do. This happens in two distinct situations:
+        #   1. The model is explicitly configured cpu_only, but the cache's default execution device is a GPU.
+        #   2. The whole install is CPU-only (no GPU), so every model's compute_device is CPU by default.
+        # Only case 1 is noteworthy — surface it at INFO with the "(cpu_only)" cause so it mirrors the
+        # "Loaded model ... onto <device> device" line emitted for GPU loads below. Case 2 would fire for every
+        # lock of every model and says nothing about a per-model choice, so keep it at DEBUG and drop the wording.
         model_compute_device = cache_entry.cached_model.compute_device
         if model_compute_device.type == "cpu":
-            # Models configured for CPU execution don't need to be loaded into VRAM
-            self._logger.debug(f"Model {cache_entry.key} is configured for CPU execution, skipping VRAM load")
+            if self._execution_device.type != "cpu":
+                self._logger.info(
+                    f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
+                    f"cpu device (cpu_only); skipping VRAM load"
+                )
+            else:
+                self._logger.debug(
+                    f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
+                    f"cpu device; skipping VRAM load"
+                )
             return
 
         try:

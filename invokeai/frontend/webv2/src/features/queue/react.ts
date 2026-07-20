@@ -9,3 +9,4 @@ export {
 export { type QueueItemProgressSink, useQueueItemProgress } from './data/progressStore';
 export { useRevealHold } from './data/revealHoldStore';
 export { QueueUiProvider, type QueueUiAdapter } from './ui/QueueUiContext';
+export { getQueueItemAccess } from './ui/queueOwnership';

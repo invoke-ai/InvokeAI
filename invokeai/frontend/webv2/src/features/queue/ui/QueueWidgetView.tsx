@@ -1,4 +1,5 @@
 import { Stack } from '@chakra-ui/react';
+import { getPersonalQueueActivity } from '@features/queue/core/types';
 import { StatusWidgetChip } from '@platform/ui/StatusWidgetChip';
 import { ListOrderedIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -27,15 +28,16 @@ export const QueueWidgetView = ({
 }) => {
   const { t } = useTranslation();
   const counts = useQueueCounts();
+  const activity = getPersonalQueueActivity(counts);
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    const isGenerating = counts.inProgress > 0;
+    const isGenerating = activity.inProgress > 0;
 
     return (
       <StatusWidgetChip icon={ListOrderedIcon} tone={isGenerating ? 'accent' : undefined}>
         {isGenerating
-          ? t('widgets.queue.generating', { count: counts.inProgress })
-          : t('widgets.queue.queued', { count: counts.pending })}
+          ? t('widgets.queue.generating', { count: activity.inProgress })
+          : t('widgets.queue.queued', { count: activity.pending })}
       </StatusWidgetChip>
     );
   }

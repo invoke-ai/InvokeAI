@@ -120,7 +120,12 @@ export const cancelScopedQueueItems = async (
   const idsResult = await getQueueItemIds('desc', scope);
   const items = await getQueueItemsByIds(idsResult.item_ids);
   const cancellableItemIds = items
-    .filter((item) => item.item_id !== currentItemId && (item.status === 'pending' || item.status === 'in_progress'))
+    .filter(
+      (item) =>
+        item.user_id !== 'redacted' &&
+        item.item_id !== currentItemId &&
+        (item.status === 'pending' || item.status === 'in_progress')
+    )
     .map((item) => item.item_id);
 
   await cancelQueueItems(cancellableItemIds);

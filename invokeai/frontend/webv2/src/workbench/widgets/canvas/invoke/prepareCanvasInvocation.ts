@@ -193,7 +193,7 @@ export const resolveRegionalReferenceImages = (
       continue;
     }
     const { config } = ref;
-    if (config.type === 'ip_adapter' && base !== 'flux') {
+    if (config.type === 'ip_adapter' && base !== 'flux' && base !== 'flux2') {
       if (!config.image || !config.model || config.model.base !== base) {
         continue;
       }
@@ -264,7 +264,7 @@ const createRegionalGuidanceCollector = (
         mainBase: model.base,
         negativePrompt: layer.negativePrompt,
         positivePrompt: layer.positivePrompt,
-        referenceImageCount: referenceImages.length,
+        referenceImageCount: layer.referenceImages.length,
       });
       if (rejection) {
         return false;

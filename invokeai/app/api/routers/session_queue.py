@@ -548,13 +548,17 @@ async def get_queue_status(
         default=None, description="Only include queue items whose origin starts with this prefix"
     ),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue. Returns global counts; non-admin users additionally
-    get their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the
-    current item's identifiers unless they own it."""
+    """Gets the status of the session queue. Returns global counts; every user additionally gets
+    their own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI
+    like the progress bar to the user's own activity). Non-admin users cannot see the current
+    item's identifiers unless they own it."""
     try:
-        user_id = None if current_user.is_admin else current_user.user_id
         queue = ApiDependencies.invoker.services.session_queue.get_queue_status(
-            queue_id, user_id=user_id, origin_prefix=origin_prefix
+            queue_id,
+            user_id=current_user.user_id,
+            acting_user_id=current_user.user_id,
+            origin_prefix=origin_prefix,
+            is_admin=current_user.is_admin,
         )
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)

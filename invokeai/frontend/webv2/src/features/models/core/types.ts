@@ -120,6 +120,7 @@ export interface ModelConfig {
   prediction_type?: PredictionType | null;
   upcast_attention?: boolean;
   config_path?: string | null;
+  cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
   default_settings?: AnyModelDefaultSettings | null;
   submodels?: Record<string, unknown> | null;
@@ -138,6 +139,7 @@ export interface ModelRecordChanges {
   prediction_type?: PredictionType | null;
   upcast_attention?: boolean;
   config_path?: string | null;
+  cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
   default_settings?: AnyModelDefaultSettings | null;
 }

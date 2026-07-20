@@ -745,4 +745,12 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(backendGraph.nodes.control_net_c1).toBeDefined();
     expect(backendGraph.nodes.rg_pos_cond_r1).toBeDefined();
   });
+
+  it('grafts positive-only regional conditioning into a FLUX.2 graph', () => {
+    const { backendGraph } = compile(flux2Model, 'txt2img', { regionalGuidance: [region('r1')] });
+
+    expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_klein_text_encoder' });
+    expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'qwen3_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(backendGraph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+  });
 });

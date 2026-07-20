@@ -15,8 +15,9 @@ import { useTranslation } from 'react-i18next';
 
 import type { AddLayerItemId } from './addLayerMenu';
 
-import { ADD_LAYER_MENU } from './addLayerMenu';
+import { ADD_LAYER_MENU, isAddLayerItemAvailable } from './addLayerMenu';
 import { useAddLayer } from './useAddLayer';
+import { useSelectedModelBase } from './useSelectedModelBase';
 
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
@@ -38,6 +39,7 @@ const ADD_LAYER_ICONS: Record<AddLayerItemId, LucideIcon> = {
 export const LayersHeaderActions = () => {
   const { t } = useTranslation();
   const addLayer = useAddLayer();
+  const base = useSelectedModelBase();
 
   const handleSelect = useCallback((id: AddLayerItemId) => () => addLayer(id), [addLayer]);
 
@@ -58,19 +60,21 @@ export const LayersHeaderActions = () => {
                   <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                     {t(group.titleKey)}
                   </Menu.ItemGroupLabel>
-                  {group.items.map((item) => {
-                    const ItemIcon = ADD_LAYER_ICONS[item.id];
-                    return (
-                      <Menu.Item key={item.id} value={item.id} onSelect={handleSelect(item.id)}>
-                        <HStack gap="2" minW="0" w="full">
-                          <Icon as={ItemIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-                          <Text flex="1" fontSize="xs">
-                            {t(item.labelKey)}
-                          </Text>
-                        </HStack>
-                      </Menu.Item>
-                    );
-                  })}
+                  {group.items
+                    .filter((item) => isAddLayerItemAvailable(item.id, base))
+                    .map((item) => {
+                      const ItemIcon = ADD_LAYER_ICONS[item.id];
+                      return (
+                        <Menu.Item key={item.id} value={item.id} onSelect={handleSelect(item.id)}>
+                          <HStack gap="2" minW="0" w="full">
+                            <Icon as={ItemIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+                            <Text flex="1" fontSize="xs">
+                              {t(item.labelKey)}
+                            </Text>
+                          </HStack>
+                        </Menu.Item>
+                      );
+                    })}
                 </Menu.ItemGroup>
               </Fragment>
             ))}

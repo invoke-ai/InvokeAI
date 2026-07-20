@@ -69,6 +69,9 @@ export const mapQueueItemDTO = (dto: QueueServerItemDTO): QueueItemReadModel => 
   startedAt: dto.started_at,
   status: dto.status,
   updatedAt: dto.updated_at,
+  userDisplayName: dto.user_display_name,
+  userEmail: dto.user_email,
+  userId: dto.user_id,
 });
 
 export const mapQueueBackendItemDTO = (dto: QueueServerItemDTO): QueueBackendItem => ({
@@ -102,5 +105,8 @@ export const mapQueueStatusDTO = (dto: QueueAndProcessorStatusDTO): QueueStatusR
     queueId: dto.queue.queue_id,
     sessionId: dto.queue.session_id,
     total: dto.queue.total,
+    userInProgress: dto.queue.user_in_progress,
+    userPending: dto.queue.user_pending,
+    waiting: dto.queue.waiting,
   },
 });

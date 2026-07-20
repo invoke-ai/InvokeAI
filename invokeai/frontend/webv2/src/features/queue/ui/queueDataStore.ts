@@ -16,6 +16,7 @@ const EMPTY_COUNTS: QueueCounts = {
   pending: 0,
   queueId: 'default',
   total: 0,
+  waiting: 0,
 };
 
 const onQueueRead = ({

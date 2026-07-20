@@ -15,6 +15,7 @@ import { QueueItemDetails } from './QueueItemDetails';
 import { QueueItemThumbnail } from './QueueItemThumbnail';
 import { QueueStatusDot } from './QueueStatusDot';
 import { QueueStepProgress } from './QueueStepProgress';
+import { useQueueUi } from './QueueUiContext';
 import { getStatusMeta } from './statusMeta';
 
 const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
@@ -35,6 +36,7 @@ const QUEUE_ITEM_BUTTON_SX: SystemStyleObject = {
 
 export const QueueItemRow = memo(({ item }: { item: QueueItemReadModel }) => {
   const { t } = useTranslation();
+  const { canManageItem, canViewItemDetails } = useQueueUi();
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((open) => !open), []);
   const meta = extractGenerationMeta(item);
@@ -42,7 +44,8 @@ export const QueueItemRow = memo(({ item }: { item: QueueItemReadModel }) => {
   const age = formatCompactAge(item.completedAt ?? item.createdAt);
   const ageLabel = [duration, age].filter(Boolean).join(' · ');
   const isFailed = item.status === 'failed';
-  const isCancellable = item.status === 'pending' || item.status === 'in_progress';
+  const isCancellable = (item.status === 'pending' || item.status === 'in_progress') && canManageItem(item);
+  const canExpand = canViewItemDetails(item);
   const progress = useItemProgress(item.id);
   const liveImage = progress?.image ?? null;
   const resultImageName = getResultImageName(item);
@@ -54,7 +57,12 @@ export const QueueItemRow = memo(({ item }: { item: QueueItemReadModel }) => {
   return (
     <Box overflow="hidden" rounded="md" borderWidth={1} borderColor={borderColor}>
       <HStack gap="0">
-        <Row aria-expanded={expanded} as="button" css={QUEUE_ITEM_BUTTON_SX} onClick={toggle}>
+        <Row
+          aria-expanded={canExpand ? expanded : undefined}
+          as={canExpand ? 'button' : 'div'}
+          css={QUEUE_ITEM_BUTTON_SX}
+          onClick={canExpand ? toggle : undefined}
+        >
           <QueueItemThumbnail boxSize="8" imageName={resultImageName} liveImage={liveImage} />
           <Stack flex="1" gap="0.5" minW="0">
             <Text fontSize="xs" truncate>
@@ -67,14 +75,16 @@ export const QueueItemRow = memo(({ item }: { item: QueueItemReadModel }) => {
               </Text>
             </HStack>
           </Stack>
-          <Icon
-            as={ChevronRightIcon}
-            boxSize="4"
-            color="fg.muted"
-            flexShrink={0}
-            transition="transform var(--wb-motion-duration-fast) ease"
-            css={expanded ? CHEVRON_OPEN : undefined}
-          />
+          {canExpand ? (
+            <Icon
+              as={ChevronRightIcon}
+              boxSize="4"
+              color="fg.muted"
+              flexShrink={0}
+              transition="transform var(--wb-motion-duration-fast) ease"
+              css={expanded ? CHEVRON_OPEN : undefined}
+            />
+          ) : null}
         </Row>
         {isCancellable ? (
           <Box flexShrink={0} pe="1">

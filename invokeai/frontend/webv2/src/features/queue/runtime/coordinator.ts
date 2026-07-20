@@ -18,6 +18,7 @@ import {
   type InvocationProgressEvent,
   type InvocationStartedEvent,
   type QueueItemStatusChangedEvent,
+  type QueueItemsCanceledEvent,
 } from '@features/queue/data/events';
 import {
   progressImageStore,
@@ -202,6 +203,7 @@ export const createQueueCoordinator = (
    * and the run being registered.
    */
   const recentTerminalOutcomes = new Map<number, TerminalOutcome>();
+  const latestStatusSequences = new Map<number, number>();
 
   const detachers: Array<() => void> = [];
   let isAttached = false;
@@ -328,7 +330,7 @@ export const createQueueCoordinator = (
   };
 
   const settleFromQueueItem = (queueItem: QueueBackendItem): void => {
-    if (queueItem.status !== 'pending' && queueItem.status !== 'in_progress') {
+    if (isTerminalBackendStatus(queueItem.status)) {
       settleWait(queueItem.id, toTerminalOutcome(queueItem.status, queueItem.errorMessage, queueItem.errorType));
     }
   };
@@ -395,6 +397,15 @@ export const createQueueCoordinator = (
   };
 
   const handleStatusChanged = (event: QueueItemStatusChangedEvent): void => {
+    const sequence = event.status_sequence;
+    const previousSequence = latestStatusSequences.get(event.item_id);
+    if (sequence !== null && previousSequence !== undefined && sequence < previousSequence) {
+      return;
+    }
+    if (sequence !== null) {
+      latestStatusSequences.set(event.item_id, sequence);
+    }
+
     if (!isTerminalBackendStatus(event.status)) {
       return;
     }
@@ -409,6 +420,14 @@ export const createQueueCoordinator = (
 
     if (event.status === 'completed') {
       scheduleGalleryRefresh();
+    }
+  };
+
+  const handleItemsCanceled = (event: QueueItemsCanceledEvent): void => {
+    for (const itemId of event.canceled_item_ids) {
+      if (waits.has(itemId)) {
+        settleWait(itemId, { status: 'canceled' });
+      }
     }
   };
 
@@ -466,6 +485,7 @@ export const createQueueCoordinator = (
 
     detachers.push(
       backend.on('queue_item_status_changed', handleStatusChanged),
+      backend.on('queue_items_canceled', handleItemsCanceled),
       backend.on('invocation_progress', handleProgress),
       backend.on('invocation_started', (event: InvocationStartedEvent) => {
         if (!isTrackedEvent(event)) {

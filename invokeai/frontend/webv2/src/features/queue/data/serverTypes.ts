@@ -27,6 +27,9 @@ export interface QueueServerItemDTO {
   started_at?: string | null;
   status: QueueItemStatus;
   updated_at: string;
+  user_display_name?: string | null;
+  user_email?: string | null;
+  user_id?: string;
 }
 
 export interface QueueImageDTO {
@@ -49,6 +52,9 @@ export interface QueueStatusCountsDTO {
   queue_id: string;
   session_id?: string | null;
   total: number;
+  user_in_progress?: number | null;
+  user_pending?: number | null;
+  waiting: number;
 }
 
 export interface QueueProcessorStatusDTO {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ADD_LAYER_MENU, groupAddItemId } from './addLayerMenu';
+import { ADD_LAYER_MENU, groupAddItemId, isAddLayerItemAvailable } from './addLayerMenu';
 
 describe('ADD_LAYER_MENU', () => {
   it('splits into the legacy Regional / Layers groups in order', () => {
@@ -28,6 +28,14 @@ describe('ADD_LAYER_MENU', () => {
         expect(item.labelKey.startsWith('widgets.layers.actions.')).toBe(true);
       }
     }
+  });
+});
+
+describe('isAddLayerItemAvailable', () => {
+  it('hides only regional reference-image creation for FLUX.2', () => {
+    expect(isAddLayerItemAvailable('regional_reference_image', 'flux2')).toBe(false);
+    expect(isAddLayerItemAvailable('regional_guidance', 'flux2')).toBe(true);
+    expect(isAddLayerItemAvailable('regional_reference_image', 'flux')).toBe(true);
   });
 });
 

@@ -591,6 +591,7 @@ const buildFlux2Graph = (
       ])
     : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'flux2_klein_text_encoder' });
+  const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
   const denoise = addNode(graph, {
     cfg_scale: 1,
     denoising_end: 1,
@@ -611,7 +612,8 @@ const buildFlux2Graph = (
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
-  addEdge(graph, posCond, 'conditioning', denoise, 'positive_text_conditioning');
+  addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
+  addEdge(graph, posCondCollect, 'collection', denoise, 'positive_text_conditioning');
   addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
   addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
   addEdge(graph, denoise, 'latents', output, 'latents');

@@ -5,7 +5,9 @@
  * request, so an identity change applies without a reload.
  */
 
-const API_BASE_URL = import.meta.env.VITE_INVOKEAI_API_BASE_URL ?? '';
+import { getDeploymentBasePath, getDeploymentBaseUrl } from './deploymentBase';
+
+const API_BASE_URL = (import.meta.env.VITE_INVOKEAI_API_BASE_URL ?? '').trim().replace(/\/$/, '');
 export interface HttpAuthAdapter {
   getToken(): string | null;
   onUnauthorized(): void;
@@ -26,22 +28,36 @@ export const getHttpAuthToken = (): string | null => authAdapter.getToken();
  * stays unaware of session semantics.
  */
 export const getBackendSocketUrl = (): string => {
-  if (!API_BASE_URL.trim()) {
-    return window.location.origin;
-  }
+  const baseUrl = API_BASE_URL || getDeploymentBaseUrl();
 
-  return new URL(API_BASE_URL, window.location.origin).origin;
+  return new URL(baseUrl, getDeploymentBaseUrl()).origin;
 };
 
-export const buildApiUrl = (path: string): string => `${API_BASE_URL}${path}`;
+export const getBackendSocketPath = (): string => {
+  if (!API_BASE_URL) {
+    return `${getDeploymentBasePath()}/ws/socket.io`;
+  }
+
+  const pathname = new URL(API_BASE_URL, getDeploymentBaseUrl()).pathname.replace(/\/$/, '');
+
+  return `${pathname === '/' ? '' : pathname}/ws/socket.io`;
+};
+
+export const buildApiUrl = (path: string): string => `${API_BASE_URL || getDeploymentBaseUrl()}${path}`;
 
 /** Resolve a backend-relative resource URL (e.g. image URLs in DTOs) against the API host. */
 export const absolutizeApiUrl = (url: string): string => {
-  if (!API_BASE_URL || url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
+  try {
+    const parsed = new URL(url);
+
+    if (parsed.protocol) {
+      return url;
+    }
+  } catch {
+    // Relative URL — resolve it against the backend deployment root below.
   }
 
-  return new URL(url, API_BASE_URL).toString();
+  return url.startsWith('/') ? buildApiUrl(url) : new URL(url, `${API_BASE_URL || getDeploymentBaseUrl()}/`).toString();
 };
 
 export class ApiError extends Error {

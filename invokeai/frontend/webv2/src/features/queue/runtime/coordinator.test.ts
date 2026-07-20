@@ -60,6 +60,19 @@ class FakeSocket implements BackendSocket {
 }
 
 const createStatusEvent = (overrides: Partial<QueueItemStatusChangedEvent>): QueueItemStatusChangedEvent => ({
+  batch_status: {
+    batch_id: 'batch-1',
+    canceled: 0,
+    completed: 0,
+    destination: 'gallery',
+    failed: 0,
+    in_progress: 1,
+    origin: null,
+    pending: 0,
+    queue_id: 'default',
+    total: 1,
+    waiting: 0,
+  },
   batch_id: 'batch-1',
   completed_at: null,
   created_at: '2026-06-10T00:00:00Z',
@@ -73,7 +86,25 @@ const createStatusEvent = (overrides: Partial<QueueItemStatusChangedEvent>): Que
   session_id: 'session-1',
   started_at: null,
   status: 'completed',
+  status_sequence: 1,
+  timestamp: 1,
   updated_at: '2026-06-10T00:00:00Z',
+  user_id: 'user-1',
+  queue_status: {
+    batch_id: 'batch-1',
+    canceled: 0,
+    completed: 0,
+    failed: 0,
+    in_progress: 1,
+    item_id: 1,
+    pending: 0,
+    queue_id: 'default',
+    session_id: 'session-1',
+    total: 1,
+    user_in_progress: 1,
+    user_pending: 0,
+    waiting: 0,
+  },
   ...overrides,
 });
 
@@ -302,6 +333,62 @@ describe('queueCoordinator', () => {
 
     await expect(resultsPromise).rejects.toBeInstanceOf(QueueItemCancelledError);
     expect(harness.api.getResultImages).not.toHaveBeenCalled();
+  });
+
+  it('settles tracked items from an owner-scoped bulk cancellation event', async () => {
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.socket.fire('queue_items_canceled', {
+      canceled_item_ids: [1],
+      canceled_item_ids_by_user: { 'user-1': [1] },
+      queue_id: 'default',
+      timestamp: 1,
+      user_ids: ['user-1'],
+    });
+
+    await expect(resultsPromise).rejects.toBeInstanceOf(QueueItemCancelledError);
+  });
+
+  it('does not settle tracked items from a sanitized bulk cancellation companion', async () => {
+    harness.callbacks.onBackendItemCancelled = vi.fn();
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+
+    harness.socket.fire('queue_items_canceled', {
+      canceled_item_ids: [],
+      canceled_item_ids_by_user: {},
+      queue_id: 'default',
+      timestamp: 1,
+      user_ids: [],
+    });
+
+    expect(harness.callbacks.onBackendItemCancelled).not.toHaveBeenCalled();
+  });
+
+  it('ignores stale status events by status sequence', async () => {
+    harness.callbacks.onBackendItemCancelled = vi.fn();
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ item_id: 1, status: 'in_progress', status_sequence: 2 })
+    );
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ item_id: 1, status: 'canceled', status_sequence: 1 })
+    );
+
+    expect(harness.callbacks.onBackendItemCancelled).not.toHaveBeenCalled();
+
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ item_id: 1, status: 'canceled', status_sequence: 3 })
+    );
+    await expect(resultsPromise).rejects.toBeInstanceOf(QueueItemCancelledError);
   });
 
   it('settles runs whose terminal event arrived before tracking began', async () => {

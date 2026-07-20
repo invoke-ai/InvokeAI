@@ -3,9 +3,7 @@ import { io } from 'socket.io-client';
 import type { BackendConnectionStatus } from './types';
 
 import { setConnectionStatus } from './connectionStore';
-import { getBackendSocketUrl, getHttpAuthToken } from './http';
-
-const SOCKET_PATH = '/ws/socket.io';
+import { getBackendSocketPath, getBackendSocketUrl, getHttpAuthToken } from './http';
 
 /**
  * The minimal Socket.IO surface the hub uses; tests substitute a fake.
@@ -46,7 +44,7 @@ const createDefaultSocket = (): BackendSocket => {
     auth: token ? { token } : undefined,
     autoConnect: false,
     extraHeaders: token ? { Authorization: `Bearer ${token}` } : undefined,
-    path: SOCKET_PATH,
+    path: getBackendSocketPath(),
     timeout: 60000,
   }) as unknown as BackendSocket;
 };

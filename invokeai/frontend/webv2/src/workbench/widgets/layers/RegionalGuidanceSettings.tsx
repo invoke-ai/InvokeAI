@@ -98,6 +98,10 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   const fill = layer.mask.fill;
   const isFlux = base === 'flux';
+  const isFlux2 = base === 'flux2';
+  const isFluxFamily = isFlux || isFlux2;
+  const showNegativeControls = !isFluxFamily || Boolean(layer.negativePrompt) || layer.autoNegative;
+  const showReferenceImages = !isFlux2 || layer.referenceImages.length > 0;
 
   const commitConfig = useCallback(
     (label: string, next: RegionalConfigPatch, before: RegionalConfigPatch) => {
@@ -335,6 +339,11 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   return (
     <Stack gap="2" onKeyDown={stopKeyboardPropagation}>
+      {isFlux2 && (
+        <Text color="fg.warning" fontSize="xs" role="alert">
+          {t('widgets.layers.regionalGuidance.flux2PositiveOnly')}
+        </Text>
+      )}
       <Field label={t('widgets.layers.regionalGuidance.positivePrompt')}>
         <PromptTextarea
           {...PROMPT_ATTENTION_TARGET_PROPS}
@@ -350,7 +359,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           onChange={handlePositiveChange}
         />
       </Field>
-      {!isFlux && (
+      {showNegativeControls && (
         <Field label={t('widgets.layers.regionalGuidance.negativePrompt')}>
           <PromptTextarea
             {...PROMPT_ATTENTION_TARGET_PROPS}
@@ -367,7 +376,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           />
         </Field>
       )}
-      {!isFlux && (
+      {showNegativeControls && (
         <Switch.Root checked={layer.autoNegative} size="sm" onCheckedChange={handleAutoNegative}>
           <Switch.HiddenInput />
           <Switch.Control>
@@ -404,37 +413,41 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         {t('widgets.layers.maskFill.invert')}
       </Button>
 
-      <Stack gap="2">
-        <HStack justify="space-between">
-          <Text fontSize="xs" fontWeight="medium">
-            {t('widgets.layers.regionalGuidance.referenceImages')}
-          </Text>
-          <IconButton
-            aria-label={t('widgets.layers.regionalGuidance.addReferenceImage')}
-            size="2xs"
-            variant="ghost"
-            onClick={handleAddReferenceImage}
-          >
-            <PlusIcon />
-          </IconButton>
-        </HStack>
-        {referenceImages.map((ref, index) => (
-          <ReferenceImageRow
-            dropId={referenceImageDropId(layer.id, ref.id)}
-            index={index}
-            ipAdapterModelCollection={ipAdapterModelCollection}
-            fluxReduxModelCollection={fluxReduxModelCollection}
-            key={ref.id}
-            methodCollection={methodCollection}
-            models={models}
-            referenceImage={ref}
-            referenceImages={referenceImages}
-            onCommit={commitReferenceImages}
-            onSetImage={setReferenceImageAsset}
-            onUpload={uploadReferenceImageAsset}
-          />
-        ))}
-      </Stack>
+      {showReferenceImages && (
+        <Stack gap="2">
+          <HStack justify="space-between">
+            <Text fontSize="xs" fontWeight="medium">
+              {t('widgets.layers.regionalGuidance.referenceImages')}
+            </Text>
+            {!isFlux2 && (
+              <IconButton
+                aria-label={t('widgets.layers.regionalGuidance.addReferenceImage')}
+                size="2xs"
+                variant="ghost"
+                onClick={handleAddReferenceImage}
+              >
+                <PlusIcon />
+              </IconButton>
+            )}
+          </HStack>
+          {referenceImages.map((ref, index) => (
+            <ReferenceImageRow
+              dropId={referenceImageDropId(layer.id, ref.id)}
+              index={index}
+              ipAdapterModelCollection={ipAdapterModelCollection}
+              fluxReduxModelCollection={fluxReduxModelCollection}
+              key={ref.id}
+              methodCollection={methodCollection}
+              models={models}
+              referenceImage={ref}
+              referenceImages={referenceImages}
+              onCommit={commitReferenceImages}
+              onSetImage={setReferenceImageAsset}
+              onUpload={uploadReferenceImageAsset}
+            />
+          ))}
+        </Stack>
+      )}
     </Stack>
   );
 };

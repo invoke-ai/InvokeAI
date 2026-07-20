@@ -29,12 +29,12 @@ export const getQueueHeaderCancelState = ({
  */
 export const QueueHeaderActions = () => {
   const { t } = useTranslation();
-  const { isConnected, notify } = useQueueUi();
+  const { canManageItem, isConnected, notify } = useQueueUi();
   const { current } = useNowNextItems();
   const [busy, setBusy] = useState(false);
   const currentItemId = current?.id ?? null;
   const { disabled, itemLabel } = getQueueHeaderCancelState({
-    currentStatus: current?.status ?? null,
+    currentStatus: current && canManageItem(current) ? current.status : null,
     isConnected,
   });
 

@@ -68,6 +68,30 @@ const fluxBaseGraph = (): TestGraph => ({
   },
 });
 
+/** A minimal FLUX.2 graph with the collector seam used by regional conditioning. */
+const flux2BaseGraph = (): TestGraph => ({
+  edges: [
+    {
+      destination: { field: 'qwen3_encoder', node_id: 'pos_cond' },
+      source: { field: 'qwen3_encoder', node_id: 'model_loader' },
+    },
+    {
+      destination: { field: 'max_seq_len', node_id: 'pos_cond' },
+      source: { field: 'max_seq_len', node_id: 'model_loader' },
+    },
+    {
+      destination: { field: 'positive_text_conditioning', node_id: 'denoise_latents' },
+      source: { field: 'collection', node_id: 'pos_cond_collect' },
+    },
+  ],
+  id: 'g',
+  nodes: {
+    denoise_latents: { id: 'denoise_latents', type: 'flux2_denoise' },
+    pos_cond: { id: 'pos_cond', type: 'flux2_klein_text_encoder' },
+    pos_cond_collect: { id: 'pos_cond_collect', type: 'collect' },
+  },
+});
+
 const ipModel = (base: string): RegionalReferenceModel => ({
   base,
   key: `ip-${base}`,
@@ -97,12 +121,25 @@ const hasEdge = (graph: TestGraph, s: string, sf: string, d: string, df: string)
   );
 
 describe('isRegionalGuidanceSupportedForBase', () => {
-  it('supports sd-1 / sdxl / flux and nothing else', () => {
+  it('supports sd-1 / sdxl / flux / flux2 and nothing else', () => {
     expect(isRegionalGuidanceSupportedForBase('sd-1')).toBe(true);
     expect(isRegionalGuidanceSupportedForBase('sdxl')).toBe(true);
     expect(isRegionalGuidanceSupportedForBase('flux')).toBe(true);
+    expect(isRegionalGuidanceSupportedForBase('flux2')).toBe(true);
     expect(isRegionalGuidanceSupportedForBase('sd-3')).toBe(false);
     expect(isRegionalGuidanceSupportedForBase('cogview4')).toBe(false);
+  });
+});
+
+describe('addRegionalGuidance — FLUX.2 Klein', () => {
+  it('creates mask-scoped positive conditioning and copies Qwen3 inputs', () => {
+    const g = run(flux2BaseGraph(), { base: 'flux2', regions: [region()] });
+
+    expect(g.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_klein_text_encoder' });
+    expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_pos_cond_r1', 'mask')).toBe(true);
+    expect(hasEdge(g, 'model_loader', 'qwen3_encoder', 'rg_pos_cond_r1', 'qwen3_encoder')).toBe(true);
+    expect(hasEdge(g, 'model_loader', 'max_seq_len', 'rg_pos_cond_r1', 'max_seq_len')).toBe(true);
+    expect(hasEdge(g, 'rg_pos_cond_r1', 'conditioning', 'pos_cond_collect', 'item')).toBe(true);
   });
 });
 
@@ -307,6 +344,18 @@ describe('getRegionalGuidanceRejectionReason', () => {
     );
     expect(getRegionalGuidanceRejectionReason({ ...params, autoNegative: true, mainBase: 'flux' })).toMatch(
       /auto-negative is not supported for FLUX/
+    );
+  });
+
+  it('rejects FLUX.2 negative prompts, autoNegative, and reference images', () => {
+    expect(getRegionalGuidanceRejectionReason({ ...params, mainBase: 'flux2', negativePrompt: 'blurry' })).toMatch(
+      /negative prompts are not supported for FLUX\.2/
+    );
+    expect(getRegionalGuidanceRejectionReason({ ...params, autoNegative: true, mainBase: 'flux2' })).toMatch(
+      /auto-negative is not supported for FLUX\.2/
+    );
+    expect(getRegionalGuidanceRejectionReason({ ...params, mainBase: 'flux2', referenceImageCount: 1 })).toMatch(
+      /reference images are not supported for FLUX\.2/
     );
   });
 });

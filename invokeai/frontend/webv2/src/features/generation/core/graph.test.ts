@@ -278,6 +278,14 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'negative_text_conditioning')).toBeUndefined();
   });
 
+  it('routes FLUX.2 positive conditioning through a stable collector', () => {
+    const graph = compile(flux2Model);
+
+    expect(graph.nodes.pos_cond_collect?.type).toBe('collect');
+    expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, 'denoise_latents', 'positive_text_conditioning')?.source.node_id).toBe('pos_cond_collect');
+  });
+
   it('rejects a stale incompatible FLUX.2 component source when Qwen3 is missing', () => {
     expect(() => compile(flux2Klein9bModel, { componentSourceModel: incompatibleFlux2Source, vae: flux2Vae })).toThrow(
       'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'

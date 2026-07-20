@@ -16,6 +16,8 @@ export interface QueueUiAdapter {
   ItemActions: ComponentType<{ item: QueueItemReadModel }>;
   activeProjectId: string | null;
   canManageProcessor: boolean;
+  canManageItem(item: QueueItemReadModel): boolean;
+  canViewItemDetails(item: QueueItemReadModel): boolean;
   isConnected: boolean;
   notify: QueueUiNotificationPort;
   openQueue(): void;

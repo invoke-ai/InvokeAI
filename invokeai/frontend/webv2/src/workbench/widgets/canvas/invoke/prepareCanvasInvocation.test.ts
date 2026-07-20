@@ -1011,6 +1011,10 @@ describe('resolveRegionalReferenceImages', () => {
     expect(inputs[0]).toMatchObject({ id: 'ref-ipa', imageName: 'ref.png', type: 'ip_adapter' });
   });
 
+  it('drops regional reference images for FLUX.2', () => {
+    expect(resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(asset)] }, 'flux2')).toEqual([]);
+  });
+
   it('drops a FLUX Redux ref with no image assigned', () => {
     expect(resolveRegionalReferenceImages({ referenceImages: [fluxReduxRef(null)] }, 'flux')).toEqual([]);
   });

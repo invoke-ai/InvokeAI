@@ -102,7 +102,7 @@ export interface QueueResultImage {
   width: number;
 }
 
-export type QueueItemStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'canceled';
+export type QueueItemStatus = 'pending' | 'in_progress' | 'waiting' | 'completed' | 'failed' | 'canceled';
 export type TerminalQueueItemStatus = Extract<QueueItemStatus, 'completed' | 'failed' | 'canceled'>;
 export type QueueConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -134,6 +134,9 @@ export interface QueueItemReadModel {
   startedAt?: string | null;
   status: QueueItemStatus;
   updatedAt: string;
+  userDisplayName?: string | null;
+  userEmail?: string | null;
+  userId?: string;
 }
 
 export interface QueueCounts {
@@ -147,7 +150,21 @@ export interface QueueCounts {
   queueId: string;
   sessionId?: string | null;
   total: number;
+  userInProgress?: number | null;
+  userPending?: number | null;
+  waiting: number;
 }
+
+export interface PersonalQueueActivity {
+  inProgress: number;
+  pending: number;
+}
+
+/** Active counts for the signed-in user, falling back to global counts in single-user mode. */
+export const getPersonalQueueActivity = (counts: QueueCounts): PersonalQueueActivity => ({
+  inProgress: counts.userInProgress ?? counts.inProgress,
+  pending: counts.userPending ?? counts.pending,
+});
 
 export interface QueueProcessorReadModel {
   isProcessing: boolean;

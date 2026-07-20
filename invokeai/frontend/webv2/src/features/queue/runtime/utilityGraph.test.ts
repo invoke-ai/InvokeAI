@@ -59,6 +59,8 @@ const completeEvent = (overrides: Partial<InvocationCompleteEvent> = {}): Invoca
   queue_id: 'default',
   result: { height: 48, image: { image_name: 'filtered.png' }, type: 'image_output', width: 64 },
   session_id: 's',
+  timestamp: 1,
+  user_id: 'user-1',
   ...overrides,
 });
 
@@ -66,6 +68,19 @@ const statusEvent = (
   status: QueueItemStatusChangedEvent['status'],
   overrides: Partial<QueueItemStatusChangedEvent> = {}
 ): QueueItemStatusChangedEvent => ({
+  batch_status: {
+    batch_id: 'b',
+    canceled: 0,
+    completed: 0,
+    destination: null,
+    failed: 0,
+    in_progress: 1,
+    origin: ORIGIN,
+    pending: 0,
+    queue_id: 'default',
+    total: 1,
+    waiting: 0,
+  },
   batch_id: 'b',
   completed_at: null,
   created_at: '',
@@ -79,7 +94,25 @@ const statusEvent = (
   session_id: 's',
   started_at: null,
   status,
+  status_sequence: 1,
+  timestamp: 1,
   updated_at: '',
+  user_id: 'user-1',
+  queue_status: {
+    batch_id: 'b',
+    canceled: 0,
+    completed: 0,
+    failed: 0,
+    in_progress: 1,
+    item_id: 1,
+    pending: 0,
+    queue_id: 'default',
+    session_id: 's',
+    total: 1,
+    user_in_progress: 1,
+    user_pending: 0,
+    waiting: 0,
+  },
   ...overrides,
 });
 
