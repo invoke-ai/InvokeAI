@@ -158,9 +158,7 @@ async def test_model_install_events_are_emitted_only_to_admins() -> None:
     socketio = SocketIO(FastAPI())
     socketio._sio.emit = AsyncMock()
 
-    event = ModelInstallStartedEvent(
-        id=1, source={"type": "url", "url": "https://example.com/model.safetensors"}
-    )
+    event = ModelInstallStartedEvent(id=1, source={"type": "url", "url": "https://example.com/model.safetensors"})
 
     await socketio._handle_model_event(("model_install_started", event))
 
