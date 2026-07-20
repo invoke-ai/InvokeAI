@@ -193,6 +193,21 @@ describe('loadWorkbench session hydration', () => {
     expect(second.hasPendingChanges()).toBe(false);
   });
 
+  it('shares one backend import across StrictMode-style load replays', async () => {
+    const state = createInitialWorkbenchState();
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state, version: 1 })
+    );
+
+    const [first, replay] = await Promise.all([service.loadWorkbench(), service.loadWorkbench()]);
+
+    expect(replay).toBe(first);
+    expect(api.listProjects).toHaveBeenCalledTimes(1);
+    expect(api.createProject).toHaveBeenCalledTimes(state.projects.length);
+    expect(api.getProject).not.toHaveBeenCalled();
+  });
+
   it('hydrates only the open set and seeds the full library', async () => {
     const first = seedServerProject('First');
     const second = seedServerProject('Second');

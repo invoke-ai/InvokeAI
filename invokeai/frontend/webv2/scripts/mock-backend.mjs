@@ -59,6 +59,9 @@ export const startMockBackend = async (port) => {
       }
       if (method === 'POST') {
         const requested = JSON.parse((await readBody(request)) || '{}');
+        if (requested.project_id && state.projects.has(requested.project_id)) {
+          return json(409, { detail: 'Project already exists' });
+        }
         const now = timestamp();
         const project = {
           created_at: now,

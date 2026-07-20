@@ -621,6 +621,7 @@ export const clearAllWorkbenchData = async (): Promise<void> => {
 /** Construct one synchronization lifetime per mounted Workbench. */
 export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence => {
   const syncState = createSyncedPersistenceState();
+  let loadPromise: Promise<HydratedWorkbenchSnapshot | null> | null = null;
 
   const adoptProjectRecord = (record: ProjectRecordDTO): Project | null => {
     const project = deserializeProjectDocument(record.data);
@@ -670,42 +671,53 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
      * unreachable. Returns null when there is nothing anywhere (first run with
      * no backend); the caller then keeps its default boot state.
      */
-    async loadWorkbench(options?: WorkbenchLoadOptions): Promise<HydratedWorkbenchSnapshot | null> {
-      let local: HydratedWorkbenchSnapshot | null = null;
-
-      try {
-        local = await localStorageWorkbenchPersistence.loadWorkbench();
-      } catch {
-        local = null;
+    loadWorkbench(options?: WorkbenchLoadOptions): Promise<HydratedWorkbenchSnapshot | null> {
+      // React StrictMode replays the Workbench mount effect. The synchronization
+      // lifetime is stable across that replay, so both calls must observe the
+      // same import instead of racing duplicate project POSTs.
+      if (loadPromise) {
+        return loadPromise;
       }
 
-      try {
-        return await loadFromBackend(syncState, local, options);
-      } catch {
-        // Backend unreachable: run from the cache; saves queue up locally and
-        // replay on reconnect.
-        syncState.hasPending = true;
+      loadPromise = (async () => {
+        let local: HydratedWorkbenchSnapshot | null = null;
 
-        const persistedRevisions = loadPersistedRevisions();
-
-        for (const [projectId, revision] of Object.entries(persistedRevisions)) {
-          syncState.syncEntries.set(projectId, { pushedDoc: null, revision });
+        try {
+          local = await localStorageWorkbenchPersistence.loadWorkbench();
+        } catch {
+          local = null;
         }
 
-        reportProjectSync({
-          hasPendingChanges: true,
-          projects: Object.fromEntries(
-            (local?.state.projects ?? []).map((project) => [
-              project.id,
-              { isPendingPush: true, revision: persistedRevisions[project.id] ?? null },
-            ])
-          ),
-        });
+        try {
+          return await loadFromBackend(syncState, local, options);
+        } catch {
+          // Backend unreachable: run from the cache; saves queue up locally and
+          // replay on reconnect.
+          syncState.hasPending = true;
 
-        // A cache holding an empty session (last tab closed offline) cannot
-        // hydrate the editor; boot a fresh draft instead.
-        return local && local.state.projects.length > 0 ? local : null;
-      }
+          const persistedRevisions = loadPersistedRevisions();
+
+          for (const [projectId, revision] of Object.entries(persistedRevisions)) {
+            syncState.syncEntries.set(projectId, { pushedDoc: null, revision });
+          }
+
+          reportProjectSync({
+            hasPendingChanges: true,
+            projects: Object.fromEntries(
+              (local?.state.projects ?? []).map((project) => [
+                project.id,
+                { isPendingPush: true, revision: persistedRevisions[project.id] ?? null },
+              ])
+            ),
+          });
+
+          // A cache holding an empty session (last tab closed offline) cannot
+          // hydrate the editor; boot a fresh draft instead.
+          return local && local.state.projects.length > 0 ? local : null;
+        }
+      })();
+
+      return loadPromise;
     },
 
     /**
