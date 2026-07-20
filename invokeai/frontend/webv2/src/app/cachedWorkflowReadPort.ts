@@ -10,6 +10,8 @@ export const createCachedWorkflowReadPort = <Source, Snapshot>(
 ): WorkflowReadPort<Snapshot> => {
   let sourceSnapshot = getSourceSnapshot();
   let snapshot = mapSnapshot(sourceSnapshot);
+  const listeners = new Set<() => void>();
+  let unsubscribeSource: (() => void) | null = null;
 
   const refresh = (): boolean => {
     const nextSourceSnapshot = getSourceSnapshot();
@@ -25,16 +27,32 @@ export const createCachedWorkflowReadPort = <Source, Snapshot>(
     return true;
   };
 
+  const notifyIfChanged = (): void => {
+    if (!refresh()) {
+      return;
+    }
+
+    for (const listener of listeners) {
+      listener();
+    }
+  };
+
   return {
     getSnapshot: () => {
       refresh();
       return snapshot;
     },
-    subscribe: (listener) =>
-      subscribe(() => {
-        if (refresh()) {
-          listener();
+    subscribe: (listener) => {
+      listeners.add(listener);
+      unsubscribeSource ??= subscribe(notifyIfChanged);
+
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0) {
+          unsubscribeSource?.();
+          unsubscribeSource = null;
         }
-      }),
+      };
+    },
   };
 };

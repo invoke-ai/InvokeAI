@@ -1,8 +1,8 @@
-import { Flex, HStack, Icon, SegmentGroup, Splitter } from '@chakra-ui/react';
+import { Flex, HStack, Icon, Splitter } from '@chakra-ui/react';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useWorkflowHostCommands, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { Scrollable, Tabs } from '@platform/ui';
+import { Button, Scrollable, Tabs } from '@platform/ui';
 import { EyeIcon, PencilIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -64,28 +64,66 @@ export const getWorkflowPanelState = (values: Record<string, unknown>): Workflow
 export const areWorkflowPanelStatesEqual = (left: WorkflowPanelState, right: WorkflowPanelState): boolean =>
   left.mode === right.mode && left.editTab === right.editTab && left.inspectorSizePct === right.inspectorSizePct;
 
-const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) => {
+export const PanelModeToggle = ({
+  mode: currentMode,
+  onChange,
+}: {
+  mode: PanelMode;
+  onChange: (mode: PanelMode) => void;
+}) => {
   const { t } = useTranslation();
-  const onValueChange = useCallback(
-    (details: { value: string | null }) => {
-      if (details.value === 'view' || details.value === 'edit') {
-        onChange(details.value);
-      }
-    },
-    [onChange]
-  );
 
   return (
-    <SegmentGroup.Root value={mode} onValueChange={onValueChange} size="xs">
-      <SegmentGroup.Indicator />
-      {PANEL_MODES.map(({ labelKey, icon, mode }) => (
-        <SegmentGroup.Item key={mode} value={mode}>
-          <SegmentGroup.ItemHiddenInput />
-          <Icon as={icon} boxSize="3" />
-          <SegmentGroup.ItemText>{t(labelKey)}</SegmentGroup.ItemText>
-        </SegmentGroup.Item>
+    <HStack
+      aria-label="Workflow panel mode"
+      borderColor="border"
+      borderRadius="md"
+      borderWidth="1px"
+      gap="0"
+      overflow="hidden"
+      role="group"
+    >
+      {PANEL_MODES.map(({ labelKey, icon, mode: itemMode }) => (
+        <PanelModeButton
+          key={itemMode}
+          currentMode={currentMode}
+          icon={icon}
+          label={t(labelKey)}
+          mode={itemMode}
+          onChange={onChange}
+        />
       ))}
-    </SegmentGroup.Root>
+    </HStack>
+  );
+};
+
+const PanelModeButton = ({
+  currentMode,
+  icon,
+  label,
+  mode,
+  onChange,
+}: {
+  currentMode: PanelMode;
+  icon: typeof EyeIcon;
+  label: string;
+  mode: PanelMode;
+  onChange: (mode: PanelMode) => void;
+}) => {
+  const onClick = useCallback(() => onChange(mode), [mode, onChange]);
+
+  return (
+    <Button
+      aria-pressed={mode === currentMode}
+      borderRadius="0"
+      colorPalette={mode === currentMode ? 'accent' : 'bg'}
+      size="xs"
+      variant={mode === currentMode ? 'solid' : 'ghost'}
+      onClick={onClick}
+    >
+      <Icon as={icon} boxSize="3" />
+      {label}
+    </Button>
   );
 };
 
