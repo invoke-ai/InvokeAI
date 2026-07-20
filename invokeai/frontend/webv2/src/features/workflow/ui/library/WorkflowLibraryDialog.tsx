@@ -1,7 +1,7 @@
 /* eslint-disable react/react-compiler, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { ProjectGraphState } from '@features/workflow/contracts';
 
-import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Stack, Tabs, Text } from '@chakra-ui/react';
+import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Spinner, Stack, Tabs, Text } from '@chakra-ui/react';
 import {
   createLibraryWorkflow,
   deleteLibraryWorkflow,
@@ -35,7 +35,10 @@ interface WorkflowPreviewState {
   document: ProjectGraphState;
   item: WorkflowLibraryListItem;
   raw: Record<string, unknown>;
+  warnings: string[];
 }
+
+type WorkflowLoadPhase = 'fetching' | 'applying';
 
 const WorkflowPreviewPane = ({
   isLoadingWorkflow,
@@ -109,13 +112,15 @@ export const WorkflowLibraryDialog = ({
   const [pages, setPages] = useState(0);
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingWorkflowId, setLoadingWorkflowId] = useState<string | null>(null);
+  const [workflowLoad, setWorkflowLoad] = useState<{ id: string; phase: WorkflowLoadPhase } | null>(null);
   const [previewingWorkflowId, setPreviewingWorkflowId] = useState<string | null>(null);
   const [preview, setPreview] = useState<WorkflowPreviewState | null>(null);
   const [pendingDelete, setPendingDelete] = useState<WorkflowLibraryListItem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const hasAutoSwitchedRef = useRef(false);
   const refreshTokenRef = useRef(0);
+  const workflowLoadInFlightRef = useRef(false);
+  const isWorkflowLoadPending = workflowLoad !== null;
 
   const refresh = useCallback(
     (nextPage: number) => {
@@ -181,30 +186,45 @@ export const WorkflowLibraryDialog = ({
     return { document, raw, warnings };
   };
 
-  const applyLoadedWorkflow = (item: WorkflowLibraryListItem, document: ProjectGraphState, warnings: string[]) => {
-    replace(document, `Loaded "${item.name}" from library`);
-
-    for (const warning of warnings) {
-      notify.info('Workflow load warning', warning);
+  const loadWorkflow = async (
+    item: WorkflowLibraryListItem,
+    loaded?: { document: ProjectGraphState; warnings: string[] }
+  ) => {
+    if (workflowLoadInFlightRef.current) {
+      return;
     }
-
-    void touchLibraryWorkflowOpenedAt(item.workflow_id).catch(() => {
-      // Recency bookkeeping only; loading already succeeded.
-    });
-    onOpenChange(false);
-  };
-
-  const loadWorkflow = async (item: WorkflowLibraryListItem) => {
-    setLoadingWorkflowId(item.workflow_id);
+    workflowLoadInFlightRef.current = true;
 
     try {
-      const { document, warnings } = await fetchParsedWorkflow(item);
+      let parsed = loaded;
 
-      applyLoadedWorkflow(item, document, warnings);
+      if (!parsed) {
+        setWorkflowLoad({ id: item.workflow_id, phase: 'fetching' });
+        parsed = await fetchParsedWorkflow(item);
+      }
+
+      setWorkflowLoad({ id: item.workflow_id, phase: 'applying' });
+      // Synchronous graph replacement can be expensive for large workflows.
+      // Give React a full frame to commit and paint the busy overlay first.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+
+      replace(parsed.document, `Loaded "${item.name}" from library`);
+
+      for (const warning of parsed.warnings) {
+        notify.info('Workflow load warning', warning);
+      }
+
+      void touchLibraryWorkflowOpenedAt(item.workflow_id).catch(() => {
+        // Recency bookkeeping only; loading already succeeded.
+      });
+      onOpenChange(false);
     } catch (error) {
       notify.error('Failed to load workflow', getApiErrorMessage(error, `Could not load "${item.name}".`));
     } finally {
-      setLoadingWorkflowId(null);
+      workflowLoadInFlightRef.current = false;
+      setWorkflowLoad(null);
     }
   };
 
@@ -212,9 +232,9 @@ export const WorkflowLibraryDialog = ({
     setPreviewingWorkflowId(item.workflow_id);
 
     try {
-      const { document, raw } = await fetchParsedWorkflow(item);
+      const { document, raw, warnings } = await fetchParsedWorkflow(item);
 
-      setPreview({ document, item, raw });
+      setPreview({ document, item, raw, warnings });
     } catch (error) {
       notify.error('Failed to preview workflow', getApiErrorMessage(error, `Could not preview "${item.name}".`));
     } finally {
@@ -249,11 +269,44 @@ export const WorkflowLibraryDialog = ({
 
   return (
     <>
-      <Dialog.Root placement="center" open={isOpen} size="lg" onOpenChange={(event) => onOpenChange(event.open)}>
+      <Dialog.Root
+        placement="center"
+        open={isOpen}
+        size="lg"
+        onOpenChange={(event) => {
+          if (!isWorkflowLoadPending) {
+            onOpenChange(event.open);
+          }
+        }}
+      >
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
+            <Dialog.Content
+              aria-busy={isWorkflowLoadPending}
+              bg="bg.subtle"
+              borderColor="border.subtle"
+              borderWidth="1px"
+              color="fg"
+              position="relative"
+            >
+              {workflowLoad ? (
+                <Stack
+                  alignItems="center"
+                  aria-live="polite"
+                  bg="bg/85"
+                  inset="0"
+                  justifyContent="center"
+                  position="absolute"
+                  role="status"
+                  zIndex="modal"
+                >
+                  <Spinner color="accent.solid" size="lg" />
+                  <Text fontSize="xs" fontWeight="600">
+                    {workflowLoad.phase === 'fetching' ? 'Fetching workflow…' : 'Applying workflow…'}
+                  </Text>
+                </Stack>
+              ) : null}
               <Dialog.Header>
                 <Dialog.Title fontSize="sm" fontWeight="700">
                   Workflow Library
@@ -262,10 +315,10 @@ export const WorkflowLibraryDialog = ({
               <Dialog.Body>
                 {preview ? (
                   <WorkflowPreviewPane
-                    isLoadingWorkflow={loadingWorkflowId === preview.item.workflow_id}
+                    isLoadingWorkflow={workflowLoad?.id === preview.item.workflow_id}
                     preview={preview}
                     onBack={() => setPreview(null)}
-                    onLoad={() => applyLoadedWorkflow(preview.item, preview.document, [])}
+                    onLoad={() => void loadWorkflow(preview.item, preview)}
                   />
                 ) : (
                   <Stack gap="3">
@@ -315,7 +368,7 @@ export const WorkflowLibraryDialog = ({
                             <Box
                               as="button"
                               _focusVisible={{ outline: '2px solid {colors.accent.solid}', outlineOffset: '-2px' }}
-                              aria-disabled={previewingWorkflowId !== null}
+                              aria-disabled={previewingWorkflowId !== null || isWorkflowLoadPending}
                               cursor="pointer"
                               flex="1"
                               minW="0"
@@ -325,7 +378,7 @@ export const WorkflowLibraryDialog = ({
                               textAlign="start"
                               title={`Preview "${item.name || 'Untitled Workflow'}"`}
                               onClick={() => {
-                                if (previewingWorkflowId === null) {
+                                if (previewingWorkflowId === null && !isWorkflowLoadPending) {
                                   void previewWorkflow(item);
                                 }
                               }}
@@ -342,6 +395,7 @@ export const WorkflowLibraryDialog = ({
                               </Stack>
                             </Box>
                             <Button
+                              disabled={previewingWorkflowId !== null || isWorkflowLoadPending}
                               flexShrink={0}
                               loading={previewingWorkflowId === item.workflow_id}
                               size="2xs"
@@ -351,8 +405,9 @@ export const WorkflowLibraryDialog = ({
                               Preview
                             </Button>
                             <Button
+                              disabled={previewingWorkflowId !== null || isWorkflowLoadPending}
                               flexShrink={0}
-                              loading={loadingWorkflowId === item.workflow_id}
+                              loading={workflowLoad?.id === item.workflow_id}
                               size="2xs"
                               variant="outline"
                               onClick={() => void loadWorkflow(item)}
@@ -436,7 +491,7 @@ export const WorkflowLibraryDialog = ({
                 )}
               </Dialog.Body>
               <Dialog.CloseTrigger asChild>
-                <CloseButton color="fg.muted" size="sm" />
+                <CloseButton color="fg.muted" disabled={isWorkflowLoadPending} size="sm" />
               </Dialog.CloseTrigger>
             </Dialog.Content>
           </Dialog.Positioner>

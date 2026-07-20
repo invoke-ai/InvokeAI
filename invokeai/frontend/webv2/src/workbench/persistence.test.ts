@@ -95,6 +95,24 @@ describe('workbench persistence migration', () => {
     expect(persisted.state.notifications).toEqual([]);
   });
 
+  it('persists empty project undo and redo stacks and normalizes legacy cache entries', async () => {
+    let state = createInitialWorkbenchState();
+    state = workbenchReducer(state, {
+      sourceId: 'workflow',
+      type: 'setInvocationSource',
+    });
+    expect(state.projects[0]?.undoRedo.past.length).toBeGreaterThan(0);
+
+    const snapshot = await localStorageWorkbenchPersistence.saveWorkbench(state);
+    expect(snapshot.state.projects[0]?.undoRedo).toEqual({ future: [], past: [] });
+
+    const raw = storage.get('invokeai:v7:webv2:workbench');
+    const hydrated = await localStorageWorkbenchPersistence.loadWorkbench();
+
+    expect(raw).toBeDefined();
+    expect(hydrated?.state.projects[0]?.undoRedo).toEqual({ future: [], past: [] });
+  });
+
   it('treats localStorage quota failures as cache misses, not save failures', async () => {
     const originalSet = window.localStorage.setItem;
 

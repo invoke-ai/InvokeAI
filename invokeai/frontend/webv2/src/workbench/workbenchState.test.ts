@@ -19,6 +19,7 @@ import { createEmptyCanvasDocumentV2 } from './canvasMigration';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
+import { GRAPH_HISTORY_BYTE_BUDGET, normalizeGraphHistory } from './workbenchState';
 import {
   createInitialWorkbenchState,
   nextLayerName,
@@ -1491,6 +1492,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(project.projectGraph.id).toBe('replacement-graph');
     expect(project.graphHistory[0]?.document?.id).toBe(originalGraphId);
+    expect(project.graphHistory[0]?.retainedBytes).toBeGreaterThan(0);
+    expect(project.graphHistory[0]?.document).toBe(project.undoRedo.past.at(-1)?.project.projectGraph);
 
     state = workbenchReducer(state, {
       snapshotId: project.graphHistory[0]?.id ?? '',
@@ -1498,6 +1501,25 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     expect(getActiveProject(state).projectGraph.id).toBe(originalGraphId);
+  });
+
+  it('normalizes graph history within count and UTF-8 retained-byte budgets', () => {
+    const entries = Array.from({ length: 50 }, (_, index) => ({
+      createdAt: `2026-07-19T00:00:${String(index).padStart(2, '0')}.000Z`,
+      document: { edges: [], nodes: [], version: 1 as const },
+      id: `snapshot-${index}`,
+      label: `Snapshot ${index}`,
+      retainedBytes: 2 * 1024 * 1024,
+    }));
+    const normalized = normalizeGraphHistory(entries);
+
+    expect(normalized).toHaveLength(32);
+    expect(normalized.reduce((total, entry) => total + (entry.retainedBytes ?? 0), 0)).toBeLessThanOrEqual(
+      GRAPH_HISTORY_BYTE_BUDGET
+    );
+
+    const legacy = normalizeGraphHistory([{ ...entries[0], retainedBytes: undefined }]);
+    expect(legacy[0]?.retainedBytes).toBeGreaterThan(0);
   });
 
   it('does not queue Upscale while its required settings are incomplete', () => {

@@ -29,6 +29,13 @@ export const stripTransientWorkbenchState = (state: WorkbenchState): WorkbenchSt
   return {
     ...nextState,
     notifications: [],
+    // Project undo/redo is deliberately session-only. Normalize legacy cache
+    // snapshots immediately and never let full-project undo entries consume
+    // localStorage quota or grow across browser sessions.
+    projects: nextState.projects.map((project) => ({
+      ...project,
+      undoRedo: { future: [], past: [] },
+    })),
   };
 };
 

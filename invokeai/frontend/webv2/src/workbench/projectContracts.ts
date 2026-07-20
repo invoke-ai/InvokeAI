@@ -88,6 +88,8 @@ export interface GraphHistorySnapshot {
   id: string;
   createdAt: string;
   label: string;
+  /** UTF-8 serialized bytes retained by this snapshot, populated during creation or hydration. */
+  retainedBytes?: number;
   graph?: GraphContract;
   document?: ProjectGraphState;
 }

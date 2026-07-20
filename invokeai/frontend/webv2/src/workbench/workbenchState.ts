@@ -255,6 +255,7 @@ type WorkbenchReducerAction =
   | { type: 'recordNotice'; kind: WorkbenchNotificationKind; title: string; message?: string };
 
 const HISTORY_LIMIT = 40;
+export const GRAPH_HISTORY_BYTE_BUDGET = 64 * 1024 * 1024;
 const NOTIFICATION_LIMIT = 100;
 const MIN_PANEL_SIZE_PX = 180;
 const MAX_PANEL_SIZE_PX = 520;
@@ -801,10 +802,13 @@ const cloneWidgetGraphs = (widgetGraphs: Project['widgetGraphs']): Project['widg
 // engine owns its own pixel-patch history, so project-level undo/redo neither
 // snapshots nor restores canvas — `restoreUndoSnapshot` passes the live
 // `project.canvas` straight through via the `...project` spread.
-const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
+const createUndoSnapshot = (
+  project: Project,
+  projectGraph = cloneProjectGraph(project.projectGraph)
+): ProjectUndoSnapshot => ({
   invocation: { ...project.invocation },
   layout: { ...project.layout, panels: { ...project.layout.panels } },
-  projectGraph: cloneProjectGraph(project.projectGraph),
+  projectGraph,
   widgetGraphs: cloneWidgetGraphs(project.widgetGraphs),
   widgetInstances: cloneWidgetInstances(project.widgetInstances),
   widgetRegions: cloneWidgetRegions(project.widgetRegions),
@@ -820,22 +824,96 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
   widgetRegions: cloneWidgetRegions(snapshot.widgetRegions),
 });
 
-const createGraphHistorySnapshot = (label: string, graph: GraphContract): GraphHistorySnapshot => ({
-  createdAt: now(),
-  graph: cloneGraph(graph),
-  id: createId('graph-history'),
-  label,
+const UTF8_ENCODER = new TextEncoder();
+
+const getGraphHistorySnapshotBytes = (snapshot: GraphHistorySnapshot): number => {
+  const { retainedBytes: _retainedBytes, ...serialized } = snapshot;
+  let retainedBytes = 0;
+
+  // Include the metadata field itself in the serialized-size budget. Its digit
+  // count can change the answer, so converge on the stable JSON byte length.
+  for (;;) {
+    const nextRetainedBytes = UTF8_ENCODER.encode(JSON.stringify({ ...serialized, retainedBytes })).byteLength;
+    if (nextRetainedBytes === retainedBytes) {
+      return retainedBytes;
+    }
+    retainedBytes = nextRetainedBytes;
+  }
+};
+
+const withRetainedBytes = (snapshot: GraphHistorySnapshot): GraphHistorySnapshot => ({
+  ...snapshot,
+  retainedBytes: getGraphHistorySnapshotBytes(snapshot),
 });
+
+export const normalizeGraphHistory = (value: unknown): GraphHistorySnapshot[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const history: GraphHistorySnapshot[] = [];
+  let retainedBytes = 0;
+
+  for (const item of value) {
+    if (history.length >= HISTORY_LIMIT || !item || typeof item !== 'object') {
+      continue;
+    }
+
+    const snapshot = item as GraphHistorySnapshot;
+    if (
+      typeof snapshot.id !== 'string' ||
+      typeof snapshot.createdAt !== 'string' ||
+      typeof snapshot.label !== 'string'
+    ) {
+      continue;
+    }
+
+    const normalized =
+      typeof snapshot.retainedBytes === 'number' &&
+      Number.isFinite(snapshot.retainedBytes) &&
+      snapshot.retainedBytes >= 0
+        ? snapshot
+        : withRetainedBytes(snapshot);
+    const snapshotBytes = normalized.retainedBytes ?? 0;
+
+    if (snapshotBytes > GRAPH_HISTORY_BYTE_BUDGET || retainedBytes + snapshotBytes > GRAPH_HISTORY_BYTE_BUDGET) {
+      continue;
+    }
+
+    retainedBytes += snapshotBytes;
+    history.push(normalized);
+  }
+
+  return history;
+};
+
+const prependGraphHistory = (
+  history: readonly GraphHistorySnapshot[],
+  snapshot: GraphHistorySnapshot
+): GraphHistorySnapshot[] => normalizeGraphHistory([snapshot, ...history]);
+
+const createGraphHistorySnapshot = (label: string, graph: GraphContract): GraphHistorySnapshot =>
+  withRetainedBytes({
+    createdAt: now(),
+    graph: cloneGraph(graph),
+    id: createId('graph-history'),
+    label,
+  });
 
 /** A restorable history entry carrying the editable workflow document. */
-const createDocumentHistorySnapshot = (label: string, document: ProjectGraphState): GraphHistorySnapshot => ({
-  createdAt: now(),
-  document: cloneProjectGraph(document),
-  id: createId('graph-history'),
-  label,
-});
+const createDocumentHistorySnapshot = (
+  label: string,
+  document: ProjectGraphState,
+  cloneDocument = true
+): GraphHistorySnapshot =>
+  withRetainedBytes({
+    createdAt: now(),
+    document: cloneDocument ? cloneProjectGraph(document) : document,
+    id: createId('graph-history'),
+    label,
+  });
 
-const pushUndo = (project: Project, label: string): Project => ({
+const pushUndo = (project: Project, label: string, projectGraph?: ProjectGraphState): Project => ({
   ...project,
   undoRedo: {
     future: [],
@@ -845,7 +923,7 @@ const pushUndo = (project: Project, label: string): Project => ({
         createdAt: now(),
         id: createId('undo'),
         label,
-        project: createUndoSnapshot(project),
+        project: createUndoSnapshot(project, projectGraph),
       },
     ].slice(-HISTORY_LIMIT),
   },
@@ -1075,6 +1153,7 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
     // `project` may come straight from persisted storage (an unsafe cast boundary), so its
     // canvas can still be v1-shaped, malformed, or missing — migrate before cloning.
     canvas,
+    graphHistory: normalizeGraphHistory((project as Partial<Project>).graphHistory),
     projectGraph: normalizeProjectGraph(project.projectGraph),
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
     queue: normalizeWorkbenchQueueHistory(project.queue, { canvas, widgetInstances }),
@@ -1777,7 +1856,7 @@ const enqueueCompiledSnapshot = (
       },
       ...project.events,
     ],
-    graphHistory: [graphHistorySnapshot, ...project.graphHistory].slice(0, HISTORY_LIMIT),
+    graphHistory: prependGraphHistory(project.graphHistory, graphHistorySnapshot),
     promptHistory: generateSettings
       ? addPromptHistoryItem(project.promptHistory, getPromptHistoryItemFromGenerateSettings(generateSettings))
       : upscaleSettings
@@ -2225,8 +2304,14 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       });
     }
     case 'replaceProjectGraph': {
+      let didRetainOutgoingGraph = true;
       const nextState = updateActiveProject(state, (project) => {
-        const nextProject = pushUndo(project, 'Replace project graph');
+        // One immutable clone is shared by undo and graph history; neither
+        // snapshot path mutates the document.
+        const outgoingGraph = cloneProjectGraph(project.projectGraph);
+        const nextProject = pushUndo(project, 'Replace project graph', outgoingGraph);
+        const historySnapshot = createDocumentHistorySnapshot(`Before: ${action.label}`, outgoingGraph, false);
+        didRetainOutgoingGraph = (historySnapshot.retainedBytes ?? 0) <= GRAPH_HISTORY_BYTE_BUDGET;
 
         return {
           ...nextProject,
@@ -2239,10 +2324,7 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
             },
             ...nextProject.events,
           ],
-          graphHistory: [
-            createDocumentHistorySnapshot(`Before: ${action.label}`, project.projectGraph),
-            ...nextProject.graphHistory,
-          ].slice(0, HISTORY_LIMIT),
+          graphHistory: prependGraphHistory(nextProject.graphHistory, historySnapshot),
           projectGraph: cloneProjectGraph(action.document),
         };
       });
@@ -2252,7 +2334,9 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
         nextState,
         createNotification({
           kind: 'info',
-          message: `The previous project graph was saved to graph history.`,
+          message: didRetainOutgoingGraph
+            ? 'The previous project graph was saved to graph history.'
+            : 'The previous project graph exceeded the 64 MiB history budget, so its graph-history snapshot was skipped. Undo remains available for this session.',
           projectId: activeProject?.id,
           title: `Project graph replaced (${action.label})`,
         })
@@ -2270,13 +2354,13 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
           },
           ...project.events,
         ],
-        graphHistory: [
+        graphHistory: prependGraphHistory(
+          project.graphHistory,
           createDocumentHistorySnapshot(
             `Manual save: ${project.projectGraph.name || 'Untitled Workflow'}`,
             project.projectGraph
-          ),
-          ...project.graphHistory,
-        ].slice(0, HISTORY_LIMIT),
+          )
+        ),
       }));
     }
     case 'restoreProjectGraphSnapshot': {
@@ -2291,10 +2375,10 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
 
         return {
           ...nextProject,
-          graphHistory: [
-            createDocumentHistorySnapshot('Before restore', project.projectGraph),
-            ...nextProject.graphHistory,
-          ].slice(0, HISTORY_LIMIT),
+          graphHistory: prependGraphHistory(
+            nextProject.graphHistory,
+            createDocumentHistorySnapshot('Before restore', project.projectGraph)
+          ),
           projectGraph: cloneProjectGraph(normalizeProjectGraph(snapshot.document)),
         };
       });
