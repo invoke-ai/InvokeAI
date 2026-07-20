@@ -1475,43 +1475,6 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         return cls(**override_fields, variant=explicit_variant)
 
 
-def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
-    """Check if state dict contains Anima model keys.
-
-    Anima models are identified by the presence of `llm_adapter` keys
-    (unique to Anima - the LLM Adapter that bridges Qwen3 text encoder to the Cosmos DiT)
-    alongside Cosmos Predict2 DiT keys (blocks, t_embedder, x_embedder, final_layer).
-
-    The checkpoint keys may have a `net.` prefix (e.g. `net.llm_adapter.`, `net.blocks.`).
-    """
-    has_llm_adapter = False
-    has_cosmos_dit = False
-
-    cosmos_prefixes = (
-        "blocks.",
-        "t_embedder.",
-        "x_embedder.",
-        "final_layer.",
-        "net.blocks.",
-        "net.t_embedder.",
-        "net.x_embedder.",
-        "net.final_layer.",
-    )
-
-    for key in state_dict.keys():
-        if isinstance(key, int):
-            continue
-        if key.startswith("llm_adapter.") or key.startswith("net.llm_adapter."):
-            has_llm_adapter = True
-        for prefix in cosmos_prefixes:
-            if key.startswith(prefix):
-                has_cosmos_dit = True
-        if has_llm_adapter and has_cosmos_dit:
-            return True
-
-    return False
-
-
 class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Anima single-file checkpoint models (safetensors).
 
