@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getWorkflowLibraryListItemState } from './workflowLibraryListItemState';
 
 describe('workflowLibraryListItemState', () => {
-  it('marks unsupported workflows with their localized reason key', () => {
+  it('does not mark ordinary workflows unsupported when they are not callable as sub-workflows', () => {
     expect(
       getWorkflowLibraryListItemState({
         category: 'user',
@@ -15,8 +15,25 @@ describe('workflowLibraryListItemState', () => {
         },
       })
     ).toEqual({
-      showUnsupportedBadge: true,
-      unsupportedMessageKey: 'workflows.savedWorkflowCompatibility.missingWorkflowReturn',
+      showCallableBadge: false,
+      showSharedBadge: false,
+      showDefaultIcon: false,
+    });
+  });
+
+  it('marks callable workflows with a positive callable badge', () => {
+    expect(
+      getWorkflowLibraryListItemState({
+        category: 'user',
+        is_public: false,
+        call_saved_workflow_compatibility: {
+          is_callable: true,
+          reason: 'ok',
+          message: null,
+        },
+      })
+    ).toEqual({
+      showCallableBadge: true,
       showSharedBadge: false,
       showDefaultIcon: false,
     });
@@ -34,8 +51,7 @@ describe('workflowLibraryListItemState', () => {
         },
       })
     ).toEqual({
-      showUnsupportedBadge: false,
-      unsupportedMessageKey: null,
+      showCallableBadge: true,
       showSharedBadge: true,
       showDefaultIcon: false,
     });
@@ -53,8 +69,7 @@ describe('workflowLibraryListItemState', () => {
         },
       })
     ).toEqual({
-      showUnsupportedBadge: false,
-      unsupportedMessageKey: null,
+      showCallableBadge: true,
       showSharedBadge: false,
       showDefaultIcon: true,
     });
