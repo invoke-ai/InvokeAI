@@ -1,7 +1,11 @@
-import type { LayerThumbnailRequestResult } from '@workbench/canvas-engine/api';
+import type { LayerThumbnailRequestResult } from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+} from '@workbench/canvas-engine/contracts';
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/types';
 
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';

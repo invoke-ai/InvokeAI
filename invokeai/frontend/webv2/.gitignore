@@ -1,6 +1,8 @@
 dist/
 node_modules/
 stats.html
+artifacts/
 
 # vitest browser-mode failure artifacts
 .vitest-attachments
+__screenshots__/

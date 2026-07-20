@@ -28,10 +28,10 @@
  * unchanged on the node test stub. Zero React, zero dispatch on the move path.
  */
 
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { PlacedSurface, PointerInput, Rect } from '@workbench/canvas-engine/types';
-import type { CanvasLayerContract } from '@workbench/types';
 
 import { strokeToPath, type StrokeSamplePoint } from '@workbench/canvas-engine/freehand';
 import { intersect, isEmpty, roundOut, union } from '@workbench/canvas-engine/math/rect';

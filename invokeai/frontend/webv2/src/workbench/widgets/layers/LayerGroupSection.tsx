@@ -1,6 +1,6 @@
 import type { DragEndEvent } from '@dnd-kit/core';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasLayerContract } from '@workbench/types';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { LucideIcon } from 'lucide-react';
 import type { Dispatch } from 'react';
@@ -9,8 +9,8 @@ import { Collapsible, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { canMergeVisibleRasters } from '@workbench/canvas-engine/document/mergeVisible';
-import { IconButton, toaster, Tooltip } from '@workbench/components/ui';
+import { IconButton, toaster, Tooltip } from '@platform/ui';
+import { canMergeVisibleRasters } from '@workbench/canvas-engine/api';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectName } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIcon } from 'lucide-react';
@@ -28,7 +28,7 @@ import { applyStructural } from './layerOps';
 import { getPsdExportNoticeKey } from './psdExportNotice';
 import { useAddLayer } from './useAddLayer';
 
-type LayerGroupEngine = LayerListItemEngine & Pick<CanvasEngineHandle, 'exports' | 'layers' | 'stores'>;
+type LayerGroupEngine = LayerListItemEngine & Pick<CanvasEngineHandle, 'exports' | 'interaction' | 'layers'>;
 
 const DND_MODIFIERS = [restrictToVerticalAxis, restrictToParentElement];
 const POINTER_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } } as const;

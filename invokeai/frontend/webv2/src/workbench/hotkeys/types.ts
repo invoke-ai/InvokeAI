@@ -1,4 +1,5 @@
-import type { WidgetContributionSource, WidgetInstanceId, WidgetRegion, WidgetTypeId } from '@workbench/types';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { WidgetContributionSource, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'viewer' | 'workflows';
 

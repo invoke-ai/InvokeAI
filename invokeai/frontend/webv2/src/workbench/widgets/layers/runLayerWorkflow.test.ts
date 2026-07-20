@@ -1,8 +1,8 @@
+import type { GalleryImage } from '@features/gallery';
+import type { ProjectGraphState } from '@features/workflow/contracts';
+import type { WorkflowImageBinding } from '@features/workflow/graph';
+import type { InvocationTemplatesSnapshot } from '@features/workflow/react';
 import type { CommitGeneratedImageResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
-import type { GalleryImage } from '@workbench/gallery/api';
-import type { WorkflowImageBinding } from '@workbench/workflows/layerWorkflow';
-import type { InvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import type { ProjectGraphState } from '@workbench/workflows/types';
 
 import { describe, expect, it, vi } from 'vitest';
 

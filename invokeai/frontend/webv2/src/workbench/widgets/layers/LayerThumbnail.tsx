@@ -1,16 +1,19 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the canvas ref callback is memoized on [engine, layerId, version]; it is intentionally re-created when the layer's thumbnail version bumps so the cache is re-blitted. */
-import type { CanvasCoreStoreCapability, CanvasPreviewCapability } from '@workbench/canvas-engine/api';
-import type { LayerThumbnailFallbackStage } from '@workbench/canvas-engine/render/thumbnail';
-import type { CanvasLayerContract } from '@workbench/types';
+import type {
+  CanvasCoreStoreCapability,
+  CanvasLayerContract,
+  CanvasPreviewCapability,
+  LayerThumbnailFallbackStage,
+} from '@workbench/canvas-engine/api';
 import type { CSSProperties } from 'react';
 
 import { Box, Icon, IconButton } from '@chakra-ui/react';
+import { galleryImageUrls } from '@features/gallery/utility';
 import {
   getLayerThumbnailFallbackRenderState,
   nextLayerThumbnailFallbackStage,
   resolveLayerThumbnailImageRef,
-} from '@workbench/canvas-engine/render/thumbnail';
-import { getImageFullUrl, getImageThumbnailUrl } from '@workbench/gallery/api';
+} from '@workbench/canvas-engine/api';
 import { useLayerThumbnailStatus, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
 import { ImageOffIcon, RefreshCwIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -82,8 +85,8 @@ const LayerThumbnailContent = ({
   const fallbackUrl =
     fallbackImage && fallbackStage !== 'failed'
       ? fallbackStage === 'thumbnail'
-        ? getImageThumbnailUrl(fallbackImage.imageName)
-        : getImageFullUrl(fallbackImage.imageName)
+        ? galleryImageUrls.thumbnail(fallbackImage.imageName)
+        : galleryImageUrls.full(fallbackImage.imageName)
       : null;
   const { showFallback, showRetry } = getLayerThumbnailFallbackRenderState(drawn, fallbackStage, status === 'error');
 

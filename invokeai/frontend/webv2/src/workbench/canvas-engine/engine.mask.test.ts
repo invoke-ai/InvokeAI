@@ -7,10 +7,11 @@
  * engine test suite.
  */
 
+import type { CanvasDocumentContractV2, CanvasStateContractV2 } from '@workbench/canvas-engine/contracts';
 import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
-import type { CanvasDocumentContractV2, CanvasStateContractV2, Project, WorkbenchState } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
+import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 
 import {
   applyCanvasProjectMutation,
@@ -25,7 +26,7 @@ import {
   createCanvasEngine as createApplicationCanvasEngine,
   type CanvasEngineOptions,
 } from '@workbench/canvas-operations/createCanvasEngine';
-import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
+import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { StrokeCommittedEvent } from './tools/tool';

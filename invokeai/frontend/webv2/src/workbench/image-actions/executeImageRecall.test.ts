@@ -1,14 +1,17 @@
-import type { GalleryImage } from '@workbench/gallery/api';
-import type { ModelConfig } from '@workbench/models/types';
+import type { GalleryImage } from '@features/gallery';
+import type { ModelConfig } from '@features/models';
+import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
-  getGalleryImageMetadata: vi.fn(),
-  getGalleryImagesByNames: vi.fn(),
+  galleryImages: {
+    metadata: vi.fn(),
+    resolveMany: vi.fn(),
+  },
 }));
 
-vi.mock('@workbench/gallery/api', () => galleryApi);
+vi.mock('@features/gallery', () => galleryApi);
 
 import { executeImageRecall } from './executeImageRecall';
 
@@ -38,20 +41,31 @@ const image: GalleryImage = {
   width: 512,
 };
 
+const createCommands = () => {
+  const add = vi.fn();
+  const setSettings = vi.fn();
+  const commands = {
+    generation: { setSettings } as unknown as WorkbenchCommands['generation'],
+    notifications: { add, reportError: vi.fn() } as unknown as WorkbenchCommands['notifications'],
+  };
+
+  return { add, commands, setSettings };
+};
+
 describe('executeImageRecall', () => {
   beforeEach(() => {
-    galleryApi.getGalleryImageMetadata.mockReset();
-    galleryApi.getGalleryImagesByNames.mockReset();
+    galleryApi.galleryImages.metadata.mockReset();
+    galleryApi.galleryImages.resolveMany.mockReset();
   });
 
   it('recalls remix settings into Generate values', async () => {
-    const dispatch = vi.fn();
+    const { add, commands, setSettings } = createCommands();
 
-    galleryApi.getGalleryImageMetadata.mockResolvedValue({ positive_prompt: 'recalled prompt' });
+    galleryApi.galleryImages.metadata.mockResolvedValue({ positive_prompt: 'recalled prompt' });
 
     await expect(
       executeImageRecall({
-        dispatch,
+        commands,
         generateValues: { modelKey: model.key },
         image,
         kind: 'remix',
@@ -60,23 +74,20 @@ describe('executeImageRecall', () => {
       })
     ).resolves.toBe(true);
 
-    expect(galleryApi.getGalleryImageMetadata).toHaveBeenCalledWith('selected.png');
-    expect(dispatch).toHaveBeenCalledWith({
-      projectId: 'project-1',
-      type: 'setGenerateSettings',
-      values: expect.objectContaining({ positivePrompt: 'recalled prompt' }),
-    });
-    expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'success', title: 'Recalled remix settings', type: 'recordNotice' })
+    expect(galleryApi.galleryImages.metadata).toHaveBeenCalledWith('selected.png');
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ positivePrompt: 'recalled prompt' }),
+      'project-1'
     );
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', title: 'Recalled remix settings' }));
   });
 
   it('uses the freshest Generate values when recalling image dimensions', async () => {
-    const dispatch = vi.fn();
+    const { commands, setSettings } = createCommands();
 
     await expect(
       executeImageRecall({
-        dispatch,
+        commands,
         generateValues: { modelKey: model.key, positivePrompt: 'stale prompt' },
         getGenerateValues: () => ({ modelKey: model.key, positivePrompt: 'fresh prompt' }),
         image,
@@ -86,15 +97,14 @@ describe('executeImageRecall', () => {
       })
     ).resolves.toBe(true);
 
-    expect(dispatch).toHaveBeenCalledWith({
-      projectId: 'project-1',
-      type: 'setGenerateSettings',
-      values: expect.objectContaining({ positivePrompt: 'fresh prompt', height: image.height, width: image.width }),
-    });
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ positivePrompt: 'fresh prompt', height: image.height, width: image.width }),
+      'project-1'
+    );
   });
 
   it('bulk-checks effective reference images and omits deleted entries before committing', async () => {
-    const dispatch = vi.fn();
+    const { commands, setSettings } = createCommands();
     const recallImage = { ...image, imageName: 'selected-with-references.png' };
     const makeReference = (id: string, imageName: string) => ({
       config: {
@@ -112,15 +122,15 @@ describe('executeImageRecall', () => {
       isEnabled: true,
     });
 
-    galleryApi.getGalleryImageMetadata.mockResolvedValue({
+    galleryApi.galleryImages.metadata.mockResolvedValue({
       positive_prompt: 'keep other fields',
       ref_images: [makeReference('valid', 'valid-crop.png'), makeReference('deleted', 'deleted-crop.png')],
     });
-    galleryApi.getGalleryImagesByNames.mockResolvedValue([{ ...image, imageName: 'valid-crop.png' }]);
+    galleryApi.galleryImages.resolveMany.mockResolvedValue([{ ...image, imageName: 'valid-crop.png' }]);
 
     await expect(
       executeImageRecall({
-        dispatch,
+        commands,
         generateValues: { modelKey: model.key },
         image: recallImage,
         kind: 'all',
@@ -129,14 +139,13 @@ describe('executeImageRecall', () => {
       })
     ).resolves.toBe(true);
 
-    expect(galleryApi.getGalleryImagesByNames).toHaveBeenCalledWith(['valid-crop.png', 'deleted-crop.png']);
-    expect(dispatch).toHaveBeenCalledWith({
-      projectId: 'project-1',
-      type: 'setGenerateSettings',
-      values: expect.objectContaining({
+    expect(galleryApi.galleryImages.resolveMany).toHaveBeenCalledWith(['valid-crop.png', 'deleted-crop.png']);
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
         positivePrompt: 'keep other fields',
         referenceImages: [expect.objectContaining({ id: 'valid' })],
       }),
-    });
+      'project-1'
+    );
   });
 });

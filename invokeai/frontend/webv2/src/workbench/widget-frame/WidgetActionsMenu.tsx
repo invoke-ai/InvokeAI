@@ -1,24 +1,22 @@
+import type { GraphContract } from '@workbench/graphContracts';
+import type { Project } from '@workbench/projectContracts';
 import type {
   GraphBearingSurfaceContract,
-  GraphContract,
-  Project,
   WidgetInstanceRuntimeMeta,
+  WidgetHeaderMenu,
   WidgetManifest,
   WidgetRuntimeApi,
   WorkbenchRegion,
-} from '@workbench/types';
+} from '@workbench/widgetContracts';
 
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui';
-import { GraphPreviewDialog } from '@workbench/graph-preview';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
+import { IconButton } from '@platform/ui';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { flushWorkbenchDrafts } from '@workbench/widgets/draftRegistry';
-import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { compileProjectGraph } from '@workbench/workflows/buildGraph';
-import { getInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { shallowEqual, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -28,10 +26,21 @@ import { useTranslation } from 'react-i18next';
  * widgets extend the frame instead of stacking their own menus and toolbars.
  */
 
-const getPreviewGraph = (project: Project, surface: GraphBearingSurfaceContract): GraphContract | null => {
+const GraphPreviewDialog = lazy(() =>
+  import('@features/workflow/preview').then((module) => ({ default: module.GraphPreviewDialog }))
+);
+
+const getPreviewGraph = async (
+  project: Project,
+  surface: GraphBearingSurfaceContract
+): Promise<GraphContract | null> => {
   // The project graph compiles fresh for preview so `View Graph` always shows
   // what Invoke would run right now; widget graphs keep their last compile.
   if (surface.sourceId === 'workflow') {
+    const [{ compileProjectGraph }, { getInvocationTemplatesSnapshot }] = await Promise.all([
+      import('@features/workflow/graph'),
+      import('@features/workflow/react'),
+    ]);
     const templatesSnapshot = getInvocationTemplatesSnapshot();
 
     if (templatesSnapshot.status !== 'loaded') {
@@ -60,12 +69,9 @@ const GraphSurfaceMenuItems = ({
 }) => {
   const { t } = useTranslation();
   const activeSourceId = useActiveProjectSelector((project) => project.invocation.sourceId);
-  const dispatch = useWorkbenchDispatch();
+  const { generation } = useWorkbenchCommands();
   const isActiveSource = activeSourceId === surface.sourceId;
-  const handleSetSource = useCallback(
-    () => dispatch({ sourceId: surface.sourceId, type: 'setInvocationSource' }),
-    [dispatch, surface.sourceId]
-  );
+  const handleSetSource = useCallback(() => generation.setSource(surface.sourceId), [generation, surface.sourceId]);
 
   return (
     <Menu.ItemGroup>
@@ -95,11 +101,13 @@ const GraphSurfaceMenuItems = ({
 };
 
 export const WidgetActionsMenu = ({
+  HeaderMenu,
   instance,
   manifest,
   region,
   runtime,
 }: {
+  HeaderMenu?: WidgetHeaderMenu;
   instance: WidgetInstanceRuntimeMeta;
   manifest: WidgetManifest;
   region: WorkbenchRegion;
@@ -111,16 +119,21 @@ export const WidgetActionsMenu = ({
     shallowEqual
   ) as Project;
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const HeaderMenu = manifest.headerMenu;
+  const [previewGraph, setPreviewGraph] = useState<GraphContract | null>(null);
   const label = resolveWidgetLabel(manifest, t);
-  const surface = manifest.graphBearing?.surfaces.includes(region)
-    ? createGraphBearingSurface(manifest, region, label)
-    : null;
+  const surface = useMemo(
+    () =>
+      manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region, label) : null,
+    [label, manifest, region]
+  );
   const surfaceSourceId = surface?.sourceId;
-  const handlePreview = useCallback(() => {
+  const handlePreview = useCallback(async () => {
     flushWorkbenchDrafts();
+    if (surface) {
+      setPreviewGraph(await getPreviewGraph(activeProject, surface));
+    }
     setIsPreviewOpen(true);
-  }, []);
+  }, [activeProject, surface]);
   const positionHints =
     isPreviewOpen && surfaceSourceId === 'workflow'
       ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
@@ -130,7 +143,6 @@ export const WidgetActionsMenu = ({
     return null;
   }
 
-  const previewGraph = surface && isPreviewOpen ? getPreviewGraph(activeProject, surface) : null;
   // The project graph mirrors the editable document, so the preview can reuse
   // the editor's node positions instead of auto-layouting.
   return (
@@ -154,15 +166,17 @@ export const WidgetActionsMenu = ({
         </Portal>
       </Menu.Root>
       {surface && isPreviewOpen ? (
-        <GraphPreviewDialog
-          graph={previewGraph}
-          graphId={surface.graphId}
-          isOpen={isPreviewOpen}
-          positionHints={positionHints}
-          sourceId={surface.sourceId}
-          title={surface.label}
-          onOpenChange={setIsPreviewOpen}
-        />
+        <Suspense fallback={null}>
+          <GraphPreviewDialog
+            graph={previewGraph}
+            graphId={surface.graphId}
+            isOpen={isPreviewOpen}
+            positionHints={positionHints}
+            sourceId={surface.sourceId}
+            title={surface.label}
+            onOpenChange={setIsPreviewOpen}
+          />
+        </Suspense>
       ) : null}
     </>
   );

@@ -1,4 +1,4 @@
-import type { WidgetInstanceId, WidgetTypeId, WorkbenchRegion } from '@workbench/types';
+import type { WidgetInstanceId, WidgetTypeId, WorkbenchRegion } from '@workbench/widgetContracts';
 
 export const getHotkeyTargetWidget = (
   target: EventTarget | null

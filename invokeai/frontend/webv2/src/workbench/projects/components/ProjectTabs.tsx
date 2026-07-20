@@ -1,29 +1,21 @@
-/* eslint-disable react/react-compiler */
-import type { Project, QueueItem, WidgetRegion } from '@workbench/types';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { Project } from '@workbench/projectContracts';
 
-import { Icon, Menu, Portal, Separator } from '@chakra-ui/react';
-import { useModelLoads } from '@workbench/backend/modelLoadStore';
-import { useQueueItemProgress } from '@workbench/backend/progressStore';
+import { Flex, Icon, Menu, Portal, ScrollArea, Separator } from '@chakra-ui/react';
+import { flushGenerateDrafts } from '@features/generation/react';
+import { useModelLoads } from '@features/models';
+import { getProjectQueueIndicatorState, type QueueItem } from '@features/queue/contracts';
+import { useQueueItemProgress } from '@features/queue/react';
+import { CloseButton, IconButton, ConfirmDialog, MenuContent, RenameDialog, Tabs, Tooltip } from '@platform/ui';
 import { QueueCircularProgress } from '@workbench/components/QueueProgressIndicator';
-import {
-  CloseButton,
-  IconButton,
-  ConfirmDialog,
-  MenuContent,
-  RenameDialog,
-  Tabs,
-  Tooltip,
-} from '@workbench/components/ui';
 import { exportOpenProject } from '@workbench/projects/projectFile';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
-import { getProjectQueueIndicatorState } from '@workbench/queueSummary';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import {
   useActiveProjectSelector,
-  useWorkbenchDispatch,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
   useWorkbenchSelector,
-  useWorkbenchStore,
 } from '@workbench/WorkbenchContext';
 import {
   FileDownIcon,
@@ -35,7 +27,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useMemo, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { OpenProjectDialog } from './OpenProjectDialog';
@@ -63,6 +55,13 @@ const selectProjectTabSummaries = (projects: readonly Project[]): ProjectTabSumm
 
 const deleteMenuItemHover = { bg: 'bg.error', color: 'fg.error' } as const;
 
+// `min-width: 0` lets the strip shrink in flex layout, but does not stop its
+// content from propagating into the tab list's intrinsic (shrink-to-fit)
+// width — `contain: inline-size` zeroes that contribution so a long tab row
+// can never stretch the list over the top bar's other controls. Same rule as
+// the preview filmstrip.
+const TAB_STRIP_CONTAIN_CSS = { contain: 'inline-size' } as const;
+
 /**
  * Document-style tabs for the open projects (the session), immediately right
  * of the Invoke control. Tabs are not the library: closing one only removes
@@ -77,32 +76,28 @@ const deleteMenuItemHover = { bg: 'bg.error', color: 'fg.error' } as const;
 export const ProjectTabs = () => {
   const { t } = useTranslation();
   const projectTabSummaries = useWorkbenchSelector(
-    (snapshot) => selectProjectTabSummaries(snapshot.state.projects),
+    (snapshot) => selectProjectTabSummaries(snapshot.projects),
     areProjectTabSummariesEqual
   );
   const activeProjectId = useActiveProjectSelector((project) => project.id);
-  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
-  const store = useWorkbenchStore();
-  const dispatch = useWorkbenchDispatch();
+  const queries = useWorkbenchQueries();
+  const { projects } = useWorkbenchCommands();
   const { closeProject, deleteProject } = useProjectActions();
   const [menuTarget, setMenuTarget] = useState<{ project: ProjectTabSummary; x: number; y: number } | null>(null);
   const [renameTarget, setRenameTarget] = useState<ProjectTabSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProjectTabSummary | null>(null);
   const [isOpenDialogVisible, setIsOpenDialogVisible] = useState(false);
 
-  const getProject = useCallback(
-    (projectId: string): Project | null =>
-      store.getState().projects.find((project) => project.id === projectId) ?? null,
-    [store]
-  );
+  const getProject = useCallback((projectId: string): Project | null => queries.getProject(projectId), [queries]);
 
   const onSwitchProject = useCallback(
     (projectId: string) => {
       flushGenerateDrafts();
-      dispatch({ projectId, type: 'switchProject' });
+      projects.switchTo(projectId);
     },
-    [dispatch]
+    [projects]
   );
 
   const openContextMenu = useCallback((project: ProjectTabSummary, event: MouseEvent) => {
@@ -112,8 +107,8 @@ export const ProjectTabs = () => {
 
   const createProject = useCallback(() => {
     flushGenerateDrafts();
-    dispatch({ type: 'createProject' });
-  }, [dispatch]);
+    projects.create();
+  }, [projects]);
 
   const showOpenDialog = useCallback(() => setIsOpenDialogVisible(true), []);
   const hideOpenDialog = useCallback(() => setIsOpenDialogVisible(false), []);
@@ -139,10 +134,10 @@ export const ProjectTabs = () => {
   const renameProject = useCallback(
     (name: string) => {
       if (renameTarget) {
-        dispatch({ name, projectId: renameTarget.id, type: 'renameProject' });
+        projects.rename(renameTarget.id, name);
       }
     },
-    [dispatch, renameTarget]
+    [projects, renameTarget]
   );
 
   const confirmDeleteProject = useCallback(async () => {
@@ -157,20 +152,32 @@ export const ProjectTabs = () => {
 
   return (
     <>
-      <Tabs.Root minW="max-content" variant="subtle" value={activeProjectId} h="full" w="full">
-        <Tabs.List flex="1 1 auto" h="full" py="1">
-          {projectTabSummaries.map((project) => (
-            <ProjectTab
-              key={project.id}
-              backendConnectionStatus={backendConnectionStatus}
-              isActive={project.id === activeProjectId}
-              loadingModelsCount={modelLoads.length}
-              project={project}
-              onCloseProject={closeProjectBySummary}
-              onContextMenu={openContextMenu}
-              onSwitchProject={onSwitchProject}
-            />
-          ))}
+      <Tabs.Root minW="0" variant="subtle" value={activeProjectId} h="full" w="full">
+        <Tabs.List flex="1 1 auto" minW="0" w="full" h="full" py="1">
+          {/* Only the tabs scroll; the new/open controls stay pinned in view. */}
+          <ScrollArea.Root css={TAB_STRIP_CONTAIN_CSS} flex="1 1 auto" minW="0" h="full" size="xs" variant="hover">
+            <ScrollArea.Viewport aria-label={t('projects.openProjects')} h="full" w="full">
+              <ScrollArea.Content asChild>
+                <Flex align="center" h="full">
+                  {projectTabSummaries.map((project) => (
+                    <ProjectTab
+                      key={project.id}
+                      backendConnectionStatus={backendConnectionStatus}
+                      isActive={project.id === activeProjectId}
+                      loadingModelsCount={modelLoads.length}
+                      project={project}
+                      onCloseProject={closeProjectBySummary}
+                      onContextMenu={openContextMenu}
+                      onSwitchProject={onSwitchProject}
+                    />
+                  ))}
+                </Flex>
+              </ScrollArea.Content>
+            </ScrollArea.Viewport>
+            <ScrollArea.Scrollbar orientation="horizontal">
+              <ScrollArea.Thumb />
+            </ScrollArea.Scrollbar>
+          </ScrollArea.Root>
 
           <Separator orientation="vertical" h={5} mx="1" alignSelf="center" />
 
@@ -262,6 +269,18 @@ const ProjectTab = ({
   const { t } = useTranslation();
   const openContextMenu = useCallback((event: MouseEvent) => onContextMenu(project, event), [onContextMenu, project]);
 
+  // Callback ref, not an effect: identity changes with `isActive`, so React
+  // re-attaches it on every selection change and the newly active tab scrolls
+  // into the strip's viewport.
+  const scrollIntoViewWhenActive = useCallback(
+    (node: HTMLButtonElement | null) => {
+      if (node && isActive) {
+        node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    },
+    [isActive]
+  );
+
   const closeProject = useCallback(
     (event: MouseEvent) => {
       event.stopPropagation();
@@ -271,7 +290,15 @@ const ProjectTab = ({
   );
 
   return (
-    <Tabs.Trigger value={project.id} onClick={switchProject} onContextMenu={openContextMenu} fontSize="xs" h="full">
+    <Tabs.Trigger
+      ref={scrollIntoViewWhenActive}
+      value={project.id}
+      onClick={switchProject}
+      onContextMenu={openContextMenu}
+      fontSize="xs"
+      flexShrink={0}
+      h="full"
+    >
       {progressState.kind === 'idle' ? (
         <Icon as={isActive ? FolderOpenIcon : FolderIcon} boxSize="4" />
       ) : (
@@ -305,36 +332,31 @@ const ProjectTabContextMenu = ({
   onRename: (project: ProjectTabSummary) => void;
   target: { project: ProjectTabSummary; x: number; y: number } | null;
 }) => {
-  const dispatch = useWorkbenchDispatch();
-  const store = useWorkbenchStore();
+  const { projects } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const targetRef = useRef(target);
   const { t } = useTranslation();
-
-  targetRef.current = target;
 
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => {
-        const currentTarget = targetRef.current;
-
-        return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
+        return target ? { height: 1, width: 1, x: target.x, y: target.y } : null;
       },
       placement: 'bottom-start' as const,
     }),
-    []
+    [target]
   );
 
   const openProjectDetails = useCallback(
     (projectSummary: ProjectTabSummary) => {
-      const project = store.getState().projects.find((candidate) => candidate.id === projectSummary.id);
+      const project = queries.getProject(projectSummary.id);
 
       if (!project) {
         return;
       }
 
       flushGenerateDrafts();
-      dispatch({ projectId: project.id, type: 'switchProject' });
+      projects.switchTo(project.id);
 
       // Reveal the Project panel wherever the project already shows it; default
       // to enabling it in the right rail. Both actions operate on the active
@@ -349,7 +371,7 @@ const ProjectTabContextMenu = ({
 
       openWorkbenchWidget('project', { preferredRegions });
     },
-    [dispatch, openWorkbenchWidget, store]
+    [openWorkbenchWidget, projects, queries]
   );
 
   const handleOpenChange = useCallback(
@@ -362,39 +384,36 @@ const ProjectTabContextMenu = ({
   );
 
   const renameTarget = useCallback(() => {
-    if (targetRef.current) {
-      onRename(targetRef.current.project);
+    if (target) {
+      onRename(target.project);
     }
-  }, [onRename]);
+  }, [onRename, target]);
 
   const showDetails = useCallback(() => {
-    if (targetRef.current) {
-      openProjectDetails(targetRef.current.project);
+    if (target) {
+      openProjectDetails(target.project);
     }
-  }, [openProjectDetails]);
+  }, [openProjectDetails, target]);
 
   const exportProject = useCallback(() => {
-    const currentTarget = targetRef.current;
-    const project = currentTarget
-      ? store.getState().projects.find((candidate) => candidate.id === currentTarget.project.id)
-      : null;
+    const project = target ? queries.getProject(target.project.id) : null;
 
     if (project) {
       exportOpenProject(project);
     }
-  }, [store]);
+  }, [queries, target]);
 
   const closeTargetProject = useCallback(() => {
-    if (targetRef.current) {
-      onCloseProject(targetRef.current.project);
+    if (target) {
+      onCloseProject(target.project);
     }
-  }, [onCloseProject]);
+  }, [onCloseProject, target]);
 
   const deleteTargetProject = useCallback(() => {
-    if (targetRef.current) {
-      onDelete(targetRef.current.project);
+    if (target) {
+      onDelete(target.project);
     }
-  }, [onDelete]);
+  }, [onDelete, target]);
 
   return (
     <Menu.Root

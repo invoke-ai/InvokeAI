@@ -1,9 +1,8 @@
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
-import type { GradientStop, GradientToolOptions } from '@workbench/canvas-engine/engineStores';
-import type { CanvasLayerSourceContract } from '@workbench/types';
+import type { CanvasLayerSourceContract, GradientStop, GradientToolOptions } from '@workbench/canvas-engine/api';
 
 import { createListCollection, HStack, NumberInput, Text } from '@chakra-ui/react';
-import { ColorPicker, Select } from '@workbench/components/ui';
+import { ColorPicker, Select } from '@platform/ui';
 import { useGradientOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
@@ -88,7 +87,7 @@ export const GradientOptions = ({ engine }: ToolOptionsComponentProps) => {
 
   const applyGradient = useCallback(
     (next: { kind: GradientKind; angle: number; stops: GradientStop[] }, commit: boolean) => {
-      engine.stores.gradientOptions.set({ angle: next.angle, kind: next.kind, stops: next.stops });
+      engine.interaction.set('gradientOptions', { angle: next.angle, kind: next.kind, stops: next.stops });
       if (selected && commit) {
         const before = selected.source;
         const after: GradientSource = { ...before, angle: next.angle, kind: next.kind, stops: next.stops };

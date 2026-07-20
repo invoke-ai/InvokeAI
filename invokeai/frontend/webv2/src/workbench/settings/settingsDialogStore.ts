@@ -1,6 +1,6 @@
-import type { SettingsSectionId } from '@workbench/types';
+import type { SettingsSectionId } from '@workbench/widgetContracts';
 
-import { createExternalStore } from '@workbench/externalStore';
+import { createExternalStore } from '@platform/state/externalStore';
 
 /**
  * Open/close state for the workbench settings dialog, addressable from

@@ -1,10 +1,9 @@
 import { Flex, HStack, Separator } from '@chakra-ui/react';
+import { AccountMenu, useCapabilities } from '@features/identity';
+import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link } from '@tanstack/react-router';
-import { useCapabilities } from '@workbench/auth/capabilities';
-import { AccountMenu } from '@workbench/auth/components/AccountMenu';
 import { ProjectTabs } from '@workbench/projects/components';
 
-import { InvokeMark } from '@/workbench/components/InvokeMark';
 import { SettingsButton } from '@/workbench/settings';
 
 import { BatchCountField } from './BatchCountField';

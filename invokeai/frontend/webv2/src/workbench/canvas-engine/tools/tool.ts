@@ -13,6 +13,7 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -25,7 +26,6 @@ import type { LayerTransform } from '@workbench/canvas-engine/transform/transfor
 import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 /**
  * Emitted once per completed brush/eraser gesture. Persistence (Task P2.2) and

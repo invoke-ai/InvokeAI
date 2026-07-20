@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, apiFetchJson } from '@workbench/backend/http';
+import { ApiError, apiFetch, apiFetchJson } from '@platform/transport/http';
 
 /**
  * REST surface for server-side project persistence (`/api/v1/projects`) and

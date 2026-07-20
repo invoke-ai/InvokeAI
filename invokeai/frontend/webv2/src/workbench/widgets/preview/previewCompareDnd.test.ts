@@ -1,4 +1,4 @@
-import { getGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { getGalleryImageDragData } from '@features/gallery/utility';
 import { describe, expect, it } from 'vitest';
 
 import { PREVIEW_COMPARE_DROP_DATA, resolvePreviewCompareDrop } from './previewCompareDnd';

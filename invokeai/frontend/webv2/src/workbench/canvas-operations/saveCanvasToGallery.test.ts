@@ -1,10 +1,11 @@
+import type { GenerateModelConfig, GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { RasterCompositeExportResult } from '@workbench/canvas-engine/exportRasterComposite';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { GenerateModelConfig, GenerateWidgetValues, MainModelConfig } from '@workbench/generation/types';
-import type { CanvasDocumentContractV2, Project } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 
-import { getDefaultGenerateSettings } from '@workbench/generation/baseGenerationPolicies';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';

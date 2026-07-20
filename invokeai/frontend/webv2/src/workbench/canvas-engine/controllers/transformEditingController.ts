@@ -1,3 +1,4 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { TransformSession } from '@workbench/canvas-engine/engineStores';
 import type { HistoryEntry } from '@workbench/canvas-engine/history/history';
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
@@ -5,7 +6,6 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { isRenderableLayer } from '@workbench/canvas-engine/document/sources';
 import { createDocumentPatchEntry } from '@workbench/canvas-engine/history/documentPatch';

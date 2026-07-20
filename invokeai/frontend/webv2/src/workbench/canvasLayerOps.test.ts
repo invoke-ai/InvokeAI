@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 
-import type { CanvasLayerContract } from './types';
+import { describe, expect, it } from 'vitest';
 
 import {
   deleteLayerActions,

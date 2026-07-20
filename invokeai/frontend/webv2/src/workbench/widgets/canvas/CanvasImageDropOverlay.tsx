@@ -1,6 +1,6 @@
 import { Grid } from '@chakra-ui/react';
 import { useDndContext } from '@dnd-kit/core';
-import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { isGalleryImageDragData } from '@features/gallery/utility';
 
 import { getCanvasImageDropData, getCanvasImageDropId } from './canvasImageDnd';
 import { CanvasImageDropZone, type CanvasImageDropZoneProps } from './CanvasImageDropZone';

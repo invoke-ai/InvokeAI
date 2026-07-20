@@ -1,6 +1,6 @@
 import { panBy, WHEEL_ZOOM_STEP, zoomAtPoint as calculateZoomAtPoint } from '@workbench/panZoom';
 /* eslint-disable react/react-compiler */
-import { useEffectEvent, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
+import { useCallback, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 
 /**
  * Shared zoom/pan for the side-by-side comparison panes: one transform, kept
@@ -54,9 +54,11 @@ export const useCompareLoupe = ({
   ]);
   const rafRef = useRef<number | null>(null);
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; fx: number; fy: number } | null>(null);
+  const naturalWidthRef = useRef(naturalWidth);
+  naturalWidthRef.current = naturalWidth;
   const [isZoomed, setIsZoomed] = useState(false);
 
-  const apply = useEffectEvent(() => {
+  const apply = useCallback(() => {
     if (rafRef.current !== null) {
       return;
     }
@@ -78,58 +80,67 @@ export const useCompareLoupe = ({
           : `translate(${fx * frame.clientWidth}px, ${fy * frame.clientHeight}px) scale(${scale})`;
         image.style.transformOrigin = '0 0';
 
-        const actualZoom = (scale * frame.clientWidth) / Math.max(1, naturalWidth);
+        const actualZoom = (scale * frame.clientWidth) / Math.max(1, naturalWidthRef.current);
 
         image.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
       }
 
       setIsZoomed(!isFit);
     });
-  });
+  }, []);
 
-  const setTransform = useEffectEvent((next: FractionTransform) => {
-    const scale = next.scale;
+  const setTransform = useCallback(
+    (next: FractionTransform) => {
+      const scale = next.scale;
 
-    transformRef.current =
-      scale === 1
-        ? { fx: 0, fy: 0, scale: 1 }
-        : { fx: clampFraction(next.fx, scale), fy: clampFraction(next.fy, scale), scale };
-    apply();
-  });
+      transformRef.current =
+        scale === 1
+          ? { fx: 0, fy: 0, scale: 1 }
+          : { fx: clampFraction(next.fx, scale), fy: clampFraction(next.fy, scale), scale };
+      apply();
+    },
+    [apply]
+  );
 
-  const zoomAroundFraction = useEffectEvent((pfx: number, pfy: number, nextScale: number) => {
-    const { fx, fy, scale } = transformRef.current;
-    const firstFrame = panesRef.current.find((pane) => pane.frame)?.frame ?? null;
-    const maxScale = firstFrame
-      ? Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidth) / Math.max(1, firstFrame.clientWidth))
-      : MAX_ACTUAL_ZOOM;
-    const next = calculateZoomAtPoint({ pan: { x: fx, y: fy }, zoom: scale }, nextScale, { x: pfx, y: pfy }, (zoom) =>
-      Math.max(1, Math.min(zoom, maxScale))
-    );
+  const zoomAroundFraction = useCallback(
+    (pfx: number, pfy: number, nextScale: number) => {
+      const { fx, fy, scale } = transformRef.current;
+      const firstFrame = panesRef.current.find((pane) => pane.frame)?.frame ?? null;
+      const maxScale = firstFrame
+        ? Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidthRef.current) / Math.max(1, firstFrame.clientWidth))
+        : MAX_ACTUAL_ZOOM;
+      const next = calculateZoomAtPoint({ pan: { x: fx, y: fy }, zoom: scale }, nextScale, { x: pfx, y: pfy }, (zoom) =>
+        Math.max(1, Math.min(zoom, maxScale))
+      );
 
-    setTransform({
-      fx: next.pan.x,
-      fy: next.pan.y,
-      scale: next.zoom,
-    });
-  });
+      setTransform({
+        fx: next.pan.x,
+        fy: next.pan.y,
+        scale: next.zoom,
+      });
+    },
+    [setTransform]
+  );
 
-  const handleWheel = useEffectEvent((node: HTMLDivElement, event: WheelEvent) => {
-    event.preventDefault();
-    const rect = node.getBoundingClientRect();
+  const handleWheel = useCallback(
+    (node: HTMLDivElement, event: WheelEvent) => {
+      event.preventDefault();
+      const rect = node.getBoundingClientRect();
 
-    if (rect.width === 0 || rect.height === 0) {
-      return;
-    }
+      if (rect.width === 0 || rect.height === 0) {
+        return;
+      }
 
-    const sensitivity = event.ctrlKey ? WHEEL_ZOOM_STEP * 4 : WHEEL_ZOOM_STEP;
+      const sensitivity = event.ctrlKey ? WHEEL_ZOOM_STEP * 4 : WHEEL_ZOOM_STEP;
 
-    zoomAroundFraction(
-      (event.clientX - rect.left) / rect.width,
-      (event.clientY - rect.top) / rect.height,
-      transformRef.current.scale * Math.exp(-event.deltaY * sensitivity)
-    );
-  });
+      zoomAroundFraction(
+        (event.clientX - rect.left) / rect.width,
+        (event.clientY - rect.top) / rect.height,
+        transformRef.current.scale * Math.exp(-event.deltaY * sensitivity)
+      );
+    },
+    [zoomAroundFraction]
+  );
 
   // One stable set of callbacks per pane index; wheel listeners need manual
   // attachment (`passive: false`) so ref callbacks with cleanup own them.
@@ -153,7 +164,7 @@ export const useCompareLoupe = ({
           zoomAroundFraction(
             (event.clientX - rect.left) / rect.width,
             (event.clientY - rect.top) / rect.height,
-            Math.max(1, naturalWidth / frame.clientWidth)
+            Math.max(1, naturalWidthRef.current / frame.clientWidth)
           );
         },
         onLostPointerCapture: (event) => endPan(event),

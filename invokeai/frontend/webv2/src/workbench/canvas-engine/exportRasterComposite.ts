@@ -1,6 +1,6 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import {

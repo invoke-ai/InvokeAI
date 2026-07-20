@@ -1,11 +1,11 @@
-import type { GalleryImage } from '@workbench/gallery/api';
+import type { GalleryImage } from '@features/gallery';
 import type {
   ComponentModelConfig,
   GenerateModelConfig,
   GenerateWidgetValues,
   MainModelConfig,
   VaeModelConfig,
-} from '@workbench/generation/types';
+} from '@features/generation/contracts';
 
 import {
   getCompatibleReferenceImages,
@@ -13,9 +13,7 @@ import {
   getGenerationUiPolicy,
   getSettingsWithModelDefaults,
   isKnownScheduler,
-} from '@workbench/generation/baseGenerationPolicies';
-import { isVaeCompatibleWithGenerateModel } from '@workbench/generation/componentCompatibility';
-import {
+  isVaeCompatibleWithGenerateModel,
   cloneGenerateWidgetValues,
   getModelDefaultVae,
   hasModelDefaultVae,
@@ -25,7 +23,7 @@ import {
   deriveAspectRatioId,
   normalizeReferenceImages,
   SEED_MAX,
-} from '@workbench/generation/settings';
+} from '@features/generation/settings';
 
 export type ImageRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'dimensions' | 'clipSkip';
 

@@ -1,7 +1,7 @@
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput } from '@workbench/canvas-engine/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { createLassoTool, lassoOpFor } from '@workbench/canvas-engine/tools/lassoTool';

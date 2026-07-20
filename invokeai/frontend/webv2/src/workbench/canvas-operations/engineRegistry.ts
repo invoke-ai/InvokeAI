@@ -14,6 +14,8 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasEngine as PublicCanvasEngine } from '@workbench/canvas-engine/api';
+
 import {
   createCanvasEngine,
   type CanvasEngine,
@@ -128,5 +130,8 @@ export const createEngineRegistry = (
 const defaultRegistry = createEngineRegistry();
 
 export const getOrCreateEngine = defaultRegistry.getOrCreateEngine;
-export const getEngine = defaultRegistry.getEngine;
 export const releaseEngine = defaultRegistry.releaseEngine;
+
+/** Non-owning public lookup. Engine construction and lease management stay inside Canvas composition. */
+export const getCanvasEngine = (projectId: string): PublicCanvasEngine | undefined =>
+  defaultRegistry.getEngine(projectId);

@@ -1,22 +1,22 @@
-/* eslint-disable react/react-compiler */
+import type { WidgetRegion } from '@workbench/layoutContracts';
 import type {
   WidgetInstanceId,
   WidgetInstanceRuntimeMeta,
+  WidgetHeaderLabel,
+  WidgetHeaderMenu,
   WidgetManifest,
-  WidgetRegion,
   WidgetRuntimeApi,
   WidgetTypeId,
   WorkbenchRegion,
-} from '@workbench/types';
+} from '@workbench/widgetContracts';
 
-import { Box, Flex, HStack, Icon, Stack, Text, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
-import { chipRecipe } from '@theme/recipes';
-import { IconButton, Tooltip } from '@workbench/components/ui';
+import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { IconButton, Tooltip } from '@platform/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
-import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { SettingsIcon, type LucideIcon } from 'lucide-react';
+import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { SettingsIcon } from 'lucide-react';
 import {
   useCallback,
   useMemo,
@@ -28,6 +28,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { WidgetActionsMenu } from './WidgetActionsMenu';
+import { WidgetIdentityIcon } from './WidgetIdentityIcon';
 
 const PANEL_SIZE_STEP_PX = 16;
 const MIN_PANEL_SIZE_PX = 180;
@@ -63,12 +64,12 @@ export const WidgetPanelFrame = ({
   typeId?: WidgetTypeId;
 }) => {
   const regionState = useActiveProjectSelector((project) => project.widgetRegions[region]);
-  const dispatch = useWorkbenchDispatch();
+  const { layout } = useWorkbenchCommands();
   const [dragSizePx, setDragSizePx] = useState<number | null>(null);
   const isLeft = region === 'left';
   const isBottom = region === 'bottom';
   const displaySizePx = dragSizePx ?? regionState.sizePx;
-  const sizeBounds = getPanelSizeBounds(region);
+  const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
 
   const commitSize = useCallback(
@@ -76,10 +77,10 @@ export const WidgetPanelFrame = ({
       const nextSizePx = clampSize(region, sizePx);
 
       if (nextSizePx !== regionState.sizePx) {
-        dispatch({ region, sizePx: nextSizePx, type: 'setRegionWidgetSize' });
+        layout.setRegionSize(region, nextSizePx);
       }
     },
-    [dispatch, region, regionState.sizePx]
+    [layout, region, regionState.sizePx]
   );
 
   const handlePointerDown = useCallback(
@@ -91,6 +92,7 @@ export const WidgetPanelFrame = ({
       const startSizePx = regionState.sizePx;
       let nextSizePx = startSizePx;
       const direction = isLeft ? 1 : -1;
+      const pointerSession = new AbortController();
 
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
@@ -100,16 +102,14 @@ export const WidgetPanelFrame = ({
       };
 
       const handlePointerUp = () => {
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-        window.removeEventListener('pointercancel', handlePointerUp);
+        pointerSession.abort();
         setDragSizePx(null);
         commitSize(nextSizePx);
       };
 
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-      window.addEventListener('pointercancel', handlePointerUp);
+      window.addEventListener('pointermove', handlePointerMove, { signal: pointerSession.signal });
+      window.addEventListener('pointerup', handlePointerUp, { signal: pointerSession.signal });
+      window.addEventListener('pointercancel', handlePointerUp, { signal: pointerSession.signal });
     },
     [commitSize, isBottom, isLeft, region, regionState.sizePx]
   );
@@ -118,12 +118,12 @@ export const WidgetPanelFrame = ({
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       const step = event.shiftKey ? PANEL_SIZE_STEP_PX * 2 : PANEL_SIZE_STEP_PX;
       const sizeChanges: Partial<Record<string, number>> = isBottom
-        ? { ArrowDown: -step, ArrowUp: step, End: sizeBounds.max - displaySizePx, Home: sizeBounds.min - displaySizePx }
+        ? { ArrowDown: -step, ArrowUp: step, End: maxPanelSizePx - displaySizePx, Home: minPanelSizePx - displaySizePx }
         : {
             ArrowLeft: isLeft ? -step : step,
             ArrowRight: isLeft ? step : -step,
-            End: sizeBounds.max - displaySizePx,
-            Home: sizeBounds.min - displaySizePx,
+            End: maxPanelSizePx - displaySizePx,
+            Home: minPanelSizePx - displaySizePx,
           };
       const sizeChange = sizeChanges[event.key];
 
@@ -134,7 +134,7 @@ export const WidgetPanelFrame = ({
       event.preventDefault();
       commitSize(displaySizePx + sizeChange);
     },
-    [commitSize, displaySizePx, isBottom, isLeft, sizeBounds.max, sizeBounds.min]
+    [commitSize, displaySizePx, isBottom, isLeft, maxPanelSizePx, minPanelSizePx]
   );
   const panelSizeProps = useMemo(
     () => (isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` }),
@@ -171,8 +171,8 @@ export const WidgetPanelFrame = ({
       <Box
         aria-label={`Resize ${region} widget panel`}
         aria-orientation={isBottom ? 'horizontal' : 'vertical'}
-        aria-valuemax={sizeBounds.max}
-        aria-valuemin={sizeBounds.min}
+        aria-valuemax={maxPanelSizePx}
+        aria-valuemin={minPanelSizePx}
         aria-valuenow={displaySizePx}
         as="div"
         cursor={isBottom ? 'ns-resize' : 'ew-resize'}
@@ -195,12 +195,16 @@ export const WidgetPanelFrame = ({
 
 export const WidgetHeader = ({
   actions,
+  HeaderLabel,
+  HeaderMenu,
   instance,
   manifest,
   region,
   runtime,
 }: {
   actions?: ReactNode;
+  HeaderLabel?: WidgetHeaderLabel;
+  HeaderMenu?: WidgetHeaderMenu;
   instance: WidgetInstanceRuntimeMeta;
   manifest: WidgetManifest;
   region: WorkbenchRegion;
@@ -209,8 +213,7 @@ export const WidgetHeader = ({
   const { t } = useTranslation();
   // Manifests may provide a component label (e.g. Workflow's editable
   // `Workflow / [name]`); plain strings render as the standard title.
-  const HeaderLabel = manifest.headerLabel;
-  const label = resolveWidgetLabel(manifest, t);
+  const label = resolveWidgetInstanceLabel(instance, manifest, t);
   const handleSettingsClick = useCallback(
     () => openWorkbenchSettings(manifest.settingsSection),
     [manifest.settingsSection]
@@ -219,10 +222,11 @@ export const WidgetHeader = ({
   return (
     <HStack justify="space-between" borderBottomWidth={1} h={10} ps="3" pe="2">
       <HStack flex="1" gap="1.5" minW="0">
-        {HeaderLabel ? (
+        <WidgetIdentityIcon icon={manifest.icon} />
+        {HeaderLabel && !instance.title ? (
           <HeaderLabel region={region} />
         ) : (
-          <Text fontSize="xs" fontWeight="700">
+          <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
             {label}
           </Text>
         )}
@@ -242,11 +246,32 @@ export const WidgetHeader = ({
             </IconButton>
           </Tooltip>
         ) : null}
-        <WidgetActionsMenu instance={instance} manifest={manifest} region={region} runtime={runtime} />
+        <WidgetActionsMenu
+          HeaderMenu={HeaderMenu}
+          instance={instance}
+          manifest={manifest}
+          region={region}
+          runtime={runtime}
+        />
       </HStack>
     </HStack>
   );
 };
+
+export const WidgetTooltipFrame = ({
+  children,
+  icon,
+  isLoading = false,
+}: {
+  children: ReactNode;
+  icon: WidgetManifest['icon'];
+  isLoading?: boolean;
+}) => (
+  <HStack align="start" gap="1.5" minW="9rem">
+    <WidgetIdentityIcon icon={icon} isLoading={isLoading} />
+    <Box minW="0">{children}</Box>
+  </HStack>
+);
 
 export const FieldPlaceholder = ({ label, h }: { label: string; h: string }) => (
   <Stack gap="1">
@@ -256,22 +281,3 @@ export const FieldPlaceholder = ({ label, h }: { label: string; h: string }) => 
     <Box bg="bg.subtle" borderWidth="1px" borderColor="border.subtle" h={h} rounded="md" w="full" />
   </Stack>
 );
-
-export const StatusWidgetChip = ({
-  children,
-  icon,
-  tone,
-}: {
-  children: ReactNode;
-  icon: LucideIcon;
-  tone?: NonNullable<RecipeVariantProps<typeof chipRecipe>>['tone'];
-}) => {
-  const recipe = useRecipe({ recipe: chipRecipe });
-
-  return (
-    <HStack css={recipe({ tone })}>
-      <Icon as={icon} boxSize="3" />
-      <Text whiteSpace="nowrap">{children}</Text>
-    </HStack>
-  );
-};

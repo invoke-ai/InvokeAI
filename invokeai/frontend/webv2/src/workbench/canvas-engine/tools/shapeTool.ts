@@ -20,9 +20,9 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import type { Tool, ToolContext } from './tool';
 

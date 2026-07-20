@@ -1,5 +1,5 @@
+import { IconButton, Tooltip } from '@platform/ui';
 import { Link } from '@tanstack/react-router';
-import { IconButton, Tooltip } from '@workbench/components/ui';
 import { useActiveProjectId } from '@workbench/WorkbenchContext';
 import { BoxIcon } from 'lucide-react';
 import { useMemo } from 'react';

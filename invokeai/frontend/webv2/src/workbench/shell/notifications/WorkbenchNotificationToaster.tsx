@@ -1,6 +1,6 @@
-import type { WorkbenchNotificationKind } from '@workbench/types';
+import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
 
-import { toaster } from '@workbench/components/ui';
+import { toaster } from '@platform/ui';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useEffect, useRef } from 'react';
 
@@ -11,7 +11,7 @@ const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' 
 };
 
 export const WorkbenchNotificationToaster = () => {
-  const notifications = useWorkbenchSelector((snapshot) => snapshot.state.notifications);
+  const notifications = useWorkbenchSelector((snapshot) => snapshot.notifications);
   const toastedNotificationIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {

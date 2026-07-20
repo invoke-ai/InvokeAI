@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { WorkbenchSnapshot, WorkbenchStore } from './workbenchStore';
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore';
 
 import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } from './diagnostics/logger';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
 import { getProjectWidgetValues } from './widgetState';
+import { createInitialWorkbenchState } from './workbenchState';
 import { createWorkbenchStore } from './workbenchStore';
 
 const watchSelector = <Selected>(
-  store: WorkbenchStore,
+  store: WorkbenchInternalStore,
   selector: (snapshot: WorkbenchSnapshot) => Selected,
   isEqual: (left: Selected, right: Selected) => boolean = Object.is
 ) => {
@@ -45,14 +46,14 @@ describe('createWorkbenchStore', () => {
     });
   });
 
-  it('exposes a stable dispatch and initializes snapshot metadata', () => {
+  it('exposes stable capability interfaces and initializes snapshot metadata', () => {
     const store = createWorkbenchStore();
     const snapshot = store.getSnapshot();
 
-    expect(store.dispatch).toBe(store.dispatch);
-    expect(snapshot.state.activeProjectId).toBe(snapshot.activeProject.id);
+    expect(store.commands).toBe(store.commands);
+    expect(store.queries).toBe(store.queries);
     expect(snapshot.hasHydrated).toBe(false);
-    expect(snapshot.state.projects).toHaveLength(1);
+    expect(snapshot.projects).toHaveLength(1);
   });
 
   it('notifies subscribers once for reducer changes and not for no-op reducer results', () => {
@@ -63,12 +64,12 @@ describe('createWorkbenchStore', () => {
 
     const projectId = store.getSnapshot().activeProject.id;
 
-    store.dispatch({ name: 'Renamed', projectId, type: 'renameProject' });
+    store.commands.projects.rename(projectId, 'Renamed');
 
     expect(listener).toHaveBeenCalledTimes(1);
     expect(store.getSnapshot().activeProject.name).toBe('Renamed');
 
-    store.dispatch({ name: '   ', projectId, type: 'renameProject' });
+    store.commands.projects.rename(projectId, '   ');
 
     expect(listener).toHaveBeenCalledTimes(1);
     expect(store.getSnapshot().activeProject.name).toBe('Renamed');
@@ -98,21 +99,43 @@ describe('createWorkbenchStore', () => {
     const store = createWorkbenchStore();
     const initialPersistedRevision = store.getPersistedRevision();
 
-    store.dispatch({ status: 'connected', type: 'setBackendConnectionStatus' });
+    store.commands.queue.setConnectionStatus({ status: 'connected' });
 
     expect(store.getPersistedRevision()).toBe(initialPersistedRevision);
 
-    store.dispatch({ kind: 'info', title: 'Global notice', type: 'recordNotice' });
+    store.commands.notifications.add({ kind: 'info', title: 'Global notice' });
 
     expect(store.getPersistedRevision()).toBe(initialPersistedRevision);
 
-    store.dispatch({
-      name: 'Persisted rename',
-      projectId: store.getSnapshot().activeProject.id,
-      type: 'renameProject',
-    });
+    store.commands.projects.rename(store.getSnapshot().activeProject.id, 'Persisted rename');
 
     expect(store.getPersistedRevision()).toBe(initialPersistedRevision + 1);
+  });
+
+  it('forwards payload-form commands into reducer actions', () => {
+    const store = createWorkbenchStore();
+
+    store.commands.notifications.add({ kind: 'info', title: 'Payload form' });
+
+    expect(store.getSnapshot().notifications[0]?.title).toBe('Payload form');
+  });
+
+  it('maps positional-form commands onto their action payloads', () => {
+    const store = createWorkbenchStore();
+    const projectId = store.getSnapshot().activeProject.id;
+
+    store.commands.gallery.setSearchTerm('positional form', projectId);
+
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery').searchTerm).toBe('positional form');
+  });
+
+  it('dispatches nullary commands with no payload', () => {
+    const store = createWorkbenchStore();
+
+    store.commands.notifications.add({ kind: 'info', title: 'To clear' });
+    store.commands.notifications.clear();
+
+    expect(store.getSnapshot().notifications).toHaveLength(0);
   });
 
   it('records recordError actions into project diagnostics', () => {
@@ -120,7 +143,11 @@ describe('createWorkbenchStore', () => {
     const projectId = store.getSnapshot().activeProject.id;
 
     clearProjectDiagnostics(projectId);
-    store.dispatch({ area: 'queue-runtime', message: 'Queue failed', namespace: 'queue', type: 'recordError' });
+    store.commands.notifications.reportError({
+      area: 'queue-runtime',
+      message: 'Queue failed',
+      namespace: 'queue',
+    });
 
     expect(getProjectDiagnostics(projectId)).toMatchObject([
       {
@@ -130,7 +157,7 @@ describe('createWorkbenchStore', () => {
         source: { area: 'queue-runtime', kind: 'workbench', projectId },
       },
     ]);
-    expect(store.getSnapshot().state.notifications[0]?.title).toBe('Error');
+    expect(store.getSnapshot().notifications[0]?.title).toBe('Error');
   });
 
   it('records accepted widget failures into diagnostics once', () => {
@@ -144,8 +171,8 @@ describe('createWorkbenchStore', () => {
     };
 
     clearProjectDiagnostics(projectId);
-    store.dispatch({ failure, type: 'recordWidgetFailure' });
-    store.dispatch({ failure, type: 'recordWidgetFailure' });
+    store.commands.notifications.recordWidgetFailure(failure);
+    store.commands.notifications.recordWidgetFailure(failure);
 
     expect(getProjectDiagnostics(projectId)).toMatchObject([
       {
@@ -164,7 +191,7 @@ describe('createWorkbenchStore', () => {
     const unsubscribe = store.subscribe(listener);
 
     unsubscribe();
-    store.dispatch({ type: 'createProject' });
+    store.commands.projects.create();
 
     expect(listener).not.toHaveBeenCalled();
   });
@@ -173,9 +200,9 @@ describe('createWorkbenchStore', () => {
     const store = createWorkbenchStore();
     const activeProjectWatcher = watchSelector(store, (snapshot) => snapshot.activeProject);
     const activeProjectIdWatcher = watchSelector(store, (snapshot) => snapshot.activeProject.id);
-    const notificationCountWatcher = watchSelector(store, (snapshot) => snapshot.state.notifications.length);
+    const notificationCountWatcher = watchSelector(store, (snapshot) => snapshot.notifications.length);
 
-    store.dispatch({ kind: 'info', title: 'Global notice', type: 'recordNotice' });
+    store.commands.notifications.add({ kind: 'info', title: 'Global notice' });
 
     expect(notificationCountWatcher.current).toBe(1);
     expect(notificationCountWatcher.changeCount).toBe(1);
@@ -185,14 +212,14 @@ describe('createWorkbenchStore', () => {
 
   it('lets narrow selectors observe only their own state changes', () => {
     const store = createWorkbenchStore();
-    const backendStatusWatcher = watchSelector(store, (snapshot) => snapshot.state.backendConnection.status);
+    const backendStatusWatcher = watchSelector(store, (snapshot) => snapshot.backendConnection.status);
     const activeProjectIdWatcher = watchSelector(store, (snapshot) => snapshot.activeProject.id);
-    const projectCountWatcher = watchSelector(store, (snapshot) => snapshot.state.projects.length);
+    const projectCountWatcher = watchSelector(store, (snapshot) => snapshot.projects.length);
     const batchCountWatcher = watchSelector(store, (snapshot) =>
       Number(getProjectWidgetValues(snapshot.activeProject, 'generate').batchCount ?? 1)
     );
 
-    store.dispatch({ status: 'connected', type: 'setBackendConnectionStatus' });
+    store.commands.queue.setConnectionStatus({ status: 'connected' });
 
     expect(backendStatusWatcher.current).toBe('connected');
     expect(backendStatusWatcher.changeCount).toBe(1);
@@ -200,7 +227,7 @@ describe('createWorkbenchStore', () => {
     expect(projectCountWatcher.changeCount).toBe(0);
     expect(batchCountWatcher.changeCount).toBe(0);
 
-    store.dispatch({ batchCount: 3, type: 'setGenerateBatchCount' });
+    store.commands.generation.setBatchCount(3);
 
     expect(batchCountWatcher.current).toBe(3);
     expect(batchCountWatcher.changeCount).toBe(1);
@@ -208,7 +235,7 @@ describe('createWorkbenchStore', () => {
     expect(activeProjectIdWatcher.changeCount).toBe(0);
     expect(projectCountWatcher.changeCount).toBe(0);
 
-    store.dispatch({ type: 'createProject' });
+    store.commands.projects.create();
 
     expect(projectCountWatcher.current).toBe(2);
     expect(projectCountWatcher.changeCount).toBe(1);
@@ -221,16 +248,16 @@ describe('createWorkbenchStore', () => {
     const store = createWorkbenchStore();
     const statusObjectWatcher = watchSelector(
       store,
-      (snapshot) => ({ status: snapshot.state.backendConnection.status }),
+      (snapshot) => ({ status: snapshot.backendConnection.status }),
       (left, right) => left.status === right.status
     );
 
-    store.dispatch({ kind: 'info', title: 'Unrelated notice', type: 'recordNotice' });
+    store.commands.notifications.add({ kind: 'info', title: 'Unrelated notice' });
 
     expect(statusObjectWatcher.current).toEqual({ status: 'connecting' });
     expect(statusObjectWatcher.changeCount).toBe(0);
 
-    store.dispatch({ status: 'connected', type: 'setBackendConnectionStatus' });
+    store.commands.queue.setConnectionStatus({ status: 'connected' });
 
     expect(statusObjectWatcher.current).toEqual({ status: 'connected' });
     expect(statusObjectWatcher.changeCount).toBe(1);
@@ -245,7 +272,7 @@ describe('createWorkbenchStore', () => {
     );
     const widgetInstancesWatcher = watchSelector(store, (snapshot) => snapshot.activeProject.widgetInstances);
 
-    store.dispatch({ instanceId: 'generate', type: 'patchWidgetInstanceValues', values: { prompt: 'updated' } });
+    store.commands.widgets.patchInstanceValues('generate', { prompt: 'updated' });
 
     expect(widgetInstancesWatcher.changeCount).toBe(1);
     expect(placementWatcher.changeCount).toBe(0);
@@ -260,7 +287,7 @@ describe('createWorkbenchStore', () => {
     );
     const firstProjectId = placementWatcher.current.projectId;
 
-    store.dispatch({ type: 'createProject' });
+    store.commands.projects.create();
 
     expect(placementWatcher.current.projectId).not.toBe(firstProjectId);
     expect(placementWatcher.changeCount).toBe(1);
@@ -272,16 +299,12 @@ describe('createWorkbenchStore', () => {
 
     store.subscribe(listener);
 
-    store.dispatch({ batchCount: 1, type: 'setGenerateBatchCount' });
-    store.dispatch({ settings: { useCpuNoise: true }, type: 'setActiveProjectSettings' });
-    store.dispatch({ isCollapsed: false, region: 'left', type: 'setRegionWidgetCollapsed' });
-    store.dispatch({
-      region: 'left',
-      sizePx: store.getSnapshot().activeProject.widgetRegions.left.sizePx,
-      type: 'setRegionWidgetSize',
-    });
-    store.dispatch({ type: 'patchWidgetValues', values: {}, widgetId: 'generate' });
-    store.dispatch({ status: 'connecting', type: 'setBackendConnectionStatus' });
+    store.commands.generation.setBatchCount(1);
+    store.commands.account.updateProjectPreferences({ useCpuNoise: true });
+    store.commands.layout.setRegionCollapsed('left', false);
+    store.commands.layout.setRegionSize('left', store.getSnapshot().activeProject.widgetRegions.left.sizePx);
+    store.commands.widgets.patchValues('generate', {});
+    store.commands.queue.setConnectionStatus({ status: 'connecting' });
 
     expect(listener).not.toHaveBeenCalled();
   });
@@ -293,17 +316,92 @@ describe('createWorkbenchStore', () => {
 
     store.subscribe(listener);
 
-    store.dispatch({
-      projectId: project.id,
-      queueItemId: 'missing-queue-item',
-      status: 'pending',
-      type: 'setQueueItemStatus',
-    });
+    store.commands.queue.setStatus({ projectId: project.id, queueItemId: 'missing-queue-item', status: 'pending' });
 
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('keeps placement selectors stable across generate, queue, and settings changes', () => {
+  it('exposes queue behavior through namespaced commands', () => {
+    const initialState = createInitialWorkbenchState();
+    const initialProject = initialState.projects[0];
+    const store = createWorkbenchStore({
+      ...initialState,
+      projects: [
+        {
+          ...initialProject,
+          queue: {
+            items: [
+              {
+                cancellable: true,
+                id: 'queue-item-1',
+                snapshot: {} as (typeof initialProject.queue.items)[number]['snapshot'],
+                status: 'pending',
+              },
+              {
+                cancellable: false,
+                id: 'queue-item-complete',
+                snapshot: {} as (typeof initialProject.queue.items)[number]['snapshot'],
+                status: 'completed',
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const projectId = store.getSnapshot().activeProject.id;
+
+    store.commands.queue.setConnectionStatus({ status: 'connected' });
+    store.commands.queue.cancel(projectId, 'queue-item-1');
+
+    expect(store.getState().backendConnection.status).toBe('connected');
+    expect(store.getSnapshot().activeProject.queue.items[0]?.status).toBe('cancelled');
+    expect(store.getSnapshot().notifications[0]).toMatchObject({
+      kind: 'info',
+      title: 'Invocation cancellation requested',
+    });
+
+    store.commands.queue.clearCompleted();
+
+    expect(store.getSnapshot().activeProject.queue.items.map((item) => item.id)).toEqual(['queue-item-1']);
+  });
+
+  it('enforces project lifecycle invariants through observable command results', () => {
+    const store = createWorkbenchStore();
+    const firstProjectId = store.getSnapshot().activeProject.id;
+
+    expect(store.commands.projects.switchTo('missing')).toEqual({ ok: false, reason: 'project-not-found' });
+    expect(store.getSnapshot().activeProject.id).toBe(firstProjectId);
+
+    const secondProject = store.commands.projects.create();
+
+    expect(store.getSnapshot().activeProject.id).toBe(secondProject.id);
+    expect(store.commands.projects.switchTo(firstProjectId)).toEqual({ ok: true });
+    expect(store.getSnapshot().activeProject.id).toBe(firstProjectId);
+    expect(store.commands.projects.close(firstProjectId)).toEqual({ ok: true });
+    expect(store.getSnapshot().activeProject.id).toBe(secondProject.id);
+    expect(store.commands.projects.close(secondProject.id)).toEqual({ ok: false, reason: 'last-project' });
+    expect(store.getSnapshot().notifications[0]).toMatchObject({
+      kind: 'error',
+      title: 'Project close blocked',
+    });
+  });
+
+  it('applies Canvas and Workflow edits without exposing aggregate reducer actions', () => {
+    const store = createWorkbenchStore();
+    const project = store.getSnapshot().activeProject;
+    const bbox = project.canvas.document.bbox;
+
+    expect(store.commands.canvas.apply(project.id, { bbox: { ...bbox, x: bbox.x + 10 }, type: 'setCanvasBbox' })).toBe(
+      true
+    );
+    expect(store.getSnapshot().activeProject.canvas.document.bbox.x).toBe(bbox.x + 10);
+
+    store.commands.workflows.editGraph({ patch: { name: 'Command-owned workflow' }, type: 'setMetadata' });
+
+    expect(store.getSnapshot().activeProject.projectGraph.name).toBe('Command-owned workflow');
+  });
+
+  it('keeps placement selectors stable across generate and settings changes', () => {
     const store = createWorkbenchStore();
     const placementWatcher = watchSelector(
       store,
@@ -311,9 +409,8 @@ describe('createWorkbenchStore', () => {
       areWidgetPlacementProjectsEqual
     );
 
-    store.dispatch({ batchCount: 2, type: 'setGenerateBatchCount' });
-    store.dispatch({ backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
-    store.dispatch({ settings: { useCpuNoise: false }, type: 'setActiveProjectSettings' });
+    store.commands.generation.setBatchCount(2);
+    store.commands.account.updateProjectPreferences({ useCpuNoise: false });
 
     expect(placementWatcher.changeCount).toBe(0);
   });

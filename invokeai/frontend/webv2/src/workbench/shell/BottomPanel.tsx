@@ -14,7 +14,6 @@ export const BottomPanel = () => {
     areWidgetRenderInstancesEqual
   );
   const widget = instance ? getWidgetById(instance.typeId) : undefined;
-  const View = widget?.manifest.view;
   const canShowBottomPanel =
     panels.isBottomOpen &&
     !bottomRegion.isCollapsed &&
@@ -26,7 +25,7 @@ export const BottomPanel = () => {
     return null;
   }
 
-  if (!instance || !widget || !View) {
+  if (!instance || !widget) {
     return (
       <MissingWidgetFrame
         label={widget ? resolveWidgetLabel(widget.manifest, t) : bottomRegion.activeInstanceId}

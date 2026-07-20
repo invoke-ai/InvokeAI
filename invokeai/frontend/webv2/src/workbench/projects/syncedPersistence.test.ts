@@ -1,4 +1,4 @@
-import type { Project, WorkbenchState } from '@workbench/types';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -145,6 +145,7 @@ const SESSION_KEY = 'webv2:workbench-account';
 
 let persistence: typeof persistenceModule;
 let library: typeof libraryModule;
+let service: persistenceModule.SyncedWorkbenchPersistence;
 
 const seedSessionBlob = (blob: Record<string, unknown>): void => {
   api.__clientState.set(SESSION_KEY, JSON.stringify(blob));
@@ -176,10 +177,37 @@ beforeEach(async () => {
   api.updateProject.mockClear();
 
   persistence = await import('./syncedPersistence');
+  service = persistence.createSyncedWorkbenchPersistence();
   library = await import('./library');
 });
 
 describe('loadWorkbench session hydration', () => {
+  it('constructs isolated synchronization lifetimes instead of sharing pending state', async () => {
+    const first = persistence.createSyncedWorkbenchPersistence();
+    const second = persistence.createSyncedWorkbenchPersistence();
+    api.listProjects.mockRejectedValueOnce(new Error('offline'));
+
+    await first.loadWorkbench();
+
+    expect(first.hasPendingChanges()).toBe(true);
+    expect(second.hasPendingChanges()).toBe(false);
+  });
+
+  it('shares one backend import across StrictMode-style load replays', async () => {
+    const state = createInitialWorkbenchState();
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state, version: 1 })
+    );
+
+    const [first, replay] = await Promise.all([service.loadWorkbench(), service.loadWorkbench()]);
+
+    expect(replay).toBe(first);
+    expect(api.listProjects).toHaveBeenCalledTimes(1);
+    expect(api.createProject).toHaveBeenCalledTimes(state.projects.length);
+    expect(api.getProject).not.toHaveBeenCalled();
+  });
+
   it('hydrates only the open set and seeds the full library', async () => {
     const first = seedServerProject('First');
     const second = seedServerProject('Second');
@@ -188,12 +216,12 @@ describe('loadWorkbench session hydration', () => {
 
     seedSessionBlob({ account, activeProjectId: second.id, openProjectIds: [second.id] });
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench();
+    const snapshot = await service.loadWorkbench();
 
     expect(snapshot?.state.projects.map((project) => project.id)).toEqual([second.id]);
     expect(snapshot?.state.activeProjectId).toBe(second.id);
     expect(api.getProject).toHaveBeenCalledTimes(1);
-    expect(persistence.syncedWorkbenchPersistence.hasPendingChanges()).toBe(false);
+    expect(service.hasPendingChanges()).toBe(false);
 
     const libraryIds = library.getProjectLibrary().summaries.map((summary) => summary.id);
 
@@ -209,7 +237,7 @@ describe('loadWorkbench session hydration', () => {
 
     seedSessionBlob({ account, activeProjectId: 'missing' });
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench();
+    const snapshot = await service.loadWorkbench();
 
     expect(snapshot?.state.projects).toHaveLength(2);
   });
@@ -218,7 +246,7 @@ describe('loadWorkbench session hydration', () => {
     seedServerProject('Backend Project');
     storage.set('invokeai:v7:webv2:workbench', '{not json');
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench();
+    const snapshot = await service.loadWorkbench();
 
     expect(snapshot?.state.projects.map((project) => project.name)).toEqual(['Backend Project']);
   });
@@ -229,12 +257,12 @@ describe('loadWorkbench session hydration', () => {
 
     seedSessionBlob({ account, activeProjectId: '', openProjectIds: [] });
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench();
+    const snapshot = await service.loadWorkbench();
 
     expect(snapshot?.state.projects).toHaveLength(1);
     expect(snapshot?.state.projects[0].id).not.toBe(existing.id);
     expect(snapshot?.state.activeProjectId).toBe(snapshot?.state.projects[0].id);
-    expect(persistence.syncedWorkbenchPersistence.hasPendingChanges()).toBe(true);
+    expect(service.hasPendingChanges()).toBe(true);
   });
 
   it('joins a deep-linked project into the open set and focuses it', async () => {
@@ -244,11 +272,11 @@ describe('loadWorkbench session hydration', () => {
 
     seedSessionBlob({ account, activeProjectId: first.id, openProjectIds: [first.id] });
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench({ openProjectId: second.id });
+    const snapshot = await service.loadWorkbench({ openProjectId: second.id });
 
     expect(snapshot?.state.projects.map((project) => project.id)).toEqual([first.id, second.id]);
     expect(snapshot?.state.activeProjectId).toBe(second.id);
-    expect(persistence.syncedWorkbenchPersistence.hasPendingChanges()).toBe(true);
+    expect(service.hasPendingChanges()).toBe(true);
   });
 
   it('appends and activates a draft when a new project is requested', async () => {
@@ -257,11 +285,11 @@ describe('loadWorkbench session hydration', () => {
 
     seedSessionBlob({ account, activeProjectId: first.id, openProjectIds: [first.id] });
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench({ createNew: true });
+    const snapshot = await service.loadWorkbench({ createNew: true });
 
     expect(snapshot?.state.projects).toHaveLength(2);
     expect(snapshot?.state.activeProjectId).not.toBe(first.id);
-    expect(persistence.syncedWorkbenchPersistence.hasPendingChanges()).toBe(true);
+    expect(service.hasPendingChanges()).toBe(true);
   });
 });
 
@@ -273,7 +301,7 @@ describe('saveWorkbench', () => {
 
     seedSessionBlob({ account, activeProjectId: first.id, openProjectIds: [first.id, second.id] });
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench();
+    const snapshot = await service.loadWorkbench();
     const open = snapshot?.state.projects ?? [];
 
     expect(open).toHaveLength(2);
@@ -284,7 +312,7 @@ describe('saveWorkbench', () => {
       first.id
     );
 
-    await persistence.syncedWorkbenchPersistence.saveWorkbench(closed);
+    await service.saveWorkbench(closed);
 
     expect(api.deleteProject).not.toHaveBeenCalled();
     expect(api.__records.has(second.id)).toBe(true);
@@ -296,11 +324,11 @@ describe('saveWorkbench', () => {
 
     seedSessionBlob({ account, activeProjectId: first.id, openProjectIds: [first.id] });
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench();
+    const snapshot = await service.loadWorkbench();
     const open = snapshot?.state.projects ?? [];
     const draft = createDraftProject(open);
 
-    await persistence.syncedWorkbenchPersistence.saveWorkbench(stateWithProjects([...open, draft], draft.id));
+    await service.saveWorkbench(stateWithProjects([...open, draft], draft.id));
 
     const blob = JSON.parse(api.__clientState.get(SESSION_KEY) ?? '{}') as {
       activeProjectId?: string;
@@ -315,8 +343,8 @@ describe('saveWorkbench', () => {
     const project = createDraftProject([]);
     const state = stateWithProjects([project]);
 
-    persistence.markProjectDeleted(project.id);
-    await persistence.syncedWorkbenchPersistence.saveWorkbench(state);
+    service.markProjectDeleted(project.id);
+    await service.saveWorkbench(state);
 
     expect(api.createProject).not.toHaveBeenCalled();
     expect(api.updateProject).not.toHaveBeenCalled();
@@ -331,9 +359,9 @@ describe('persistEmptySession', () => {
 
     seedSessionBlob({ account, activeProjectId: first.id, openProjectIds: [first.id] });
 
-    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench();
+    const snapshot = await service.loadWorkbench();
 
-    await persistence.persistEmptySession(snapshot?.state ?? createInitialWorkbenchState());
+    await service.persistEmptySession(snapshot?.state ?? createInitialWorkbenchState());
 
     const blob = JSON.parse(api.__clientState.get(SESSION_KEY) ?? '{}') as { openProjectIds?: string[] };
 
@@ -346,7 +374,7 @@ describe('persistEmptySession', () => {
 describe('hydrateProjectFromServer', () => {
   it('returns an openable project and registers its revision for future saves', async () => {
     const project = seedServerProject('Closed project');
-    const hydrated = await persistence.hydrateProjectFromServer(project.id);
+    const hydrated = await service.hydrateProjectFromServer(project.id);
 
     expect(hydrated?.id).toBe(project.id);
     expect(hydrated?.undoRedo).toEqual({ future: [], past: [] });
@@ -354,13 +382,13 @@ describe('hydrateProjectFromServer', () => {
     // A subsequent save updates in place rather than re-creating.
     const renamed = { ...hydrated!, name: 'Renamed after reopen' };
 
-    await persistence.syncedWorkbenchPersistence.saveWorkbench(stateWithProjects([renamed]));
+    await service.saveWorkbench(stateWithProjects([renamed]));
 
     expect(api.createProject).not.toHaveBeenCalled();
     expect(api.__records.get(project.id)?.name).toBe('Renamed after reopen');
   });
 
   it('returns null for unknown projects', async () => {
-    expect(await persistence.hydrateProjectFromServer('nope')).toBeNull();
+    expect(await service.hydrateProjectFromServer('nope')).toBeNull();
   });
 });

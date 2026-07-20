@@ -11,6 +11,7 @@ const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, 'ws');
 export default defineConfig({
   base: './',
   build: {
+    manifest: true,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -52,8 +53,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@app': fileURLToPath(new URL('./src/app', import.meta.url)),
       '@assets': fileURLToPath(new URL('./src/assets', import.meta.url)),
-      '@theme': fileURLToPath(new URL('./src/theme', import.meta.url)),
+      '@features': fileURLToPath(new URL('./src/features', import.meta.url)),
+      '@platform': fileURLToPath(new URL('./src/platform', import.meta.url)),
+      '@theme': fileURLToPath(new URL('./src/platform/ui/theme', import.meta.url)),
       '@workbench': fileURLToPath(new URL('./src/workbench', import.meta.url)),
     },
   },

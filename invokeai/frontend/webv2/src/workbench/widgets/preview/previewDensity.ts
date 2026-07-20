@@ -1,6 +1,6 @@
-import type { WorkbenchRegion } from '@workbench/types';
+import type { WorkbenchRegion } from '@workbench/widgetContracts';
 
-import { useEffectEvent, useState, type Ref } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type Ref } from 'react';
 
 /**
  * Single source of truth for the preview widget's responsive behavior. Every
@@ -45,9 +45,13 @@ export const usePreviewDensity = (
   region: WorkbenchRegion
 ): { density: PreviewDensity; rootRef: Ref<HTMLDivElement> } => {
   const [density, setDensity] = useState<PreviewDensity>(region === 'left' || region === 'right' ? 'compact' : 'full');
-  const applyMeasuredWidth = useEffectEvent((widthPx: number) => {
-    setDensity(getPreviewDensity({ region, widthPx }));
-  });
+  const regionRef = useRef(region);
+  useLayoutEffect(() => {
+    regionRef.current = region;
+  }, [region]);
+  const applyMeasuredWidth = useCallback((widthPx: number) => {
+    setDensity(getPreviewDensity({ region: regionRef.current, widthPx }));
+  }, []);
   const [rootRef] = useState(() => (node: HTMLDivElement | null) => {
     if (!node) {
       return;

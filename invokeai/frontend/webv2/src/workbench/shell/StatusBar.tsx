@@ -1,10 +1,10 @@
-import type { WidgetInstanceId } from '@workbench/types';
+import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 import type { PlacedWidgetRegionItem, WidgetPlacementInstanceMeta } from '@workbench/widgetRegionViewModel';
 
 import { Box } from '@chakra-ui/react';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { Row, Tooltip } from '@workbench/components/ui';
+import { Row, Tooltip } from '@platform/ui';
 import {
   WidgetEnableMenu,
   WidgetInstanceContextMenu,
@@ -24,7 +24,7 @@ import {
   isExpandableBottomItem,
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { type KeyboardEvent, type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -42,7 +42,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
-  const dispatch = useWorkbenchDispatch();
+  const { widgets } = useWorkbenchCommands();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
   const getWidgetLabel = useCallback(
@@ -78,24 +78,24 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
     (item: WidgetEnableMenuItem) =>
       item.isEnabled
         ? closeWidgetPlacement({
-            dispatch,
+            widgets,
             getWidgetById,
             instanceId: item.id,
             project: placementProject,
             region: 'bottom',
           })
         : openWidgetPlacement({
-            dispatch,
+            widgets,
             getWidgetsForRegion,
             options: { createNew: item.allowMultiple, preferredRegions: ['bottom'] },
             typeId: item.typeId,
           }),
-    [dispatch, placementProject]
+    [placementProject, widgets]
   );
   const handleSelect = useCallback(
     (instanceId: WidgetInstanceId) =>
-      revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'bottom' }),
-    [dispatch, placementProject]
+      revealWidgetPlacement({ instanceId, project: placementProject, region: 'bottom', widgets }),
+    [placementProject, widgets]
   );
   const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
   const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
@@ -160,7 +160,6 @@ const CompactBottomWidget = ({
   onContextMenu: (item: BottomWidgetItem, event: MouseEvent) => void;
   onSelect: (widgetId: WidgetInstanceId) => void;
 }) => {
-  const View = item.widget.manifest.view;
   const { dragHandleProps, isDragging, setNodeRef, style } = useWidgetSortable({
     instanceId: item.id,
     region: 'bottom',
@@ -196,10 +195,6 @@ const CompactBottomWidget = ({
   }, [item.id, item.isExpandable, onSelect]);
   const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
   const tooltipContent = useMemo(() => (item.instance ? <BottomWidgetTooltipContent item={item} /> : null), [item]);
-
-  if (!View) {
-    return null;
-  }
 
   const content = (
     <Box ref={setNodeRef} h="full" style={style}>

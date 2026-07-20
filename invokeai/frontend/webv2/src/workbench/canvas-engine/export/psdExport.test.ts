@@ -1,5 +1,5 @@
+import type { CanvasBlendMode } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasBlendMode } from '@workbench/types';
 
 import { describe, expect, it } from 'vitest';
 

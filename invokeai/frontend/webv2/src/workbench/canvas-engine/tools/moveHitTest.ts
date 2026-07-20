@@ -19,8 +19,12 @@
  * Zero React, zero import-time side effects.
  */
 
+import type {
+  CanvasDocumentContractV2,
+  CanvasLayerBaseContract,
+  CanvasLayerContract,
+} from '@workbench/canvas-engine/contracts';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2, CanvasLayerBaseContract, CanvasLayerContract } from '@workbench/types';
 
 import {
   getSourceContentRect,

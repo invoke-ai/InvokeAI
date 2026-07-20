@@ -1,5 +1,5 @@
+import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
-import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/types';
 
 import { createDecodedBitmapPool } from '@workbench/canvas-engine/render/decodedBitmapPool';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';

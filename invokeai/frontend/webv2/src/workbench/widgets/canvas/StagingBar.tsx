@@ -1,6 +1,6 @@
+import type { CanvasStagingAreaContractV2, CanvasStagingCandidateContract } from '@workbench/canvas-engine/api';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
-import type { CanvasStagingAreaContractV2, CanvasStagingCandidateContract } from '@workbench/types';
 
 import {
   Flex,
@@ -14,13 +14,13 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
-import { useQueueItemProgress } from '@workbench/backend/progressStore';
+import { galleryDurability } from '@features/gallery';
+import { galleryImageUrls } from '@features/gallery/utility';
+import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
+import { Button, IconButton, MenuContent, toaster, Tooltip } from '@platform/ui';
+import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
+import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { getCancelableCanvasStagingQueueItemId } from '@workbench/canvasStagingView';
-import { Button, IconButton, MenuContent, toaster, Tooltip } from '@workbench/components/ui';
-import { getImageThumbnailUrl, saveImageToGallery } from '@workbench/gallery/api';
-import { StreamingImageFrame } from '@workbench/images/StreamingImageFrame';
-import { progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
 import { CanvasOptionsBar } from '@workbench/widgets/canvas/tool-options/CanvasOptionsBar';
 import {
   CheckIcon,
@@ -111,7 +111,7 @@ export const StagingBar = ({
     }
     setIsSaving(true);
     try {
-      await saveImageToGallery(selectedCandidate.imageName);
+      await galleryDurability.save(selectedCandidate.imageName);
       toaster.create({
         description: t('widgets.canvas.staging.savedDescription', { name: selectedCandidate.imageName }),
         title: t('widgets.canvas.staging.saved'),
@@ -358,7 +358,7 @@ const StagingThumbnail = ({
       {slot.kind === 'candidate' ? (
         <img
           alt={slot.candidate.imageName}
-          src={slot.candidate.thumbnailUrl || getImageThumbnailUrl(slot.candidate.imageName)}
+          src={slot.candidate.thumbnailUrl || galleryImageUrls.thumbnail(slot.candidate.imageName)}
           style={{ display: 'block', height: '100%', objectFit: 'cover', width: '100%' }}
         />
       ) : (

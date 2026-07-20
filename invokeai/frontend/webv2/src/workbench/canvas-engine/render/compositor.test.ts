@@ -1,11 +1,11 @@
-import type { Mat2d } from '@workbench/canvas-engine/types';
 import type {
   CanvasBlendMode,
   CanvasDocumentContractV2,
   CanvasImageRef,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
+import type { Mat2d } from '@workbench/canvas-engine/types';
 
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { identity } from '@workbench/canvas-engine/math/mat2d';

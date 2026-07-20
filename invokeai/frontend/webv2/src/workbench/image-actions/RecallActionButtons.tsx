@@ -1,5 +1,5 @@
 import { ButtonGroup, Icon } from '@chakra-ui/react';
-import { Button, Tooltip } from '@workbench/components/ui';
+import { Button, Tooltip } from '@platform/ui';
 import {
   AsteriskIcon,
   QuoteIcon,

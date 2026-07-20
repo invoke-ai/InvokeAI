@@ -1,4 +1,4 @@
-import type { WidgetInstanceContract } from '@workbench/types';
+import type { WidgetInstanceContract } from '@workbench/widgetContracts';
 
 import { describe, expect, it } from 'vitest';
 

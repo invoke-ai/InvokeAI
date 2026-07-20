@@ -1,12 +1,12 @@
+import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasLayerContract } from '@workbench/types';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch, KeyboardEvent, MouseEvent } from 'react';
 
 import { Badge, Box, HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { IconButton, Row, ToggleDot } from '@workbench/components/ui';
+import { IconButton, Row, ToggleDot } from '@platform/ui';
 import { LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';

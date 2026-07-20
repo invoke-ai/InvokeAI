@@ -49,7 +49,7 @@ This avoids symlink assumptions and lets multi-user/admin rules follow the exist
 
 ## Missing Core Systems
 
-The extension API stubs exist in `extensionApi.ts`, but these systems still need real shell features:
+The contribution registries exist in `extensionRegistry.ts` (one registry per Workbench mount, constructed by `WorkbenchProvider`), but these systems still need real shell features:
 
 - Command registry UI and lifecycle ownership.
 - Command palette UI.

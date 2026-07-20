@@ -1,83 +1,54 @@
+import { flushGenerateDrafts } from '@features/generation/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { areArraysEqual } from '@platform/state/selectors';
 import { useNavigate } from '@tanstack/react-router';
-import { useEffect, useRef } from 'react';
 
 import type { WorkbenchSearch } from './projects/session';
 
-import { hydrateProjectFromServer } from './projects/syncedPersistence';
-import { flushGenerateDrafts } from './widgets/generate/generateDraftRegistry';
-import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
-import { areArraysEqual } from './workbenchSelectors';
+import {
+  useWorkbenchCommands,
+  useWorkbenchHasHydrated,
+  useWorkbenchPersistenceService,
+  useWorkbenchSelector,
+} from './WorkbenchContext';
 
-/**
- * Keeps a mounted editor in line with the /app search params. Renders nothing.
- *
- * Boot is not its job — `WorkbenchProvider` consumes the params present at
- * mount as load options. This covers what happens afterwards:
- *
- * - `?new` is stripped once hydration has consumed it, so a reload (or a
- *   bookmark) does not mint another draft project.
- * - `?project` changing while the editor is open (a deep link clicked from
- *   elsewhere) focuses the tab if it is open, or hydrates it from the
- *   library and opens it if not.
- */
-export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch }) => {
-  const projectIds = useWorkbenchSelector(
-    (snapshot) => snapshot.state.projects.map((project) => project.id),
-    areArraysEqual
-  );
-  const dispatch = useWorkbenchDispatch();
-  const hasHydrated = useWorkbenchHasHydrated();
+const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
+  const commands = useWorkbenchCommands();
   const navigate = useNavigate();
-  const latestProjectIdsRef = useRef(projectIds);
-  // The mount-time param was already handled by the boot load options.
-  const handledProjectIdRef = useRef<string | null>(search.project ?? null);
+  const persistence = useWorkbenchPersistenceService();
+  const projectIds = useWorkbenchSelector((snapshot) => snapshot.projects.map((project) => project.id), areArraysEqual);
 
-  useEffect(() => {
-    latestProjectIdsRef.current = projectIds;
-  }, [projectIds]);
-
-  const isNewRequested = search.new === true;
-
-  useEffect(() => {
-    if (!hasHydrated || !isNewRequested) {
+  useMountEffect(() => {
+    if (search.new === true) {
+      void navigate({ replace: true, search: {}, to: '/app' });
       return;
     }
 
-    void navigate({ replace: true, search: {}, to: '/app' });
-  }, [hasHydrated, isNewRequested, navigate]);
-
-  const requestedProjectId = search.project;
-
-  useEffect(() => {
-    if (!hasHydrated || !requestedProjectId || handledProjectIdRef.current === requestedProjectId) {
-      return undefined;
+    const requestedProjectId = search.project;
+    if (!requestedProjectId) {
+      return;
     }
 
-    handledProjectIdRef.current = requestedProjectId;
-
-    if (latestProjectIdsRef.current.includes(requestedProjectId)) {
+    if (projectIds.includes(requestedProjectId)) {
       flushGenerateDrafts();
-      dispatch({ projectId: requestedProjectId, type: 'switchProject' });
-
-      return undefined;
+      commands.projects.switchTo(requestedProjectId);
+      return;
     }
 
     let isCancelled = false;
-
-    void hydrateProjectFromServer(requestedProjectId).then((project) => {
+    void persistence.hydrateProjectFromServer(requestedProjectId).then((project) => {
       if (isCancelled) {
         return;
       }
 
       if (project) {
         flushGenerateDrafts();
-        dispatch({ project, type: 'openProject' });
+        commands.projects.open(project);
       } else {
-        dispatch({
+        commands.notifications.add({
           kind: 'info',
           message: 'The linked project does not exist on this account — it may have been deleted.',
           title: 'Project not found',
-          type: 'recordNotice',
         });
       }
     });
@@ -85,7 +56,21 @@ export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch
     return () => {
       isCancelled = true;
     };
-  }, [dispatch, hasHydrated, requestedProjectId]);
+  });
 
   return null;
+};
+
+/**
+ * Search changes remount the lifecycle adapter, eliminating effect-based prop
+ * synchronization while preserving cancellation for asynchronous hydration.
+ */
+export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch }) => {
+  const hasHydrated = useWorkbenchHasHydrated();
+
+  if (!hasHydrated) {
+    return null;
+  }
+
+  return <HydratedSessionController key={`${search.new === true}:${search.project ?? ''}`} search={search} />;
 };

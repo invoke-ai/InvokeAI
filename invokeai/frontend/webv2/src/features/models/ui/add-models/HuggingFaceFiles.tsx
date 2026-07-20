@@ -1,0 +1,68 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
+import type { HFLookupState } from '@features/models/ui/uiStore';
+
+import { Stack } from '@chakra-ui/react';
+import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
+import { InstallSourceButton, SourceListItem } from '@features/models/ui/shared/SourceListItem';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+const fileNameOf = (url: string): string => url.split(/[\\/]/).at(-1) ?? url;
+
+export const HuggingFaceFiles = ({
+  lookup,
+  onClear,
+  onInstall,
+  pendingSources,
+}: {
+  lookup: HFLookupState;
+  onClear: () => void;
+  onInstall: (url: string) => void;
+  pendingSources: ReadonlySet<string>;
+}) => {
+  const { t } = useTranslation();
+  const [filter, setFilter] = useState('');
+  const deferredFilter = useDeferredValue(filter);
+
+  const filteredUrls = useMemo(() => {
+    const term = deferredFilter.trim().toLowerCase();
+
+    if (!term) {
+      return lookup.urls;
+    }
+
+    return lookup.urls.filter((url) => fileNameOf(url).toLowerCase().includes(term));
+  }, [deferredFilter, lookup.urls]);
+
+  const installAll = () => {
+    for (const url of filteredUrls) {
+      onInstall(url);
+    }
+  };
+
+  return (
+    <Stack gap="1.5">
+      <ResultsListHeader
+        installAllDisabled={filteredUrls.length === 0}
+        installAllLabel={t('models.installAllCount', { count: filteredUrls.length })}
+        searchPlaceholder={t('models.filterFiles')}
+        searchValue={filter}
+        summary={t('models.filesInRepo', { count: lookup.urls.length, repo: lookup.repo })}
+        onClear={onClear}
+        onInstallAll={installAll}
+        onSearchChange={setFilter}
+      />
+      {filteredUrls.map((url) => (
+        <SourceListItem
+          key={url}
+          title={fileNameOf(url)}
+          titleTooltip={url}
+          trailing={
+            <InstallSourceButton isPending={pendingSources.has(url)} source={url} onInstall={() => onInstall(url)} />
+          }
+        />
+      ))}
+    </Stack>
+  );
+};
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

@@ -3,16 +3,20 @@ import type {
   LayerExportGuard,
   ReplaceSelectionFromImageResult,
 } from '@workbench/canvas-engine/api';
+import type { CanvasDocumentContractV2, CanvasImageRef } from '@workbench/canvas-engine/contracts';
 import type { CommitRasterFilterResult } from '@workbench/canvas-engine/controllers/filterResultController';
 import type {
   CommitMaskImageResult,
   MaskImageResultTarget,
 } from '@workbench/canvas-engine/controllers/maskResultController';
 import type { CanvasEditGate } from '@workbench/canvas-engine/editGate';
-export type { CanvasCompositeExecutorDeps } from '@workbench/canvas-engine/api';
 import type { ExportBakedLayerBlobResult, ExportLayerPixelsResult } from '@workbench/canvas-engine/engine';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
+import type {
+  ComposeForGenerationOptions,
+  ComposeForGenerationResult,
+} from '@workbench/canvas-operations/generationComposite';
 import type {
   FilterCommitTarget,
   FilterOperationSessionState,
@@ -22,7 +26,8 @@ import type {
   SamSessionError,
   SamSessionSnapshot,
 } from '@workbench/canvas-operations/operationTypes';
-import type { BackendGraphContract, CanvasDocumentContractV2, CanvasImageRef, WorkbenchState } from '@workbench/types';
+import type { BackendGraphContract } from '@workbench/graphContracts';
+import type { WorkbenchState } from '@workbench/projectContracts';
 
 export type StartSelectObjectSessionResult =
   | 'started'
@@ -48,6 +53,45 @@ export interface SelectObjectSessionUpdate {
   applyPolygonRefinement?: boolean;
   autoProcess?: boolean;
   isolatedPreview?: boolean;
+}
+
+/** Intent-oriented application operations attached to one Canvas engine. */
+export interface CanvasOperationCapability {
+  /** Runs the complete canvas → generation composite pipeline (see `composeForGeneration`). */
+  composeForGeneration(options: ComposeForGenerationOptions): Promise<ComposeForGenerationResult>;
+  uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
+  getOperationState(): CanvasOperationState;
+  subscribeOperation(listener: () => void): () => void;
+  getFilterSessionState(): FilterOperationSessionState | null;
+  subscribeFilterSession(listener: () => void): () => void;
+  getSamSessionState(): SamSessionSnapshot | null;
+  subscribeSamSession(listener: () => void): () => void;
+  startSelectObject(layerId: string): StartSelectObjectSessionResult;
+  startFilterOperation(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
+  updateFilterOperation(draft: LayerFilterSettings): CanvasOperationMutationResult;
+  setFilterOperationAutoProcess(value: boolean): CanvasOperationMutationResult;
+  processFilterOperation(): Promise<CanvasOperationActionResult>;
+  resetFilterOperation(settings: Record<string, unknown>): CanvasOperationMutationResult;
+  commitFilterOperation(
+    target: FilterCommitTarget,
+    makeImageDurable: (imageName: string) => Promise<void>
+  ): Promise<FilterCommitOperationResult>;
+  cancelFilterOperation(): void;
+  updateSelectObjectSession(changes: SelectObjectSessionUpdate): CanvasOperationMutationResult;
+  processSelectObjectSession(): Promise<SelectObjectSessionProcessResult>;
+  applySelectObjectSession(makeImageDurable: (imageName: string) => Promise<void>): Promise<CommitGeneratedImageResult>;
+  saveSelectObjectSession(
+    target: SelectObjectSaveTarget,
+    makeImageDurable: (imageName: string) => Promise<void>
+  ): Promise<SaveSelectObjectSessionResult>;
+  resetSelectObjectSession(): CanvasOperationMutationResult;
+  cancelSelectObjectSession(): void;
+}
+
+/** Private composition shape; mutable stores and controller never cross the Canvas interface. */
+export interface CanvasOperationImplementation extends CanvasOperationCapability {
+  readonly controller: CanvasOperationController;
+  readonly stores: CanvasApplicationOperationStores;
 }
 
 export type CanvasOperationIdentity =

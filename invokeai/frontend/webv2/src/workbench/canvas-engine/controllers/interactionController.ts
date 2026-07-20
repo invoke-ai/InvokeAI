@@ -1,4 +1,4 @@
-import type { CanvasToolCapability } from '@workbench/canvas-engine/api';
+import type { CanvasToolCapability } from '@workbench/canvas-engine/capabilities';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { ToolId } from '@workbench/canvas-engine/types';
 

@@ -1,4 +1,4 @@
-import type { WidgetContributionSource } from '@workbench/types';
+import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
 const GLOBAL_SOURCE_KEY = 'global';
 

@@ -1,4 +1,4 @@
-import type { CanvasDocumentContractV2 } from '@workbench/types';
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { describe, expect, it, vi } from 'vitest';

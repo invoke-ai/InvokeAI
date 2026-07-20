@@ -1,16 +1,16 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
-import type { History } from '@workbench/canvas-engine/history/history';
+import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 import { mergeDownMatrix } from '@workbench/canvas-engine/document/mergeDown';
 import { getMergeVisibleRasterLayers } from '@workbench/canvas-engine/document/mergeVisible';
 import { isMergeableRasterLayer } from '@workbench/canvas-engine/document/sources';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { blendToComposite } from '@workbench/canvas-engine/render/compositor';
+
+import type { CanvasMutationContext } from './mutationContext';
 
 export type MergeVisibleResult = 'merged' | 'not-ready' | 'busy' | 'nothing';
 
@@ -20,28 +20,12 @@ type ExportResult =
 
 export interface MergeLayerControllerOptions {
   readonly backend: RasterBackend;
-  readonly history: History;
+  readonly ctx: CanvasMutationContext;
   readonly layers: LayerCacheStore;
-  readonly getDocument: () => CanvasDocumentContractV2 | null;
-  readonly getReducerDocument: () => CanvasDocumentContractV2 | null;
   readonly canEdit: () => boolean;
-  readonly capturePermit: () => object | null;
-  readonly isPermitCurrent: (permit: object) => boolean;
-  readonly isGestureActive: () => boolean;
   readonly isCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV2) => boolean;
   readonly hasExportableContent: (layerId: string) => boolean;
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
-  readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
-  readonly createLayerId: () => string;
-  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => unknown;
-  readonly installPrepared: (prepared: unknown) => void;
-  readonly dispatchPrepared: (
-    action: CanvasProjectMutation,
-    expectedReducer: () => boolean,
-    expectedMirror: () => boolean
-  ) => void;
-  readonly endBurst: () => void;
-  readonly dispatch: (action: CanvasProjectMutation) => void;
   readonly notifyPainted: (layerId: string) => void;
   readonly markDirty: (layerId: string) => void;
 }
@@ -53,11 +37,11 @@ export class MergeLayerController {
   constructor(private readonly deps: MergeLayerControllerOptions) {}
 
   mergeDown(upperLayerId: string): boolean {
-    if (this.disposed || !this.deps.canEdit() || this.deps.isGestureActive()) {
+    if (this.disposed || !this.deps.canEdit() || this.deps.ctx.isGestureActive()) {
       return false;
     }
-    this.deps.endBurst();
-    const document = this.deps.getDocument();
+    this.deps.ctx.endBurst();
+    const document = this.deps.ctx.getDocument();
     if (!document) {
       return false;
     }
@@ -84,7 +68,7 @@ export class MergeLayerController {
       return false;
     }
     if (!belowHasContent && !upperHasContent) {
-      this.deps.dispatch({
+      this.deps.ctx.dispatch({
         source: { bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' },
         type: 'mergeCanvasLayersDown',
         upperLayerId,
@@ -121,7 +105,7 @@ export class MergeLayerController {
       context.globalAlpha = 1;
       context.globalCompositeOperation = 'source-over';
     }
-    this.deps.dispatch({
+    this.deps.ctx.dispatch({
       source: { bitmap: null, offset: { x: mergedRect.x, y: mergedRect.y }, type: 'paint' },
       type: 'mergeCanvasLayersDown',
       upperLayerId,
@@ -136,12 +120,12 @@ export class MergeLayerController {
   }
 
   async mergeVisible(): Promise<MergeVisibleResult> {
-    const permit = this.deps.capturePermit();
-    if (this.disposed || !permit || !this.deps.canEdit() || this.deps.isGestureActive()) {
+    const permit = this.deps.ctx.capturePermit();
+    if (this.disposed || !permit || !this.deps.canEdit() || this.deps.ctx.isGestureActive()) {
       return 'busy';
     }
-    this.deps.endBurst();
-    const document = this.deps.getDocument();
+    this.deps.ctx.endBurst();
+    const document = this.deps.ctx.getDocument();
     if (!document) {
       return 'nothing';
     }
@@ -164,13 +148,13 @@ export class MergeLayerController {
         throw rejected.reason instanceof Error ? rejected.reason : new Error(String(rejected.reason));
       }
       const exports = settled.map((result) => (result as PromiseFulfilledResult<ExportResult>).value);
-      if (!this.deps.isPermitCurrent(permit)) {
+      if (!this.deps.ctx.isPermitCurrent(permit)) {
         return 'busy';
       }
       if (exports.some((result) => result.status !== 'ok')) {
         return 'not-ready';
       }
-      if (this.deps.isGestureActive()) {
+      if (this.deps.ctx.isGestureActive()) {
         return 'busy';
       }
       for (let index = 0; index < exports.length; index += 1) {
@@ -181,13 +165,13 @@ export class MergeLayerController {
           exported.status !== 'ok' ||
           !contributor ||
           exported.guard.layer !== contributor ||
-          !this.deps.isGuardCurrent(exported.guard)
+          !this.deps.ctx.isGuardCurrent(exported.guard)
         ) {
           return 'not-ready';
         }
       }
 
-      const liveDocument = this.deps.getDocument();
+      const liveDocument = this.deps.ctx.getDocument();
       const liveContributors = liveDocument
         ? getMergeVisibleRasterLayers(liveDocument.layers, this.deps.hasExportableContent)
         : [];
@@ -222,7 +206,7 @@ export class MergeLayerController {
       context.globalAlpha = 1;
       context.globalCompositeOperation = 'source-over';
 
-      const resultId = this.deps.createLayerId();
+      const resultId = this.deps.ctx.createLayerId();
       const resultLayer: CanvasLayerContract = {
         blendMode: 'normal',
         id: resultId,
@@ -238,37 +222,37 @@ export class MergeLayerController {
       const hasResult = (doc: CanvasDocumentContractV2 | null): boolean =>
         doc?.selectedLayerId === resultId && doc.layers[0] === resultLayer;
       const apply = (): void => {
-        const prepared = this.deps.preparePixels(resultId, rect, pixels);
-        this.deps.dispatchPrepared(
+        const prepared = this.deps.ctx.preparePixels(resultId, rect, pixels);
+        this.deps.ctx.dispatchPrepared(
           {
             add: { index: 0, layers: [resultLayer] },
             enabledUpdates: [],
             selectedLayerId: resultId,
             type: 'applyCanvasLayerStackMutation',
           },
-          () => hasResult(this.deps.getReducerDocument()),
-          () => hasResult(this.deps.getDocument())
+          () => hasResult(this.deps.ctx.getReducerDocument()),
+          () => hasResult(this.deps.ctx.getDocument())
         );
-        this.deps.installPrepared(prepared);
+        this.deps.ctx.installPrepared(prepared);
       };
-      if (!this.deps.isPermitCurrent(permit)) {
+      if (!this.deps.ctx.isPermitCurrent(permit)) {
         return 'busy';
       }
       apply();
-      this.deps.history.push({
+      this.deps.ctx.history.push({
         bytes: rect.width * rect.height * 4 + 256,
         label: 'Merge visible',
         redo: apply,
         replayFailureAtomic: true,
         undo: () =>
-          this.deps.dispatchPrepared(
+          this.deps.ctx.dispatchPrepared(
             { enabledUpdates: [], removeIds: [resultId], selectedLayerId, type: 'applyCanvasLayerStackMutation' },
             () =>
-              this.deps.getReducerDocument()?.selectedLayerId === selectedLayerId &&
-              this.deps.getReducerDocument()?.layers.some((layer) => layer.id === resultId) === false,
+              this.deps.ctx.getReducerDocument()?.selectedLayerId === selectedLayerId &&
+              this.deps.ctx.getReducerDocument()?.layers.some((layer) => layer.id === resultId) === false,
             () =>
-              this.deps.getDocument()?.selectedLayerId === selectedLayerId &&
-              this.deps.getDocument()?.layers.some((layer) => layer.id === resultId) === false
+              this.deps.ctx.getDocument()?.selectedLayerId === selectedLayerId &&
+              this.deps.ctx.getDocument()?.layers.some((layer) => layer.id === resultId) === false
           ),
       });
       return 'merged';

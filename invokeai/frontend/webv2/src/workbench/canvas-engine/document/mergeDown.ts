@@ -15,8 +15,8 @@
  * Zero React, zero DOM, zero import-time side effects.
  */
 
+import type { CanvasLayerBaseContract } from '@workbench/canvas-engine/contracts';
 import type { Mat2d } from '@workbench/canvas-engine/types';
-import type { CanvasLayerBaseContract } from '@workbench/types';
 
 import { fromTRS, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 

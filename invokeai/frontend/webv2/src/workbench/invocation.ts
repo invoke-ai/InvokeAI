@@ -1,26 +1,27 @@
-import type { ModelConfig } from './models/types';
+import type { ModelConfig } from '@features/models';
+import type { ProjectGraphState } from '@features/workflow/contracts';
 import type {
   InvocationMode,
   InvocationRoute,
   InvocationSourceId,
-  Project,
   ResolvedInvocationRoute,
   ResultDestination,
-  WidgetId,
-} from './types';
-import type { ProjectGraphState } from './workflows/types';
+} from '@workbench/invocationContracts';
+import type { Project } from '@workbench/projectContracts';
+import type { WidgetId } from '@workbench/widgetContracts';
 
 import {
   getGenerationModelAvailabilityReasons,
   getGenerationValidationReasons,
   isSupportedGenerateModel,
-} from './generation/baseGenerationPolicies';
-import { normalizeGenerateWidgetValues } from './generation/settings';
-import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from './upscale/settings';
+  normalizeGenerateWidgetValues,
+} from '@features/generation/settings';
+import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@features/upscale';
+import { getProjectGraphReadiness } from '@features/workflow/graph';
+import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
+import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
+
 import { getProjectWidgetValues } from './widgetState';
-import { areArraysEqual, createStableSelector } from './workbenchSelectors';
-import { getProjectGraphReadiness } from './workflows/buildGraph';
-import { getInvocationTemplatesSnapshot } from './workflows/templates';
 
 /**
  * Static metadata for the Invocation Controller surfaces.

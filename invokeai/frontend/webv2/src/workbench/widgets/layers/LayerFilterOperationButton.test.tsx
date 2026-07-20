@@ -1,5 +1,5 @@
+import type * as WorkbenchUI from '@platform/ui';
 import type { StartFilterOperationResult } from '@workbench/canvas-operations/api';
-import type * as WorkbenchUI from '@workbench/components/ui';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -31,7 +31,7 @@ const { captured, notifyError, thumbnailSubscription } = vi.hoisted(() => ({
   thumbnailSubscription: vi.fn(),
 }));
 
-vi.mock('@workbench/components/ui', async (importOriginal) => {
+vi.mock('@platform/ui', async (importOriginal) => {
   const actual = await importOriginal<typeof WorkbenchUI>();
 
   return {

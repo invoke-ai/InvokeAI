@@ -3,19 +3,23 @@ import type {
   SelectValueChangeDetails,
   SliderValueChangeDetails,
 } from '@chakra-ui/react';
-import type { CanvasDocumentCapability } from '@workbench/canvas-engine/api';
-import type { ControlAdapterKind } from '@workbench/generation/canvas/addControlLayers';
-import type { CanvasControlAdapterContract, CanvasControlLayerContract } from '@workbench/types';
+import type {
+  CanvasControlAdapterContract,
+  CanvasControlLayerContract,
+  CanvasDocumentCapability,
+} from '@workbench/canvas-engine/api';
 import type { LayerFilterOperationEngine } from '@workbench/widgets/layers/LayerFilterOperationButton';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
 import { createListCollection, HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
-import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
-import { Field, Select, Slider } from '@workbench/components/ui';
-import { isControlKindSupportedForBase } from '@workbench/generation/canvas/addControlLayers';
-import { resolveDefaultFilterForModel } from '@workbench/generation/canvas/controlRecommendations';
-import { getControlValidationReason } from '@workbench/generation/canvas/controlValidation';
-import { useModelsSelector } from '@workbench/models/modelsStore';
+import {
+  getControlValidationReason,
+  isControlKindSupportedForBase,
+  type ControlAdapterKind,
+} from '@features/generation/graph';
+import { useModelsSelector } from '@features/models';
+import { Field, Select, Slider } from '@platform/ui';
+import { getCanvasOperations, resolveDefaultFilterForModel } from '@workbench/canvas-operations/api';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';

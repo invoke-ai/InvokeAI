@@ -1,4 +1,5 @@
-import type { AccountState, WorkbenchPreferences, WorkbenchState } from '@workbench/types';
+import type { AccountState, WorkbenchState } from '@workbench/projectContracts';
+import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
 import { getClientStateValue } from './api';
 

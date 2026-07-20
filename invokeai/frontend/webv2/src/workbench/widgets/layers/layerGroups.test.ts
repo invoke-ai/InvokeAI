@@ -3,7 +3,7 @@ import type {
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasRegionalGuidanceLayerContract,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it } from 'vitest';
 

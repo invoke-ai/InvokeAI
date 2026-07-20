@@ -1,22 +1,22 @@
-import type {
-  CommitGeneratedImageOptions,
-  CommitGeneratedImageResult,
-  ExportBakedLayerBlobResult,
-  LayerExportGuard,
-} from '@workbench/canvas-engine/engine';
-import type { RunUtilityGraphOptions, UtilityGraphResult } from '@workbench/canvas-operations/backend/utilityQueue';
-import type { GalleryImage } from '@workbench/gallery/api';
-import type { CanvasStagingCandidateContract } from '@workbench/types';
+import type { GalleryImage } from '@features/gallery';
+import type { RunUtilityGraphOptions, UtilityGraphResult } from '@features/queue/utility';
+import type { ProjectGraphState } from '@features/workflow/contracts';
 import type {
   BuildLayerWorkflowGraphOptions,
   BuiltLayerWorkflowGraph,
   LayerWorkflowDestination,
   WorkflowImageBinding,
-} from '@workbench/workflows/layerWorkflow';
-import type { InvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import type { ProjectGraphState } from '@workbench/workflows/types';
+} from '@features/workflow/graph';
+import type { InvocationTemplatesSnapshot } from '@features/workflow/react';
+import type {
+  CanvasStagingCandidateContract,
+  CommitGeneratedImageOptions,
+  CommitGeneratedImageResult,
+  ExportBakedLayerBlobResult,
+  LayerExportGuard,
+} from '@workbench/canvas-engine/api';
 
-export type { LayerWorkflowDestination } from '@workbench/workflows/layerWorkflow';
+export type { LayerWorkflowDestination } from '@features/workflow/graph';
 
 export type LayerWorkflowFailureStage =
   | 'export'

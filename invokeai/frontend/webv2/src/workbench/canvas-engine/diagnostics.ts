@@ -1,20 +1,6 @@
-export interface CanvasDiagnosticsSnapshot {
-  readonly surfaceCreations: number;
-  readonly surfaceResizes: number;
-  readonly allocatedBaseBytes: number;
-  readonly allocatedDerivedBytes: number;
-  readonly imageDataReads: number;
-  readonly imageDataWrites: number;
-  readonly derivedCacheHits: number;
-  readonly derivedCacheMisses: number;
-  readonly derivedCacheEvictions: number;
-  readonly layersConsidered: number;
-  readonly layersCulled: number;
-  readonly layersDrawn: number;
-  readonly compositeFrames: number;
-  readonly overlayFrames: number;
-  readonly overBudgetVisibleBaseBytes: number;
-}
+import type { CanvasDiagnosticsSnapshot } from './capabilities';
+
+export type { CanvasDiagnosticsSnapshot } from './capabilities';
 
 export type CanvasDiagnosticsCounter = keyof CanvasDiagnosticsSnapshot;
 type MutableCanvasDiagnosticsSnapshot = { -readonly [K in CanvasDiagnosticsCounter]: number };

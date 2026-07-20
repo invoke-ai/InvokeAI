@@ -1,4 +1,4 @@
-import type { WorkflowImageBinding } from '@workbench/workflows/layerWorkflow';
+import type { WorkflowImageBinding } from '@features/workflow/graph';
 
 import { describe, expect, it } from 'vitest';
 

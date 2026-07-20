@@ -1,4 +1,4 @@
-import type { WidgetContributionSource } from '@workbench/types';
+import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
 import { describe, expect, it } from 'vitest';
 

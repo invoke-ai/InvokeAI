@@ -1,9 +1,8 @@
 import splashImageUrl from '@assets/SplashImage.webp';
 import { Box, Flex, Heading, HStack, Spinner, Text, VStack } from '@chakra-ui/react';
-import { InvokeMark } from '@workbench/components/InvokeMark';
+import { APP_VERSION } from '@platform/runtime/appMetadata';
+import { InvokeMark } from '@platform/ui/InvokeMark';
 import { useTranslation } from 'react-i18next';
-
-import { APP_VERSION } from '@/appMetadata';
 
 const splashImageStyle = { backgroundPosition: 'center', backgroundSize: 'cover' } as const;
 

@@ -1,13 +1,14 @@
-import type { WidgetId } from '@workbench/types';
+import type { WidgetId } from '@workbench/widgetContracts';
 
 import { Code, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui';
+import { Button } from '@platform/ui';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface WidgetFailureBoundaryProps {
   widgetId: WidgetId;
   resetKey: string;
   children: ReactNode;
+  onRetry?: () => void;
 }
 
 interface WidgetFailureBoundaryState {
@@ -20,6 +21,7 @@ export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps,
   state: WidgetFailureBoundaryState = { resetKey: this.props.resetKey };
 
   private handleRetry = () => {
+    this.props.onRetry?.();
     this.setState({ details: undefined, error: undefined, resetKey: this.props.resetKey });
   };
 

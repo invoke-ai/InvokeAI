@@ -1,5 +1,5 @@
+import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { ExportLayerPixelsResult, LayerExportGuard } from '@workbench/canvas-engine/engine';
-import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { createCanvasOperationController } from '@workbench/canvas-operations/operationController';

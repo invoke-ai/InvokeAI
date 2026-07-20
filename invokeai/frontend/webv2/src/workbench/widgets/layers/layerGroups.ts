@@ -1,17 +1,4 @@
-/**
- * Pure grouping + within-group reorder mapping for the layers panel.
- *
- * The reducer keeps ONE z-ordered `layers` array (index 0 = top). The panel
- * renders it as type groups (inpaint masks, regional guidance, control, raster
- * — legacy display order), which are filtered *views* preserving each layer's
- * global relative order. Reordering happens WITHIN a group only: moving layer A
- * relative to same-group layer B rewrites A's slot in the GLOBAL array while
- * every other layer stays put. Cross-group moves are rejected (null → no-op).
- *
- * Kept free of React / dnd-kit so the mapping is unit-testable in node.
- */
-
-import type { CanvasLayerContract } from '@workbench/types';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 
 import { moveItem } from './layersDnd';
 

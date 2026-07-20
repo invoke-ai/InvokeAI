@@ -1,9 +1,14 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+  CanvasLayerSourceContract,
+} from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
+import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/types';
 
 import { renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { intersect, isEmpty, roundOut } from '@workbench/canvas-engine/math/rect';
@@ -38,8 +43,8 @@ export interface CropLayerControllerOptions {
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV2
   ) => PixelSnapshot | null | 'not-ready';
-  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => unknown;
-  readonly installPrepared: (prepared: unknown) => void;
+  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => PreparedLayerCacheReplacement;
+  readonly installPrepared: (prepared: PreparedLayerCacheReplacement) => void;
   readonly discardPersisted: (layerId: string) => void;
   readonly dispatchPrepared: (
     action: CanvasProjectMutation,
@@ -124,7 +129,7 @@ export class CropLayerController {
         } else {
           after = { ...before, mask: { ...before.mask, bitmap: null, offset: paint.offset }, transform: identity };
         }
-        const publish = (contract: CanvasLayerContract, prepared: unknown): void => {
+        const publish = (contract: CanvasLayerContract, prepared: PreparedLayerCacheReplacement): void => {
           this.deps.dispatchPrepared(
             { layer: contract, layerId, type: 'replaceCanvasLayer' },
             () => this.deps.getReducerDocument()?.layers.find((candidate) => candidate.id === layerId) === contract,

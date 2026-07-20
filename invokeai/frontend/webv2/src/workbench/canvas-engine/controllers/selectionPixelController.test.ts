@@ -1,5 +1,5 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';

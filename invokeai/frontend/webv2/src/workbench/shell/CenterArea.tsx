@@ -7,18 +7,19 @@ import type {
 
 import { Box, Flex, Text } from '@chakra-ui/react';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { useModelLoads } from '@workbench/backend/modelLoadStore';
-import { useQueueItemProgress } from '@workbench/backend/progressStore';
+import { useModelLoads } from '@features/models';
+import { getProjectQueueIndicatorState, type QueueProgressBarState } from '@features/queue/contracts';
+import { useQueueItemProgress } from '@features/queue/react';
+import { Tabs } from '@platform/ui';
 import { QueueTabBackgroundProgress } from '@workbench/components/QueueProgressIndicator';
-import { Tabs } from '@workbench/components/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { getProjectQueueIndicatorState, type QueueProgressBarState } from '@workbench/queueSummary';
 import {
   WidgetEnableMenu,
   WidgetInstanceContextMenu,
   WidgetRendererById,
   WidgetStrip,
+  useWidgetIntentPreloadProps,
   useWidgetSortable,
   type WidgetEnableMenuItem,
   type WidgetInstanceContextMenuTarget,
@@ -32,7 +33,7 @@ import {
   isRequiredCenterView,
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -49,9 +50,9 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
   const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
   const invocation = useActiveProjectSelector((project) => project.invocation);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
-  const dispatch = useWorkbenchDispatch();
+  const { widgets } = useWorkbenchCommands();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{
     x: number;
     y: number;
@@ -115,14 +116,14 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
     (item: WidgetEnableMenuItem) =>
       item.isEnabled
         ? closeWidgetPlacement({
-            dispatch,
+            widgets,
             getWidgetById,
             instanceId: item.id,
             project: placementProject,
             region: 'center',
           })
         : openWidgetPlacement({
-            dispatch,
+            widgets,
             getWidgetsForRegion,
             options: {
               createNew: item.allowMultiple,
@@ -130,18 +131,18 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
             },
             typeId: item.typeId,
           }),
-    [dispatch, placementProject]
+    [placementProject, widgets]
   );
 
   const handleCenterTabChange = useCallback(
     (event: { value: string }) =>
       revealWidgetPlacement({
-        dispatch,
         instanceId: event.value as CenterWidgetItem['id'],
         project: placementProject,
         region: 'center',
+        widgets,
       }),
-    [dispatch, placementProject]
+    [placementProject, widgets]
   );
 
   const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
@@ -257,6 +258,7 @@ const SortableCenterTab = ({
     typeId: item.instance.typeId,
   });
   const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
+  const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, item.status === 'disabled');
 
   return (
     <Tabs.Trigger
@@ -269,6 +271,7 @@ const SortableCenterTab = ({
       px="3"
       style={style}
       {...dragHandleProps}
+      {...intentPreloadProps}
       onContextMenu={handleContextMenu}
     >
       {showProgress ? <QueueTabBackgroundProgress state={progressState} zIndex="-1" /> : null}
@@ -290,9 +293,7 @@ const CenterViewSlot = ({
 }) => {
   const widget = items.find((item) => item.id === activeWidgetId)?.widget;
   const instance = items.find((item) => item.id === activeWidgetId)?.instance;
-  const View = widget?.manifest.view;
-
-  if (!instance || !widget || widget.status !== 'enabled' || !View) {
+  if (!instance || !widget || widget.status !== 'enabled') {
     return <FallbackCenterView label="Center widget unavailable" />;
   }
 

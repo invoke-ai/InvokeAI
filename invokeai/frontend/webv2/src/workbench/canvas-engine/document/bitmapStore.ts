@@ -46,10 +46,10 @@
  * injectable, so this runs in node tests with fakes. Zero React.
  */
 
+import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/types';
 
 /** Default idle window before a dirty layer is flushed. */
 export const DEFAULT_DEBOUNCE_MS = 1500;

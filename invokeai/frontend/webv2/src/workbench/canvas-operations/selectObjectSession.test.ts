@@ -1,8 +1,8 @@
+import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { LayerExportGuard } from '@workbench/canvas-engine/engine';
 import type { SamSessionError } from '@workbench/canvas-operations/operationTypes';
-import type { CanvasRasterLayerContractV2 } from '@workbench/types';
 
-import { UtilityQueueError } from '@workbench/canvas-operations/backend/utilityQueue';
+import { UtilityQueueError } from '@features/queue/utility';
 import { createCanvasOperationController } from '@workbench/canvas-operations/operationController';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

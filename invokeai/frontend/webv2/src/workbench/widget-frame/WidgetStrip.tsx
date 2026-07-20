@@ -1,4 +1,5 @@
-import type { WidgetInstanceId, WidgetRegion } from '@workbench/types';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 
 import { Flex, type FlexProps } from '@chakra-ui/react';

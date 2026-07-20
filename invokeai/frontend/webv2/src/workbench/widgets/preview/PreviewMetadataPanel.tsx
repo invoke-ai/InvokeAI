@@ -1,8 +1,8 @@
-import type { GalleryImage, GalleryImageMetadata } from '@workbench/gallery/api';
+import type { GalleryImage, GalleryImageMetadata } from '@features/gallery';
 
 import { Box, DataList, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { IconButton, Tooltip } from '@workbench/components/ui';
-import { getGalleryImageMetadata } from '@workbench/gallery/api';
+import { galleryImages } from '@features/gallery';
+import { IconButton, Tooltip } from '@platform/ui';
 import {
   EMPTY_IMAGE_RECALL_CAPABILITIES,
   RecallActionButtons,
@@ -56,7 +56,7 @@ export const PreviewMetadataPanel = ({
 
     let isStale = false;
 
-    Promise.all([getGalleryImageMetadata(image.imageName), actions.getImageRecallCapabilities(image)])
+    Promise.all([galleryImages.metadata(image.imageName), actions.getImageRecallCapabilities(image)])
       .then(([metadata, capabilities]) => {
         if (!isStale) {
           setLoaded({ capabilities, imageName: image.imageName, metadata });

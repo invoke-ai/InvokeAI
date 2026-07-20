@@ -1,5 +1,5 @@
+import type { CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
 import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
-import type { CanvasLayerSourceContract } from '@workbench/types';
 
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';

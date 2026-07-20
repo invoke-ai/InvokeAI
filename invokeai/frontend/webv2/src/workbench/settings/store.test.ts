@@ -30,7 +30,7 @@ const api = vi.hoisted(() => {
 const auth = vi.hoisted(() => ({ scope: '' }));
 
 vi.mock('../projects/api', () => api);
-vi.mock('../auth/session', () => ({ getUserStorageScope: () => auth.scope }));
+vi.mock('@features/identity', () => ({ getUserStorageScope: () => auth.scope }));
 
 const storage = new Map<string, string>();
 

@@ -1,4 +1,4 @@
-import type { CanvasMaskFillContract } from '@workbench/types';
+import type { CanvasMaskFillContract } from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it } from 'vitest';
 

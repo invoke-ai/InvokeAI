@@ -1,4 +1,4 @@
-import type { WidgetLabelProps } from '@workbench/types';
+import type { WidgetLabelProps } from '@workbench/widgetContracts';
 
 import { HStack, Text } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';

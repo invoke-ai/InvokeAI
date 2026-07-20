@@ -1,17 +1,14 @@
-import type {
-  RegisteredWidget,
-  WidgetIconComponent,
-  WidgetInstanceId,
-  WidgetRegion,
-  WidgetTypeId,
-} from '@workbench/types';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { RegisteredWidget, WidgetIconComponent, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui';
+import { IconButton } from '@platform/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { useWidgetIntentPreloadProps } from './useWidgetIntentPreload';
 
 export interface WidgetEnableMenuItem {
   allowMultiple: boolean;
@@ -155,6 +152,7 @@ const WidgetEnableMenuRow = ({
   onToggle: (item: WidgetEnableMenuItem) => void;
 }) => {
   const handleClick = useCallback(() => onToggle(item), [item, onToggle]);
+  const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, disabled);
 
   return (
     <Menu.Item
@@ -164,6 +162,7 @@ const WidgetEnableMenuRow = ({
       closeOnSelect={false}
       disabled={disabled}
       _disabled={MENU_ITEM_DISABLED_PROPS}
+      {...intentPreloadProps}
       onClick={handleClick}
     >
       <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />

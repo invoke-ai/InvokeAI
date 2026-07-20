@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { StreamingImageSource } from '@workbench/images/streamingImageSource';
+import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import {
@@ -11,9 +11,9 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import { isGalleryImageDragData } from '@features/gallery/utility';
 import { system } from '@theme/system';
 import { widgetCollisionDetection } from '@workbench/widgetDnd';
-import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -25,7 +25,7 @@ import { PreviewFrame } from './PreviewFrame';
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({
   fallbackLng: 'en',
-  initImmediate: false,
+  initAsync: false,
   lng: 'en',
   resources: {
     en: { translation: { widgets: { preview: { dropToCompare: 'Drop to compare', resetZoom: 'Reset zoom' } } } },

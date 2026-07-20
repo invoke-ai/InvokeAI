@@ -1,5 +1,5 @@
 import { Badge } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui';
+import { Button } from '@platform/ui';
 import { clearProjectDiagnostics, useProjectDiagnostics } from '@workbench/diagnostics/logger';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { BugIcon } from 'lucide-react';

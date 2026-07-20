@@ -1,4 +1,4 @@
-import type { TextEditSession } from '@workbench/canvas-engine/engineStores';
+import type { TextEditSession } from '@workbench/canvas-engine/api';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop -- the editable's style object is derived from the live session/viewport and intentionally recomputed each render. */
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
@@ -6,7 +6,7 @@ import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useTextEditSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCallback, useSyncExternalStore } from 'react';
 
-type TextEditEngine = Pick<CanvasEngineHandle, 'layers' | 'stores' | 'viewport'>;
+type TextEditEngine = Pick<CanvasEngineHandle, 'interaction' | 'layers' | 'viewport'>;
 
 /**
  * The text-editing portal: a positioned `contenteditable` div, rendered over the

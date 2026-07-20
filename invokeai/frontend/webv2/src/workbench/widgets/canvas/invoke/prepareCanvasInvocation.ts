@@ -2,85 +2,67 @@
  * Wires the canvas-generation pipeline into the Invoke button.
  *
  * `prepareCanvasInvocation` is the thin command-layer entry: it resolves the
- * active project's engine, scopes a per-engine dedupe cache, and delegates to
- * the React-free {@link runCanvasInvocation} orchestrator. The orchestrator runs
- * the whole flush → composite → mode-detect → compile → enqueue flow with every
- * side-effecting dependency injected, so it is fully node-testable with fakes.
+ * active project's engine and delegates to the React-free
+ * {@link runCanvasInvocation} orchestrator. The orchestrator runs the whole
+ * flush → compose → compile → enqueue flow with every side-effecting dependency
+ * injected, so it is fully node-testable with fakes.
  *
  * ## Flow (per the plan)
- * 1. Resolve the engine + its live document (no engine/document → notice, abort).
+ * 1. Resolve the engine (no engine → notice, abort) and normalize/sync the
+ *    generate values exactly as the generate path does.
  * 2. `flushPendingUploads()` — the paint-bitmap persistence barrier — so the
- *    composite reads the latest painted pixels.
- * 3. Plan the composites, then run a **bounds-only pre-pass**: if enabled raster
- *    content does not overlap the bbox, the mode is txt2img regardless of
- *    coverage, so we skip the composite/encode/upload entirely (no useless base
- *    image). Only when content overlaps do we run the executor (which the
- *    image-referencing modes need) and detect img2img/outpaint from coverage.
+ *    composite reads the latest painted pixels. The composite operation
+ *    captures its document snapshot internally, AFTER this barrier, so it
+ *    plans from the post-flush document (fresh bitmap refs, fresh bbox).
+ * 3. `composeForGeneration` — Canvas's one deep composite call — produces
+ *    every uploaded image (base / masks / controls / regionals) plus the
+ *    resolved mode. This module supplies the policy: `detectCanvasMode` as the
+ *    mode strategy, control validation as a throwing predicate (an invalid
+ *    enabled nonempty control layer blocks the invoke), and regional-guidance
+ *    rejection as a silent-skip predicate.
  * 4. Compile the base-appropriate graph and dispatch it to canvas staging.
- * 5. Any failure (validation throw, upload error, unsupported mode) records a
+ * 5. Publish the operation-local dedupe cache only after dispatch returns.
+ * 6. Any failure (validation throw, upload error, unsupported mode) records a
  *    notice — the app never gets stuck.
  *
  * A module-scoped in-flight guard drops an invoke while a prior prepare for the
  * same project is still running (the Invoke hotkey can be mashed).
  */
 
+import type { GenerateModelConfig } from '@features/generation/contracts';
+import type { ModelConfig } from '@features/models';
 import type {
-  CanvasDocumentSnapshot,
-  CanvasDocumentCapability,
-  CanvasExportCapability,
-  CanvasLifecycleCapability,
-  CaptureRasterSnapshotResult,
+  CanvasControlLayerContract,
+  CanvasRegionalGuidanceLayerContract,
+  RegionalGuidanceReferenceImage,
 } from '@workbench/canvas-engine/api';
-import type {
-  CompositeDedupeCache,
-  ExecuteCompositePlanDeps,
-} from '@workbench/canvas-operations/compositeForGeneration';
-import type { ControlLayerGraphInput } from '@workbench/generation/canvas/addControlLayers';
-import type {
-  RegionalGuidanceInput,
-  RegionalReferenceImageInput,
-} from '@workbench/generation/canvas/addRegionalGuidance';
-import type { CanvasCompileMode } from '@workbench/generation/canvas/types';
-import type { GenerateModelConfig, RegionalGuidanceReferenceImage } from '@workbench/generation/types';
-import type { ModelConfig } from '@workbench/models/types';
-import type {
-  CanvasDocumentContractV2,
-  ProjectSettings,
-  ResultDestination,
-  WorkbenchNotificationKind,
-} from '@workbench/types';
-import type { CanvasCompositingSettings } from '@workbench/widgets/canvas/invoke/canvasCompositing';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+import type { ComposeForGenerationOptions, ComposeForGenerationResult } from '@workbench/canvas-operations/api';
+import type { ResultDestination } from '@workbench/invocationContracts';
+import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
+import type { ProjectSettings } from '@workbench/settings/contracts';
+import type { WorkbenchCommands, WorkbenchNotificationCommands } from '@workbench/workbenchStore';
 
 import {
-  computeCompositeContentBounds,
-  executeCompositePlan,
-  executeControlComposite,
-  executeMaskComposite,
-  executeRegionalMaskComposite,
-} from '@workbench/canvas-operations/compositeForGeneration';
-import { getEngine } from '@workbench/canvas-operations/engineRegistry';
-import {
+  compileCanvasGraph,
+  detectCanvasMode,
+  getControlValidationReason,
   getRegionalGuidanceRejectionReason,
   isRegionalGuidanceSupportedForBase,
-} from '@workbench/generation/canvas/addRegionalGuidance';
-import { detectCanvasMode, rectsIntersect } from '@workbench/generation/canvas/canvasMode';
-import { compileCanvasGraph } from '@workbench/generation/canvas/compileCanvasGraph';
+  type CanvasCompileMode,
+  type ControlLayerGraphInput,
+  type RegionalGuidanceInput,
+  type RegionalReferenceImageInput,
+  resolveGenerateSeed,
+} from '@features/generation/graph';
+import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@features/generation/settings';
+import { getCanvasEngine, getCanvasOperations } from '@workbench/canvas-operations/api';
 import {
-  planComposites,
-  planControlComposites,
-  planRegionalMaskComposites,
-} from '@workbench/generation/canvas/compositePlan';
-import { getControlValidationReason } from '@workbench/generation/canvas/controlValidation';
-import { resolveGenerateSeed } from '@workbench/generation/graph';
-import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@workbench/generation/settings';
-import { DEFAULT_CANVAS_COMPOSITING } from '@workbench/widgets/canvas/invoke/canvasCompositing';
+  DEFAULT_CANVAS_COMPOSITING,
+  type CanvasCompositingSettings,
+} from '@workbench/widgets/canvas/invoke/canvasCompositing';
 
 /** Title on every canvas-invoke failure notice. */
 export const CANVAS_INVOKE_ERROR_TITLE = 'Canvas generation failed';
-
-/** Engine-backed executor deps, minus the caller-owned dedupe cache. */
-type CompositeExecutorDeps = Omit<ExecuteCompositePlanDeps, 'dedupe' | 'getLayerSurface'>;
 
 /** Injected dependencies for the React-free orchestrator. */
 export interface RunCanvasInvocationDeps {
@@ -92,22 +74,15 @@ export interface RunCanvasInvocationDeps {
    * snapshot's destination, so a Canvas source can target the Gallery.
    */
   destination: ResultDestination;
-  /** Captures the exact post-flush canvas contract used by immutable invocation transactions. */
-  captureDocumentSnapshot: () => CanvasDocumentSnapshot | null;
-  /** Detaches every layer surface required by the transaction's complete composite plan. */
-  captureRasterSnapshot: (
-    snapshot: CanvasDocumentSnapshot,
-    layerIds: readonly string[],
-    options: { signal: AbortSignal }
-  ) => Promise<CaptureRasterSnapshotResult>;
-  /** Cancels cache preparation and detachment for this invocation transaction. */
+  /**
+   * Canvas's composite-generation operation: snapshot → plan → capture →
+   * composite → upload, releasing pixel resources on both success and failure.
+   */
+  composeForGeneration: (options: ComposeForGenerationOptions) => Promise<ComposeForGenerationResult>;
+  /** Cancels raster capture for this invocation. */
   signal: AbortSignal;
   /** Paint-bitmap persistence barrier, awaited before compositing. */
   flushPendingUploads: () => Promise<void>;
-  /** Engine-backed composite executor deps (backend + rasterize-or-throw + uploader). */
-  executorDeps: CompositeExecutorDeps;
-  /** Per-engine dedupe cache (caller-owned; persists across invokes, size-capped). */
-  dedupe: CompositeDedupeCache;
   /** Project ids with a prepare currently in flight (module/registry-scoped). */
   inFlight: Set<string>;
   /** The generate widget's raw persisted values (model/prompt/steps, shared with Generate). */
@@ -120,89 +95,82 @@ export interface RunCanvasInvocationDeps {
   strength: number;
   /** Persisted compositing settings (infill / coherence / mask blur), defaulted + clamped. */
   compositing: CanvasCompositingSettings;
-  /** Reducer dispatch. */
-  dispatch: (action: WorkbenchAction) => void;
+  commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
 }
 
 const recordNotice = (
-  dispatch: (action: WorkbenchAction) => void,
+  notifications: WorkbenchNotificationCommands,
   kind: WorkbenchNotificationKind,
   message: string
 ): void => {
-  dispatch({ kind, message, title: CANVAS_INVOKE_ERROR_TITLE, type: 'recordNotice' });
+  notifications.add({ kind, message, title: CANVAS_INVOKE_ERROR_TITLE });
 };
 
 /**
- * Composites + resolves the enabled control layers into graph inputs. Each
- * content-bearing control layer is composited SEPARATELY (never blended) and its
- * adapter model resolved from the loaded models. Enabled nonempty invalid layers
- * throw a shared reason code and block invocation; content-less control layers
- * are already excluded by `planControlComposites` and remain harmless.
+ * Control-layer policy + metadata side-channel for the composite operation.
+ * `shouldComposite` validates each enabled content-bearing control layer in
+ * z-order and resolves its adapter model from the loaded models: an invalid
+ * layer throws a shared reason code and blocks the invocation (content-less
+ * control layers are already excluded by the operation's plan and remain
+ * harmless). `toGraphInputs` joins the composited image names back with the
+ * recorded adapter/model metadata.
  */
-const collectControlLayerInputs = async (
-  document: CanvasDocumentContractV2,
-  bbox: { x: number; y: number; width: number; height: number },
+const createControlLayerCollector = (
   model: GenerateModelConfig,
-  models: readonly ModelConfig[] | undefined,
-  executorDeps: ExecuteCompositePlanDeps
-): Promise<ControlLayerGraphInput[]> => {
-  const composites = planControlComposites(document, bbox);
-  if (composites.length === 0) {
-    return [];
-  }
-
-  const layerById = new Map(document.layers.map((layer) => [layer.id, layer]));
-  const inputs: ControlLayerGraphInput[] = [];
+  models: readonly ModelConfig[] | undefined
+): {
+  shouldComposite(layer: CanvasControlLayerContract): boolean;
+  toGraphInputs(images: readonly { layerId: string; imageName: string }[]): ControlLayerGraphInput[];
+} => {
+  const metadata = new Map<string, Omit<ControlLayerGraphInput, 'imageName'>>();
   let controlLoraCount = 0;
   let zImageControlCount = 0;
 
-  for (const { entry, layerId } of composites) {
-    const layer = layerById.get(layerId);
-    if (!layer || layer.type !== 'control') {
-      continue;
-    }
-
-    const { adapter } = layer;
-    const resolved = adapter.model ? models?.find((candidate) => candidate.key === adapter.model) : undefined;
-    const rejection = getControlValidationReason({
-      adapterModel: resolved ? { base: resolved.base, type: resolved.type } : null,
-      beginEndStepPct: adapter.beginEndStepPct,
-      controlLoraIndex: adapter.kind === 'control_lora' ? controlLoraCount : 0,
-      kind: adapter.kind,
-      mainBase: model.base,
-      mainVariant: model.variant ?? undefined,
-      weight: adapter.weight,
-      zImageControlIndex: adapter.kind === 'z_image_control' ? zImageControlCount : 0,
-    });
-    if (rejection || !resolved) {
-      throw new Error(`[${rejection ?? 'missing_model'}] Control layer "${layer.name}" is invalid.`);
-    }
-    if (adapter.kind === 'control_lora') {
-      controlLoraCount += 1;
-    }
-    if (adapter.kind === 'z_image_control') {
-      zImageControlCount += 1;
-    }
-
-    const result = await executeControlComposite(entry, executorDeps);
-    inputs.push({
-      beginEndStepPct: adapter.beginEndStepPct,
-      controlMode: adapter.controlMode,
-      id: layerId,
-      imageName: result.imageName,
-      kind: adapter.kind,
-      model: {
-        base: resolved.base,
-        key: resolved.key,
-        name: resolved.name,
-        type: resolved.type,
-        ...(typeof resolved.hash === 'string' ? { hash: resolved.hash } : {}),
-      },
-      weight: adapter.weight,
-    });
-  }
-
-  return inputs;
+  return {
+    shouldComposite: (layer) => {
+      const { adapter } = layer;
+      const resolved = adapter.model ? models?.find((candidate) => candidate.key === adapter.model) : undefined;
+      const rejection = getControlValidationReason({
+        adapterModel: resolved ? { base: resolved.base, type: resolved.type } : null,
+        beginEndStepPct: adapter.beginEndStepPct,
+        controlLoraIndex: adapter.kind === 'control_lora' ? controlLoraCount : 0,
+        kind: adapter.kind,
+        mainBase: model.base,
+        mainVariant: model.variant ?? undefined,
+        weight: adapter.weight,
+        zImageControlIndex: adapter.kind === 'z_image_control' ? zImageControlCount : 0,
+      });
+      if (rejection || !resolved) {
+        throw new Error(`[${rejection ?? 'missing_model'}] Control layer "${layer.name}" is invalid.`);
+      }
+      if (adapter.kind === 'control_lora') {
+        controlLoraCount += 1;
+      }
+      if (adapter.kind === 'z_image_control') {
+        zImageControlCount += 1;
+      }
+      metadata.set(layer.id, {
+        beginEndStepPct: adapter.beginEndStepPct,
+        controlMode: adapter.controlMode,
+        id: layer.id,
+        kind: adapter.kind,
+        model: {
+          base: resolved.base,
+          key: resolved.key,
+          name: resolved.name,
+          type: resolved.type,
+          ...(typeof resolved.hash === 'string' ? { hash: resolved.hash } : {}),
+        },
+        weight: adapter.weight,
+      });
+      return true;
+    },
+    toGraphInputs: (images) =>
+      images.flatMap(({ imageName, layerId }) => {
+        const meta = metadata.get(layerId);
+        return meta ? [{ ...meta, imageName }] : [];
+      }),
+  };
 };
 
 /** FLUX Redux image-influence → backend redux settings (mirrors `graph.ts` FLUX_REDUX_INFLUENCE). */
@@ -268,61 +236,54 @@ export const resolveRegionalReferenceImages = (
 };
 
 /**
- * Composites + resolves the enabled regional-guidance regions into graph inputs.
- * Each region with mask content is composited SEPARATELY (its alpha feeds its own
- * `alpha_mask_to_tensor`); regions invalid for the base (unsupported base, empty,
- * FLUX + negative/autoNegative) are skipped silently, mirroring legacy. Regions
- * whose prompts + reference images are all empty are also skipped.
+ * Regional-guidance policy + metadata side-channel for the composite operation.
+ * `shouldComposite` resolves each region's reference images and rejects regions
+ * invalid for the base (unsupported base, FLUX + negative/autoNegative, all
+ * prompts + references empty) with a SILENT skip, mirroring legacy.
+ * `toGraphInputs` joins the composited mask image names back with the recorded
+ * prompt/reference metadata.
  */
-const collectRegionalGuidanceInputs = async (
-  document: CanvasDocumentContractV2,
-  bbox: { x: number; y: number; width: number; height: number },
-  model: GenerateModelConfig,
-  executorDeps: ExecuteCompositePlanDeps
-): Promise<RegionalGuidanceInput[]> => {
-  if (!isRegionalGuidanceSupportedForBase(model.base)) {
-    return [];
-  }
-  const composites = planRegionalMaskComposites(document, bbox);
-  if (composites.length === 0) {
-    return [];
-  }
+const createRegionalGuidanceCollector = (
+  model: GenerateModelConfig
+): {
+  shouldComposite(layer: CanvasRegionalGuidanceLayerContract): boolean;
+  toGraphInputs(images: readonly { layerId: string; imageName: string }[]): RegionalGuidanceInput[];
+} => {
+  const metadata = new Map<string, Omit<RegionalGuidanceInput, 'maskImageName'>>();
 
-  const layerById = new Map(document.layers.map((layer) => [layer.id, layer]));
-  const inputs: RegionalGuidanceInput[] = [];
-
-  for (const { entry, layerId } of composites) {
-    const layer = layerById.get(layerId);
-    if (!layer || layer.type !== 'regional_guidance') {
-      continue;
-    }
-
-    const referenceImages = resolveRegionalReferenceImages(layer, model.base);
-    const rejection = getRegionalGuidanceRejectionReason({
-      autoNegative: layer.autoNegative,
-      hasContent: true,
-      layerName: layer.name,
-      mainBase: model.base,
-      negativePrompt: layer.negativePrompt,
-      positivePrompt: layer.positivePrompt,
-      referenceImageCount: referenceImages.length,
-    });
-    if (rejection) {
-      continue;
-    }
-
-    const result = await executeRegionalMaskComposite(entry, executorDeps);
-    inputs.push({
-      autoNegative: layer.autoNegative,
-      id: layerId,
-      maskImageName: result.imageName,
-      negativePrompt: layer.negativePrompt,
-      positivePrompt: layer.positivePrompt,
-      referenceImages,
-    });
-  }
-
-  return inputs;
+  return {
+    shouldComposite: (layer) => {
+      if (!isRegionalGuidanceSupportedForBase(model.base)) {
+        return false;
+      }
+      const referenceImages = resolveRegionalReferenceImages(layer, model.base);
+      const rejection = getRegionalGuidanceRejectionReason({
+        autoNegative: layer.autoNegative,
+        hasContent: true,
+        layerName: layer.name,
+        mainBase: model.base,
+        negativePrompt: layer.negativePrompt,
+        positivePrompt: layer.positivePrompt,
+        referenceImageCount: referenceImages.length,
+      });
+      if (rejection) {
+        return false;
+      }
+      metadata.set(layer.id, {
+        autoNegative: layer.autoNegative,
+        id: layer.id,
+        negativePrompt: layer.negativePrompt,
+        positivePrompt: layer.positivePrompt,
+        referenceImages,
+      });
+      return true;
+    },
+    toGraphInputs: (images) =>
+      images.flatMap(({ imageName, layerId }) => {
+        const meta = metadata.get(layerId);
+        return meta ? [{ ...meta, maskImageName: imageName }] : [];
+      }),
+  };
 };
 
 /**
@@ -331,7 +292,7 @@ const collectRegionalGuidanceInputs = async (
  * cleared. Returns when the graph has been dispatched (or the invoke aborted).
  */
 export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promise<void> => {
-  const { dispatch, inFlight, projectId } = deps;
+  const { commands, inFlight, projectId } = deps;
 
   // Concurrency guard: ignore a re-invoke while a prior prepare for this project
   // is still settling (the hotkey can be mashed). Cleared in `finally`.
@@ -340,11 +301,10 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
   }
   inFlight.add(projectId);
 
-  let rasterSnapshot: Extract<CaptureRasterSnapshotResult, { status: 'ok' }>['snapshot'] | null = null;
   try {
     const values = normalizeGenerateWidgetValues(deps.generateValues);
     if (!values) {
-      recordNotice(dispatch, 'error', 'Select a supported model before invoking the canvas.');
+      recordNotice(commands.notifications, 'error', 'Select a supported model before invoking the canvas.');
       return;
     }
 
@@ -355,130 +315,57 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     const model: GenerateModelConfig = settings.model;
 
     // Persist any pending paint bitmaps BEFORE compositing from their pixels.
+    // The composite operation captures its document snapshot internally — after
+    // this barrier — so it plans from the post-flush document: the flush
+    // dispatches `updateCanvasLayerSource` for each just-persisted paint layer,
+    // and a pre-flush snapshot would still reference `paint:empty`/stale bitmap
+    // names (silent dedupe cache misses) and a possibly-moved bbox.
     await deps.flushPendingUploads();
 
-    // Re-read the document AFTER the flush barrier: the flush dispatches
-    // `updateCanvasLayerSource` for each just-persisted paint layer, so the
-    // pre-flush snapshot still references `paint:empty`/stale bitmap names. Plan,
-    // composite, and compile from the post-flush document so the dedupe keys are
-    // built from the persisted refs (silent cache misses otherwise) and so the
-    // empty-paint-layer filter (see `planComposites`) sees the real `bitmap`.
-    // The bbox can also move during a slow flush; take it from the fresh snapshot.
-    const documentSnapshot = deps.captureDocumentSnapshot();
-    if (!documentSnapshot) {
-      recordNotice(dispatch, 'error', 'The canvas has no active document to generate from.');
-      return;
-    }
-    const postFlushDocument = documentSnapshot.canvas.document;
-    const bbox = postFlushDocument.bbox;
-
-    const plan = planComposites(postFlushDocument, bbox);
-    const controlPlan = planControlComposites(postFlushDocument, bbox);
-    const regionalPlan = planRegionalMaskComposites(postFlushDocument, bbox);
-
-    const requiredLayerIds = new Set<string>();
-    for (const entry of [
-      ...plan.entries,
-      ...controlPlan.map((item) => item.entry),
-      ...regionalPlan.map((item) => item.entry),
-    ]) {
-      for (const layer of entry.layers) {
-        requiredLayerIds.add(layer.id);
-      }
-      for (const layer of entry.maskLayers ?? []) {
-        requiredLayerIds.add(layer.id);
-      }
-    }
-    const capture = await deps.captureRasterSnapshot(documentSnapshot, [...requiredLayerIds], { signal: deps.signal });
-    if (capture.status !== 'ok') {
+    const controls = createControlLayerCollector(model, deps.models);
+    const regions = createRegionalGuidanceCollector(model);
+    const composed = await deps.composeForGeneration({
+      // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay
+      // structurally identical to canvas-operations' `GenerationModeFacts` /
+      // `GenerationCompositeMode` — tsc fails here on drift in either direction.
+      detectMode: (facts) => detectCanvasMode(facts),
+      shouldCompositeControlLayer: controls.shouldComposite,
+      shouldCompositeRegionalMask: regions.shouldComposite,
+      signal: deps.signal,
+    });
+    if (composed.status !== 'ok') {
       recordNotice(
-        dispatch,
+        commands.notifications,
         'error',
-        capture.status === 'stale'
-          ? 'The canvas changed while generation was being prepared. Please invoke again.'
-          : `The canvas could not be captured for generation (${capture.status}).`
+        composed.status === 'no-document'
+          ? 'The canvas has no active document to generate from.'
+          : composed.status === 'stale'
+            ? 'The canvas changed while generation was being prepared. Please invoke again.'
+            : `The canvas could not be captured for generation (${composed.status}).`
       );
       return;
     }
-    rasterSnapshot = capture.snapshot;
-    const canvasSnapshot = rasterSnapshot.canvas;
-    const getLayerSurface = (layerId: string) => {
-      const detached = rasterSnapshot?.layerSurfaces.get(layerId);
-      if (!detached) {
-        return Promise.reject(new Error(`Canvas raster snapshot is missing layer ${layerId}.`));
-      }
-      return Promise.resolve(detached);
-    };
-    const transactionDedupe: CompositeDedupeCache = {
-      byHash: new Map(deps.dedupe.byHash),
-      byKey: new Map(deps.dedupe.byKey),
-    };
-    // Bounds-only pre-pass (pure geometry, no upload): content that does not
-    // overlap the bbox is txt2img no matter the coverage. Also naturally skips a
-    // zero-area bbox (rectsIntersect is false), which validation rejects anyway.
-    const contentBounds = computeCompositeContentBounds(plan);
-
-    const executorDeps = { ...deps.executorDeps, dedupe: transactionDedupe, getLayerSurface };
-
-    let mode: CanvasCompileMode = 'txt2img';
-    let compositeImageName: string | null = null;
-    let maskImageName: string | null = null;
-    let noiseMaskImageName: string | null = null;
-
-    if (contentBounds && rectsIntersect(contentBounds, bbox)) {
-      const result = await executeCompositePlan(plan, executorDeps);
-      compositeImageName = result.base.imageName;
-
-      // The grayscale denoise-limit mask (when enabled inpaint masks exist) both
-      // decides inpaint-vs-img2img (its coverage) and feeds the graph. Legacy
-      // parity: raster opaque + mask has content → inpaint; else img2img.
-      const maskEntry = plan.entries.find((entry) => entry.kind === 'inpaint-mask');
-      const maskResult = maskEntry ? await executeMaskComposite(maskEntry, executorDeps) : null;
-
-      const detected = detectCanvasMode({
-        bbox,
-        bboxFullyCovered: result.bboxFullyCovered,
-        contentBounds: result.contentBounds,
-        hasActiveInpaintMask: maskResult?.hasContent ?? false,
-      });
-      mode = detected;
-
-      if (detected === 'inpaint' || detected === 'outpaint') {
-        // A real (non-white) mask feeds create_gradient_mask; outpaint without one
-        // derives its mask from the raster alpha (maskImageName stays null).
-        maskImageName = maskResult?.hasContent ? maskResult.imageName : null;
-        const noiseEntry = plan.entries.find((entry) => entry.kind === 'noise-mask');
-        if (noiseEntry) {
-          noiseMaskImageName = (await executeMaskComposite(noiseEntry, executorDeps)).imageName;
-        }
-      }
-    }
-
-    // Control layers apply in every mode, independent of the base composite —
-    // composite + resolve them regardless of whether raster content overlaps.
-    const controlLayers = await collectControlLayerInputs(postFlushDocument, bbox, model, deps.models, executorDeps);
-
-    // Regional guidance also applies in every mode, independent of the base
-    // composite — composite + resolve each region regardless of raster overlap.
-    const regionalGuidance = await collectRegionalGuidanceInputs(postFlushDocument, bbox, model, executorDeps);
+    const { composites } = composed;
+    // The other half of the mode-union drift guard (see `detectMode` above).
+    const mode: CanvasCompileMode = composites.mode;
 
     const compiled = compileCanvasGraph({
-      bbox,
-      compositeImageName,
+      bbox: composites.bbox,
+      compositeImageName: composites.baseImageName,
       compositing: deps.compositing,
-      controlLayers,
+      controlLayers: controls.toGraphInputs(composites.controlImages),
       destination: deps.destination,
-      maskImageName,
+      maskImageName: composites.maskImageName,
       mode,
       model,
-      noiseMaskImageName,
+      noiseMaskImageName: composites.noiseMaskImageName,
       projectSettings: deps.projectSettings,
-      regionalGuidance,
+      regionalGuidance: regions.toGraphInputs(composites.regionalMaskImages),
       settings,
       strength: deps.strength,
     });
 
-    dispatch({
+    commands.generation.submitCanvas({
       backendSupportsCancellation: true,
       destination: deps.destination,
       generate: {
@@ -488,74 +375,19 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
         values: settings,
       },
       graph: compiled.graph,
-      canvas: canvasSnapshot,
+      canvas: composites.canvas,
       projectId,
-      type: 'submitCanvasInvocationSnapshot',
     });
-    for (const [key, value] of transactionDedupe.byHash) {
-      deps.dedupe.byHash.set(key, value);
-    }
-    for (const [key, value] of transactionDedupe.byKey) {
-      deps.dedupe.byKey.set(key, value);
-    }
+    composed.dedupeCommit.commit();
   } catch (error) {
-    recordNotice(dispatch, 'error', error instanceof Error ? error.message : String(error));
+    recordNotice(commands.notifications, 'error', error instanceof Error ? error.message : String(error));
   } finally {
-    rasterSnapshot?.release();
     inFlight.delete(projectId);
   }
 };
 
-// ---- Command-layer wiring (per-engine caches + in-flight guard) -------------
-
-/** The dedupe cache's per-map entry cap (bounds unbounded growth across invokes). */
-const DEDUPE_CACHE_CAPACITY = 16;
-
-/**
- * A {@link Map} that evicts its oldest (insertion-order) entry once it exceeds
- * `capacity`, so a long-lived dedupe cache can't grow without bound across many
- * invokes with distinct plans/pixels.
- */
-class BoundedMap<K, V> extends Map<K, V> {
-  constructor(private readonly capacity: number) {
-    super();
-  }
-
-  override set(key: K, value: V): this {
-    if (!this.has(key) && this.size >= this.capacity) {
-      const oldest = this.keys().next().value;
-      if (oldest !== undefined) {
-        this.delete(oldest);
-      }
-    }
-    return super.set(key, value);
-  }
-}
-
-/** A size-capped {@link CompositeDedupeCache}. */
-export const createBoundedCompositeDedupeCache = (capacity = DEDUPE_CACHE_CAPACITY): CompositeDedupeCache => ({
-  byHash: new BoundedMap(capacity),
-  byKey: new BoundedMap(capacity),
-});
-
 // Project ids with a prepare in flight (survives across the async orchestrator).
 const inFlightProjects = new Set<string>();
-type CanvasInvocationEngine = {
-  readonly document: CanvasDocumentCapability;
-  readonly exports: CanvasExportCapability;
-  readonly lifecycle: CanvasLifecycleCapability;
-};
-// Per-engine dedupe caches, dropped when the engine is disposed and GC'd.
-const dedupeCachesByEngine = new WeakMap<CanvasInvocationEngine, CompositeDedupeCache>();
-
-const getEngineDedupeCache = (engine: CanvasInvocationEngine): CompositeDedupeCache => {
-  let cache = dedupeCachesByEngine.get(engine);
-  if (!cache) {
-    cache = createBoundedCompositeDedupeCache();
-    dedupeCachesByEngine.set(engine, cache);
-  }
-  return cache;
-};
 
 /** Arguments for the thin command-layer {@link prepareCanvasInvocation}. */
 export interface PrepareCanvasInvocationArgs {
@@ -572,7 +404,7 @@ export interface PrepareCanvasInvocationArgs {
    * (`readCanvasCompositingSettings`). Falls back to legacy defaults when omitted.
    */
   compositing?: CanvasCompositingSettings;
-  dispatch: (action: WorkbenchAction) => void;
+  commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
 }
 
 /**
@@ -580,21 +412,18 @@ export interface PrepareCanvasInvocationArgs {
  * Fire-and-track: the caller does not await it (the Invoke command stays sync).
  */
 export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs): Promise<void> => {
-  const engine = getEngine(args.projectId);
+  const engine = getCanvasEngine(args.projectId);
   if (!engine) {
-    recordNotice(args.dispatch, 'error', 'Open the canvas before invoking it.');
+    recordNotice(args.commands.notifications, 'error', 'Open the canvas before invoking it.');
     return;
   }
+  const operations = getCanvasOperations(engine);
 
   await runCanvasInvocation({
     compositing: args.compositing ?? DEFAULT_CANVAS_COMPOSITING,
-    dedupe: getEngineDedupeCache(engine),
     destination: args.destination,
-    dispatch: args.dispatch,
-    executorDeps: engine.exports.getCompositeExecutorDeps(),
-    captureDocumentSnapshot: () => engine.document.captureSnapshot(),
-    captureRasterSnapshot: (snapshot, layerIds, options) =>
-      engine.exports.captureRasterSnapshot(snapshot, layerIds, options),
+    commands: args.commands,
+    composeForGeneration: (composeOptions) => operations.composeForGeneration(composeOptions),
     flushPendingUploads: () => engine.lifecycle.flushPendingUploads(),
     generateValues: args.generateValues,
     inFlight: inFlightProjects,

@@ -1,4 +1,4 @@
-import { createExternalStore } from '@workbench/externalStore';
+import { createExternalStore } from '@platform/state/externalStore';
 
 /**
  * Read-only window into the project sync layer for shell surfaces (the

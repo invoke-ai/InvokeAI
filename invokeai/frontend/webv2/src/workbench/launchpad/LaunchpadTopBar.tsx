@@ -1,11 +1,11 @@
-import type { BackendConnectionStatus } from '@workbench/types';
+import type { BackendConnectionStatus } from '@platform/transport/types';
 
 import { Box, Flex, HStack, Text } from '@chakra-ui/react';
+import { AccountMenu } from '@features/identity';
+import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
+import { Button } from '@platform/ui';
+import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link, useSearch } from '@tanstack/react-router';
-import { AccountMenu } from '@workbench/auth/components/AccountMenu';
-import { useConnectionStatusSelector } from '@workbench/backend/connectionStore';
-import { InvokeMark } from '@workbench/components/InvokeMark';
-import { Button } from '@workbench/components/ui';
 import { SettingsButton } from '@workbench/settings/SettingsDialog';
 import { ArrowLeftIcon } from 'lucide-react';
 import { useMemo } from 'react';

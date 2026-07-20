@@ -1,30 +1,31 @@
-import { describe, expect, it } from 'vitest';
-
-import type { CanvasProjectMutation } from './canvasProjectMutations';
-import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
+import type { GeneratedImageContract } from '@features/gallery';
+import type { GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type {
   CanvasControlLayerContract,
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
   CanvasStagingCandidateContract,
-  GeneratedImageContract,
-  GraphContract,
-  Project,
-  WorkbenchState,
-} from './types';
+} from '@workbench/canvas-engine/contracts';
+import type { GraphContract } from '@workbench/graphContracts';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
+
+import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { createEmptyCanvasDocumentV2 } from './canvasMigration';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
-import { MAX_PROMPT_HISTORY } from './generation/promptHistory';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
+import { GRAPH_HISTORY_BYTE_BUDGET, normalizeGraphHistory } from './workbenchState';
 import {
   createInitialWorkbenchState,
   nextLayerName,
   type WorkbenchAction,
   workbenchReducer as reduceWorkbench,
-} from './workbenchState';
+} from './workbenchState.testing';
 
 type LegacyCanvasMutation = CanvasProjectMutation & { projectId?: string };
 const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
@@ -1491,6 +1492,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(project.projectGraph.id).toBe('replacement-graph');
     expect(project.graphHistory[0]?.document?.id).toBe(originalGraphId);
+    expect(project.graphHistory[0]?.retainedBytes).toBeGreaterThan(0);
+    expect(project.graphHistory[0]?.document).toBe(project.undoRedo.past.at(-1)?.project.projectGraph);
 
     state = workbenchReducer(state, {
       snapshotId: project.graphHistory[0]?.id ?? '',
@@ -1498,6 +1501,84 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     expect(getActiveProject(state).projectGraph.id).toBe(originalGraphId);
+  });
+
+  it('keeps the newest graph-history entries within the count limit and recomputes retained bytes', () => {
+    const entries = Array.from({ length: 50 }, (_, index) => ({
+      createdAt: `2026-07-19T00:00:${String(index).padStart(2, '0')}.000Z`,
+      document: { edges: [], nodes: [], version: 1 as const },
+      id: `snapshot-${index}`,
+      label: `Snapshot ${index}`,
+      retainedBytes: 0,
+    }));
+    const normalized = normalizeGraphHistory(entries);
+
+    expect(normalized).toHaveLength(40);
+    expect(normalized.map((entry) => entry.id)).toEqual(entries.slice(0, 40).map((entry) => entry.id));
+    expect(normalized.every((entry) => (entry.retainedBytes ?? 0) > 0)).toBe(true);
+  });
+
+  it('measures loaded graph-history entries instead of trusting forged retained-byte metadata', () => {
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode').mockImplementation((input) => {
+      const byteLength = String(input).includes('"id":"oversized"') ? GRAPH_HISTORY_BYTE_BUDGET + 1 : 128;
+
+      return Object.defineProperty(new Uint8Array(0), 'byteLength', { value: byteLength });
+    });
+
+    try {
+      const normalized = normalizeGraphHistory([
+        {
+          createdAt: '2026-07-19T00:00:00.000Z',
+          document: { edges: [], nodes: [], version: 1 as const },
+          id: 'oversized',
+          label: 'Forged low byte count',
+          retainedBytes: 0,
+        },
+        {
+          createdAt: '2026-07-19T00:00:01.000Z',
+          document: { edges: [], nodes: [], version: 1 as const },
+          id: 'within-budget',
+          label: 'Forged high byte count',
+          retainedBytes: GRAPH_HISTORY_BYTE_BUDGET + 1,
+        },
+      ]);
+
+      expect(normalized).toHaveLength(1);
+      expect(normalized[0]).toMatchObject({ id: 'within-budget', retainedBytes: 128 });
+    } finally {
+      encode.mockRestore();
+    }
+  });
+
+  it('admits newest graph-history entries without exceeding the cumulative byte budget', () => {
+    const halfBudgetPlusOne = Math.floor(GRAPH_HISTORY_BYTE_BUDGET / 2) + 1;
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode').mockImplementation((input) => {
+      const byteLength = String(input).includes('"id":"small"') ? 128 : halfBudgetPlusOne;
+
+      return Object.defineProperty(new Uint8Array(0), 'byteLength', { value: byteLength });
+    });
+
+    try {
+      const createEntry = (id: string) => ({
+        createdAt: '2026-07-19T00:00:00.000Z',
+        document: { edges: [], nodes: [], version: 1 as const },
+        id,
+        label: id,
+        retainedBytes: 0,
+      });
+      const normalized = normalizeGraphHistory([
+        createEntry('newest-large'),
+        createEntry('older-large'),
+        createEntry('small'),
+      ]);
+
+      expect(normalized.map((entry) => entry.id)).toEqual(['newest-large', 'small']);
+      expect(normalized.reduce((total, entry) => total + (entry.retainedBytes ?? 0), 0)).toBeLessThanOrEqual(
+        GRAPH_HISTORY_BYTE_BUDGET
+      );
+    } finally {
+      encode.mockRestore();
+    }
   });
 
   it('does not queue Upscale while its required settings are incomplete', () => {
@@ -2914,6 +2995,7 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
 
   it('submitCanvasInvocationSnapshot enqueues a pre-compiled graph bound for the canvas', () => {
     const graph: GraphContract = {
+      backendGraph: { edges: [], id: 'canvas-backend-graph', nodes: {} },
       edges: [],
       id: 'canvas-graph',
       label: 'Canvas',
@@ -2960,6 +3042,18 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
       seed: 42,
       shouldRandomizeSeed: false,
     });
+    expect(queueItem?.snapshot.backendSubmission).toMatchObject({
+      batchCount: 1,
+      kind: 'generate',
+      negativePrompt: 'avoid blur',
+      negativePromptNodeId: 'negative_prompt',
+      positivePrompt: 'inpaint prompt',
+      positivePromptNodeId: 'positive_prompt',
+      seed: 42,
+      seedNodeId: 'seed',
+      shouldRandomizeSeed: false,
+    });
+    expect(queueItem?.snapshot.resultNodeIds).toEqual(['canvas_output']);
     expect(getActiveProject(state).invocation.sourceId).toBe('canvas');
   });
 

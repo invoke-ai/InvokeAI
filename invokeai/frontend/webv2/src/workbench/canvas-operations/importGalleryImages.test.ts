@@ -1,9 +1,10 @@
+import type { GalleryImage } from '@features/gallery';
+import type { GenerateWidgetValues } from '@features/generation/contracts';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { uploadCanvasImage } from '@workbench/canvas-operations/backend/canvasImages';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { GalleryImage } from '@workbench/gallery/api';
-import type { GenerateWidgetValues } from '@workbench/generation/types';
-import type { CanvasLayerContract, Project, WorkbenchState } from '@workbench/types';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
   createControlLayer,
@@ -15,10 +16,15 @@ import {
   nextRegionalGuidanceFillColor,
 } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { createInitialWorkbenchState, type WorkbenchAction } from '@workbench/workbenchState';
+import { createInitialWorkbenchState, type WorkbenchAction } from '@workbench/workbenchState.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import { importGalleryImagesToCanvas, type GalleryCanvasImportDestination } from './importGalleryImages';
+
+const queriesFor = (getState: () => WorkbenchState) => ({
+  getProject: (projectId: string) => getState().projects.find((project) => project.id === projectId) ?? null,
+  isActiveProject: (projectId: string) => getState().activeProjectId === projectId,
+});
 
 const image = (imageName: string, width = 320, height = 160): GalleryImage => ({
   boardId: 'none',
@@ -190,9 +196,10 @@ describe('importGalleryImagesToCanvas', () => {
 
     const result = await importGalleryImagesToCanvas({
       destination,
-      dispatch,
+      applyCanvasMutation: (projectId, mutation) =>
+        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' }),
       engine: canvasEngine,
-      getState: () => state,
+      ...queriesFor(() => state),
       images,
       project,
     });
@@ -238,10 +245,11 @@ describe('importGalleryImagesToCanvas', () => {
 
     const result = await importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch,
+      applyCanvasMutation: (projectId, mutation) =>
+        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' }),
       engine: null,
       fetchImage,
-      getState: () => state,
+      ...queriesFor(() => state),
       images: [image('wide.png', 1600, 900), image('square.png', 400, 400)],
       project,
       uploadImage,
@@ -305,9 +313,10 @@ describe('importGalleryImagesToCanvas', () => {
     const dispatch = vi.fn<(action: WorkbenchAction) => void>();
     const result = await importGalleryImagesToCanvas({
       destination: 'raster',
-      dispatch,
+      applyCanvasMutation: (projectId, mutation) =>
+        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' }),
       engine: null,
-      getState: () => state,
+      ...queriesFor(() => state),
       images: [],
       project,
     });
@@ -321,13 +330,13 @@ describe('importGalleryImagesToCanvas', () => {
     const uploadImage = vi.fn<typeof uploadCanvasImage>();
     const result = await importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch: vi.fn(),
+      applyCanvasMutation: () => undefined,
       engine: engine(
         project.id,
         vi.fn(() => false)
       ),
       fetchImage,
-      getState: () => state,
+      ...queriesFor(() => state),
       images: [image('a.png')],
       project,
       uploadImage,
@@ -348,14 +357,14 @@ describe('importGalleryImagesToCanvas', () => {
     >(() => false);
     const result = await importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch: vi.fn(),
+      applyCanvasMutation: () => undefined,
       engine: engine(
         project.id,
         vi.fn(() => true),
         commitStructural
       ),
       fetchImage,
-      getState: () => state,
+      ...queriesFor(() => state),
       images: [image('a.png')],
       project,
       uploadImage,
@@ -382,10 +391,11 @@ describe('importGalleryImagesToCanvas', () => {
     const dispatch = vi.fn<(action: WorkbenchAction) => void>();
     const result = await importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch,
+      applyCanvasMutation: (projectId, mutation) =>
+        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' }),
       engine: null,
       fetchImage: () => Promise.resolve(new Response(new Blob(['pixels']), { status: 200 })),
-      getState: () => current,
+      ...queriesFor(() => current),
       images: [image('a.png')],
       project,
       uploadImage,
@@ -406,10 +416,11 @@ describe('importGalleryImagesToCanvas', () => {
     });
     const result = await importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch,
+      applyCanvasMutation: (projectId, mutation) =>
+        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' }),
       engine: matchingEngine,
       fetchImage: () => Promise.resolve(new Response(new Blob(['pixels']), { status: 200 })),
-      getState: () => current,
+      ...queriesFor(() => current),
       images: [image('a.png')],
       project,
       uploadImage,
@@ -438,10 +449,11 @@ describe('importGalleryImagesToCanvas', () => {
 
     const result = await importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch,
+      applyCanvasMutation: (projectId, mutation) =>
+        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' }),
       engine: matchingEngine,
       fetchImage: () => Promise.resolve(new Response(new Blob(['pixels']), { status: 200 })),
-      getState: () => current,
+      ...queriesFor(() => current),
       images: [image('a.png')],
       project,
       uploadImage,
@@ -469,10 +481,11 @@ describe('importGalleryImagesToCanvas', () => {
     const dispatch = vi.fn<(action: WorkbenchAction) => void>();
     const result = await importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch,
+      applyCanvasMutation: (projectId, mutation) =>
+        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' }),
       engine: null,
       fetchImage: () => Promise.resolve(new Response(new Blob(['pixels']), { status: 200 })),
-      getState: () => current,
+      ...queriesFor(() => current),
       images: [image('a.png')],
       project,
       uploadImage,
@@ -498,27 +511,27 @@ describe('importGalleryImagesToCanvas', () => {
     );
     const firstImport = importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch: vi.fn(),
+      applyCanvasMutation: () => undefined,
       engine: null,
       fetchImage,
-      getState: () => first.state,
+      ...queriesFor(() => first.state),
       images: [image('a.png')],
       project: first.project,
       uploadImage,
     });
     const overlap = await importGalleryImagesToCanvas({
       destination: 'raster',
-      dispatch: vi.fn(),
+      applyCanvasMutation: () => undefined,
       engine: null,
-      getState: () => first.state,
+      ...queriesFor(() => first.state),
       images: [image('b.png')],
       project: first.project,
     });
     const independent = await importGalleryImagesToCanvas({
       destination: 'raster',
-      dispatch: vi.fn(),
+      applyCanvasMutation: () => undefined,
       engine: null,
-      getState: () => secondState,
+      ...queriesFor(() => secondState),
       images: [image('c.png')],
       project: secondProject,
     });
@@ -551,10 +564,11 @@ describe('importGalleryImagesToCanvas', () => {
     const dispatch = vi.fn<(action: WorkbenchAction) => void>();
     const importing = importGalleryImagesToCanvas({
       destination: 'control-resized',
-      dispatch,
+      applyCanvasMutation: (projectId, mutation) =>
+        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' }),
       engine: null,
       fetchImage,
-      getState: () => state,
+      ...queriesFor(() => state),
       images: Array.from({ length: 7 }, (_, index) => image(`${index}.png`)),
       project,
       uploadImage,
@@ -582,10 +596,10 @@ describe('importGalleryImagesToCanvas', () => {
     const { project, state } = withProject();
     const options = {
       destination: 'control-resized' as const,
-      dispatch: vi.fn(),
+      applyCanvasMutation: () => undefined,
       engine: null,
       fetchImage: () => Promise.resolve(new Response(new Blob(['pixels']), { status: 200 })),
-      getState: () => state,
+      ...queriesFor(() => state),
       images: [image('a.png'), image('b.png')],
       project,
       uploadImage: vi.fn<typeof uploadCanvasImage>(() => Promise.reject(new Error('failed'))),

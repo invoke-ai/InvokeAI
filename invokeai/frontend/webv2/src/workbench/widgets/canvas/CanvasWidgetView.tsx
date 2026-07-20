@@ -1,11 +1,10 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { WidgetViewProps } from '@workbench/types';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
-import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
-import { getCanvasImportNotice } from '@workbench/canvas-operations/canvasImportNotice';
+import { useQueueItemProgressImage } from '@features/queue/react';
+import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
 import {
   createLayerId,
   deleteLayerActions,
@@ -21,7 +20,7 @@ import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMut
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -85,9 +84,9 @@ const REORDER_KINDS: Record<string, LayerReorderKind> = {
  */
 export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const { canvas: canvasCommands, notifications, queue } = useWorkbenchCommands();
   const canvasDispatch = useCanvasProjectMutationDispatch();
-  const store = useWorkbenchStore();
+  const queries = useWorkbenchQueries();
   const engine = useCanvasEngine();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
@@ -101,29 +100,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   // pointer. Locked interaction skips the hit-test but keeps global save visible.
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
-  const handleSurfaceContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
-    // Keep the native menu inside inline editors (the text tool's contenteditable
-    // overlay), consistent with the surface-focus INLINE_EDIT_SELECTOR.
-    const rect = event.currentTarget.getBoundingClientRect();
-    const resolution = resolveCanvasContextMenu({
-      clientX: event.clientX,
-      clientY: event.clientY,
-      hitTest: engine ? (point) => engine.tools.contextMenuLayerIdAt(point) : undefined,
-      isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
-      isInteractionLocked,
-      surfaceLeft: rect.left,
-      surfaceTop: rect.top,
-    });
-    if (!resolution.preventDefault) {
-      return;
-    }
-    event.preventDefault();
-    if (resolution.target?.layerId) {
-      canvasDispatch({ id: resolution.target.layerId, type: 'setCanvasSelectedLayer' });
-    }
-    setContextMenuTarget(resolution.target);
-  };
-
   // The bbox tool snaps to a model-dependent grid; the engine is model-agnostic,
   // so read the active generate model's base and feed the grid size in.
   const modelBase = useActiveProjectSelector((project) => {
@@ -150,7 +126,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       // Only engine-backed settings feed a store; React-consumed ones (e.g.
       // showProgressOnCanvas, read below) have no store and are skipped here.
       if (setting.store) {
-        engine.stores[setting.store].set(settings[setting.key]);
+        engine.interaction.set(setting.store, settings[setting.key]);
       }
     }
   }, [engine, settings]);
@@ -163,7 +139,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   // passive effect in the same commit, so getComputedStyle reads the new theme.
   const themeId = useWorkbenchSettingsSelector((snapshot) => snapshot.preferences.themeId);
   useEffect(() => {
-    engine?.stores.checkerColors.set(resolveCheckerColors());
+    engine?.interaction.set('checkerColors', resolveCheckerColors());
   }, [engine, themeId]);
 
   const stagingSlots = getCanvasStagingSlots(canvas, queueItems);
@@ -190,6 +166,31 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     operationKind: operation?.status === 'active' ? operation.identity.kind : null,
   });
   const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
+  const handleSurfaceContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      // Keep the native menu inside inline editors (the text tool's contenteditable
+      // overlay), consistent with the surface-focus INLINE_EDIT_SELECTOR.
+      const rect = event.currentTarget.getBoundingClientRect();
+      const resolution = resolveCanvasContextMenu({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        hitTest: engine ? (point) => engine.tools.contextMenuLayerIdAt(point) : undefined,
+        isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
+        isInteractionLocked,
+        surfaceLeft: rect.left,
+        surfaceTop: rect.top,
+      });
+      if (!resolution.preventDefault) {
+        return;
+      }
+      event.preventDefault();
+      if (resolution.target?.layerId) {
+        canvasDispatch({ id: resolution.target.layerId, type: 'setCanvasSelectedLayer' });
+      }
+      setContextMenuTarget(resolution.target);
+    },
+    [canvasDispatch, engine, isInteractionLocked]
+  );
 
   const handleCanvasImageDrop = useCallback(
     (event: DragEndEvent) => {
@@ -200,26 +201,26 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
 
       // Capture the destination project and mounted engine before any network
       // work so a project switch cannot retarget this import mid-flight.
-      const project = store.getSnapshot().activeProject;
+      const project = queries.getSnapshot().activeProject;
       const mountedEngine = engine;
 
       const execute = async (): Promise<void> => {
         try {
           const result = await executeCanvasImageDropImport({
             destination: resolution.destination,
-            dispatch,
+            canvas: canvasCommands,
             engine: mountedEngine,
-            getState: store.getState,
+            queries,
             imageNames: resolution.imageNames,
             project,
           });
           const notice = getCanvasImportNotice(result);
-          dispatch({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}), type: 'recordNotice' });
+          notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
         } catch (error: unknown) {
           recordCanvasImportError({
-            dispatch,
             error,
             localizedMessage: t('widgets.canvas.import.failed'),
+            notifications,
             projectId: project.id,
           });
         }
@@ -227,7 +228,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
 
       void execute();
     },
-    [dispatch, engine, store, t]
+    [canvasCommands, engine, notifications, queries, t]
   );
 
   useDndMonitor({ onDragEnd: handleCanvasImageDrop });
@@ -236,6 +237,46 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     engine?.tools.setInteractionLocked(isInteractionLocked);
     return () => engine?.tools.setInteractionLocked(false);
   }, [engine, isInteractionLocked]);
+
+  /* eslint-disable react/react-compiler -- imperative engine payload is mutable by design */
+  const acceptStagedImage = useCallback(() => {
+    if (selectedSlot?.kind === 'candidate') {
+      engine?.layers.commitStagedImage({
+        candidate: selectedSlot.candidate,
+        selectedImageIndex: stagingArea.selectedImageIndex,
+      });
+    }
+  }, [engine, selectedSlot, stagingArea.selectedImageIndex]);
+  /* eslint-enable react/react-compiler */
+  const cancelQueueItem = useCallback((queueItemId: string) => queue.cancel(undefined, queueItemId), [queue]);
+  const cycleStagedImage = useCallback(
+    (direction: -1 | 1) => canvasDispatch({ direction, type: 'cycleStagedImage' }),
+    [canvasDispatch]
+  );
+  const discardAllStagedImages = useCallback(
+    () => canvasDispatch({ type: 'discardAllStagedImages' }),
+    [canvasDispatch]
+  );
+  const discardSelectedStagedImage = useCallback(
+    () => canvasDispatch({ type: 'discardSelectedStagedImage' }),
+    [canvasDispatch]
+  );
+  const selectStagedImage = useCallback(
+    (imageIndex: number) => canvasDispatch({ imageIndex, type: 'setStagedImageIndex' }),
+    [canvasDispatch]
+  );
+  const setStagingAutoSwitch = useCallback(
+    (mode: 'off' | 'latest' | 'progress') => canvasDispatch({ mode, type: 'setCanvasStagingAutoSwitch' }),
+    [canvasDispatch]
+  );
+  const toggleStagingThumbnails = useCallback(
+    () => canvasDispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' }),
+    [canvasDispatch]
+  );
+  const toggleStagingVisibility = useCallback(
+    () => canvasDispatch({ type: 'toggleCanvasStagingVisibility' }),
+    [canvasDispatch]
+  );
 
   // "Show progress on canvas" gates ONLY the selected placeholder's live denoise
   // frame; a selected finished candidate still previews (that's staging, not progress).
@@ -514,22 +555,15 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 selectedImageIndex={stagingArea.selectedImageIndex}
                 selectedSlot={selectedSlot}
                 slots={stagingSlots}
-                onAccept={() => {
-                  if (selectedSlot?.kind === 'candidate') {
-                    engine?.layers.commitStagedImage({
-                      candidate: selectedSlot.candidate,
-                      selectedImageIndex: stagingArea.selectedImageIndex,
-                    });
-                  }
-                }}
-                onCancelQueueItem={(queueItemId) => dispatch({ queueItemId, type: 'cancelQueueItem' })}
-                onCycle={(direction) => canvasDispatch({ direction, type: 'cycleStagedImage' })}
-                onDiscardAll={() => canvasDispatch({ type: 'discardAllStagedImages' })}
-                onDiscardSelected={() => canvasDispatch({ type: 'discardSelectedStagedImage' })}
-                onSelectImage={(imageIndex) => canvasDispatch({ imageIndex, type: 'setStagedImageIndex' })}
-                onSetAutoSwitch={(mode) => canvasDispatch({ mode, type: 'setCanvasStagingAutoSwitch' })}
-                onToggleThumbnails={() => canvasDispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' })}
-                onToggleVisibility={() => canvasDispatch({ type: 'toggleCanvasStagingVisibility' })}
+                onAccept={acceptStagedImage}
+                onCancelQueueItem={cancelQueueItem}
+                onCycle={cycleStagedImage}
+                onDiscardAll={discardAllStagedImages}
+                onDiscardSelected={discardSelectedStagedImage}
+                onSelectImage={selectStagedImage}
+                onSetAutoSwitch={setStagingAutoSwitch}
+                onToggleThumbnails={toggleStagingThumbnails}
+                onToggleVisibility={toggleStagingVisibility}
               />
             </CanvasBottomOverlay.Staging>
           ) : null}

@@ -13,8 +13,8 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { isRenderableLayer } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
@@ -67,7 +67,9 @@ export const sampleDocumentColor = (
       continue;
     }
     const entry = layers.get(layer.id);
-    if (!entry) {
+    // drawImage throws for zero-sized OffscreenCanvas sources in Chromium.
+    // Empty paint layers legitimately retain a 0x0 cache until their first stroke.
+    if (!entry || entry.surface.canvas.width === 0 || entry.surface.canvas.height === 0) {
       continue;
     }
 

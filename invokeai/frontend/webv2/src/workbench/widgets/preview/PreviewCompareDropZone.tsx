@@ -1,6 +1,6 @@
 import { Badge, Flex } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
-import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
+import { isGalleryImageDragData } from '@features/gallery/utility';
 import { useTranslation } from 'react-i18next';
 
 import { PREVIEW_COMPARE_DROP_DATA, PREVIEW_COMPARE_DROP_ID } from './previewCompareDnd';

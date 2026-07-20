@@ -1,4 +1,4 @@
-import type { CanvasLayerBaseContract } from '@workbench/types';
+import type { CanvasLayerBaseContract } from '@workbench/canvas-engine/contracts';
 
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { describe, expect, it } from 'vitest';

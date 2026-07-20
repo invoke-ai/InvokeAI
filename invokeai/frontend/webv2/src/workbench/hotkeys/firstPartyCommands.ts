@@ -1,21 +1,23 @@
-import { getConnectionStatus } from '@workbench/backend/connectionStore';
-import { commandApi } from '@workbench/extensions/extensionApi';
-import { cancelCurrentQueueItem } from '@workbench/generation/api';
-import { executeImageRecall, getSelectedGalleryImage, type ImageRecallKind } from '@workbench/image-actions';
+import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
+
+import {
+  adjustFocusedPromptAttention,
+  flushGenerateDrafts,
+  focusPositivePrompt,
+  promptHistoryNavigation,
+} from '@features/generation/react';
+import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
+import { queueCommands } from '@features/queue';
+import { useInvocationTemplatesSelector } from '@features/workflow/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { getConnectionStatus } from '@platform/transport/connectionStore';
 import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
 import { submitResolvedInvocation } from '@workbench/invocationSubmit';
-import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { prepareCanvasInvocation } from '@workbench/widgets/canvas/invoke/prepareCanvasInvocation';
-import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
-import { focusPositivePrompt } from '@workbench/widgets/generate/promptFields';
-import { adjustFocusedPromptAttention } from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
-import { navigatePromptHistory } from '@workbench/widgets/generate/promptFields/promptHistoryNavigation';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
-import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useEffect, useEffectEvent } from 'react';
 
 const imageRecallCommands: Record<string, ImageRecallKind> = {
   'gallery.remix': 'remix',
@@ -51,38 +53,34 @@ export const FIRST_PARTY_IMAGE_RECALL_COMMAND_IDS = Object.keys(imageRecallComma
 
 export const FIRST_PARTY_COMMAND_IDS = [...FIRST_PARTY_APP_COMMAND_IDS, ...Object.keys(imageRecallCommands)] as const;
 
-export const useRegisterFirstPartyCommands = () => {
-  const store = useWorkbenchStore();
-  const dispatch = useWorkbenchDispatch();
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
-  const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
-  const projectRef = useRef(store.getSnapshot().activeProject);
-  const modelsRef = useRef(availabilityModels);
+const getAvailableModels = () => {
+  const snapshot = getModelsSnapshot();
+  return snapshot.status === 'loaded' ? snapshot.models : undefined;
+};
 
+export const useRegisterFirstPartyCommands = () => {
+  const commands = useWorkbenchCommands();
+  const { commands: commandApi } = useWorkbenchExtensions();
+  const queries = useWorkbenchQueries();
+  const { layout, notifications, queue, widgets } = commands;
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
-  useEffect(() => {
-    modelsRef.current = availabilityModels;
-  }, [availabilityModels]);
+  useMountEffect(() => {
+    void ensureModelsLoaded();
+  });
 
-  useEffect(
-    () =>
-      store.subscribe(() => {
-        projectRef.current = store.getSnapshot().activeProject;
-      }),
-    [store]
-  );
-
-  useEffect(() => {
-    ensureModelsLoaded();
-  }, []);
-
-  const submitInvocation = useEffectEvent(() => {
+  const submitInvocation = useEffectEvent(async () => {
     flushGenerateDrafts();
 
-    const activeProject = projectRef.current;
-    const resolvedRoute = resolveInvocationRoute(activeProject, 'global', activeProject.invocation, modelsRef.current);
+    const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
+
+    const activeProject = queries.getSnapshot().activeProject;
+    const resolvedRoute = resolveInvocationRoute(
+      activeProject,
+      'global',
+      activeProject.invocation,
+      getAvailableModels()
+    );
     const { status } = getConnectionStatus();
 
     if (!isInvocationRouteValid(resolvedRoute) || status !== 'connected') {
@@ -90,8 +88,8 @@ export const useRegisterFirstPartyCommands = () => {
     }
 
     submitResolvedInvocation({
-      dispatch,
-      models: modelsRef.current,
+      commands,
+      models: getAvailableModels(),
       prepareCanvasInvocation,
       project: activeProject,
       route: resolvedRoute,
@@ -99,34 +97,37 @@ export const useRegisterFirstPartyCommands = () => {
   });
 
   const recallSelectedImage = useEffectEvent(async (kind: ImageRecallKind) => {
-    const activeProject = projectRef.current;
+    const [{ executeImageRecall }, { getSelectedGalleryImage }] = await Promise.all([
+      import('@workbench/image-actions/executeImageRecall'),
+      import('@workbench/image-actions/selectedImage'),
+    ]);
+    const activeProject = queries.getSnapshot().activeProject;
     const image = getSelectedGalleryImage(activeProject);
 
     if (!image) {
-      dispatch({
+      notifications.add({
         kind: 'info',
         message: 'Select an image in Gallery or Preview first.',
         title: 'No image selected',
-        type: 'recordNotice',
       });
       return;
     }
 
     const didRecall = await executeImageRecall({
-      dispatch,
+      commands,
       generateValues: getProjectWidgetValues(activeProject, 'generate'),
       image,
       kind,
-      models: modelsRef.current ?? [],
+      models: getAvailableModels() ?? [],
       projectId: activeProject.id,
     });
 
-    if (didRecall && store.getSnapshot().activeProject.id === activeProject.id) {
+    if (didRecall && queries.isActiveProject(activeProject.id)) {
       openWidgetPlacement({
-        dispatch,
         getWidgetsForRegion,
         options: { preferredRegions: ['left'] },
         typeId: 'generate',
+        widgets,
       });
     }
   });
@@ -136,22 +137,22 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({ handler: submitInvocation, id: 'app.invoke', title: 'Invoke' }),
       commandApi.register({ handler: submitInvocation, id: 'app.invokeFront', title: 'Invoke front' }),
       commandApi.register({
-        handler: () => void cancelCurrentQueueItem().finally(() => dispatch({ type: 'refreshBackendData' })),
+        handler: () => void queueCommands.cancelCurrentItem().finally(queue.refreshBackendData),
         id: 'app.cancelQueueItem',
         title: 'Cancel current queue item',
       }),
       commandApi.register({
-        handler: () => dispatch({ projectId: projectRef.current.id, type: 'cancelAllQueueItems' }),
+        handler: () => queue.cancelAll(queries.getSnapshot().activeProject.id),
         id: 'app.clearQueue',
         title: 'Clear queue',
       }),
       commandApi.register({
         handler: () =>
           openWidgetPlacement({
-            dispatch,
             getWidgetsForRegion,
             options: { preferredRegions: ['left'] },
             typeId: 'generate',
+            widgets,
           }),
         id: 'app.selectGenerateTab',
         title: 'Select Generate tab',
@@ -159,10 +160,10 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({
         handler: () =>
           openWidgetPlacement({
-            dispatch,
             getWidgetsForRegion,
             options: { preferredRegions: ['center'], requireCenterView: true },
             typeId: 'canvas',
+            widgets,
           }),
         id: 'app.selectCanvasTab',
         title: 'Select Canvas tab',
@@ -170,26 +171,27 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({
         handler: () =>
           openWidgetPlacement({
-            dispatch,
             getWidgetsForRegion,
             options: { preferredRegions: ['center'], requireCenterView: true },
             typeId: 'workflow',
+            widgets,
           }),
         id: 'app.selectWorkflowsTab',
         title: 'Select Workflows tab',
       }),
       commandApi.register({
-        handler: () => (window.location.hash = `#/models?project=${encodeURIComponent(projectRef.current.id)}`),
+        handler: () =>
+          (window.location.hash = `#/models?project=${encodeURIComponent(queries.getSnapshot().activeProject.id)}`),
         id: 'app.selectModelsTab',
         title: 'Select Models tab',
       }),
       commandApi.register({
         handler: () =>
           openWidgetPlacement({
-            dispatch,
             getWidgetsForRegion,
             options: { preferredRegions: ['right', 'bottom'] },
             typeId: 'queue',
+            widgets,
           }),
         id: 'app.selectQueueTab',
         title: 'Select Queue tab',
@@ -197,10 +199,10 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({
         handler: () => {
           openWidgetPlacement({
-            dispatch,
             getWidgetsForRegion,
             options: { preferredRegions: ['left'] },
             typeId: 'generate',
+            widgets,
           });
           window.requestAnimationFrame(() => focusPositivePrompt());
         },
@@ -211,11 +213,15 @@ export const useRegisterFirstPartyCommands = () => {
         handler: () => {
           flushGenerateDrafts();
 
-          navigatePromptHistory({
+          const project = queries.getSnapshot().activeProject;
+
+          promptHistoryNavigation.navigate({
             direction: -1,
-            dispatch,
-            models: modelsRef.current,
-            project: projectRef.current,
+            models: getAvailableModels(),
+            patchValues: (values, projectId) => widgets.patchValues('generate', values, projectId),
+            projectId: project.id,
+            promptHistory: project.promptHistory,
+            values: getProjectWidgetValues(project, 'generate'),
           });
         },
         id: 'app.promptHistoryPrev',
@@ -225,11 +231,15 @@ export const useRegisterFirstPartyCommands = () => {
         handler: () => {
           flushGenerateDrafts();
 
-          navigatePromptHistory({
+          const project = queries.getSnapshot().activeProject;
+
+          promptHistoryNavigation.navigate({
             direction: 1,
-            dispatch,
-            models: modelsRef.current,
-            project: projectRef.current,
+            models: getAvailableModels(),
+            patchValues: (values, projectId) => widgets.patchValues('generate', values, projectId),
+            projectId: project.id,
+            promptHistory: project.promptHistory,
+            values: getProjectWidgetValues(project, 'generate'),
           });
         },
         id: 'app.promptHistoryNext',
@@ -237,47 +247,53 @@ export const useRegisterFirstPartyCommands = () => {
       }),
       commandApi.register({
         handler: () =>
-          adjustFocusedPromptAttention('increment', projectRef.current.settings.preferNumericAttentionStyle),
+          adjustFocusedPromptAttention(
+            'increment',
+            queries.getSnapshot().activeProject.settings.preferNumericAttentionStyle
+          ),
         id: 'app.promptWeightUp',
         title: 'Increase prompt weight',
       }),
       commandApi.register({
         handler: () =>
-          adjustFocusedPromptAttention('decrement', projectRef.current.settings.preferNumericAttentionStyle),
+          adjustFocusedPromptAttention(
+            'decrement',
+            queries.getSnapshot().activeProject.settings.preferNumericAttentionStyle
+          ),
         id: 'app.promptWeightDown',
         title: 'Decrease prompt weight',
       }),
       commandApi.register({
         handler: () => {
-          const region = projectRef.current.widgetRegions.left;
+          const region = queries.getSnapshot().activeProject.widgetRegions.left;
 
-          dispatch({ isCollapsed: !region.isCollapsed, region: 'left', type: 'setRegionWidgetCollapsed' });
+          layout.setRegionCollapsed('left', !region.isCollapsed);
         },
         id: 'app.toggleLeftPanel',
         title: 'Toggle left panel',
       }),
       commandApi.register({
         handler: () => {
-          const region = projectRef.current.widgetRegions.right;
+          const region = queries.getSnapshot().activeProject.widgetRegions.right;
 
-          dispatch({ isCollapsed: !region.isCollapsed, region: 'right', type: 'setRegionWidgetCollapsed' });
+          layout.setRegionCollapsed('right', !region.isCollapsed);
         },
         id: 'app.toggleRightPanel',
         title: 'Toggle right panel',
       }),
       commandApi.register({
-        handler: () => dispatch({ type: 'resetActiveLayout' }),
+        handler: layout.reset,
         id: 'app.resetPanelLayout',
         title: 'Reset panel layout',
       }),
       commandApi.register({
         handler: () => {
-          const { bottom, left, right } = projectRef.current.widgetRegions;
+          const { bottom, left, right } = queries.getSnapshot().activeProject.widgetRegions;
           const shouldCollapse = !left.isCollapsed || !right.isCollapsed || !bottom.isCollapsed;
 
-          dispatch({ isCollapsed: shouldCollapse, region: 'left', type: 'setRegionWidgetCollapsed' });
-          dispatch({ isCollapsed: shouldCollapse, region: 'right', type: 'setRegionWidgetCollapsed' });
-          dispatch({ isCollapsed: shouldCollapse, region: 'bottom', type: 'setRegionWidgetCollapsed' });
+          layout.setRegionCollapsed('left', shouldCollapse);
+          layout.setRegionCollapsed('right', shouldCollapse);
+          layout.setRegionCollapsed('bottom', shouldCollapse);
         },
         id: 'app.togglePanels',
         title: 'Toggle panels',
@@ -290,5 +306,5 @@ export const useRegisterFirstPartyCommands = () => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [dispatch]);
+  }, [commandApi, commands, layout, notifications, queries, queue, widgets]);
 };

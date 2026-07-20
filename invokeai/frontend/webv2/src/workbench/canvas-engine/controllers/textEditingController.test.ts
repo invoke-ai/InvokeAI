@@ -1,5 +1,5 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { TextEditSession } from '@workbench/canvas-engine/engineStores';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { DEFAULT_TEXT_OPTIONS } from '@workbench/canvas-engine/engineStores';
 import { describe, expect, it, vi } from 'vitest';

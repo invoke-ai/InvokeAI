@@ -10,8 +10,9 @@
  * Zero React, zero import-time side effects.
  */
 
+import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
+
 import type { CanvasProjectMutation } from './canvasProjectMutations';
-import type { CanvasLayerContract } from './types';
 
 /** A forward/inverse reducer-action pair for one reversible structural edit. */
 export interface StructuralActions {

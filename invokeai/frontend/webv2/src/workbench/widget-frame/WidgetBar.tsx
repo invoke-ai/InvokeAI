@@ -1,14 +1,16 @@
-import type { WidgetInstanceId, WidgetRegion } from '@workbench/types';
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 import type { WidgetPlacementInstanceMeta, WidgetRegionItem } from '@workbench/widgetRegionViewModel';
 
 import { Box, type SystemStyleObject } from '@chakra-ui/react';
 import { verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Row, Tooltip } from '@workbench/components/ui';
+import { Row, Tooltip } from '@platform/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useWidgetIntentPreloadProps } from './useWidgetIntentPreload';
 import { useWidgetSortable } from './useWidgetSortable';
 import { WidgetEnableMenu, type WidgetEnableMenuItem } from './WidgetEnableMenu';
 import { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';
@@ -161,6 +163,7 @@ const WidgetSlot = ({
       onSelect(item.id);
     }
   }, [isDisabled, item.id, onSelect]);
+  const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, isDisabled);
 
   const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
 
@@ -184,6 +187,7 @@ const WidgetSlot = ({
           as="button"
           data-disabled={isDisabled ? '' : undefined}
           tabIndex={isDisabled ? -1 : undefined}
+          {...intentPreloadProps}
           onClick={handleClick}
           onContextMenu={handleContextMenu}
         >

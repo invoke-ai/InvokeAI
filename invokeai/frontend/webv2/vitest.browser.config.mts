@@ -7,9 +7,10 @@ import viteConfig from './vite.config.mts';
 export default mergeConfig(
   viteConfig,
   defineConfig({
-    // dnd-kit must share the app's React instance in the browser-test module
-    // graph, or its hooks dispatch against a second React copy and crash.
-    optimizeDeps: { include: ['@dnd-kit/core'] },
+    // Hook-bearing dependencies must be prebundled into the initial browser-test
+    // graph. An optimization reload can otherwise leave the running suite with
+    // two React instances and produce invalid-hook failures.
+    optimizeDeps: { include: ['@dnd-kit/core', '@tanstack/react-query', 'react-hook-tanstack-virtual'] },
     test: {
       browser: {
         enabled: true,

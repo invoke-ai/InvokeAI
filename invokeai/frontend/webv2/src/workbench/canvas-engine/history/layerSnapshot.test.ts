@@ -1,4 +1,4 @@
-import type { CanvasControlLayerContract } from '@workbench/types';
+import type { CanvasControlLayerContract } from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it, vi } from 'vitest';
 

@@ -1,10 +1,10 @@
-import type { WidgetViewProps } from '@workbench/types';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Box, HStack, Icon } from '@chakra-ui/react';
-import { useProgressImage } from '@workbench/backend/progressImageStore';
-import { IconButton } from '@workbench/components/ui';
+import { useProgressImage } from '@features/queue/react';
+import { IconButton } from '@platform/ui';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { GalleryThumbnailsIcon, HourglassIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,23 +27,18 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
   const isFilmstripVisible = useActiveProjectSelector((project) =>
     getPreviewFilmstripVisible(getProjectWidgetValues(project, 'preview'))
   );
-  const dispatch = useWorkbenchDispatch();
+  const { account, widgets } = useWorkbenchCommands();
   const label = showProgressImagesInViewer
     ? t('widgets.preview.hideInProgressDiffusion')
     : t('widgets.preview.showInProgressDiffusion');
   const filmstripLabel = isFilmstripVisible ? t('widgets.preview.hideFilmstrip') : t('widgets.preview.showFilmstrip');
   const toggleProgressImages = useCallback(
-    () =>
-      dispatch({
-        settings: { showProgressImagesInViewer: !showProgressImagesInViewer },
-        type: 'setActiveProjectSettings',
-      }),
-    [dispatch, showProgressImagesInViewer]
+    () => account.updateProjectPreferences({ showProgressImagesInViewer: !showProgressImagesInViewer }),
+    [account, showProgressImagesInViewer]
   );
   const toggleFilmstrip = useCallback(
-    () =>
-      dispatch({ type: 'patchWidgetValues', values: { filmstripVisible: !isFilmstripVisible }, widgetId: 'preview' }),
-    [dispatch, isFilmstripVisible]
+    () => widgets.patchValues('preview', { filmstripVisible: !isFilmstripVisible }),
+    [isFilmstripVisible, widgets]
   );
 
   return (

@@ -1,6 +1,6 @@
 import { Box, Flex, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { IconButton, ConfirmDialog, MenuContent, RenameDialog, toaster } from '@platform/ui';
 import { Link } from '@tanstack/react-router';
-import { IconButton, ConfirmDialog, MenuContent, RenameDialog, toaster } from '@workbench/components/ui';
 import {
   deleteLibraryProject,
   duplicateLibraryProject,

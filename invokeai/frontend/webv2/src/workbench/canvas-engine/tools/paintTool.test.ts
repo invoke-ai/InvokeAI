@@ -1,3 +1,8 @@
+import type {
+  CanvasControlLayerContract,
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+} from '@workbench/canvas-engine/contracts';
 import type { StubRasterBackend, StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import type {
   ControlPixelEditTransaction,
@@ -7,7 +12,6 @@ import type {
 } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasControlLayerContract, CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';

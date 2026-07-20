@@ -1,27 +1,29 @@
+import type { WidgetRegion } from '@workbench/layoutContracts';
 import type {
   NormalizedWidgetManifest,
   RegisteredWidget,
   WidgetFailure,
   WidgetManifest,
-  WidgetRegion,
   WidgetTypeId,
-} from './types';
+} from '@workbench/widgetContracts';
 
-import { getAuthSession } from './auth/session';
-import { autosaveStatusWidgetManifest } from './widgets/autosave-status';
-import { canvasWidgetManifest } from './widgets/canvas';
-import { diagnosticsWidgetManifest } from './widgets/diagnostics';
-import { galleryWidgetManifest } from './widgets/gallery';
-import { generateWidgetManifest } from './widgets/generate';
-import { layersWidgetManifest } from './widgets/layers';
-import { notificationsWidgetManifest } from './widgets/notifications';
-import { previewWidgetManifest } from './widgets/preview';
-import { projectWidgetManifest } from './widgets/project';
-import { queueWidgetManifest } from './widgets/queue';
-import { serverStatusWidgetManifest } from './widgets/server-status';
-import { upscaleWidgetManifest } from './widgets/upscale';
-import { versionStatusWidgetManifest } from './widgets/version-status';
-import { workflowWidgetManifest } from './widgets/workflow';
+import { getAuthSession } from '@features/identity';
+
+import { createWidgetImplementationResource } from './widgetImplementationResource';
+import { autosaveStatusWidgetManifest } from './widgets/autosave-status/manifest';
+import { canvasWidgetManifest } from './widgets/canvas/manifest';
+import { diagnosticsWidgetManifest } from './widgets/diagnostics/manifest';
+import { galleryWidgetManifest } from './widgets/gallery/manifest';
+import { generateWidgetManifest } from './widgets/generate/manifest';
+import { layersWidgetManifest } from './widgets/layers/manifest';
+import { notificationsWidgetManifest } from './widgets/notifications/manifest';
+import { previewWidgetManifest } from './widgets/preview/manifest';
+import { projectWidgetManifest } from './widgets/project/manifest';
+import { queueWidgetManifest } from './widgets/queue/manifest';
+import { serverStatusWidgetManifest } from './widgets/server-status/manifest';
+import { upscaleWidgetManifest } from './widgets/upscale/manifest';
+import { versionStatusWidgetManifest } from './widgets/version-status/manifest';
+import { workflowWidgetManifest } from './widgets/workflow/manifest';
 
 export const firstPartyWidgetManifests: WidgetManifest[] = [
   generateWidgetManifest,
@@ -75,8 +77,8 @@ const validateManifest = (manifest: NormalizedWidgetManifest): void => {
     throw new TypeError(`Widget ${manifest.id} must provide an icon component.`);
   }
 
-  if (manifest.allowedRegions.some((region) => renderableRegions.has(region)) && !manifest.view) {
-    throw new Error(`Widget ${manifest.id} declares a renderable region but does not include manifest.view.`);
+  if (typeof manifest.load !== 'function') {
+    throw new TypeError(`Widget ${manifest.id} must provide a deferred implementation loader.`);
   }
 };
 
@@ -93,12 +95,21 @@ export const registerWidgets = (manifests: WidgetManifest[]): RegisteredWidget[]
     try {
       validateManifest(manifest);
 
-      return { manifest, status: 'enabled' as const };
+      return {
+        implementation: createWidgetImplementationResource(manifest.id, manifest.load),
+        manifest,
+        status: 'enabled' as const,
+      };
     } catch (error) {
       const failure = createFailure(manifest.id, error);
       const status = manifest.failurePolicy.onRegistrationFailure === 'hide' ? 'hidden' : 'disabled';
 
-      return { failure, manifest, status };
+      return {
+        failure,
+        implementation: createWidgetImplementationResource(manifest.id, manifest.load),
+        manifest,
+        status,
+      };
     }
   });
 
@@ -130,11 +141,20 @@ export const getWidgetsForRegion = (region: WidgetRegion): RegisteredWidget[] =>
 
 export const getWidgetHosts = (): RegisteredWidget[] =>
   registeredWidgets.filter(
-    (widget) => widget.status === 'enabled' && widget.manifest.host && isWidgetAvailable(widget)
+    (widget) => widget.status === 'enabled' && widget.manifest.hasHost && isWidgetAvailable(widget)
   );
 
 export const getWidgetById = (widgetId: WidgetTypeId): RegisteredWidget | undefined =>
   registeredWidgets.find((widget) => widget.manifest.id === widgetId);
+
+/** Starts a cached implementation load for an explicit user intent. */
+export const preloadWidget = (widgetId: WidgetTypeId): void => {
+  const widget = getWidgetById(widgetId);
+
+  if (widget?.status === 'enabled') {
+    widget.implementation.preload();
+  }
+};
 
 export const widgetRegistrationFailures = registeredWidgets.flatMap((widget) =>
   widget.failure ? [widget.failure] : []

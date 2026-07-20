@@ -1,13 +1,8 @@
-import type {
-  DeveloperLogLevel,
-  DeveloperLogNamespace,
-  ProjectSettings,
-  Project,
-  SettingsSectionId,
-  WorkbenchLanguage,
-  WorkbenchPreferences,
-  WorkbenchThemeId,
-} from '@workbench/types';
+import type { WorkbenchThemeId } from '@theme/themes';
+import type { DeveloperLogLevel, DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
+import type { Project } from '@workbench/projectContracts';
+import type { ProjectSettings, WorkbenchLanguage, WorkbenchPreferences } from '@workbench/settings/contracts';
+import type { SettingsSectionId } from '@workbench/widgetContracts';
 
 import {
   Box,
@@ -26,17 +21,18 @@ import {
   Field,
   useSlotRecipe,
 } from '@chakra-ui/react';
+import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
+import { Button, CloseButton, IconButton, ConfirmDialog, Tabs, Tooltip } from '@platform/ui';
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
-import { Button, CloseButton, IconButton, ConfirmDialog, Tabs, Tooltip } from '@workbench/components/ui';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
-import { WORKBENCH_LANGUAGE_OPTIONS } from '@workbench/i18n';
-import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
+import { clearAllWorkbenchData } from '@workbench/projects/syncedPersistence';
 import {
   shallowEqual,
-  useOptionalWorkbenchDispatch,
+  useHasWorkbenchProvider,
+  useOptionalWorkbenchCommands,
+  useOptionalWorkbenchPersistenceService,
   useOptionalWorkbenchSelector,
-  useOptionalWorkbenchStore,
 } from '@workbench/WorkbenchContext';
 import {
   CheckIcon,
@@ -198,7 +194,7 @@ const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
 
 const SettingsTabs = () => {
   const { t } = useTranslation();
-  const hasWorkbench = useOptionalWorkbenchStore() !== null;
+  const hasWorkbench = useHasWorkbenchProvider();
   const settingsTabs: SettingsTabDefinition[] = useMemo(
     () => [
       {
@@ -452,12 +448,12 @@ const ProjectSection = () => {
     null,
     shallowEqual
   );
-  const dispatch = useOptionalWorkbenchDispatch();
+  const commands = useOptionalWorkbenchCommands();
   const updateProjectSettings = useCallback(
     (patch: Partial<ProjectSettings>) => {
-      dispatch?.({ settings: patch, type: 'setActiveProjectSettings' });
+      commands?.account.updateProjectPreferences(patch);
     },
-    [dispatch]
+    [commands]
   );
   const updateUseCpuNoise = useCallback(
     (checked: boolean) => {
@@ -496,7 +492,7 @@ const ProjectSection = () => {
     [updateProjectSettings]
   );
 
-  if (!activeProject || !dispatch) {
+  if (!activeProject || !commands) {
     return null;
   }
 
@@ -719,15 +715,19 @@ const DeveloperNamespaceCheckbox = ({
 };
 
 const WorkspaceSection = () => {
-  const dispatch = useOptionalWorkbenchDispatch();
+  const commands = useOptionalWorkbenchCommands();
+  const mountedPersistence = useOptionalWorkbenchPersistenceService();
   const { scope } = useWorkbenchSettings();
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
   const clearSavedData = useCallback(async () => {
-    await Promise.all([syncedWorkbenchPersistence.clearWorkbench(), clearWorkbenchSettings()]);
+    await Promise.all([
+      mountedPersistence ? mountedPersistence.clearWorkbench() : clearAllWorkbenchData(),
+      clearWorkbenchSettings(),
+    ]);
     window.location.reload();
-  }, []);
-  const resetLayout = useCallback(() => dispatch?.({ type: 'resetActiveLayout' }), [dispatch]);
+  }, [mountedPersistence]);
+  const resetLayout = useCallback(() => commands?.layout.reset(), [commands]);
   const openClearConfirm = useCallback(() => setIsClearConfirmOpen(true), []);
   const closeClearConfirm = useCallback(() => setIsClearConfirmOpen(false), []);
 
@@ -737,7 +737,7 @@ const WorkspaceSection = () => {
       title="Workspace"
     >
       <HStack gap="2" wrap="wrap">
-        {dispatch ? (
+        {commands ? (
           <Button size="sm" variant="outline" onClick={resetLayout}>
             <RotateCcwIcon />
             Reset layout

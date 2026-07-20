@@ -13,7 +13,7 @@
  */
 
 import { system } from '@theme/system';
-import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
+import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/api';
 
 /**
  * The two Chakra semantic tokens used for the checker squares. `bg.subtle` and

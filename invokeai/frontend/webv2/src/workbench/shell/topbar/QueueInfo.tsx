@@ -1,13 +1,15 @@
-/* eslint-disable react/react-compiler */
-import type { QueueItem } from '@workbench/types';
-
 import { Badge, HStack, Icon, Progress, Stack, Text } from '@chakra-ui/react';
-import { useModelLoads, type ModelLoadInfo } from '@workbench/backend/modelLoadStore';
-import { useQueueItemProgress, type QueueItemProgress } from '@workbench/backend/progressStore';
-import { Button, Tooltip } from '@workbench/components/ui';
+import { useModelLoads, type ModelLoadInfo } from '@features/models';
+import {
+  getQueueItemExpectedImageCount,
+  getQueueItemSnapshotPositivePrompt,
+  getQueueProgressBarState,
+  getQueueSummary,
+  type QueueItem,
+} from '@features/queue/contracts';
+import { useQueueItemProgress, type QueueItemProgress } from '@features/queue/react';
+import { Button, Tooltip } from '@platform/ui';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
-import { getQueueItemSourceWidgetValues } from '@workbench/queueSnapshot';
-import { getQueueItemExpectedImageCount, getQueueProgressBarState, getQueueSummary } from '@workbench/queueSummary';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ListOrderedIcon } from 'lucide-react';
@@ -17,12 +19,13 @@ const TOOLTIP_CONTENT_PROPS = { maxW: '22rem', p: '0' };
 
 export const QueueInfo = () => {
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const baseSummary = getQueueSummary(queueItems);
   const runningProgress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
   const summary = getQueueSummary(queueItems, runningProgress);
+  const { current, total } = summary;
   const runningItem = summary.runningQueueItemId
     ? queueItems.find((item) => item.id === summary.runningQueueItemId)
     : undefined;
@@ -40,11 +43,11 @@ export const QueueInfo = () => {
         item={runningItem}
         modelLoads={modelLoads}
         progress={runningProgress}
-        total={summary.total}
-        current={summary.current}
+        total={total}
+        current={current}
       />
     ),
-    [modelLoads, runningItem, runningProgress, summary]
+    [current, modelLoads, runningItem, runningProgress, total]
   );
 
   const handleOpenQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
@@ -139,8 +142,7 @@ const QueueInfoTooltip = ({
     );
   }
 
-  const sourceValues = getQueueItemSourceWidgetValues(item);
-  const prompt = typeof sourceValues.positivePrompt === 'string' ? sourceValues.positivePrompt.trim() : '';
+  const prompt = getQueueItemSnapshotPositivePrompt(item).trim();
   const expectedCount = getQueueItemExpectedImageCount(item);
   const activeItemIndex = Math.min(expectedCount, Math.max(1, progress?.activeItemIndex ?? 1));
   const activeBackendItemId = item.backendItemIds?.[activeItemIndex - 1];

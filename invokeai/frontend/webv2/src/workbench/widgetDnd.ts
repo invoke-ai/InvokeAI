@@ -1,7 +1,8 @@
+import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
+import type { WidgetIconComponent, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
+
 import { closestCenter, pointerWithin, type CollisionDetection } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-
-import type { WidgetIconComponent, WidgetInstanceId, WidgetRegion, WidgetRegionState, WidgetTypeId } from './types';
 
 export interface WidgetDndProject {
   widgetInstances: Record<WidgetInstanceId, { typeId: WidgetTypeId; title?: string }>;

@@ -1,12 +1,12 @@
 import type {
-  CanvasCompositeExecutorDeps,
   CommitGeneratedImageOptions,
   CommitGeneratedImageResult,
   ExportBakedLayerBlobResult,
   ExportLayerPixelsOptions,
   LayerExportGuard,
   ReplaceSelectionFromImageResult,
-} from '@workbench/canvas-engine/api';
+} from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentContractV2, CanvasImageRef } from '@workbench/canvas-engine/contracts';
 import type {
   CommitRasterFilterOptions,
   CommitRasterFilterResult,
@@ -15,10 +15,10 @@ import type {
   CommitMaskImageResult,
   CommitMaskImageResultOptions,
 } from '@workbench/canvas-engine/controllers/maskResultController';
+import type { CanvasCompositeExecutorDeps } from '@workbench/canvas-engine/rasterTransactions';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engine/samInteraction';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasDocumentContractV2, CanvasImageRef } from '@workbench/types';
 
 export type SelectObjectStartContext =
   | { status: 'missing' | 'disabled' | 'locked' | 'unsupported' | 'not-ready' }

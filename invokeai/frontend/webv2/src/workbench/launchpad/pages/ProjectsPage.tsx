@@ -1,9 +1,9 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 
 import { Flex, Heading, HStack, Stack, Text } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
+import { Button, Scrollable, toaster } from '@platform/ui';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useAuthSession } from '@workbench/auth/session';
-import { Button, Scrollable, toaster } from '@workbench/components/ui';
 import { ProjectsGrid } from '@workbench/launchpad/ProjectsGrid';
 import { refreshProjectLibrary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';

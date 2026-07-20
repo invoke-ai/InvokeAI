@@ -1,12 +1,12 @@
+import type { GalleryBoard, GalleryImage } from '@features/gallery';
 /* eslint-disable react/react-compiler */
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
-import type { GalleryBoard, GalleryImage } from '@workbench/gallery/api';
 
 import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
-import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
+import { Button, MenuContent, Tooltip } from '@platform/ui';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   AsteriskIcon,
   ChevronRightIcon,
@@ -340,17 +340,15 @@ const SingleImageMenuItems = ({
   const handleRecallClipSkip = useRecallImageDataHandler(actions, image, 'clipSkip');
   const handleSelectForCompare = useSelectForCompareHandler(actions, image);
   const handleUseAsReferenceImage = useUseAsReferenceImageHandler(actions, image);
-  const dispatch = useWorkbenchDispatch();
+  const { generation, widgets } = useWorkbenchCommands();
   const openWidget = useOpenWorkbenchWidget();
   const handleSendToUpscale = useCallback(() => {
     openWidget('upscale', { preferredRegions: ['left'] });
-    dispatch({
-      type: 'patchWidgetValues',
-      values: { inputImage: { height: image.height, image_name: image.imageName, width: image.width } },
-      widgetId: 'upscale',
+    widgets.patchValues('upscale', {
+      inputImage: { height: image.height, image_name: image.imageName, width: image.width },
     });
-    dispatch({ sourceId: 'upscale', type: 'setInvocationSource' });
-  }, [dispatch, image.height, image.imageName, image.width, openWidget]);
+    generation.setSource('upscale');
+  }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
 
   return (
     <>

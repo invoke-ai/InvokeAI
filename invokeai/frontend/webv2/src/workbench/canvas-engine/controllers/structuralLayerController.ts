@@ -1,6 +1,6 @@
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2 } from '@workbench/types';
 
 import { createDocumentPatchEntry } from '@workbench/canvas-engine/history/documentPatch';
 

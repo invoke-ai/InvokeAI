@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import type { GeneratedImageContract } from '@features/gallery';
+import type { QueueHistoryItemStatus } from '@features/queue/contracts';
+import type { CanvasStagingCandidateContract } from '@workbench/canvas-engine/contracts';
+import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 
-import type { CanvasStagingCandidateContract, GeneratedImageContract, QueueItem, QueueItemStatus } from './types';
+import { describe, expect, it } from 'vitest';
 
 import { createEmptyCanvasStateV2 } from './canvasMigration';
 import {
@@ -78,7 +81,7 @@ const createQueueItem = ({
   destination?: 'canvas' | 'gallery';
   id: string;
   revision?: number;
-  status?: QueueItemStatus;
+  status?: QueueHistoryItemStatus;
   submittedAt?: string;
 }): QueueItem =>
   ({
@@ -88,9 +91,13 @@ const createQueueItem = ({
     completedBackendItemIds,
     id,
     snapshot: {
+      backendSubmission: { error: 'not submitted in staging view tests', kind: 'invalid' },
       canvas: createCanvas({ bbox, revision }),
       destination,
+      filterIntermediateResults: false,
+      galleryBoardId: null,
       graph: { edges: [], id: 'graph', label: 'Graph', nodes: [], updatedAt: '2026-06-09T00:00:00.000Z', version: 1 },
+      presentation: { batchCount, height: bbox.height, width: bbox.width },
       sourceId: 'canvas',
       submittedAt,
       widgetInstances: {},

@@ -1,25 +1,25 @@
 import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
+import type { ModelConfig } from '@features/models';
 import type {
-  IPAdapterMethod,
+  CanvasMaskContract,
+  CanvasMaskFillContract,
+  CanvasRegionalGuidanceLayerContract,
+  RegionalGuidanceIPAdapterMethod,
   RegionalGuidanceReferenceImage,
   RegionalGuidanceReferenceImageAsset,
-} from '@workbench/generation/types';
-import type { ModelConfig } from '@workbench/models/types';
-import type { CanvasMaskContract, CanvasMaskFillContract, CanvasRegionalGuidanceLayerContract } from '@workbench/types';
+} from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 import type { ChangeEvent, CSSProperties, FocusEvent, KeyboardEvent } from 'react';
 
 import { Box, createListCollection, HStack, IconButton, Input, Stack, Switch, Text } from '@chakra-ui/react';
 import { useDndMonitor, useDroppable } from '@dnd-kit/core';
-import { Button, ColorPicker, Field, Select, Slider } from '@workbench/components/ui';
-import { getGalleryImagesByNames, uploadGalleryImage } from '@workbench/gallery/api';
-import { useModelsSelector } from '@workbench/models/modelsStore';
+import { galleryImages, galleryTransfers } from '@features/gallery';
+import { isGalleryImageDragData } from '@features/gallery/utility';
+import { FluxReduxControls, PROMPT_ATTENTION_TARGET_PROPS, PromptTextarea } from '@features/generation/components';
+import { useModelsSelector } from '@features/models';
+import { Button, ColorPicker, Field, Select, Slider } from '@platform/ui';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
-import { isGalleryImageDragData } from '@workbench/widgets/gallery/galleryDnd';
-import { PROMPT_ATTENTION_TARGET_PROPS } from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
-import { PromptTextarea } from '@workbench/widgets/generate/promptFields/PromptTextarea';
-import { FluxReduxControls } from '@workbench/widgets/generate/reference-images/ReferenceImageControls';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { ImageIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,7 +46,7 @@ const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
   'vertical',
 ];
 
-const IP_ADAPTER_METHODS: readonly IPAdapterMethod[] = [
+const IP_ADAPTER_METHODS: readonly RegionalGuidanceIPAdapterMethod[] = [
   'full',
   'style',
   'composition',
@@ -88,7 +88,7 @@ interface RegionalGuidanceSettingsProps {
 export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSettingsProps) => {
   const { t } = useTranslation();
   const dispatch = useCanvasProjectMutationDispatch();
-  const workbenchDispatch = useWorkbenchDispatch();
+  const { gallery, notifications } = useWorkbenchCommands();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const base = useSelectedModelBase();
   const showSyntaxHighlighting = useActiveProjectSelector((project) => project.settings.showPromptSyntaxHighlighting);
@@ -263,19 +263,18 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const uploadReferenceImageAsset = useCallback(
     async (refId: string, file: File) => {
       try {
-        const uploaded = await uploadGalleryImage(file, 'none');
+        const uploaded = await galleryTransfers.upload(file, 'none');
         setReferenceImageAsset(refId, uploaded);
-        workbenchDispatch({ type: 'touchGalleryImagesRefresh' });
+        gallery.touchImages();
       } catch (error) {
-        workbenchDispatch({
+        notifications.reportError({
           area: 'regional-guidance',
           message: error instanceof Error ? error.message : String(error),
           namespace: 'generation',
-          type: 'recordError',
         });
       }
     },
-    [setReferenceImageAsset, workbenchDispatch]
+    [gallery, notifications, setReferenceImageAsset]
   );
 
   // A single monitor routes gallery-image drops to the region's ref slot the drop
@@ -293,7 +292,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       }
       const refId = overId.slice(prefix.length);
       const [first] = data.images;
-      void getGalleryImagesByNames([first.imageName]).then((images) => {
+      void galleryImages.resolveMany([first.imageName]).then((images) => {
         if (images[0]) {
           setReferenceImageAsset(refId, images[0]);
         }
@@ -529,7 +528,7 @@ const ReferenceImageRow = ({
       if (config.type !== 'ip_adapter') {
         return;
       }
-      const method = value[0] as IPAdapterMethod | undefined;
+      const method = value[0] as RegionalGuidanceIPAdapterMethod | undefined;
       if (method) {
         replaceRef({ ...referenceImage, config: { ...config, method } });
       }

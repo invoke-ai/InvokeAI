@@ -1,4 +1,4 @@
-import type { Project } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 
 import { getProjectWidgetValues } from '@workbench/widgetState';
 

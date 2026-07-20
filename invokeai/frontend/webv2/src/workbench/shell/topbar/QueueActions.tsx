@@ -1,6 +1,6 @@
 import { Group, Menu, Portal } from '@chakra-ui/react';
-import { IconButton, Tooltip } from '@workbench/components/ui';
-import { QueueMenuItems, useQueueMenuActions } from '@workbench/widgets/queue/queueMenuActions';
+import { QueueMenuItems, useQueueMenuActions } from '@features/queue/menu';
+import { IconButton, Tooltip } from '@platform/ui';
 import { ChevronDownIcon, XIcon } from 'lucide-react';
 
 /** Queue cancel cluster and processor actions. */

@@ -1,4 +1,8 @@
-import type { CanvasDocumentContractV2, CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/types';
+import type {
+  CanvasDocumentContractV2,
+  CanvasLayerContract,
+  CanvasRasterLayerContractV2,
+} from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it } from 'vitest';
 
@@ -128,6 +132,15 @@ describe('sampleDocumentColor', () => {
 
     const scratch = backend.__surfaces.at(-1)!;
     expect(scratch.drawnCanvases).toEqual([bottomEntry.surface.canvas, topEntry.surface.canvas]);
+  });
+
+  it('skips zero-sized cached layer surfaces', () => {
+    const backend = createFixedPixelBackend([1, 2, 3, 0]);
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('empty', 0, 0);
+
+    expect(sampleDocumentColor(makeDoc([rasterLayer('empty')]), layers, backend, { x: 5, y: 5 })).toBeNull();
+    expect(backend.__surfaces.at(-1)?.drawnCanvases).toEqual([]);
   });
 
   it('translates the view so the floored sample point lands at the scratch origin', () => {

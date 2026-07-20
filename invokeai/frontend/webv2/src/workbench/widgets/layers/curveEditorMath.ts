@@ -1,4 +1,4 @@
-import type { CanvasAdjustmentsContract } from '@workbench/types';
+import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/api';
 
 export const CURVE_SIZE = 180;
 export const CURVE_PADDING = 6;

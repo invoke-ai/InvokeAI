@@ -1,25 +1,4 @@
-/**
- * Mask fill rendering: turns a mask layer's alpha stencil into a tinted,
- * translucent overlay coloured by its {@link CanvasMaskFillContract}.
- *
- * Mirrors legacy (`features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer.ts`):
- * the mask objects are drawn as an opaque alpha stencil, then a fill (a solid
- * colour, or one of five line PATTERNS) is composited over them with
- * `globalCompositeOperation: 'source-in'` so the colour/pattern shows ONLY where
- * the mask is painted. The whole overlay is drawn above all raster/control
- * content at the layer's opacity (legacy default `1`).
- *
- * Pattern tiles are small, colour-specific, cached surfaces built through the
- * {@link RasterBackend} seam (like the transparency checkerboard). Legacy anchors
- * its pattern to the screen; here the colorized surface is drawn through the
- * layer transform, so the pattern is OBJECT-anchored (it scales/pans with the
- * mask content) — a deliberate, documented simplification of the screen-anchored
- * legacy behaviour that keeps the whole pipeline node-testable through the seam.
- *
- * Zero React, zero import-time side effects.
- */
-
-import type { CanvasMaskFillContract } from '@workbench/types';
+import type { CanvasMaskFillContract } from '@workbench/canvas-engine/contracts';
 
 import type { RasterBackend, RasterSurface } from './raster';
 

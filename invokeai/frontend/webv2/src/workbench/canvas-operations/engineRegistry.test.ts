@@ -2,7 +2,7 @@ import type {
   CanvasControlLayerContract,
   CanvasDocumentContractV2,
   CanvasRegionalGuidanceLayerContract,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
 
 import { createBitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
@@ -11,9 +11,12 @@ import {
   executeControlComposite,
   executeRegionalMaskComposite,
 } from '@workbench/canvas-operations/compositeForGeneration';
+import {
+  planControlComposites,
+  planRegionalMaskComposites,
+} from '@workbench/canvas-operations/generationCompositePlan';
 import { createEmptyCanvasDocumentV2 } from '@workbench/canvasMigration';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import { planControlComposites, planRegionalMaskComposites } from '@workbench/generation/canvas/compositePlan';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 

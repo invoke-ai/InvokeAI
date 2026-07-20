@@ -1,11 +1,9 @@
-/* eslint-disable react/react-compiler */
-import type { WidgetContributionSource } from '@workbench/types';
+import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
-import { commandApi } from '@workbench/extensions/extensionApi';
 import { getFocusedRegionSnapshot } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
 import { useEffect, useEffectEvent, useMemo } from 'react';
 import { tinykeys } from 'tinykeys';
 
@@ -40,6 +38,7 @@ export const shouldPreventHotkeyDefault = (hotkey: RegisteredHotkey | null): boo
 export const WorkbenchHotkeyRuntime = () => {
   useRegisterFirstPartyCommands();
 
+  const { commands: commandApi } = useWorkbenchExtensions();
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
@@ -101,7 +100,7 @@ export const WorkbenchHotkeyRuntime = () => {
     executeHotkey(hotkey, commandSource);
   });
 
-  const keybindings = useMemo(() => {
+  useEffect(() => {
     const bindings: Record<string, (event: KeyboardEvent) => void> = {};
 
     for (const hotkey of registeredHotkeys) {
@@ -118,16 +117,12 @@ export const WorkbenchHotkeyRuntime = () => {
       }
     }
 
-    return bindings;
-  }, [registeredHotkeys]);
-
-  useEffect(() => {
-    if (Object.keys(keybindings).length === 0) {
+    if (Object.keys(bindings).length === 0) {
       return;
     }
 
-    return tinykeys(window, keybindings, { ignore: () => false });
-  }, [keybindings]);
+    return tinykeys(window, bindings, { ignore: () => false });
+  }, [registeredHotkeys]);
 
   return null;
 };

@@ -13,10 +13,12 @@
  * node-testable with a fake dispatch + a stubbed canvas pipeline.
  */
 
-import type { ModelConfig } from './models/types';
-import type { Project, ResolvedInvocationRoute } from './types';
+import type { ModelConfig } from '@features/models';
+import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
+import type { Project } from '@workbench/projectContracts';
+
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
-import type { WorkbenchAction } from './workbenchState';
+import type { WorkbenchCommands } from './workbenchStore';
 
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
 import { readCanvasDenoisingStrength } from './widgets/canvas/invoke/canvasStrength';
@@ -29,7 +31,7 @@ export interface SubmitResolvedInvocationDeps {
   project: Project;
   /** Loaded models (or `undefined` while loading), forwarded verbatim to both paths. */
   models: readonly ModelConfig[] | undefined;
-  dispatch: (action: WorkbenchAction) => void;
+  commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   /**
    * The async canvas-invoke entry point, injected for testability. The real
    * implementation is fire-and-track (its returned promise is intentionally not
@@ -39,7 +41,7 @@ export interface SubmitResolvedInvocationDeps {
 }
 
 export const submitResolvedInvocation = ({
-  dispatch,
+  commands,
   models,
   prepareCanvasInvocation,
   project,
@@ -54,7 +56,7 @@ export const submitResolvedInvocation = ({
     prepareCanvasInvocation({
       compositing: readCanvasCompositingSettings(getProjectWidgetValues(project, 'canvas')),
       destination: route.destination,
-      dispatch,
+      commands,
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
       projectId: project.id,
@@ -64,10 +66,9 @@ export const submitResolvedInvocation = ({
     return;
   }
 
-  dispatch({
+  commands.generation.submitResolved({
     backendSupportsCancellation: true,
     models,
     route,
-    type: 'submitResolvedInvocationSnapshot',
   });
 };

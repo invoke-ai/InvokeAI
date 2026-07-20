@@ -1,15 +1,4 @@
-/**
- * Pure logic for the layers-panel type-group header actions (round-3 restructure).
- *
- * Each type group renders a right-aligned action cluster. The set of actions per
- * group is data (`getGroupActions`), so a new action — e.g. Task 44's PSD export —
- * is added by extending one array, not by threading a new prop through the header.
- * The visibility-toggle planning lives here as pure functions so it is
- * unit-testable in node (no React, no engine); merge-visible planning lives in
- * the engine's `document/mergeVisible` (shared with the engine op).
- */
-
-import type { CanvasLayerContract } from '@workbench/types';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 
 import type { LayerGroupKey } from './layerGroups';
 
@@ -88,5 +77,4 @@ export const planGroupVisibilityToggle = (
 };
 
 // Merge-visible contributor selection lives in the engine's document layer
-// (`@workbench/canvas-engine/document/mergeVisible`) so button enablement and
-// execution use the same legacy-parity eligibility rules.
+// Canvas execution uses the same legacy-parity eligibility rules.

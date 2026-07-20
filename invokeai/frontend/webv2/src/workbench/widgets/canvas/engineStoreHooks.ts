@@ -8,29 +8,39 @@
  * `widgets/`) preserves the engine's zero-React boundary.
  */
 
-import type { CanvasCoreStoreCapability } from '@workbench/canvas-engine/api';
 import type {
   BboxToolOptions,
   BrushOptions,
+  CanvasCoreStoreCapability,
+  CanvasInteractionState,
   EraserOptions,
   GradientToolOptions,
   LassoToolOptions,
-  ScalarStore,
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
   TransformSession,
   LayerThumbnailStatus,
-} from '@workbench/canvas-engine/engineStores';
-import type { ToolId } from '@workbench/canvas-engine/types';
-import type { CanvasOperationState } from '@workbench/canvas-operations/operationController';
-import type { FilterOperationSessionState, SamSessionSnapshot } from '@workbench/canvas-operations/operationTypes';
+  ToolId,
+} from '@workbench/canvas-engine/api';
 
-import { getCanvasOperations } from '@workbench/canvas-operations/createCanvasEngine';
+import {
+  getCanvasOperations,
+  type CanvasOperationState,
+  type FilterOperationSessionState,
+  type SamSessionSnapshot,
+} from '@workbench/canvas-operations/api';
 import { useCallback, useSyncExternalStore } from 'react';
 
 /** Subscribes the calling component to a single engine scalar store. */
-const useScalarStore = <T>(store: ScalarStore<T>): T => useSyncExternalStore(store.subscribe, store.get);
+const useCanvasInteractionState = <K extends keyof CanvasInteractionState>(
+  engine: CanvasCoreStoreCapability,
+  key: K
+): CanvasInteractionState[K] => {
+  const subscribe = useCallback((listener: () => void) => engine.interaction.subscribe(key, listener), [engine, key]);
+  const getSnapshot = useCallback(() => engine.interaction.get(key), [engine, key]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
 
 /**
  * Subscribes to a single layer's thumbnail version on `engine`, re-rendering
@@ -44,10 +54,11 @@ export const useLayerThumbnailVersion = (
   layerId: string
 ): number | undefined => {
   const subscribe = useCallback(
-    (onStoreChange: () => void) => engine?.stores.thumbnailVersion.subscribeKey(layerId, onStoreChange) ?? (() => {}),
+    (onStoreChange: () => void) =>
+      engine?.interaction.subscribeLayerThumbnailVersion(layerId, onStoreChange) ?? (() => {}),
     [engine, layerId]
   );
-  const getSnapshot = useCallback(() => engine?.stores.thumbnailVersion.get(layerId), [engine, layerId]);
+  const getSnapshot = useCallback(() => engine?.interaction.getLayerThumbnailVersion(layerId), [engine, layerId]);
   return useSyncExternalStore(subscribe, getSnapshot);
 };
 
@@ -57,104 +68,122 @@ export const useLayerThumbnailStatus = (
   layerId: string
 ): LayerThumbnailStatus | 'idle' => {
   const subscribe = useCallback(
-    (onStoreChange: () => void) => engine?.stores.thumbnailStatus.subscribeKey(layerId, onStoreChange) ?? (() => {}),
+    (onStoreChange: () => void) =>
+      engine?.interaction.subscribeLayerThumbnailStatus(layerId, onStoreChange) ?? (() => {}),
     [engine, layerId]
   );
-  const getSnapshot = useCallback(() => engine?.stores.thumbnailStatus.get(layerId) ?? 'idle', [engine, layerId]);
+  const getSnapshot = useCallback(
+    () => engine?.interaction.getLayerThumbnailStatus(layerId) ?? 'idle',
+    [engine, layerId]
+  );
   return useSyncExternalStore(subscribe, getSnapshot);
 };
 
 /** Current viewport zoom factor for `engine` (re-renders on zoom change). */
-export const useCanvasZoom = (engine: CanvasCoreStoreCapability): number => useScalarStore(engine.stores.zoom);
+export const useCanvasZoom = (engine: CanvasCoreStoreCapability): number => useCanvasInteractionState(engine, 'zoom');
 
 /** Whether `engine` has render targets bound and its viewport is live. */
 export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boolean =>
-  useScalarStore(engine.stores.viewportReady);
+  useCanvasInteractionState(engine, 'viewportReady');
 
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
-  useScalarStore(engine.stores.activeTool);
+  useCanvasInteractionState(engine, 'activeTool');
 
 const IDLE_CANVAS_OPERATION: CanvasOperationState = { status: 'idle' };
 
 export const useCanvasOperation = (engine: object | null): CanvasOperationState => {
   const subscribe = useCallback(
-    (listener: () => void) => (engine ? getCanvasOperations(engine).controller.subscribe(listener) : () => undefined),
+    (listener: () => void) => (engine ? getCanvasOperations(engine).subscribeOperation(listener) : () => undefined),
     [engine]
   );
   const getSnapshot = useCallback(
-    () => (engine ? getCanvasOperations(engine).controller.getSnapshot() : IDLE_CANVAS_OPERATION),
+    () => (engine ? getCanvasOperations(engine).getOperationState() : IDLE_CANVAS_OPERATION),
     [engine]
   );
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
-export const useSamSession = (engine: object): SamSessionSnapshot | null =>
-  useScalarStore(getCanvasOperations(engine).stores.samSession);
+export const useSamSession = (engine: object): SamSessionSnapshot | null => {
+  const operations = getCanvasOperations(engine);
+  return useSyncExternalStore(
+    operations.subscribeSamSession,
+    operations.getSamSessionState,
+    operations.getSamSessionState
+  );
+};
 
-export const useFilterSession = (engine: object): FilterOperationSessionState | null =>
-  useScalarStore(getCanvasOperations(engine).stores.filterSession);
+export const useFilterSession = (engine: object): FilterOperationSessionState | null => {
+  const operations = getCanvasOperations(engine);
+  return useSyncExternalStore(
+    operations.subscribeFilterSession,
+    operations.getFilterSessionState,
+    operations.getFilterSessionState
+  );
+};
 
 /** Whether the engine-owned canvas history has an entry to undo (enables the header undo button). */
-export const useCanvasCanUndo = (engine: CanvasCoreStoreCapability): boolean => useScalarStore(engine.stores.canUndo);
+export const useCanvasCanUndo = (engine: CanvasCoreStoreCapability): boolean =>
+  useCanvasInteractionState(engine, 'canUndo');
 
 /** Whether the engine-owned canvas history has an entry to redo (enables the header redo button). */
-export const useCanvasCanRedo = (engine: CanvasCoreStoreCapability): boolean => useScalarStore(engine.stores.canRedo);
+export const useCanvasCanRedo = (engine: CanvasCoreStoreCapability): boolean =>
+  useCanvasInteractionState(engine, 'canRedo');
 
 /** Whether a SAM/filter operation currently excludes ordinary canvas document edits. */
 export const useCanvasDocumentEditingLocked = (engine: CanvasCoreStoreCapability | null): boolean => {
   const subscribe = useCallback(
-    (listener: () => void) => engine?.stores.documentEditingLocked.subscribe(listener) ?? (() => undefined),
+    (listener: () => void) => engine?.interaction.subscribe('documentEditingLocked', listener) ?? (() => undefined),
     [engine]
   );
-  const getSnapshot = useCallback(() => engine?.stores.documentEditingLocked.get() ?? false, [engine]);
+  const getSnapshot = useCallback(() => engine?.interaction.get('documentEditingLocked') ?? false, [engine]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
 /**
  * The brush tool's current options (size / color / opacity / pressure). Write
- * through `engine.stores.brushOptions.set(...)` directly — there is no reducer
+ * through `engine.interaction.set('brushOptions', ...)` directly — there is no reducer
  * mirror to dispatch through, so the options bar reads and writes this one
  * store.
  */
 export const useBrushOptions = (engine: CanvasCoreStoreCapability): BrushOptions =>
-  useScalarStore(engine.stores.brushOptions);
+  useCanvasInteractionState(engine, 'brushOptions');
 
-/** The eraser tool's current options (size / opacity). Write through `engine.stores.eraserOptions.set(...)`. */
+/** The eraser tool's current options (size / opacity). Write through `engine.interaction.set`. */
 export const useEraserOptions = (engine: CanvasCoreStoreCapability): EraserOptions =>
-  useScalarStore(engine.stores.eraserOptions);
+  useCanvasInteractionState(engine, 'eraserOptions');
 
-/** The bbox tool's current options (aspect lock / ratio). Write through `engine.stores.bboxOptions.set(...)`. */
+/** The bbox tool's current options (aspect lock / ratio). Write through `engine.interaction.set`. */
 export const useBboxOptions = (engine: CanvasCoreStoreCapability): BboxToolOptions =>
-  useScalarStore(engine.stores.bboxOptions);
+  useCanvasInteractionState(engine, 'bboxOptions');
 
 /** The bbox tool's current snapping grid size (document px). */
-export const useBboxGrid = (engine: CanvasCoreStoreCapability): number => useScalarStore(engine.stores.bboxGrid);
+export const useBboxGrid = (engine: CanvasCoreStoreCapability): number => useCanvasInteractionState(engine, 'bboxGrid');
 
 /** The active transform-tool session (layer id + live transform), or `null`. */
 export const useTransformSession = (engine: CanvasCoreStoreCapability): TransformSession | null =>
-  useScalarStore(engine.stores.transformSession);
+  useCanvasInteractionState(engine, 'transformSession');
 
 /** Whether a pixel selection currently exists (enables fill/erase/invert/deselect controls). */
 export const useCanvasHasSelection = (engine: CanvasCoreStoreCapability): boolean =>
-  useScalarStore(engine.stores.hasSelection);
+  useCanvasInteractionState(engine, 'hasSelection');
 
-/** The lasso tool's current options (the committed boolean op mode). Write through `engine.stores.lassoOptions.set(...)`. */
+/** The lasso tool's current options (the committed boolean op mode). Write through `engine.interaction.set`. */
 export const useLassoOptions = (engine: CanvasCoreStoreCapability): LassoToolOptions =>
-  useScalarStore(engine.stores.lassoOptions);
+  useCanvasInteractionState(engine, 'lassoOptions');
 
-/** The shape tool's current options (kind / fill / stroke / stroke width). Write through `engine.stores.shapeOptions.set(...)`. */
+/** The shape tool's current options (kind / fill / stroke / stroke width). Write through `engine.interaction.set`. */
 export const useShapeOptions = (engine: CanvasCoreStoreCapability): ShapeToolOptions =>
-  useScalarStore(engine.stores.shapeOptions);
+  useCanvasInteractionState(engine, 'shapeOptions');
 
-/** The gradient tool's current options (kind / angle / stops). Write through `engine.stores.gradientOptions.set(...)`. */
+/** The gradient tool's current options (kind / angle / stops). Write through `engine.interaction.set`. */
 export const useGradientOptions = (engine: CanvasCoreStoreCapability): GradientToolOptions =>
-  useScalarStore(engine.stores.gradientOptions);
+  useCanvasInteractionState(engine, 'gradientOptions');
 
 /** The text tool's current options (font / size / weight / line-height / align / color). */
 export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptions =>
-  useScalarStore(engine.stores.textOptions);
+  useCanvasInteractionState(engine, 'textOptions');
 
 /** The active text-editing session (create/edit mode + live source + transform), or `null`. */
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
-  useScalarStore(engine.stores.textEditSession);
+  useCanvasInteractionState(engine, 'textEditSession');

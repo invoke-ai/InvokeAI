@@ -1,9 +1,9 @@
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { BackendGraphContract } from '@workbench/types';
+import type { BackendGraphContract } from '@workbench/graphContracts';
 
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
-import { buildFilterGraph } from '@workbench/generation/canvas/filterGraphs';
+import { buildFilterGraph } from '@workbench/canvas-operations/filterGraphs';
 export { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
 
 export interface LayerFilterResult {

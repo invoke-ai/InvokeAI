@@ -1,8 +1,8 @@
 import type { SelectValueChangeDetails } from '@chakra-ui/react';
 
 import { createListCollection, HStack } from '@chakra-ui/react';
-import { constrainBboxToRatio } from '@workbench/canvas-engine/tools/bboxHitTest';
-import { Select, ToggleDot } from '@workbench/components/ui';
+import { Select, ToggleDot } from '@platform/ui';
+import { constrainBboxToRatio } from '@workbench/canvas-engine/api';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -62,10 +62,10 @@ export const BboxOptions = ({ engine }: ToolOptionsComponentProps) => {
         return;
       }
       if (preset.ratio === null) {
-        engine.stores.bboxOptions.set({ ...options, aspectLocked: false });
+        engine.interaction.set('bboxOptions', { ...options, aspectLocked: false });
         return;
       }
-      engine.stores.bboxOptions.set({ aspectLocked: true, aspectRatio: preset.ratio });
+      engine.interaction.set('bboxOptions', { aspectLocked: true, aspectRatio: preset.ratio });
       commitBbox(constrainBboxToRatio(bbox, preset.ratio, grid));
     },
     [bbox, commitBbox, engine, grid, options]
@@ -79,7 +79,7 @@ export const BboxOptions = ({ engine }: ToolOptionsComponentProps) => {
           : options.aspectRatio > 0
             ? options.aspectRatio
             : 1;
-      engine.stores.bboxOptions.set({ aspectLocked: checked, aspectRatio });
+      engine.interaction.set('bboxOptions', { aspectLocked: checked, aspectRatio });
     },
     [bbox, engine, options.aspectRatio]
   );

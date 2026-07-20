@@ -1,4 +1,5 @@
-import type { WidgetViewProps, WorkbenchNotificationKind } from '@workbench/types';
+import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@workbench/widget-frame';
@@ -21,9 +22,9 @@ const kindIcon = {
 export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const { t } = useTranslation();
   const { errorCount, totalCount, unreadCount } = useWorkbenchSelector((snapshot) => ({
-    errorCount: snapshot.state.notifications.filter((notification) => notification.kind === 'error').length,
-    totalCount: snapshot.state.notifications.length,
-    unreadCount: snapshot.state.notifications.filter((notification) => !notification.isRead).length,
+    errorCount: snapshot.notifications.filter((notification) => notification.kind === 'error').length,
+    totalCount: snapshot.notifications.length,
+    unreadCount: snapshot.notifications.filter((notification) => !notification.isRead).length,
   }));
   const label =
     unreadCount > 0
@@ -40,7 +41,7 @@ export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProp
 
 const NotificationsPanel = () => {
   const { t } = useTranslation();
-  const notifications = useWorkbenchSelector((snapshot) => snapshot.state.notifications);
+  const notifications = useWorkbenchSelector((snapshot) => snapshot.notifications);
 
   return (
     <Stack flex="1" gap="3" minH="0" p="2">

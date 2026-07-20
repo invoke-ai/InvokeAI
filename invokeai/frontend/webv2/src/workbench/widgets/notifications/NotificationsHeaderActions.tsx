@@ -1,21 +1,18 @@
 import { HStack } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui';
-import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useCallback } from 'react';
+import { Button } from '@platform/ui';
+import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useTranslation } from 'react-i18next';
 
 export const NotificationsHeaderActions = () => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
-  const markAllRead = useCallback(() => dispatch({ type: 'markAllNotificationsRead' }), [dispatch]);
-  const clearNotifications = useCallback(() => dispatch({ type: 'clearNotifications' }), [dispatch]);
+  const { notifications } = useWorkbenchCommands();
 
   return (
     <HStack gap="2">
-      <Button size="2xs" variant="outline" onClick={markAllRead}>
+      <Button size="2xs" variant="outline" onClick={notifications.markAllRead}>
         {t('notifications.markRead')}
       </Button>
-      <Button size="2xs" variant="outline" onClick={clearNotifications}>
+      <Button size="2xs" variant="outline" onClick={notifications.clear}>
         {t('common.clear')}
       </Button>
     </HStack>

@@ -1,15 +1,16 @@
-import type { Rect } from '@workbench/canvas-engine/types';
-import type { Project, WidgetViewProps } from '@workbench/types';
+import type { Rect } from '@workbench/canvas-engine/api';
+import type { Project } from '@workbench/projectContracts';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
 import { Box, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { useModifierHeld } from '@platform/react/useModifierHeld';
+import { ConfirmDialog, IconButton, MenuContent, Tooltip } from '@platform/ui';
 import { createNewCanvasStateV2 } from '@workbench/canvasMigration';
-import { ConfirmDialog, IconButton, MenuContent, Tooltip } from '@workbench/components/ui';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
-import { useModifierHeld } from '@workbench/useModifierHeld';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   BugIcon,
   CheckIcon,
@@ -42,7 +43,7 @@ import { computeFitBboxToLayers, computeFitBboxToMasks } from './fitBbox';
 import { useCanvasEngine } from './useCanvasEngine';
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';
 
-type CanvasHeaderEngine = Pick<CanvasEngineHandle, 'diagnostics' | 'history' | 'layers' | 'stores' | 'viewport'>;
+type CanvasHeaderEngine = Pick<CanvasEngineHandle, 'diagnostics' | 'history' | 'interaction' | 'layers' | 'viewport'>;
 
 const ZOOM_OPTIONS = zoomMenuOptions();
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
@@ -304,17 +305,13 @@ const HeaderDivider = () => <Box bg="border.subtle" flexShrink={0} h="4" mx="1" 
  */
 const CanvasSettingsMenu = ({ editingLocked, engine }: { editingLocked: boolean; engine: CanvasHeaderEngine }) => {
   const { t } = useTranslation();
-  const dispatch = useWorkbenchDispatch();
+  const { widgets } = useWorkbenchCommands();
   const settings = useActiveProjectSelector(selectCanvasSettings, canvasSettingsEqual);
   // Shift reveals the Debug section, matching legacy `useShiftModifier` (event-driven).
   const shiftHeld = useModifierHeld('Shift');
 
   const toggle = (setting: CanvasBooleanSetting) => {
-    dispatch({
-      type: 'patchWidgetValues',
-      values: { [setting.key]: !settings[setting.key] },
-      widgetId: 'canvas',
-    });
+    widgets.patchValues('canvas', { [setting.key]: !settings[setting.key] });
   };
 
   return (

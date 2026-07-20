@@ -1,12 +1,14 @@
+import type { GalleryImage } from '@features/gallery';
 import type { CanvasLayerCapability } from '@workbench/canvas-engine/api';
+import type { CanvasImageRef, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { GalleryImage } from '@workbench/gallery/api';
-import type { CanvasImageRef, CanvasLayerContract, Project, WorkbenchState } from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
-import type { Dispatch } from 'react';
+import type { Project } from '@workbench/projectContracts';
 
-import { getGenerationDimensions } from '@workbench/generation/baseGenerationPolicies';
-import { calculateNewSize, normalizeGenerateWidgetValues } from '@workbench/generation/settings';
+import {
+  calculateNewSize,
+  getGenerationDimensions,
+  normalizeGenerateWidgetValues,
+} from '@features/generation/settings';
 import {
   createControlLayer,
   createEmptyPaintLayer,
@@ -215,22 +217,24 @@ const resizeImages = async (
 type GalleryImportEngine = { readonly projectId: string; readonly layers: CanvasLayerCapability };
 
 export const importGalleryImagesToCanvas = async (options: {
+  applyCanvasMutation: (projectId: string, mutation: CanvasProjectMutation) => boolean | void;
   destination: GalleryCanvasImportDestination;
-  dispatch: Dispatch<WorkbenchAction>;
   engine: GalleryImportEngine | null;
-  getState: () => WorkbenchState;
+  getProject: (projectId: string) => Project | null;
+  isActiveProject: (projectId: string) => boolean;
   images: readonly GalleryImage[];
   project: Project;
   fetchImage?: typeof fetch;
   uploadImage?: typeof uploadCanvasImage;
 }): Promise<ImportGalleryImagesResult> => {
   const {
+    applyCanvasMutation,
     destination,
-    dispatch,
     engine,
     fetchImage = globalThis.fetch,
-    getState,
+    getProject,
     images,
+    isActiveProject,
     project,
     uploadImage = uploadCanvasImage,
   } = options;
@@ -244,13 +248,8 @@ export const importGalleryImagesToCanvas = async (options: {
 
   try {
     const capturedDocument = project.canvas.document;
-    const initialState = getState();
     const matchingProjectEngine = engine !== null && engine.projectId === project.id ? engine : null;
-    if (
-      matchingProjectEngine &&
-      initialState.activeProjectId === project.id &&
-      !matchingProjectEngine.layers.canCommitStructural()
-    ) {
+    if (matchingProjectEngine && isActiveProject(project.id) && !matchingProjectEngine.layers.canCommitStructural()) {
       return { status: 'blocked' };
     }
 
@@ -277,8 +276,7 @@ export const importGalleryImagesToCanvas = async (options: {
       type: 'applyCanvasLayerStackMutation',
     };
 
-    const latestState = getState();
-    const latestProject = latestState.projects.find((candidate) => candidate.id === project.id);
+    const latestProject = getProject(project.id);
     if (!latestProject) {
       return { status: 'stale-project' };
     }
@@ -286,12 +284,12 @@ export const importGalleryImagesToCanvas = async (options: {
       return { status: 'stale-document' };
     }
 
-    if (matchingProjectEngine && latestState.activeProjectId === project.id) {
+    if (matchingProjectEngine && isActiveProject(project.id)) {
       if (!matchingProjectEngine.layers.commitStructural('Import gallery images', forward, inverse)) {
         return { status: 'blocked' };
       }
     } else {
-      dispatch({ mutation: forward, projectId: project.id, type: 'applyCanvasProjectMutation' });
+      applyCanvasMutation(project.id, forward);
     }
     return { failedImageNames, layerIds: layers.map((layer) => layer.id), status: 'imported' };
   } finally {

@@ -1,13 +1,15 @@
-import type { DeveloperLogLevel, DeveloperLogNamespace, ProjectSettings, WorkbenchPreferences } from '@workbench/types';
+import type { DeveloperLogLevel, DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
+import type { ProjectSettings, WorkbenchPreferences } from '@workbench/settings/contracts';
 
+import { getUserStorageScope } from '@features/identity';
+import { normalizeWorkbenchLanguage } from '@platform/i18n/languages';
+import { createExternalStore } from '@platform/state/externalStore';
+import { createSingleFlight } from '@platform/state/singleFlight';
 import { DEFAULT_THEME_ID, isWorkbenchThemeId } from '@theme/themes';
-import { getUserStorageScope } from '@workbench/auth/session';
-import { createExternalStore } from '@workbench/externalStore';
-import { normalizeWorkbenchLanguage } from '@workbench/i18n/languages';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
 
-export { WORKBENCH_LANGUAGES } from '@workbench/i18n/languages';
+export { WORKBENCH_LANGUAGES } from '@platform/i18n/languages';
 
 const SETTINGS_BASE_STORAGE_KEY = 'invokeai:v7:webv2:settings';
 const LEGACY_WORKBENCH_BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
@@ -60,6 +62,8 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
 };
 
 interface WorkbenchSettingsSnapshot {
+  /** Account-scope storage key these preferences were hydrated for; null until a load succeeds. */
+  hydratedStorageKey: string | null;
   preferences: WorkbenchPreferences;
   scope: 'global' | 'user';
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -67,6 +71,7 @@ interface WorkbenchSettingsSnapshot {
 }
 
 const store = createExternalStore<WorkbenchSettingsSnapshot>({
+  hydratedStorageKey: null,
   preferences: DEFAULT_PREFERENCES,
   scope: 'global',
   status: 'idle',
@@ -295,8 +300,12 @@ const loadLegacySessionPreferences = async (): Promise<WorkbenchPreferences | nu
   return blob?.account.preferences ? normalizeWorkbenchPreferences(blob.account.preferences) : null;
 };
 
-const replaceSnapshot = (preferences: WorkbenchPreferences, status: WorkbenchSettingsSnapshot['status']): void => {
-  store.setSnapshot({ preferences, scope: getSettingsScope(), status });
+const replaceSnapshot = (
+  preferences: WorkbenchPreferences,
+  status: WorkbenchSettingsSnapshot['status'],
+  hydratedStorageKey: string | null = store.getSnapshot().hydratedStorageKey
+): void => {
+  store.setSnapshot({ hydratedStorageKey, preferences, scope: getSettingsScope(), status });
 };
 
 const pushPreferences = (preferences: WorkbenchPreferences): Promise<void> =>
@@ -328,9 +337,7 @@ const resolveSettings = async (local: StoredSettings | null): Promise<WorkbenchP
   return preferences;
 };
 
-let pendingLoad: Promise<WorkbenchPreferences> | null = null;
-let pendingLoadStorageKey = '';
-let loadedStorageKey: string | null = null;
+const settingsLoad = createSingleFlight<WorkbenchPreferences>();
 
 /**
  * Resolve settings once per account scope (a sign-in/out switches scope and
@@ -340,26 +347,19 @@ let loadedStorageKey: string | null = null;
 export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
   const storageKey = getSettingsStorageKey();
 
-  if (pendingLoad && pendingLoadStorageKey === storageKey) {
-    return pendingLoad;
-  }
-
-  if (loadedStorageKey === storageKey) {
+  if (store.getSnapshot().hydratedStorageKey === storageKey) {
     return Promise.resolve(getWorkbenchPreferences());
   }
 
-  pendingLoadStorageKey = storageKey;
-  store.patchSnapshot({ scope: getSettingsScope(), status: 'loading' });
-
-  pendingLoad = (async () => {
+  return settingsLoad.run(storageKey, async () => {
+    store.patchSnapshot({ scope: getSettingsScope(), status: 'loading' });
     const local = readLocalSettings();
 
     try {
       const preferences = await resolveSettings(local);
 
       writeLocalSettings(preferences);
-      replaceSnapshot(preferences, 'ready');
-      loadedStorageKey = storageKey;
+      replaceSnapshot(preferences, 'ready', storageKey);
 
       return preferences;
     } catch (error) {
@@ -369,6 +369,7 @@ export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
       writeLocalSettings(preferences, local?.pendingPush);
       store.setSnapshot({
         error: error instanceof Error ? error.message : 'Failed to load settings from the backend.',
+        hydratedStorageKey: null,
         preferences,
         scope: getSettingsScope(),
         status: fallback ? 'ready' : 'error',
@@ -376,11 +377,7 @@ export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
 
       return preferences;
     }
-  })().finally(() => {
-    pendingLoad = null;
   });
-
-  return pendingLoad;
 };
 
 export const useWorkbenchSettings = (): WorkbenchSettingsSnapshot => store.useSnapshot();
@@ -401,6 +398,13 @@ export const useWorkbenchPreferenceSelector = <Selected>(
 ): Selected => useWorkbenchSettingsSelector((snapshot) => selector(snapshot.preferences), isEqual);
 
 export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnapshot().preferences;
+
+/** Non-React runtimes use this to keep infrastructure configuration current. */
+export const subscribeWorkbenchPreferences = (listener: (preferences: WorkbenchPreferences) => void): (() => void) => {
+  listener(store.getSnapshot().preferences);
+
+  return store.subscribe(() => listener(store.getSnapshot().preferences));
+};
 
 export const getWorkbenchReduceMotion = (): boolean => store.getSnapshot().preferences.reduceMotion;
 
@@ -426,8 +430,7 @@ export const patchWorkbenchPreferences = async (preferences: Partial<WorkbenchPr
 
 export const clearWorkbenchSettings = async (): Promise<void> => {
   removeLocalSettings();
-  replaceSnapshot(normalizeWorkbenchPreferences(), 'ready');
-  loadedStorageKey = getSettingsStorageKey();
+  replaceSnapshot(normalizeWorkbenchPreferences(), 'ready', getSettingsStorageKey());
 
   try {
     await deleteClientStateValue(SETTINGS_CLIENT_STATE_KEY);

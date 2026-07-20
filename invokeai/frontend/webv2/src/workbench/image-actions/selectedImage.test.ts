@@ -1,4 +1,4 @@
-import type { GeneratedImageContract } from '@workbench/types';
+import type { GeneratedImageContract } from '@features/gallery';
 
 import { describe, expect, it } from 'vitest';
 

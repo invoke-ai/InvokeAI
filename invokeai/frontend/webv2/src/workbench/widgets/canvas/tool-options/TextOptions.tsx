@@ -1,15 +1,14 @@
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
-import type { TextToolOptions } from '@workbench/canvas-engine/engineStores';
-import type { CanvasLayerSourceContract } from '@workbench/types';
+import type { CanvasLayerSourceContract, TextToolOptions } from '@workbench/canvas-engine/api';
 
 import { createListCollection, HStack, NumberInput } from '@chakra-ui/react';
+import { ColorPicker, IconButton, Select } from '@platform/ui';
 import {
   MAX_TEXT_FONT_SIZE,
   MIN_TEXT_FONT_SIZE,
   TEXT_FONT_FAMILIES,
   TEXT_FONT_WEIGHTS,
-} from '@workbench/canvas-engine/engineStores';
-import { ColorPicker, IconButton, Select } from '@workbench/components/ui';
+} from '@workbench/canvas-engine/api';
 import { useTextEditSession, useTextOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { AlignCenterIcon, AlignLeftIcon, AlignRightIcon } from 'lucide-react';
@@ -134,7 +133,7 @@ export const TextOptions = ({ engine }: ToolOptionsComponentProps) => {
    */
   const applyEdit = useCallback(
     (patch: Partial<TextToolOptions>, commit: boolean) => {
-      engine.stores.textOptions.set({ align, color, fontFamily, fontSize, fontWeight, lineHeight, ...patch });
+      engine.interaction.set('textOptions', { align, color, fontFamily, fontSize, fontWeight, lineHeight, ...patch });
       if (session) {
         engine.layers.updateTextEditStyle(patch);
         return;

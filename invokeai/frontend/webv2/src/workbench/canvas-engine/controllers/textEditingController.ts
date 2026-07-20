@@ -1,7 +1,7 @@
+import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { TextEditSession, TextSource, TextToolOptions } from '@workbench/canvas-engine/engineStores';
 import type { Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 export interface TextEditingControllerOptions {
   readonly session: {

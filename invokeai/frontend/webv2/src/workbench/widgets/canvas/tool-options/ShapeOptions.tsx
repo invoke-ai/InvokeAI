@@ -1,10 +1,9 @@
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
-import type { ShapeToolOptions } from '@workbench/canvas-engine/engineStores';
-import type { CanvasLayerSourceContract } from '@workbench/types';
+import type { CanvasLayerSourceContract, ShapeToolOptions } from '@workbench/canvas-engine/api';
 
 import { createListCollection, HStack, NumberInput, Text } from '@chakra-ui/react';
-import { MAX_SHAPE_STROKE_WIDTH } from '@workbench/canvas-engine/engineStores';
-import { ColorPicker, Select, ToggleDot } from '@workbench/components/ui';
+import { ColorPicker, Select, ToggleDot } from '@platform/ui';
+import { MAX_SHAPE_STROKE_WIDTH } from '@workbench/canvas-engine/api';
 import { useShapeOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
@@ -77,7 +76,7 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
    */
   const applyEdit = useCallback(
     (patch: Partial<ShapeToolOptions>, commit: boolean) => {
-      engine.stores.shapeOptions.set({ fill, kind, stroke, strokeWidth, ...patch });
+      engine.interaction.set('shapeOptions', { fill, kind, stroke, strokeWidth, ...patch });
       if (selected && commit) {
         const before = selected.source;
         const after: ShapeSource = { ...before, ...patch };

@@ -1,20 +1,4 @@
-/**
- * A cached, non-destructive "adjusted surface" per raster layer.
- *
- * Raster adjustments (brightness/contrast/saturation + curves) must be applied at
- * composite time WITHOUT recomputing every frame (the plan explicitly forbids a
- * third per-frame recompute alongside the mask-colorize and control-transparency
- * smells). This store memoizes each layer's adjusted pixels, keyed by the source
- * cache's `version` AND the adjustments' identity ({@link adjustmentsKey}), and
- * rebuilds only when either changes — so a steady frame reuses the cached surface,
- * an edit to the layer (cache version bump) invalidates it, and an unrelated
- * layer's edit does not.
- *
- * Everything flows through the injected {@link RasterBackend} seam, so it runs
- * unchanged in node tests. Zero React, zero import-time side effects.
- */
-
-import type { CanvasAdjustmentsContract } from '@workbench/types';
+import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
 
 import type { LayerCacheEntry } from './layerCache';
 import type { RasterBackend, RasterSurface } from './raster';

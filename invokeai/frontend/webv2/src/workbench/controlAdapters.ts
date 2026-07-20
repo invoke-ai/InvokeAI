@@ -1,4 +1,4 @@
-import type { CanvasControlAdapterContract } from './types';
+import type { CanvasControlAdapterContract } from '@workbench/canvas-engine/api';
 
 export const CONTROL_ADAPTER_DEFAULTS: Readonly<
   Record<CanvasControlAdapterContract['kind'], CanvasControlAdapterContract>

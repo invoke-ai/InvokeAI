@@ -1,9 +1,10 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
+import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
@@ -20,8 +21,8 @@ export interface CopyLayerControllerOptions {
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
   readonly createLayerId: () => string;
-  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => unknown;
-  readonly installPrepared: (prepared: unknown) => void;
+  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => PreparedLayerCacheReplacement;
+  readonly installPrepared: (prepared: PreparedLayerCacheReplacement) => void;
   readonly dispatchPrepared: (
     action: CanvasProjectMutation,
     expectedReducer: () => boolean,

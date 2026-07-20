@@ -1,7 +1,7 @@
-import type { CanvasGallerySaveRegion } from '@workbench/canvas-operations/saveCanvasToGallery';
+import type { CanvasGallerySaveRegion } from '@workbench/canvas-operations/api';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { MenuContent } from '@workbench/components/ui';
+import { MenuContent } from '@platform/ui';
 import { ChevronRightIcon, SaveIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

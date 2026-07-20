@@ -34,10 +34,9 @@ const enCatalog = Object.values(englishCatalogModules)[0] as {
 const en = enCatalog;
 const testI18n = createInstance();
 await testI18n.init({
-  initImmediate: false,
+  initAsync: false,
   lng: 'en',
   resources: { en: { translation: enCatalog } },
-  showSupportNotice: false,
 });
 
 const snapshot = (overrides: Partial<SamSessionSnapshot> = {}): SamSessionSnapshot => ({

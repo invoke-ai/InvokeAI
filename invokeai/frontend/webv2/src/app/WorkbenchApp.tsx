@@ -1,0 +1,50 @@
+import type { WorkbenchSearch } from '@workbench/projects/session';
+
+import { SessionExpiryGuard } from '@features/identity';
+import { useSearch } from '@tanstack/react-router';
+import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
+import { WorkbenchShell } from '@workbench/shell';
+import { WidgetHosts } from '@workbench/widget-frame/WidgetHosts';
+import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { WorkbenchProvider } from '@workbench/WorkbenchContext';
+import { WorkbenchRuntime } from '@workbench/WorkbenchRuntime';
+import { WorkbenchSessionController } from '@workbench/WorkbenchSessionController';
+import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
+import { useMemo } from 'react';
+
+import { QueueRuntimeAdapter } from './QueueRuntimeAdapter';
+import { WorkbenchUiPorts } from './workbenchPorts';
+
+/**
+ * The authenticated editor: providers, editor-only runtimes, and the shell.
+ * The shared backend socket is mounted above this route; `WorkbenchRuntime`
+ * attaches the generation queue listeners while the editor is open.
+ *
+ * The route's search params shape the boot: ?project deep-links a library
+ * project into the session, ?new starts a fresh draft. Both are consumed by
+ * the persistence load; the session controller handles params that change
+ * while the editor is already mounted.
+ */
+export const WorkbenchApp = () => {
+  const search = useSearch({ strict: false }) as WorkbenchSearch;
+  const loadOptions = useMemo(
+    () => ({ createNew: search.new, openProjectId: search.project }),
+    [search.new, search.project]
+  );
+
+  return (
+    <WorkbenchProvider loadOptions={loadOptions}>
+      <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
+        <WorkbenchUiPorts>
+          <SessionExpiryGuard />
+          <WorkbenchHotkeyRuntime />
+          <QueueRuntimeAdapter />
+          <WorkbenchRuntime />
+          <WorkbenchSessionController search={search} />
+          <WidgetHosts />
+          <WorkbenchShell />
+        </WorkbenchUiPorts>
+      </WorkbenchWidgetRegistryProvider>
+    </WorkbenchProvider>
+  );
+};

@@ -1,12 +1,16 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { DerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
-import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import type {
+  LayerCacheEntry,
+  LayerCacheStore,
+  PreparedLayerCacheReplacement,
+} from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/types';
 
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
@@ -40,8 +44,8 @@ export interface ExtractMaskedAreaControllerOptions {
   readonly getAdjustedSurface: (layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null;
   readonly getMaskPattern: (style: string, color: string) => RasterSurface | null;
   readonly createLayerId: () => string;
-  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => unknown;
-  readonly installPrepared: (prepared: unknown) => void;
+  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => PreparedLayerCacheReplacement;
+  readonly installPrepared: (prepared: PreparedLayerCacheReplacement) => void;
   readonly dispatchPrepared: (
     action: CanvasProjectMutation,
     expectedReducer: () => boolean,

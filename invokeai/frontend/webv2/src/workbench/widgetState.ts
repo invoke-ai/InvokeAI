@@ -1,4 +1,5 @@
-import type { Project, WidgetInstanceContract, WidgetStateContract, WidgetTypeId } from './types';
+import type { Project } from '@workbench/projectContracts';
+import type { WidgetInstanceContract, WidgetStateContract, WidgetTypeId } from '@workbench/widgetContracts';
 
 const emptyWidgetState = (widgetId: WidgetTypeId): WidgetStateContract => ({
   id: widgetId,

@@ -1,4 +1,4 @@
-import { createExternalStore } from '@workbench/externalStore';
+import { createExternalStore } from '@platform/state/externalStore';
 
 const store = createExternalStore<{ activeLayerIds: ReadonlySet<string> }>({ activeLayerIds: new Set<string>() });
 

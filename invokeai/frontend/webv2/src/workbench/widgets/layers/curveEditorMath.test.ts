@@ -1,4 +1,4 @@
-import type { CanvasAdjustmentsContract } from '@workbench/types';
+import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it, vi } from 'vitest';
 

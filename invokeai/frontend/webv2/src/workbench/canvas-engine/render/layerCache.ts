@@ -20,6 +20,7 @@ import type { RasterBackend, RasterSurface } from './raster';
 export const DEFAULT_CACHE_BUDGET_BYTES = 512 * 1024 * 1024;
 
 const BYTES_PER_PIXEL = 4;
+const READBACK_SURFACE_OPTIONS = { willReadFrequently: true } as const;
 
 /** A single layer's cache entry. */
 export interface LayerCacheEntry {
@@ -198,7 +199,7 @@ export const createLayerCacheStore = (
       layerId,
       rect: { height, width, x: 0, y: 0 },
       stale: true,
-      surface: backend.createSurface(width, height),
+      surface: backend.createSurface(width, height, READBACK_SURFACE_OPTIONS),
       version: initialVersion(layerId),
     };
     touch(entry);
@@ -220,7 +221,7 @@ export const createLayerCacheStore = (
       layerId,
       rect: { height, width, x: rect.x, y: rect.y },
       stale: true,
-      surface: backend.createSurface(width, height),
+      surface: backend.createSurface(width, height, READBACK_SURFACE_OPTIONS),
       version: initialVersion(layerId),
     };
     touch(entry);
@@ -243,7 +244,7 @@ export const createLayerCacheStore = (
         layerId,
         rect: targetRect,
         stale: false,
-        surface: backend.createSurface(targetRect.width, targetRect.height),
+        surface: backend.createSurface(targetRect.width, targetRect.height, READBACK_SURFACE_OPTIONS),
         version: initialVersion(layerId),
       };
       touch(entry);
@@ -295,7 +296,7 @@ export const createLayerCacheStore = (
       x: rect.x,
       y: rect.y,
     };
-    const surface = backend.createSurface(normalizedRect.width, normalizedRect.height);
+    const surface = backend.createSurface(normalizedRect.width, normalizedRect.height, READBACK_SURFACE_OPTIONS);
     if (normalizedRect.width > 0 && normalizedRect.height > 0) {
       surface.ctx.clearRect(0, 0, normalizedRect.width, normalizedRect.height);
       surface.ctx.drawImage(pixels.canvas, 0, 0);

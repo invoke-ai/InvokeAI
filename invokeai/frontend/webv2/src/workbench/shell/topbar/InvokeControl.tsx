@@ -1,10 +1,12 @@
-/* eslint-disable react/react-compiler */
-import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/types';
+import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
-import { Button, IconButton, Tooltip } from '@workbench/components/ui';
-import { sanitizeBatchCount } from '@workbench/generation/batch';
-import { useMountEffect } from '@workbench/hooks/useMountEffect';
+import { flushGenerateDrafts } from '@features/generation/react';
+import { sanitizeBatchCount } from '@features/generation/settings';
+import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { useInvocationTemplatesSelector } from '@features/workflow/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { Button, IconButton, Tooltip } from '@platform/ui';
 import {
   formatRoute,
   createInvocationRouteInputSelector,
@@ -16,18 +18,14 @@ import {
   resultDestinations,
 } from '@workbench/invocation';
 import { submitResolvedInvocation } from '@workbench/invocationSubmit';
-import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
-import { prepareCanvasInvocation } from '@workbench/widgets/canvas/invoke/prepareCanvasInvocation';
-import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import {
   useActiveProjectSelector,
-  useWorkbenchDispatch,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
   useWorkbenchSelector,
-  useWorkbenchStore,
 } from '@workbench/WorkbenchContext';
-import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 
 const CONTROL_WIDTH = '10rem';
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
@@ -105,9 +103,10 @@ const InvokeTooltipContent = ({
 
 export const InvokeControl = () => {
   const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
-  const dispatch = useWorkbenchDispatch();
-  const store = useWorkbenchStore();
-  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const commands = useWorkbenchCommands();
+  const { generation } = commands;
+  const queries = useWorkbenchQueries();
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
@@ -127,36 +126,33 @@ export const InvokeControl = () => {
   );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected;
   const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
-  const modelsRef = useRef(availabilityModels);
-
-  modelsRef.current = availabilityModels;
-
   useMountEffect(() => {
-    ensureModelsLoaded();
+    void ensureModelsLoaded();
   });
 
-  const onInvoke = useCallback(() => {
+  const onInvoke = useCallback(async () => {
     flushGenerateDrafts();
-    const snapshot = store.getSnapshot();
+    const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
+    const snapshot = queries.getSnapshot();
     const postFlushRoute = resolveInvocationRoute(
       snapshot.activeProject,
       'global',
       snapshot.activeProject.invocation,
-      modelsRef.current
+      availabilityModels
     );
 
-    if (!isInvocationRouteValid(postFlushRoute) || snapshot.state.backendConnection.status !== 'connected') {
+    if (!isInvocationRouteValid(postFlushRoute) || snapshot.backendConnection.status !== 'connected') {
       return;
     }
 
     submitResolvedInvocation({
-      dispatch,
-      models: modelsRef.current,
+      commands,
+      models: availabilityModels,
       prepareCanvasInvocation,
       project: snapshot.activeProject,
       route: postFlushRoute,
     });
-  }, [dispatch, store]);
+  }, [availabilityModels, commands, queries]);
   const tooltipContent = useMemo(
     () => (
       <InvokeTooltipContent
@@ -178,18 +174,13 @@ export const InvokeControl = () => {
     ]
   );
   const handleSourceChange = useCallback(
-    (event: { value: string }) =>
-      dispatch({ sourceId: event.value as InvocationSourceId, type: 'setInvocationSource' }),
-    [dispatch]
+    (event: { value: string }) => generation.setSource(event.value as InvocationSourceId),
+    [generation]
   );
   const handleDestinationChange = useCallback(
-    (event: { value: string }) =>
-      dispatch({ destination: event.value as ResultDestination, type: 'setInvocationDestination' }),
-    [dispatch]
+    (event: { value: string }) => generation.setDestination(event.value as ResultDestination),
+    [generation]
   );
-  const handleToggleSourceLock = useCallback(() => dispatch({ type: 'toggleSourceLock' }), [dispatch]);
-  const handleToggleDestinationLock = useCallback(() => dispatch({ type: 'toggleDestinationLock' }), [dispatch]);
-
   return (
     <Flex>
       <Menu.Root positioning={MENU_POSITIONING}>
@@ -278,11 +269,11 @@ export const InvokeControl = () => {
 
               <Menu.Separator borderColor="border.subtle" />
 
-              <Menu.Item value="lock-source" closeOnSelect={false} onClick={handleToggleSourceLock}>
+              <Menu.Item value="lock-source" closeOnSelect={false} onClick={generation.toggleSourceLock}>
                 <Icon as={LockKeyholeIcon} boxSize="3" opacity={invocation.sourceLocked ? 1 : 0.35} />
                 <Menu.ItemText>{invocation.sourceLocked ? 'Unlock source' : 'Lock source'}</Menu.ItemText>
               </Menu.Item>
-              <Menu.Item value="lock-destination" closeOnSelect={false} onClick={handleToggleDestinationLock}>
+              <Menu.Item value="lock-destination" closeOnSelect={false} onClick={generation.toggleDestinationLock}>
                 <Icon as={LockKeyholeIcon} boxSize="3" opacity={invocation.destinationLocked ? 1 : 0.35} />
                 <Menu.ItemText>
                   {invocation.destinationLocked ? 'Unlock destination' : 'Lock destination'}

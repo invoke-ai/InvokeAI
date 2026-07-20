@@ -1,8 +1,8 @@
 import type { DiagnosticEntry } from '@workbench/diagnostics/logger';
-import type { WidgetViewProps } from '@workbench/types';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Badge, Box, HStack, Stack, Text } from '@chakra-ui/react';
-import { Button, Panel } from '@workbench/components/ui';
+import { Button, Panel } from '@platform/ui';
 import { clearProjectDiagnostics, useProjectDiagnostics } from '@workbench/diagnostics/logger';
 import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';

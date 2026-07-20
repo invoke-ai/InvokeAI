@@ -26,11 +26,14 @@
  * does today. Zero React.
  */
 
-import type { AspectRatioId } from './generation/types';
-import type { CanvasDocumentContractV2, WorkbenchState } from './types';
-import type { WorkbenchAction } from './workbenchState';
+import type { AspectRatioId } from '@features/generation/contracts';
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/api';
+import type { WorkbenchState } from '@workbench/projectContracts';
 
-import { deriveAspectRatioId } from './generation/settings';
+import { deriveAspectRatioId } from '@features/generation/settings';
+
+import type { WorkbenchCommands } from './workbenchStore';
+
 import { gridSizeForModelBase } from './widgets/canvas/bboxGrid';
 import { getProjectWidgetValues } from './widgetState';
 
@@ -128,9 +131,9 @@ export const reconcileCanvasDims = ({
 
 /** The minimal workbench store surface the sync depends on. */
 export interface CanvasDimsSyncStore {
+  commands: Pick<WorkbenchCommands, 'canvas' | 'generation'>;
   getState(): WorkbenchState;
   subscribe(listener: () => void): () => void;
-  dispatch(action: WorkbenchAction): void;
 }
 
 export interface CanvasDimsSync {
@@ -215,16 +218,15 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
         };
         isSyncing = true;
         try {
-          store.dispatch({
-            projectId: project.id,
-            type: 'patchGenerateSettings',
-            values: {
+          store.commands.generation.patchSettings(
+            {
               aspectRatioId: result.aspectRatioId,
               aspectRatioValue: result.aspectRatioValue,
               height: result.height,
               width: result.width,
             },
-          });
+            project.id
+          );
         } finally {
           isSyncing = false;
         }
@@ -239,11 +241,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
         };
         isSyncing = true;
         try {
-          store.dispatch({
-            mutation: { bbox: result.bbox, type: 'setCanvasBbox' },
-            projectId: project.id,
-            type: 'applyCanvasProjectMutation',
-          });
+          store.commands.canvas.apply(project.id, { bbox: result.bbox, type: 'setCanvasBbox' });
         } finally {
           isSyncing = false;
         }

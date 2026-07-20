@@ -1,6 +1,6 @@
-import type { Project } from '@workbench/types';
+import type { Project } from '@workbench/projectContracts';
 
-import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
+import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it } from 'vitest';
 
 import { createRecoveredDocument, deserializeProjectDocument, serializeProjectDocument } from './syncedPersistence';
@@ -57,9 +57,13 @@ describe('project document serialization', () => {
             cancellable: true,
             id: 'legacy-queue-item',
             snapshot: {
+              backendSubmission: { batchCount: 1, graph: { edges: [], id: 'graph', nodes: {} }, kind: 'workflow' },
               canvas: base.canvas,
               destination: 'gallery',
+              filterIntermediateResults: true,
+              galleryBoardId: null,
               graph: { edges: [], id: 'graph', label: 'Graph', nodes: [], updatedAt: 'now', version: 1 },
+              presentation: { batchCount: 1, height: 1024, width: 1024 },
               sourceId: 'workflow',
               submittedAt: 'now',
               widgetInstances: {},

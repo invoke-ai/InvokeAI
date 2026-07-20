@@ -1,5 +1,5 @@
 import { Badge, Box, Text } from '@chakra-ui/react';
-import { useQueueItemProgress, type QueueItemProgress } from '@workbench/backend/progressStore';
+import { useQueueItemProgress, type QueueItemProgress } from '@features/queue/react';
 import { useMemo, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 

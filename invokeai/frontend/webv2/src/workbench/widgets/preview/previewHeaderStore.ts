@@ -1,7 +1,7 @@
-import type { GalleryImage } from '@workbench/gallery/api';
+import type { GalleryImage } from '@features/gallery';
 import type { ImageActions } from '@workbench/image-actions';
 
-import { createExternalStore } from '@workbench/externalStore';
+import { createExternalStore } from '@platform/state/externalStore';
 
 /**
  * Header context published by the preview view so the widget frame's chrome

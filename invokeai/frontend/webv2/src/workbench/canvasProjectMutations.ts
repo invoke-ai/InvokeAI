@@ -9,11 +9,10 @@ import type {
   CanvasMaskContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
-  ProjectEvent,
   CanvasStagingAreaContractV2,
   CanvasStateContractV2,
-  Project,
-} from './types';
+} from '@workbench/canvas-engine/api';
+import type { ProjectEvent, Project } from '@workbench/projectContracts';
 
 import { normalizeCanvasDocumentControlAdapters } from './canvasMigration';
 import {

@@ -1,14 +1,17 @@
+import type { WidgetRegion } from '@workbench/layoutContracts';
+import type { Project } from '@workbench/projectContracts';
 import type {
-  Project,
   NormalizedWidgetManifest,
   RegisteredWidget,
   WidgetInstanceContract,
-  WidgetRegion,
   WidgetTypeId,
-} from '@workbench/types';
-import type { WorkbenchAction } from '@workbench/workbenchState';
+} from '@workbench/widgetContracts';
+import type { WorkbenchAction } from '@workbench/workbenchState.testing';
+import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 
 import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } from '@workbench/diagnostics/logger';
+import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cloneWidgetRuntimeState, createWidgetRuntime, getProjectWidgetRuntimeState } from './createWidgetRuntime';
@@ -19,6 +22,7 @@ const TestView = () => null;
 const createWidget = (
   overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'label'>
 ): RegisteredWidget => ({
+  implementation: createWidgetImplementationResource(overrides.id, () => Promise.resolve({ view: TestView })),
   manifest: {
     apiVersion: 1,
     allowMultiple: false,
@@ -27,9 +31,9 @@ const createWidget = (
     centerPlacement: 'view',
     failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
     icon: TestIcon,
+    load: () => Promise.resolve({ view: TestView }),
     state: { createInitial: () => ({}), persistence: 'project', version: 1 },
     version: 1,
-    view: TestView,
     ...overrides,
   },
   status: 'enabled',
@@ -48,7 +52,20 @@ const createDispatch = () => {
     actions.push(action);
   };
 
-  return { actions, dispatch };
+  const widgets: WorkbenchWidgetCommands = {
+    move: (options) => dispatch({ ...options, type: 'moveWidgetInstance' }),
+    open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
+    patchInstanceValues: (instanceId, values, projectId) =>
+      dispatch({ instanceId, projectId, type: 'patchWidgetInstanceValues', values }),
+    patchValues: (widgetId, values, projectId) => dispatch({ projectId, type: 'patchWidgetValues', values, widgetId }),
+    reorder: (options) => dispatch({ ...options, type: 'reorderWidgetInstances' }),
+    select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),
+    setInstanceValues: (instanceId, values, projectId) =>
+      dispatch({ instanceId, projectId, type: 'setWidgetInstanceValues', values }),
+    toggle: (options) => dispatch({ ...options, type: 'toggleRegionWidget' }),
+  };
+
+  return { actions, widgets };
 };
 
 const createStateApi = () => ({
@@ -107,10 +124,11 @@ describe('createWidgetRuntime', () => {
   });
 
   it('exposes widget state reads and writes through the state namespace', () => {
-    const { actions, dispatch } = createDispatch();
+    const { actions, widgets } = createDispatch();
     const state = createStateApi();
     const runtime = createWidgetRuntime({
-      dispatch,
+      extensions: createExtensionRegistry(),
+      widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance(),
@@ -129,9 +147,10 @@ describe('createWidgetRuntime', () => {
   });
 
   it('binds diagnostics to the current widget source', () => {
-    const { dispatch } = createDispatch();
+    const { widgets } = createDispatch();
     const runtime = createWidgetRuntime({
-      dispatch,
+      extensions: createExtensionRegistry(),
+      widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance('workflow:center', 'workflow'),
@@ -159,10 +178,11 @@ describe('createWidgetRuntime', () => {
   });
 
   it('opens widgets through canonical validation and seeded initial values', () => {
-    const { actions, dispatch } = createDispatch();
+    const { actions, widgets } = createDispatch();
     const createInitial = vi.fn(() => ({ seeded: true }));
     const runtime = createWidgetRuntime({
-      dispatch,
+      extensions: createExtensionRegistry(),
+      widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({
         bottom: [createWidget({ bottomPanel: 'tooltip', id: 'tooltip-widget', label: 'Tooltip Widget' })],
@@ -212,9 +232,10 @@ describe('createWidgetRuntime', () => {
   });
 
   it('dispatches own-region close and reveal actions', () => {
-    const { actions, dispatch } = createDispatch();
+    const { actions, widgets } = createDispatch();
     const runtime = createWidgetRuntime({
-      dispatch,
+      extensions: createExtensionRegistry(),
+      widgets,
       getWidgetById: (typeId) => createWidget({ id: typeId, label: typeId }),
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance(),
@@ -239,9 +260,10 @@ describe('createWidgetRuntime', () => {
   });
 
   it('returns unsupported for cross-region close and reveal', () => {
-    const { actions, dispatch } = createDispatch();
+    const { actions, widgets } = createDispatch();
     const runtime = createWidgetRuntime({
-      dispatch,
+      extensions: createExtensionRegistry(),
+      widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance(),
@@ -256,9 +278,11 @@ describe('createWidgetRuntime', () => {
   });
 
   it('executes commands registered by the current widget source', async () => {
-    const { dispatch } = createDispatch();
+    const { widgets } = createDispatch();
+    const extensions = createExtensionRegistry();
     const alphaRuntime = createWidgetRuntime({
-      dispatch,
+      extensions,
+      widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance('alpha', 'test-widget'),
@@ -267,7 +291,8 @@ describe('createWidgetRuntime', () => {
       state: createStateApi(),
     });
     const betaRuntime = createWidgetRuntime({
-      dispatch,
+      extensions,
+      widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance('beta', 'test-widget'),
@@ -294,9 +319,11 @@ describe('createWidgetRuntime', () => {
   });
 
   it('does not execute commands registered by the same widget instance in another project', async () => {
-    const { dispatch } = createDispatch();
+    const { widgets } = createDispatch();
+    const extensions = createExtensionRegistry();
     const projectOneRuntime = createWidgetRuntime({
-      dispatch,
+      extensions,
+      widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance('alpha', 'test-widget'),
@@ -305,7 +332,8 @@ describe('createWidgetRuntime', () => {
       state: createStateApi(),
     });
     const projectTwoRuntime = createWidgetRuntime({
-      dispatch,
+      extensions,
+      widgets,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance('alpha', 'test-widget'),
@@ -329,5 +357,29 @@ describe('createWidgetRuntime', () => {
 
     disposeOne();
     disposeTwo();
+  });
+
+  it('scopes palette, search, and toolbar registrations to the widget source', () => {
+    const { widgets } = createDispatch();
+    const extensions = createExtensionRegistry();
+    const runtime = createWidgetRuntime({
+      extensions,
+      widgets,
+      getWidgetById: () => undefined,
+      getWidgetsForRegion: createRegistry({}),
+      instance: createInstance('alpha', 'test-widget'),
+      project: createPlacementProject(),
+      region: 'right',
+      state: createStateApi(),
+    });
+
+    runtime.palette.register({ commandId: 'test-widget.palette-command', title: 'Palette entry' });
+    runtime.search.registerProvider({ id: 'test-widget.search', label: 'Search', search: () => [] });
+    runtime.toolbars.register({ id: 'test-widget.toolbar', items: [], location: 'status.left' });
+
+    const expectedSource = expect.objectContaining({ instanceId: 'alpha', typeId: 'test-widget' });
+    expect(extensions.stores.palette.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
+    expect(extensions.stores.search.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
+    expect(extensions.stores.toolbars.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
   });
 });

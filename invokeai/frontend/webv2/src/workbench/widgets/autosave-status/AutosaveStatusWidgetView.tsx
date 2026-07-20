@@ -1,4 +1,4 @@
-import type { WidgetViewProps } from '@workbench/types';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@workbench/widget-frame';
@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 export const AutosaveStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   const { t } = useTranslation();
-  const autosave = useWorkbenchSelector((snapshot) => snapshot.state.autosave);
+  const autosave = useWorkbenchSelector((snapshot) => snapshot.autosave);
   const icon = autosave.status === 'error' ? CloudAlertIcon : CloudCheckIcon;
   const label = autosave.status === 'saved' ? t('common.saved') : autosave.status;
 

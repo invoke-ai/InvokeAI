@@ -1,8 +1,11 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type {
+  CommitMaskImageResult,
+  CommitMaskImageResultOptions,
+  LayerExportGuard,
+} from '@workbench/canvas-engine/capabilities';
+import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
-import type { Rect } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasDocumentContractV2, CanvasImageRef } from '@workbench/types';
 
 import {
   createInpaintMaskFromImage,
@@ -13,17 +16,11 @@ import {
   nextRegionalGuidanceName,
 } from '@workbench/canvas-engine/document/layerFactories';
 
-export type MaskImageResultTarget = 'inpaint_mask' | 'regional_guidance';
-export interface CommitMaskImageResultOptions {
-  guard: LayerExportGuard;
-  image: CanvasImageRef;
-  rect: Rect;
-  target: MaskImageResultTarget;
-  signal?: AbortSignal;
-}
-export type CommitMaskImageResult =
-  | { status: 'committed'; layerId: string }
-  | { status: 'aborted' | 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' };
+export type {
+  CommitMaskImageResult,
+  CommitMaskImageResultOptions,
+  MaskImageResultTarget,
+} from '@workbench/canvas-engine/capabilities';
 
 export interface MaskResultControllerOptions<Owner = symbol> {
   readonly canEdit: (owner?: Owner) => boolean;

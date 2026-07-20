@@ -1,12 +1,12 @@
-import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
-import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
-import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type {
   CanvasDocumentContractV2,
   CanvasImageRef,
   CanvasLayerContract,
   CanvasLayerSourceContract,
-} from '@workbench/types';
+} from '@workbench/canvas-engine/contracts';
+import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
+import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 
 export type DecodeImageResult =
   | { status: 'ok'; surface: RasterSurface; decodedWidth: number; decodedHeight: number }
