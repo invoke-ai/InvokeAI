@@ -11,7 +11,7 @@ export {
   type GalleryImageDragImage,
 } from './ui/galleryDnd';
 
-import { getGalleryImageFullUrl, getGalleryImageThumbnailUrl } from './core/imageUrls';
+import { getGalleryImageFullUrl, getGalleryImageThumbnailUrl } from './data/imageUrls';
 
 export const galleryImageUrls = {
   full: getGalleryImageFullUrl,

@@ -1,7 +1,5 @@
 import type { GeneratedImageContract } from '@features/gallery';
 
-import { galleryImageUrls } from '@features/gallery/utility';
-
 import type { CroppableImageWithDims, ImageWithDims } from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -193,8 +191,3 @@ export const applyReferenceImageCrop = (
 export const clearReferenceImageCrop = (image: CroppableImageWithDims): CroppableImageWithDims => ({
   original: { image: cloneImageWithDims(image.original.image) },
 });
-
-export const getReferenceImageUrls = (image: CroppableImageWithDims) => {
-  const { image_name } = getEffectiveReferenceImage(image);
-  return { imageUrl: galleryImageUrls.full(image_name), thumbnailUrl: galleryImageUrls.thumbnail(image_name) };
-};

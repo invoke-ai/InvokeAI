@@ -36,7 +36,7 @@ describe('dependency policy parser', () => {
 
     expect(references).toEqual([
       { exposesCanvasEngine: false, kind: 'import', specifier: '@platform/value' },
-      { exposesCanvasEngine: false, kind: 'import', specifier: '@platform/type' },
+      { exposesCanvasEngine: false, kind: 'import-type', specifier: '@platform/type' },
       { exposesCanvasEngine: false, kind: 'export', specifier: '@platform/named' },
       { exposesCanvasEngine: false, kind: 'export', specifier: '@platform/named-type' },
       { exposesCanvasEngine: true, kind: 'export-star', specifier: '@platform/star' },
@@ -103,6 +103,26 @@ describe('dependency policy rules', () => {
   it('permits same-module implementation imports', () => {
     expect(checkDependency('features/queue/ui/View.tsx', '../data/queries')).toEqual([]);
     expect(checkDependency('workbench/canvas-engine/controllers/a.ts', '../engine')).toEqual([]);
+  });
+
+  it.each([
+    `import { apiFetchJson } from '@platform/transport/http';`,
+    `import type { BackendConnectionStatus } from '@platform/transport/types';`,
+    `import { Button } from '@platform/ui';`,
+    `import type { ColorPalette } from '@chakra-ui/react';`,
+    `import type { ReactFlowInstance } from '@xyflow/react';`,
+    `import { ImageIcon } from 'lucide-react';`,
+    `import type { ReactNode } from 'react';`,
+    `type Button = import('@platform/ui').Button;`,
+  ])('keeps feature Core independent of transport, React, and UI imports: %s', (source) => {
+    expect(checkSource('features/example/core/policy.ts', source)).toContainEqual(
+      expect.objectContaining({ rule: 'feature-core-purity' })
+    );
+  });
+
+  it('permits feature Core to depend on other pure Core and Platform State modules', () => {
+    expect(checkDependency('features/queue/core/policy.ts', './types')).toEqual([]);
+    expect(checkDependency('features/queue/core/policy.ts', '@platform/state/selectorCore')).toEqual([]);
   });
 
   it('rejects the retired global Workbench contract hub', () => {

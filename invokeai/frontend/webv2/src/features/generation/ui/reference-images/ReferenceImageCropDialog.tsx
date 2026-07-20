@@ -7,11 +7,11 @@ import {
   FULL_REFERENCE_IMAGE_CROP_BOX,
   generatedImageToReferenceImage,
   getReferenceImageCropBoxPct,
-  getReferenceImageUrls,
   isFullReferenceImageCropBox,
   resolveReferenceImageCrop,
   type ReferenceImageCropBoxPct,
 } from '@features/generation/core/referenceImage';
+import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { Button } from '@platform/ui';
 import { useCallback, useMemo, useRef, useState } from 'react';

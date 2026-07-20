@@ -75,7 +75,7 @@ export const collectImportReferences = (source: string, fileName = 'source.ts'):
           ts.isNamedImports(bindings) &&
           bindings.elements.some((element) => (element.propertyName ?? element.name).text === 'CanvasEngine')
         );
-      pushLiteral('import', node.moduleSpecifier, exposesCanvasEngine);
+      pushLiteral(node.importClause?.isTypeOnly ? 'import-type' : 'import', node.moduleSpecifier, exposesCanvasEngine);
     } else if (ts.isExportDeclaration(node)) {
       const exposesCanvasEngine =
         !node.exportClause ||
@@ -157,20 +157,48 @@ const isCanvasPrivatePath = (path: string): boolean => {
 const isCanvasOwnedPath = (path: string): boolean =>
   path.startsWith('workbench/canvas-engine/') || path.startsWith('workbench/canvas-operations/');
 
-export const checkDependency = (source: string, specifier: string): DependencyViolation[] => {
-  const target = resolveImportPath(source, specifier);
+const FEATURE_CORE_FORBIDDEN_PACKAGE_ROOTS = [
+  '@chakra-ui/react',
+  '@xyflow/react',
+  'lucide-react',
+  'react',
+  'react-dom',
+] as const;
 
-  if (!target) {
-    return [];
+const isPackageOrSubpath = (specifier: string, packageRoot: string): boolean =>
+  specifier === packageRoot || specifier.startsWith(`${packageRoot}/`);
+
+const isFeatureCoreForbiddenDependency = (specifier: string, target: string | null): boolean =>
+  FEATURE_CORE_FORBIDDEN_PACKAGE_ROOTS.some((packageRoot) => isPackageOrSubpath(specifier, packageRoot)) ||
+  Boolean(
+    target &&
+    (isPackageOrSubpath(target, 'platform/transport') ||
+      isPackageOrSubpath(target, 'platform/ui') ||
+      /\/(?:data|ui)(?:\/|$)/.test(target))
+  );
+
+export const checkDependency = (source: string, specifier: string): DependencyViolation[] => {
+  const sourcePath = normalizePath(source).replace(/^src\//, '');
+  const target = resolveImportPath(source, specifier);
+  const violations: DependencyViolation[] = [];
+  const add = (rule: string, resolvedTarget = target ?? specifier): void => {
+    violations.push({ rule, source: sourcePath, target: resolvedTarget });
+  };
+
+  if (
+    sourcePath.startsWith('features/') &&
+    sourcePath.includes('/core/') &&
+    isFeatureCoreForbiddenDependency(specifier, target)
+  ) {
+    add('feature-core-purity');
   }
 
-  const sourcePath = normalizePath(source).replace(/^src\//, '');
+  if (!target) {
+    return violations;
+  }
+
   const sourceOwner = getModuleOwner(sourcePath);
   const targetOwner = getModuleOwner(target);
-  const violations: DependencyViolation[] = [];
-  const add = (rule: string): void => {
-    violations.push({ rule, source: sourcePath, target });
-  };
 
   if (sourceOwner === 'platform' && (targetOwner === 'workbench' || targetOwner.startsWith('feature:'))) {
     add('platform-independence');
@@ -187,13 +215,6 @@ export const checkDependency = (source: string, specifier: string): DependencyVi
 
     if (targetOwner.startsWith('feature:') && targetOwner !== sourceOwner && !isFeaturePublicInterface(target)) {
       add('feature-public-interface');
-    }
-
-    if (
-      sourcePath.includes('/core/') &&
-      (specifier === 'react' || target.includes('/ui/') || target.includes('/data/'))
-    ) {
-      add('feature-core-purity');
     }
   }
 

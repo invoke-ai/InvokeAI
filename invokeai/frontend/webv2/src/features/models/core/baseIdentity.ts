@@ -1,14 +1,14 @@
-import type { ColorPalette } from '@chakra-ui/react';
-
 import type { ModelBase, ModelConfig } from './types';
 
 // Model-base identity registry: labels, colors, and scalar display facts only.
 // Generation behavior keyed by base lives in @features/generation/settings.
 
+export type ModelBaseColorPalette = 'blue' | 'cyan' | 'gray' | 'green' | 'orange' | 'pink' | 'purple' | 'red' | 'teal';
+
 export interface ModelBaseInfo {
   base: ModelBase;
   label: string;
-  colorPalette: ColorPalette;
+  colorPalette: ModelBaseColorPalette;
   description?: string;
   supportsDiffusersConversion?: boolean;
 }
@@ -106,7 +106,7 @@ export const getModelBaseInfo = (base: ModelBase): ModelBaseInfo =>
 
 export const getModelBaseLabel = (base: ModelBase): string => getModelBaseInfo(base).label;
 
-export const getModelBaseColorPalette = (base: ModelBase): string => getModelBaseInfo(base).colorPalette;
+export const getModelBaseColorPalette = (base: ModelBase): ModelBaseColorPalette => getModelBaseInfo(base).colorPalette;
 
 export const isKnownModelBase = (base: ModelBase): base is KnownModelBase => base in MODEL_BASES;
 

@@ -1,5 +1,3 @@
-import type { BackendConnectionStatus } from '@platform/transport/types';
-
 export interface QueueBackendInvocation {
   id: string;
   type: string;
@@ -106,6 +104,7 @@ export interface QueueResultImage {
 
 export type QueueItemStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'canceled';
 export type TerminalQueueItemStatus = Extract<QueueItemStatus, 'completed' | 'failed' | 'canceled'>;
+export type QueueConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
 export interface QueueQueryScope {
   originPrefix?: string;
@@ -223,5 +222,5 @@ export interface QueueBackendPort extends QueueFeatureCommands {
   retryItems(itemIds: number[]): Promise<unknown>;
   emit(event: string, payload: unknown): void;
   on(event: string, handler: (payload: never) => void): () => void;
-  onConnectionChange(handler: (status: BackendConnectionStatus, error?: string) => void): () => void;
+  onConnectionChange(handler: (status: QueueConnectionStatus, error?: string) => void): () => void;
 }

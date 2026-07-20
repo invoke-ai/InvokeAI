@@ -6,7 +6,7 @@ export type {
   ModelTaxonomyType,
   PredictionType,
 } from './core/types';
-export { getModelBaseColorPalette, getModelBaseLabel } from './core/baseIdentity';
+export { getModelBaseColorPalette, getModelBaseLabel, type ModelBaseColorPalette } from './core/baseIdentity';
 export {
   ensureModelsLoaded,
   getModelsSnapshot,

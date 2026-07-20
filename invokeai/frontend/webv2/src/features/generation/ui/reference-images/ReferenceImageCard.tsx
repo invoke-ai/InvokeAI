@@ -8,7 +8,8 @@ import type {
 import type { CSSProperties } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { getEffectiveReferenceImage, getReferenceImageUrls } from '@features/generation/core/referenceImage';
+import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
+import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
 import { IconButton, ToggleDot, Tooltip } from '@platform/ui';
 import { ChevronDownIcon, CropIcon, ImageIcon, RulerIcon, Trash2Icon } from 'lucide-react';

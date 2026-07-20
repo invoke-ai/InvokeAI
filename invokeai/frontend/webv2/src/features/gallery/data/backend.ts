@@ -8,8 +8,9 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
-import { getGalleryImageThumbnailUrl } from '@features/gallery/core/imageUrls';
 import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
+
+import { getGalleryImageThumbnailUrl } from './imageUrls';
 
 interface BackendBoardDTO {
   board_id: string;
