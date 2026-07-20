@@ -30,7 +30,7 @@ export const getHttpAuthToken = (): string | null => authAdapter.getToken();
 export const getBackendSocketUrl = (): string => {
   const baseUrl = API_BASE_URL || getDeploymentBaseUrl();
 
-  return new URL(baseUrl, window.location.origin).origin;
+  return new URL(baseUrl, getDeploymentBaseUrl()).origin;
 };
 
 export const getBackendSocketPath = (): string => {
@@ -38,7 +38,7 @@ export const getBackendSocketPath = (): string => {
     return `${getDeploymentBasePath()}/ws/socket.io`;
   }
 
-  const pathname = new URL(API_BASE_URL, window.location.origin).pathname.replace(/\/$/, '');
+  const pathname = new URL(API_BASE_URL, getDeploymentBaseUrl()).pathname.replace(/\/$/, '');
 
   return `${pathname === '/' ? '' : pathname}/ws/socket.io`;
 };

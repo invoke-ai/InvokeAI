@@ -27,9 +27,12 @@ export const deriveDeploymentBaseUrl = (
 
 let cachedDeploymentBaseUrl: string | undefined;
 
+const getRuntimeOrigin = (): string => (typeof window === 'undefined' ? 'http://localhost' : window.location.origin);
+
 /** Deployment origin plus prefix, without a trailing slash. */
 export const getDeploymentBaseUrl = (): string => {
-  cachedDeploymentBaseUrl ??= deriveDeploymentBaseUrl(import.meta.url, window.location.origin);
+  const runtimeOrigin = getRuntimeOrigin();
+  cachedDeploymentBaseUrl ??= deriveDeploymentBaseUrl(import.meta.url, runtimeOrigin, runtimeOrigin);
 
   return cachedDeploymentBaseUrl;
 };
