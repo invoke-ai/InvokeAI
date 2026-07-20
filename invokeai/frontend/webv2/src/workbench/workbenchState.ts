@@ -841,21 +841,48 @@ const getGraphHistorySnapshotBytes = (snapshot: GraphHistorySnapshot): number =>
   }
 };
 
-const withRetainedBytes = (snapshot: GraphHistorySnapshot): GraphHistorySnapshot => ({
+type MeasuredGraphHistorySnapshot = GraphHistorySnapshot & { retainedBytes: number };
+
+const withRetainedBytes = (snapshot: GraphHistorySnapshot): MeasuredGraphHistorySnapshot => ({
   ...snapshot,
   retainedBytes: getGraphHistorySnapshotBytes(snapshot),
 });
+
+/** Trims state-owned snapshots without reserializing retained history. */
+const trimMeasuredGraphHistory = (snapshots: readonly GraphHistorySnapshot[]): GraphHistorySnapshot[] => {
+  const history: GraphHistorySnapshot[] = [];
+  let retainedBytes = 0;
+
+  for (const snapshot of snapshots) {
+    if (history.length >= HISTORY_LIMIT) {
+      break;
+    }
+
+    const snapshotBytes = snapshot.retainedBytes;
+    if (typeof snapshotBytes !== 'number' || !Number.isFinite(snapshotBytes) || snapshotBytes < 0) {
+      continue;
+    }
+
+    if (snapshotBytes > GRAPH_HISTORY_BYTE_BUDGET || retainedBytes + snapshotBytes > GRAPH_HISTORY_BYTE_BUDGET) {
+      continue;
+    }
+
+    retainedBytes += snapshotBytes;
+    history.push(snapshot);
+  }
+
+  return history;
+};
 
 export const normalizeGraphHistory = (value: unknown): GraphHistorySnapshot[] => {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  const history: GraphHistorySnapshot[] = [];
-  let retainedBytes = 0;
+  const measuredHistory: MeasuredGraphHistorySnapshot[] = [];
 
   for (const item of value) {
-    if (history.length >= HISTORY_LIMIT || !item || typeof item !== 'object') {
+    if (!item || typeof item !== 'object') {
       continue;
     }
 
@@ -868,31 +895,21 @@ export const normalizeGraphHistory = (value: unknown): GraphHistorySnapshot[] =>
       continue;
     }
 
-    const normalized =
-      typeof snapshot.retainedBytes === 'number' &&
-      Number.isFinite(snapshot.retainedBytes) &&
-      snapshot.retainedBytes >= 0
-        ? snapshot
-        : withRetainedBytes(snapshot);
-    const snapshotBytes = normalized.retainedBytes ?? 0;
-
-    if (snapshotBytes > GRAPH_HISTORY_BYTE_BUDGET || retainedBytes + snapshotBytes > GRAPH_HISTORY_BYTE_BUDGET) {
-      continue;
-    }
-
-    retainedBytes += snapshotBytes;
-    history.push(normalized);
+    // Persisted metadata is untrusted. Always derive the retained size from the
+    // actual snapshot so a forged low count cannot bypass the load-time budget
+    // and a stale high count cannot discard valid history.
+    measuredHistory.push(withRetainedBytes(snapshot));
   }
 
-  return history;
+  return trimMeasuredGraphHistory(measuredHistory);
 };
 
 const prependGraphHistory = (
   history: readonly GraphHistorySnapshot[],
-  snapshot: GraphHistorySnapshot
-): GraphHistorySnapshot[] => normalizeGraphHistory([snapshot, ...history]);
+  snapshot: MeasuredGraphHistorySnapshot
+): GraphHistorySnapshot[] => trimMeasuredGraphHistory([snapshot, ...history]);
 
-const createGraphHistorySnapshot = (label: string, graph: GraphContract): GraphHistorySnapshot =>
+const createGraphHistorySnapshot = (label: string, graph: GraphContract): MeasuredGraphHistorySnapshot =>
   withRetainedBytes({
     createdAt: now(),
     graph: cloneGraph(graph),
@@ -905,7 +922,7 @@ const createDocumentHistorySnapshot = (
   label: string,
   document: ProjectGraphState,
   cloneDocument = true
-): GraphHistorySnapshot =>
+): MeasuredGraphHistorySnapshot =>
   withRetainedBytes({
     createdAt: now(),
     document: cloneDocument ? cloneProjectGraph(document) : document,
