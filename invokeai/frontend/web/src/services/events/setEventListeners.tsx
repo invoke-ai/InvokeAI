@@ -51,12 +51,7 @@ import { createWorkflowExecutionCoordinator } from 'services/events/workflowExec
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import {
-  $lastProgressEvent,
-  $loadingModelsCount,
-  clearAllProgressEvents,
-  setProgressEvent,
-} from './stores';
+import { $lastProgressEvent, $loadingModelsCount, clearAllProgressEvents, setProgressEvent } from './stores';
 
 const log = logger('events');
 
