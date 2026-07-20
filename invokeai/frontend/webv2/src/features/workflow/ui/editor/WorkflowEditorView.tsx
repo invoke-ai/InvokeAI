@@ -80,15 +80,11 @@ import {
   WORKFLOW_INITIAL_RENDER_NODE_COUNT,
   WORKFLOW_MINIMAP_DELAY_MS,
 } from './performanceConstants';
-import {
-  clearNodeSelectionRequest,
-  reportNodeHover,
-  reportNodeSelection,
-  workflowSelectionStore,
-} from './selectionStore';
+import { reportNodeHover, reportNodeSelection, workflowSelectionStore } from './selectionStore';
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { WorkflowEdge } from './WorkflowEdge';
+import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
 const nodeTypes: NodeTypes = {
@@ -520,35 +516,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
     return () => {
       releaseWorkflowFlowInstance(flowInstance);
-    };
-  }, [flowInstance]);
-
-  const applyRequestedSelection = useEffectEvent(() => {
-    const selectionRequest = workflowSelectionStore.getSnapshot().selectionRequest;
-
-    if (!selectionRequest || !flowInstance) {
-      return;
-    }
-
-    selectNodes(selectionRequest.nodeIds);
-    void flowInstance.fitView({
-      duration: reduceMotion ? 0 : 300,
-      maxZoom: 1.25,
-      nodes: selectionRequest.nodeIds.map((id) => ({ id })),
-    });
-    clearNodeSelectionRequest();
-  });
-
-  // Outside surfaces publish selection requests through an external store.
-  // Subscribe at that seam so the request does not need an intermediate
-  // render-and-effect cycle before it reaches the flow instance.
-  useEffect(() => {
-    const pendingRequestTimer = window.setTimeout(applyRequestedSelection, 0);
-    const unsubscribe = workflowSelectionStore.subscribe(applyRequestedSelection);
-
-    return () => {
-      window.clearTimeout(pendingRequestTimer);
-      unsubscribe();
     };
   }, [flowInstance]);
 
@@ -1115,6 +1082,13 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         />
         {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
       </ReactFlow>
+      {flowInstance ? (
+        <WorkflowSelectionRequestRuntime
+          flowInstance={flowInstance}
+          reduceMotion={reduceMotion}
+          selectNodes={selectNodes}
+        />
+      ) : null}
       {lassoOverlay}
       {eraserOverlay}
       <NodeContextMenu
