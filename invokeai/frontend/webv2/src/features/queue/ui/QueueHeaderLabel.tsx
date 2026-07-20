@@ -1,4 +1,5 @@
 import { Stack, Text } from '@chakra-ui/react';
+import { getPersonalQueueActivity } from '@features/queue/core/types';
 import { useTranslation } from 'react-i18next';
 
 import { useQueueCounts } from './queueDataStore';
@@ -12,7 +13,8 @@ import { useQueueCounts } from './queueDataStore';
 export const QueueHeaderLabel = () => {
   const { t } = useTranslation();
   const counts = useQueueCounts();
-  const isGenerating = counts.inProgress > 0;
+  const activity = getPersonalQueueActivity(counts);
+  const isGenerating = activity.inProgress > 0;
 
   return (
     <Stack gap="0.5" minW="0">
@@ -21,9 +23,9 @@ export const QueueHeaderLabel = () => {
       </Text>
       <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" lineHeight="1.15" truncate mb="-1.5">
         <Text as="span" color={isGenerating ? 'accent.solid' : 'fg.subtle'} fontWeight={isGenerating ? '600' : '400'}>
-          {t('widgets.queue.generating', { count: counts.inProgress })}
+          {t('widgets.queue.generating', { count: activity.inProgress })}
         </Text>{' '}
-        · {t('widgets.queue.waiting', { count: counts.pending })}
+        · {t('widgets.queue.waiting', { count: activity.pending })}
       </Text>
     </Stack>
   );

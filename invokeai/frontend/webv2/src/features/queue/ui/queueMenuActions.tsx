@@ -1,4 +1,5 @@
 import { Icon, Menu } from '@chakra-ui/react';
+import { getPersonalQueueActivity } from '@features/queue/core/types';
 import { queueCommands } from '@features/queue/publicApi';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { ListOrderedIcon, PauseIcon, PlayIcon, XIcon, type LucideIcon } from 'lucide-react';
@@ -102,13 +103,14 @@ export const useQueueMenuActions = (): QueueMenuAction[] => {
   const counts = useQueueCounts();
   const { current } = useNowNextItems();
   const scope = useQueueQueryScope();
-  const { canManageProcessor, isConnected, notify, openQueue } = useQueueUi();
-  const cancellableCount = counts.pending + counts.inProgress;
-  const hasRunningItem = current?.status === 'in_progress';
-  const hasPendingQueueWork = counts.pending > 0;
+  const { canManageItem, canManageProcessor, isConnected, notify, openQueue } = useQueueUi();
+  const activity = getPersonalQueueActivity(counts);
+  const cancellableCount = activity.pending + activity.inProgress;
+  const hasRunningItem = current?.status === 'in_progress' && canManageItem(current);
+  const hasPendingQueueWork = activity.pending > 0;
 
   const cancelCurrent = useCallback(() => {
-    if (!current) {
+    if (!current || !canManageItem(current)) {
       notify.info(t('widgets.queue.noCurrentItem'), t('widgets.queue.noCurrentItemDescription'));
       return;
     }
@@ -125,7 +127,7 @@ export const useQueueMenuActions = (): QueueMenuAction[] => {
           getApiErrorMessage(error, t('widgets.queue.couldNotCancelCurrentItem'))
         )
       );
-  }, [current, notify, t]);
+  }, [canManageItem, current, notify, t]);
 
   const cancelAllExceptCurrent = useCallback(() => {
     queueCommands

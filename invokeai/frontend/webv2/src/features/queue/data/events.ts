@@ -1,4 +1,5 @@
 import type { QueueItemStatus, TerminalQueueItemStatus } from '@features/queue/core/types';
+import type { QueueStatusCountsDTO } from '@features/queue/data/serverTypes';
 
 /**
  * Typed contracts for the backend Socket.IO events webv2 consumes. Payload
@@ -12,6 +13,22 @@ export interface QueueItemEventBase {
   batch_id: string;
   origin: string | null;
   destination: string | null;
+  timestamp: number;
+  user_id: string;
+}
+
+export interface BatchStatusDTO {
+  batch_id: string;
+  canceled: number;
+  completed: number;
+  destination: string | null;
+  failed: number;
+  in_progress: number;
+  origin: string | null;
+  pending: number;
+  queue_id: string;
+  total: number;
+  waiting: number;
 }
 
 export interface QueueItemStatusChangedEvent extends QueueItemEventBase {
@@ -24,6 +41,9 @@ export interface QueueItemStatusChangedEvent extends QueueItemEventBase {
   started_at: string | null;
   completed_at: string | null;
   session_id: string;
+  status_sequence: number | null;
+  batch_status: BatchStatusDTO;
+  queue_status: QueueStatusCountsDTO;
 }
 
 export interface BatchEnqueuedEvent {
@@ -34,15 +54,29 @@ export interface BatchEnqueuedEvent {
   priority: number;
   origin: string | null;
   user_id: string;
+  timestamp: number;
 }
 
 export interface QueueClearedEvent {
   queue_id: string;
+  timestamp: number;
+  user_id: string | null;
 }
 
 export interface QueueItemsRetriedEvent {
   queue_id: string;
   retried_item_ids: number[];
+  retried_item_ids_by_user: Record<string, number[]>;
+  timestamp: number;
+  user_ids: string[];
+}
+
+export interface QueueItemsCanceledEvent {
+  canceled_item_ids: number[];
+  canceled_item_ids_by_user: Record<string, number[]>;
+  queue_id: string;
+  timestamp: number;
+  user_ids: string[];
 }
 
 /** Shared shape of per-invocation lifecycle events (`InvocationEventBase` on the backend). */
@@ -77,6 +111,7 @@ export interface BackendSocketEvents {
   batch_enqueued: BatchEnqueuedEvent;
   queue_cleared: QueueClearedEvent;
   queue_items_retried: QueueItemsRetriedEvent;
+  queue_items_canceled: QueueItemsCanceledEvent;
   invocation_started: InvocationStartedEvent;
   invocation_progress: InvocationProgressEvent;
   invocation_complete: InvocationCompleteEvent;

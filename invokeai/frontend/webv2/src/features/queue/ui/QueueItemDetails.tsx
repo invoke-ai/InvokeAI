@@ -47,6 +47,9 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
           #{item.id}
         </Text>
       </DetailRow>
+      {item.userDisplayName || item.userEmail ? (
+        <DetailRow label={t('users.user')}>{item.userDisplayName ?? item.userEmail}</DetailRow>
+      ) : null}
       {item.errorMessage ? (
         <DetailRow label={t('common.error')}>
           <Text as="span" color="fg.error">

@@ -30,6 +30,9 @@ describe('queue transport mappers', () => {
         started_at: '2026-07-18T00:30:00Z',
         status: 'completed',
         updated_at: '2026-07-18T01:00:00Z',
+        user_display_name: 'Ada',
+        user_email: 'ada@example.com',
+        user_id: 'user-1',
       })
     ).toEqual({
       batchId: 'batch-1',
@@ -51,6 +54,9 @@ describe('queue transport mappers', () => {
       startedAt: '2026-07-18T00:30:00Z',
       status: 'completed',
       updatedAt: '2026-07-18T01:00:00Z',
+      userDisplayName: 'Ada',
+      userEmail: 'ada@example.com',
+      userId: 'user-1',
     });
   });
 
@@ -85,6 +91,9 @@ describe('queue transport mappers', () => {
           queue_id: 'default',
           session_id: 'session-1',
           total: 15,
+          user_in_progress: 1,
+          user_pending: 2,
+          waiting: 0,
         },
       })
     ).toEqual({
@@ -100,6 +109,9 @@ describe('queue transport mappers', () => {
         queueId: 'default',
         sessionId: 'session-1',
         total: 15,
+        userInProgress: 1,
+        userPending: 2,
+        waiting: 0,
       },
     });
   });

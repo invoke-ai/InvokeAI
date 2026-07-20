@@ -80,6 +80,7 @@ export const createQueueRealtimeRuntime = ({
       backend.on('batch_enqueued', scheduleInvalidation),
       backend.on('queue_cleared', scheduleInvalidation),
       backend.on('queue_items_retried', scheduleInvalidation),
+      backend.on('queue_items_canceled', scheduleInvalidation),
       backend.on('invocation_started', (payload: never) => {
         const event = payload as unknown as InvocationStartedEvent;
 

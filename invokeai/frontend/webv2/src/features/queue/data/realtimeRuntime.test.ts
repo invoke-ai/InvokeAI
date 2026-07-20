@@ -46,9 +46,10 @@ describe('queue realtime runtime', () => {
     handlers.get('batch_enqueued')?.({} as never);
     handlers.get('queue_cleared')?.({} as never);
     handlers.get('queue_items_retried')?.({} as never);
+    handlers.get('queue_items_canceled')?.({ canceled_item_ids: [] } as never);
 
     expect(backend.onConnectionChange).toHaveBeenCalledTimes(1);
-    expect(backend.on).toHaveBeenCalledTimes(7);
+    expect(backend.on).toHaveBeenCalledTimes(8);
     expect(invalidate).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(50);

@@ -1,5 +1,7 @@
 import type { QueueCounts, QueueItemStatus } from '@features/queue/core/types';
 
+import { getPersonalQueueActivity } from '@features/queue/core/types';
+
 /** Status filters for the RECENT list, matching the screenshot's tab row. */
 export type QueueFilterId = 'all' | 'active' | 'completed' | 'failed' | 'canceled';
 
@@ -17,7 +19,7 @@ export const matchesFilter = (status: QueueItemStatus, filter: QueueFilterId): b
   }
 
   if (filter === 'active') {
-    return status === 'pending' || status === 'in_progress';
+    return status === 'pending' || status === 'in_progress' || status === 'waiting';
   }
 
   return status === filter;
@@ -29,7 +31,8 @@ export const getFilterCount = (counts: QueueCounts, filter: QueueFilterId): numb
     case 'all':
       return counts.total;
     case 'active':
-      return counts.pending + counts.inProgress;
+      const activity = getPersonalQueueActivity(counts);
+      return activity.pending + activity.inProgress;
     case 'completed':
       return counts.completed;
     case 'failed':
