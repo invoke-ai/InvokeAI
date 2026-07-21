@@ -17,6 +17,7 @@ export type ImageOutputNodes =
   | 'cogview4_l2i'
   | 'qwen_image_l2i'
   | 'z_image_l2i'
+  | 'ernie_image_vae_decode'
   | 'anima_l2i';
 
 export type LatentToImageNodes =
@@ -27,6 +28,7 @@ export type LatentToImageNodes =
   | 'cogview4_l2i'
   | 'qwen_image_l2i'
   | 'z_image_l2i'
+  | 'ernie_image_vae_decode'
   | 'anima_l2i';
 
 export type ImageToLatentsNodes =
@@ -47,7 +49,14 @@ export type DenoiseLatentsNodes =
   | 'cogview4_denoise'
   | 'qwen_image_denoise'
   | 'z_image_denoise'
+  | 'ernie_image_denoise'
   | 'anima_denoise';
+
+/**
+ * Denoise nodes that support masked denoising (inpaint/outpaint). ERNIE-Image's denoise node
+ * has no `denoise_mask` input (it is text-to-image only), so it is excluded here.
+ */
+export type MaskableDenoiseNodes = Exclude<DenoiseLatentsNodes, 'ernie_image_denoise'>;
 
 export type MainModelLoaderNodes =
   | 'main_model_loader'
@@ -58,6 +67,7 @@ export type MainModelLoaderNodes =
   | 'cogview4_model_loader'
   | 'qwen_image_model_loader'
   | 'z_image_model_loader'
+  | 'ernie_image_model_loader'
   | 'anima_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';

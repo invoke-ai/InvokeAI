@@ -9,6 +9,7 @@ import {
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
   DenoiseLatentsNodes,
+  ImageToLatentsNodes,
   LatentToImageNodes,
   MainModelLoaderNodes,
   VaeSourceNodes,
@@ -21,16 +22,7 @@ type AddImageToImageArg = {
   state: RootState;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
-  i2l: Invocation<
-    | 'i2l'
-    | 'flux_vae_encode'
-    | 'flux2_vae_encode'
-    | 'sd3_i2l'
-    | 'cogview4_i2l'
-    | 'qwen_image_i2l'
-    | 'z_image_i2l'
-    | 'anima_i2l'
-  >;
+  i2l: Invocation<ImageToLatentsNodes>;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
@@ -45,19 +37,7 @@ export const addImageToImage = async ({
   noise,
   denoise,
   vaeSource,
-}: AddImageToImageArg): Promise<
-  Invocation<
-    | 'img_resize'
-    | 'l2i'
-    | 'flux_vae_decode'
-    | 'flux2_vae_decode'
-    | 'sd3_l2i'
-    | 'cogview4_l2i'
-    | 'qwen_image_l2i'
-    | 'z_image_l2i'
-    | 'anima_l2i'
-  >
-> => {
+}: AddImageToImageArg): Promise<Invocation<LatentToImageNodes | 'img_resize'>> => {
   const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
   denoise.denoising_end = denoising_end;
@@ -71,6 +51,7 @@ export const addImageToImage = async ({
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
     denoise.type === 'z_image_denoise' ||
+    denoise.type === 'ernie_image_denoise' ||
     denoise.type === 'anima_denoise'
   ) {
     denoise.width = scaledSize.width;
