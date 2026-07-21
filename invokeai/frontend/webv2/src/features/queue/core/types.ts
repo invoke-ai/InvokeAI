@@ -191,6 +191,11 @@ export interface QueueItemProgress {
   totalItemCount?: number;
 }
 
+export interface QueueItemProgressTarget {
+  queueItemId: string;
+  itemIndex: number;
+}
+
 export interface QueueReadModel {
   current: QueueItemReadModel | null;
   items: QueueItemReadModel[];

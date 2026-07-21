@@ -4,6 +4,7 @@ import type {
   QueueItemProgress,
   QueueResultImage,
 } from '@features/queue/core/types';
+import type { ActiveProgressTargetSink } from '@features/queue/data/activeProgressTargetStore';
 import type { QueueItemProgressSink } from '@features/queue/data/progressStore';
 
 import {
@@ -141,6 +142,7 @@ const generateRequest: QueueEnqueueGenerateRequest = {
 };
 
 interface Harness {
+  activeProgressTarget: { clear: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn> };
   api: {
     [Key in Exclude<keyof QueueCoordinatorBackendPort, 'emit' | 'on' | 'onConnectionChange'>]: ReturnType<typeof vi.fn>;
   };
@@ -193,6 +195,7 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     started: vi.fn(),
   };
   const progressImage = { clear: vi.fn(), set: vi.fn() };
+  const activeProgressTarget = { clear: vi.fn(), set: vi.fn() } satisfies ActiveProgressTargetSink;
   const hub = createSocketHub({ createSocket: () => socket });
 
   hub.connect();
@@ -204,6 +207,7 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
       on: hub.on,
       onConnectionChange: hub.onConnectionChange,
     },
+    activeProgressTarget,
     galleryRefreshCoalesceMs: options.galleryRefreshCoalesceMs ?? 1,
     modelLoads,
     nodeExecution,
@@ -211,7 +215,18 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     progressImage,
   });
 
-  return { api, callbacks, coordinator, hub, modelLoads, nodeExecution, progressImage, progressEntries, socket };
+  return {
+    activeProgressTarget,
+    api,
+    callbacks,
+    coordinator,
+    hub,
+    modelLoads,
+    nodeExecution,
+    progressImage,
+    progressEntries,
+    socket,
+  };
 };
 
 describe('queueCoordinator', () => {
@@ -483,6 +498,7 @@ describe('queueCoordinator', () => {
       percentage: 0.5,
       totalItemCount: 1,
     });
+    expect(harness.activeProgressTarget.set).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
 
     const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
 
@@ -490,7 +506,32 @@ describe('queueCoordinator', () => {
     await resultsPromise;
 
     expect(harness.progressEntries.has('local-1')).toBe(false);
+    expect(harness.activeProgressTarget.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
     expect(harness.progressImage.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
+  });
+
+  it('publishes the active target before a progress image is available', async () => {
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 1 }),
+      message: 'Starting denoise',
+      percentage: 0.01,
+    });
+
+    expect(harness.activeProgressTarget.set).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
+    expect(harness.progressImage.set).not.toHaveBeenCalled();
+  });
+
+  it('clears active target and image state when the connection drops', async () => {
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+
+    harness.hub.disconnect();
+
+    expect(harness.activeProgressTarget.clear).toHaveBeenCalledWith();
+    expect(harness.progressImage.clear).toHaveBeenCalledWith();
   });
 
   it('keeps the completed progress image until backend item result routing finishes', async () => {
@@ -637,8 +678,10 @@ describe('queueCoordinator', () => {
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
 
+    // No slot is executing yet, so no active index is published — queued
+    // items must never present as live.
     expect(harness.progressEntries.get('local-1')).toEqual({
-      activeItemIndex: 1,
+      activeItemIndex: undefined,
       completedItemCount: 0,
       message: '',
       percentage: null,
@@ -647,19 +690,80 @@ describe('queueCoordinator', () => {
 
     const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
 
-    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 1 }),
+      message: 'Denoising',
+      percentage: 0.5,
+    });
 
     expect(harness.progressEntries.get('local-1')).toEqual({
-      activeItemIndex: 2,
+      activeItemIndex: 1,
+      completedItemCount: 0,
+      message: 'Denoising',
+      percentage: 0.5,
+      totalItemCount: 2,
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+
+    // Between slots the item is idle again: completion is tracked, but no
+    // active index until the next progress event arrives.
+    expect(harness.progressEntries.get('local-1')).toEqual({
+      activeItemIndex: undefined,
       completedItemCount: 1,
       message: '',
       percentage: null,
       totalItemCount: 2,
     });
 
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 2 }),
+      message: 'Denoising',
+      percentage: 0.25,
+    });
+
+    expect(harness.progressEntries.get('local-1')).toEqual({
+      activeItemIndex: 2,
+      completedItemCount: 1,
+      message: 'Denoising',
+      percentage: 0.25,
+      totalItemCount: 2,
+    });
+
     harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 2 }));
 
     await resultsPromise;
+  });
+
+  it('does not clear a newer active slot when an older terminal event arrives late', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 1 }),
+      message: 'First slot',
+      percentage: 0.9,
+    });
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 2 }),
+      message: 'Second slot',
+      percentage: 0.2,
+    });
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+
+    expect(harness.progressEntries.get('local-1')).toEqual({
+      activeItemIndex: 2,
+      completedItemCount: 1,
+      message: 'Second slot',
+      percentage: 0.2,
+      totalItemCount: 2,
+    });
   });
 
   describe('reconcile', () => {

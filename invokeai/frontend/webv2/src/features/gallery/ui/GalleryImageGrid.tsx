@@ -28,6 +28,7 @@ import type { GalleryQueuePlaceholder } from './galleryStateView';
 import type { GalleryImageContextMenuTarget } from './GalleryUiContext';
 
 import { getGalleryImageDragData, getGalleryImageDragId } from './galleryDnd';
+import { getGalleryPlaceholderInsertionIndex } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -43,6 +44,7 @@ const THUMBNAIL_BUTTON_STYLE = {
   height: '100%',
   inset: 0,
   minWidth: 0,
+  outline: 'none',
   padding: 0,
   position: 'absolute',
   width: '100%',
@@ -87,21 +89,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     t('widgets.gallery.selectedBoardFallback');
   const isEmpty = gallery.images.length === 0 && gallery.pendingPlaceholders.length === 0;
 
-  // Fresh generations are unstarred, so with newest-first ordering they land
-  // right after the starred block — pending placeholders go there too.
-  const leadingStarredCount = useMemo(() => {
-    if (imageOrderDir !== 'DESC' || !starredFirst) {
-      return 0;
-    }
-
-    let count = 0;
-
-    while (count < gallery.images.length && gallery.images[count].starred) {
-      count += 1;
-    }
-
-    return count;
-  }, [gallery.images, imageOrderDir, starredFirst]);
+  const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(gallery.images, imageOrderDir, starredFirst);
 
   const cells = useMemo<GridCell[]>(() => {
     const imageCells: GridCell[] = gallery.images.map((image, imageIndex) => ({
@@ -114,17 +102,15 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       placeholder,
     }));
 
-    if (imageOrderDir !== 'DESC') {
-      return [...imageCells, ...placeholderCells];
-    }
-
-    return [...imageCells.slice(0, leadingStarredCount), ...placeholderCells, ...imageCells.slice(leadingStarredCount)];
-  }, [gallery.images, gallery.pendingPlaceholders, imageOrderDir, leadingStarredCount]);
+    return [
+      ...imageCells.slice(0, placeholderInsertionIndex),
+      ...placeholderCells,
+      ...imageCells.slice(placeholderInsertionIndex),
+    ];
+  }, [gallery.images, gallery.pendingPlaceholders, placeholderInsertionIndex]);
 
   const getCellIndexForImage = (imageIndex: number): number =>
-    imageOrderDir === 'DESC' && imageIndex >= leadingStarredCount
-      ? imageIndex + gallery.pendingPlaceholders.length
-      : imageIndex;
+    imageIndex >= placeholderInsertionIndex ? imageIndex + gallery.pendingPlaceholders.length : imageIndex;
 
   const rowCount = Math.ceil(cells.length / columnCount);
 

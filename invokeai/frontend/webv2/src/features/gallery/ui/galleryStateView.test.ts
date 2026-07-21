@@ -158,7 +158,7 @@ describe('gallery state view', () => {
     expect(placeholders[0]).toMatchObject({
       height: 768,
       itemIndex: 1,
-      queueItemId: 'queue-item-pending-board-1',
+      queueItemId: 'queue-item-running-board-1',
       width: 512,
     });
   });
@@ -234,6 +234,23 @@ describe('gallery state view', () => {
     expect(sequence.liveSlot).toBeNull();
   });
 
+  it('keeps unsubmitted batches grouped after backend-ranked slots', () => {
+    const submittedBatch = createQueueItem({
+      backendItemIds: [11],
+      boardId: 'board-1',
+      localId: 'submitted-batch',
+      status: 'running',
+    });
+    const pendingBatchB = createQueueItem({ batchCount: 2, boardId: 'board-1', localId: 'batch-b' });
+    const pendingBatchA = createQueueItem({ batchCount: 2, boardId: 'board-1', localId: 'batch-a' });
+
+    expect(
+      getGalleryGenerationSequence([pendingBatchB, submittedBatch, pendingBatchA], null).chronologicalSlots.map(
+        (slot) => slot.id
+      )
+    ).toEqual(['submitted-batch:0', 'batch-a:0', 'batch-a:1', 'batch-b:0', 'batch-b:1']);
+  });
+
   it('reverses the complete flattened sequence for newest-first galleries', () => {
     const newerBatch = createQueueItem({
       backendItemIds: [21, 22],
@@ -289,6 +306,27 @@ describe('gallery state view', () => {
         selectedImageName: 'saved.png',
       })
     ).toEqual({ imageName: 'saved.png', kind: 'image' });
+  });
+
+  it('keeps the visible image selected when the active placeholder belongs to another board', () => {
+    const image = {
+      ...createImage('selected.png'),
+      boardId: 'board-1',
+      imageCategory: 'general',
+      starred: false,
+    } as const;
+    const activeItem = createQueueItem({ boardId: 'board-2', localId: 'active-other-board', status: 'running' });
+    const gallery = getGalleryStateView(
+      { selectedBoardId: 'board-1', selectedImageName: image.imageName },
+      boards,
+      [image],
+      false,
+      [activeItem],
+      true,
+      { itemIndex: 1, queueItemId: activeItem.id }
+    );
+
+    expect(gallery.currentItem).toEqual({ imageName: image.imageName, kind: 'image' });
   });
 
   it('skips cancelled backend item slots when creating placeholders', () => {

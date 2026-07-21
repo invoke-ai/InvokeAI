@@ -1,3 +1,4 @@
+import type { QueueItem } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Box, Stack, Text } from '@chakra-ui/react';
@@ -16,11 +17,12 @@ import {
   getGalleryRecentImagesKey,
   getGalleryRefreshToken,
   getGallerySettings,
+  normalizeGalleryImage,
   type GalleryQueuePlaceholder,
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
-import { useProgressImage, type LatestProgressImageSnapshot } from '@features/queue/react';
+import { useActiveProgressTarget, useProgressImage, type LatestProgressImageSnapshot } from '@features/queue/react';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -53,6 +55,11 @@ import { PreviewFooter } from './PreviewFooter';
 import { PreviewFrame } from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
 import {
+  getPreviewNavigationCursor,
+  getPreviewNavigationSequence,
+  getPreviewNavigationTarget,
+} from './previewNavigation';
+import {
   getPreviewComparisonMode,
   getPreviewFilmstripVisible,
   getPreviewMetadataOpen,
@@ -66,17 +73,20 @@ const fallbackBoards: GalleryBoard[] = [
   { archived: false, assetCount: 0, id: 'none', imageCount: 0, kind: 'uncategorized', name: 'Uncategorized' },
 ];
 
-const getGalleryImages = (values: Record<string, unknown>): PreviewImage[] =>
+const getGalleryImages = (values: Record<string, unknown>, queueItems: QueueItem[]): PreviewImage[] =>
   Array.isArray(values.recentImages)
-    ? (values.recentImages as GeneratedImageContract[]).map((image) => ({
-        ...image,
-        boardId: 'none',
-        imageCategory: 'general' as const,
-      }))
+    ? (() => {
+        const queueBoardIds = new Map(
+          queueItems.map((item) => [item.id, item.snapshot.galleryBoardId ?? 'none'] as const)
+        );
+
+        return (values.recentImages as Array<GeneratedImageContract & Partial<GalleryImage>>).map((image) =>
+          normalizeGalleryImage(image, queueBoardIds.get(image.sourceQueueItemId))
+        );
+      })()
     : [];
 
-const getSelectedImage = (values: Record<string, unknown>): PreviewImage | null => {
-  const images = getGalleryImages(values);
+const getSelectedImage = (values: Record<string, unknown>, localImages: PreviewImage[]): PreviewImage | null => {
   const selectedImage = values.selectedImage;
   const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
 
@@ -85,10 +95,73 @@ const getSelectedImage = (values: Record<string, unknown>): PreviewImage | null 
     typeof selectedImage === 'object' &&
     typeof (selectedImage as GeneratedImageContract).imageName === 'string'
   ) {
-    return selectedImage as PreviewImage;
+    const image = selectedImage as PreviewImage;
+
+    return typeof image.boardId === 'string'
+      ? image
+      : (localImages.find((candidate) => candidate.imageName === image.imageName) ?? image);
   }
 
-  return images.find((image) => image.imageName === selectedImageName) ?? images[0] ?? null;
+  return localImages.find((image) => image.imageName === selectedImageName) ?? localImages[0] ?? null;
+};
+
+const getOrderedPreviewImages = (
+  images: PreviewImage[],
+  imageOrderDir: 'ASC' | 'DESC',
+  starredFirst: boolean,
+  inputOrder: 'display' | 'newest-first'
+): PreviewImage[] =>
+  images
+    .map((image, index) => ({ image, index }))
+    .sort((a, b) => {
+      if (starredFirst && Boolean(a.image.starred) !== Boolean(b.image.starred)) {
+        return a.image.starred ? -1 : 1;
+      }
+
+      const chronological = a.image.queuedAt.localeCompare(b.image.queuedAt);
+
+      if (chronological !== 0) {
+        return imageOrderDir === 'DESC' ? -chronological : chronological;
+      }
+
+      return inputOrder === 'newest-first' && imageOrderDir === 'ASC' ? b.index - a.index : a.index - b.index;
+    })
+    .map(({ image }) => image);
+
+const getOrderedLocalImages = ({
+  boardId,
+  galleryView,
+  images,
+  imageOrderDir,
+  starredFirst,
+}: {
+  boardId: string;
+  galleryView: GalleryView;
+  images: PreviewImage[];
+  imageOrderDir: 'ASC' | 'DESC';
+  starredFirst: boolean;
+}): PreviewImage[] =>
+  getOrderedPreviewImages(
+    images.filter((image) => getImageBoardId(image) === boardId && getImageGalleryView(image) === galleryView),
+    imageOrderDir,
+    starredFirst,
+    'newest-first'
+  );
+
+export const mergePreviewBoardImages = (
+  backendImages: PreviewImage[],
+  localImages: PreviewImage[],
+  imageOrderDir: 'ASC' | 'DESC',
+  starredFirst: boolean
+): PreviewImage[] => {
+  const backendNames = new Set(backendImages.map((image) => image.imageName));
+  const missingLocalImages = localImages.filter((image) => !backendNames.has(image.imageName));
+
+  if (missingLocalImages.length === 0) {
+    return backendImages;
+  }
+
+  return getOrderedPreviewImages([...backendImages, ...missingLocalImages], imageOrderDir, starredFirst, 'display');
 };
 
 /**
@@ -128,14 +201,11 @@ const getBoardName = (
 ): string =>
   boardId === 'none' ? uncategorizedLabel : (boards.find((board) => board.id === boardId)?.name ?? unknownBoardLabel);
 
-const shouldLoadBackendBoard = (image: PreviewImage): boolean => image.sourceQueueItemId === 'backend-gallery';
-
 export const getPreviewBoardsRequestKey = ({
   hasSelectedImage,
   refreshToken,
 }: {
   hasSelectedImage: boolean;
-  isBackendImage: boolean;
   refreshToken: string;
 }): string | null => (hasSelectedImage ? refreshToken : null);
 
@@ -166,19 +236,31 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     (project) => project.settings
   );
   const progressImage = useProgressImage();
-  const { gallery, notifications, widgets } = useWorkbenchCommands();
+  const activeProgressTarget = useActiveProgressTarget();
+  const { account, gallery, notifications, widgets } = useWorkbenchCommands();
   const { density, rootRef } = usePreviewDensity(region);
-  const selectedImage = useMemo(() => getSelectedImage(galleryValues), [galleryValues]);
+  const recentImages = Array.isArray(galleryValues.recentImages) ? galleryValues.recentImages : null;
+  const localImages = useMemo(() => getGalleryImages({ recentImages }, queueItems), [queueItems, recentImages]);
+  const selectedImage = useMemo(() => getSelectedImage(galleryValues, localImages), [galleryValues, localImages]);
   const compareImage = getGalleryCompareImage(galleryValues);
   const comparisonMode = getPreviewComparisonMode(previewValues);
-  const recentImages = Array.isArray(galleryValues.recentImages) ? galleryValues.recentImages : null;
-  const localImages = useMemo(() => getGalleryImages({ recentImages }), [recentImages]);
   const imageBoardId = selectedImage ? getImageBoardId(selectedImage) : 'none';
   const displayBoardId = selectedImage ? getDisplayBoardId(selectedImage, galleryValues) : 'none';
   const selectedGalleryView = selectedImage ? getImageGalleryView(selectedImage) : 'images';
   const hasSelectedImage = selectedImage !== null;
-  const isBackendImage = selectedImage ? shouldLoadBackendBoard(selectedImage) : false;
   const { imageOrderDir, starredFirst } = getGallerySettings(galleryValues);
+  const selectedImageName = selectedImage?.imageName ?? null;
+  const isComparing =
+    selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
+  const activeGalleryPlaceholder = useMemo(
+    () => getGalleryGenerationSequence(queueItems, activeProgressTarget).liveSlot,
+    [activeProgressTarget, queueItems]
+  );
+  const matchingProgressImage = getMatchingProgressImage(progressImage, activeGalleryPlaceholder);
+  const shouldFollowLive = showProgressImagesInViewer && activeGalleryPlaceholder !== null && !isComparing;
+  const navigationBoardId = shouldFollowLive ? activeGalleryPlaceholder.boardId : imageBoardId;
+  const navigationGalleryView = shouldFollowLive ? 'images' : selectedGalleryView;
+  const hasNavigationContext = shouldFollowLive || hasSelectedImage;
   const boardRefreshToken = getGalleryRefreshToken(galleryValues);
   const imageRefreshToken = getGalleryImagesRefreshToken(galleryValues);
   const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
@@ -187,55 +269,130 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   const boardsRequestKey = getPreviewBoardsRequestKey({
     hasSelectedImage,
-    isBackendImage,
     refreshToken: boardRefreshToken,
   });
-  const boardImagesRequestKey = `${imageBoardId}:${selectedGalleryView}:${imageOrderDir}:${starredFirst}:${imageRefreshToken}:${recentImagesKey}`;
+  const boardImagesRequestKey = `${navigationBoardId}:${navigationGalleryView}:${imageOrderDir}:${starredFirst}:${imageRefreshToken}:${recentImagesKey}`;
   const boardsQuery = useQuery({
     ...galleryBoardsOptions({ revision: boardsRequestKey ?? undefined }),
     enabled: boardsRequestKey !== null,
   });
   const boardImagesQuery = useQuery({
     ...galleryImagesOptions({
-      boardId: imageBoardId,
-      galleryView: selectedGalleryView,
+      boardId: navigationBoardId,
+      galleryView: navigationGalleryView,
       orderDir: imageOrderDir,
       revision: boardImagesRequestKey,
       searchTerm: '',
       starredFirst,
     }),
-    enabled: hasSelectedImage && isBackendImage,
+    enabled: hasNavigationContext,
   });
   const boards = boardsQuery.data ?? fallbackBoards;
-  const boardImages = !hasSelectedImage
-    ? EMPTY_PREVIEW_IMAGES
-    : !isBackendImage
-      ? localImages
-      : (boardImagesQuery.data?.images ?? EMPTY_PREVIEW_IMAGES);
-  const isLoadingBoard = isBackendImage && boardImagesQuery.isFetching;
-  const selectedIndex = selectedImage
-    ? boardImages.findIndex((image) => image.imageName === selectedImage.imageName)
-    : -1;
+  const optimisticQueueItemIds = useMemo(
+    () =>
+      new Set(
+        queueItems.filter((item) => item.status === 'pending' || item.status === 'running').map((item) => item.id)
+      ),
+    [queueItems]
+  );
+  const navigationLocalImages = useMemo(() => {
+    const refreshingSelectedSourceId =
+      !shouldFollowLive && boardImagesQuery.isFetching ? selectedImage?.sourceQueueItemId : null;
+
+    return localImages.filter(
+      (image) =>
+        optimisticQueueItemIds.has(image.sourceQueueItemId) || image.sourceQueueItemId === refreshingSelectedSourceId
+    );
+  }, [
+    boardImagesQuery.isFetching,
+    localImages,
+    optimisticQueueItemIds,
+    selectedImage?.sourceQueueItemId,
+    shouldFollowLive,
+  ]);
+  const localBoardImages = useMemo(
+    () =>
+      getOrderedLocalImages({
+        boardId: navigationBoardId,
+        galleryView: navigationGalleryView,
+        images: navigationLocalImages,
+        imageOrderDir,
+        starredFirst,
+      }),
+    [imageOrderDir, navigationBoardId, navigationGalleryView, navigationLocalImages, starredFirst]
+  );
+  const backendBoardImages = boardImagesQuery.data?.images ?? EMPTY_PREVIEW_IMAGES;
+  const boardImages = useMemo(
+    () =>
+      !hasNavigationContext
+        ? EMPTY_PREVIEW_IMAGES
+        : mergePreviewBoardImages(backendBoardImages, localBoardImages, imageOrderDir, starredFirst),
+    [backendBoardImages, hasNavigationContext, imageOrderDir, localBoardImages, starredFirst]
+  );
+  const isLoadingBoard = hasNavigationContext && boardImagesQuery.isFetching;
   const boardName = getBoardName(
     boards,
     displayBoardId,
     t('widgets.gallery.uncategorized'),
     t('widgets.gallery.unknownBoard')
   );
+  const navigationSequence = useMemo(
+    () =>
+      getPreviewNavigationSequence({
+        activePlaceholder: activeGalleryPlaceholder,
+        boardId: navigationBoardId,
+        boardImages,
+        galleryView: navigationGalleryView,
+        imageOrderDir,
+        starredFirst,
+      }),
+    [activeGalleryPlaceholder, boardImages, imageOrderDir, navigationBoardId, navigationGalleryView, starredFirst]
+  );
+  const navigationCursor = getPreviewNavigationCursor(navigationSequence, {
+    isFollowingLive: shouldFollowLive,
+    selectedImageName,
+  });
 
-  const selectByOffset = useCallback(
+  // One navigation action shared by the arrow keys and the footer buttons.
+  // Compare mode stays inert and never exposes the placeholder.
+  const navigate = useCallback(
     (offset: -1 | 1) => {
-      if (selectedIndex === -1) {
+      if (isComparing) {
         return;
       }
 
-      const nextImage = boardImages[selectedIndex + offset];
+      const target = getPreviewNavigationTarget(navigationSequence, navigationCursor, offset);
 
-      if (nextImage) {
-        gallery.selectImage(nextImage);
+      if (!target) {
+        return;
+      }
+
+      if (target.kind === 'image') {
+        gallery.selectImage(target.image);
+      } else {
+        account.updateProjectPreferences({ showProgressImagesInViewer: true });
       }
     },
-    [boardImages, gallery, selectedIndex]
+    [account, gallery, isComparing, navigationCursor, navigationSequence]
+  );
+
+  const handleNavigationKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+        return;
+      }
+
+      if (isComparing) {
+        return;
+      }
+
+      // stopPropagation keeps the widget hotkey runtime from handling the same
+      // arrow press a second time.
+      event.preventDefault();
+      event.stopPropagation();
+      navigate(event.key === 'ArrowLeft' ? -1 : 1);
+    },
+    [isComparing, navigate]
   );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
@@ -288,14 +445,6 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       starred: boardImage?.starred ?? selectedImage.starred ?? false,
     };
   }, [boardImages, displayBoardId, selectedImage]);
-  const isComparing =
-    selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
-  const activeGalleryPlaceholder = useMemo(
-    () => getGalleryGenerationSequence(queueItems, progressImage?.target ?? null).liveSlot,
-    [progressImage?.target, queueItems]
-  );
-  const matchingProgressImage = getMatchingProgressImage(progressImage, activeGalleryPlaceholder);
-  const shouldFollowLive = showProgressImagesInViewer && matchingProgressImage !== null && !isComparing;
   const exitCompare = useCallback(() => gallery.setCompareImage(null), [gallery]);
   const swapCompareImages = useCallback(() => {
     if (selectedImage && compareImage) {
@@ -359,10 +508,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     },
     [contextMenuImage]
   );
-  const selectNextImage = useCallback(() => selectByOffset(1), [selectByOffset]);
-  const selectPreviousImage = useCallback(() => selectByOffset(-1), [selectByOffset]);
+  const selectNextImage = useCallback(() => navigate(1), [navigate]);
+  const selectPreviousImage = useCallback(() => navigate(-1), [navigate]);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
-  const selectedImageName = selectedImage?.imageName ?? null;
   const headerImageName = shouldFollowLive ? null : selectedImageName;
 
   // Publish the header chrome context (the "[board] / [image]" label and the
@@ -381,10 +529,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   useEffect(() => () => previewHeaderStore.clear(), []);
 
-  // Warm the browser cache for the board neighbors so arrow-key navigation
+  // Warm the browser cache for the sequence neighbors so arrow-key navigation
   // swaps without a decode flash.
-  const previousNeighborUrl = boardImages[selectedIndex - 1]?.imageUrl ?? null;
-  const nextNeighborUrl = boardImages[selectedIndex + 1]?.imageUrl ?? null;
+  const previousNeighbor = navigationSequence[navigationCursor - 1];
+  const nextNeighbor = navigationSequence[navigationCursor + 1];
+  const previousNeighborUrl = previousNeighbor?.kind === 'image' ? previousNeighbor.image.imageUrl : null;
+  const nextNeighborUrl = nextNeighbor?.kind === 'image' ? nextNeighbor.image.imageUrl : null;
 
   useEffect(() => {
     [previousNeighborUrl, nextNeighborUrl].forEach((url) => {
@@ -446,53 +596,67 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   return (
     <Box ref={rootRef} p="2" h="full">
-      {shouldFollowLive && activeGalleryPlaceholder && matchingProgressImage ? (
-        <LivePreview
-          placeholder={activeGalleryPlaceholder}
-          progressImage={matchingProgressImage}
-          shouldAntialiasProgressImage={antialiasProgressImages}
-        />
-      ) : selectedImage ? (
-        <>
-          {isComparing && compareImage ? (
-            <PreviewCompare
-              baseImage={selectedImage}
-              compareImage={compareImage}
-              mode={comparisonMode}
-              runtime={runtime}
-              onExit={exitCompare}
-              onModeChange={setComparisonMode}
-              onSwap={swapCompareImages}
-            />
-          ) : (
-            <SelectedImagePreview
-              actionImage={contextMenuImage}
-              actions={imageActions}
-              filmstripImages={isFilmstripVisible && density !== 'minimal' ? boardImages : null}
-              loupeControlsRef={loupeControlsRef}
-              boardImageCount={boardImages.length}
-              density={density}
-              image={selectedImage}
-              isLoadingBoard={isLoadingBoard}
-              isMetadataOpen={isMetadataOpen}
-              selectedIndex={selectedIndex}
-              onContextMenu={openImageContextMenu}
-              onNext={selectNextImage}
-              onPrevious={selectPreviousImage}
-              onSelectImage={selectImage}
-              onToggleMetadata={toggleMetadata}
-            />
-          )}
-          <ImageContextMenu
-            actions={imageActions}
-            boards={boards}
-            target={contextMenuTarget}
-            onClose={closeContextMenu}
+      {/* Single always-mounted keyboard boundary: DOM focus survives swaps
+          between the live, selected, and compare branches, so arrow
+          navigation keeps working across them. */}
+      <Stack
+        aria-label={t('widgets.labels.preview')}
+        gap="3"
+        h="full"
+        minH="0"
+        outline="none"
+        tabIndex={0}
+        w="full"
+        onKeyDown={handleNavigationKeyDown}
+      >
+        {shouldFollowLive && activeGalleryPlaceholder ? (
+          <LivePreview
+            placeholder={activeGalleryPlaceholder}
+            progressImage={matchingProgressImage}
+            shouldAntialiasProgressImage={antialiasProgressImages}
           />
-        </>
-      ) : (
-        <EmptyPreview />
-      )}
+        ) : selectedImage ? (
+          <>
+            {isComparing && compareImage ? (
+              <PreviewCompare
+                baseImage={selectedImage}
+                compareImage={compareImage}
+                mode={comparisonMode}
+                runtime={runtime}
+                onExit={exitCompare}
+                onModeChange={setComparisonMode}
+                onSwap={swapCompareImages}
+              />
+            ) : (
+              <SelectedImagePreview
+                actionImage={contextMenuImage}
+                actions={imageActions}
+                filmstripImages={isFilmstripVisible && density !== 'minimal' ? boardImages : null}
+                loupeControlsRef={loupeControlsRef}
+                boardImageCount={navigationSequence.length}
+                density={density}
+                image={selectedImage}
+                isLoadingBoard={isLoadingBoard}
+                isMetadataOpen={isMetadataOpen}
+                selectedIndex={navigationCursor}
+                onContextMenu={openImageContextMenu}
+                onNext={selectNextImage}
+                onPrevious={selectPreviousImage}
+                onSelectImage={selectImage}
+                onToggleMetadata={toggleMetadata}
+              />
+            )}
+            <ImageContextMenu
+              actions={imageActions}
+              boards={boards}
+              target={contextMenuTarget}
+              onClose={closeContextMenu}
+            />
+          </>
+        ) : (
+          <EmptyPreview />
+        )}
+      </Stack>
     </Box>
   );
 };
@@ -547,23 +711,8 @@ const SelectedImagePreview = ({
     () => ({ boardId: actionImage?.boardId ?? 'none', imageName: image.imageName }),
     [actionImage?.boardId, image.imageName]
   );
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        onPrevious();
-      }
-
-      if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        onNext();
-      }
-    },
-    [onNext, onPrevious]
-  );
-
   return (
-    <Stack gap="3" h="full" minH="0" outline="none" tabIndex={0} w="full" onKeyDown={handleKeyDown}>
+    <Stack gap="3" h="full" minH="0" w="full">
       <PreviewFrame
         dragImage={dragImage}
         frameHeight={previewHeight}
@@ -608,7 +757,7 @@ const LivePreview = ({
   shouldAntialiasProgressImage,
 }: {
   placeholder: GalleryQueuePlaceholder;
-  progressImage: LatestProgressImageSnapshot;
+  progressImage: LatestProgressImageSnapshot | null;
   shouldAntialiasProgressImage: boolean;
 }) => {
   const { t } = useTranslation();

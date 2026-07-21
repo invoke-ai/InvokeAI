@@ -9,6 +9,7 @@ export type {
   GalleryView,
   GeneratedImageContract,
 } from './core/types';
+export { normalizeGalleryImage } from './core/image';
 export {
   DEFAULT_GALLERY_SETTINGS,
   getGallerySettings,
@@ -20,6 +21,7 @@ export {
   getGalleryCompareImage,
   getGalleryCurrentItem,
   getGalleryGenerationSequence,
+  getGalleryPlaceholderInsertionIndex,
   getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
   getGalleryRefreshToken,
