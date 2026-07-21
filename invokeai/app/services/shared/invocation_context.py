@@ -436,7 +436,7 @@ class ModelsInterface(InvocationContextInterface):
         if submodel_type:
             message += f" ({submodel_type.value})"
         self._util.signal_progress(message)
-        return self._services.model_manager.load.load_model(model, submodel_type)
+        return self._services.model_manager.load.load_model(model, submodel_type, user_id=self._data.queue_item.user_id)
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
@@ -466,7 +466,9 @@ class ModelsInterface(InvocationContextInterface):
         if submodel_type:
             message += f" ({submodel_type.value})"
         self._util.signal_progress(message)
-        return self._services.model_manager.load.load_model(configs[0], submodel_type)
+        return self._services.model_manager.load.load_model(
+            configs[0], submodel_type, user_id=self._data.queue_item.user_id
+        )
 
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:

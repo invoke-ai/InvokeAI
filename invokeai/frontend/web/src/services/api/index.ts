@@ -7,6 +7,7 @@ import type {
   TagDescription,
 } from '@reduxjs/toolkit/query/react';
 import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@reduxjs/toolkit/query/react';
+import { getDeploymentBaseUrl } from 'common/util/baseUrl';
 import { sessionExpiredLogout } from 'features/auth/store/authSlice';
 import queryString from 'query-string';
 import stableHash from 'stable-hash';
@@ -70,7 +71,7 @@ export const LIST_TAG = 'LIST';
 export const LIST_ALL_TAG = 'LIST_ALL';
 
 export const getBaseUrl = (): string => {
-  return window.location.origin;
+  return getDeploymentBaseUrl();
 };
 
 const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
