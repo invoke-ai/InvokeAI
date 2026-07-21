@@ -68,7 +68,7 @@
       "data": {
         "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
         "type": "wan_model_loader",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "label": "",
         "notes": "",
         "isOpen": true,

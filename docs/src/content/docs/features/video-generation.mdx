@@ -50,7 +50,7 @@ InvokeAI handles the swap automatically — both experts have to be installed (t
 The default A14B variants need ~40–50 denoise steps for clean output. The Wan team also released **Lightning distillation LoRAs** that collapse that to 4 steps with minimal quality loss — about a 10× speedup. There's a pair per variant (one LoRA for the high-noise expert, one for the low-noise), wired through the LoRA loader nodes in the starter workflows.
 
 :::tip
-**TI2V-5B doesn't have a Lightning LoRA.** Its smaller size means each step is cheap; you typically run it at 40–50 steps and end up in a similar wall-clock ballpark as A14B + Lightning.
+**TI2V-5B doesn't have a Lightning LoRA.** Its smaller size means each step is cheap; you typically run it at 40–50 steps and end up in a similar wall-clock ballpark as A14B + Lightning. (The bundled TI2V-5B workflows ship with 20 steps as a speed/quality compromise — raise the step count if you want cleaner output.)
 :::
 
 ### Installing models
@@ -157,12 +157,12 @@ This is **I2V-A14B only** (`num_frames > 1`); it is not supported on TI2V-5B or 
 
 | | T2V-A14B + Lightning | T2V-A14B | I2V-A14B + Lightning | TI2V-5B (T2V or I2V) |
 |---|---|---|---|---|
-| Steps | 4 | 40–50 | 4 | 40–50 |
+| Steps | 4 | 40–50 | 4 | 40–50 (bundled workflows use 20 for speed) |
 | CFG (high) | 1.0 | 5.0 | 1.0 | 5.0–5.5 |
 | CFG (low) | 1.0 | 4.0 | 1.0 | n/a (single expert) |
 | Num frames | 81 | 81 | 81 | 81 |
 | Width × Height | 832×480 | 832×480 | 832×480 | 832×480 |
-| Scheduler | Auto (FlowMatchEuler) | Auto | Auto | Auto (UniPC) |
+| Scheduler | Auto (UniPC) | Auto (UniPC) | Auto (UniPC) | Auto (UniPC) |
 
 ---
 

@@ -207,7 +207,10 @@ def test_timeout_kills_worker_descendants(monkeypatch: pytest.MonkeyPatch, tmp_p
         return [sys.executable, "-c", script, str(child_pid_path)]
 
     monkeypatch.setattr(video_thumbnails, "_worker_command", _descendant_command)
-    assert video_thumbnails._run_worker(["probe", "unused"], timeout=0.5) is None
+    # The timeout must comfortably cover interpreter startup + the child spawn on a
+    # loaded CI machine — if the worker is killed before it writes the pid file, the
+    # test can't observe the descendant and fails spuriously.
+    assert video_thumbnails._run_worker(["probe", "unused"], timeout=2.0) is None
     child_pid = int(child_pid_path.read_text())
 
     deadline = time.monotonic() + 5

@@ -74,7 +74,7 @@
       "type": "invocation",
       "data": {
         "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -510,7 +510,7 @@
       "data": {
         "id": "54663968-7e96-432a-a59a-dcd7e40418bc",
         "type": "wan_lora_loader",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -554,7 +554,7 @@
       "data": {
         "id": "29f62b13-6e9a-4ee3-b279-01b36565fee8",
         "type": "wan_lora_loader",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -598,7 +598,7 @@
       "data": {
         "id": "9ea995ab-3db6-45ae-b961-4a3b2b9ab8d4",
         "type": "wan_lora_collection_loader",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "label": "",
         "notes": "",
         "isOpen": true,

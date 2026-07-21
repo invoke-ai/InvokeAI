@@ -595,7 +595,7 @@
       "type": "invocation",
       "data": {
         "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -872,7 +872,7 @@
       "type": "invocation",
       "data": {
         "id": "291abec8-b996-4c7b-959c-360f56a3ed60",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "nodePack": "invokeai",
         "label": "Apply Lightning LoRA (High Noise)",
         "notes": "",
@@ -916,7 +916,7 @@
       "type": "invocation",
       "data": {
         "id": "ae8f115d-a3b8-4f76-b280-7313366a94ad",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
