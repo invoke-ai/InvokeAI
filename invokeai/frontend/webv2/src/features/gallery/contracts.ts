@@ -17,9 +17,13 @@ export {
   type GalleryThumbnailFit,
 } from './core/settings';
 export {
+  getActiveGalleryQueuePlaceholder,
   getGalleryCompareImage,
+  getGalleryCurrentItem,
   getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
   getGalleryRefreshToken,
+  type GalleryCurrentItem,
+  type GalleryQueuePlaceholder,
 } from './ui/galleryStateView';
 export { getSelectedGalleryImageFromValues } from './core/selection';

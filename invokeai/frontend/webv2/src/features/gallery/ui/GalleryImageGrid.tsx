@@ -77,6 +77,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     gallery.settings;
   const columnCount = getGalleryColumnCount(imageDensityPercent, layout);
   const selectedNames = useMemo(() => new Set(gallery.selectedImageNames), [gallery.selectedImageNames]);
+  const isFollowingLive = gallery.currentItem?.kind === 'placeholder';
   const isComparisonActive =
     gallery.compareImageName !== null &&
     gallery.selectedImageName !== null &&
@@ -302,7 +303,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
   );
 
   const handleShowProgressImages = useCallback(() => {
-    account.showProgressImages();
+    account.enableLiveFollow();
   }, [account]);
 
   const handleToggleStarred = useCallback(
@@ -461,6 +462,10 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                             key={cell.placeholder.id}
                             antialiasProgressImages={antialiasProgressImages}
                             fit={thumbnailFit}
+                            isSelected={
+                              gallery.currentItem?.kind === 'placeholder' &&
+                              gallery.currentItem.placeholder.id === cell.placeholder.id
+                            }
                             placeholder={cell.placeholder}
                             onClick={handleShowProgressImages}
                           />
@@ -478,8 +483,8 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                             fit={thumbnailFit}
                             getDragImages={getDragImages}
                             image={cell.image}
-                            isPrimary={cell.image.imageName === gallery.selectedImageName}
-                            isSelected={selectedNames.has(cell.image.imageName)}
+                            isPrimary={!isFollowingLive && cell.image.imageName === gallery.selectedImageName}
+                            isSelected={!isFollowingLive && selectedNames.has(cell.image.imageName)}
                             onClick={handleThumbnailClick}
                             onContextMenu={handleThumbnailContextMenu}
                             onToggleStarred={handleToggleStarred}
@@ -536,11 +541,13 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
 const GalleryQueuePlaceholderCell = ({
   antialiasProgressImages,
   fit,
+  isSelected,
   onClick,
   placeholder,
 }: {
   antialiasProgressImages: boolean;
   fit: GalleryThumbnailFit;
+  isSelected: boolean;
   onClick: () => void;
   placeholder: GalleryQueuePlaceholder;
 }) => {
@@ -554,15 +561,17 @@ const GalleryQueuePlaceholderCell = ({
     <Box
       as="button"
       aria-label={t('widgets.preview.showInProgressDiffusion')}
+      aria-selected={isSelected}
       aspectRatio={1}
       bg="bg"
-      borderColor={isActive ? 'accent.solid' : 'border.subtle'}
-      borderWidth="1px"
+      borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
+      borderWidth={isSelected ? '2px' : '1px'}
       cursor="pointer"
       minW="0"
       rounded="md"
       overflow="hidden"
       position="relative"
+      role="option"
       w="full"
       onClick={onClick}
     >

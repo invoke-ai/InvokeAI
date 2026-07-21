@@ -73,7 +73,7 @@ export interface GalleryWidgetProps {
 export interface GalleryUiAdapter {
   ImageActionsProvider: ComponentType<GalleryImageActionsOptions & { children: ReactNode }>;
   ImageContextMenu: ComponentType<GalleryImageContextMenuProps>;
-  account: { showProgressImages(): void };
+  account: { enableLiveFollow(): void };
   antialiasProgressImages: boolean;
   gallery: GalleryCommandsPort;
   galleryValues: Record<string, unknown>;
@@ -82,6 +82,7 @@ export interface GalleryUiAdapter {
   projectId: string;
   projectName: string;
   queueItems: QueueItem[];
+  liveFollowEnabled: boolean;
   widgets: { patchGalleryValues(values: Record<string, unknown>): void };
 }
 

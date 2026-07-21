@@ -10,15 +10,17 @@ import {
   type GeneratedImageContract,
 } from '@features/gallery';
 import {
+  getActiveGalleryQueuePlaceholder,
   getGalleryCompareImage,
   getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
   getGalleryRefreshToken,
   getGallerySettings,
+  type GalleryQueuePlaceholder,
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
-import { useProgressImage, useRevealHold, type LatestProgressImageSnapshot } from '@features/queue/react';
+import { useProgressImage, type LatestProgressImageSnapshot } from '@features/queue/react';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -50,6 +52,7 @@ import { PreviewFilmstrip } from './PreviewFilmstrip';
 import { PreviewFooter } from './PreviewFooter';
 import { PreviewFrame } from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
+import { PreviewLiveStatusLine } from './PreviewLiveReadout';
 import {
   getPreviewComparisonMode,
   getPreviewFilmstripVisible,
@@ -137,10 +140,27 @@ export const getPreviewBoardsRequestKey = ({
   refreshToken: string;
 }): string | null => (hasSelectedImage ? refreshToken : null);
 
+export const getMatchingProgressImage = (
+  progressImage: LatestProgressImageSnapshot | null,
+  placeholder: GalleryQueuePlaceholder | null
+): LatestProgressImageSnapshot | null => {
+  if (
+    !progressImage?.target ||
+    !placeholder ||
+    progressImage.target.queueItemId !== placeholder.queueItemId ||
+    progressImage.target.itemIndex !== placeholder.itemIndex
+  ) {
+    return null;
+  }
+
+  return progressImage;
+};
+
 const selectGenerateRecallValues = createGenerateFormValuesSelector();
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const previewValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'preview'));
   const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
   const { antialiasProgressImages, showProgressImagesInViewer } = useActiveProjectSelector(
@@ -271,11 +291,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [boardImages, displayBoardId, selectedImage]);
   const isComparing =
     selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
-  // The reveal window suppresses live frames briefly after a completion so the
-  // finished result is seen before the next item's noise takes over.
-  const isRevealHolding = useRevealHold();
-  const shouldShowProgressImage =
-    showProgressImagesInViewer && progressImage !== null && !isComparing && !isRevealHolding;
+  const activeGalleryPlaceholder = useMemo(() => getActiveGalleryQueuePlaceholder(queueItems), [queueItems]);
+  const shouldFollowLive = showProgressImagesInViewer && activeGalleryPlaceholder !== null && !isComparing;
+  const matchingProgressImage = getMatchingProgressImage(progressImage, activeGalleryPlaceholder);
   const exitCompare = useCallback(() => gallery.setCompareImage(null), [gallery]);
   const swapCompareImages = useCallback(() => {
     if (selectedImage && compareImage) {
@@ -343,6 +361,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const selectPreviousImage = useCallback(() => selectByOffset(-1), [selectByOffset]);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
   const selectedImageName = selectedImage?.imageName ?? null;
+  const headerImageName = shouldFollowLive ? null : selectedImageName;
 
   // Publish the header chrome context (the "[board] / [image]" label and the
   // action strip's image + actions) for the widget frame; the chrome renders
@@ -350,13 +369,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   // unmount so stale chrome never outlives us.
   useEffect(() => {
     previewHeaderStore.set({
-      actionImage: contextMenuImage,
-      actions: imageActions,
-      boardName: selectedImageName === null ? null : boardName,
-      imageName: selectedImageName,
-      openImageMenu: openImageContextMenu,
+      actionImage: shouldFollowLive ? null : contextMenuImage,
+      actions: shouldFollowLive ? null : imageActions,
+      boardName: headerImageName === null ? null : boardName,
+      imageName: headerImageName,
+      openImageMenu: shouldFollowLive ? null : openImageContextMenu,
     });
-  }, [boardName, contextMenuImage, imageActions, openImageContextMenu, selectedImageName]);
+  }, [boardName, contextMenuImage, headerImageName, imageActions, openImageContextMenu, shouldFollowLive]);
 
   useEffect(() => () => previewHeaderStore.clear(), []);
 
@@ -384,7 +403,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       return;
     }
 
-    if (commandId === 'viewer.deleteImage' && selectedImage) {
+    if (commandId === 'viewer.deleteImage' && selectedImage && !shouldFollowLive) {
       void imageActions.deleteImages([selectedImage.imageName]);
       return;
     }
@@ -425,7 +444,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   return (
     <Box ref={rootRef} p="2" h="full">
-      {selectedImage ? (
+      {shouldFollowLive && activeGalleryPlaceholder ? (
+        <LivePreview
+          placeholder={activeGalleryPlaceholder}
+          progressImage={matchingProgressImage}
+          shouldAntialiasProgressImage={antialiasProgressImages}
+        />
+      ) : selectedImage ? (
         <>
           {isComparing && compareImage ? (
             <PreviewCompare
@@ -448,9 +473,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               image={selectedImage}
               isLoadingBoard={isLoadingBoard}
               isMetadataOpen={isMetadataOpen}
-              progressImage={shouldShowProgressImage ? progressImage : null}
               selectedIndex={selectedIndex}
-              shouldAntialiasProgressImage={antialiasProgressImages}
               onContextMenu={openImageContextMenu}
               onNext={selectNextImage}
               onPrevious={selectPreviousImage}
@@ -466,10 +489,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
           />
         </>
       ) : (
-        <EmptyPreview
-          progressImage={shouldShowProgressImage ? progressImage : null}
-          shouldAntialiasProgressImage={antialiasProgressImages}
-        />
+        <EmptyPreview />
       )}
     </Box>
   );
@@ -485,9 +505,7 @@ const SelectedImagePreview = ({
   isLoadingBoard,
   isMetadataOpen,
   loupeControlsRef,
-  progressImage,
   selectedIndex,
-  shouldAntialiasProgressImage,
   onContextMenu,
   onNext,
   onPrevious,
@@ -504,9 +522,7 @@ const SelectedImagePreview = ({
   isLoadingBoard: boolean;
   isMetadataOpen: boolean;
   loupeControlsRef?: Ref<PreviewLoupeControls>;
-  progressImage: LatestProgressImageSnapshot | null;
   selectedIndex: number;
-  shouldAntialiasProgressImage: boolean;
   onContextMenu: (x: number, y: number) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -522,12 +538,9 @@ const SelectedImagePreview = ({
       src: image.imageUrl,
       width: image.width,
     }),
-    liveImage: progressImageToStreamingSource(progressImage),
   });
-  const isProgressImage = previewImage?.kind === 'live';
   const previewWidth = previewImage?.width ?? image.width;
   const previewHeight = previewImage?.height ?? image.height;
-  const liveQueueItemId = progressImage?.target?.queueItemId ?? null;
   const dragImage = useMemo(
     () => ({ boardId: actionImage?.boardId ?? 'none', imageName: image.imageName }),
     [actionImage?.boardId, image.imageName]
@@ -553,12 +566,11 @@ const SelectedImagePreview = ({
         dragImage={dragImage}
         frameHeight={previewHeight}
         frameWidth={previewWidth}
-        isLive={isProgressImage}
+        isLive={false}
         liveBadgeLabel={t('common.generating')}
-        liveQueueItemId={liveQueueItemId}
         loupeControlsRef={loupeControlsRef}
         padding={density === 'full' ? '6' : '3'}
-        shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+        shouldAntialiasLiveImage
         source={previewImage}
         variant="framed"
         onContextMenu={onContextMenu}
@@ -576,10 +588,9 @@ const SelectedImagePreview = ({
         actions={actions}
         boardImageCount={boardImageCount}
         image={image}
-        isLive={isProgressImage}
+        isLive={false}
         isLoadingBoard={isLoadingBoard}
         isMetadataOpen={isMetadataOpen}
-        liveQueueItemId={liveQueueItemId}
         selectedIndex={selectedIndex}
         onNext={onNext}
         onPrevious={onPrevious}
@@ -589,10 +600,12 @@ const SelectedImagePreview = ({
   );
 };
 
-const EmptyPreview = ({
+const LivePreview = ({
+  placeholder,
   progressImage,
   shouldAntialiasProgressImage,
 }: {
+  placeholder: GalleryQueuePlaceholder;
   progressImage: LatestProgressImageSnapshot | null;
   shouldAntialiasProgressImage: boolean;
 }) => {
@@ -603,13 +616,36 @@ const EmptyPreview = ({
 
   return (
     <PreviewFrame
-      frameHeight={previewImage?.height ?? 1}
-      frameWidth={previewImage?.width ?? 1}
+      frameHeight={previewImage?.height ?? placeholder.height}
+      frameWidth={previewImage?.width ?? placeholder.width}
       isLive
       liveBadgeLabel={t('common.generating')}
-      liveQueueItemId={progressImage?.target?.queueItemId ?? null}
+      liveQueueItemId={placeholder.queueItemId}
       shouldAntialiasLiveImage={shouldAntialiasProgressImage}
       source={previewImage}
+      variant="inset"
+    >
+      <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
+        <Text fontSize="sm" fontWeight="800">
+          {t('common.generating')}
+        </Text>
+        <PreviewLiveStatusLine queueItemId={placeholder.queueItemId} />
+      </Stack>
+    </PreviewFrame>
+  );
+};
+
+const EmptyPreview = () => {
+  const { t } = useTranslation();
+
+  return (
+    <PreviewFrame
+      frameHeight={1}
+      frameWidth={1}
+      isLive={false}
+      liveBadgeLabel={t('common.generating')}
+      shouldAntialiasLiveImage
+      source={null}
       variant="inset"
     >
       <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">

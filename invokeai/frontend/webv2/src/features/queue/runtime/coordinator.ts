@@ -26,7 +26,6 @@ import {
   type ProgressImageTarget,
 } from '@features/queue/data/progressImageStore';
 import { queueItemProgressStore, type QueueItemProgressSink } from '@features/queue/data/progressStore';
-import { revealHoldStore, type RevealHoldSink } from '@features/queue/data/revealHoldStore';
 import { ApiError } from '@platform/transport/http';
 
 const GALLERY_REFRESH_COALESCE_MS = 400;
@@ -181,7 +180,6 @@ export const createQueueCoordinator = (
     nodeExecution: QueueNodeExecutionPort;
     progress?: QueueItemProgressSink;
     progressImage?: ProgressImageSink;
-    revealHold?: RevealHoldSink;
     sweepIntervalMs?: number;
   }
 ): QueueCoordinator => {
@@ -190,7 +188,6 @@ export const createQueueCoordinator = (
   const modelLoads = options.modelLoads;
   const nodeExecution = options.nodeExecution;
   const progressImage = options.progressImage ?? progressImageStore;
-  const revealHold = options.revealHold ?? revealHoldStore;
   const galleryRefreshCoalesceMs = options.galleryRefreshCoalesceMs ?? GALLERY_REFRESH_COALESCE_MS;
   const sweepIntervalMs = options.sweepIntervalMs ?? SAFETY_SWEEP_INTERVAL_MS;
 
@@ -298,22 +295,13 @@ export const createQueueCoordinator = (
 
     if (outcome.status === 'completed') {
       const routingPromise = callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
-      // Reveal window: while sibling items keep generating, hold off the next
-      // live frames briefly so the just-finished result is actually seen.
-      const settleCompleted = (): void => {
-        clearProgressImage();
-
-        if (waits.size > 0) {
-          revealHold.arm();
-        }
-      };
 
       if (routingPromise) {
         void Promise.resolve(routingPromise)
-          .finally(settleCompleted)
+          .finally(clearProgressImage)
           .catch(() => undefined);
       } else {
-        settleCompleted();
+        clearProgressImage();
       }
     }
 

@@ -18,6 +18,7 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
  * deliver to the currently viewed board once generation completes.
  */
 export interface GalleryQueuePlaceholder {
+  boardId: string;
   id: string;
   queueItemId: string;
   itemIndex: number;
@@ -25,9 +26,15 @@ export interface GalleryQueuePlaceholder {
   height: number;
 }
 
+export type GalleryCurrentItem =
+  | { kind: 'image'; imageName: string }
+  | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder }
+  | null;
+
 export interface GalleryStateView {
   boards: GalleryBoard[];
   compareImageName: string | null;
+  currentItem: GalleryCurrentItem;
   galleryView: GalleryView;
   images: GalleryImage[];
   isLoading: boolean;
@@ -39,6 +46,57 @@ export interface GalleryStateView {
   selectedImageNames: string[];
   settings: GallerySettings;
 }
+
+export const getActiveGalleryQueuePlaceholder = (queueItems: QueueItem[]): GalleryQueuePlaceholder | null => {
+  for (const item of queueItems) {
+    if (item.status !== 'running' || item.snapshot.destination !== 'gallery') {
+      continue;
+    }
+
+    const boardId = item.snapshot.galleryBoardId ?? 'none';
+    const { width, height } = getQueueItemSnapshotDimensions(item, { height: 1024, width: 1024 });
+    const completedBackendItemIds = new Set(item.completedBackendItemIds ?? []);
+    const cancelledBackendItemIds = new Set(item.cancelledBackendItemIds ?? []);
+
+    if (item.backendItemIds?.length) {
+      const index = item.backendItemIds.findIndex(
+        (backendItemId) => !completedBackendItemIds.has(backendItemId) && !cancelledBackendItemIds.has(backendItemId)
+      );
+
+      if (index !== -1) {
+        return { boardId, height, id: `${item.id}:${index}`, itemIndex: index + 1, queueItemId: item.id, width };
+      }
+
+      continue;
+    }
+
+    const expectedImageCount = getQueueItemSnapshotBatchCount(item);
+
+    if (expectedImageCount > 0) {
+      return { boardId, height, id: `${item.id}:0`, itemIndex: 1, queueItemId: item.id, width };
+    }
+  }
+
+  return null;
+};
+
+export const getGalleryCurrentItem = ({
+  activePlaceholder,
+  isComparisonActive,
+  liveFollowEnabled,
+  selectedImageName,
+}: {
+  activePlaceholder: GalleryQueuePlaceholder | null;
+  isComparisonActive: boolean;
+  liveFollowEnabled: boolean;
+  selectedImageName: string | null;
+}): GalleryCurrentItem => {
+  if (liveFollowEnabled && !isComparisonActive && activePlaceholder) {
+    return { kind: 'placeholder', placeholder: activePlaceholder };
+  }
+
+  return selectedImageName ? { imageName: selectedImageName, kind: 'image' } : null;
+};
 
 export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
   values.galleryView === 'assets' ? 'assets' : 'images';
@@ -155,14 +213,28 @@ export const getGalleryQueuePlaceholders = (
           continue;
         }
 
-        placeholders.push({ height, id: `${item.id}:${index}`, itemIndex: index + 1, queueItemId: item.id, width });
+        placeholders.push({
+          boardId: targetBoardId,
+          height,
+          id: `${item.id}:${index}`,
+          itemIndex: index + 1,
+          queueItemId: item.id,
+          width,
+        });
       }
 
       continue;
     }
 
     for (let index = 0; index < expectedImageCount; index++) {
-      placeholders.push({ height, id: `${item.id}:${index}`, itemIndex: index + 1, queueItemId: item.id, width });
+      placeholders.push({
+        boardId: targetBoardId,
+        height,
+        id: `${item.id}:${index}`,
+        itemIndex: index + 1,
+        queueItemId: item.id,
+        width,
+      });
     }
   }
 
@@ -174,7 +246,8 @@ export const getGalleryStateView = (
   backendBoards: GalleryBoard[],
   backendImages: GalleryImage[] | null,
   isLoading: boolean,
-  queueItems: QueueItem[] = []
+  queueItems: QueueItem[] = [],
+  liveFollowEnabled = false
 ): GalleryStateView => {
   const localImages = Array.isArray(values.recentImages)
     ? (values.recentImages as GeneratedImageContract[]).map((image) => ({
@@ -196,10 +269,20 @@ export const getGalleryStateView = (
   const boards = backendBoards.length ? backendBoards : [{ ...UNCATEGORIZED_BOARD, imageCount: images.length }];
   const selectedBoardId = getGallerySelectedBoardId(values, backendBoards);
   const compareImage = getGalleryCompareImage(values);
+  const compareImageName = compareImage?.imageName ?? null;
+  const isComparisonActive =
+    visibleSelectedImageName !== null && compareImageName !== null && compareImageName !== visibleSelectedImageName;
+  const currentItem = getGalleryCurrentItem({
+    activePlaceholder: getActiveGalleryQueuePlaceholder(queueItems),
+    isComparisonActive,
+    liveFollowEnabled,
+    selectedImageName: visibleSelectedImageName,
+  });
 
   return {
     boards,
-    compareImageName: compareImage?.imageName ?? null,
+    compareImageName,
+    currentItem,
     galleryView,
     images,
     isLoading,

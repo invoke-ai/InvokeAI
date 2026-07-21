@@ -4,7 +4,9 @@ import type { QueueHistoryItemStatus, QueueItem } from '@features/queue/contract
 import { describe, expect, it } from 'vitest';
 
 import {
+  getActiveGalleryQueuePlaceholder,
   getBoardCounts,
+  getGalleryCurrentItem,
   getGalleryImagesRefreshToken,
   getGalleryQueuePlaceholders,
   getGallerySelectedBoardId,
@@ -176,6 +178,50 @@ describe('gallery state view', () => {
     });
 
     expect(placeholders.map((placeholder) => placeholder.itemIndex)).toEqual([2, 3]);
+  });
+
+  it('derives the active gallery placeholder from the running queue item before a progress image arrives', () => {
+    const pending = createQueueItem({ backendItemIds: [1], boardId: 'none', status: 'pending' });
+    const running = createQueueItem({
+      backendItemIds: [11, 12, 13],
+      boardId: 'board-1',
+      completedBackendItemIds: [11],
+      status: 'running',
+    });
+
+    expect(getActiveGalleryQueuePlaceholder([pending, running])).toMatchObject({
+      boardId: 'board-1',
+      itemIndex: 2,
+      queueItemId: running.id,
+    });
+  });
+
+  it('uses one derived current item while live-follow is active', () => {
+    const placeholder = {
+      boardId: 'board-1',
+      height: 768,
+      id: 'queue-item:0',
+      itemIndex: 1,
+      queueItemId: 'queue-item',
+      width: 512,
+    };
+
+    expect(
+      getGalleryCurrentItem({
+        activePlaceholder: placeholder,
+        isComparisonActive: false,
+        liveFollowEnabled: true,
+        selectedImageName: 'saved.png',
+      })
+    ).toEqual({ kind: 'placeholder', placeholder });
+    expect(
+      getGalleryCurrentItem({
+        activePlaceholder: placeholder,
+        isComparisonActive: false,
+        liveFollowEnabled: false,
+        selectedImageName: 'saved.png',
+      })
+    ).toEqual({ imageName: 'saved.png', kind: 'image' });
   });
 
   it('skips cancelled backend item slots when creating placeholders', () => {

@@ -1836,6 +1836,101 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     ]);
   });
 
+  it('preserves the last partial Gallery result when the final aggregate repeats the batch', () => {
+    let state = primeGenerate(undefined, { batchCount: 3 });
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+    const images = ['gallery-image-1.png', 'gallery-image-2.png', 'gallery-image-3.png'].map((name) =>
+      createImage(name, queueItem.id)
+    );
+
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12, 13],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+
+    for (const [index, image] of images.entries()) {
+      state = workbenchReducer(state, {
+        backendItemId: 11 + index,
+        images: [image],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemPartialResults',
+      });
+    }
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+
+    state = workbenchReducer(state, {
+      images,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+  });
+
+  it('selects the last image from a final-only Gallery batch', () => {
+    let state = primeGenerate(undefined, { batchCount: 3 });
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      images: ['gallery-image-1.png', 'gallery-image-2.png', 'gallery-image-3.png'].map((name) =>
+        createImage(name, queueItem.id)
+      ),
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+  });
+
+  it('pauses live-follow when the user selects a saved Gallery image', () => {
+    let state = createInitialWorkbenchState();
+
+    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(true);
+
+    state = workbenchReducer(state, { image: createImage('selected.png', 'gallery'), type: 'selectGalleryImage' });
+
+    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('selected.png');
+  });
+
+  it('pauses live-follow for saved Gallery multi-selection and comparison intents', () => {
+    const primaryImage = createImage('primary.png', 'gallery');
+    const compareImage = createImage('compare.png', 'gallery');
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      imageNames: [primaryImage.imageName, compareImage.imageName],
+      primaryImage,
+      type: 'setGalleryMultiSelection',
+    });
+
+    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+
+    state = workbenchReducer(state, {
+      settings: { showProgressImagesInViewer: true },
+      type: 'setActiveProjectSettings',
+    });
+    state = workbenchReducer(state, { image: compareImage, type: 'setGalleryCompareImage' });
+
+    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+  });
+
   it('stores selected backend board id for gallery submissions', () => {
     let state = createInitialWorkbenchState();
 
