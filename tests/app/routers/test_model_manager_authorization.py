@@ -93,9 +93,7 @@ def test_scan_folder_allows_admin(enable_multiuser: Any, client: TestClient, adm
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
-def test_scan_folder_missing_param_is_a_clean_400(
-    enable_multiuser: Any, client: TestClient, admin_token: str
-) -> None:
+def test_scan_folder_missing_param_is_a_clean_400(enable_multiuser: Any, client: TestClient, admin_token: str) -> None:
     """Omitting scan_path must not crash: the None default is guarded before pathlib.Path() sees it."""
     response = client.get("/api/v2/models/scan_folder", headers=_auth(admin_token))
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -112,11 +110,8 @@ def test_scan_folder_is_not_an_existence_oracle(
     not_a_dir = tmp_path / "weights.ckpt"
     not_a_dir.write_text("not a directory")
 
-    responses = [
-        client.get(f"/api/v2/models/scan_folder?scan_path={p}", headers=_auth(admin_token))
-        for p in (tmp_path / "does_not_exist", not_a_dir)
-    ]
-    for response, p in zip(responses, (tmp_path / "does_not_exist", not_a_dir)):
+    for p in (tmp_path / "does_not_exist", not_a_dir):
+        response = client.get(f"/api/v2/models/scan_folder?scan_path={p}", headers=_auth(admin_token))
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.json()["detail"] == f"The search path '{p}' could not be scanned"
 
