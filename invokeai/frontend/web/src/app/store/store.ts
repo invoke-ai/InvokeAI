@@ -1,5 +1,12 @@
 import type { ThunkDispatch, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
-import { addListener, combineReducers, configureStore, createAction, createListenerMiddleware } from '@reduxjs/toolkit';
+import {
+  addListener,
+  combineReducers,
+  configureStore,
+  createAction,
+  createListenerMiddleware,
+  isAnyOf,
+} from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
@@ -19,7 +26,7 @@ import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMi
 import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
-import { authSliceConfig } from 'features/auth/store/authSlice';
+import { authSliceConfig, logout, sessionExpiredLogout } from 'features/auth/store/authSlice';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
@@ -257,6 +264,14 @@ export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
 
 // To avoid circular dependencies, all listener middleware listeners are added here in the main store setup file.
 const startAppListening = listenerMiddleware.startListening as AppStartListening;
+
+startAppListening({
+  matcher: isAnyOf(logout, sessionExpiredLogout),
+  effect: (_action, { dispatch }) => {
+    dispatch(api.util.resetApiState());
+  },
+});
+
 addImageUploadedFulfilledListener(startAppListening);
 addVideoUploadedListeners(startAppListening);
 
