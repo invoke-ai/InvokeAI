@@ -78084,7 +78084,7 @@
       "WanI2VIdealDimensionsInvocation": {
         "category": "video",
         "class": "invocation",
-        "classification": "stable",
+        "classification": "prototype",
         "description": "Ideal dimensions for the Wan 2.2 A14B models (I2V-A14B and T2V-A14B).\n\nUse this node for the A14B family. For the TI2V-5B model use \"Wan 2.2 TI2V\nIdeal Dimensions\" instead \u2014 TI2V-5B requires multiples of 32, and feeding it\nthese multiples-of-16 dims fails the patchify step.\n\nScales the input W\u00d7H so the shorter side equals the chosen preset (480 / 720 /\n1080 px), then snaps each dimension to a multiple of 16 (the A14B pixel-grid\nconstraint). Wire from ``Image Primitive``'s width/height outputs and into\n``wan_ref_image_encoder`` / ``wan_denoise``.",
         "node_pack": "invokeai",
         "properties": {
@@ -78605,7 +78605,7 @@
         "tags": ["lora", "model", "wan"],
         "title": "Apply LoRA Collection - Wan 2.2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/WanLoRALoaderOutput"
         }
@@ -78709,7 +78709,7 @@
         "tags": ["lora", "model", "wan"],
         "title": "Apply LoRA - Wan 2.2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/WanLoRALoaderOutput"
         }
@@ -78881,7 +78881,7 @@
         "tags": ["model", "wan"],
         "title": "Main Model - Wan 2.2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/WanModelLoaderOutput"
         }
@@ -79267,7 +79267,7 @@
       "WanTI2VIdealDimensionsInvocation": {
         "category": "video",
         "class": "invocation",
-        "classification": "stable",
+        "classification": "prototype",
         "description": "Ideal dimensions for the Wan 2.2 TI2V-5B model.\n\nUse this node for TI2V-5B only. For the A14B models (I2V-A14B / T2V-A14B) use\n\"Wan 2.2 I2V Ideal Dimensions\" instead \u2014 those need multiples of 16, and this\nnode's multiples-of-32 dims would overshoot their pixel grid.\n\nIdentical to the A14B node but snaps each dimension to a multiple of 32 instead\nof 16: the Wan 2.2-VAE used by TI2V-5B applies 16x spatial compression and the\ntransformer adds a 2x patch on top, so pixel dims must divide by 32 for the\npatchify step. Wire from ``Image Primitive``'s width/height outputs and into\nthe matching ``wan_denoise`` inputs.",
         "node_pack": "invokeai",
         "properties": {
@@ -79365,7 +79365,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a text prompt for Wan 2.2 using the UMT5-XXL encoder.\n\nOutput is the encoder's last hidden state (shape: [seq_len=226, 4096]) plus\nan attention mask marking valid (non-padding) tokens. The Wan transformer\nconsumes these directly as ``encoder_hidden_states``.",
+        "description": "Encodes a text prompt for Wan 2.2 using the UMT5-XXL encoder.\n\nOutput is the encoder's last hidden state (shape: [seq_len=512, 4096]) plus\nan attention mask marking valid (non-padding) tokens. The Wan transformer\nconsumes these directly as ``encoder_hidden_states``.",
         "node_pack": "invokeai",
         "properties": {
           "id": {

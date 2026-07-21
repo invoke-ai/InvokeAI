@@ -45,6 +45,10 @@ export const videosApi = api.injectEndpoints({
       }),
       providesTags: (result, error, queryArgs) => [
         { type: 'VideoList', id: stableHash(queryArgs) },
+        // The LIST_TAG-scoped tag is what mutations invalidate when they can't know which
+        // query-arg-specific lists changed (star/unstar, board cascades). Without
+        // providing it here those invalidations match nothing and the lists go stale.
+        { type: 'VideoList', id: LIST_TAG },
         { type: 'Board', id: queryArgs.board_id ?? 'none' },
         'FetchOnReconnect',
       ],
@@ -195,9 +199,9 @@ export const videosApi = api.injectEndpoints({
         if (!result) {
           return [];
         }
-        // ``starred_first=true`` gallery queries are cached under the LIST_TAG-scoped
-        // ``VideoList`` tag, so without this invalidation the freshly-starred video
-        // stays in its original position until some other mutation refetches the list.
+        // Starring reorders every video list (starred_first), but this mutation can't
+        // know which query-arg-specific lists are cached — invalidate the LIST_TAG-scoped
+        // tag that all listVideos queries provide.
         return [
           ...getTagsToInvalidateForVideoMutation(result.starred_videos),
           ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),

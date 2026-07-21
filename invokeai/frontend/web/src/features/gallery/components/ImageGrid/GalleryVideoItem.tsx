@@ -4,6 +4,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNewTab';
 import { uniq } from 'es-toolkit';
 import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
 import { firefoxDndFix } from 'features/dnd/util';
@@ -114,6 +115,11 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
 
   // Right-click / long-press context menu (delete, change board, download).
   useVideoContextMenu(videoDTO, ref);
+
+  // The "middle click opens in new tab" setting covers videos too. Unlike GalleryImage
+  // (whose inner DndImage registers its own handler and the wrapper only catches the
+  // padding), the thumbnail here registers nothing — so catch clicks anywhere in the item.
+  useMiddleClickOpenInNewTab(ref, videoDTO.video_url);
 
   // Register the item as a drag source so users can drop videos onto node fields,
   // ref-image inputs, etc. — mirrors DndImage for image gallery items.

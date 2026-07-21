@@ -12,6 +12,8 @@ import { fieldVideoValueChanged } from 'features/nodes/store/nodesSlice';
 import { isVideoFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
+import { t } from 'i18next';
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { videosApi } from 'services/api/endpoints/videos';
@@ -54,7 +56,7 @@ const deleteVideosWithDialog = async (video_names: string[], store: AppStore): P
   });
 };
 
-const clearNodesVideoFields = (state: RootState, dispatch: AppDispatch, video_name: string) => {
+export const clearNodesVideoFields = (state: RootState, dispatch: AppDispatch, video_name: string) => {
   state.nodes.present.nodes.forEach((node) => {
     if (!isInvocationNode(node)) {
       return;
@@ -94,7 +96,13 @@ export const handleDeletions = async (video_names: string[], store: AppStore) =>
     deletedNames = new Set(result.deleted_videos);
   } catch {
     // The whole request failed — nothing was confirmed deleted, so leave selection and
-    // node references untouched.
+    // node references untouched. The mutation is untracked, so this toast is the only
+    // user-visible signal that the delete didn't happen.
+    toast({
+      status: 'error',
+      title: t('toast.videoDeleteFailed'),
+      description: t('toast.videoDeleteFailedDesc'),
+    });
   }
 
   // Clear workflow-node VideoField inputs that referenced a now-deleted video. Failed

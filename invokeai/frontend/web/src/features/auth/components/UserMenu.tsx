@@ -2,6 +2,7 @@ import { Badge, Flex, IconButton, Menu, MenuButton, MenuItem, MenuList, Text, To
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { logout, selectCurrentUser } from 'features/auth/store/authSlice';
 import { logoutAfterServerConfirmation } from 'features/auth/store/logoutAfterServerConfirmation';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearBold, PiSignOutBold, PiUserBold, PiUsersBold } from 'react-icons/pi';
@@ -22,8 +23,17 @@ export const UserMenu = memo(() => {
         dispatch(logout());
         navigate('/login');
       }
-    ).catch(() => undefined);
-  }, [dispatch, navigate, logoutMutation]);
+    ).catch(() => {
+      // Local auth state is deliberately kept when the server can't confirm the logout
+      // (the media cookie may still be live) — but silently doing nothing leaves the
+      // user stuck with a dead button, so say why.
+      toast({
+        status: 'error',
+        title: t('auth.logoutFailed'),
+        description: t('auth.logoutFailedDesc'),
+      });
+    });
+  }, [dispatch, navigate, logoutMutation, t]);
 
   const handleProfile = useCallback(() => {
     navigate('/profile');

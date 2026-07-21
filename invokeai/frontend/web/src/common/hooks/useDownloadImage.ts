@@ -8,7 +8,13 @@ export const useDownloadItem = () => {
   const downloadItem = useCallback(
     async (item_url: string, item_id: string) => {
       try {
-        const blob = await fetch(item_url).then((resp) => resp.blob());
+        const resp = await fetch(item_url);
+        if (!resp.ok) {
+          // Without this check an error response body (e.g. a 401 after the media cookie
+          // expired) would be saved as the media file itself.
+          throw new Error(`Server returned ${resp.status}`);
+        }
+        const blob = await resp.blob();
         if (!blob) {
           throw new Error('Unable to create Blob');
         }

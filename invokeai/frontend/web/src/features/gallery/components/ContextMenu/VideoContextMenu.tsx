@@ -9,7 +9,7 @@ import { ContextMenuItemDownloadVideo } from 'features/gallery/components/Contex
 import { ContextMenuItemOpenInNewTabVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemOpenInNewTabVideo';
 import MultipleSelectionMenuItemsVideos from 'features/gallery/components/ContextMenu/MultipleSelectionMenuItemsVideos';
 import { VideoDTOContextProvider } from 'features/gallery/contexts/VideoDTOContext';
-import { selectSelectionCount } from 'features/gallery/store/gallerySelectors';
+import { selectSelection } from 'features/gallery/store/gallerySelectors';
 import { map } from 'nanostores';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
@@ -94,11 +94,15 @@ VideoContextMenu.displayName = 'VideoContextMenu';
 
 const MenuContent = memo(() => {
   const state = useStore($videoContextMenuState);
-  const selectionCount = useAppSelector(selectSelectionCount);
+  const selection = useAppSelector(selectSelection);
   if (!state.videoDTO) {
     return null;
   }
-  if (selectionCount > 1) {
+  // Only show the multi-selection menu when the clicked video is part of the selection —
+  // right-clicking an item outside the selection acts on that item alone. Without this,
+  // right-clicking a video while 2+ images are selected showed a menu whose every action
+  // was disabled (the multi menu filters the selection down to videos and finds none).
+  if (selection.length > 1 && selection.includes(state.videoDTO.video_name)) {
     return (
       <MenuList visibility="visible">
         <MultipleSelectionMenuItemsVideos />

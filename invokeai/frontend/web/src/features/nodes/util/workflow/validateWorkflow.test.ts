@@ -207,6 +207,7 @@ describe('validateWorkflow', () => {
       workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveFalse,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -219,6 +220,7 @@ describe('validateWorkflow', () => {
       workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveFalse,
       checkModelAccess: resolveTrue,
     });
@@ -230,6 +232,7 @@ describe('validateWorkflow', () => {
       workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveFalse,
     });
@@ -271,6 +274,7 @@ describe('validateWorkflow', () => {
         },
         templates: { img_resize, main_model_loader, workflow_return },
         checkImageAccess: resolveTrue,
+        checkVideoAccess: resolveTrue,
         checkBoardAccess: resolveTrue,
         checkModelAccess: resolveTrue,
       })
@@ -293,6 +297,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -317,6 +322,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -353,6 +359,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -378,6 +385,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -403,6 +411,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -428,6 +437,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -455,6 +465,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -480,6 +491,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -519,6 +531,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { add, call_saved_workflow },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
       getWorkflow: (workflowId) => {

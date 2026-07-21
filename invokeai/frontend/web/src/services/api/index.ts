@@ -18,7 +18,6 @@ const tagTypes = [
   'Board',
   'BoardImagesTotal',
   'BoardAssetsTotal',
-  'BoardVideosTotal',
   'HFTokenStatus',
   'Image',
   'ImageNameList',

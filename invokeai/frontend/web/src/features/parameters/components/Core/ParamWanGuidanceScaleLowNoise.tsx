@@ -1,6 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  selectCFGScale,
   selectWanGuidanceScaleLowNoise,
   wanGuidanceScaleLowNoiseChanged,
 } from 'features/controlLayers/store/paramsSlice';
@@ -38,6 +39,7 @@ const MARKS = [CONSTRAINTS.sliderMin, Math.floor(CONSTRAINTS.sliderMax / 2), CON
 const ParamWanGuidanceScaleLowNoise = () => {
   const { t } = useTranslation();
   const value = useAppSelector(selectWanGuidanceScaleLowNoise);
+  const primaryCfgScale = useAppSelector(selectCFGScale);
   const dispatch = useAppDispatch();
 
   const onChange = useCallback((v: number) => dispatch(wanGuidanceScaleLowNoiseChanged(v)), [dispatch]);
@@ -50,7 +52,9 @@ const ParamWanGuidanceScaleLowNoise = () => {
     [dispatch]
   );
 
-  const displayValue = value ?? CONSTRAINTS.initial;
+  // When unset, the backend falls back to the *primary* guidance scale — show that
+  // effective value rather than a constant the run won't actually use.
+  const displayValue = value ?? primaryCfgScale;
 
   return (
     <FormControl>

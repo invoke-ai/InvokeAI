@@ -31,8 +31,11 @@ import type { JsonObject } from 'type-fest';
 
 const log = logger('events');
 
-// These nodes are passthrough nodes. They do not add images to the gallery, so we must skip that handling for them.
-const nodeTypeDenylist = ['load_image', 'image'];
+// These nodes are passthrough nodes. They do not add images/videos to the gallery — their
+// outputs reference an existing asset — so we must skip the gallery handling for them.
+// Without 'video' here, a Video Primitive completing mid-run would invalidate the gallery
+// caches and auto-switch the user's selection to the node's *input* video.
+const nodeTypeDenylist = ['load_image', 'image', 'video'];
 
 /**
  * Builds the socket event handler for the current user's own invocation complete events. Adds
