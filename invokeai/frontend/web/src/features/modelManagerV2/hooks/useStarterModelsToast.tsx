@@ -1,11 +1,11 @@
 import { Button, Text, useToast } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser, selectIsAuthenticated } from 'features/auth/store/authSlice';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
+import { selectIsAuthenticated } from 'features/auth/store/authSlice';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 
 const TOAST_ID = 'starterModels';
@@ -16,11 +16,7 @@ export const useStarterModelsToast = () => {
   const [mainModels, { data }] = useMainModels();
   const toast = useToast();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const { data: setupStatus } = useGetSetupStatusQuery();
-  const user = useAppSelector(selectCurrentUser);
-
-  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
-  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const isAdmin = useIsAdmin();
 
   useEffect(() => {
     // Only show the toast if the user is authenticated
