@@ -23,7 +23,7 @@
     "border.error": "oklch(70.61% 0.0841 19.38)",
     "gray.contrast": "oklch(21.074% 0.0087 264.37)",
     "gray.fg": "oklch(96.017% 0.0029 264.54)",
-    "gray.subtle": "oklch(31.237% 0.0157 264.32)",
+    "gray.subtle": "oklch(38.5% 0.0203 264.29)",
     "gray.muted": "oklch(36.004% 0.019 264.3)",
     "gray.emphasized": "oklch(45.106% 0.0251 264.28)",
     "gray.solid": "oklch(96.017% 0.0029 264.54)",

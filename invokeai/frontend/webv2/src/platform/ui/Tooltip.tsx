@@ -68,6 +68,8 @@ const composeRefs =
 
 type TooltipChildProps = Record<string, unknown> & { ref?: Ref<HTMLButtonElement> };
 
+type TooltipPlacement = NonNullable<NonNullable<ChakraTooltip.RootProps['positioning']>['placement']>;
+
 export interface TooltipProps extends ChakraTooltip.RootProps {
   showArrow?: boolean;
   portalled?: boolean;
@@ -75,6 +77,13 @@ export interface TooltipProps extends ChakraTooltip.RootProps {
   content: ReactNode;
   contentRef?: Ref<HTMLDivElement>;
   contentProps?: ChakraTooltip.ContentProps;
+  /**
+   * Which trigger edge the tooltip sits on, centered against it — `top`/
+   * `bottom` center horizontally, `left`/`right` center vertically; `-start`/
+   * `-end` suffixes align to an edge instead. Shorthand for
+   * `positioning.placement` (an explicit `positioning.placement` wins).
+   */
+  placement?: TooltipPlacement;
   ref?: Ref<HTMLButtonElement>;
   triggerProps?: TooltipTriggerProps;
 }
@@ -93,12 +102,17 @@ export const Tooltip = (props: TooltipProps) => {
     content,
     contentProps,
     contentRef,
+    placement,
     portalRef,
     ref,
     triggerProps,
     ...rest
   } = props;
   const { rootProps, triggerProps: triggerPassthroughProps } = splitTooltipProps(rest);
+
+  if (placement) {
+    rootProps.positioning = { placement, ...(rootProps.positioning as object | undefined) };
+  }
   const { ref: explicitTriggerRef, ...explicitTriggerProps } = triggerProps ?? {};
   const mergedTriggerProps = { ...triggerPassthroughProps, ...explicitTriggerProps };
   const hasTriggerPassthrough = ref || explicitTriggerRef || Object.keys(mergedTriggerProps).length > 0;
