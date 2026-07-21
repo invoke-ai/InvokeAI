@@ -1,12 +1,15 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { WidgetHotkeyContribution, WorkbenchRegion } from '@workbench/widgetContracts';
 
-import { useWorkbenchExtensions } from '@workbench/WorkbenchContext';
+import { useOptionalWorkbenchExtensions } from '@workbench/WorkbenchContext';
 import { useMemo, useSyncExternalStore } from 'react';
 
 import type { HotkeyDefinition } from './types';
 
 const widgetRegions = new Set<WorkbenchRegion>(['bottom', 'center', 'left', 'right']);
+const NO_EXTENSION_HOTKEYS: WidgetHotkeyContribution[] = [];
+const subscribeToNothing = (): (() => void) => () => {};
+const getNoExtensionHotkeys = (): WidgetHotkeyContribution[] => NO_EXTENSION_HOTKEYS;
 
 const isWidgetRegion = (region: WorkbenchRegion | undefined): region is WidgetRegion =>
   region !== undefined && widgetRegions.has(region);
@@ -40,8 +43,12 @@ export const toExtensionHotkeyDefinition = (hotkey: WidgetHotkeyContribution): H
 };
 
 export const useExtensionHotkeyDefinitions = (): HotkeyDefinition[] => {
-  const store = useWorkbenchExtensions().stores.hotkeys;
-  const hotkeys = useSyncExternalStore(store.subscribe, store.list, store.list);
+  const store = useOptionalWorkbenchExtensions()?.stores.hotkeys;
+  const hotkeys = useSyncExternalStore(
+    store?.subscribe ?? subscribeToNothing,
+    store?.list ?? getNoExtensionHotkeys,
+    store?.list ?? getNoExtensionHotkeys
+  );
 
   return useMemo(
     () => hotkeys.map(toExtensionHotkeyDefinition).filter((hotkey): hotkey is HotkeyDefinition => hotkey !== null),

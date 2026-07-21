@@ -217,6 +217,8 @@ export const useWorkbenchExtensions = (): ExtensionRegistry => {
   return extensions;
 };
 
+export const useOptionalWorkbenchExtensions = (): ExtensionRegistry | null => use(WorkbenchExtensionsContext);
+
 export const useOptionalWorkbenchCommands = () => useOptionalWorkbenchStore()?.commands ?? null;
 
 export const useOptionalWorkbenchQueries = () => useOptionalWorkbenchStore()?.queries ?? null;
