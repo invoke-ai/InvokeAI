@@ -455,6 +455,10 @@ def _parse_range_header(range_header: str, file_size: int) -> Optional[tuple[int
     match = re.match(r"^bytes=(\d*)-(\d*)$", range_header.strip())
     if match is None:
         return None
+    if file_size <= 0:
+        # No byte range is satisfiable against an empty file (a suffix range would
+        # otherwise "satisfy" with the invalid pair (0, -1)).
+        return None
     start_str, end_str = match.group(1), match.group(2)
     if start_str == "" and end_str == "":
         return None

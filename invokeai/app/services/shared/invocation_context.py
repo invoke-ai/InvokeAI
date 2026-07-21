@@ -337,6 +337,8 @@ class VideosInterface(InvocationContextInterface):
         self._util = util
 
     def _assert_read_access(self, video_name: str) -> None:
+        if not self._services.configuration.multiuser:
+            return
         user_id = self._data.queue_item.user_id
         user = self._services.users.get(user_id)
         if user is None:
@@ -385,7 +387,7 @@ class VideosInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
-        if board_id_ is not None:
+        if board_id_ is not None and self._services.configuration.multiuser:
             board = self._services.boards.get_dto(board_id_)
             user = self._services.users.get(self._data.queue_item.user_id)
             if user is None or (

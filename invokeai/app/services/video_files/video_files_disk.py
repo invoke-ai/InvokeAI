@@ -260,10 +260,12 @@ class DiskVideoFileStorage(VideoFileStorageBase):
                     directory=staging_dir,
                     files=[(source, staging_dir / str(index)) for index, source in enumerate(candidates)],
                 )
-                if self.__invoker.services.video_records.get(video_name) is None:
-                    self.commit_delete(token)
-                else:
-                    self.rollback_delete(token)
+                # get() raises VideoRecordNotFoundException when the record is gone —
+                # handled below by purging the staging dir (the delete had committed in
+                # the DB, so finish it). A surviving record means the delete never
+                # committed: restore the files.
+                self.__invoker.services.video_records.get(video_name)
+                self.rollback_delete(token)
             except Exception as error:
                 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 
