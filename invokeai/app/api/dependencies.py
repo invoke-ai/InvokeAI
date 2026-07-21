@@ -24,7 +24,9 @@ from invokeai.app.services.external_generation.providers import (
     SeedreamProvider,
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
+from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_files.image_files_s3 import S3CompatibleImageFileStorage
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
@@ -107,7 +109,16 @@ class ApiDependencies:
         if output_folder is None:
             raise ValueError("Output folder is not set")
 
-        image_files = DiskImageFileStorage(f"{output_folder}/images")
+        image_files: ImageFileStorageBase
+        if config.storage_backend == "s3":
+            image_files = S3CompatibleImageFileStorage(
+                bucket=config.s3_bucket,
+                endpoint_url=config.s3_endpoint_url,
+                region_name=config.s3_region,
+                pil_compress_level=config.pil_compress_level,
+            )
+        else:
+            image_files = DiskImageFileStorage(f"{output_folder}/images")
 
         model_images_folder = config.models_path
         style_presets_folder = config.style_presets_path
@@ -131,7 +142,16 @@ class ApiDependencies:
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
         image_records = SqliteImageRecordStorage(db=db)
-        image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
+        # The image-move / subfolder-reorganize service is filesystem-only
+        # (os.replace, fsync, empty-dir cleanup) and has no meaning for object
+        # storage, so it is not created for the S3 backend. The image_moves API
+        # then reports unavailable (503) and subfoldering is forced flat at write
+        # time (see ImageService._create_and_store), so nothing ever needs moving.
+        image_moves: "ImageMoveService | None"
+        if config.storage_backend == "s3":
+            image_moves = None
+        else:
+            image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(

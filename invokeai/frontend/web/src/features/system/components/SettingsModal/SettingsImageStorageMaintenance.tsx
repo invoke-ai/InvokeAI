@@ -49,7 +49,12 @@ export const SettingsImageStorageMaintenance = memo(() => {
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector(selectCurrentUser);
   const { data: runtimeConfig } = useGetRuntimeConfigQuery();
-  const canAccess = runtimeConfig ? !runtimeConfig.config.multiuser || Boolean(currentUser?.is_admin) : false;
+  // The S3 backend has no filesystem move/reorganize path, so storage
+  // maintenance (move-all / recovery) is not applicable and is hidden.
+  const isS3Backend = runtimeConfig?.config.storage_backend === 's3';
+  const canAccess = runtimeConfig
+    ? (!runtimeConfig.config.multiuser || Boolean(currentUser?.is_admin)) && !isS3Backend
+    : false;
   const [startImageMove, startImageMoveState] = useStartImageMoveMutation();
   const [startImageMoveRecovery, startImageMoveRecoveryState] = useStartImageMoveRecoveryMutation();
   const [shouldPollStatus, setShouldPollStatus] = useState(false);

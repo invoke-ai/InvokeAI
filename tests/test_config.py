@@ -354,6 +354,58 @@ def test_deny_nodes(patch_rootdir):
     InvocationRegistry.invalidate_invocation_typeadapter()
 
 
+def test_storage_backend_defaults_to_disk(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch):
+    for var in ("INVOKEAI_STORAGE_BACKEND", "INVOKEAI_S3_BUCKET", "INVOKEAI_S3_ENDPOINT_URL", "INVOKEAI_S3_REGION"):
+        monkeypatch.delenv(var, raising=False)
+    config = InvokeAIAppConfig()
+    assert config.storage_backend == "disk"
+    assert config.s3_bucket is None
+    assert config.s3_endpoint_url is None
+    assert config.s3_region is None
+
+
+def test_storage_backend_accepts_s3(patch_rootdir: None):
+    config = InvokeAIAppConfig(
+        storage_backend="s3",
+        s3_bucket="my-bucket",
+        s3_endpoint_url="https://s3.us-west-004.backblazeb2.com",
+        s3_region="us-west-004",
+    )
+    assert config.storage_backend == "s3"
+    assert config.s3_bucket == "my-bucket"
+    assert config.s3_endpoint_url == "https://s3.us-west-004.backblazeb2.com"
+    assert config.s3_region == "us-west-004"
+
+
+def test_storage_backend_rejects_unknown_value(patch_rootdir: None):
+    with pytest.raises(ValidationError):
+        InvokeAIAppConfig(storage_backend="azure")
+
+
+def test_storage_backend_s3_requires_bucket(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch):
+    """`storage_backend="s3"` without `s3_bucket` (and no env var) must fail
+    at config-load time rather than deep in dependencies.initialize().
+    Per Copilot review on PR #9182."""
+    monkeypatch.delenv("INVOKEAI_S3_BUCKET", raising=False)
+    with pytest.raises(ValidationError, match="s3_bucket"):
+        InvokeAIAppConfig(storage_backend="s3")
+
+
+def test_storage_backend_s3_accepts_bucket_via_env(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch):
+    """`INVOKEAI_S3_BUCKET` should also satisfy the bucket requirement."""
+    monkeypatch.setenv("INVOKEAI_S3_BUCKET", "env-bucket")
+    # Should not raise.
+    config = InvokeAIAppConfig(storage_backend="s3")
+    assert config.storage_backend == "s3"
+
+
+def test_storage_backend_s3_rejects_whitespace_only_bucket(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch):
+    """A whitespace-only bucket must be treated as unset, not a valid bucket."""
+    monkeypatch.delenv("INVOKEAI_S3_BUCKET", raising=False)
+    with pytest.raises(ValidationError, match="s3_bucket"):
+        InvokeAIAppConfig(storage_backend="s3", s3_bucket="   ")
+
+
 @pytest.mark.parametrize(
     "raw, expected",
     [

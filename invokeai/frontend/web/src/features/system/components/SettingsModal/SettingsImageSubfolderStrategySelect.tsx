@@ -43,6 +43,9 @@ export const SettingsImageSubfolderStrategySelect = memo(() => {
   const [updateRuntimeConfig, { isLoading }] = useUpdateRuntimeConfigMutation();
   const imageSubfolderStrategy: string = runtimeConfig?.config.image_subfolder_strategy ?? 'flat';
   const canEditRuntimeConfig = runtimeConfig ? !runtimeConfig.config.multiuser || currentUser?.is_admin : false;
+  // The S3 backend stores images flat and cannot reorganize existing objects
+  // (no move service), so switching strategies is not offered there.
+  const isS3Backend = runtimeConfig?.config.storage_backend === 's3';
 
   const options = useMemo(() => {
     const localizedOptions: ImageSubfolderStrategySelectOption[] = imageSubfolderStrategyOptions.map((option) => ({
@@ -83,6 +86,10 @@ export const SettingsImageSubfolderStrategySelect = memo(() => {
     },
     [imageSubfolderStrategy, t, updateRuntimeConfig]
   );
+
+  if (isS3Backend) {
+    return null;
+  }
 
   return (
     <FormControl>

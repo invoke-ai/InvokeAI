@@ -133,6 +133,10 @@ Available strategies:
 
 Changing this setting only affects newly-created images. Existing images remain in their current locations unless you run [Image Storage Maintenance](/features/image-storage-maintenance/).
 
+:::caution[Disk backend only]
+This setting has no effect when [`storage_backend`](/configuration/object-storage/) is set to `s3`. Object storage has no directory structure to organize and cannot be reorganized in place (there is no move operation for S3), so the S3 backend always stores images flat. The strategy selector and Image Storage Maintenance are hidden in the Settings panel when the S3 backend is active.
+:::
+
 #### Logging
 
 Several different log handler destinations are available, and multiple destinations are supported by providing a list:

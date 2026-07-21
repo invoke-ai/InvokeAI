@@ -16771,7 +16771,7 @@ export type components = {
             outputs_dir?: string;
             /**
              * Image Subfolder Strategy
-             * @description Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.
+             * @description Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance. Disk backend only: has no effect when storage_backend="s3" (S3 always stores images flat, since object storage cannot be reorganized in place).
              * @default flat
              * @enum {string}
              */
@@ -16797,6 +16797,28 @@ export type components = {
              * @default workflow_thumbnails
              */
             workflow_thumbnails_dir?: string;
+            /**
+             * Storage Backend
+             * @description Backend for storing generated images. "disk" uses the local filesystem; "s3" uses any S3-compatible object store (AWS S3, Backblaze B2, etc.). Choose this once at deploy time: there is no migration between backends, and images written to one are not visible to the other.
+             * @default disk
+             * @enum {string}
+             */
+            storage_backend?: "disk" | "s3";
+            /**
+             * S3 Bucket
+             * @description Bucket name for the s3 storage backend. Required when storage_backend="s3".
+             */
+            s3_bucket?: string | null;
+            /**
+             * S3 Endpoint Url
+             * @description Endpoint URL for the s3 storage backend. Leave unset to talk to AWS S3; set to a provider-specific URL (e.g. https://s3.us-west-004.backblazeb2.com for Backblaze B2) for any other S3-compatible store.
+             */
+            s3_endpoint_url?: string | null;
+            /**
+             * S3 Region
+             * @description Region name for the s3 storage backend. Optional; if unset, the standard AWS region resolution applies (AWS_REGION / AWS_DEFAULT_REGION / AWS config). For Backblaze B2, set the region embedded in your endpoint, e.g. us-west-004.
+             */
+            s3_region?: string | null;
             /**
              * Log Handlers
              * @description Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
