@@ -129,7 +129,10 @@ class TestUninstallPackNameValidation:
         for pack_name in ("..", ".", "foo/bar", "..\\outside"):
             with (
                 patch("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path") as mock_get_path,
-                patch("invokeai.app.api.routers.custom_nodes.shutil.rmtree") as mock_rmtree,
+                # Patch the router's `shutil` attribute, NOT `shutil.rmtree`: patching the latter
+                # mutates the global shutil module, so a gc pass that finalizes a TemporaryDirectory
+                # leaked anywhere else in the suite calls the mock and fails assert_not_called().
+                patch("invokeai.app.api.routers.custom_nodes.shutil") as mock_shutil,
                 patch("invokeai.app.api.routers.custom_nodes._remove_workflows_by_ids") as mock_remove_workflows,
             ):
                 response = asyncio.run(uninstall_custom_node_pack(MagicMock(), pack_name))
@@ -138,7 +141,7 @@ class TestUninstallPackNameValidation:
             assert response.success is False
             assert response.message == "Invalid node pack name."
             mock_get_path.assert_not_called()
-            mock_rmtree.assert_not_called()
+            mock_shutil.rmtree.assert_not_called()
             mock_remove_workflows.assert_not_called()
 
 
