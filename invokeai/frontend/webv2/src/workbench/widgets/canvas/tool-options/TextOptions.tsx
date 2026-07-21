@@ -208,6 +208,7 @@ export const TextOptions = ({ engine }: ToolOptionsComponentProps) => {
       />
 
       <NumberInput.Root
+        flexShrink={0}
         max={MAX_TEXT_FONT_SIZE}
         min={MIN_TEXT_FONT_SIZE}
         size="xs"
@@ -231,6 +232,7 @@ export const TextOptions = ({ engine }: ToolOptionsComponentProps) => {
       />
 
       <NumberInput.Root
+        flexShrink={0}
         max={4}
         min={0.5}
         size="xs"

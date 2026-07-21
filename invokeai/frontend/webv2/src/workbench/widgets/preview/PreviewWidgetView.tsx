@@ -712,7 +712,7 @@ const SelectedImagePreview = ({
     [actionImage?.boardId, image.imageName]
   );
   return (
-    <Stack gap="3" h="full" minH="0" w="full">
+    <Stack gap="2" h="full" minH="0" w="full">
       <PreviewFrame
         dragImage={dragImage}
         frameHeight={previewHeight}

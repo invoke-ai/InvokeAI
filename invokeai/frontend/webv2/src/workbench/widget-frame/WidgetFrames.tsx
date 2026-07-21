@@ -231,7 +231,7 @@ export const WidgetHeader = ({
           </Text>
         )}
       </HStack>
-      <HStack flexShrink={0} gap="1.5">
+      <HStack flexShrink={0} gap="0.5">
         {actions}
         {manifest.settingsSection ? (
           <Tooltip content={t('widgets.settingsLabel', { label })}>

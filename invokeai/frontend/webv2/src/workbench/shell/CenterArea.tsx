@@ -190,7 +190,7 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
         strategy={horizontalListSortingStrategy}
         onContextMenu={openEnableMenu}
       >
-        <Tabs.Root value={activeCenterViewId} h="full" w="full" onValueChange={handleCenterTabChange}>
+        <Tabs.Root value={activeCenterViewId} h="full" onValueChange={handleCenterTabChange}>
           <Tabs.List>
             {centerViewItems.map((item) => (
               <SortableCenterTab
@@ -203,8 +203,6 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
             ))}
           </Tabs.List>
         </Tabs.Root>
-
-        <Box flex="1" />
 
         {centerToolbarItems.map((item) => (
           <Flex key={item.id} align="center" h="full">

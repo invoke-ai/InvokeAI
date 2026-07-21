@@ -20,8 +20,8 @@ import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-en
  * `bg.emphasized` are two adjacent neutral surfaces, giving a low-contrast checker
  * that reads as "empty" in every theme (light and dark) without a bespoke pair.
  */
-export const CHECKER_TOKEN_A = 'bg.subtle';
-export const CHECKER_TOKEN_B = 'bg.emphasized';
+export const CHECKER_TOKEN_A = 'bg.inset';
+export const CHECKER_TOKEN_B = 'bg.subtle';
 
 /** The `var(--chakra-colors-…)` reference for a semantic color token, or `null` if unknown. */
 const cssVarRef = (token: string): string | null => {

@@ -85,11 +85,11 @@ export const WidgetBar = ({
       direction="column"
       dropState={dropState}
       flexShrink={0}
-      pt="1.5"
+      pt="1"
       region={region}
       sortableInstanceIds={sortableInstanceIds}
       strategy={verticalListSortingStrategy}
-      w="12"
+      w="11"
       onContextMenu={openEnableMenu}
     >
       {railItems.map((item) => (
@@ -104,18 +104,16 @@ export const WidgetBar = ({
         />
       ))}
 
-      <Box mt="1.5">
-        <WidgetEnableMenu
-          contextTarget={enableMenuTarget}
-          groupLabel={t('widgets.groupLabel')}
-          items={menuItems}
-          positioning={positioning}
-          trigger={trigger}
-          triggerLabel={t('widgets.visibilityLabel', { region: region === 'left' ? 'Left' : 'Right' })}
-          onContextClose={handleContextClose}
-          onToggle={handleMenuToggle}
-        />
-      </Box>
+      <WidgetEnableMenu
+        contextTarget={enableMenuTarget}
+        groupLabel={t('widgets.groupLabel')}
+        items={menuItems}
+        positioning={positioning}
+        trigger={trigger}
+        triggerLabel={t('widgets.visibilityLabel', { region: region === 'left' ? 'Left' : 'Right' })}
+        onContextClose={handleContextClose}
+        onToggle={handleMenuToggle}
+      />
 
       <WidgetInstanceContextMenu
         target={instanceMenuTarget}
@@ -176,7 +174,7 @@ const WidgetSlot = ({
 
   return (
     <Tooltip showArrow closeDelay={80} content={tooltipLabel} openDelay={250} positioning={positioning}>
-      <Box ref={setNodeRef} pb="1.5" style={style}>
+      <Box ref={setNodeRef} pb="1" style={style}>
         <Row
           {...dragHandleProps}
           css={WIDGET_ITEM_SX}
