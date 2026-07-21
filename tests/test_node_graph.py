@@ -276,6 +276,15 @@ def test_graph_connects_collector():
     g.add_edge(e3)
 
 
+def test_graph_rejects_collector_output_edge_before_input_edge():
+    graph = Graph()
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(ListPassThroughInvocation(id="consumer"))
+
+    with pytest.raises(InvalidEdgeError, match="Collector must have at least one item or collection input edge"):
+        graph.add_edge(create_edge("collect", "collection", "consumer", "collection"))
+
+
 # TODO: test that derived types mixed with base types are compatible
 
 
