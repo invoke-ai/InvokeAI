@@ -1712,14 +1712,11 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
   const previousImages = getGalleryImages(galleryValues);
   const previousImageNames = new Set(previousImages.map((image) => image.imageName));
   const newImages = images.filter((image) => !previousImageNames.has(image.imageName));
-  const existingImages = previousImages.filter(
-    (image) => !images.some((incomingImage) => incomingImage.imageName === image.imageName)
-  );
   const nextSelectedImage = newImages.at(-1);
 
   return updateProjectWidgetValues(project, 'gallery', () => ({
     ...galleryValues,
-    recentImages: [...images, ...existingImages],
+    recentImages: [...[...newImages].reverse(), ...previousImages],
     selectedImage: nextSelectedImage ?? galleryValues.selectedImage,
     selectedImageName: nextSelectedImage?.imageName ?? galleryValues.selectedImageName,
     selectedImageNames: nextSelectedImage ? [nextSelectedImage.imageName] : getGallerySelectedImageNames(galleryValues),

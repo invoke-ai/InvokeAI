@@ -10,8 +10,8 @@ import {
   type GeneratedImageContract,
 } from '@features/gallery';
 import {
-  getActiveGalleryQueuePlaceholder,
   getGalleryCompareImage,
+  getGalleryGenerationSequence,
   getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
   getGalleryRefreshToken,
@@ -52,7 +52,6 @@ import { PreviewFilmstrip } from './PreviewFilmstrip';
 import { PreviewFooter } from './PreviewFooter';
 import { PreviewFrame } from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
-import { PreviewLiveStatusLine } from './PreviewLiveReadout';
 import {
   getPreviewComparisonMode,
   getPreviewFilmstripVisible,
@@ -291,9 +290,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [boardImages, displayBoardId, selectedImage]);
   const isComparing =
     selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
-  const activeGalleryPlaceholder = useMemo(() => getActiveGalleryQueuePlaceholder(queueItems), [queueItems]);
-  const shouldFollowLive = showProgressImagesInViewer && activeGalleryPlaceholder !== null && !isComparing;
+  const activeGalleryPlaceholder = useMemo(
+    () => getGalleryGenerationSequence(queueItems, progressImage?.target ?? null).liveSlot,
+    [progressImage?.target, queueItems]
+  );
   const matchingProgressImage = getMatchingProgressImage(progressImage, activeGalleryPlaceholder);
+  const shouldFollowLive = showProgressImagesInViewer && matchingProgressImage !== null && !isComparing;
   const exitCompare = useCallback(() => gallery.setCompareImage(null), [gallery]);
   const swapCompareImages = useCallback(() => {
     if (selectedImage && compareImage) {
@@ -444,7 +446,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   return (
     <Box ref={rootRef} p="2" h="full">
-      {shouldFollowLive && activeGalleryPlaceholder ? (
+      {shouldFollowLive && activeGalleryPlaceholder && matchingProgressImage ? (
         <LivePreview
           placeholder={activeGalleryPlaceholder}
           progressImage={matchingProgressImage}
@@ -606,7 +608,7 @@ const LivePreview = ({
   shouldAntialiasProgressImage,
 }: {
   placeholder: GalleryQueuePlaceholder;
-  progressImage: LatestProgressImageSnapshot | null;
+  progressImage: LatestProgressImageSnapshot;
   shouldAntialiasProgressImage: boolean;
 }) => {
   const { t } = useTranslation();
@@ -624,14 +626,7 @@ const LivePreview = ({
       shouldAntialiasLiveImage={shouldAntialiasProgressImage}
       source={previewImage}
       variant="inset"
-    >
-      <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
-        <Text fontSize="sm" fontWeight="800">
-          {t('common.generating')}
-        </Text>
-        <PreviewLiveStatusLine queueItemId={placeholder.queueItemId} />
-      </Stack>
-    </PreviewFrame>
+    />
   );
 };
 

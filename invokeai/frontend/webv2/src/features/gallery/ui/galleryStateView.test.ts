@@ -4,9 +4,9 @@ import type { QueueHistoryItemStatus, QueueItem } from '@features/queue/contract
 import { describe, expect, it } from 'vitest';
 
 import {
-  getActiveGalleryQueuePlaceholder,
   getBoardCounts,
   getGalleryCurrentItem,
+  getGalleryGenerationSequence,
   getGalleryImagesRefreshToken,
   getGalleryQueuePlaceholders,
   getGallerySelectedBoardId,
@@ -36,6 +36,7 @@ const createQueueItem = ({
   cancelledBackendItemIds,
   destination = 'gallery',
   status = 'pending',
+  localId,
 }: {
   backendItemIds?: number[];
   batchCount?: number;
@@ -44,12 +45,13 @@ const createQueueItem = ({
   cancelledBackendItemIds?: number[];
   destination?: 'gallery' | 'canvas';
   status?: QueueHistoryItemStatus;
+  localId?: string;
 }): QueueItem => ({
   backendItemIds,
   cancellable: true,
   cancelledBackendItemIds,
   completedBackendItemIds,
-  id: `queue-item-${status}-${boardId}`,
+  id: localId ?? `queue-item-${status}-${boardId}`,
   snapshot: {
     backendSubmission: {
       batchCount,
@@ -180,20 +182,85 @@ describe('gallery state view', () => {
     expect(placeholders.map((placeholder) => placeholder.itemIndex)).toEqual([2, 3]);
   });
 
-  it('derives the active gallery placeholder from the running queue item before a progress image arrives', () => {
-    const pending = createQueueItem({ backendItemIds: [1], boardId: 'none', status: 'pending' });
-    const running = createQueueItem({
-      backendItemIds: [11, 12, 13],
+  it('resolves the live slot from the exact denoising target instead of the newest submitted batch', () => {
+    const newerBatch = createQueueItem({
+      backendItemIds: [21, 22],
+      boardId: 'board-1',
+      localId: 'newer-batch',
+      status: 'running',
+    });
+    const activeEarlierBatch = createQueueItem({
+      backendItemIds: [11, 12],
       boardId: 'board-1',
       completedBackendItemIds: [11],
+      localId: 'active-earlier-batch',
       status: 'running',
     });
 
-    expect(getActiveGalleryQueuePlaceholder([pending, running])).toMatchObject({
+    expect(
+      getGalleryGenerationSequence([newerBatch, activeEarlierBatch], {
+        itemIndex: 2,
+        queueItemId: activeEarlierBatch.id,
+      }).liveSlot
+    ).toMatchObject({
       boardId: 'board-1',
       itemIndex: 2,
-      queueItemId: running.id,
+      queueItemId: activeEarlierBatch.id,
     });
+  });
+
+  it('flattens pending slots from multiple batches into one global execution order', () => {
+    const newerBatch = createQueueItem({
+      backendItemIds: [21, 22],
+      boardId: 'board-1',
+      localId: 'newer-batch',
+      status: 'running',
+    });
+    const earlierBatch = createQueueItem({
+      backendItemIds: [11, 12],
+      boardId: 'board-1',
+      localId: 'earlier-batch',
+      status: 'running',
+    });
+
+    const sequence = getGalleryGenerationSequence([newerBatch, earlierBatch], null);
+
+    expect(sequence.chronologicalSlots.map((slot) => slot.id)).toEqual([
+      'earlier-batch:0',
+      'earlier-batch:1',
+      'newer-batch:0',
+      'newer-batch:1',
+    ]);
+    expect(sequence.liveSlot).toBeNull();
+  });
+
+  it('reverses the complete flattened sequence for newest-first galleries', () => {
+    const newerBatch = createQueueItem({
+      backendItemIds: [21, 22],
+      boardId: 'board-1',
+      localId: 'newer-batch',
+      status: 'running',
+    });
+    const earlierBatch = createQueueItem({
+      backendItemIds: [11, 12],
+      boardId: 'board-1',
+      localId: 'earlier-batch',
+      status: 'running',
+    });
+
+    const placeholders = getGalleryQueuePlaceholders([newerBatch, earlierBatch], {
+      galleryView: 'images',
+      imageOrderDir: 'DESC',
+      searchTerm: '',
+      selectedBoardId: 'board-1',
+    });
+
+    expect(placeholders.map((slot) => slot.id)).toEqual([
+      'newer-batch:1',
+      'newer-batch:0',
+      'earlier-batch:1',
+      'earlier-batch:0',
+    ]);
   });
 
   it('uses one derived current item while live-follow is active', () => {

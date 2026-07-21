@@ -2,6 +2,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 import type { ReactNode } from 'react';
 
 import { GalleryUiProvider } from '@features/gallery/react';
+import { useProgressImage } from '@features/queue/react';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
@@ -33,6 +34,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
   const liveFollowEnabled = useActiveProjectSelector((project) => project.settings.showProgressImagesInViewer);
+  const liveProgressTarget = useProgressImage()?.target ?? null;
   const { account, gallery, notifications, widgets } = useWorkbenchCommands();
   const adapter = useMemo<GalleryUiAdapter>(
     () => ({
@@ -46,6 +48,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       ImageActionsProvider: GalleryImageActionsAdapter,
       ImageContextMenu: GalleryImageContextMenu,
       liveFollowEnabled,
+      liveProgressTarget,
       notifications,
       projectId,
       projectName,
@@ -59,6 +62,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       galleryValues,
       generateValues,
       liveFollowEnabled,
+      liveProgressTarget,
       notifications,
       projectId,
       projectName,

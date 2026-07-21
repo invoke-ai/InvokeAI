@@ -1877,6 +1877,50 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
   });
 
+  it('does not reorder existing results when an older batch final aggregate arrives late', () => {
+    let state = primeGenerate(undefined, { batchCount: 2 });
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const projectId = getActiveProject(state).id;
+    const olderQueueItem = getActiveProject(state).queue.items[0];
+    const olderImage1 = createImage('older-1.png', olderQueueItem.id);
+    const olderImage2 = createImage('older-2.png', olderQueueItem.id);
+
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      images: [olderImage1],
+      projectId,
+      queueItemId: olderQueueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    state = submitGenerate(state);
+
+    const newerQueueItem = getActiveProject(state).queue.items[0];
+    const newerImage = createImage('newer-1.png', newerQueueItem.id);
+
+    state = workbenchReducer(state, {
+      backendItemId: 21,
+      images: [newerImage],
+      projectId,
+      queueItemId: newerQueueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    state = workbenchReducer(state, {
+      images: [olderImage1, olderImage2],
+      projectId,
+      queueItemId: olderQueueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(
+      (getProjectWidgetValues(getActiveProject(state), 'gallery').recentImages as GeneratedImageContract[]).map(
+        (image) => image.imageName
+      )
+    ).toEqual(['older-2.png', 'newer-1.png', 'older-1.png']);
+  });
+
   it('selects the last image from a final-only Gallery batch', () => {
     let state = primeGenerate(undefined, { batchCount: 3 });
 

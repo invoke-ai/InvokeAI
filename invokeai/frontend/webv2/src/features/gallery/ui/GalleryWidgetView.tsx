@@ -45,6 +45,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     galleryValues,
     generateValues,
     liveFollowEnabled,
+    liveProgressTarget,
     projectId,
     projectName,
     queueItems,
@@ -77,7 +78,8 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     data.images,
     data.isLoadingImages,
     queueItems,
-    liveFollowEnabled
+    liveFollowEnabled,
+    liveProgressTarget
   );
 
   const onStarredChange = useCallback(

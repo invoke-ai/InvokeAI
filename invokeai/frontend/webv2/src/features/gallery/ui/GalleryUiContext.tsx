@@ -4,6 +4,8 @@ import type { QueueItem } from '@features/queue/contracts';
 
 import { createContext, use, type ComponentType, type ReactNode } from 'react';
 
+import type { GalleryLiveTarget } from './galleryStateView';
+
 export interface GalleryImageActions {
   deleteImages(imageNames: string[]): Promise<void>;
   moveImagesToBoard(imageNames: string[], boardId: string): Promise<void>;
@@ -83,6 +85,7 @@ export interface GalleryUiAdapter {
   projectName: string;
   queueItems: QueueItem[];
   liveFollowEnabled: boolean;
+  liveProgressTarget: GalleryLiveTarget | null;
   widgets: { patchGalleryValues(values: Record<string, unknown>): void };
 }
 
