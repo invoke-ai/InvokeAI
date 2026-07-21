@@ -35,7 +35,7 @@ WAN_T5_MAX_SEQ_LEN = 512
 class WanTextEncoderInvocation(BaseInvocation):
     """Encodes a text prompt for Wan 2.2 using the UMT5-XXL encoder.
 
-    Output is the encoder's last hidden state (shape: [seq_len=226, 4096]) plus
+    Output is the encoder's last hidden state (shape: [seq_len=512, 4096]) plus
     an attention mask marking valid (non-padding) tokens. The Wan transformer
     consumes these directly as ``encoder_hidden_states``.
     """

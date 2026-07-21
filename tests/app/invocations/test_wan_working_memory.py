@@ -53,7 +53,9 @@ class TestEstimateVaeWorkingMemoryWan:
             operation="decode", vae=vae, pixel_height=256, pixel_width=256, pixel_frames=1
         )
         area_bytes = 256 * 256 * 2
-        assert est == area_bytes * 2900 + 3 * 1 * area_bytes
+        # Decode counts the clip twice: torch.cat frame accumulation transiently holds
+        # the clip and its copy at peak.
+        assert est == area_bytes * 2900 + 2 * 3 * 1 * area_bytes
 
     def test_encode_uses_half_the_decode_constant(self):
         vae = _mock_wan_vae()
@@ -61,11 +63,12 @@ class TestEstimateVaeWorkingMemoryWan:
             operation="encode", vae=vae, pixel_height=256, pixel_width=256, pixel_frames=1
         )
         area_bytes = 256 * 256 * 2
+        # Encode consumes the input clip without duplicating it — one copy only.
         assert est == area_bytes * 1450 + 3 * 1 * area_bytes
 
     def test_additional_frames_add_only_clip_bytes(self):
         """The Wan VAE is causal (frame-at-a-time with cached features), so extra frames
-        grow the resident clip, not the conv working set."""
+        grow the resident clip (2 copies at decode peak), not the conv working set."""
         vae = _mock_wan_vae()
         one = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=128, pixel_width=128, pixel_frames=1
@@ -73,14 +76,14 @@ class TestEstimateVaeWorkingMemoryWan:
         many = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=128, pixel_width=128, pixel_frames=81
         )
-        assert many - one == 3 * 80 * 128 * 128 * 2
+        assert many - one == 2 * 3 * 80 * 128 * 128 * 2
 
     def test_tile_size_bounds_the_per_frame_term(self):
         vae = _mock_wan_vae()
         tiled = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=1920, pixel_width=1080, pixel_frames=17, tile_size=256
         )
-        expected = int(256 * 256 * 2 * 2900 * 1.25 + 3 * 17 * 1920 * 1080 * 2)
+        expected = int(256 * 256 * 2 * 2900 * 1.25 + 2 * 3 * 17 * 1920 * 1080 * 2)
         assert tiled == expected
         full = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=1920, pixel_width=1080, pixel_frames=17

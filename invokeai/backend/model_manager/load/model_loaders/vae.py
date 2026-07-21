@@ -201,8 +201,13 @@ class VAELoader(GenericDiffusersLoader):
         Without overriding those params at construction time, the state dict
         from the TI2V-5B VAE checkpoint won't load (channel and shape mismatches
         throughout the encoder + decoder).
+
+        Forces bfloat16 (same as ``WanDiffusersModel`` and ``_load_wan_vae_diffusers``) —
+        fp16 is unstable on the Wan VAE, and the default ``precision: auto`` resolves to
+        float16 on CUDA.
         """
         import accelerate
+        import torch
         from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
         from safetensors.torch import load_file
 
@@ -211,10 +216,9 @@ class VAELoader(GenericDiffusersLoader):
         patch_wan_causal_conv3d_for_rocm()
         sd = load_file(config.path)
 
-        if self._torch_dtype is not None:
-            for k in list(sd.keys()):
-                if sd[k].is_floating_point():
-                    sd[k] = sd[k].to(self._torch_dtype)
+        for k in list(sd.keys()):
+            if sd[k].is_floating_point():
+                sd[k] = sd[k].to(torch.bfloat16)
 
         new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
         self._ram_cache.make_room(new_sd_size)

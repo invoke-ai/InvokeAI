@@ -64,32 +64,28 @@ class WanDiffusersModel(GenericDiffusersLoader):
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
 
-        # bfloat16 across the board: matches Diffusers WanPipeline reference and
-        # avoids the fp16 instability seen in the Wan VAE.
-        dtype_kwarg = {"dtype": torch.bfloat16}
-        try:
-            result: AnyModel = load_class.from_pretrained(
-                model_path,
-                **dtype_kwarg,
-                variant=variant,
-                local_files_only=True,
-            )
-        except TypeError:
-            # Older diffusers releases use torch_dtype instead of dtype.
-            dtype_kwarg = {"torch_dtype": torch.bfloat16}
-            result = load_class.from_pretrained(
-                model_path,
-                **dtype_kwarg,
-                variant=variant,
-                local_files_only=True,
-            )
-        except OSError as e:
+        def _load_with_variant_fallback(dtype_kwarg: dict[str, torch.dtype]) -> AnyModel:
             # Some Wan repos ship without a fp16 variant suffix on every submodel.
             # If the requested variant isn't on disk, fall back to the default weights.
-            if variant and "no file named" in str(e):
-                result = load_class.from_pretrained(model_path, **dtype_kwarg, local_files_only=True)
-            else:
+            try:
+                return load_class.from_pretrained(
+                    model_path,
+                    **dtype_kwarg,
+                    variant=variant,
+                    local_files_only=True,
+                )
+            except OSError as e:
+                if variant and "no file named" in str(e):
+                    return load_class.from_pretrained(model_path, **dtype_kwarg, local_files_only=True)
                 raise
+
+        # bfloat16 across the board: matches Diffusers WanPipeline reference and
+        # avoids the fp16 instability seen in the Wan VAE.
+        try:
+            result: AnyModel = _load_with_variant_fallback({"dtype": torch.bfloat16})
+        except TypeError:
+            # Older diffusers releases use torch_dtype instead of dtype.
+            result = _load_with_variant_fallback({"torch_dtype": torch.bfloat16})
 
         return result
 

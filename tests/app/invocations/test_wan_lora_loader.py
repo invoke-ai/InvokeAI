@@ -10,7 +10,12 @@ from invokeai.app.invocations.wan_lora_loader import (
     WanLoRALoaderInvocation,
     _resolve_target,
 )
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelType,
+    WanLoRAVariantType,
+    WanVariantType,
+)
 
 # --------------------------------------------------------------------------
 # _resolve_target — pure function, no mocks needed.
@@ -176,7 +181,10 @@ class TestCollectionLoaderRouting:
 
         def get_config(field: ModelIdentifierField) -> MagicMock:
             config = MagicMock()
-            config.expert = expert_by_key[field.key]
+            if field.key == "wan-main":
+                config.variant = None  # unrecorded -> variant check skipped
+            else:
+                config.expert = expert_by_key[field.key]
             return config
 
         ctx.models.get_config.side_effect = get_config
@@ -223,3 +231,73 @@ class TestCollectionLoaderRouting:
         assert out.transformer is not None
         assert len(out.transformer.loras) == 0
         assert len(out.transformer.loras_low_noise) == 0
+
+
+# --------------------------------------------------------------------------
+# LoRA-variant vs transformer-variant validation (A14B vs 5B).
+# --------------------------------------------------------------------------
+
+
+def _make_variant_context(lora_variant, main_variant) -> MagicMock:
+    """Context whose get_config returns a LoRA config (with variant + expert) for LoRA
+    keys and a main config (with variant) for the transformer key."""
+    ctx = MagicMock()
+    ctx.models.exists.return_value = True
+    lora_config = MagicMock()
+    lora_config.expert = None
+    lora_config.variant = lora_variant
+    main_config = MagicMock()
+    main_config.variant = main_variant
+
+    def _get_config(model_id):
+        return main_config if model_id.key == "wan-main" else lora_config
+
+    ctx.models.get_config.side_effect = _get_config
+    return ctx
+
+
+class TestVariantValidation:
+    """An A14B LoRA against a 5B main (or vice versa) crashes deep in the layer patcher
+    with an opaque shape error — the loaders must reject the mismatch up front."""
+
+    @pytest.mark.parametrize(
+        "lora_variant, main_variant",
+        [
+            (WanLoRAVariantType.A14B, WanVariantType.TI2V_5B),
+            (WanLoRAVariantType.Wan5B, WanVariantType.T2V_A14B),
+            (WanLoRAVariantType.Wan5B, WanVariantType.I2V_A14B),
+        ],
+    )
+    def test_single_loader_rejects_mismatch(self, lora_variant, main_variant):
+        inv = WanLoRALoaderInvocation(id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field())
+        with pytest.raises(ValueError, match="not interchangeable"):
+            inv.invoke(_make_variant_context(lora_variant, main_variant))
+
+    @pytest.mark.parametrize(
+        "lora_variant, main_variant",
+        [
+            (WanLoRAVariantType.A14B, WanVariantType.T2V_A14B),
+            (WanLoRAVariantType.A14B, WanVariantType.I2V_A14B),
+            (WanLoRAVariantType.Wan5B, WanVariantType.TI2V_5B),
+            (None, WanVariantType.T2V_A14B),  # unrecorded LoRA variant -> skip check
+            (WanLoRAVariantType.A14B, None),  # unrecorded main variant -> skip check
+        ],
+    )
+    def test_single_loader_accepts_match_or_unknown(self, lora_variant, main_variant):
+        inv = WanLoRALoaderInvocation(id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field())
+        out = inv.invoke(_make_variant_context(lora_variant, main_variant))
+        assert out.transformer is not None
+        assert len(out.transformer.loras) == 1
+
+    def test_collection_loader_rejects_mismatch(self):
+        lora = LoRAField(lora=_make_lora_field(), weight=1.0)
+        inv = WanLoRACollectionLoader(id="inv-1", loras=[lora], transformer=_make_transformer_field())
+        with pytest.raises(ValueError, match="not interchangeable"):
+            inv.invoke(_make_variant_context(WanLoRAVariantType.Wan5B, WanVariantType.T2V_A14B))
+
+    def test_collection_loader_accepts_match(self):
+        lora = LoRAField(lora=_make_lora_field(), weight=1.0)
+        inv = WanLoRACollectionLoader(id="inv-1", loras=[lora], transformer=_make_transformer_field())
+        out = inv.invoke(_make_variant_context(WanLoRAVariantType.A14B, WanVariantType.T2V_A14B))
+        assert out.transformer is not None
+        assert len(out.transformer.loras) == 1

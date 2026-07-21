@@ -94,15 +94,24 @@ def test_gguf_loader_accepts_valid_expert_pair_in_either_order(
             _config("main", WanVariantType.T2V_A14B, "high"),
             _config("low", WanVariantType.T2V_A14B, "none"),
         ),
-        (
-            _config("main", WanVariantType.TI2V_5B, "none"),
-            _config("low", WanVariantType.T2V_A14B, "low"),
-        ),
     ],
 )
 def test_gguf_loader_rejects_invalid_expert_pair(main_config: SimpleNamespace, low_config: SimpleNamespace) -> None:
     with pytest.raises(ValueError, match="expert|variant"):
         _invoke(main_config, low_config)
+
+
+@pytest.mark.parametrize("low_variant", [WanVariantType.TI2V_5B, WanVariantType.T2V_A14B])
+def test_ti2v_5b_main_ignores_wired_low_noise_model(low_variant: WanVariantType) -> None:
+    """The field docs promise 'Transformer (Low Noise)' is ignored for the single-expert
+    TI2V-5B — e.g. a wire left over from an A14B session must not abort the run."""
+    output = _invoke(
+        _config("main", WanVariantType.TI2V_5B, "none"),
+        _config("low", low_variant, "low"),
+    )
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is None
 
 
 @pytest.mark.parametrize("expert", ["low", "none"])

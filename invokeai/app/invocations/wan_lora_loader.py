@@ -10,7 +10,12 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, WanTransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelType,
+    WanLoRAVariantType,
+    WanVariantType,
+)
 
 # Target option for routing a LoRA to one or both Wan A14B expert lists.
 #
@@ -21,6 +26,30 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 # - ``high``: append only to the primary list (high-noise expert).
 # - ``low``: append only to the low-noise list (low-noise expert).
 WanLoRATarget = Literal["auto", "both", "high", "low"]
+
+
+def _assert_lora_variant_matches_main(
+    context: InvocationContext,
+    transformer_field: WanTransformerField,
+    lora_id: ModelIdentifierField,
+) -> None:
+    """Reject an A14B LoRA wired against a 5B main (and vice versa).
+
+    A mismatch otherwise crashes deep in the layer patcher mid-denoise with an opaque
+    tensor-shape error, after minutes of model loading. Skips silently when either
+    variant is unrecorded (e.g. a LoRA whose targeted layers don't pin the inner dim).
+    """
+    lora_variant = getattr(context.models.get_config(lora_id), "variant", None)
+    main_variant = getattr(context.models.get_config(transformer_field.transformer), "variant", None)
+    if lora_variant is None or main_variant is None:
+        return
+    lora_is_5b = lora_variant == WanLoRAVariantType.Wan5B
+    main_is_5b = main_variant == WanVariantType.TI2V_5B
+    if lora_is_5b != main_is_5b:
+        raise ValueError(
+            f"LoRA '{lora_id.key}' targets Wan {lora_variant.value.upper()} models, but the "
+            f"transformer is a {main_variant.value} model. A14B and 5B LoRAs are not interchangeable."
+        )
 
 
 def _resolve_target(target: WanLoRATarget, lora_expert: str | None) -> tuple[bool, bool]:
@@ -54,7 +83,7 @@ class WanLoRALoaderOutput(BaseInvocationOutput):
     title="Apply LoRA - Wan 2.2",
     tags=["lora", "model", "wan"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class WanLoRALoaderInvocation(BaseInvocation):
@@ -98,6 +127,8 @@ class WanLoRALoaderInvocation(BaseInvocation):
         if self.transformer is None:
             return output
 
+        _assert_lora_variant_matches_main(context, self.transformer, self.lora)
+
         lora_config = context.models.get_config(self.lora)
         lora_expert = getattr(lora_config, "expert", None)
         to_primary, to_low_noise = _resolve_target(self.target, lora_expert)
@@ -123,7 +154,7 @@ class WanLoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - Wan 2.2",
     tags=["lora", "model", "wan"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class WanLoRACollectionLoader(BaseInvocation):
@@ -175,6 +206,8 @@ class WanLoRACollectionLoader(BaseInvocation):
                     f"{lora.lora.base.value if lora.lora.base else 'unknown'} models, "
                     "not Wan 2.2."
                 )
+
+            _assert_lora_variant_matches_main(context, self.transformer, lora.lora)
 
             lora_config = context.models.get_config(lora.lora)
             lora_expert = getattr(lora_config, "expert", None)

@@ -526,6 +526,45 @@ def test_device_context_released_when_lora_enter_raises():
         # device-exit:HIGH would be missing from the log.
         swapper.close()
 
+
+def test_device_context_released_when_lora_exit_raises():
+    """Counterpart to the enter-raises regression: if LoRA weight-restore (``__exit__``)
+    raises — e.g. OOM restoring original weights on a nearly full card — the device
+    context must still exit so the cache record unlocks and the expert leaves GPU."""
+    log: list[str] = []
+    high_nn = nn.Linear(1, 1)
+    ctx = _FakeContext({"high": _FakeInfo("HIGH", high_nn, log)}, log)
+
+    class _ExitRaisingLoraStub:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            raise RuntimeError("LoRA weight restore blew up")
+
+    with patch(
+        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        side_effect=lambda **_kwargs: _ExitRaisingLoraStub(),
+    ):
+        swapper = _ExpertSwapper(
+            context=ctx,
+            high_model="high",
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            high_lora_factory=_make_factory(log, "HIGH"),
+            low_lora_factory=None,
+        )
+        swapper.get(_ExpertSwapper.HIGH)
+        with pytest.raises(RuntimeError, match="LoRA weight restore blew up"):
+            swapper.close()
+        assert "device-exit:HIGH" in log
+        # The swapper must also have cleared its slots so a later close() is a no-op.
+        assert swapper._active_device_ctx is None
+        assert swapper._active_lora_ctx is None
+
     assert "device-exit:HIGH" in log, "device context must be exited even if LoRA enter raised"
 
 

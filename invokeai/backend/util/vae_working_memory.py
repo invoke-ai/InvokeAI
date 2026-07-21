@@ -155,8 +155,11 @@ def estimate_vae_working_memory_wan(
         per_frame = pixel_height * pixel_width * element_size * scaling_constant
 
     # The full RGB clip stays on the execution device regardless of tiling (decode
-    # output / encode input).
-    clip_bytes = 3 * pixel_frames * pixel_height * pixel_width * element_size
+    # output / encode input). Decode accumulates frames with torch.cat, whose final
+    # iterations transiently hold both the accumulated clip and its copy — ~2x the
+    # clip bytes at peak. Encode consumes the input clip without duplicating it.
+    clip_copies = 2 if operation == "decode" else 1
+    clip_bytes = clip_copies * 3 * pixel_frames * pixel_height * pixel_width * element_size
 
     return int(per_frame + clip_bytes)
 

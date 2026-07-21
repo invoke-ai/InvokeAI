@@ -38,7 +38,7 @@ class WanModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - Wan 2.2",
     tags=["model", "wan"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class WanModelLoaderInvocation(BaseInvocation):
@@ -145,7 +145,12 @@ class WanModelLoaderInvocation(BaseInvocation):
             primary_expert = getattr(main_config, "expert", "none")
             primary_id = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
 
-            if self.transformer_low_noise_model is not None:
+            if self.transformer_low_noise_model is not None and main_variant == WanVariantType.TI2V_5B:
+                # The field's own docs promise this input is ignored for the
+                # single-expert TI2V-5B — e.g. a leftover wire from an A14B session.
+                context.logger.warning("'Transformer (Low Noise)' is ignored for the single-expert TI2V-5B variant.")
+
+            if self.transformer_low_noise_model is not None and main_variant != WanVariantType.TI2V_5B:
                 low_config = context.models.get_config(self.transformer_low_noise_model)
                 if low_config.format != ModelFormat.GGUFQuantized:
                     raise ValueError(
@@ -157,7 +162,7 @@ class WanModelLoaderInvocation(BaseInvocation):
 
                 if getattr(low_config, "variant", None) != main_variant:
                     raise ValueError("The high-noise and low-noise GGUF models must use the same Wan variant.")
-                if main_variant == WanVariantType.TI2V_5B or {primary_expert, low_expert} != {"high", "low"}:
+                if {primary_expert, low_expert} != {"high", "low"}:
                     raise ValueError("A Wan A14B GGUF expert pair must contain one high and one low expert.")
 
                 # Make sure 'transformer' is the high-noise expert and

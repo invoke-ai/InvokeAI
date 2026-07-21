@@ -905,3 +905,222 @@ class TestDefaultSchedulerForVariant:
             assert s.config.prediction_type == "flow_prediction"
             assert s.config.use_flow_sigmas is True
             assert s.config.solver_type == "bh2"
+
+
+class _TimestepRecordingTransformer(_ZeroTransformer):
+    """_ZeroTransformer that additionally keeps the full per-token timestep tensor and
+    the frame-0 slice of each hidden_states input — needed to verify the TI2V-5B
+    expand-timesteps blend, which _ZeroTransformer's scalar recording can't observe."""
+
+    def __init__(self, label: str = "single") -> None:
+        super().__init__(label)
+        self.full_timesteps: list[torch.Tensor] = []
+        self.frame0_inputs: list[torch.Tensor] = []
+
+    def forward(self, hidden_states, timestep, encoder_hidden_states, attention_kwargs=None, return_dict=True):
+        self.full_timesteps.append(timestep.detach().clone())
+        self.frame0_inputs.append(hidden_states[:, :, 0].detach().clone())
+        return super().forward(hidden_states, timestep, encoder_hidden_states, attention_kwargs, return_dict)
+
+
+def _make_video_invocation(
+    *,
+    ref_field: WanRefImageConditioningField | None = None,
+    width: int = 64,
+    height: int = 64,
+    num_frames: int = 17,
+    steps: int = 3,
+    guidance_scale: float = 1.0,
+    transformer_field: WanTransformerField | None = None,
+) -> WanVideoDenoiseInvocation:
+    return WanVideoDenoiseInvocation(
+        id="test",
+        transformer=transformer_field or _wan_transformer_field(),
+        positive_conditioning=WanConditioningField(conditioning_name="pos"),
+        negative_conditioning=None,
+        ref_image=ref_field,
+        width=width,
+        height=height,
+        num_frames=num_frames,
+        steps=steps,
+        guidance_scale=guidance_scale,
+        seed=42,
+    )
+
+
+class TestWanVideoDenoiseMultiFrame:
+    """The multi-frame (T_lat > 1) video denoise loop — the core video feature.
+
+    Uses the same synthetic zero-velocity transformer as the single-frame tests:
+    latents shapes, per-variant conditioning mechanisms (A14B channel-concat vs
+    TI2V-5B expand-timesteps mask blend), and the zero-velocity noise invariant
+    are all checkable on CPU without weights.
+    """
+
+    @pytest.mark.parametrize(
+        "variant,latent_channels,scale",
+        [
+            (WanVariantType.T2V_A14B, 16, 8),
+            (WanVariantType.TI2V_5B, 48, 16),
+        ],
+    )
+    def test_t2v_multi_frame_returns_5d_finite(self, variant, latent_channels, scale, fake_model_root) -> None:
+        transformer = _ZeroTransformer()
+        ctx = _build_context(
+            transformer,
+            variant=variant,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        inv = _make_video_invocation(num_frames=17, steps=3)
+
+        latents = inv._run_diffusion(ctx)
+
+        # 17 pixel frames -> (17 - 1) / 4 + 1 = 5 latent frames.
+        h_lat, w_lat = 64 // scale, 64 // scale
+        assert latents.shape == (1, latent_channels, 5, h_lat, w_lat)
+        assert torch.isfinite(latents).all()
+        assert len(transformer.calls) == 3
+        for h_shape, t_shape, _ctx_shape in transformer.calls:
+            assert h_shape == (1, latent_channels, 5, h_lat, w_lat)
+            assert t_shape == (1,)  # T2V: scalar timestep per batch item
+
+    def test_zero_velocity_preserves_initial_noise_video(self, fake_model_root) -> None:
+        transformer = _ZeroTransformer()
+        ctx = _build_context(
+            transformer,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        inv = _make_video_invocation(num_frames=17, steps=4)
+
+        latents = inv._run_diffusion(ctx)
+
+        from invokeai.backend.wan.sampling_utils import make_noise
+
+        expected = make_noise(
+            batch_size=1,
+            latent_channels=16,
+            height=64,
+            width=64,
+            spatial_scale_factor=8,
+            device=torch.device("cpu"),
+            dtype=torch.float32,
+            seed=42,
+            num_latent_frames=5,
+        )
+        assert torch.allclose(latents, expected, atol=1e-5)
+
+    def test_a14b_i2v_video_concatenates_condition_across_frames(self, fake_model_root) -> None:
+        """I2V-A14B video: the [1, 20, T_lat, ...] condition concats to 36 channels at
+        every step, with T_lat matching the noise latents."""
+        transformer = _ZeroTransformer()
+        ctx = _build_context(
+            transformer,
+            variant=WanVariantType.I2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        ctx.tensors.load.return_value = torch.zeros(1, 20, 5, 8, 8)
+        ref = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64, num_frames=17)
+        inv = _make_video_invocation(ref_field=ref, num_frames=17, steps=3)
+
+        inv._run_diffusion(ctx)
+
+        assert len(transformer.calls) == 3
+        for h_shape, t_shape, _ctx_shape in transformer.calls:
+            assert h_shape == (1, 36, 5, 8, 8)
+            assert t_shape == (1,)  # concat path keeps the scalar timestep
+
+    def test_a14b_i2v_video_field_frame_count_mismatch_raises(self, fake_model_root) -> None:
+        ctx = _build_context(
+            _ZeroTransformer(),
+            variant=WanVariantType.I2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        ctx.tensors.load.return_value = torch.zeros(1, 20, 2, 8, 8)
+        ref = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64, num_frames=5)
+        inv = _make_video_invocation(ref_field=ref, num_frames=17, steps=3)
+
+        with pytest.raises(ValueError, match="must match denoise\\s+num_frames"):
+            inv._run_diffusion(ctx)
+
+    def test_a14b_i2v_video_condition_tensor_frame_mismatch_raises(self, fake_model_root) -> None:
+        """Field metadata matches but the saved tensor's T_lat doesn't — fail clearly."""
+        ctx = _build_context(
+            _ZeroTransformer(),
+            variant=WanVariantType.I2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        ctx.tensors.load.return_value = torch.zeros(1, 20, 2, 8, 8)
+        ref = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64, num_frames=17)
+        inv = _make_video_invocation(ref_field=ref, num_frames=17, steps=3)
+
+        with pytest.raises(ValueError, match="latent frames"):
+            inv._run_diffusion(ctx)
+
+    def test_ti2v_expand_timesteps_blend(self, fake_model_root) -> None:
+        """TI2V-5B I2V: frame 0 is locked to the condition via the first-frame mask.
+
+        Checks the three parts of the expand-timesteps mechanism:
+        1. The model input's frame 0 equals the condition (blend), other frames don't.
+        2. The per-token timestep tensor is 0 at frame-0 token positions and `t`
+           elsewhere (shape [1, T_lat * H_lat/2 * W_lat/2] from the ::2 stride).
+        3. After the loop, frame 0 is restored to the clean condition while later
+           frames keep the initial noise (zero-velocity invariant).
+        """
+        transformer = _TimestepRecordingTransformer()
+        ctx = _build_context(
+            transformer,
+            variant=WanVariantType.TI2V_5B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        # 64x64 at 16x spatial scale -> 4x4 latents; condition is a single latent
+        # frame of 48 channels with a distinctive constant value.
+        condition = torch.full((1, 48, 1, 4, 4), 0.7)
+        ctx.tensors.load.return_value = condition
+        ref = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64, num_frames=1)
+        inv = _make_video_invocation(ref_field=ref, num_frames=17, steps=3)
+
+        latents = inv._run_diffusion(ctx)
+
+        t_lat, h_lat, w_lat = 5, 4, 4
+        tokens_per_frame = (h_lat // 2) * (w_lat // 2)
+        assert len(transformer.calls) == 3
+        for step_idx, (h_shape, t_shape, _ctx_shape) in enumerate(transformer.calls):
+            assert h_shape == (1, 48, t_lat, h_lat, w_lat)
+            assert t_shape == (1, t_lat * tokens_per_frame)
+            full_ts = transformer.full_timesteps[step_idx]
+            # Frame-0 tokens are gated to timestep 0; all others carry the step's t.
+            assert torch.all(full_ts[0, :tokens_per_frame] == 0)
+            assert torch.all(full_ts[0, tokens_per_frame:] != 0)
+            # The blended input's frame 0 is exactly the condition.
+            assert torch.allclose(transformer.frame0_inputs[step_idx], condition[:, :, 0], atol=1e-6)
+
+        # Final restore: frame 0 == clean condition; frames 1+ == the initial noise.
+        assert torch.allclose(latents[:, :, 0], condition[:, :, 0].to(latents.dtype), atol=1e-6)
+
+        from invokeai.backend.wan.sampling_utils import make_noise
+
+        expected_noise = make_noise(
+            batch_size=1,
+            latent_channels=48,
+            height=64,
+            width=64,
+            spatial_scale_factor=16,
+            device=torch.device("cpu"),
+            dtype=torch.float32,
+            seed=42,
+            num_latent_frames=t_lat,
+        )
+        assert torch.allclose(latents[:, :, 1:], expected_noise[:, :, 1:], atol=1e-5)

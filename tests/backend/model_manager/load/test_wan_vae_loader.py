@@ -7,10 +7,13 @@ encoder + decoder. The fix routes z_dim=48 to the TI2V-5B-specific
 constructor kwargs.
 """
 
+from unittest.mock import MagicMock, patch
+
 import accelerate
+import torch
 from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
 
-from invokeai.backend.model_manager.load.model_loaders.vae import _wan_vae_init_kwargs_for
+from invokeai.backend.model_manager.load.model_loaders.vae import VAELoader, _wan_vae_init_kwargs_for
 
 
 def test_a14b_returns_default_z_dim_only() -> None:
@@ -56,3 +59,34 @@ def test_a14b_kwargs_instantiate_with_expected_shapes() -> None:
     assert model.config.base_dim == 96
     assert model.config.out_channels == 3
     assert model.config.patch_size is None
+
+
+def test_wan_vae_checkpoint_loads_bfloat16_even_when_loader_dtype_is_fp16() -> None:
+    """fp16 is unstable on the Wan VAE (NaN/garbled frames), so the checkpoint path must
+    force bfloat16 like ``_load_wan_vae_diffusers`` and ``WanDiffusersModel`` do — even
+    though ``precision: auto`` resolves the loader's default dtype to float16 on CUDA."""
+    loader = VAELoader.__new__(VAELoader)
+    loader._ram_cache = MagicMock()
+    loader._torch_dtype = torch.float16  # what `precision: auto` yields on CUDA
+
+    sd = {
+        "decoder.weight": torch.zeros(2, 2, dtype=torch.float32),
+        "step_counter": torch.zeros(1, dtype=torch.int64),
+    }
+    config = MagicMock()
+    config.latent_channels = 16
+
+    fake_model = MagicMock()
+    with (
+        patch("safetensors.torch.load_file", return_value=sd),
+        patch("diffusers.models.autoencoders.autoencoder_kl_wan.AutoencoderKLWan", return_value=fake_model),
+        # The real ROCm patch mutates WanCausalConv3d.forward process-wide, which breaks
+        # the conv3d idempotency test when it runs later in the same session.
+        patch("invokeai.backend.wan.rocm_causal_conv3d.patch_wan_causal_conv3d_for_rocm"),
+    ):
+        result = loader._load_wan_vae(config)
+
+    assert result is fake_model
+    loaded_sd = fake_model.load_state_dict.call_args.args[0]
+    assert loaded_sd["decoder.weight"].dtype == torch.bfloat16
+    assert loaded_sd["step_counter"].dtype == torch.int64  # non-float buffers untouched

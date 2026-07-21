@@ -16,7 +16,7 @@ only in the pixel multiple they snap to.
 import math
 from typing import Literal
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import InputField
 from invokeai.app.invocations.ideal_size import IdealSizeOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -100,6 +100,7 @@ def _scale_and_snap(
     tags=["wan", "video", "dimensions", "math"],
     category="video",
     version="1.1.0",
+    classification=Classification.Prototype,
 )
 class WanI2VIdealDimensionsInvocation(BaseInvocation):
     """Ideal dimensions for the Wan 2.2 A14B models (I2V-A14B and T2V-A14B).
@@ -156,6 +157,7 @@ class WanI2VIdealDimensionsInvocation(BaseInvocation):
     tags=["wan", "video", "dimensions", "math"],
     category="video",
     version="1.0.0",
+    classification=Classification.Prototype,
 )
 class WanTI2VIdealDimensionsInvocation(BaseInvocation):
     """Ideal dimensions for the Wan 2.2 TI2V-5B model.
