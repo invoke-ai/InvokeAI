@@ -4354,6 +4354,11 @@
         "summary": "Create Image Upload Entry",
         "description": "Uploads an image from a URL, not implemented",
         "operationId": "create_image_upload_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {

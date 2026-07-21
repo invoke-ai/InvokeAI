@@ -44,10 +44,12 @@ PROTECTED_ROUTES = [
     ("get", "/api/v1/app/external_providers/status"),
     ("get", "/api/v1/app/external_providers/config"),
     ("get", "/api/v1/app/logging"),
+    ("post", "/api/v1/app/logging"),
     ("get", "/api/v1/app/invocation_cache/status"),
     ("delete", "/api/v1/app/invocation_cache"),
     ("put", "/api/v1/app/invocation_cache/enable"),
     ("put", "/api/v1/app/invocation_cache/disable"),
+    ("post", "/api/v1/images/"),
 ]
 
 # Routes that must additionally reject authenticated non-admin users.
@@ -60,6 +62,8 @@ ADMIN_ONLY_ROUTES = [
     ("get", "/api/v1/app/external_providers/config"),
     ("get", "/api/v1/app/runtime_config"),
     ("get", "/api/v1/app/logging"),
+    ("post", "/api/v1/app/logging"),
+    ("get", "/api/v1/app/invocation_cache/status"),
     ("delete", "/api/v1/app/invocation_cache"),
     ("put", "/api/v1/app/invocation_cache/enable"),
     ("put", "/api/v1/app/invocation_cache/disable"),
@@ -138,6 +142,19 @@ def test_scan_folder_mid_scan_failure_is_a_generic_500(
     assert "permission denied" not in response.text
 
 
+def test_create_image_upload_entry_requires_auth_before_the_501_stub(
+    enable_multiuser: Any, client: TestClient, user1_token: str
+) -> None:
+    """The unimplemented upload-entry endpoint must authenticate first, so that implementing it later
+    cannot silently ship an unauthenticated state-mutating route (the 401 side is in PROTECTED_ROUTES)."""
+    response = client.post(
+        "/api/v1/images/",
+        headers=_auth(user1_token),
+        json={"width": 512, "height": 512},
+    )
+    assert response.status_code == status.HTTP_501_NOT_IMPLEMENTED
+
+
 # (method, path) pairs that are deliberately public. Everything else must carry an auth dependency.
 #
 # - auth bootstrap: reachable pre-login by construction
@@ -145,13 +162,11 @@ def test_scan_folder_mid_scan_failure_is_a_generic_500(
 #   these needs a signed-URL or cookie scheme (tracked separately, see PR #9367)
 # - version: intentionally public
 # - docs/redoc: API documentation
-# - POST /api/v1/images/ is a 501 stub
 PUBLIC_ROUTES = {
     ("GET", "/api/v1/app/version"),
     ("POST", "/api/v1/auth/login"),
     ("POST", "/api/v1/auth/setup"),
     ("GET", "/api/v1/auth/status"),
-    ("POST", "/api/v1/images/"),
     ("GET", "/api/v1/images/i/{image_name}/full"),
     ("HEAD", "/api/v1/images/i/{image_name}/full"),
     ("GET", "/api/v1/images/i/{image_name}/thumbnail"),
