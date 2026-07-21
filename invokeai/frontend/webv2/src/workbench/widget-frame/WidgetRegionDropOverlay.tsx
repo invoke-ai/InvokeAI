@@ -1,6 +1,8 @@
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 
-import { Box } from '@chakra-ui/react';
+import { DropZone, type DropZoneProps } from '@platform/ui';
+
+const DISALLOWED_STYLES: DropZoneProps = { bg: 'bg.muted', borderColor: 'border.subtle' };
 
 export const WidgetRegionDropOverlay = ({
   dropState,
@@ -9,21 +11,17 @@ export const WidgetRegionDropOverlay = ({
   dropState: WidgetRegionDropState;
   isOver: boolean;
 }) => (
-  <Box
-    bg={dropState.isAllowed ? (isOver ? 'accent.subtle' : 'transparent') : 'bg.muted'}
-    borderColor={dropState.isAllowed ? 'accent.solid' : 'border.subtle'}
-    borderStyle="dashed"
-    borderWidth="2px"
+  <DropZone
     bottom="0"
+    isOver={dropState.isAllowed && isOver}
     left="0"
     opacity={dropState.isAllowed ? 0.96 : 0.5}
     pointerEvents="none"
     position="absolute"
     right="0"
-    rounded="sm"
-    shadow={dropState.isAllowed && isOver ? '0 0 0 1px {colors.accent.solid}' : undefined}
     top="0"
-    transition="background var(--wb-motion-duration-fast) ease, border-color var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease, box-shadow var(--wb-motion-duration-fast) ease"
+    variant="overlay"
     zIndex="2"
+    {...(dropState.isAllowed ? undefined : DISALLOWED_STYLES)}
   />
 );

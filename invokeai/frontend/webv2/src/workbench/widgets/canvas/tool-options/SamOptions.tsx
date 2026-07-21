@@ -2,13 +2,13 @@
 import type { ChangeEvent } from 'react';
 
 import {
+  createListCollection,
   Flex,
   Group,
   HStack,
   IconButton,
   Input,
   Menu,
-  NativeSelect,
   Popover,
   Portal,
   Stack,
@@ -16,7 +16,7 @@ import {
   Text,
   VisuallyHidden,
 } from '@chakra-ui/react';
-import { Button, MenuContent, Tooltip } from '@platform/ui';
+import { Button, MenuContent, Select, Tooltip } from '@platform/ui';
 import {
   getCanvasOperations,
   isSamDocumentInputValid,
@@ -30,6 +30,7 @@ import {
 import { CanvasFloatingBar, CanvasFloatingBarDivider } from '@workbench/widgets/canvas/CanvasFloatingBar';
 import { useSamSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { ChevronDownIcon, SettingsIcon } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CanvasOperationUIEngine } from './operationUIEngine';
@@ -345,6 +346,17 @@ export const SamSettingsPopover = ({
   onToggle(key: 'applyPolygonRefinement' | 'autoProcess' | 'isolatedPreview', value: boolean): void;
 }) => {
   const { t } = useTranslation();
+  const modelValue = useMemo(() => [session.model], [session.model]);
+  const modelCollection = useMemo(
+    () =>
+      createListCollection({
+        items: [
+          { label: t('widgets.layers.selectObject.modelSam2Large'), value: 'segment-anything-2-large' },
+          { label: t('widgets.layers.selectObject.modelHuge'), value: 'segment-anything-huge' },
+        ] as const,
+      }),
+    [t]
+  );
   return (
     <Popover.Root lazyMount positioning={SAM_UPWARD_POSITIONING} unmountOnExit>
       <Popover.Trigger asChild>
@@ -363,19 +375,20 @@ export const SamSettingsPopover = ({
                   <Text asChild fontSize="xs" fontWeight="semibold">
                     <label htmlFor="sam-model">{t('widgets.layers.selectObject.model')}</label>
                   </Text>
-                  <NativeSelect.Root disabled={isProcessing || !eligibility.canEditInputs} size="xs">
-                    <NativeSelect.Field
-                      id="sam-model"
-                      value={session.model}
-                      onChange={(event) => onModelChange(event.currentTarget.value as SamModel)}
-                    >
-                      <option value="segment-anything-2-large">
-                        {t('widgets.layers.selectObject.modelSam2Large')}
-                      </option>
-                      <option value="segment-anything-huge">{t('widgets.layers.selectObject.modelHuge')}</option>
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
+                  <Select
+                    collection={modelCollection}
+                    disabled={isProcessing || !eligibility.canEditInputs}
+                    ids={{ trigger: 'sam-model' }}
+                    size="xs"
+                    value={modelValue}
+                    onValueChange={({ value }) => {
+                      const model = value[0];
+
+                      if (model === 'segment-anything-2-large' || model === 'segment-anything-huge') {
+                        onModelChange(model);
+                      }
+                    }}
+                  />
                 </Stack>
                 <SamSettingsSwitch
                   checked={session.applyPolygonRefinement}

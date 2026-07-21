@@ -17,7 +17,7 @@ import { galleryImages, galleryTransfers } from '@features/gallery';
 import { isGalleryImageDragData } from '@features/gallery/utility';
 import { FluxReduxControls, PROMPT_ATTENTION_TARGET_PROPS, PromptTextarea } from '@features/generation/components';
 import { useModelsSelector } from '@features/models';
-import { Button, ColorPicker, Field, Select, Slider } from '@platform/ui';
+import { Button, ColorPicker, DropZone, Field, Select, Slider } from '@platform/ui';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { ImageIcon, PlusIcon, XIcon } from 'lucide-react';
@@ -621,17 +621,14 @@ const ReferenceImageRow = ({
       </HStack>
 
       <HStack align="flex-start" gap="2">
-        <Box
-          bg={isOver ? 'accent.muted' : undefined}
-          borderColor={isOver ? 'accent.solid' : 'border.emphasized'}
+        <DropZone
+          ref={setNodeRef}
           borderStyle={image ? 'solid' : 'dashed'}
-          borderWidth="1px"
           flexShrink="0"
           h="16"
+          isOver={isOver}
           overflow="hidden"
           position="relative"
-          ref={setNodeRef}
-          rounded="md"
           w="16"
         >
           <Box
@@ -667,7 +664,7 @@ const ReferenceImageRow = ({
               <XIcon />
             </IconButton>
           ) : null}
-        </Box>
+        </DropZone>
         <Text color="fg.muted" flex="1" fontSize="2xs" minW="0">
           {t('widgets.layers.regionalGuidance.referenceImageHelp')}
         </Text>

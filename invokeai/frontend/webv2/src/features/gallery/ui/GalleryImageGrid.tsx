@@ -5,7 +5,7 @@ import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text }
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
-import { IconButton } from '@platform/ui';
+import { DropZone, IconButton } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { StarIcon, UploadIcon } from 'lucide-react';
@@ -493,26 +493,24 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
         </ScrollArea.Root>
       )}
       {isDropActive && (
-        <Flex
-          align="center"
-          bg="bg.muted/80"
-          borderColor="accent.solid"
-          borderStyle="dashed"
-          borderWidth="2px"
-          direction="column"
+        <DropZone
+          alignItems="center"
+          display="flex"
+          flexDirection="column"
           gap="2"
           inset="0"
-          justify="center"
+          isOver
+          justifyContent="center"
           pointerEvents="none"
           position="absolute"
-          rounded="md"
+          variant="overlay"
           zIndex="1"
         >
           <UploadIcon size="20" />
           <Text fontSize="xs" fontWeight="600">
             {t('widgets.gallery.dropImagesToUploadToBoard', { name: selectedBoardName })}
           </Text>
-        </Flex>
+        </DropZone>
       )}
       <ImageContextMenu
         actions={imageActions}

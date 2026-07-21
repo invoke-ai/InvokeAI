@@ -8,11 +8,11 @@ import {
   Box,
   chakra,
   Checkbox,
+  createListCollection,
   Dialog,
   Flex,
   HStack,
   Icon,
-  NativeSelect,
   Portal,
   SimpleGrid,
   Stack,
@@ -22,7 +22,7 @@ import {
   useSlotRecipe,
 } from '@chakra-ui/react';
 import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
-import { Button, CloseButton, IconButton, ConfirmDialog, Tabs, Tooltip } from '@platform/ui';
+import { Button, CloseButton, IconButton, ConfirmDialog, Select, Tabs, Tooltip } from '@platform/ui';
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
@@ -272,7 +272,8 @@ const SettingsTabs = () => {
         borderColor="border.subtle"
         borderRightWidth="1px"
         flexShrink={0}
-        p="2"
+        p="1"
+        gap="0.5"
         w={SETTINGS_TAB_LIST_WIDTH}
       >
         {tabs.map((tab) => (
@@ -346,15 +347,10 @@ const AppearanceSection = () => {
       <SettingSelect
         description={t('settings.languageDescription')}
         label={t('settings.language')}
+        options={WORKBENCH_LANGUAGE_OPTIONS}
         value={language}
         onChange={updateLanguage}
-      >
-        {WORKBENCH_LANGUAGE_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </SettingSelect>
+      />
       <SettingToggle
         checked={reduceMotion}
         description="Disable transitions and animations across the workbench."
@@ -565,12 +561,10 @@ const WorkflowSection = () => {
       <SettingSelect
         description="How connections between nodes are drawn in the editor."
         label="Connection style"
+        options={WORKFLOW_EDGE_STYLE_OPTIONS}
         value={workflowEdgeStyle}
         onChange={updateWorkflowEdgeStyle}
-      >
-        <option value="curved">Curved</option>
-        <option value="square">Square</option>
-      </SettingSelect>
+      />
       <SettingToggle
         checked={workflowSnapToGrid}
         description="Snap nodes to the grid while dragging. When off, hold Ctrl to snap temporarily."
@@ -604,12 +598,10 @@ const QueueSection = () => {
       <SettingSelect
         description="Show jobs from only the active project, or all queue jobs visible to you."
         label="Show jobs from"
+        options={QUEUE_JOBS_SCOPE_OPTIONS}
         value={queueJobsScope}
         onChange={updateQueueJobsScope}
-      >
-        <option value="active-project">Active project</option>
-        <option value="all">All</option>
-      </SettingSelect>
+      />
     </SettingsSection>
   );
 };
@@ -655,15 +647,10 @@ const DeveloperSection = () => {
       <SettingSelect
         description="Minimum log level recorded in the Diagnostics widget."
         label="Log level"
+        options={DEVELOPER_LOG_LEVEL_OPTIONS}
         value={developerLogLevel}
         onChange={updateDeveloperLogLevel}
-      >
-        {DEVELOPER_LOG_LEVELS.map((value) => (
-          <option key={value} value={value}>
-            {formatSettingLabel(value)}
-          </option>
-        ))}
-      </SettingSelect>
+      />
       <SettingToggle
         checked={developerPerformanceTimingsEnabled}
         description="Record performance measurements such as workflow editor timing and project serialization costs."
@@ -820,22 +807,30 @@ const SettingToggle = ({
 };
 
 const SettingSelect = ({
-  children,
   comingSoon,
   description,
   label,
   onChange,
+  options,
   value,
 }: {
-  children: ReactNode;
   comingSoon?: boolean;
   description?: string;
   label: string;
   onChange: (value: string) => void;
+  options: readonly { label: string; value: string }[];
   value: string;
 }) => {
-  const handleChange = useCallback(
-    (event: { currentTarget: { value: string } }) => onChange(event.currentTarget.value),
+  const collection = useMemo(() => createListCollection({ items: options }), [options]);
+  const selectedValue = useMemo(() => [value], [value]);
+  const handleValueChange = useCallback(
+    ({ value: next }: { value: string[] }) => {
+      const nextValue = next[0];
+
+      if (nextValue !== undefined) {
+        onChange(nextValue);
+      }
+    },
     [onChange]
   );
 
@@ -858,12 +853,16 @@ const SettingSelect = ({
           </Field.HelperText>
         )}
       </Stack>
-      <NativeSelect.Root flexShrink={0} maxW={SELECT_MAX_WIDTH} size="sm" w="full">
-        <NativeSelect.Field value={value} onChange={handleChange}>
-          {children}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
+      <Select
+        collection={collection}
+        disabled={comingSoon}
+        flexShrink={0}
+        maxW={SELECT_MAX_WIDTH}
+        size="sm"
+        value={selectedValue}
+        w="full"
+        onValueChange={handleValueChange}
+      />
     </Field.Root>
   );
 };
@@ -873,3 +872,18 @@ const formatSettingLabel = (value: string): string =>
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+
+const WORKFLOW_EDGE_STYLE_OPTIONS = [
+  { label: 'Curved', value: 'curved' },
+  { label: 'Square', value: 'square' },
+];
+
+const QUEUE_JOBS_SCOPE_OPTIONS = [
+  { label: 'Active project', value: 'active-project' },
+  { label: 'All', value: 'all' },
+];
+
+const DEVELOPER_LOG_LEVEL_OPTIONS = DEVELOPER_LOG_LEVELS.map((value) => ({
+  label: formatSettingLabel(value),
+  value,
+}));

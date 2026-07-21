@@ -1,6 +1,7 @@
-import { Badge, Flex } from '@chakra-ui/react';
+import { Badge } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { isGalleryImageDragData } from '@features/gallery/utility';
+import { DropZone } from '@platform/ui';
 import { useTranslation } from 'react-i18next';
 
 import { PREVIEW_COMPARE_DROP_DATA, PREVIEW_COMPARE_DROP_ID } from './previewCompareDnd';
@@ -20,26 +21,22 @@ export const PreviewCompareDropZone = () => {
   }
 
   return (
-    <Flex
+    <DropZone
       ref={setNodeRef}
-      align="center"
-      bg={isOver ? 'bg.subtle' : 'transparent'}
-      borderColor={isOver ? 'border.emphasized' : 'border.subtle'}
-      borderStyle="dashed"
-      borderWidth="1px"
+      alignItems="center"
+      display="flex"
       inset="1"
-      justify="center"
+      isOver={isOver}
+      justifyContent="center"
       opacity={isOver ? 1 : 0.85}
       position="absolute"
       rounded="lg"
-      transitionDuration="var(--wb-motion-duration-fast)"
-      transitionProperty="opacity, background-color, border-color"
-      transitionTimingFunction="ease"
+      variant="overlay"
       zIndex="2"
     >
       <Badge size="xs" variant="subtle">
         {t('widgets.preview.dropToCompare')}
       </Badge>
-    </Flex>
+    </DropZone>
   );
 };
