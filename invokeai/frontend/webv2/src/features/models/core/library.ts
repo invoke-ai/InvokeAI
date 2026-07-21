@@ -48,12 +48,24 @@ export interface ModelPickerOptions {
   searchTerm: string;
 }
 
+/**
+ * Picker list group: one per (type, base) pair so items never need a per-row
+ * base badge — the header renders the base (and, for multi-type pickers, the
+ * type label) from `base`/`type`.
+ */
+export interface ModelPickerGroup {
+  key: string;
+  type: ModelTaxonomyType;
+  base: string;
+  models: ModelConfig[];
+}
+
 export interface ModelPickerResult {
   /** Distinct bases among candidates (pre-search, pre-base-filter), for chips. */
   availableBases: string[];
   /** Models available before text search, used for empty-state copy. */
   candidates: ModelConfig[];
-  groups: ModelGroup[];
+  groups: ModelPickerGroup[];
 }
 
 const matchesSearch = (model: ModelConfig, searchTerm: string): boolean => {
@@ -156,10 +168,31 @@ export const getModelPickerGroups = (models: ModelConfig[], options: ModelPicker
     .sort(
       (a, b) =>
         getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
+        getBaseDisplayRank(String(a.base)) - getBaseDisplayRank(String(b.base)) ||
+        String(a.base).localeCompare(String(b.base)) ||
         a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
     );
 
-  return { availableBases, candidates, groups: groupModelsByType(visibleModels) };
+  return { availableBases, candidates, groups: groupModelsForPicker(visibleModels) };
+};
+
+const groupModelsForPicker = (models: ModelConfig[]): ModelPickerGroup[] => {
+  const groups = new Map<string, ModelPickerGroup>();
+
+  for (const model of models) {
+    const base = String(model.base);
+    const key = `${model.type}:${base}`;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.models.push(model);
+    } else {
+      groups.set(key, { base, key, models: [model], type: model.type });
+    }
+  }
+
+  // Insertion order already follows the sorted model list (category, base, name).
+  return [...groups.values()];
 };
 
 /** Distinct bases present in a model list, for base filter menus. */
@@ -174,19 +207,21 @@ const DEPRIORITIZED_BASES: ReadonlySet<string> = new Set(['any', 'external', 'un
  * registry order from `baseIdentity`, unknown bases come next, and the
  * meaningless `any`/`external`/`unknown` bases are pushed to the very end.
  */
+/** Display rank for a base: registry order, unknown bases next, meaningless bases last. */
+const getBaseDisplayRank = (base: string): number => {
+  if (DEPRIORITIZED_BASES.has(base)) {
+    return KNOWN_MODEL_BASES.length + 1;
+  }
+
+  const index = KNOWN_MODEL_BASES.indexOf(base as (typeof KNOWN_MODEL_BASES)[number]);
+
+  return index === -1 ? KNOWN_MODEL_BASES.length : index;
+};
+
 export const collectBasesForDisplay = (models: Pick<ModelConfig, 'base'>[]): string[] => {
   const bases = [...new Set(models.map((model) => String(model.base)))];
-  const rank = (base: string): number => {
-    if (DEPRIORITIZED_BASES.has(base)) {
-      return KNOWN_MODEL_BASES.length + 1;
-    }
 
-    const index = KNOWN_MODEL_BASES.indexOf(base as (typeof KNOWN_MODEL_BASES)[number]);
-
-    return index === -1 ? KNOWN_MODEL_BASES.length : index;
-  };
-
-  return bases.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  return bases.sort((a, b) => getBaseDisplayRank(a) - getBaseDisplayRank(b) || a.localeCompare(b));
 };
 
 /** Distinct types present in a model list, in canonical order. */

@@ -1,14 +1,15 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelConfig, PredictionType } from '@features/models/core/types';
 
-import { HStack, Input, NativeSelect, Stack, Text, Textarea } from '@chakra-ui/react';
+import { createListCollection, HStack, Input, Stack, Text, Textarea } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { modelEditSchema, type ModelEditFormValues } from '@features/models/core/schemas';
 import { getModelTypeLabel, MODEL_CATEGORIES } from '@features/models/core/taxonomy';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
 import { useZodForm } from '@platform/react/useZodForm';
-import { Button, Field } from '@platform/ui';
+import { Button, Field, Select } from '@platform/ui';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const KNOWN_BASES = [
@@ -26,6 +27,10 @@ const KNOWN_BASES = [
   'any',
   'unknown',
 ];
+
+const MODEL_TYPE_COLLECTION = createListCollection({
+  items: MODEL_CATEGORIES.map((category) => ({ label: getModelTypeLabel(category.type), value: category.type })),
+});
 
 /** Zod-validated editor for a model's identity fields. */
 type ModelEditTarget = Pick<
@@ -53,7 +58,25 @@ export const ModelEditForm = ({
     variant: model.variant ?? '',
   });
 
-  const bases = KNOWN_BASES.includes(String(model.base)) ? KNOWN_BASES : [String(model.base), ...KNOWN_BASES];
+  const baseCollection = useMemo(() => {
+    const bases = KNOWN_BASES.includes(String(model.base)) ? KNOWN_BASES : [String(model.base), ...KNOWN_BASES];
+
+    return createListCollection({
+      items: bases.map((base) => ({ label: getModelBaseLabel(base), value: base })),
+    });
+  }, [model.base]);
+  const predictionTypeCollection = useMemo(
+    () =>
+      createListCollection({
+        items: [
+          { label: t('common.none'), value: '' },
+          { label: 'epsilon', value: 'epsilon' },
+          { label: 'v_prediction', value: 'v_prediction' },
+          { label: 'sample', value: 'sample' },
+        ],
+      }),
+    [t]
+  );
 
   const handleSave = () =>
     form.handleSubmit(async (values) => {
@@ -91,34 +114,34 @@ export const ModelEditForm = ({
       </Field>
       <HStack align="start" gap="2">
         <Field error={form.errors.base} label={t('models.base')}>
-          <NativeSelect.Root size="sm">
-            <NativeSelect.Field
-              value={form.values.base}
-              onChange={(event) => form.setValue('base', event.currentTarget.value)}
-            >
-              {bases.map((base) => (
-                <option key={base} value={base}>
-                  {getModelBaseLabel(base)}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+          <Select
+            aria-label={t('models.base')}
+            collection={baseCollection}
+            size="sm"
+            value={[form.values.base]}
+            onValueChange={({ value }) => {
+              const base = value[0];
+
+              if (base !== undefined) {
+                form.setValue('base', base);
+              }
+            }}
+          />
         </Field>
         <Field error={form.errors.type} label={t('models.type')}>
-          <NativeSelect.Root size="sm">
-            <NativeSelect.Field
-              value={form.values.type}
-              onChange={(event) => form.setValue('type', event.currentTarget.value)}
-            >
-              {MODEL_CATEGORIES.map((category) => (
-                <option key={category.type} value={category.type}>
-                  {getModelTypeLabel(category.type)}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+          <Select
+            aria-label={t('models.type')}
+            collection={MODEL_TYPE_COLLECTION}
+            size="sm"
+            value={[form.values.type]}
+            onValueChange={({ value }) => {
+              const type = value[0];
+
+              if (type !== undefined) {
+                form.setValue('type', type);
+              }
+            }}
+          />
         </Field>
       </HStack>
       <HStack align="start" gap="2">
@@ -130,20 +153,19 @@ export const ModelEditForm = ({
           />
         </Field>
         <Field error={form.errors.predictionType} label={t('models.predictionType')}>
-          <NativeSelect.Root size="sm">
-            <NativeSelect.Field
-              value={form.values.predictionType}
-              onChange={(event) =>
-                form.setValue('predictionType', event.currentTarget.value as ModelEditFormValues['predictionType'])
+          <Select
+            aria-label={t('models.predictionType')}
+            collection={predictionTypeCollection}
+            size="sm"
+            value={[form.values.predictionType]}
+            onValueChange={({ value }) => {
+              const predictionType = value[0];
+
+              if (predictionType !== undefined) {
+                form.setValue('predictionType', predictionType as ModelEditFormValues['predictionType']);
               }
-            >
-              <option value="">{t('common.none')}</option>
-              <option value="epsilon">epsilon</option>
-              <option value="v_prediction">v_prediction</option>
-              <option value="sample">sample</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+            }}
+          />
         </Field>
       </HStack>
       <Field error={form.errors.sourceUrl} helpText={t('models.sourceUrlHelp')} label={t('models.sourceUrl')}>

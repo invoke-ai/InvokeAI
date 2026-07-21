@@ -2,11 +2,11 @@
 import type { AnyModelDefaultSettings, ModelConfig } from '@features/models/core/types';
 import type { TFunction } from 'i18next';
 
-import { Grid, HStack, Icon, NativeSelect, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
+import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
-import { Button, Combobox, FieldLabel, Panel } from '@platform/ui';
+import { Button, Combobox, FieldLabel, Panel, Select } from '@platform/ui';
 import { MoveHorizontalIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -129,22 +129,29 @@ const numberControl =
     </NumberInput.Root>
   );
 
-const selectControl =
-  (options: string[]) => (value: unknown, setValue: (value: unknown) => void, disabled: boolean, _label: string) => (
-    <NativeSelect.Root disabled={disabled} size="sm">
-      <NativeSelect.Field
-        value={typeof value === 'string' ? value : ''}
-        onChange={(event) => setValue(event.currentTarget.value)}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </NativeSelect.Field>
-      <NativeSelect.Indicator />
-    </NativeSelect.Root>
+const selectControl = (options: string[]) => {
+  // Called only at module scope, so the collection is built once per field spec.
+  const collection = createListCollection({
+    items: options.map((option) => ({ label: option, value: option })),
+  });
+
+  return (value: unknown, setValue: (value: unknown) => void, disabled: boolean, label: string) => (
+    <Select
+      aria-label={label}
+      collection={collection}
+      disabled={disabled}
+      size="sm"
+      value={typeof value === 'string' ? [value] : []}
+      onValueChange={({ value: next }) => {
+        const nextValue = next[0];
+
+        if (nextValue !== undefined) {
+          setValue(nextValue);
+        }
+      }}
+    />
   );
+};
 
 const schedulerControl =
   (options: { label: string; value: string }[]) =>

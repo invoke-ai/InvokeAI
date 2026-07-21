@@ -23,6 +23,7 @@ import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, CloseButton, IconButton, Tooltip } from '@platform/ui';
 import { Link } from '@tanstack/react-router';
+import { dropdownContent, dropdownGroupLabel, dropdownItem } from '@theme/recipes';
 import { BoxIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SearchIcon, XIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useRef, useState } from 'react';
 
@@ -203,15 +204,22 @@ export const ModelSelect = ({
               aria-invalid={invalid ? true : undefined}
               aria-haspopup="listbox"
               className={className}
-              colorPalette={invalid ? 'red' : isOpen ? 'accent' : 'bg'}
+              borderColor={invalid ? undefined : isOpen ? 'accent.solid' : 'border'}
+              colorPalette={invalid ? 'red' : 'gray'}
               disabled={disabled}
               justifyContent="space-between"
               minW="0"
               pe={canClear ? '7' : '2'}
               ps="2"
               size={size}
+              transitionDuration="fast"
+              transitionProperty="border-color, background"
               variant="outline"
               w="full"
+              _hover={{
+                bg: 'transparent',
+                borderColor: invalid ? undefined : isOpen ? 'accent.solid' : 'border.emphasized',
+              }}
             >
               {selectedModel ? (
                 <ModelButtonContent model={selectedModel} />
@@ -248,13 +256,9 @@ export const ModelSelect = ({
         <Portal>
           <Popover.Positioner>
             <Popover.Content
-              bg="bg.muted"
-              borderColor="border.emphasized"
-              borderRadius="lg"
-              borderWidth="1px"
-              boxShadow="lg"
-              color="fg"
+              css={dropdownContent}
               maxH="min(18rem, var(--available-height))"
+              maxW="min(24rem, calc(100vw - 1rem))"
               minW="min(18rem, calc(100vw - 1rem))"
               overflow="hidden"
               p="0"
@@ -310,7 +314,7 @@ export const ModelSelect = ({
               <HStack borderTopWidth="1px" borderColor="border.subtle" />
               <ScrollArea.Root maxH="14rem" size="xs" variant="hover" w="full">
                 <ScrollArea.Viewport maxH="inherit" w="full">
-                  <ScrollArea.Content py="1" role="listbox" aria-label={`Available ${scopeLabel}`}>
+                  <ScrollArea.Content maxW="full" py="1" role="listbox" aria-label={`Available ${scopeLabel}`}>
                     {loadStatus === 'idle' || loadStatus === 'loading' ? (
                       <Text color="fg.subtle" fontSize="2xs" p="2">
                         Loading models…
@@ -335,19 +339,21 @@ export const ModelSelect = ({
                     ) : null}
                     {loadStatus === 'loaded'
                       ? groups.map((group) => (
-                          <Stack key={group.type} gap="0">
-                            {modelTypes.length > 1 ? (
-                              <Text
-                                color="fg.subtle"
-                                fontSize="2xs"
-                                fontWeight="600"
-                                letterSpacing="0.02em"
-                                px="2"
-                                py="1"
-                                textTransform="uppercase"
-                              >
-                                {group.label}
-                              </Text>
+                          <Stack key={group.key} gap="0">
+                            {groups.length > 1 ? (
+                              <HStack gap="1.5" px="2" py="1">
+                                {modelTypes.length > 1 ? (
+                                  <Text css={dropdownGroupLabel}>{getModelTypePluralLabel(group.type)}</Text>
+                                ) : null}
+                                <Badge
+                                  colorPalette={getModelBaseColorPalette(group.base)}
+                                  fontSize="2xs"
+                                  size="xs"
+                                  variant="surface"
+                                >
+                                  {getModelBaseLabel(group.base)}
+                                </Badge>
+                              </HStack>
                             ) : null}
                             {group.models.map((model) => {
                               const currentOptionIndex = optionIndex;
@@ -363,19 +369,16 @@ export const ModelSelect = ({
                                   }}
                                   aria-selected={value === model.key}
                                   borderRadius="0"
+                                  css={dropdownItem}
                                   gap="2"
+                                  h="auto"
                                   justifyContent="start"
-                                  truncate
+                                  minH="6"
+                                  py="1"
                                   role="option"
                                   size="2xs"
                                   variant="ghost"
                                   w="full"
-                                  _highlighted={{ bg: 'bg.subtle' }}
-                                  _focusVisible={{
-                                    outline: '2px solid',
-                                    outlineColor: 'accent.solid',
-                                    outlineOffset: '-2px',
-                                  }}
                                   onClick={() => selectModel(model)}
                                   onKeyDown={(event) => {
                                     if (event.key === 'Escape') {
@@ -488,6 +491,8 @@ const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
   </HStack>
 );
 
+// No per-item base badge: the list is grouped by (type, base), so the group
+// header already carries that information.
 const ModelOptionContent = ({ enableDescription, model }: { enableDescription: boolean; model: ModelConfig }) => (
   <HStack flex="1" gap="2" minW="0" textAlign="left" w="full">
     <Stack flex="1" gap="0" minW="0">
@@ -495,7 +500,7 @@ const ModelOptionContent = ({ enableDescription, model }: { enableDescription: b
         {model.name}
       </Text>
       {enableDescription && model.description ? (
-        <Text color="fg.subtle" fontSize="2xs" truncate>
+        <Text color="fg.subtle" fontSize="2xs" lineClamp={2}>
           {model.description}
         </Text>
       ) : null}
@@ -503,14 +508,5 @@ const ModelOptionContent = ({ enableDescription, model }: { enableDescription: b
     <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
       {formatBytes(model.file_size)}
     </Text>
-    <Badge
-      colorPalette={getModelBaseColorPalette(model.base)}
-      flexShrink={0}
-      fontSize="2xs"
-      size="xs"
-      variant="surface"
-    >
-      {getModelBaseLabel(model.base)}
-    </Badge>
   </HStack>
 );
