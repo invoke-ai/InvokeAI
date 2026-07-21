@@ -1,6 +1,6 @@
 import { Button, Flex, Link, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import {
@@ -22,10 +22,8 @@ export const UpscaleWarning = () => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useControlNetModels();
   const { data: setupStatus } = useGetSetupStatusQuery();
-  const user = useAppSelector(selectCurrentUser);
 
-  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
-  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const isAdmin = useIsAdmin();
   const adminEmail = setupStatus?.admin_email ?? null;
 
   useEffect(() => {
