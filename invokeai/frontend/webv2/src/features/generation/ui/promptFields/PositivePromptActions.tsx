@@ -10,23 +10,10 @@ import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
-import {
-  BookDashedIcon,
-  CurlyBracesIcon,
-  HistoryIcon,
-  ImageUpIcon,
-  PlusIcon,
-  SparklesIcon,
-  TrashIcon,
-  Undo2Icon,
-} from 'lucide-react';
+import { HistoryIcon, ImageUpIcon, PlusIcon, SparklesIcon, TrashIcon, Undo2Icon } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const DISABLED_PROMPT_ACTIONS = [
-  { icon: BookDashedIcon, labelKey: 'widgets.generate.promptTemplate' },
-  { icon: CurlyBracesIcon, labelKey: 'widgets.generate.showDynamicPrompts' },
-];
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
@@ -50,21 +37,12 @@ export const PositivePromptActions = ({
   positivePrompt,
   projectId,
 }: PositivePromptActionsProps) => {
-  const { t } = useTranslation();
-
   return (
     <HStack gap="0.5">
       <AddPromptTriggerButton
         isOpen={isPromptTriggerPickerOpen}
         onOpenPromptTriggerPicker={onOpenPromptTriggerPicker}
       />
-      {DISABLED_PROMPT_ACTIONS.map(({ icon: ActionIcon, labelKey }) => (
-        <Tooltip key={labelKey} content={t(labelKey)}>
-          <IconButton aria-label={t(labelKey)} disabled size="2xs" variant="ghost">
-            <ActionIcon />
-          </IconButton>
-        </Tooltip>
-      ))}
       <ExpandPromptButton
         positivePrompt={positivePrompt}
         projectId={projectId}

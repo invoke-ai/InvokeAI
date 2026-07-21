@@ -10,6 +10,10 @@ export const generateWidgetManifest: WidgetManifest = {
   icon: SlidersHorizontalIcon,
   id: 'generate',
   label: (t) => t('widgets.labels.generate'),
-  load: () => import('@features/generation/widget').then((module) => ({ view: module.GenerateWidgetView })),
+  load: () =>
+    import('@features/generation/widget').then((module) => ({
+      headerActions: module.GenerateHeaderActions,
+      view: module.GenerateWidgetView,
+    })),
   version: 1,
 };

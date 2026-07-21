@@ -6,7 +6,7 @@ import { HStack, Switch } from '@chakra-ui/react';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { Field } from '@platform/ui';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AddPromptTriggerButton, PromptTriggerPopover } from './PositivePromptActions';
@@ -128,6 +128,9 @@ export const NegativePromptField = ({
     [commitPromptChange]
   );
 
+  // The switch shares the Field.Root with the textarea; an explicit id keeps
+  // its label bound to its own hidden input instead of the Field's control id.
+  const enableSwitchInputId = useId();
   const labelEnd = useMemo(
     () => (
       <HStack gap="0.5">
@@ -137,7 +140,12 @@ export const NegativePromptField = ({
             onOpenPromptTriggerPicker={handleOpenPromptTriggerPicker}
           />
         ) : null}
-        <Switch.Root checked={isEnabled} size="sm" onCheckedChange={handleEnabledChange}>
+        <Switch.Root
+          checked={isEnabled}
+          ids={{ hiddenInput: enableSwitchInputId, label: `${enableSwitchInputId}-label` }}
+          size="sm"
+          onCheckedChange={handleEnabledChange}
+        >
           <Switch.HiddenInput />
           <Switch.Control _checked={{ bg: 'accent.solid' }}>
             <Switch.Thumb />
@@ -146,7 +154,7 @@ export const NegativePromptField = ({
         </Switch.Root>
       </HStack>
     ),
-    [handleEnabledChange, handleOpenPromptTriggerPicker, isEnabled, t, triggerPickerState]
+    [enableSwitchInputId, handleEnabledChange, handleOpenPromptTriggerPicker, isEnabled, t, triggerPickerState]
   );
 
   const triggerPickerPositioning = useMemo(

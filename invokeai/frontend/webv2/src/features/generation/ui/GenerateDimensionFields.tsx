@@ -270,7 +270,12 @@ export const GenerateDimensionFields = ({
   );
 
   return (
-    <GenerateCollapsibleSection label={t('widgets.generate.dimensions')} badges={badges} defaultOpen>
+    <GenerateCollapsibleSection
+      label={t('widgets.generate.dimensions')}
+      badges={badges}
+      defaultOpen
+      sectionId="dimensions"
+    >
       <Field label={t('widgets.generate.aspectRatio')} p="2">
         <HStack gap="1">
           <Select
@@ -358,11 +363,12 @@ export const GenerateDimensionFields = ({
             >
               <InputGroup
                 endElement={
-                  <ModelDefaultButton
-                    disabled={!modelDefaults || displayDimensions.width === modelDefaults.width}
-                    label={t('widgets.generate.useModelDefaultWidth')}
-                    onClick={() => setDimensionToModelDefault('width')}
-                  />
+                  modelDefaults && displayDimensions.width !== modelDefaults.width ? (
+                    <ModelDefaultButton
+                      label={t('widgets.generate.useModelDefaultWidth')}
+                      onClick={() => setDimensionToModelDefault('width')}
+                    />
+                  ) : undefined
                 }
                 endElementProps={{ pointerEvents: 'auto' }}
                 startElementProps={{ pointerEvents: 'auto' }}
@@ -393,11 +399,12 @@ export const GenerateDimensionFields = ({
             >
               <InputGroup
                 endElement={
-                  <ModelDefaultButton
-                    disabled={!modelDefaults || displayDimensions.height === modelDefaults.height}
-                    label={t('widgets.generate.useModelDefaultHeight')}
-                    onClick={() => setDimensionToModelDefault('height')}
-                  />
+                  modelDefaults && displayDimensions.height !== modelDefaults.height ? (
+                    <ModelDefaultButton
+                      label={t('widgets.generate.useModelDefaultHeight')}
+                      onClick={() => setDimensionToModelDefault('height')}
+                    />
+                  ) : undefined
                 }
                 endElementProps={{ pointerEvents: 'auto' }}
                 startElementProps={{ pointerEvents: 'auto' }}

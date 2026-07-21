@@ -62,6 +62,11 @@ export interface GenerationUiAdapter {
     clear(): void;
     remove(prompt: PromptHistoryItem): void;
   };
+  sectionPreferences: {
+    /** Persisted per-user open/closed overrides for panel sections; absent = section default. */
+    sectionsOpen: Readonly<Record<string, boolean>>;
+    setSectionOpen(sectionId: string, open: boolean): void;
+  };
   settings: {
     patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string): void;
   };

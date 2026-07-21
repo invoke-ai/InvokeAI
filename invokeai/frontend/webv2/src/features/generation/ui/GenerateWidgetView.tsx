@@ -1,10 +1,5 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
-import type {
-  GenerateModelConfig,
-  GenerateSettings,
-  LoraModelConfig,
-  VaeModelConfig,
-} from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
 import {
   getAutoFlux2ComponentSourceModel,
@@ -53,10 +48,6 @@ export const GenerateWidgetView = () => {
   const supportedModels = useMemo<GenerateModelConfig[]>(() => models.filter(isSupportedGenerateModel), [models]);
   const loraModels = useMemo(
     () => models.filter((model): model is ModelConfig & LoraModelConfig => isLoraModelConfig(model)),
-    [models]
-  );
-  const vaeModels = useMemo(
-    () => models.filter((model): model is ModelConfig & VaeModelConfig => model.type === 'vae'),
     [models]
   );
   const normalizedSettings = normalizeGenerateSettings(storedValues);
@@ -125,7 +116,6 @@ export const GenerateWidgetView = () => {
       selectedModel={selectedModel}
       settings={settings}
       supportedModels={supportedModels}
-      vaeModels={vaeModels}
       onCommitSettings={commitSettings}
       onPatchSettings={patchSettings}
     />

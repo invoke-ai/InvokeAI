@@ -687,7 +687,6 @@
       "promptHistory": "Prompt history",
       "promptHistoryEntries": "Prompt history entries",
       "promptHistoryKeyboardHelp": "Alt+Up/Down switches between prompts while focused.",
-      "promptTemplate": "Prompt Template",
       "promptTriggerOptions": "Prompt trigger options",
       "random": "Random",
       "activeSteps": "Active steps",
@@ -703,7 +702,6 @@
       "modeBoth": "Both",
       "modeComposition": "Composition",
       "modeStyle": "Style",
-      "pullBboxIntoReferenceImage": "Pull Bbox into Reference Image",
       "referenceImage": "Reference Image",
       "referenceImageModel": "Reference image model",
       "referenceImages": "Reference images",
@@ -736,7 +734,6 @@
       "setOptimalSize": "Set optimal size",
       "setOptimalSizeDescription": "Set size to the model's optimal pixel count",
       "shuffleSeed": "Shuffle seed",
-      "showDynamicPrompts": "Show dynamic prompts",
       "steps": "Steps",
       "swapWidthAndHeight": "Swap width and height",
       "tileX": "Tile X",
@@ -779,7 +776,8 @@
         "coherenceEdgeSize": "Coherence edge size",
         "coherenceMinDenoise": "Coherence min denoise",
         "maskBlur": "Mask blur"
-      }
+      },
+      "resetAllToModelDefaults": "Reset all to model defaults"
     },
     "upscale": {
       "addLora": "LoRAs",

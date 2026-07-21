@@ -257,6 +257,26 @@ describe('normalizeWorkbenchPreferences queue scope', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences generate sections', () => {
+  it('defaults to no section overrides', () => {
+    expect(store.normalizeWorkbenchPreferences({}).generateSectionsOpen).toEqual({});
+  });
+
+  it('keeps only boolean entries', () => {
+    expect(
+      store.normalizeWorkbenchPreferences({
+        generateSectionsOpen: { advanced: true, concepts: false, model: 'yes' as never },
+      }).generateSectionsOpen
+    ).toEqual({ advanced: true, concepts: false });
+  });
+
+  it('heals malformed shapes to no overrides', () => {
+    expect(
+      store.normalizeWorkbenchPreferences({ generateSectionsOpen: ['advanced'] as never }).generateSectionsOpen
+    ).toEqual({});
+  });
+});
+
 describe('normalizeWorkbenchPreferences language', () => {
   it('accepts locale files that were migrated from the legacy web app', () => {
     expect(store.normalizeWorkbenchPreferences({ language: 'uk' }).language).toBe('uk');

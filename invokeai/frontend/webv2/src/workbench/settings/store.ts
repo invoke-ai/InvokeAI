@@ -50,6 +50,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   developerPerformanceTimingsEnabled: false,
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
+  generateSectionsOpen: {},
   language: 'en',
   queueJobsScope: 'all',
   reduceMotion: false,
@@ -120,6 +121,18 @@ const normalizeCustomHotkeys = (values: unknown): Record<string, string[]> => {
   );
 };
 
+const normalizeGenerateSectionsOpen = (values: unknown): Record<string, boolean> => {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(values).filter(
+      (entry): entry is [string, boolean] => typeof entry[0] === 'string' && typeof entry[1] === 'boolean'
+    )
+  );
+};
+
 export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
   antialiasProgressImages:
     typeof settings?.antialiasProgressImages === 'boolean'
@@ -175,6 +188,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.enableModelDescriptions === 'boolean'
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
+  generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,
   queueJobsScope:
     preferences?.queueJobsScope === 'all-projects'
