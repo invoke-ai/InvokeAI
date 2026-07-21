@@ -147,7 +147,11 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
 
     The runtime config carries provider API keys and model-download bearer tokens. The route is admin-only, but no
     client - not even an admin's browser - has any use for the raw values; the UI only cares whether a credential is
-    configured. Masking here means a future secret added to the config is not automatically served to a browser.
+    configured.
+
+    NOTE: coverage is by convention, not automatic. Only `*_api_key` fields listed in
+    EXTERNAL_PROVIDER_CONFIG_FIELDS plus `remote_api_tokens` are masked. If you add a credential to
+    InvokeAIAppConfig under any other name, you must extend this function or it will be served verbatim.
     """
     updates: dict[str, Any] = {}
 

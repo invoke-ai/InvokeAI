@@ -717,7 +717,7 @@
       "get": {
         "tags": ["model_manager"],
         "summary": "List Missing Models",
-        "description": "Get models whose files are missing from disk.\n\nThese are models that have database entries but their corresponding\nweight files have been deleted externally (not via Model Manager).",
+        "description": "Get models whose files are missing from disk.\n\nThese are models that have database entries but their corresponding\nweight files have been deleted externally (not via Model Manager).\n\nAvailable to any authenticated user, not just admins: the frontend's model hooks subtract this\nset from the model list so unusable models are kept out of the generation dropdowns.",
         "operationId": "list_missing_models",
         "responses": {
           "200": {
