@@ -1,4 +1,3 @@
-import { getIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,11 +13,8 @@ describe('invocation cache controls', () => {
   describe('non-admin in multiuser mode', () => {
     // The status route is admin-only, so a non-admin's cacheStatus is always undefined. Without the
     // admin check that reads as "cache is disabled" and offers an Enable button that always 403s.
-    const isAdmin = getIsAdmin({ multiuser_enabled: true }, { is_admin: false });
-
-    it('is not admin', () => {
-      expect(isAdmin).toBe(false);
-    });
+    // (getIsAdmin's own semantics are covered by its colocated test, features/auth/hooks/useIsAdmin.test.ts.)
+    const isAdmin = false;
 
     it('offers no cache mutation while connected with no status data', () => {
       expect(getIsEnableInvocationCacheDisabled(isAdmin, true, undefined)).toBe(true);
@@ -36,11 +32,6 @@ describe('invocation cache controls', () => {
   });
 
   describe('admin', () => {
-    it('treats the multiuser admin and the single-user operator alike', () => {
-      expect(getIsAdmin({ multiuser_enabled: true }, { is_admin: true })).toBe(true);
-      expect(getIsAdmin({ multiuser_enabled: false }, { is_admin: false })).toBe(true);
-    });
-
     it('preserves the pre-existing enable/disable/clear semantics', () => {
       // Enable is offered only when the cache is off and has capacity.
       expect(getIsEnableInvocationCacheDisabled(true, true, DISABLED_CACHE)).toBe(false);

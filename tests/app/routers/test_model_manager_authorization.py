@@ -93,18 +93,121 @@ def test_scan_folder_allows_admin(enable_multiuser: Any, client: TestClient, adm
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
-@pytest.mark.parametrize("scan_path", ["/nonexistent_xyz", "/etc/ssl", "/"])
-def test_scan_folder_is_not_an_existence_oracle(
-    scan_path: str, enable_multiuser: Any, client: TestClient, admin_token: str
+def test_scan_folder_missing_param_is_a_clean_400(
+    enable_multiuser: Any, client: TestClient, admin_token: str
 ) -> None:
-    """Nonexistent, unreadable and readable-but-unscannable paths must be indistinguishable from the response.
+    """Omitting scan_path must not crash: the None default is guarded before pathlib.Path() sees it."""
+    response = client.get("/api/v2/models/scan_folder", headers=_auth(admin_token))
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    Previously these returned 400 / 500 / 200 respectively, letting a caller probe arbitrary paths.
+
+def test_scan_folder_is_not_an_existence_oracle(
+    enable_multiuser: Any, client: TestClient, admin_token: str, tmp_path: Path
+) -> None:
+    """A nonexistent path and an existing non-directory must be indistinguishable from the response.
+
+    Bounded to tmp_path fixtures - scanning real host paths ('/', '/etc') makes runtime depend on the host
+    filesystem and can walk enormous trees on permissive CI runners.
     """
-    response = client.get(f"/api/v2/models/scan_folder?scan_path={scan_path}", headers=_auth(admin_token))
-    assert response.status_code in (status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST)
-    if response.status_code == status.HTTP_400_BAD_REQUEST:
-        assert response.json()["detail"] == f"The search path '{scan_path}' could not be scanned"
+    not_a_dir = tmp_path / "weights.ckpt"
+    not_a_dir.write_text("not a directory")
+
+    responses = [
+        client.get(f"/api/v2/models/scan_folder?scan_path={p}", headers=_auth(admin_token))
+        for p in (tmp_path / "does_not_exist", not_a_dir)
+    ]
+    for response, p in zip(responses, (tmp_path / "does_not_exist", not_a_dir)):
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == f"The search path '{p}' could not be scanned"
+
+
+def test_scan_folder_mid_scan_failure_is_a_generic_500(
+    enable_multiuser: Any, client: TestClient, admin_token: str, tmp_path: Path, monkeypatch: Any
+) -> None:
+    """A failure after path validation is a server fault: 500, with the details only in the server log.
+
+    By that point is_dir() has already confirmed existence, so a distinct status leaks nothing new - and it
+    preserves the caller-error vs server-fault distinction for the admin and for retrying clients.
+    """
+
+    class ExplodingSearch:
+        def search(self, path: Path) -> None:
+            raise PermissionError("permission denied inside the tree")
+
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ModelSearch", ExplodingSearch)
+
+    response = client.get(f"/api/v2/models/scan_folder?scan_path={tmp_path}", headers=_auth(admin_token))
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    # The response must not echo the exception - details go to the server log only.
+    assert "PermissionError" not in response.text
+    assert "permission denied" not in response.text
+
+
+# (method, path) pairs that are deliberately public. Everything else must carry an auth dependency.
+#
+# - auth bootstrap: reachable pre-login by construction
+# - binary <img src>/thumbnail routes: browsers cannot attach a Bearer header to <img> requests; closing
+#   these needs a signed-URL or cookie scheme (tracked separately, see PR #9367)
+# - version: intentionally public
+# - docs/redoc: API documentation
+# - POST /api/v1/images/ is a 501 stub
+PUBLIC_ROUTES = {
+    ("GET", "/api/v1/app/version"),
+    ("POST", "/api/v1/auth/login"),
+    ("POST", "/api/v1/auth/setup"),
+    ("GET", "/api/v1/auth/status"),
+    ("POST", "/api/v1/images/"),
+    ("GET", "/api/v1/images/i/{image_name}/full"),
+    ("HEAD", "/api/v1/images/i/{image_name}/full"),
+    ("GET", "/api/v1/images/i/{image_name}/thumbnail"),
+    ("GET", "/api/v1/workflows/i/{workflow_id}/thumbnail"),
+    ("GET", "/api/v2/models/i/{key}/image"),
+    ("GET", "/docs"),
+    ("GET", "/redoc"),
+}
+
+
+def _routes_without_auth() -> set[tuple[str, str]]:
+    """Every (method, path) in the app whose dependency tree contains no auth dependency."""
+    from fastapi.routing import APIRoute
+
+    from invokeai.app.api import auth_dependencies
+    from invokeai.app.api_app import app
+
+    auth_functions = {auth_dependencies.get_current_user, auth_dependencies.get_current_user_or_default}
+
+    def has_auth(dependant: Any) -> bool:
+        if dependant.call in auth_functions:
+            return True
+        return any(has_auth(sub) for sub in dependant.dependencies)
+
+    return {
+        (method, route.path)
+        for route in app.routes
+        if isinstance(route, APIRoute) and not has_auth(route.dependant)
+        for method in route.methods
+    }
+
+
+def test_every_route_is_authenticated_or_explicitly_public() -> None:
+    """Default-deny: a new route without an auth dependency must be a conscious, allowlisted decision.
+
+    GH #9365 happened because auth was opt-in per route and nothing failed when a route lacked it. A
+    hand-maintained list of protected routes cannot catch the next unauthenticated route; walking the app's
+    actual dependency trees can.
+    """
+    unauthenticated = _routes_without_auth()
+
+    unlisted = unauthenticated - PUBLIC_ROUTES
+    assert not unlisted, (
+        f"Routes without an auth dependency that are not on the public allowlist: {sorted(unlisted)}. "
+        "Add an auth dependency (CurrentUserOrDefault / AdminUserOrDefault), or - only for routes that must "
+        "be public - add them to PUBLIC_ROUTES with a justification."
+    )
+
+    # Keep the allowlist honest: an entry that gained auth (or disappeared) must be removed.
+    stale = PUBLIC_ROUTES - unauthenticated
+    assert not stale, f"PUBLIC_ROUTES entries that are no longer unauthenticated routes: {sorted(stale)}"
 
 
 def test_regular_user_can_still_list_models(

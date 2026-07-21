@@ -351,15 +351,19 @@ async def scan_for_models(
     current_admin: AdminUserOrDefault,
     scan_path: str = Query(description="Directory path to search for models", default=None),
 ) -> List[FoundModel]:
-    # A single generic error is used for every failure mode below, so that the response cannot be used as an
-    # existence/readability oracle for arbitrary filesystem paths.
+    # A single generic error is used for every path-validation failure below, so that the response cannot be
+    # used as an existence/readability oracle for arbitrary filesystem paths.
     scan_failed = HTTPException(
         status_code=400,
         detail=f"The search path '{scan_path}' could not be scanned",
     )
 
+    # Guard before constructing a Path: the query param defaults to None and pathlib.Path(None) raises.
+    if not scan_path:
+        raise scan_failed
+
     path = pathlib.Path(scan_path)
-    if not scan_path or not path.is_dir():
+    if not path.is_dir():
         raise scan_failed
 
     search = ModelSearch()
@@ -387,7 +391,10 @@ async def scan_for_models(
         ApiDependencies.invoker.services.logger.error(
             f"Error scanning '{scan_path}' for models: {type(e).__name__}: {e}"
         )
-        raise scan_failed
+        # By this point is_dir() has already confirmed the path exists, so a distinct status leaks nothing
+        # new. Keeping 500 (with the details only in the server log) preserves the caller-error vs
+        # server-fault distinction for the admin and for retry logic.
+        raise HTTPException(status_code=500, detail=f"An error occurred while scanning '{scan_path}'")
     return scan_results
 
 

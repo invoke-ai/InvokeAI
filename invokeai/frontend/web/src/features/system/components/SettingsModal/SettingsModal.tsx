@@ -312,21 +312,26 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
                       <FormLabel>{t('settings.enableInvisibleWatermark')}</FormLabel>
                       <Switch isChecked={shouldUseWatermarker} onChange={handleChangeShouldUseWatermarker} />
                     </FormControl>
-                    <FormControl>
-                      <FormLabel>{t('settings.maxQueueHistory')}</FormLabel>
-                      <NumberInput
-                        min={0}
-                        step={1}
-                        value={maxQueueHistoryInput}
-                        onChange={handleChangeMaxQueueHistory}
-                        onBlur={handleBlurMaxQueueHistory}
-                        clampValueOnBlur={false}
-                        isDisabled={!runtimeConfig || !canEditRuntimeConfig || isUpdatingRuntimeConfig}
-                        w="8rem"
-                      >
-                        <NumberInputField onKeyDown={handleKeyDownMaxQueueHistory} />
-                      </NumberInput>
-                    </FormControl>
+                    {/* Admin-only: the backing runtime_config query is skipped for non-admins, so a
+                        rendered-but-disabled input would sit permanently blank. Hide it instead, matching
+                        SettingsImageSubfolderStrategySelect below. */}
+                    {canEditRuntimeConfig && (
+                      <FormControl>
+                        <FormLabel>{t('settings.maxQueueHistory')}</FormLabel>
+                        <NumberInput
+                          min={0}
+                          step={1}
+                          value={maxQueueHistoryInput}
+                          onChange={handleChangeMaxQueueHistory}
+                          onBlur={handleBlurMaxQueueHistory}
+                          clampValueOnBlur={false}
+                          isDisabled={!runtimeConfig || isUpdatingRuntimeConfig}
+                          w="8rem"
+                        >
+                          <NumberInputField onKeyDown={handleKeyDownMaxQueueHistory} />
+                        </NumberInput>
+                      </FormControl>
+                    )}
                     <SettingsImageSubfolderStrategySelect />
                     <SettingsImageStorageMaintenance />
                   </StickyScrollable>
