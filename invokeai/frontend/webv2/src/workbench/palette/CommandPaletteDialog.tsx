@@ -20,6 +20,7 @@ import {
   buildStageEntries,
   PROVIDER_MIN_QUERY_LENGTH,
   searchPaletteRows,
+  STAGE_ENTRY_ID_PREFIX,
 } from './entries';
 import { getRecentEntryIds, recordRecentEntry } from './recents';
 
@@ -428,6 +429,27 @@ const CommandPaletteContent = ({
   const effectiveActiveIndex = navigableRowIndexes.includes(activeIndex) ? activeIndex : (navigableRowIndexes[0] ?? -1);
   const activeRow = effectiveActiveIndex === -1 ? undefined : rows[effectiveActiveIndex];
 
+  // --- Stage preview -----------------------------------------------------
+  // Leaving a previewing stage always changes `stage` (pop sets it null, close
+  // unmounts), so this cleanup reverts the preview on every exit path. A pick
+  // persists first, making the revert an idempotent no-op.
+  useEffect(() => {
+    if (!stage?.clearPreview) {
+      return;
+    }
+
+    return stage.clearPreview;
+  }, [stage]);
+
+  // Preview follows the highlight, including the first match while typing.
+  useEffect(() => {
+    if (!stage?.preview || activeRow?.kind !== 'entry' || !activeRow.entry.id.startsWith(STAGE_ENTRY_ID_PREFIX)) {
+      return;
+    }
+
+    stage.preview(activeRow.entry.id.slice(STAGE_ENTRY_ID_PREFIX.length));
+  }, [activeRow, stage]);
+
   const estimateRowSize = useCallback(
     (index: number) => (rows[index]?.kind === 'label' ? LABEL_ROW_HEIGHT_PX : ENTRY_ROW_HEIGHT_PX),
     [rows]
@@ -466,7 +488,11 @@ const CommandPaletteContent = ({
       if (row.entry.stage) {
         setStage(row.entry.stage);
         setQuery('');
-        setActiveIndex(-1);
+        // Land the highlight on the current value (+1 skips the single group
+        // label row) — matches native pickers, and keeps a previewing stage
+        // from flashing the first option's preview on open.
+        const currentIndex = row.entry.stage.options.findIndex((option) => option.isCurrent);
+        setActiveIndex(currentIndex === -1 ? -1 : currentIndex + 1);
         return;
       }
 

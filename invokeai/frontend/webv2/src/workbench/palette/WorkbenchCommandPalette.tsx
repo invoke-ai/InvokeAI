@@ -1,5 +1,7 @@
+import { getQueueQueryScope } from '@features/queue/queries';
+import { requestQueueItemReveal } from '@features/queue/react';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
-import { patchWorkbenchPreferences, useWorkbenchPreferences } from '@workbench/settings/store';
+import { getWorkbenchPreferences, useWorkbenchPreferences } from '@workbench/settings/store';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -20,9 +22,11 @@ import {
   createImagesProvider,
   createModelsProvider,
   createPromptHistoryProvider,
+  createQueueItemsProvider,
   createWorkflowsProvider,
 } from './paletteProviders';
 import { closeCommandPalette, commandPaletteStore } from './paletteStore';
+import { SETTINGS_ENTRY_DEPS } from './settingsEntryDeps';
 
 /**
  * Editor host: aggregates the hotkey catalog, extension palette contributions,
@@ -30,11 +34,6 @@ import { closeCommandPalette, commandPaletteStore } from './paletteStore';
  * types present in the current layout, and execute through the contribution's
  * own source so widget handlers resolve exactly as they do for hotkeys.
  */
-
-const SETTINGS_ENTRY_DEPS = {
-  openSettingsSection: openWorkbenchSettings,
-  patchPreferences: patchWorkbenchPreferences,
-};
 
 const STATIC_APP_ENTRIES: PaletteEntry[] = [
   {
@@ -104,7 +103,7 @@ export const WorkbenchCommandPalette = () => {
   const extensionSearchProviders = useSyncExternalStore(searchStore.subscribe, searchStore.list, searchStore.list);
   const providers = useMemo<PaletteSearchProvider[]>(() => {
     const { gallery, widgets } = workbenchCommands;
-    const openWidget = (typeId: 'workflow' | 'gallery' | 'generate' | 'preview') =>
+    const openWidget = (typeId: 'workflow' | 'gallery' | 'generate' | 'preview' | 'queue') =>
       openWidgetPlacement({
         getWidgetsForRegion,
         options:
@@ -112,7 +111,9 @@ export const WorkbenchCommandPalette = () => {
             ? { preferredRegions: ['center'], requireCenterView: true }
             : typeId === 'generate'
               ? { preferredRegions: ['left'] }
-              : { preferredRegions: ['center', 'right'] },
+              : typeId === 'queue'
+                ? { preferredRegions: ['right'] }
+                : { preferredRegions: ['center', 'right'] },
         typeId,
         widgets,
       });
@@ -141,6 +142,17 @@ export const WorkbenchCommandPalette = () => {
         openPreviewWidget: () => openWidget('preview'),
         selectBoard: (boardId) => gallery.selectBoard(boardId),
         selectImage: (image) => gallery.selectImage(image),
+      }),
+      createQueueItemsProvider({
+        // Scope must be read at search time — the jobs-scope pref is itself
+        // editable from the palette.
+        getScope: () =>
+          getQueueQueryScope({
+            projectId: queries.getSnapshot().activeProject.id,
+            queueJobsScope: getWorkbenchPreferences().queueJobsScope,
+          }),
+        openQueueWidget: () => openWidget('queue'),
+        revealItem: (itemId) => requestQueueItemReveal(itemId),
       }),
       createPromptHistoryProvider({
         getPromptHistory: () => queries.getSnapshot().activeProject.promptHistory,

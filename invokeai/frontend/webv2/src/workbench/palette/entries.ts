@@ -27,6 +27,10 @@ export interface PaletteStageOption {
 export interface PaletteStage {
   title: string;
   options: PaletteStageOption[];
+  /** Transient preview of the highlighted option (must not persist anything). */
+  preview?: (optionId: string) => void;
+  /** Revert any active preview; called on every stage exit path. */
+  clearPreview?: () => void;
 }
 
 export interface PaletteEntry {
@@ -234,6 +238,10 @@ const SETTINGS_SECTIONS: ReadonlyArray<{ id: SettingsSectionId; title: string }>
 export interface SettingsEntryDeps {
   openSettingsSection: (sectionId: SettingsSectionId) => void;
   patchPreferences: (patch: Partial<WorkbenchPreferences>) => unknown;
+  /** Transient theme preview while the Theme stage is open (no persistence). */
+  previewTheme?: (themeId: string) => void;
+  /** Revert a theme preview to the stored preference. */
+  clearThemePreview?: () => void;
 }
 
 export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: SettingsEntryDeps): PaletteEntry[] => {
@@ -254,6 +262,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
     keywords,
     options,
     sectionId,
+    stagePreview,
     subtitle,
     title,
   }: {
@@ -261,6 +270,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
     keywords: string;
     options: PaletteStageOption[];
     sectionId: SettingsSectionId;
+    stagePreview?: Pick<PaletteStage, 'clearPreview' | 'preview'>;
     subtitle: string;
     title: string;
   }): PaletteEntry => ({
@@ -269,7 +279,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
     keywords,
     run: () => deps.openSettingsSection(sectionId),
     secondary: { label: 'Open in Settings', run: () => deps.openSettingsSection(sectionId) },
-    stage: { options, title },
+    stage: { options, title, ...stagePreview },
     subtitle,
     title,
   });
@@ -285,6 +295,10 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
         label: theme.label,
       })),
       sectionId: 'appearance',
+      stagePreview:
+        deps.previewTheme && deps.clearThemePreview
+          ? { clearPreview: deps.clearThemePreview, preview: deps.previewTheme }
+          : undefined,
       subtitle: THEMES_BY_ID[preferences.themeId]?.label ?? preferences.themeId,
       title: 'Theme',
     }),
@@ -475,11 +489,14 @@ export const searchPaletteRows = (
 // Stage / provider row assembly
 // ---------------------------------------------------------------------------
 
+/** Row-id prefix for stage options; the dialog strips it to recover the option id. */
+export const STAGE_ENTRY_ID_PREFIX = 'stage:';
+
 /** Turn a value-picker stage into filterable entry rows; picking applies and pops. */
 export const buildStageEntries = (stage: PaletteStage, onApplied: () => void): PaletteEntry[] =>
   stage.options.map((option) => ({
     group: stage.title,
-    id: `stage:${option.id}`,
+    id: `${STAGE_ENTRY_ID_PREFIX}${option.id}`,
     keepOpen: true,
     run: () => {
       void option.apply();

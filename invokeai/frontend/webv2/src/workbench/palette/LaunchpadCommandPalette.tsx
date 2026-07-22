@@ -1,7 +1,7 @@
 import { useCapabilities } from '@features/identity';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
-import { patchWorkbenchPreferences, useWorkbenchPreferences } from '@workbench/settings/store';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
 import { useEffect, useMemo } from 'react';
 import { tinykeys } from 'tinykeys';
 
@@ -10,6 +10,7 @@ import type { PaletteEntry } from './entries';
 import { CommandPaletteDialog } from './CommandPaletteDialog';
 import { buildSettingsEntries } from './entries';
 import { closeCommandPalette, commandPaletteStore, toggleCommandPalette } from './paletteStore';
+import { SETTINGS_ENTRY_DEPS } from './settingsEntryDeps';
 
 /**
  * Launchpad host: the editor's hotkey runtime is not mounted here, so this
@@ -17,11 +18,6 @@ import { closeCommandPalette, commandPaletteStore, toggleCommandPalette } from '
  * navigation and settings only; editor commands need an editor mount. A mod+K
  * that works "sometimes" trains users not to trust it.
  */
-
-const SETTINGS_ENTRY_DEPS = {
-  openSettingsSection: openWorkbenchSettings,
-  patchPreferences: patchWorkbenchPreferences,
-};
 
 export const LaunchpadCommandPalette = () => {
   const isOpen = commandPaletteStore.useSelector((snapshot) => snapshot.isOpen);

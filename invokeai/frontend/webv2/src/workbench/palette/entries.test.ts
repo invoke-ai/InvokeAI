@@ -122,6 +122,32 @@ describe('buildSettingsEntries', () => {
     edgeStyle?.stage?.options[1]?.apply();
     expect(patchPreferences).toHaveBeenCalledWith({ workflowEdgeStyle: 'square' });
   });
+
+  it('wires theme stage preview hooks only when the host provides them', () => {
+    const previewTheme = vi.fn();
+    const clearThemePreview = vi.fn();
+    const withPreview = buildSettingsEntries(DEFAULT_PREFERENCES, {
+      clearThemePreview,
+      openSettingsSection: vi.fn(),
+      patchPreferences: vi.fn(),
+      previewTheme,
+    });
+    const theme = withPreview.find((entry) => entry.id === 'setting.themeId');
+
+    theme?.stage?.preview?.('light');
+    theme?.stage?.clearPreview?.();
+    expect(previewTheme).toHaveBeenCalledWith('light');
+    expect(clearThemePreview).toHaveBeenCalled();
+
+    const withoutPreview = buildSettingsEntries(DEFAULT_PREFERENCES, {
+      openSettingsSection: vi.fn(),
+      patchPreferences: vi.fn(),
+    });
+    const bareTheme = withoutPreview.find((entry) => entry.id === 'setting.themeId');
+
+    expect(bareTheme?.stage?.preview).toBeUndefined();
+    expect(bareTheme?.stage?.clearPreview).toBeUndefined();
+  });
 });
 
 describe('buildStageEntries', () => {
