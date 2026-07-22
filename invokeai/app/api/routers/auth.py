@@ -9,13 +9,18 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Resp
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, field_validator
 
-from invokeai.app.api.auth_dependencies import MEDIA_TOKEN_COOKIE, AdminUser, CurrentUser, security
+from invokeai.app.api.auth_dependencies import (
+    MEDIA_TOKEN_COOKIE,
+    AdminUser,
+    CurrentUser,
+    CurrentUserOrDefault,
+    security,
+)
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.auth.token_service import (
     TokenData,
     create_access_token,
     get_token_remaining_seconds,
-    verify_token,
 )
 from invokeai.app.services.users.users_common import (
     UserCreateRequest,
@@ -248,6 +253,7 @@ async def logout(
 async def refresh_media_cookie(
     request: Request,
     response: Response,
+    _current_user: CurrentUserOrDefault,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
 ) -> MediaCookieResponse:
     """Re-issue the media cookie from a valid Bearer token.
@@ -269,26 +275,19 @@ async def refresh_media_cookie(
 
     Raises:
         HTTPException: 401 if the Bearer token is missing, invalid, or expired, or
-        the user no longer exists or is inactive.
+        the user no longer exists or is inactive (raised by the auth dependency).
     """
     config = ApiDependencies.invoker.services.configuration
     if not config.multiuser:
         return MediaCookieResponse(success=True)
 
+    # CurrentUserOrDefault has already validated the Bearer token (signature, expiry,
+    # user exists and is active) — in multiuser mode it 401s otherwise, so credentials
+    # cannot be None here. The raw token is still needed as the cookie value.
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     token = credentials.credentials
-    token_data = verify_token(token)
-    if token_data is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-
-    # Mirror get_current_user: the token alone isn't enough — the user must still
-    # exist and be active, since the cookie grants access to media routes.
-    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
-
     remaining = get_token_remaining_seconds(token)
     if remaining is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")

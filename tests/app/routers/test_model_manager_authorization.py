@@ -158,8 +158,9 @@ def test_create_image_upload_entry_requires_auth_before_the_501_stub(
 # (method, path) pairs that are deliberately public. Everything else must carry an auth dependency.
 #
 # - auth bootstrap: reachable pre-login by construction
-# - binary <img src>/thumbnail routes: browsers cannot attach a Bearer header to <img> requests; closing
-#   these needs a signed-URL or cookie scheme (tracked separately, see PR #9367)
+# - binary <img src>/thumbnail routes: browsers cannot attach a Bearer header to <img> requests. Image and
+#   video media routes now authenticate via the path-scoped media cookie (get_current_media_user_or_default);
+#   the workflow-thumbnail and model-image routes remain open pending the same treatment (see PR #9367)
 # - version: intentionally public
 # - docs/redoc: API documentation
 PUBLIC_ROUTES = {
@@ -167,9 +168,6 @@ PUBLIC_ROUTES = {
     ("POST", "/api/v1/auth/login"),
     ("POST", "/api/v1/auth/setup"),
     ("GET", "/api/v1/auth/status"),
-    ("GET", "/api/v1/images/i/{image_name}/full"),
-    ("HEAD", "/api/v1/images/i/{image_name}/full"),
-    ("GET", "/api/v1/images/i/{image_name}/thumbnail"),
     ("GET", "/api/v1/workflows/i/{workflow_id}/thumbnail"),
     ("GET", "/api/v2/models/i/{key}/image"),
     ("GET", "/docs"),
@@ -184,7 +182,11 @@ def _routes_without_auth() -> set[tuple[str, str]]:
     from invokeai.app.api import auth_dependencies
     from invokeai.app.api_app import app
 
-    auth_functions = {auth_dependencies.get_current_user, auth_dependencies.get_current_user_or_default}
+    auth_functions = {
+        auth_dependencies.get_current_user,
+        auth_dependencies.get_current_user_or_default,
+        auth_dependencies.get_current_media_user_or_default,
+    }
 
     def has_auth(dependant: Any) -> bool:
         if dependant.call in auth_functions:

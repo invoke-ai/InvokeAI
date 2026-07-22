@@ -115,7 +115,7 @@ export type paths = {
          *
          *     Raises:
          *         HTTPException: 401 if the Bearer token is missing, invalid, or expired, or
-         *         the user no longer exists or is inactive.
+         *         the user no longer exists or is inactive (raised by the auth dependency).
          */
         post: operations["refresh_media_cookie_api_v1_auth_media_cookie_post"];
         delete?: never;

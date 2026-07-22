@@ -367,6 +367,9 @@ class TestRefreshMediaCookie:
 
     def _login(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient, email: str) -> str:
         monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        # The media-cookie route authenticates via CurrentUserOrDefault, which reads
+        # ApiDependencies from the auth_dependencies module.
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
         setup_test_user(mock_invoker, email, "TestPass123")
         response = client.post(
             "/api/v1/auth/login",
@@ -398,12 +401,14 @@ class TestRefreshMediaCookie:
 
     def test_requires_bearer_token(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
         monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
         client.cookies.clear()
         response = client.post("/api/v1/auth/media-cookie")
         assert response.status_code == 401
 
     def test_rejects_invalid_token(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
         monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
         response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": "Bearer not-a-jwt"})
         assert response.status_code == 401
         assert response.cookies.get("invokeai_media_token") is None
@@ -430,6 +435,7 @@ class TestRefreshMediaCookie:
         """In single-user mode media routes don't require auth; the frontend may
         still call this on load, so it must succeed without setting a cookie."""
         monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
         mock_invoker.services.configuration.multiuser = False
         client.cookies.clear()
 
@@ -480,6 +486,7 @@ class TestMediaCookieBehindSubPathProxy:
         self, preserve: bool, monkeypatch: Any, mock_invoker: Invoker
     ) -> None:
         monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
         setup_test_user(mock_invoker, f"proxy-media-{preserve}@example.com", "TestPass123")
         client = self._proxied_client(preserve)
         token, _ = self._login(client, f"proxy-media-{preserve}@example.com")

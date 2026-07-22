@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getDeletedImagesFromDeleteBoardAction } from './boardAndImagesDeleted';
+import { getDeletedImagesFromDeleteBoardAction, getDeletedVideosFromDeleteBoardAction } from './boardAndImagesDeleted';
 
 describe('getDeletedImagesFromDeleteBoardAction', () => {
   it('reads deleted images from a successful response', () => {
@@ -19,5 +19,25 @@ describe('getDeletedImagesFromDeleteBoardAction', () => {
   it('rejects malformed partial-failure data', () => {
     expect(getDeletedImagesFromDeleteBoardAction({ data: { detail: { deleted_images: [123] } } })).toEqual([]);
     expect(getDeletedImagesFromDeleteBoardAction(undefined)).toEqual([]);
+  });
+});
+
+describe('getDeletedVideosFromDeleteBoardAction', () => {
+  it('reads deleted videos from a successful response', () => {
+    expect(getDeletedVideosFromDeleteBoardAction({ deleted_videos: ['a.mp4'] })).toEqual(['a.mp4']);
+  });
+
+  it('reads deleted videos from a partial-failure response', () => {
+    expect(
+      getDeletedVideosFromDeleteBoardAction({
+        status: 500,
+        data: { detail: { deleted_images: [], deleted_videos: ['a.mp4'], board_deleted: false } },
+      })
+    ).toEqual(['a.mp4']);
+  });
+
+  it('rejects malformed partial-failure data', () => {
+    expect(getDeletedVideosFromDeleteBoardAction({ data: { detail: { deleted_videos: [123] } } })).toEqual([]);
+    expect(getDeletedVideosFromDeleteBoardAction(undefined)).toEqual([]);
   });
 });
