@@ -796,7 +796,7 @@ export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
 export const zParamsState = z.object({
-  _version: z.literal(3),
+  _version: z.literal(4),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -890,7 +890,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 3,
+  _version: 4,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',

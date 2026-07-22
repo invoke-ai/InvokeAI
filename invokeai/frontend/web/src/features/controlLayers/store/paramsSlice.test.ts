@@ -157,7 +157,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(3);
+    expect(result._version).toBe(4);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     // Existing params should be preserved
@@ -166,6 +166,29 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.shouldRandomizeSeed).toBe(false);
     expect(result.dimensions.width).toBe(768);
     expect(result.dimensions.height).toBe(768);
+  });
+
+  it('merges the separate Klein / dev VAE slots into flux2VaeModel when migrating from v3', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const kleinVae = { key: 'klein-vae', hash: 'h', name: 'Klein VAE', base: 'flux2', type: 'vae' };
+    // Pre-PR v3 state: separate Klein / dev VAE slots, no shared flux2VaeModel.
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      _version: 3,
+      kleinVaeModel: kleinVae,
+      flux2DevVaeModel: null,
+    };
+    delete v3State.flux2VaeModel;
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
+
+    expect(result._version).toBe(4);
+    expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('klein-vae');
+    // The old slots must be gone.
+    expect(result.kleinVaeModel).toBeUndefined();
+    expect(result.flux2DevVaeModel).toBeUndefined();
   });
 
   it('migrates old positive prompt history entries to prompt pairs', () => {
