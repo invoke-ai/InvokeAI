@@ -1,13 +1,17 @@
 import type { GalleryBoard, GalleryImage } from '@features/gallery/contracts';
 import type { ModelConfig } from '@features/models';
+import type { QueueItemStatus, QueueQueryScope } from '@features/queue/contracts';
 import type { PromptHistoryItem } from '@workbench/projectContracts';
 
 import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/queries';
 import { focusPositivePrompt } from '@features/generation/react';
 import { ensureModelsLoaded, getModelBaseLabel, getModelsSnapshot } from '@features/models';
+import { extractGenerationMeta, getResultImageName } from '@features/queue/contracts';
+import { getQueueReadModelOptions } from '@features/queue/queries';
 import { listLibraryWorkflows } from '@features/workflow/queries';
 import { requestLibraryWorkflowLoad } from '@features/workflow/react';
 import { queryClient } from '@platform/query/client';
+import { absolutizeApiUrl } from '@platform/transport/http';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
@@ -153,6 +157,59 @@ export const createModelsProvider = ({
         subtitle: getModelBaseLabel(model.base),
         title: model.name,
       }));
+  },
+});
+
+const QUEUE_STATUS_LABELS: Record<QueueItemStatus, string> = {
+  canceled: 'Canceled',
+  completed: 'Completed',
+  failed: 'Failed',
+  in_progress: 'In progress',
+  pending: 'Pending',
+  waiting: 'Waiting',
+};
+
+export const createQueueItemsProvider = ({
+  getScope,
+  openQueueWidget,
+  revealItem,
+}: {
+  getScope: () => QueueQueryScope;
+  openQueueWidget: () => void;
+  revealItem: (itemId: number) => void;
+}): PaletteSearchProvider => ({
+  id: 'queue-items',
+  label: 'Queue items',
+  search: async (query) => {
+    // The queue read model is a recent window with no server-side text search;
+    // filter the fetched window client-side.
+    const model = await queryClient.fetchQuery(getQueueReadModelOptions(getScope()));
+
+    return model.items
+      .map((item) => ({ item, meta: extractGenerationMeta(item) }))
+      .filter(({ item, meta }) =>
+        matchesTerms(
+          `${meta.positivePrompt ?? ''} ${meta.negativePrompt ?? ''} ${QUEUE_STATUS_LABELS[item.status]} ${item.userDisplayName ?? ''}`,
+          query
+        )
+      )
+      .map<PaletteEntry>(({ item, meta }) => {
+        const resultImageName = getResultImageName(item);
+
+        return {
+          group: 'Queue items',
+          id: `queue-item:${item.id}`,
+          run: () => {
+            openQueueWidget();
+            revealItem(item.id);
+          },
+          subtitle: QUEUE_STATUS_LABELS[item.status],
+          thumbnailUrl: resultImageName
+            ? absolutizeApiUrl(`/api/v1/images/i/${encodeURIComponent(resultImageName)}/thumbnail`)
+            : undefined,
+          title: meta.positivePrompt?.trim() || 'Untitled generation',
+        };
+      });
   },
 });
 

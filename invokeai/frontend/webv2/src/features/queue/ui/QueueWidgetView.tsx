@@ -11,6 +11,7 @@ import { CurrentBatchSection } from './NowNextSection';
 import { useQueueCounts } from './queueDataStore';
 import { QueueFilterTabs } from './QueueFilterTabs';
 import { QueueStats } from './QueueStats';
+import { usePendingQueueItemReveal } from './queueUiStore';
 import { RecentSection } from './RecentSection';
 
 /**
@@ -47,13 +48,22 @@ export const QueueWidgetView = ({
 
 const QueueContent = () => {
   const [filter, setFilter] = useState<QueueFilterId>('all');
+  const revealItemId = usePendingQueueItemReveal();
+  const [handledRevealId, setHandledRevealId] = useState<number | null>(null);
+
+  // Render-phase adjustment (not an effect): a reveal request must not be
+  // hidden by the active status tab.
+  if (revealItemId !== null && revealItemId !== handledRevealId) {
+    setHandledRevealId(revealItemId);
+    setFilter('all');
+  }
 
   return (
     <Stack gap="3" p="3">
       <QueueStats />
       <QueueFilterTabs value={filter} onChange={setFilter} />
       <CurrentBatchSection />
-      <RecentSection filter={filter} />
+      <RecentSection filter={filter} revealItemId={revealItemId} />
     </Stack>
   );
 };

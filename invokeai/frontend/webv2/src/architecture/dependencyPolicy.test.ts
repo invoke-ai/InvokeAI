@@ -163,6 +163,7 @@ describe('feature public-interface registry', () => {
     ]);
     expect(checkDependency('workbench/shell/View.tsx', '@features/identity')).toEqual([]);
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/workflow/queries')).toEqual([]);
+    expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/queue/queries')).toEqual([]);
     expect(checkDependency('features/gallery/ui/View.tsx', '@features/queue/publicApi')).toMatchObject([
       { rule: 'feature-public-interface' },
     ]);

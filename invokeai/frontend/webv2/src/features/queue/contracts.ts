@@ -48,7 +48,7 @@ export {
   isBackendSubmittableSourceId,
   shouldSubmitPendingQueueItem,
 } from './core/submissionRules';
-export { extractGenerationMeta, type QueueGenerationMeta } from './core/generationMeta';
+export { extractGenerationMeta, getResultImageName, type QueueGenerationMeta } from './core/generationMeta';
 export {
   buildProjectQueueItemOriginPrefix,
   buildQueueItemOrigin,
