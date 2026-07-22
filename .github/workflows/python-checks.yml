@@ -64,8 +64,9 @@ jobs:
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: '0.6.10'
+          version: '0.11.16'
           enable-cache: true
+          python-version: '3.14'
 
       - name: check pypi classifiers
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}

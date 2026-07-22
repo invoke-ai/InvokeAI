@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 15 # expected run time: <5 min
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Free up more disk space on the runner
         # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
@@ -64,7 +64,7 @@ jobs:
         # - CVE-2025-30066
         # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
         # - https://github.com/tj-actions/changed-files/issues/2463
-        uses: tj-actions/changed-files@a284dc1814e3fd07f2e34267fc8f81227ed29fb8
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
           files_yaml: |
             src:
@@ -73,17 +73,17 @@ jobs:
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: '0.6.10'
+          version: '0.11.16'
           enable-cache: true
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: setup python
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
@@ -102,7 +102,7 @@ jobs:
 
       - name: generate schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm prettier --write openapi.json
+        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py openapi.json && pnpm prettier --write openapi.json
         shell: bash
 
       - name: compare files
