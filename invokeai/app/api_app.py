@@ -166,20 +166,28 @@ class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _is_authenticated_video_upload(scope: Scope) -> bool:
+def _identify_video_upload_user(scope: Scope) -> tuple[bool, str | None]:
+    """Identify the uploader for auth and per-user slot accounting.
+
+    Returns (authenticated, per_user_key). In single-user mode there is only one
+    tenant, so per_user_key is None — the whole global capacity is theirs and no
+    per-user quota applies.
+    """
     if not ApiDependencies.invoker.services.configuration.multiuser:
-        return True
+        return True, None
 
     scheme, token = get_authorization_scheme_param(Headers(scope=scope).get("authorization"))
     if scheme.lower() != "bearer":
-        return False
+        return False, None
     from invokeai.app.services.auth.token_service import verify_token
 
     token_data = verify_token(token)
     if token_data is None:
-        return False
+        return False, None
     user = ApiDependencies.invoker.services.users.get(token_data.user_id)
-    return user is not None and user.is_active
+    if user is None or not user.is_active:
+        return False, None
+    return True, token_data.user_id
 
 
 class VideoUploadLimitASGIMiddleware:
@@ -190,7 +198,8 @@ class VideoUploadLimitASGIMiddleware:
     concurrent uploads could exhaust temp space before ever being rejected. This
     middleware rejects oversized requests from the Content-Length header, aborts
     chunked bodies that exceed the cap mid-stream, and bounds concurrent uploads
-    globally.
+    both globally and per user (so one tenant's slow uploads cannot starve the
+    others into 429s).
     """
 
     def __init__(
@@ -198,13 +207,16 @@ class VideoUploadLimitASGIMiddleware:
         app: ASGIApp,
         max_body_bytes: int,
         max_concurrent: int,
-        is_authenticated: Callable[[Scope], bool] | None = None,
+        max_concurrent_per_user: int | None = None,
+        identify_user: Callable[[Scope], tuple[bool, str | None]] | None = None,
     ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
         self.max_concurrent = max_concurrent
-        self.is_authenticated = is_authenticated
+        self.max_concurrent_per_user = max_concurrent_per_user
+        self.identify_user = identify_user
         self._active = 0
+        self._active_by_user: dict[str, int] = {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -214,13 +226,16 @@ class VideoUploadLimitASGIMiddleware:
         if not (scope.get("method") == "POST" and route_path == "/api/v1/videos/upload"):
             return await self.app(scope, receive, send)
 
-        if self.is_authenticated is not None and not self.is_authenticated(scope):
-            response = JSONResponse(
-                {"detail": "Authentication required"},
-                status_code=401,
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-            return await response(scope, receive, send)
+        per_user_key: str | None = None
+        if self.identify_user is not None:
+            authenticated, per_user_key = self.identify_user(scope)
+            if not authenticated:
+                response = JSONResponse(
+                    {"detail": "Authentication required"},
+                    status_code=401,
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+                return await response(scope, receive, send)
 
         content_length = Headers(scope=scope).get("content-length")
         if content_length is not None and content_length.isdigit() and int(content_length) > self.max_body_bytes:
@@ -238,7 +253,21 @@ class VideoUploadLimitASGIMiddleware:
             )
             return await response(scope, receive, send)
 
+        if (
+            per_user_key is not None
+            and self.max_concurrent_per_user is not None
+            and self._active_by_user.get(per_user_key, 0) >= self.max_concurrent_per_user
+        ):
+            response = JSONResponse(
+                {"detail": "Too many concurrent video uploads for this user; try again shortly"},
+                status_code=429,
+                headers={"Retry-After": "5"},
+            )
+            return await response(scope, receive, send)
+
         self._active += 1
+        if per_user_key is not None:
+            self._active_by_user[per_user_key] = self._active_by_user.get(per_user_key, 0) + 1
         received = 0
 
         async def limited_receive() -> Message:
@@ -258,6 +287,12 @@ class VideoUploadLimitASGIMiddleware:
             await self.app(scope, limited_receive, send)
         finally:
             self._active -= 1
+            if per_user_key is not None:
+                remaining = self._active_by_user.get(per_user_key, 0) - 1
+                if remaining > 0:
+                    self._active_by_user[per_user_key] = remaining
+                else:
+                    self._active_by_user.pop(per_user_key, None)
 
 
 class SubPathASGIMiddleware:
@@ -307,7 +342,8 @@ app.add_middleware(
     VideoUploadLimitASGIMiddleware,
     max_body_bytes=videos.MAX_UPLOAD_REQUEST_SIZE,
     max_concurrent=videos.MAX_CONCURRENT_VIDEO_UPLOADS,
-    is_authenticated=_is_authenticated_video_upload,
+    max_concurrent_per_user=videos.MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER,
+    identify_user=_identify_video_upload_user,
 )
 
 

@@ -57,6 +57,9 @@ MAX_UPLOAD_REQUEST_SIZE = MAX_UPLOAD_SIZE + 10 * 1024 * 1024
 # Global bound on concurrent video uploads — each in-flight upload can hold up to two
 # copies of the file in temp storage (the multipart spool + the route's own tmp file).
 MAX_CONCURRENT_VIDEO_UPLOADS = 4
+# Per-user bound (multiuser mode only): keeps one tenant's slow uploads from holding
+# every global slot and starving the other users into 429s.
+MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER = 2
 
 
 def _get_video_cache_control() -> str:

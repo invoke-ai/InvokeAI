@@ -22,7 +22,7 @@ from invokeai.app.api.routers.videos import upload_video
 from invokeai.app.api_app import (
     SubPathASGIMiddleware,
     VideoUploadLimitASGIMiddleware,
-    _is_authenticated_video_upload,
+    _identify_video_upload_user,
 )
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
 from invokeai.app.services.image_records.image_records_common import ImageCategory
@@ -131,13 +131,21 @@ def test_active_count_released_after_request():
     assert middleware._active == 0
 
 
+def _identify_by_bearer(scope: Any) -> tuple[bool, str | None]:
+    """Test identify_user: 'Bearer <name>' authenticates as user <name>."""
+    authorization = Headers(scope=scope).get("authorization")
+    if authorization is None or not authorization.startswith("Bearer "):
+        return False, None
+    return True, authorization.removeprefix("Bearer ")
+
+
 def test_unauthenticated_upload_is_rejected_without_consuming_capacity():
     app, calls = _build_app()
     middleware = VideoUploadLimitASGIMiddleware(
         app,
         max_body_bytes=MAX_BODY,
         max_concurrent=MAX_CONCURRENT,
-        is_authenticated=lambda scope: Headers(scope=scope).get("authorization") == "Bearer valid",
+        identify_user=_identify_by_bearer,
     )
     middleware._active = MAX_CONCURRENT
 
@@ -145,6 +153,7 @@ def test_unauthenticated_upload_is_rejected_without_consuming_capacity():
 
     assert status_code == 401
     assert middleware._active == MAX_CONCURRENT
+    assert middleware._active_by_user == {}
     assert calls == []
 
 
@@ -154,7 +163,7 @@ def test_authenticated_upload_still_obeys_concurrency_bound():
         app,
         max_body_bytes=MAX_BODY,
         max_concurrent=MAX_CONCURRENT,
-        is_authenticated=lambda scope: Headers(scope=scope).get("authorization") == "Bearer valid",
+        identify_user=_identify_by_bearer,
     )
     middleware._active = MAX_CONCURRENT
 
@@ -164,13 +173,71 @@ def test_authenticated_upload_still_obeys_concurrency_bound():
     assert calls == []
 
 
+def test_per_user_quota_blocks_only_the_saturating_user():
+    """One tenant at their per-user cap gets 429 while another tenant still uploads,
+    even though global capacity remains."""
+    app, calls = _build_app()
+    middleware = VideoUploadLimitASGIMiddleware(
+        app,
+        max_body_bytes=MAX_BODY,
+        max_concurrent=4,
+        max_concurrent_per_user=2,
+        identify_user=_identify_by_bearer,
+    )
+    middleware._active = 2
+    middleware._active_by_user = {"alice": 2}
+
+    status_a = _call_asgi(middleware, "/api/v1/videos/upload", authorization="Bearer alice")
+    status_b = _call_asgi(middleware, "/api/v1/videos/upload", authorization="Bearer bob")
+
+    assert status_a == 429
+    assert status_b == 200
+    assert calls == ["upload"]
+
+
+def test_per_user_count_released_after_request():
+    app, _calls = _build_app()
+    middleware = VideoUploadLimitASGIMiddleware(
+        app,
+        max_body_bytes=MAX_BODY,
+        max_concurrent=4,
+        max_concurrent_per_user=2,
+        identify_user=_identify_by_bearer,
+    )
+
+    status = _call_asgi(middleware, "/api/v1/videos/upload", authorization="Bearer alice")
+
+    assert status == 200
+    assert middleware._active == 0
+    assert middleware._active_by_user == {}
+
+
+def test_single_user_mode_has_no_per_user_quota():
+    """identify_user returning (True, None) — single-user mode — must get the whole
+    global capacity, not be clipped by the per-user cap."""
+    app, calls = _build_app()
+    middleware = VideoUploadLimitASGIMiddleware(
+        app,
+        max_body_bytes=MAX_BODY,
+        max_concurrent=4,
+        max_concurrent_per_user=2,
+        identify_user=lambda scope: (True, None),
+    )
+    middleware._active = 3  # above the per-user cap, below the global cap
+
+    status = _call_asgi(middleware, "/api/v1/videos/upload")
+
+    assert status == 200
+    assert calls == ["upload"]
+
+
 @pytest.mark.parametrize(
     "multiuser,send_token,user_active,expected",
     [
-        (False, False, False, True),
-        (True, False, True, False),
-        (True, True, False, False),
-        (True, True, True, True),
+        (False, False, False, (True, None)),
+        (True, False, True, (False, None)),
+        (True, True, False, (False, None)),
+        (True, True, True, (True, "user")),
     ],
 )
 def test_production_upload_authentication(
@@ -178,7 +245,7 @@ def test_production_upload_authentication(
     multiuser: bool,
     send_token: bool,
     user_active: bool,
-    expected: bool,
+    expected: tuple[bool, str | None],
 ) -> None:
     set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
     token_data = TokenData(user_id="user", email="user@example.com", is_admin=False)
@@ -194,7 +261,7 @@ def test_production_upload_authentication(
     if send_token:
         headers.append((b"authorization", f"Bearer {create_access_token(token_data)}".encode()))
 
-    assert _is_authenticated_video_upload({"headers": headers}) is expected  # type: ignore[arg-type]
+    assert _identify_video_upload_user({"headers": headers}) == expected  # type: ignore[arg-type]
 
 
 def test_upload_video_closes_tmp_handle_when_stream_copy_fails():

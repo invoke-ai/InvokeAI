@@ -31,6 +31,27 @@ import imageio.v3 as iio
 import numpy as np
 from PIL import Image
 
+# Upper bound on the decoded frame size we are willing to allocate (~8K video). A small
+# crafted container can claim absurd dimensions in cheap metadata while the full frame
+# is only allocated at decode time, so dimensions are checked before any decode.
+# Keep in sync with MAX_VIDEO_FRAME_PIXELS in video_thumbnails.py (this script must not
+# import the invokeai package).
+MAX_FRAME_PIXELS = 64 * 1024 * 1024
+
+
+def _assert_decodable_dims(video_path: Path) -> None:
+    """Refuses to decode frames from a video whose reported dimensions exceed the bound.
+
+    If the dimensions cannot be probed at all the decode proceeds — the parent's frame
+    record bound and PIL's decompression-bomb check still backstop the frame path.
+    """
+    try:
+        width, height, _duration, _fps = _probe(video_path)
+    except Exception:
+        return
+    if width > 0 and height > 0 and width * height > MAX_FRAME_PIXELS:
+        raise ValueError(f"Video dimensions {width}x{height} exceed the maximum decodable size")
+
 
 def _extract_frame(video_path: Path, frame_index: int) -> Optional[Image.Image]:
     """Extracts a single frame from a video file as a PIL Image. Returns None on failure.
@@ -142,26 +163,64 @@ def _count(video_path: Path) -> Optional[int]:
         return None
 
 
+def _emit_stream_frame(frame: np.ndarray) -> None:
+    record = io.BytesIO()
+    np.save(record, np.ascontiguousarray(frame), allow_pickle=False)
+    payload = record.getvalue()
+    sys.stdout.buffer.write(struct.pack(">Q", len(payload)))
+    sys.stdout.buffer.write(payload)
+    sys.stdout.buffer.flush()
+
+
 def _stream(video_path: Path) -> None:
-    """Writes decoded frames as length-prefixed, non-pickled numpy records."""
-    for frame in iio.imiter(video_path, plugin="FFMPEG"):
-        record = io.BytesIO()
-        np.save(record, np.ascontiguousarray(frame), allow_pickle=False)
-        payload = record.getvalue()
-        sys.stdout.buffer.write(struct.pack(">Q", len(payload)))
-        sys.stdout.buffer.write(payload)
-        sys.stdout.buffer.flush()
+    """Writes decoded frames as length-prefixed, non-pickled numpy records.
+
+    Tries imageio's FFMPEG plugin first and falls back to cv2, mirroring
+    ``_extract_frame``/``_probe``/``_count`` — a file accepted at upload via the cv2
+    fallback must also stream in the frame-range and concat nodes. The fallback only
+    engages when no frame has been emitted yet: a mid-stream decoder failure must
+    surface as an error, not restart the stream from frame 0.
+    """
+    emitted = False
+    try:
+        for frame in iio.imiter(video_path, plugin="FFMPEG"):
+            _emit_stream_frame(frame)
+            emitted = True
+        return
+    except Exception:
+        if emitted:
+            raise
+
+    import cv2
+
+    capture = cv2.VideoCapture(str(video_path))
+    if not capture.isOpened():
+        capture.release()
+        raise FileNotFoundError(f"Unable to open video at {video_path}")
+    try:
+        while True:
+            ok, frame_bgr = capture.read()
+            if not ok or frame_bgr is None:
+                break
+            _emit_stream_frame(cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB))
+            emitted = True
+    finally:
+        capture.release()
+    if not emitted:
+        raise ValueError(f"No frames decoded from {video_path}")
 
 
 def main(argv: list[str]) -> int:
     try:
         command = argv[1]
         if command == "stream":
+            _assert_decodable_dims(Path(argv[2]))
             _stream(Path(argv[2]))
         elif command == "probe":
             width, height, duration, fps = _probe(Path(argv[2]))
             print(json.dumps({"width": width, "height": height, "duration": duration, "fps": fps}))
         elif command == "frame":
+            _assert_decodable_dims(Path(argv[2]))
             image = _extract_frame(Path(argv[2]), int(argv[3]))
             if image is None:
                 print("no frame decoded", file=sys.stderr)

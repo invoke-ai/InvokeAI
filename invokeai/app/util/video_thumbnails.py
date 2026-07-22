@@ -13,6 +13,7 @@ FFmpeg process.
 
 import io
 import json
+import math
 import os
 import queue
 import signal
@@ -37,6 +38,12 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 VIDEO_DECODE_TIMEOUT_SECONDS = 30.0
 MAX_DECODED_FRAME_RECORD_BYTES = 256 * 1024 * 1024
 MAX_DECODE_STDERR_BYTES = 16 * 1024
+# Upper bound on decoded frame size (~8K video). Decoder-reported dimensions are
+# untrusted metadata: a tiny crafted container can claim absurd dimensions whose full
+# frame is only allocated at decode time. probe_video rejects such files before the
+# upload path persists them, and the worker refuses to decode frames from them.
+# Keep in sync with MAX_FRAME_PIXELS in video_decode_worker.py.
+MAX_VIDEO_FRAME_PIXELS = 64 * 1024 * 1024
 
 _WORKER_PATH = Path(__file__).parent / "video_decode_worker.py"
 
@@ -250,7 +257,12 @@ def probe_video(
     """Returns (width, height, duration_seconds, fps_or_none) for a video file.
 
     Raises FileNotFoundError if the file cannot be read — including when the decode
-    times out, since a file we cannot probe within the bound is treated as unreadable.
+    times out, since a file we cannot probe within the bound is treated as unreadable —
+    or when the decoder reports metadata no sane video has (non-positive or over-limit
+    dimensions, non-finite or negative duration). Decoder-reported values are untrusted:
+    they come from the uploaded container, and the upload path persists them and sizes
+    thumbnail decoding by them. A non-finite or non-positive fps is coerced to None
+    (unknown) rather than rejected, matching the decoder's own unknown-fps behavior.
     """
     result = _run_worker(["probe", str(video_path)], timeout)
     if result is None:
@@ -261,8 +273,14 @@ def probe_video(
         duration = float(result["duration"])
         fps_raw = result.get("fps")
         fps: Optional[float] = float(fps_raw) if fps_raw else None
-    except (KeyError, TypeError, ValueError) as e:
+    except (KeyError, TypeError, ValueError, OverflowError) as e:
         raise FileNotFoundError(f"Unable to open video at {video_path}") from e
+    if width <= 0 or height <= 0 or width * height > MAX_VIDEO_FRAME_PIXELS:
+        raise FileNotFoundError(f"Video at {video_path} reports invalid dimensions {width}x{height}")
+    if not math.isfinite(duration) or duration < 0:
+        raise FileNotFoundError(f"Video at {video_path} reports an invalid duration {duration}")
+    if fps is not None and (not math.isfinite(fps) or fps <= 0):
+        fps = None
     return width, height, duration, fps
 
 

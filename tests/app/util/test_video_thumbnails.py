@@ -217,3 +217,145 @@ def test_timeout_kills_worker_descendants(monkeypatch: pytest.MonkeyPatch, tmp_p
     while video_thumbnails._is_process_running(child_pid) and time.monotonic() < deadline:
         time.sleep(0.05)
     assert not video_thumbnails._is_process_running(child_pid)
+
+
+class TestProbeMetadataValidation:
+    """probe_video must reject decoder-reported metadata no sane video has (JPPhoto
+    review 2026-07-21): the upload path persists these values and sizes thumbnail
+    decoding by them, so zero/negative/absurd dimensions and non-finite durations must
+    fail before ``videos.create`` ever sees them."""
+
+    def _probe_with(self, monkeypatch: pytest.MonkeyPatch, payload: dict) -> tuple:
+        monkeypatch.setattr(video_thumbnails, "_run_worker", lambda args, timeout: payload)
+        return probe_video(Path("fake.mp4"))
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"width": 0, "height": 32, "duration": 1.0, "fps": 8.0},
+            {"width": 48, "height": -32, "duration": 1.0, "fps": 8.0},
+            {"width": 100_000, "height": 100_000, "duration": 1.0, "fps": 8.0},
+            {"width": 48, "height": 32, "duration": float("nan"), "fps": 8.0},
+            {"width": 48, "height": 32, "duration": float("inf"), "fps": 8.0},
+            {"width": 48, "height": 32, "duration": -1.0, "fps": 8.0},
+            {"width": float("inf"), "height": 32, "duration": 1.0, "fps": 8.0},
+            {"width": float("nan"), "height": 32, "duration": 1.0, "fps": 8.0},
+        ],
+        ids=[
+            "zero-width",
+            "negative-height",
+            "over-limit-pixels",
+            "nan-duration",
+            "inf-duration",
+            "negative-duration",
+            "inf-width",
+            "nan-width",
+        ],
+    )
+    def test_invalid_metadata_is_rejected(self, monkeypatch: pytest.MonkeyPatch, payload: dict) -> None:
+        with pytest.raises(FileNotFoundError):
+            self._probe_with(monkeypatch, payload)
+
+    def test_boundary_dimensions_are_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # 8192x8192 = 64 MP, exactly at the cap.
+        width, height, duration, fps = self._probe_with(
+            monkeypatch, {"width": 8192, "height": 8192, "duration": 0.0, "fps": 8.0}
+        )
+        assert (width, height, duration, fps) == (8192, 8192, 0.0, 8.0)
+
+    @pytest.mark.parametrize("bad_fps", [float("nan"), float("inf"), -1.0, 0.0])
+    def test_unusable_fps_is_coerced_to_unknown(self, monkeypatch: pytest.MonkeyPatch, bad_fps: float) -> None:
+        # fps=None already means "unknown" to every caller, so garbage fps degrades to
+        # that instead of rejecting an otherwise-decodable file.
+        *_rest, fps = self._probe_with(monkeypatch, {"width": 48, "height": 32, "duration": 1.0, "fps": bad_fps})
+        assert fps is None
+
+
+class TestWorkerDecodeBounds:
+    """The worker refuses to decode frames from files whose reported dimensions exceed
+    the bound — the full frame is only allocated at decode time, so a small crafted
+    container claiming 100k x 100k would otherwise attempt a ~30 GB allocation."""
+
+    def test_oversized_dims_refused_before_frame_decode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from invokeai.app.util import video_decode_worker as worker
+
+        monkeypatch.setattr(worker, "_probe", lambda path: (100_000, 100_000, 1.0, 8.0))
+        with pytest.raises(ValueError, match="exceed the maximum decodable size"):
+            worker._assert_decodable_dims(Path("fake.mp4"))
+
+    def test_unprobeable_file_is_not_blocked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from invokeai.app.util import video_decode_worker as worker
+
+        def _raise(path: Path):
+            raise FileNotFoundError("no metadata")
+
+        monkeypatch.setattr(worker, "_probe", _raise)
+        worker._assert_decodable_dims(Path("fake.mp4"))  # must not raise
+
+    def test_in_bounds_dims_pass(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from invokeai.app.util import video_decode_worker as worker
+
+        monkeypatch.setattr(worker, "_probe", lambda path: (48, 32, 1.0, 8.0))
+        worker._assert_decodable_dims(Path("fake.mp4"))  # must not raise
+
+
+class TestStreamBackendFallback:
+    """_stream must fall back to cv2 like probe/frame/count do (JPPhoto review
+    2026-07-21) — a file accepted at upload via the cv2 fallback previously worked in
+    single-frame extract but failed in the frame-range and concat nodes."""
+
+    def _collect_stream(self, monkeypatch: pytest.MonkeyPatch, video_path: Path) -> list[np.ndarray]:
+        from invokeai.app.util import video_decode_worker as worker
+
+        buffer = io.BytesIO()
+        fake_stdout = MagicMock()
+        fake_stdout.buffer = buffer
+        monkeypatch.setattr(worker.sys, "stdout", fake_stdout)
+        worker._stream(video_path)
+
+        import struct
+
+        frames: list[np.ndarray] = []
+        buffer.seek(0)
+        while size_bytes := buffer.read(8):
+            (size,) = struct.unpack(">Q", size_bytes)
+            frames.append(np.load(io.BytesIO(buffer.read(size)), allow_pickle=False))
+        return frames
+
+    def test_falls_back_to_cv2_when_imageio_cannot_stream(
+        self, monkeypatch: pytest.MonkeyPatch, synthetic_mp4: Path
+    ) -> None:
+        from invokeai.app.util import video_decode_worker as worker
+
+        def _imiter_fails(*args, **kwargs):
+            raise RuntimeError("imageio cannot decode this container")
+            yield  # pragma: no cover - makes this a generator
+
+        monkeypatch.setattr(worker.iio, "imiter", _imiter_fails)
+
+        frames = self._collect_stream(monkeypatch, synthetic_mp4)
+
+        assert len(frames) == FRAMES
+        assert frames[0].shape == (32, 48, 3)
+
+    def test_midstream_failure_does_not_restart_from_frame_zero(
+        self, monkeypatch: pytest.MonkeyPatch, synthetic_mp4: Path
+    ) -> None:
+        from invokeai.app.util import video_decode_worker as worker
+
+        def _imiter_dies_midstream(*args, **kwargs):
+            yield np.zeros((32, 48, 3), dtype=np.uint8)
+            raise RuntimeError("decoder died mid-stream")
+
+        monkeypatch.setattr(worker.iio, "imiter", _imiter_dies_midstream)
+
+        with pytest.raises(RuntimeError, match="mid-stream"):
+            self._collect_stream(monkeypatch, synthetic_mp4)
+
+    def test_totally_undecodable_file_raises(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        bogus = tmp_path / "junk.mp4"
+        bogus.write_bytes(b"not actually an mp4")
+        # imageio raises first; cv2 then fails to open -> FileNotFoundError. Either way
+        # the worker must error rather than emit an empty, successful stream.
+        with pytest.raises((FileNotFoundError, ValueError)):
+            self._collect_stream(monkeypatch, bogus)
