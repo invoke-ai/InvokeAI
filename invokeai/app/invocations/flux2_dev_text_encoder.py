@@ -203,21 +203,27 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
                 "Ensure output_hidden_states=True is supported by this model."
             )
         num_hidden_states = len(outputs.hidden_states)  # = num_hidden_layers + 1 (embedding output)
+        num_layers = num_hidden_states - 1
 
-        # Safety check: the model loaders only accept 30-layer cow weights, so
-        # hidden_states[] should have ≥ 31 entries (embedding output + 30 layers).
-        # Fall back to a scaled tuple only if a non-cow encoder somehow slipped
-        # past the loaders, so we don't crash with an IndexError.
-        if num_hidden_states - 1 < max(DEV_EXTRACTION_LAYERS):
-            n = num_hidden_states - 1
-            extraction_layers = (max(1, n // 3), max(1, (2 * n) // 3), n)
-        else:
-            extraction_layers = DEV_EXTRACTION_LAYERS
+        # The standalone Mistral encoder loaders only accept 30-layer cow or 40-layer
+        # Mistral Small 3 weights, so hidden_states[] should always contain the layers
+        # FLUX.2 [dev]'s joint attention was trained to read (10/20/30). A text encoder
+        # extracted from a Main_Diffusers_Flux2 pipeline, however, is loaded via generic
+        # from_pretrained with no layer-count validation — so a nonstandard pipeline with
+        # a <30-layer encoder could reach here. Fail loudly instead of inventing extraction
+        # indices that would silently produce off-distribution (degraded) embeddings.
+        if num_layers < max(DEV_EXTRACTION_LAYERS):
+            raise RuntimeError(
+                f"Mistral encoder returned only {num_layers} hidden layer(s), but FLUX.2 [dev] reads "
+                f"layers {DEV_EXTRACTION_LAYERS} and requires at least {max(DEV_EXTRACTION_LAYERS)}. "
+                "This is not a supported FLUX.2 [dev] text encoder."
+            )
+        extraction_layers = DEV_EXTRACTION_LAYERS
 
-        stacked = torch.stack([outputs.hidden_states[i] for i in extraction_layers], dim=1)
-        # stacked: (B, 3, seq, hidden_size) -> (B, seq, 3 * hidden_size)
-        batch_size, num_layers, seq_len, hidden_dim = stacked.shape
-        prompt_embeds = stacked.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_layers * hidden_dim)
+        # Concatenate the selected layers along the hidden dim: (B, seq, 3 * hidden_size).
+        # This is byte-identical to stack(dim=1).permute(0,2,1,3).reshape(...) but avoids
+        # the two intermediate full copies that stack + permute-reshape would allocate.
+        prompt_embeds = torch.cat([outputs.hidden_states[i] for i in extraction_layers], dim=-1)
         prompt_embeds = prompt_embeds.to(dtype=text_encoder.dtype, device=device)
 
         return prompt_embeds

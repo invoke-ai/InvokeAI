@@ -2,6 +2,7 @@ import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { Invocation, S } from 'services/api/types';
 
 export const addFlux2KleinLoRAs = (
@@ -11,7 +12,20 @@ export const addFlux2KleinLoRAs = (
   modelLoader: Invocation<'flux2_klein_model_loader'>,
   textEncoder: Invocation<'flux2_klein_text_encoder'>
 ): void => {
-  const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'flux2');
+  // Klein and dev LoRAs both carry `base === 'flux2'`; a base-only filter would wire a dev
+  // LoRA (hidden 5120/6144) into the Klein graph → guaranteed shape-mismatch during denoise
+  // (Klein hidden 3072/4096). The bare identifier carries no variant, so resolve each config
+  // and drop dev LoRAs here. The Klein LoRA loaders reject dev LoRAs server-side too.
+  const modelConfigsData = selectModelConfigsQuery(state).data;
+  const isNotDevVariant = (key: string): boolean => {
+    const config = modelConfigsData ? modelConfigsAdapterSelectors.selectById(modelConfigsData, key) : undefined;
+    const variant = config && 'variant' in config ? config.variant : undefined;
+    // Fail open when the variant can't be determined; the backend still guards.
+    return variant !== 'dev';
+  };
+  const enabledLoRAs = state.loras.loras.filter(
+    (l) => l.isEnabled && l.model.base === 'flux2' && isNotDevVariant(l.model.key)
+  );
   const loraCount = enabledLoRAs.length;
 
   if (loraCount === 0) {

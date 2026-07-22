@@ -190,6 +190,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       scheduler: fluxScheduler,
     });
 
+    posCondCollect = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('pos_cond_collect'),
+    });
+
     const devLoader = modelLoader as Invocation<'flux2_dev_model_loader'>;
     const devCond = posCond as Invocation<'flux2_dev_text_encoder'>;
     g.addEdge(devLoader, 'mistral_encoder', devCond, 'mistral_encoder');
@@ -198,7 +203,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     g.addEdge(devLoader, 'vae', denoise, 'vae'); // required for BN statistics + inpaint paths
     g.addEdge(devLoader, 'vae', l2i, 'vae');
     g.addEdge(positivePrompt, 'value', devCond, 'prompt');
-    g.addEdge(devCond, 'conditioning', denoise, 'positive_text_conditioning');
+    // Route through a collector (like Klein) so regional guidance can add more items.
+    g.addEdge(devCond, 'conditioning', posCondCollect, 'item');
+    g.addEdge(posCondCollect, 'collection', denoise, 'positive_text_conditioning');
   } else if (isFlux2Klein) {
     // Flux2 Klein: Use Qwen3-based model loader, text encoder, and dedicated denoise node
     // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately.
@@ -457,6 +464,31 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g.upsertMetadata({ generation_mode: 'flux2_outpaint' });
     } else {
       assert<Equals<typeof generationMode, never>>(false);
+    }
+
+    // Regional guidance for FLUX.2 [dev]. Same single-attention-mask model as Klein
+    // (positive prompts only; negatives / auto-negative are blocked by the validators).
+    if (manager !== null && posCondCollect !== null) {
+      const ipAdapterCollect = g.addNode({
+        type: 'collect',
+        id: getPrefixedId('ip_adapter_collector'),
+      });
+      await addRegions({
+        manager,
+        regions: canvas.regionalGuidance.entities,
+        g,
+        bbox: canvas.bbox.rect,
+        model,
+        posCond: flux2DevCond,
+        negCond: null,
+        posCondCollect,
+        negCondCollect: null,
+        ipAdapterCollect,
+        fluxReduxCollect: null,
+      });
+      // The collector exists only for type compatibility with addRegions; FLUX.2 [dev]
+      // does not consume IP adapters, so drop the node if nothing connected to it.
+      g.deleteNode(ipAdapterCollect.id);
     }
   } else if (isFlux2) {
     // Flux2 Klein path

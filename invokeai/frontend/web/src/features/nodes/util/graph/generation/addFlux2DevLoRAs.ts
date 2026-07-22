@@ -2,6 +2,7 @@ import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { Invocation, S } from 'services/api/types';
 
 /**
@@ -15,9 +16,21 @@ export const addFlux2DevLoRAs = (
   modelLoader: Invocation<'flux2_dev_model_loader'>,
   textEncoder: Invocation<'flux2_dev_text_encoder'>
 ): void => {
-  // Currently all `flux2` LoRAs share a single base value (the variant guard happens
-  // server-side in the dev LoRA loader, which warns on mismatches).
-  const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'flux2');
+  // Klein and dev LoRAs both carry `base === 'flux2'`, so a base-only filter would wire a
+  // Klein LoRA (hidden 3072/4096) into the dev graph → guaranteed shape-mismatch during
+  // denoise (dev hidden 5120/6144). The bare identifier in the slice carries no variant, so
+  // resolve each LoRA's config and keep only dev (or unknown-variant) LoRAs. The dev LoRA
+  // loaders reject a mismatch server-side too (defense in depth for hand-built graphs).
+  const modelConfigsData = selectModelConfigsQuery(state).data;
+  const isDevOrUnknownVariant = (key: string): boolean => {
+    const config = modelConfigsData ? modelConfigsAdapterSelectors.selectById(modelConfigsData, key) : undefined;
+    const variant = config && 'variant' in config ? config.variant : undefined;
+    // Fail open when the variant can't be determined; the backend still guards.
+    return variant === null || variant === undefined || variant === 'dev';
+  };
+  const enabledLoRAs = state.loras.loras.filter(
+    (l) => l.isEnabled && l.model.base === 'flux2' && isDevOrUnknownVariant(l.model.key)
+  );
   if (enabledLoRAs.length === 0) {
     return;
   }

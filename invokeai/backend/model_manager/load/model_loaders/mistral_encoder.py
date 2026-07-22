@@ -133,19 +133,8 @@ def _build_mistral_config(
     )
 
 
-def _read_gguf_metadata_value(path: Path, key: str) -> Any | None:
-    """Read a single named field from a GGUF file's metadata header.
-
-    Returns ``None`` if the key is missing or the file/header can't be read —
-    callers must treat the return as best-effort and fall back to defaults.
-    """
-    try:
-        import gguf
-
-        reader = gguf.GGUFReader(path)
-    except Exception:
-        return None
-    field = reader.fields.get(key)
+def _decode_gguf_field(field: Any) -> Any | None:
+    """Decode a single GGUFReader field to a Python scalar, or ``None``."""
     if field is None:
         return None
     try:
@@ -167,6 +156,27 @@ def _read_gguf_metadata_value(path: Path, key: str) -> Any | None:
     except Exception:
         return None
     return None
+
+
+def _read_gguf_metadata_values(path: Path, keys: tuple[str, ...]) -> dict[str, Any]:
+    """Read several named metadata fields from a GGUF header in a single reader pass.
+
+    Returns an empty dict if the file/header can't be read — callers must treat the
+    result as best-effort and fall back to defaults. Reading multiple keys with one
+    ``GGUFReader`` avoids re-parsing the (potentially large) header once per key.
+    """
+    try:
+        import gguf
+
+        reader = gguf.GGUFReader(path)
+    except Exception:
+        return {}
+    return {key: _decode_gguf_field(reader.fields.get(key)) for key in keys}
+
+
+def _read_gguf_metadata_value(path: Path, key: str) -> Any | None:
+    """Read a single named field from a GGUF file's metadata header, or ``None``."""
+    return _read_gguf_metadata_values(path, (key,)).get(key)
 
 
 def _read_gguf_metadata_float(path: Path, key: str) -> float | None:
@@ -236,7 +246,14 @@ def _materialize_remaining_meta_tensors(model: torch.nn.Module, dtype: torch.dty
     for name, param in list(model.named_parameters()):
         if not param.is_meta:
             continue
-        is_norm = "norm" in name.split(".") or name.endswith("_norm.weight")
+        # Any RMSNorm weight must init to ones, not zeros. Use the same broad substring
+        # test as the checkpoint loader's missing-norm loop so both code paths agree —
+        # e.g. `layers.N.input_layernorm.weight` is a norm. (For MistralModel the only
+        # params containing "norm" are the layernorms and the final norm, so there are no
+        # false positives.) The narrower `split('.')`/`endswith('_norm.weight')` test used
+        # here previously missed `input_layernorm.weight`, zero-filling it on the GGUF path
+        # where the missing-norm loop doesn't run.
+        is_norm = "norm" in name
         new_tensor = torch.ones(param.shape, dtype=dtype) if is_norm else torch.zeros(param.shape, dtype=dtype)
         parent_name, _, attr = name.rpartition(".")
         parent = model.get_submodule(parent_name) if parent_name else model
@@ -303,12 +320,18 @@ def _warn_if_40_layer_mistral(num_hidden_layers: int, logger: Any) -> None:
     )
 
 
-def _drop_quantization_metadata(sd: dict[str, Any], logger) -> dict[str, Any]:
+def _drop_quantization_metadata(sd: dict[str, Any], logger, target_dtype: torch.dtype | None = None) -> dict[str, Any]:
     """Dequantize Comfy-Org-style FP8/FP4 weights and drop their metadata keys.
 
     Comfy-Org's Mistral FLUX.2 redistributions store quantized weights alongside
     ``*.weight_scale`` (and occasionally ``*.input_scale``) tensors. We apply the
     scale in-place and remove the metadata so transformers can load the result.
+
+    Dequantization runs in fp32 for numerical accuracy, but each result is cast
+    back down to ``target_dtype`` immediately (when provided) so the transient peak
+    is a single fp32 weight at a time rather than the whole dict held at fp32. For a
+    24B fp8 encoder that difference is tens of GB — enough to OOM machines that can
+    otherwise load the model.
     """
     weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(".weight_scale")]
     dequantized = 0
@@ -324,7 +347,8 @@ def _drop_quantization_metadata(sd: dict[str, Any], logger) -> dict[str, Any]:
                     block = weight.shape[dim] // scale.shape[dim]
                     if block > 1:
                         scale = scale.repeat_interleave(block, dim=dim)
-        sd[weight_key] = weight * scale
+        result = weight * scale
+        sd[weight_key] = result.to(target_dtype) if target_dtype is not None else result
         dequantized += 1
     if dequantized:
         logger.info(f"Dequantized {dequantized} Comfy-Org-style quantized weights")
@@ -739,7 +763,8 @@ class MistralEncoderCheckpointLoader(ModelLoader):
 
         sd = load_file(Path(config.path))
         sd = _strip_known_prefixes(sd)
-        sd = _drop_quantization_metadata(sd, logger)
+        # Dequantize straight to the compute dtype (per-tensor peak, not whole-dict fp32).
+        sd = _drop_quantization_metadata(sd, logger, target_dtype=model_dtype)
 
         mistral_config = _build_mistral_config(sd, torch_dtype=model_dtype)
         logger.info(
@@ -748,9 +773,17 @@ class MistralEncoderCheckpointLoader(ModelLoader):
             f"kv_heads={mistral_config.num_key_value_heads}, intermediate={mistral_config.intermediate_size}"
         )
 
-        # Cast tensors to compute dtype before loading.
+        # Drop the LM head before casting: it's the single largest tensor (vocab × hidden),
+        # bare MistralModel doesn't use it, and `_convert_for_bare_mistral_model` drops it
+        # anyway — casting it first would just waste memory and time.
+        for k in [k for k in sd.keys() if isinstance(k, str) and k.startswith("lm_head.")]:
+            del sd[k]
+
+        # Cast remaining tensors to compute dtype before loading. Dequantized weights are
+        # already at model_dtype; this covers the un-quantized ones (norms, embeddings).
         for k in list(sd.keys()):
-            sd[k] = sd[k].to(model_dtype)
+            if sd[k].dtype != model_dtype:
+                sd[k] = sd[k].to(model_dtype)
 
         # Adapt CausalLM-prefixed keys for bare MistralModel.
         sd = _convert_for_bare_mistral_model(sd)
@@ -836,8 +869,11 @@ class MistralEncoderGGUFLoader(ModelLoader):
         # they share llama.cpp's architecture family. Falling back silently is OK:
         # `_build_mistral_config` defaults to Mistral Small 3.1 values when the
         # override is None.
-        rope_theta = _read_gguf_metadata_float(Path(config.path), "llama.rope.freq_base")
-        max_pos = _read_gguf_metadata_int(Path(config.path), "llama.context_length")
+        gguf_meta = _read_gguf_metadata_values(Path(config.path), ("llama.rope.freq_base", "llama.context_length"))
+        rope_raw = gguf_meta.get("llama.rope.freq_base")
+        rope_theta = float(rope_raw) if isinstance(rope_raw, (int, float)) else None
+        ctx_raw = gguf_meta.get("llama.context_length")
+        max_pos = int(ctx_raw) if isinstance(ctx_raw, (int, float)) else None
         if rope_theta is not None:
             logger.info(f"GGUF metadata: rope_theta={rope_theta}, max_position={max_pos}")
 

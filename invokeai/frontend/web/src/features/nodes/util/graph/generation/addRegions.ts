@@ -88,6 +88,10 @@ export const addRegions = async ({
   const isSDXL = model.base === 'sdxl';
   const isFLUX = model.base === 'flux';
   const isFlux2 = model.base === 'flux2';
+  // FLUX.2 Klein uses the Qwen3 encoder; FLUX.2 [dev] uses the Mistral encoder. The region
+  // conditioning node type must match the main model's encoder.
+  const isFlux2Dev = isFlux2 && 'variant' in model && model.variant === 'dev';
+  const isFlux2Klein = isFlux2 && !isFlux2Dev;
   const isZImage = model.base === 'z-image';
   const isAnima = model.base === 'anima';
 
@@ -135,6 +139,7 @@ export const addRegions = async ({
         | 'sdxl_compel_prompt'
         | 'flux_text_encoder'
         | 'flux2_klein_text_encoder'
+        | 'flux2_dev_text_encoder'
         | 'z_image_text_encoder'
         | 'anima_text_encoder'
       >;
@@ -151,7 +156,13 @@ export const addRegions = async ({
           id: getPrefixedId('prompt_region_positive_cond'),
           prompt: region.positivePrompt,
         });
-      } else if (isFlux2) {
+      } else if (isFlux2Dev) {
+        regionalPosCond = g.addNode({
+          type: 'flux2_dev_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isFlux2Klein) {
         regionalPosCond = g.addNode({
           type: 'flux2_klein_text_encoder',
           id: getPrefixedId('prompt_region_positive_cond'),
@@ -201,6 +212,12 @@ export const addRegions = async ({
         }
       } else if (posCond.type === 'flux2_klein_text_encoder') {
         for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'max_seq_len', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else if (posCond.type === 'flux2_dev_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['mistral_encoder', 'max_seq_len', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalPosCond.id;
           g.addEdgeFromObj(clone);

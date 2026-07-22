@@ -28,13 +28,36 @@ _MISTRAL_24B_NUM_LAYERS = 40
 _COW_NUM_LAYERS = 30
 _ACCEPTED_NUM_LAYERS = (_COW_NUM_LAYERS, _MISTRAL_24B_NUM_LAYERS)
 
+# Minimum vocab size to accept as a FLUX.2 Mistral encoder. Mistral Small 3's
+# Tekken vocab is 131072 (shared by the 30-layer cow distillation). This gates out
+# unrelated causal LMs that happen to share the 5120-hidden / 40-layer geometry —
+# most notably Llama-2-13B (vocab 32000), which otherwise matches the llama.cpp key
+# names and geometry and would install as a Mistral encoder producing garbage. We
+# use a floor rather than an exact match to tolerate any vocab padding in GGUF.
+_MISTRAL_3_MIN_VOCAB_SIZE = 100000
+
+# Wrapper prefixes some FLUX.2 single-file redistributions add to Mistral keys. The
+# runtime loader strips these (see ``_strip_known_prefixes`` in the loader); the
+# install-time probe below normalizes keys the same way so it recognizes exactly the
+# layouts the loader can actually load.
+_PROBE_KEY_PREFIXES = ("text_encoder.", "language_model.")
+
+
+def _normalize_probe_key(key: str) -> str:
+    """Strip a single known wrapper prefix, mirroring the loader's ``_strip_known_prefixes``."""
+    for prefix in _PROBE_KEY_PREFIXES:
+        if key.startswith(prefix):
+            return key[len(prefix) :]
+    return key
+
 
 def _has_mistral_keys(state_dict: dict[str | int, Any]) -> bool:
     """Check if a state dict looks like a Mistral causal-LM / multimodal model.
 
     Supports both:
     - PyTorch/diffusers/transformers format: model.layers.0., model.embed_tokens.weight
-      (with optional language_model. prefix for multimodal Mistral3ForConditionalGeneration)
+      (with optional language_model. / text_encoder. prefixes used by multimodal
+      Mistral3ForConditionalGeneration and Comfy-Org single-file redistributions)
     - GGUF/llama.cpp format: blk.0., token_embd.weight
     """
     pytorch_indicators = (
@@ -48,9 +71,10 @@ def _has_mistral_keys(state_dict: dict[str | int, Any]) -> bool:
     for key in state_dict.keys():
         if not isinstance(key, str):
             continue
-        if key.startswith(pytorch_indicators):
+        normalized = _normalize_probe_key(key)
+        if normalized.startswith(pytorch_indicators):
             return True
-        if key.startswith(gguf_indicators):
+        if normalized.startswith(gguf_indicators):
             return True
     return False
 
@@ -70,41 +94,54 @@ def _count_mistral_layers(state_dict: dict[str | int, Any]) -> int:
     for key in state_dict.keys():
         if not isinstance(key, str):
             continue
+        normalized = _normalize_probe_key(key)
         # transformers / diffusers: model.layers.N.* or language_model.model.layers.N.*
-        if ".layers." in key:
-            parts = key.split(".layers.", 1)[1].split(".", 1)
+        if ".layers." in normalized:
+            parts = normalized.split(".layers.", 1)[1].split(".", 1)
             if parts and parts[0].isdigit():
                 indices.add(int(parts[0]))
                 continue
         # llama.cpp GGUF: blk.N.*
-        if key.startswith("blk."):
-            parts = key.split(".", 2)
+        if normalized.startswith("blk."):
+            parts = normalized.split(".", 2)
             if len(parts) >= 2 and parts[1].isdigit():
                 indices.add(int(parts[1]))
     return (max(indices) + 1) if indices else 0
 
 
-def _embed_hidden_size(state_dict: dict[str | int, Any]) -> int | None:
-    """Read the embedding hidden size from a Mistral-like state dict.
+def _embed_shape(state_dict: dict[str | int, Any]) -> tuple[int, int] | None:
+    """Read the ``(vocab_size, hidden_size)`` of the embedding tensor, or ``None``.
 
-    Returns None if no recognized embedding tensor is present.
+    Scans keys with the loader's prefix normalization so ``text_encoder.``- /
+    ``language_model.``-prefixed layouts are recognized too.
     """
-    candidate_keys = (
+    candidate_keys = {
         "model.embed_tokens.weight",
         "language_model.model.embed_tokens.weight",
         "token_embd.weight",
-    )
-    for key in candidate_keys:
-        if key not in state_dict:
+    }
+    for key, tensor in state_dict.items():
+        if not isinstance(key, str) or _normalize_probe_key(key) not in candidate_keys:
             continue
-        tensor = state_dict[key]
         if isinstance(tensor, GGMLTensor):
             shape = getattr(tensor, "tensor_shape", None) or getattr(tensor, "shape", None)
         else:
             shape = getattr(tensor, "shape", None)
         if shape is not None and len(shape) >= 2:
-            return int(shape[1])
+            return int(shape[0]), int(shape[1])
     return None
+
+
+def _embed_hidden_size(state_dict: dict[str | int, Any]) -> int | None:
+    """Read the embedding hidden size from a Mistral-like state dict, or ``None``."""
+    shape = _embed_shape(state_dict)
+    return shape[1] if shape is not None else None
+
+
+def _embed_vocab_size(state_dict: dict[str | int, Any]) -> int | None:
+    """Read the embedding vocab size from a Mistral-like state dict, or ``None``."""
+    shape = _embed_shape(state_dict)
+    return shape[0] if shape is not None else None
 
 
 def _get_mistral_variant_from_state_dict(state_dict: dict[str | int, Any]) -> MistralVariantType | None:
@@ -113,8 +150,15 @@ def _get_mistral_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Mi
     Recognized variants:
     - 30-layer + hidden_size=5120 → ``MistralVariantType.Cow`` (BFL distillation)
     - 40-layer + hidden_size=5120 → ``MistralVariantType.Mistral24B`` (BFL canonical / upstream Mistral Small 3.x)
+
+    The vocab-size floor rejects unrelated causal LMs (e.g. Llama-2-13B) that share
+    the 5120-hidden / 40-layer geometry and llama.cpp key names but are not Mistral
+    Small 3 encoders — without it they would install and emit garbage embeddings.
     """
     if _embed_hidden_size(state_dict) != _MISTRAL_3_HIDDEN_SIZE:
+        return None
+    vocab_size = _embed_vocab_size(state_dict)
+    if vocab_size is None or vocab_size < _MISTRAL_3_MIN_VOCAB_SIZE:
         return None
     num_layers = _count_mistral_layers(state_dict)
     if num_layers == _COW_NUM_LAYERS:
@@ -251,7 +295,8 @@ class MistralEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         if variant is None:
             raise NotAMatchError(
                 f"unrecognized Mistral geometry (got hidden_size={_embed_hidden_size(state_dict)}, "
-                f"layers={_count_mistral_layers(state_dict)}). Expected hidden_size={_MISTRAL_3_HIDDEN_SIZE} "
+                f"vocab_size={_embed_vocab_size(state_dict)}, layers={_count_mistral_layers(state_dict)}). "
+                f"Expected hidden_size={_MISTRAL_3_HIDDEN_SIZE}, vocab_size>={_MISTRAL_3_MIN_VOCAB_SIZE} "
                 f"and num_hidden_layers in {_ACCEPTED_NUM_LAYERS}."
             )
 
@@ -289,7 +334,8 @@ class MistralEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         if variant is None:
             raise NotAMatchError(
                 f"unrecognized Mistral geometry (got hidden_size={_embed_hidden_size(state_dict)}, "
-                f"layers={_count_mistral_layers(state_dict)}). Expected hidden_size={_MISTRAL_3_HIDDEN_SIZE} "
+                f"vocab_size={_embed_vocab_size(state_dict)}, layers={_count_mistral_layers(state_dict)}). "
+                f"Expected hidden_size={_MISTRAL_3_HIDDEN_SIZE}, vocab_size>={_MISTRAL_3_MIN_VOCAB_SIZE} "
                 f"and num_hidden_layers in {_ACCEPTED_NUM_LAYERS}."
             )
 

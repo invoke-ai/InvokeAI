@@ -24,6 +24,25 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, ModelType
 
 
+def _assert_dev_lora(context: InvocationContext, lora_config) -> None:
+    """Reject a non-dev FLUX.2 LoRA applied via the FLUX.2 [dev] loaders.
+
+    A Klein LoRA (hidden 3072/4096) applied to a dev transformer/encoder (hidden 5120/6144)
+    is guaranteed to raise a shape-mismatch ``RuntimeError`` partway through denoise. Fail
+    fast here with an actionable message instead. This is independent of *which* input the
+    LoRA is wired to — the mismatch happens on whichever module it patches — so the check
+    is not gated on the transformer being connected. The frontend also filters these out
+    before they reach the graph (see ``addFlux2DevLoRAs``); this is the backend backstop for
+    hand-built workflow graphs.
+    """
+    lora_variant = getattr(lora_config, "variant", None)
+    if lora_variant is not None and lora_variant != Flux2VariantType.Dev:
+        raise ValueError(
+            f"LoRA '{lora_config.name}' is a {lora_variant.value} LoRA and cannot be applied via the "
+            "FLUX.2 [dev] loader. Use the FLUX.2 Klein LoRA loader for Klein LoRAs."
+        )
+
+
 @invocation_output("flux2_dev_lora_loader_output")
 class Flux2DevLoRALoaderOutput(BaseInvocationOutput):
     """FLUX.2 [dev] LoRA loader output."""
@@ -73,23 +92,10 @@ class Flux2DevLoRALoaderInvocation(BaseInvocation):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
         lora_config = context.models.get_config(lora_key)
-        lora_variant = getattr(lora_config, "variant", None)
 
-        # Warn if LoRA variant doesn't match transformer variant. A Klein LoRA on a
-        # dev transformer is virtually guaranteed to produce shape errors.
-        if lora_variant and self.transformer is not None:
-            transformer_config = context.models.get_config(self.transformer.transformer.key)
-            transformer_variant = getattr(transformer_config, "variant", None)
-            if transformer_variant and lora_variant != transformer_variant:
-                context.logger.warning(
-                    f"LoRA variant mismatch: LoRA '{lora_config.name}' is for {lora_variant.value} "
-                    f"but transformer is {transformer_variant.value}. This may cause shape errors."
-                )
-            if lora_variant != Flux2VariantType.Dev:
-                context.logger.warning(
-                    f"LoRA '{lora_config.name}' is a {lora_variant.value} LoRA but is being applied "
-                    "via the FLUX.2 [dev] loader. Use the Klein loader for Klein LoRAs."
-                )
+        # Reject variant-mismatched LoRAs regardless of which input they're wired to. A Klein
+        # LoRA on a dev transformer/encoder is guaranteed to shape-error during denoise.
+        _assert_dev_lora(context, lora_config)
 
         # Check for duplicate keys.
         if self.transformer and any(existing.lora.key == lora_key for existing in self.transformer.loras):
@@ -156,15 +162,8 @@ class Flux2DevLoRACollectionLoader(BaseInvocation):
             assert lora.lora.base in (BaseModelType.Flux, BaseModelType.Flux2)
 
             lora_config = context.models.get_config(lora.lora.key)
-            lora_variant = getattr(lora_config, "variant", None)
-            if lora_variant and self.transformer is not None:
-                transformer_config = context.models.get_config(self.transformer.transformer.key)
-                transformer_variant = getattr(transformer_config, "variant", None)
-                if transformer_variant and lora_variant != transformer_variant:
-                    context.logger.warning(
-                        f"LoRA variant mismatch: LoRA '{lora_config.name}' is for {lora_variant.value} "
-                        f"but transformer is {transformer_variant.value}. This may cause shape errors."
-                    )
+            # Reject variant-mismatched LoRAs, matching the single-LoRA loader above.
+            _assert_dev_lora(context, lora_config)
 
             added_loras.append(lora.lora.key)
 

@@ -851,6 +851,21 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
         raise_for_override_fields(cls, override_fields)
 
+        # A FLUX.2 *main* model is a full diffusers pipeline: a `model_index.json` at
+        # the root, or at least the transformer packaged as a `transformer/` subfolder.
+        # A loose transformer-only checkout — just the contents of `transformer/`, with
+        # a root `config.json` whose `_class_name` is `Flux2Transformer2DModel` — is NOT
+        # a usable main model: the loader unconditionally appends `vae/` / `text_encoder/`
+        # subfolders that don't exist and fails with an OSError mid-queue. Reject that
+        # layout here so it falls through to a non-main classification instead of
+        # registering as a broken pipeline. (The standalone `transformer/` still matches
+        # via the pipeline layout below when it ships inside a full folder.)
+        if not (mod.path / "model_index.json").exists() and not (mod.path / "transformer").exists():
+            raise NotAMatchError(
+                "directory is not a full FLUX.2 pipeline (no model_index.json and no transformer/ subfolder); "
+                "a loose transformer-only checkout cannot be used as a FLUX.2 main model"
+            )
+
         # Check for FLUX.2-specific pipeline class names
         raise_for_class_name(
             common_config_paths(mod.path),

@@ -1213,9 +1213,18 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
  * VAE into the Klein slice (the exact cross-contamination this guards against).
  */
 const isFlux2DevMetadata = async (metadata: unknown, store: AppStore): Promise<boolean> => {
-  const identifier = zModelIdentifierField.parse(getProperty(metadata, 'model'));
-  const config = await resolveModel(identifier, store);
-  return config.base === 'flux2' && 'variant' in config && config.variant === 'dev';
+  // Return false (rather than throwing) when the image's main model is missing/malformed
+  // or can no longer be resolved (uninstalled, past the key/hash/name fallbacks). Throwing
+  // here would reject BOTH the Klein and dev VAE handlers, making the VAE row vanish from
+  // the metadata viewer and skipping it in recall-all. Failing closed instead lets the
+  // Klein VAE handler recall as it did before this dev/Klein disambiguation was added.
+  try {
+    const identifier = zModelIdentifierField.parse(getProperty(metadata, 'model'));
+    const config = await resolveModel(identifier, store);
+    return config.base === 'flux2' && 'variant' in config && config.variant === 'dev';
+  } catch {
+    return false;
+  }
 };
 
 //#region KleinVAEModel

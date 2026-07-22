@@ -52,12 +52,12 @@ const ParamFlux2DevVaeModelSelect = memo(() => {
 
   const hasDiffusersSource = mainModelConfig?.format === 'diffusers' || diffusersModels.length > 0;
   const placeholder = hasDiffusersSource
-    ? t('modelManager.flux2DevVaePlaceholder', { defaultValue: 'Auto (from Diffusers source)' })
-    : t('modelManager.flux2DevVaeNoModelPlaceholder', { defaultValue: 'Select a FLUX.2 VAE model' });
+    ? t('modelManager.flux2DevVaePlaceholder')
+    : t('modelManager.flux2DevVaeNoModelPlaceholder');
 
   return (
     <FormControl minW={0} flexGrow={1} gap={2}>
-      <FormLabel m={0}>{t('modelManager.flux2DevVae', { defaultValue: 'FLUX.2 [dev] VAE' })}</FormLabel>
+      <FormLabel m={0}>{t('modelManager.flux2DevVae')}</FormLabel>
       <Combobox
         value={value}
         options={options}
@@ -107,16 +107,12 @@ const ParamFlux2DevMistralEncoderModelSelect = memo(() => {
 
   const hasDiffusersSource = mainModelConfig?.format === 'diffusers' || diffusersModels.length > 0;
   const placeholder = hasDiffusersSource
-    ? t('modelManager.flux2DevMistralEncoderPlaceholder', { defaultValue: 'Auto (from Diffusers source)' })
-    : t('modelManager.flux2DevMistralEncoderNoModelPlaceholder', {
-        defaultValue: 'Select a Mistral text encoder',
-      });
+    ? t('modelManager.flux2DevMistralEncoderPlaceholder')
+    : t('modelManager.flux2DevMistralEncoderNoModelPlaceholder');
 
   return (
     <FormControl minW={0} flexGrow={1} gap={2}>
-      <FormLabel m={0}>
-        {t('modelManager.flux2DevMistralEncoder', { defaultValue: 'FLUX.2 [dev] Mistral Encoder' })}
-      </FormLabel>
+      <FormLabel m={0}>{t('modelManager.flux2DevMistralEncoder')}</FormLabel>
       <Combobox
         value={value}
         options={options}

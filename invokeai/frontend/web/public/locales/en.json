@@ -1359,6 +1359,7 @@
         "t5Encoder": "T5 Encoder",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwenVLEncoder": "Qwen2.5-VL Encoder",
+        "mistralEncoder": "Mistral Encoder",
         "animaVae": "VAE",
         "animaVaePlaceholder": "Select Anima-compatible VAE",
         "animaQwen3Encoder": "Qwen3 0.6B Encoder",
