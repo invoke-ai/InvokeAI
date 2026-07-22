@@ -11,13 +11,12 @@ import {
   animaQwen3EncoderModelSelected,
   animaVaeModelSelected,
   flux2DevMistralEncoderModelSelected,
-  flux2DevVaeModelSelected,
+  flux2VaeModelSelected,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
   heightChanged,
   imageSizeChanged,
   kleinQwen3EncoderModelSelected,
-  kleinVaeModelSelected,
   negativePromptChanged,
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
@@ -1199,52 +1198,25 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion AnimaQwen3EncoderModel
 
+//#region Flux2VAEModel
 /**
- * FLUX.2 Klein and FLUX.2 [dev] both have base `flux2` and write their VAE
- * under `metadata.vae`, so the two VAE handlers must disambiguate which slice
- * to recall into. We resolve the image's own main model and inspect its
- * variant — the same signal the graph builder uses (`isFlux2Dev =
- * model.variant === 'dev'`, see buildFLUXGraph.ts).
- *
- * We must NOT key off the presence of `mistral_encoder`/`qwen3_encoder`: those
- * fields are written only when a *standalone* encoder was selected, so a dev
- * image whose encoder was extracted from a Diffusers source carries neither.
- * Keying off `mistral_encoder` presence would silently recall such a dev image's
- * VAE into the Klein slice (the exact cross-contamination this guards against).
+ * FLUX.2 Klein and FLUX.2 [dev] share a single VAE slot (`flux2VaeModel`) and the same
+ * `metadata.vae` field — both draw from the 32-channel AutoencoderKLFlux2 pool — so one
+ * handler covers both variants and no dev/Klein disambiguation is needed on recall.
  */
-const isFlux2DevMetadata = async (metadata: unknown, store: AppStore): Promise<boolean> => {
-  // Return false (rather than throwing) when the image's main model is missing/malformed
-  // or can no longer be resolved (uninstalled, past the key/hash/name fallbacks). Throwing
-  // here would reject BOTH the Klein and dev VAE handlers, making the VAE row vanish from
-  // the metadata viewer and skipping it in recall-all. Failing closed instead lets the
-  // Klein VAE handler recall as it did before this dev/Klein disambiguation was added.
-  try {
-    const identifier = zModelIdentifierField.parse(getProperty(metadata, 'model'));
-    const config = await resolveModel(identifier, store);
-    return config.base === 'flux2' && 'variant' in config && config.variant === 'dev';
-  } catch {
-    return false;
-  }
-};
-
-//#region KleinVAEModel
-const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
+const Flux2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
-  type: 'KleinVAEModel',
+  type: 'Flux2VAEModel',
   parse: async (metadata, store) => {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     const base = selectBase(store.getState());
-    assert(base === 'flux2', 'KleinVAEModel handler only works with FLUX.2 Klein models');
-    assert(
-      !(await isFlux2DevMetadata(metadata, store)),
-      'KleinVAEModel does not handle FLUX.2 [dev] images (main model variant is `dev`)'
-    );
+    assert(base === 'flux2', 'Flux2VAEModel handler only works with FLUX.2 models');
     return parsed;
   },
   recall: (value, store) => {
-    store.dispatch(kleinVaeModelSelected(value));
+    store.dispatch(flux2VaeModelSelected(value));
   },
   i18nKey: 'metadata.vae',
   LabelComponent: MetadataLabel,
@@ -1252,34 +1224,7 @@ const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
   ),
 };
-//#endregion KleinVAEModel
-
-//#region Flux2DevVAEModel
-const Flux2DevVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
-  [SingleMetadataKey]: true,
-  type: 'Flux2DevVAEModel',
-  parse: async (metadata, store) => {
-    const raw = getProperty(metadata, 'vae');
-    const parsed = await parseModelIdentifier(raw, store, 'vae');
-    assert(parsed.type === 'vae');
-    const base = selectBase(store.getState());
-    assert(base === 'flux2', 'Flux2DevVAEModel handler only works with FLUX.2 models');
-    assert(
-      await isFlux2DevMetadata(metadata, store),
-      'Flux2DevVAEModel handler only fires on FLUX.2 [dev] images (main model variant is `dev`)'
-    );
-    return parsed;
-  },
-  recall: (value, store) => {
-    store.dispatch(flux2DevVaeModelSelected(value));
-  },
-  i18nKey: 'metadata.vae',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
-    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
-  ),
-};
-//#endregion Flux2DevVAEModel
+//#endregion Flux2VAEModel
 
 //#region KleinQwen3EncoderModel
 const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
@@ -1730,9 +1675,8 @@ export const ImageMetadataHandlers = {
   ZImageQwen3SourceModel,
   AnimaVAEModel,
   AnimaQwen3EncoderModel,
-  KleinVAEModel,
+  Flux2VAEModel,
   KleinQwen3EncoderModel,
-  Flux2DevVAEModel,
   Flux2DevMistralEncoderModel,
   ZImageSeedVarianceEnabled,
   ZImageSeedVarianceStrength,

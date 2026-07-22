@@ -12,6 +12,12 @@ from invokeai.backend.model_manager.configs.base import (
     Config_Base,
 )
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
+from invokeai.backend.model_manager.configs.flux2_variant import (
+    FLUX2_CONTEXT_IN_DIMS,
+    flux2_variant_from_context_dim,
+    flux2_variant_from_hidden_size,
+    flux2_variant_from_vec_dim,
+)
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     raise_for_override_fields,
@@ -90,9 +96,9 @@ def _get_flux_lora_format(mod: ModelOnDisk) -> FluxLoRAFormat | None:
     return value
 
 
-# FLUX.2 context_in_dim values: 3 * text encoder hidden_size
-# Klein 4B: 3 * 2560 = 7680, Klein 9B: 3 * 4096 = 12288, Dev: 3 * 5120 = 15360 (Mistral)
-_FLUX2_CONTEXT_IN_DIMS = {7680, 12288, 15360}
+# FLUX.2 context_in_dim values (Klein 4B 7680 / Klein 9B 12288 / Dev 15360) come from the
+# shared dimension table so this "is it FLUX.2?" check can't drift from variant detection.
+_FLUX2_CONTEXT_IN_DIMS = FLUX2_CONTEXT_IN_DIMS
 
 # FLUX.2 vec_in_dim values: text encoder hidden_size
 # Klein 4B: 2560 (Qwen3-4B), Klein 9B: 4096 (Qwen3-8B), Dev: 5120 (Mistral Small 3.1)
@@ -327,42 +333,12 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
     Returns None if the variant cannot be determined (e.g. LoRA only targets layers
     with identical dimensions across variants).
     """
-    KLEIN_4B_CONTEXT_DIM = 7680  # 3 * 2560
-    KLEIN_9B_CONTEXT_DIM = 12288  # 3 * 4096
-    DEV_CONTEXT_DIM = 15360  # 3 * 5120
-    KLEIN_4B_VEC_DIM = 2560
-    KLEIN_9B_VEC_DIM = 4096
-    DEV_VEC_DIM = 5120
-    KLEIN_4B_HIDDEN_SIZE = 3072
-    KLEIN_9B_HIDDEN_SIZE = 4096
-    DEV_HIDDEN_SIZE = 6144  # 48 heads × 128 head_dim
-
-    def _variant_from_context_dim(dim: int) -> Flux2VariantType | None:
-        if dim == DEV_CONTEXT_DIM:
-            return Flux2VariantType.Dev
-        if dim == KLEIN_9B_CONTEXT_DIM:
-            return Flux2VariantType.Klein9B
-        if dim == KLEIN_4B_CONTEXT_DIM:
-            return Flux2VariantType.Klein4B
-        return None
-
-    def _variant_from_vec_dim(dim: int) -> Flux2VariantType | None:
-        if dim == DEV_VEC_DIM:
-            return Flux2VariantType.Dev
-        if dim == KLEIN_9B_VEC_DIM:
-            return Flux2VariantType.Klein9B
-        if dim == KLEIN_4B_VEC_DIM:
-            return Flux2VariantType.Klein4B
-        return None
-
-    def _variant_from_hidden_size(dim: int) -> Flux2VariantType | None:
-        if dim == DEV_HIDDEN_SIZE:
-            return Flux2VariantType.Dev
-        if dim == KLEIN_9B_HIDDEN_SIZE:
-            return Flux2VariantType.Klein9B
-        if dim == KLEIN_4B_HIDDEN_SIZE:
-            return Flux2VariantType.Klein4B
-        return None
+    # Reverse-lookup helpers come from the shared FLUX.2 dimension table (single source of
+    # truth shared with main.py's identification code). Aliased to the original local names
+    # to keep the detection code below unchanged.
+    _variant_from_context_dim = flux2_variant_from_context_dim
+    _variant_from_vec_dim = flux2_variant_from_vec_dim
+    _variant_from_hidden_size = flux2_variant_from_hidden_size
 
     # Check diffusers/PEFT format keys
     for prefix in ["transformer.", "base_model.model.", ""]:

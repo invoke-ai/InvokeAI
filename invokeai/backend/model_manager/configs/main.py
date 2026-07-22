@@ -12,6 +12,7 @@ from invokeai.backend.model_manager.configs.base import (
     SubmodelDefinition,
 )
 from invokeai.backend.model_manager.configs.clip_embed import get_clip_variant_type_from_config
+from invokeai.backend.model_manager.configs.flux2_variant import flux2_variant_from_context_dim
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     common_config_paths,
@@ -368,11 +369,6 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
     - BFL format: txt_in.weight (context embedder)
     - Diffusers format: context_embedder.weight
     """
-    # Context dimensions for each variant
-    KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
-    KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
-    DEV_CONTEXT_DIM = 15360  # 3 × 5120 (Mistral Small 3.1)
-
     # Check context_embedder to determine variant
     # Support both BFL format (txt_in.weight) and diffusers format (context_embedder.weight)
     context_keys = {
@@ -395,16 +391,12 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
                 continue
             if len(shape) >= 2:
                 context_in_dim = shape[1]
-                # Determine variant based on context dimension
-                if context_in_dim == DEV_CONTEXT_DIM:
-                    return Flux2VariantType.Dev
-                elif context_in_dim == KLEIN_9B_CONTEXT_DIM:
-                    # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
-                    return Flux2VariantType.Klein9B
-                elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
-                    # Default to Klein4B - callers use filename heuristics to detect Klein4BBase
-                    return Flux2VariantType.Klein4B
-                elif context_in_dim > 4096:
+                # Determine variant based on context dimension. Callers use filename
+                # heuristics to upgrade Klein4B/Klein9B to their Base variants.
+                variant = flux2_variant_from_context_dim(context_in_dim)
+                if variant is not None:
+                    return variant
+                if context_in_dim > 4096:
                     # Unknown FLUX.2 variant, default to 4B
                     return Flux2VariantType.Klein4B
 
@@ -898,10 +890,6 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         Klein distilled and Base variants share identical architectures; the Base variant
         is detected by a filename heuristic.
         """
-        KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
-        KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
-        DEV_CONTEXT_DIM = 15360  # 3 × 5120
-
         # Try transformer/config.json first (full pipeline), fall back to root config.json
         # (loose transformer-only checkouts).
         transformer_config_path = mod.path / "transformer" / "config.json"
@@ -913,23 +901,18 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
         joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
 
-        # Determine variant based on joint_attention_dim
-        if joint_attention_dim == DEV_CONTEXT_DIM:
-            return Flux2VariantType.Dev
-        elif joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
-            if _filename_suggests_base(mod.name):
-                return Flux2VariantType.Klein9BBase
-            return Flux2VariantType.Klein9B
-        elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
-            if _filename_suggests_base(mod.name):
-                return Flux2VariantType.Klein4BBase
+        # Determine variant based on joint_attention_dim (= context_in_dim).
+        variant = flux2_variant_from_context_dim(joint_attention_dim)
+        if variant is None:
+            # Unknown or FLUX.1-sized joint_attention_dim — default to Klein 4B.
             return Flux2VariantType.Klein4B
-        elif joint_attention_dim > 4096:
-            # Unknown FLUX.2 variant, default to 4B
-            return Flux2VariantType.Klein4B
-
-        # Default to 4B
-        return Flux2VariantType.Klein4B
+        # Klein 4B/9B share their architecture with the corresponding Base variant; use the
+        # filename heuristic to distinguish. Dev has no Base variant.
+        if variant is Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+        if variant is Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
+        return variant
 
 
 class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):

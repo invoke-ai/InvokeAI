@@ -300,7 +300,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     // pipeline of the matching variant family is installed to extract from.
     if ('variant' in model && model.variant === 'dev') {
       // FLUX.2 [dev]: needs FLUX.2 VAE + Mistral text encoder.
-      if (!params.flux2DevVaeModel && !hasFlux2DevDiffusersSource) {
+      if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
         reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
       }
       if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
@@ -308,7 +308,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
       }
     } else {
       // FLUX.2 Klein: needs FLUX.2 VAE + Qwen3 text encoder (variant-matched).
-      if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
+      if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
         reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
       }
       if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
@@ -637,14 +637,14 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     // pipeline of the matching variant family is installed to extract from.
     if (model.format !== 'diffusers') {
       if ('variant' in model && model.variant === 'dev') {
-        if (!params.flux2DevVaeModel && !hasFlux2DevDiffusersSource) {
+        if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
           reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
         }
         if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
           reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
         }
       } else {
-        if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
+        if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
           reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
         }
         if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {

@@ -3,9 +3,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import {
   flux2DevMistralEncoderModelSelected,
-  flux2DevVaeModelSelected,
+  flux2VaeModelSelected,
   selectFlux2DevMistralEncoderModel,
-  selectFlux2DevVaeModel,
+  selectFlux2VaeModel,
   selectMainModelConfig,
 } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -27,7 +27,7 @@ import type { MistralEncoderModelConfig, VAEModelConfig } from 'services/api/typ
 const ParamFlux2DevVaeModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const flux2DevVaeModel = useAppSelector(selectFlux2DevVaeModel);
+  const flux2VaeModel = useAppSelector(selectFlux2VaeModel);
   const mainModelConfig = useAppSelector(selectMainModelConfig);
   const [modelConfigs, { isLoading }] = useFlux2VAEModels();
   const [diffusersModels] = useFlux2DevDiffusersModels();
@@ -35,9 +35,9 @@ const ParamFlux2DevVaeModelSelect = memo(() => {
   const _onChange = useCallback(
     (model: VAEModelConfig | null) => {
       if (model) {
-        dispatch(flux2DevVaeModelSelected(zModelIdentifierField.parse(model)));
+        dispatch(flux2VaeModelSelected(zModelIdentifierField.parse(model)));
       } else {
-        dispatch(flux2DevVaeModelSelected(null));
+        dispatch(flux2VaeModelSelected(null));
       }
     },
     [dispatch]
@@ -46,7 +46,7 @@ const ParamFlux2DevVaeModelSelect = memo(() => {
   const { options, value, onChange, noOptionsMessage } = useModelCombobox({
     modelConfigs,
     onChange: _onChange,
-    selectedModel: flux2DevVaeModel,
+    selectedModel: flux2VaeModel,
     isLoading,
   });
 

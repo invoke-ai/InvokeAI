@@ -63,9 +63,8 @@ export const IMAGE_METADATA_ACTION_HANDLERS: ImageMetadataActionHandler[] = [
   ImageMetadataHandlers.ZImageShift,
   ImageMetadataHandlers.CanvasLayers,
   ImageMetadataHandlers.RefImages,
-  ImageMetadataHandlers.KleinVAEModel,
+  ImageMetadataHandlers.Flux2VAEModel,
   ImageMetadataHandlers.KleinQwen3EncoderModel,
-  ImageMetadataHandlers.Flux2DevVAEModel,
   ImageMetadataHandlers.Flux2DevMistralEncoderModel,
   ImageMetadataHandlers.LoRAs,
 ];

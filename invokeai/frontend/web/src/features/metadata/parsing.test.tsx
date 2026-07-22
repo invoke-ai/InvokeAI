@@ -8,8 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Module mocks
 //
 // We are testing only the *gating* logic of the model-related metadata
-// handlers (`VAEModel`, `KleinVAEModel`, `KleinQwen3EncoderModel`,
-// `Flux2DevVAEModel`, `Flux2DevMistralEncoderModel`). The model lookup goes
+// handlers (`VAEModel`, `Flux2VAEModel`, `KleinQwen3EncoderModel`,
+// `Flux2DevMistralEncoderModel`). The model lookup goes
 // through `parseModelIdentifier`, which dispatches an RTK Query thunk. We stub
 // the models endpoint so any lookup resolves to a canned model identifier —
 // the parse step then succeeds and the assertions inside each handler become
@@ -80,85 +80,34 @@ beforeEach(() => {
 });
 
 describe('ImageMetadataHandlers — Klein recall gating', () => {
-  describe('KleinVAEModel', () => {
-    it('parses metadata.vae for Klein images (main model variant klein_*) when base is flux2', async () => {
-      currentBase = 'flux2';
-      nextResolved = fakeModel('vae', 'flux2');
-      modelRegistry['main-key'] = fakeMainModel('klein_9b');
-      const store = makeStore();
+  describe('Flux2VAEModel', () => {
+    // Klein and [dev] share a single flux2VaeModel slot, so one handler recalls both
+    // variants' VAE from metadata.vae — no dev/Klein disambiguation.
+    it.each(['klein_9b', 'dev'] as const)(
+      'parses metadata.vae for FLUX.2 %s images when base is flux2',
+      async (variant) => {
+        currentBase = 'flux2';
+        nextResolved = fakeModel('vae', 'flux2');
+        modelRegistry['main-key'] = fakeMainModel(variant);
+        const store = makeStore();
 
-      const parsed = await ImageMetadataHandlers.KleinVAEModel.parse(
-        { vae: nextResolved, model: fakeMainModel('klein_9b') },
-        store
-      );
+        const parsed = await ImageMetadataHandlers.Flux2VAEModel.parse(
+          { vae: nextResolved, model: fakeMainModel(variant) },
+          store
+        );
 
-      expect(parsed.key).toBe('vae-key');
-      expect(parsed.type).toBe('vae');
-    });
-
-    it('rejects when base is not flux2', async () => {
-      currentBase = 'sdxl';
-      nextResolved = fakeModel('vae', 'flux2');
-      const store = makeStore();
-
-      await expect(
-        ImageMetadataHandlers.KleinVAEModel.parse({ vae: nextResolved, model: fakeMainModel('klein_9b') }, store)
-      ).rejects.toThrow();
-    });
-
-    it('rejects FLUX.2 [dev] images (main model variant dev) even without a mistral_encoder field', async () => {
-      // Regression: a [dev] image whose encoder came from a Diffusers source has
-      // a `vae` field but NO `mistral_encoder`. It must still be recognized as
-      // [dev] (via the main model variant) and NOT recalled into the Klein slice.
-      currentBase = 'flux2';
-      nextResolved = fakeModel('vae', 'flux2');
-      modelRegistry['main-key'] = fakeMainModel('dev');
-      const store = makeStore();
-
-      await expect(
-        ImageMetadataHandlers.KleinVAEModel.parse({ vae: nextResolved, model: fakeMainModel('dev') }, store)
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('Flux2DevVAEModel', () => {
-    it('parses metadata.vae for [dev] images (main model variant dev) even without a mistral_encoder field', async () => {
-      // The dev VAE must recall from a [dev] image regardless of whether a
-      // standalone Mistral encoder was selected (Diffusers-sourced encoders
-      // write no `mistral_encoder` metadata).
-      currentBase = 'flux2';
-      nextResolved = fakeModel('vae', 'flux2');
-      modelRegistry['main-key'] = fakeMainModel('dev');
-      const store = makeStore();
-
-      const parsed = await ImageMetadataHandlers.Flux2DevVAEModel.parse(
-        { vae: nextResolved, model: fakeMainModel('dev') },
-        store
-      );
-
-      expect(parsed.key).toBe('vae-key');
-      expect(parsed.type).toBe('vae');
-    });
-
-    it('rejects Klein images (main model variant klein_*)', async () => {
-      currentBase = 'flux2';
-      nextResolved = fakeModel('vae', 'flux2');
-      modelRegistry['main-key'] = fakeMainModel('klein_9b');
-      const store = makeStore();
-
-      await expect(
-        ImageMetadataHandlers.Flux2DevVAEModel.parse({ vae: nextResolved, model: fakeMainModel('klein_9b') }, store)
-      ).rejects.toThrow();
-    });
+        expect(parsed.key).toBe('vae-key');
+        expect(parsed.type).toBe('vae');
+      }
+    );
 
     it('rejects when base is not flux2', async () => {
       currentBase = 'sdxl';
       nextResolved = fakeModel('vae', 'flux2');
-      modelRegistry['main-key'] = fakeMainModel('dev');
       const store = makeStore();
 
       await expect(
-        ImageMetadataHandlers.Flux2DevVAEModel.parse({ vae: nextResolved, model: fakeMainModel('dev') }, store)
+        ImageMetadataHandlers.Flux2VAEModel.parse({ vae: nextResolved, model: fakeMainModel('klein_9b') }, store)
       ).rejects.toThrow();
     });
   });
@@ -215,7 +164,7 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
   describe('VAEModel (generic)', () => {
     // The generic VAEModel handler must NOT also fire for FLUX.2 / Z-Image
     // images, otherwise the metadata viewer renders duplicate VAE rows next
-    // to the dedicated KleinVAEModel / Flux2DevVAEModel / ZImageVAEModel handlers.
+    // to the dedicated Flux2VAEModel / ZImageVAEModel handlers.
     it.each(['flux2', 'z-image'])('rejects parsing when current base is %s', async (base) => {
       currentBase = base;
       nextResolved = fakeModel('vae', base);

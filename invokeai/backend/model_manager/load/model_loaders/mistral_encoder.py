@@ -32,6 +32,7 @@ from invokeai.backend.model_manager.load.model_loader_registry import ModelLoade
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
+    MistralVariantType,
     ModelFormat,
     ModelType,
     SubModelType,
@@ -49,7 +50,6 @@ from invokeai.backend.util.logging import InvokeAILogger
 _COW_HIDDEN_SIZE = 5120
 _COW_INTERMEDIATE_SIZE = 32768
 _COW_NUM_HIDDEN_LAYERS = 30
-_MISTRAL_24B_NUM_HIDDEN_LAYERS = 40
 _COW_NUM_ATTENTION_HEADS = 32
 _COW_NUM_KV_HEADS = 8  # grouped-query attention
 _COW_HEAD_DIM = 128
@@ -273,7 +273,7 @@ def _materialize_remaining_meta_tensors(model: torch.nn.Module, dtype: torch.dty
         )
 
 
-def _strip_final_norm_for_cow(model: torch.nn.Module, num_hidden_layers: int, logger: Any) -> None:
+def _strip_final_norm_for_cow(model: torch.nn.Module, variant: MistralVariantType, logger: Any) -> None:
     """Replace ``model.norm`` with ``Identity`` for the 30-layer cow distillation.
 
     ComfyUI's reference implementation (``Mistral3_24BModel`` with ``num_layers=30``)
@@ -284,9 +284,11 @@ def _strip_final_norm_for_cow(model: torch.nn.Module, num_hidden_layers: int, lo
     off-distribution embeddings for the cow weights. Swap the norm out for an
     identity here so our extraction matches Comfy / BFL.
 
-    The 40-layer Mistral Small 3 variant keeps the final norm.
+    The 40-layer Mistral Small 3 variant keeps the final norm. The decision keys on
+    the persisted ``config.variant`` (single source of truth) rather than re-deriving
+    it from the loaded layer count, so the config and loader can never disagree.
     """
-    if num_hidden_layers != _COW_NUM_HIDDEN_LAYERS:
+    if variant is not MistralVariantType.Cow:
         return
     if not hasattr(model, "norm"):
         return
@@ -294,7 +296,7 @@ def _strip_final_norm_for_cow(model: torch.nn.Module, num_hidden_layers: int, lo
     logger.info("Replaced model.norm with Identity for 30-layer cow Mistral (final_norm=False).")
 
 
-def _warn_if_40_layer_mistral(num_hidden_layers: int, logger: Any) -> None:
+def _warn_if_40_layer_mistral(variant: MistralVariantType, logger: Any) -> None:
     """Warn when a 40-layer Mistral Small 3 is loaded as a FLUX.2 [dev] text encoder.
 
     Architecturally, BFL's canonical ``black-forest-labs/FLUX.2-dev/text_encoder``
@@ -306,9 +308,10 @@ def _warn_if_40_layer_mistral(num_hidden_layers: int, logger: Any) -> None:
 
     We accept both at probe time and emit this warning at load time so users who
     install a non-BFL 40-layer Mistral see the issue called out in the log
-    instead of just getting weird images.
+    instead of just getting weird images. Keys on ``config.variant`` (single source
+    of truth), consistent with ``_strip_final_norm_for_cow``.
     """
-    if num_hidden_layers != _MISTRAL_24B_NUM_HIDDEN_LAYERS:
+    if variant is not MistralVariantType.Mistral24B:
         return
     logger.warning(
         "Loaded a 40-layer Mistral Small 3 text encoder. "
@@ -714,10 +717,9 @@ class MistralEncoderDiffusersLoader(ModelLoader):
                 # ComfyUI's reference implementation. ``Mistral3ForConditionalGeneration``
                 # nests the LM under ``.language_model``; handle both layouts.
                 inner = getattr(model, "language_model", None) or model
-                num_layers = int(getattr(getattr(inner, "config", None), "num_hidden_layers", 0))
                 logger = InvokeAILogger.get_logger("MistralEncoderDiffusersLoader")
-                _strip_final_norm_for_cow(inner, num_layers, logger)
-                _warn_if_40_layer_mistral(num_layers, logger)
+                _strip_final_norm_for_cow(inner, config.variant, logger)
+                _warn_if_40_layer_mistral(config.variant, logger)
                 return model
 
         raise ValueError(
@@ -823,8 +825,8 @@ class MistralEncoderCheckpointLoader(ModelLoader):
                 parent.register_buffer(parts[-1], inv_freq.to(model_dtype), persistent=False)
 
         _materialize_remaining_meta_tensors(model, model_dtype, logger)
-        _strip_final_norm_for_cow(model, mistral_config.num_hidden_layers, logger)
-        _warn_if_40_layer_mistral(mistral_config.num_hidden_layers, logger)
+        _strip_final_norm_for_cow(model, config.variant, logger)
+        _warn_if_40_layer_mistral(config.variant, logger)
 
         return model
 
@@ -927,8 +929,8 @@ class MistralEncoderGGUFLoader(ModelLoader):
                 parent.register_buffer(parts[-1], inv_freq.to(compute_dtype), persistent=False)
 
         _materialize_remaining_meta_tensors(model, compute_dtype, logger)
-        _strip_final_norm_for_cow(model, mistral_config.num_hidden_layers, logger)
-        _warn_if_40_layer_mistral(mistral_config.num_hidden_layers, logger)
+        _strip_final_norm_for_cow(model, config.variant, logger)
+        _warn_if_40_layer_mistral(config.variant, logger)
 
         return model
 
