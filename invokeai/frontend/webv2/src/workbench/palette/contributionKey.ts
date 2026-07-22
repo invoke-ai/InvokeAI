@@ -8,7 +8,7 @@ import type { WidgetContributionSource } from '@workbench/widgetContracts';
  * pulling extension registry internals into either route's initial graph.
  */
 export const getPaletteContributionKey = (
-  kind: 'command' | 'provider' | 'provider-result' | 'provider-row' | 'scope',
+  kind: 'command' | 'provider' | 'provider-result' | 'provider-row' | 'scope' | 'scope-command',
   id: string,
   source?: WidgetContributionSource | null
 ): string =>

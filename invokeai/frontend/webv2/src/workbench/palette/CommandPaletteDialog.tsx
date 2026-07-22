@@ -12,7 +12,6 @@ import type { CommandPaletteRowsHandle } from './CommandPaletteRows';
 import type { PaletteEntry, PaletteSearchProvider, PaletteStage } from './entries';
 
 import { CommandPaletteRows, getCommandPaletteRowDomId } from './CommandPaletteRows';
-import { PROVIDER_MIN_QUERY_LENGTH } from './entries';
 import { useCommandPaletteController } from './useCommandPaletteController';
 
 const INPUT_PLACEHOLDER_STYLE = { color: 'fg.subtle' };
@@ -109,18 +108,18 @@ const CommandPaletteContent = ({
   let emptyState: ReactNode = null;
 
   if (controller.rows.length === 0) {
-    if (controller.scopeIsError && controller.scopeErrorLabel) {
+    if (controller.scopeIsError && controller.scopeLabel) {
       emptyState = (
-        <EmptyState danger py="6" title={`Couldn't search ${controller.scopeErrorLabel}`}>
+        <EmptyState danger py="6" title={`Couldn't search ${controller.scopeLabel}`}>
           <Button size="xs" variant="subtle" onClick={controller.onRetry}>
             Retry
           </Button>
         </EmptyState>
       );
-    } else if (controller.scopeErrorLabel && controller.trimmedQuery.length < PROVIDER_MIN_QUERY_LENGTH) {
-      emptyState = <EmptyState py="6" title={`Keep typing to search ${controller.scopeErrorLabel}`} />;
-    } else if (controller.scopeErrorLabel && controller.scopeIsFetching) {
+    } else if (controller.scopeLabel && controller.scopeIsFetching) {
       emptyState = <EmptyState py="6" title="Searching…" />;
+    } else if (controller.scopeLabel && controller.trimmedQuery.length === 0) {
+      emptyState = <EmptyState py="6" title={`No ${controller.scopeLabel} yet`} />;
     } else {
       emptyState = <EmptyState py="6" title={`No results for “${controller.trimmedQuery}”`} />;
     }

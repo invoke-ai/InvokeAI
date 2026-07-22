@@ -15,12 +15,14 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { PaletteEntry, PaletteRow, PaletteSearchProvider, PaletteStage, ProviderResultSection } from './entries';
 
+import { getPaletteContributionKey } from './contributionKey';
 import {
   buildProviderSectionRows,
   buildScopeRows,
   buildStageEntries,
   PROVIDER_MIN_QUERY_LENGTH,
   resolveActivePaletteRow,
+  SEARCH_SCOPE_GROUP,
   searchPaletteRows,
   STAGE_ENTRY_ID_PREFIX,
 } from './entries';
@@ -76,9 +78,9 @@ export interface CommandPaletteController {
   placeholder: string;
   query: string;
   rows: PaletteRow[];
-  scopeErrorLabel: string | null;
   scopeIsError: boolean;
   scopeIsFetching: boolean;
+  scopeLabel: string | null;
   secondaryHint: string | undefined;
   setInputElement: (node: HTMLInputElement | null) => void;
   stage: PaletteStage | null;
@@ -150,9 +152,13 @@ export const useCommandPaletteController = ({
     [debouncedParse, debouncedQuery]
   );
   // A valid date range is a complete query on its own — it bypasses the
-  // minimum text length so `from:7d` alone searches.
+  // minimum text length so `from:7d` alone searches. An active scope is a
+  // committed search context: it searches at any length, including empty
+  // (initial recent results) and one character.
   const shouldSearchProviders =
-    (providerQuery.text.length >= PROVIDER_MIN_QUERY_LENGTH || providerQuery.range !== undefined) &&
+    (scopeProvider !== null ||
+      providerQuery.text.length >= PROVIDER_MIN_QUERY_LENGTH ||
+      providerQuery.range !== undefined) &&
     !stage &&
     !isCommandsScope;
   // Pure date query (range, no text): only range-capable providers run —
@@ -299,6 +305,41 @@ export const useCommandPaletteController = ({
     return rows;
   }, [datesEnabled, query, replaceQuery]);
 
+  const enterScope = useCallback(
+    (providerKey: string, { resetQuery = false }: { resetQuery?: boolean } = {}) => {
+      clearDebounce();
+      setScopeProviderKey(providerKey);
+      if (resetQuery) {
+        setQuery('');
+      }
+      setDebouncedQuery(resetQuery ? '' : trimmedQuery);
+      setActiveRowId(null);
+      focusInput();
+    },
+    [clearDebounce, focusInput, trimmedQuery]
+  );
+
+  // One "Search images…"-style command per provider, merged into the local
+  // entries so the empty-state launcher, `>` commands mode, fuzzy matching,
+  // and recents all treat them like any other command. Running one enters the
+  // scope with a fresh query — the text that found the command is not a
+  // search term for its results.
+  const scopeCommandEntries = useMemo<PaletteEntry[]>(
+    () =>
+      providers.map((provider) => ({
+        group: SEARCH_SCOPE_GROUP,
+        id: getPaletteContributionKey('scope-command', provider.providerKey),
+        isPersistentRecent: true,
+        keepOpen: true,
+        keywords: `search find browse ${provider.label.toLowerCase()}`,
+        run: () => enterScope(provider.providerKey, { resetQuery: true }),
+        showInEmptyState: true,
+        title: `Search ${provider.label.toLowerCase()}…`,
+      })),
+    [enterScope, providers]
+  );
+  const allEntries = useMemo(() => [...entries, ...scopeCommandEntries], [entries, scopeCommandEntries]);
+
   const rows = useMemo<PaletteRow[]>(() => {
     if (stage) {
       return searchPaletteRows(buildStageEntries(stage, onStageApplied), query, [], { showAllOnEmpty: true });
@@ -315,7 +356,7 @@ export const useCommandPaletteController = ({
     // are provider results (and their scopes) only.
     const localRows = isLivePureDate
       ? []
-      : searchPaletteRows(entries, matchText, recentIds, {
+      : searchPaletteRows(allEntries, matchText, recentIds, {
           commandsOnly: isCommandsScope,
           showAllOnEmpty: isCommandsScope && trimmedQuery.length === 0,
         });
@@ -335,9 +376,9 @@ export const useCommandPaletteController = ({
       ...buildScopeRows(scopeProviders, isLivePureDate ? '' : matchText.trim()),
     ];
   }, [
+    allEntries,
     dateParse,
     dateSuggestionRows,
-    entries,
     isCommandsScope,
     localQuery,
     onStageApplied,
@@ -356,17 +397,6 @@ export const useCommandPaletteController = ({
   const effectiveActive = useMemo(() => resolveActivePaletteRow(rows, activeRowId), [activeRowId, rows]);
   const effectiveActiveRowId = effectiveActive?.row.id ?? null;
   const activeRow = effectiveActive?.row;
-
-  const enterScope = useCallback(
-    (providerKey: string) => {
-      clearDebounce();
-      setScopeProviderKey(providerKey);
-      setDebouncedQuery(trimmedQuery);
-      setActiveRowId(null);
-      focusInput();
-    },
-    [clearDebounce, focusInput, trimmedQuery]
-  );
 
   const runRow = useCallback(
     (row: PaletteRow) => {
@@ -571,9 +601,9 @@ export const useCommandPaletteController = ({
         : 'Search commands, settings, and more…',
     query,
     rows,
-    scopeErrorLabel: scopeProvider?.label.toLowerCase() ?? null,
     scopeIsError: Boolean(scopeProvider && scopedQueryResult?.isError),
     scopeIsFetching: Boolean(scopeProvider && scopedQueryResult?.isFetching),
+    scopeLabel: scopeProvider?.label.toLowerCase() ?? null,
     secondaryHint: activeRow?.kind === 'entry' ? activeRow.entry.secondary?.label : undefined,
     setInputElement,
     stage,

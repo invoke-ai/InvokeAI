@@ -105,6 +105,8 @@ export const resolveActivePaletteRow = (
 export const PROVIDER_ROOT_RESULT_CAP = 3;
 /** Entity providers only fire at this query length. */
 export const PROVIDER_MIN_QUERY_LENGTH = 2;
+/** Group for the synthesized "Search images…"-style scope commands. */
+export const SEARCH_SCOPE_GROUP = 'Search in';
 
 const PALETTE_GROUP_ORDER = [
   'Recent',
@@ -119,6 +121,7 @@ const PALETTE_GROUP_ORDER = [
   'Workflows',
   'Commands',
   'Settings',
+  SEARCH_SCOPE_GROUP,
 ];
 
 const RECENT_GROUP = 'Recent';

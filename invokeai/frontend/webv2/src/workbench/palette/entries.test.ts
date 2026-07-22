@@ -12,6 +12,7 @@ import {
   buildScopeRows,
   buildSettingsEntries,
   buildStageEntries,
+  SEARCH_SCOPE_GROUP,
   searchPaletteRows,
   resolveActivePaletteRow,
 } from './entries';
@@ -296,6 +297,34 @@ describe('searchPaletteRows', () => {
       'app.invokeFront',
       'app.selectCanvasTab',
     ]);
+  });
+
+  it('renders the search-scope section last in the empty launcher', () => {
+    const rows = searchPaletteRows(
+      [
+        ...entries,
+        makeEntry({ group: SEARCH_SCOPE_GROUP, id: 'scope.images', showInEmptyState: true, title: 'Search images…' }),
+      ],
+      '',
+      []
+    );
+
+    expect(rows.filter((row) => row.kind === 'label').map((row) => row.id)).toEqual([
+      'label:Navigation',
+      `label:${SEARCH_SCOPE_GROUP}`,
+    ]);
+    expect(rows.at(-1)?.id).toBe('scope.images');
+  });
+
+  it('includes search-scope commands in commands-only mode', () => {
+    const rows = searchPaletteRows(
+      [...entries, makeEntry({ group: SEARCH_SCOPE_GROUP, id: 'scope.images', title: 'Search images…' })],
+      '',
+      [],
+      { commandsOnly: true, showAllOnEmpty: true }
+    );
+
+    expect(rows.filter((row) => row.kind === 'entry').map((row) => row.entry.id)).toContain('scope.images');
   });
 });
 

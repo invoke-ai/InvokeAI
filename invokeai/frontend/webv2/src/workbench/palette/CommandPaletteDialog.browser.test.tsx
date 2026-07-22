@@ -260,6 +260,160 @@ describe('CommandPaletteDialog interaction', () => {
     });
   });
 
+  it('shows one search-scope command per provider in the empty launcher and bare > mode', async () => {
+    const providers: PaletteSearchProvider[] = [
+      { contextKey: 'context', label: 'Entities', providerKey: 'entities', search: vi.fn(() => []) },
+      { contextKey: 'context', label: 'Widgets', providerKey: 'widgets', search: vi.fn(() => []) },
+    ];
+    const { input } = await renderPalette({ entries: [entry('first', 'First command')], providers });
+
+    expect(document.body.textContent).toContain('Search in');
+    expect(document.body.textContent).toContain('Search entities…');
+    expect(document.body.textContent).toContain('Search widgets…');
+
+    await act(() => userEvent.fill(input, '>'));
+    expect(document.body.textContent).toContain('Search entities…');
+    expect(document.body.textContent).toContain('Search widgets…');
+  });
+
+  it('shows no search-scope section without providers (Launchpad shape)', async () => {
+    const { input } = await renderPalette({ entries: [entry('first', 'First command')] });
+
+    expect(document.body.textContent).not.toContain('Search in');
+
+    await act(() => userEvent.fill(input, '>'));
+    expect(document.body.textContent).not.toContain('Search in');
+  });
+
+  it('runs a search-scope command: clears the query, keeps the palette open, and lists results immediately', async () => {
+    const providerSearch = vi.fn(() => [
+      { group: 'Entities', id: 'entity-one', isPersistentRecent: false, run: vi.fn(), title: 'Entity One' },
+    ]);
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Entities',
+      providerKey: 'entities',
+      search: providerSearch,
+      supportsCreatedAtRange: true,
+    };
+    const { input, onClose } = await renderPalette({ entries: [], providers: [provider] });
+
+    await act(() => userEvent.fill(input, 'search ent'));
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(input.value).toBe('');
+    expect(onClose).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: '' });
+    });
+    expect(document.body.textContent).toContain('Entity One');
+
+    // The same command works from > commands mode and exits it into the scope.
+    await act(() => userEvent.keyboard('{Backspace}'));
+    await act(() => userEvent.fill(input, '>search ent'));
+    await act(() => userEvent.keyboard('{Enter}'));
+    expect(input.value).toBe('');
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Entity One'));
+  });
+
+  it('keeps the query when entering a scope through a Tab scope row', async () => {
+    const providerSearch = vi.fn(() => []);
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Entities',
+      providerKey: 'entities',
+      search: providerSearch,
+    };
+    const { input } = await renderPalette({ entries: [], providers: [provider] });
+
+    await act(() => userEvent.fill(input, 'zz'));
+    // The trailing scope row is the last navigable row; ArrowUp wraps to it.
+    await act(() => userEvent.keyboard('{ArrowUp}'));
+    await act(() => userEvent.keyboard('{Tab}'));
+
+    expect(input.value).toBe('zz');
+    await vi.waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: 'zz' });
+    });
+  });
+
+  it('searches at any length inside a scope but keeps the root minimum length', async () => {
+    const providerSearch = vi.fn(() => []);
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Entities',
+      providerKey: 'entities',
+      search: providerSearch,
+    };
+    const { input } = await renderPalette({ entries: [], providers: [provider] });
+
+    await act(() => userEvent.fill(input, 'e'));
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 250);
+    });
+    expect(providerSearch).not.toHaveBeenCalled();
+
+    await act(() => userEvent.fill(input, ''));
+    await act(() => userEvent.keyboard('{Enter}'));
+    await vi.waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: '' });
+    });
+
+    await act(() => userEvent.fill(input, 'a'));
+    await vi.waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: 'a' });
+    });
+  });
+
+  it('says what an empty scope is missing and falls back to no-results for a miss', async () => {
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Entities',
+      providerKey: 'entities',
+      search: vi.fn(() => []),
+    };
+    const { input } = await renderPalette({ entries: [], providers: [provider] });
+
+    await act(() => userEvent.keyboard('{Enter}'));
+    await vi.waitFor(() => expect(document.body.textContent).toContain('No entities yet'));
+
+    await act(() => userEvent.fill(input, 'x'));
+    await vi.waitFor(() => expect(document.body.textContent).toContain('No results for “x”'));
+  });
+
+  it('keeps the error state and Retry for an empty scope', async () => {
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Entities',
+      providerKey: 'entities',
+      search: vi.fn(() => Promise.reject(new Error('offline'))),
+    };
+    await renderPalette({ entries: [], providers: [provider] });
+
+    await act(() => userEvent.keyboard('{Enter}'));
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Couldn't search entities"));
+    expect([...document.querySelectorAll('button')].some((button) => button.textContent === 'Retry')).toBe(true);
+  });
+
+  it('records a used search-scope command as a persistent recent', async () => {
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Entities',
+      providerKey: 'entities',
+      search: vi.fn(() => []),
+    };
+    await renderPalette({ entries: [], providers: [provider] });
+
+    await act(() => userEvent.keyboard('{Enter}'));
+    await act(() => root?.unmount());
+    host?.remove();
+
+    await renderPalette({ entries: [], providers: [provider] });
+    expect(document.body.textContent).toContain('Recent');
+    // Deliberately listed twice: once under Recent, once under Search in.
+    expect(document.body.textContent?.match(/Search entities…/g)).toHaveLength(2);
+  });
+
   it('drives stage preview from navigation and restores it on Escape and unmount', async () => {
     const preview = vi.fn();
     const clearPreview = vi.fn();
