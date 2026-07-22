@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PaletteEntry, PaletteSearchProvider, ProviderResultSection } from './entries';
 
 import { derivePaletteQueryModel } from './paletteQueryModel';
-import { buildCommandPaletteRows } from './paletteRowModel';
+import { buildCommandPaletteRows, buildStageRows } from './paletteRowModel';
 import { createInitialPaletteState, enterPaletteStage, type PaletteState } from './paletteState';
 
 const t = ((key: string, options?: Record<string, unknown>) =>
@@ -111,5 +111,34 @@ describe('buildCommandPaletteRows', () => {
 
     expect(commandsOnly.at(-1)).toMatchObject({ label: 'commandPalette.syntax.commands' });
     expect(withDates.at(-1)).toMatchObject({ label: 'commandPalette.syntax.commandsAndDates' });
+  });
+});
+
+describe('buildStageRows', () => {
+  const stage = {
+    options: [
+      { apply: vi.fn(), id: 'dark', isCurrent: true, label: 'Dark' },
+      { apply: vi.fn(), id: 'light', isCurrent: false, label: 'Light' },
+    ],
+    title: 'Theme',
+  };
+
+  it('shows every option for an empty query', () => {
+    const rows = buildStageRows(stage, vi.fn(), '');
+
+    expect(rows.filter((row) => row.kind === 'entry').map((row) => row.id)).toEqual(['stage:dark', 'stage:light']);
+  });
+
+  it('filters options for a non-empty query', () => {
+    const rows = buildStageRows(stage, vi.fn(), 'li');
+
+    expect(rows.filter((row) => row.kind === 'entry').map((row) => row.id)).toEqual(['stage:light']);
+  });
+
+  it('marks the current option with the localized subtitle when a translator is supplied', () => {
+    const rows = buildStageRows(stage, vi.fn(), '', t);
+    const current = rows.find((row) => row.id === 'stage:dark');
+
+    expect(current?.kind === 'entry' && current.entry.subtitle).toBe('commandPalette.settings.current');
   });
 });

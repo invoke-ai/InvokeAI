@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 
 import { completeTrailingDateToken, matchTrailingDateToken } from '@platform/search/dateTokens';
 
-import type { PaletteEntry, PaletteRow, PaletteSearchProvider, ProviderResultSection } from './entries';
+import type { PaletteEntry, PaletteRow, PaletteSearchProvider, PaletteStage, ProviderResultSection } from './entries';
 import type { PaletteQueryModel } from './paletteQueryModel';
 
 import { getPaletteContributionKey } from './contributionKey';
@@ -15,6 +15,18 @@ import {
   SEARCH_SCOPE_GROUP,
   searchPaletteRows,
 } from './entries';
+
+/**
+ * Single source for stage row construction. `t` is optional so the synchronous
+ * stage-preview path can build rows without translation-dependent labels;
+ * rendered rows always pass it.
+ */
+export const buildStageRows = (
+  stage: PaletteStage,
+  onStageApplied: () => void,
+  query: string,
+  t?: TFunction
+): PaletteRow[] => searchPaletteRows(buildStageEntries(stage, onStageApplied, t), query, [], { showAllOnEmpty: true });
 
 const DATE_TOKEN_SUGGESTIONS: Record<DateTokenKey, ReadonlyArray<{ labelKey: string; value: string }>> = {
   date: [
@@ -126,7 +138,7 @@ export const buildCommandPaletteRows = ({
     queryModel;
 
   if (stage) {
-    return searchPaletteRows(buildStageEntries(stage, onStageApplied, t), query, [], { showAllOnEmpty: true });
+    return buildStageRows(stage, onStageApplied, query, t);
   }
 
   if (scopeProvider) {

@@ -8,10 +8,10 @@ import { useTranslation } from 'react-i18next';
 import type { PaletteEntry, PaletteRow, PaletteSearchProvider, PaletteStage } from './entries';
 import type { ScrollToIndex } from './usePaletteNavigation';
 
-import { buildStageEntries, searchPaletteRows, STAGE_ENTRY_ID_PREFIX } from './entries';
+import { STAGE_ENTRY_ID_PREFIX } from './entries';
 import { PaletteDebouncer } from './paletteDebouncer';
 import { derivePaletteQueryModel } from './paletteQueryModel';
-import { buildCommandPaletteRows } from './paletteRowModel';
+import { buildCommandPaletteRows, buildStageRows } from './paletteRowModel';
 import {
   commitPaletteQuery,
   createInitialPaletteState,
@@ -143,7 +143,9 @@ export const useCommandPaletteController = ({
       clearDebounce();
 
       if (stage) {
-        const nextRows = searchStageRows(stage, onStageApplied, nextQuery);
+        // Stage preview needs the next synchronous row set while typing; labels
+        // are not rendered here, so the optional translator is omitted.
+        const nextRows = buildStageRows(stage, onStageApplied, nextQuery);
         previewRow(nextRows.find((row) => row.kind !== 'label'));
       }
 
@@ -271,8 +273,3 @@ export const useCommandPaletteController = ({
     trimmedQuery,
   };
 };
-
-const searchStageRows = (stage: PaletteStage, onStageApplied: () => void, query: string): PaletteRow[] =>
-  // Kept local because stage preview needs the next synchronous row set while typing.
-  // The main rendered row path lives in paletteRowModel.
-  searchPaletteRows(buildStageEntries(stage, onStageApplied), query, [], { showAllOnEmpty: true });
