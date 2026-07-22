@@ -36,7 +36,8 @@ export const RecentSection = ({
   const cannotReveal =
     revealRequest !== null &&
     loadState === 'loaded' &&
-    (excluded.has(revealRequest.itemId) || !items.some((item) => item.id === revealRequest.itemId));
+    !excluded.has(revealRequest.itemId) &&
+    !items.some((item) => item.id === revealRequest.itemId);
 
   return (
     <Stack gap="2">

@@ -2,6 +2,7 @@ import type { DateRange } from '@platform/search/dateTokens';
 import type { CustomHotkeys, HotkeyDefinition } from '@workbench/hotkeys/types';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { SettingsSectionId } from '@workbench/widgetContracts';
+import type { TFunction } from 'i18next';
 
 import fuzzysort from 'fuzzysort';
 
@@ -37,6 +38,8 @@ export interface PaletteEntry {
   title: string;
   /** Section header the entry renders under; ordered via PALETTE_GROUP_ORDER. */
   group: string;
+  /** Localized section header; group remains a stable internal ordering key. */
+  groupLabel?: string;
   /** Trailing muted text: a setting's current value, an entity's metadata. */
   subtitle?: string;
   /** Leading 28×28 thumbnail (image results). */
@@ -65,6 +68,10 @@ export interface PaletteProviderQuery {
   range?: DateRange;
 }
 
+export interface PaletteSearchContext {
+  signal: AbortSignal;
+}
+
 /** An async entity source the palette can query (workflows, boards, …). */
 export interface PaletteSearchProvider {
   /** Globally unique, stable identity (including extension source identity). */
@@ -78,12 +85,13 @@ export interface PaletteSearchProvider {
    * could only return broad unfiltered results.
    */
   supportsCreatedAtRange?: boolean;
-  search: (query: PaletteProviderQuery) => Promise<PaletteEntry[]> | PaletteEntry[];
+  search: (query: PaletteProviderQuery, context: PaletteSearchContext) => Promise<PaletteEntry[]> | PaletteEntry[];
 }
 
 export type PaletteRow =
   | { kind: 'label'; id: string; label: string }
   | { kind: 'entry'; id: string; entry: PaletteEntry; matchIndexes?: readonly number[] }
+  | { kind: 'provider-error'; id: string; providerKey: string; label: string; retry: () => void }
   | { kind: 'scope'; id: string; providerKey: string; label: string };
 
 export interface ActivePaletteRow {
@@ -218,12 +226,14 @@ export const buildCatalogCommandEntries = ({
   execute,
   formatHotkey,
   presentWidgetTypeIds,
+  t,
 }: {
   catalog: readonly HotkeyDefinition[];
   customHotkeys: CustomHotkeys;
   execute: (commandId: string) => unknown;
   formatHotkey: (key: string) => string[];
   presentWidgetTypeIds: ReadonlySet<string>;
+  t: TFunction;
 }): PaletteEntry[] =>
   catalog
     .filter((definition) => definition.implemented !== false && !PALETTE_HIDDEN_COMMANDS.has(definition.commandId))
@@ -234,17 +244,25 @@ export const buildCatalogCommandEntries = ({
     })
     .map((definition) => {
       const widgetGroup = WIDGET_CATEGORY_GROUPS[definition.category];
-      const group = widgetGroup?.group ?? APP_COMMAND_GROUPS[definition.commandId] ?? 'App';
+      const rawGroup = widgetGroup?.group ?? APP_COMMAND_GROUPS[definition.commandId] ?? 'App';
+      const group = rawGroup;
+      const groupLabel = t(
+        `commandPalette.groups.${rawGroup.replaceAll(' ', '').replace(/^./, (char) => char.toLowerCase())}`,
+        { defaultValue: rawGroup }
+      );
 
       return {
         group,
+        groupLabel,
         id: definition.commandId,
         isPersistentRecent: true,
         keys: getEntryKeys(definition, customHotkeys, formatHotkey),
         keywords: widgetGroup?.group,
         run: () => execute(definition.commandId),
         showInEmptyState: group === 'Navigation',
-        title: TITLE_OVERRIDES[definition.commandId] ?? definition.title,
+        title: t(`commandPalette.commands.${definition.commandId.replace('.', '_')}`, {
+          defaultValue: TITLE_OVERRIDES[definition.commandId] ?? definition.title,
+        }),
       };
     });
 
@@ -290,16 +308,21 @@ export interface SettingsEntryDeps {
   themes: ReadonlyArray<{ id: WorkbenchPreferences['themeId']; label: string }>;
 }
 
-export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: SettingsEntryDeps): PaletteEntry[] => {
+export const buildSettingsEntries = (
+  preferences: WorkbenchPreferences,
+  deps: SettingsEntryDeps,
+  t: TFunction
+): PaletteEntry[] => {
   const toggles = SETTING_TOGGLES.map<PaletteEntry>(({ key, keywords, title }) => ({
     group: 'Settings',
+    groupLabel: t('commandPalette.groups.settings'),
     id: `setting.${key}`,
     isPersistentRecent: true,
     keepOpen: true,
     keywords: keywords ? `${keywords} toggle` : 'toggle',
     run: () => deps.patchPreferences({ [key]: !preferences[key] }),
-    subtitle: preferences[key] ? 'On' : 'Off',
-    title,
+    subtitle: preferences[key] ? t('commandPalette.settings.on') : t('commandPalette.settings.off'),
+    title: t(`commandPalette.settings.toggles.${key}`, { defaultValue: title }),
   }));
 
   // Multi-value preferences push an inline value-picker stage; mod+Enter (or
@@ -322,11 +345,12 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
     title: string;
   }): PaletteEntry => ({
     group: 'Settings',
+    groupLabel: t('commandPalette.groups.settings'),
     id,
     isPersistentRecent: true,
     keywords,
     run: () => deps.openSettingsSection(sectionId),
-    secondary: { label: 'Open in Settings', run: () => deps.openSettingsSection(sectionId) },
+    secondary: { label: t('commandPalette.actions.openInSettings'), run: () => deps.openSettingsSection(sectionId) },
     stage: { options, title, ...stagePreview },
     subtitle,
     title,
@@ -348,7 +372,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
           ? { clearPreview: deps.clearThemePreview, preview: deps.previewTheme }
           : undefined,
       subtitle: deps.themes.find((theme) => theme.id === preferences.themeId)?.label ?? preferences.themeId,
-      title: 'Theme',
+      title: t('commandPalette.settings.values.theme'),
     }),
     enumEntry({
       id: 'setting.language',
@@ -362,7 +386,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
       sectionId: 'appearance',
       subtitle:
         deps.languageOptions.find((language) => language.value === preferences.language)?.label ?? preferences.language,
-      title: 'Language',
+      title: t('commandPalette.settings.values.language'),
     }),
     enumEntry({
       id: 'setting.workflowEdgeStyle',
@@ -371,11 +395,15 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
         apply: () => deps.patchPreferences({ workflowEdgeStyle: style }),
         id: style,
         isCurrent: style === preferences.workflowEdgeStyle,
-        label: style === 'square' ? 'Square' : 'Curved',
+        label:
+          style === 'square' ? t('commandPalette.settings.values.square') : t('commandPalette.settings.values.curved'),
       })),
       sectionId: 'workflow',
-      subtitle: preferences.workflowEdgeStyle === 'square' ? 'Square' : 'Curved',
-      title: 'Workflow Edge Style',
+      subtitle:
+        preferences.workflowEdgeStyle === 'square'
+          ? t('commandPalette.settings.values.square')
+          : t('commandPalette.settings.values.curved'),
+      title: t('commandPalette.settings.values.workflowEdgeStyle'),
     }),
     enumEntry({
       id: 'setting.queueJobsScope',
@@ -384,21 +412,30 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
         apply: () => deps.patchPreferences({ queueJobsScope: scope }),
         id: scope,
         isCurrent: scope === preferences.queueJobsScope,
-        label: scope === 'all' ? 'All Projects' : 'Active Project',
+        label:
+          scope === 'all'
+            ? t('commandPalette.settings.values.allProjects')
+            : t('commandPalette.settings.values.activeProject'),
       })),
       sectionId: 'queue',
-      subtitle: preferences.queueJobsScope === 'all' ? 'All Projects' : 'Active Project',
-      title: 'Queue Jobs Scope',
+      subtitle:
+        preferences.queueJobsScope === 'all'
+          ? t('commandPalette.settings.values.allProjects')
+          : t('commandPalette.settings.values.activeProject'),
+      title: t('commandPalette.settings.values.queueJobsScope'),
     }),
   ];
 
   const sections = SETTINGS_SECTIONS.map<PaletteEntry>(({ id, title }) => ({
     group: 'Settings',
+    groupLabel: t('commandPalette.groups.settings'),
     id: `settings.section.${id}`,
     isPersistentRecent: true,
     keywords: 'settings preferences open',
     run: () => deps.openSettingsSection(id),
-    title: `Settings: ${title}`,
+    title: t('commandPalette.settings.settingsSection', {
+      section: t(`commandPalette.settings.sections.${id}`, { defaultValue: title }),
+    }),
   }));
 
   return [...toggles, ...enums, ...sections];
@@ -427,7 +464,7 @@ const toGroupedRows = (groups: Map<string, RankedEntry[]>): PaletteRow[] => {
       continue;
     }
 
-    rows.push({ id: `label:${group}`, kind: 'label', label: group });
+    rows.push({ id: `label:${group}`, kind: 'label', label: ranked[0]?.entry.groupLabel ?? group });
 
     for (const { entry, matchIndexes } of ranked) {
       rows.push({ entry, id: entry.id, kind: 'entry', matchIndexes });
@@ -437,7 +474,11 @@ const toGroupedRows = (groups: Map<string, RankedEntry[]>): PaletteRow[] => {
   return rows;
 };
 
-const buildEmptyStateRows = (entries: readonly PaletteEntry[], recentIds: readonly string[]): PaletteRow[] => {
+const buildEmptyStateRows = (
+  entries: readonly PaletteEntry[],
+  recentIds: readonly string[],
+  recentLabel = RECENT_GROUP
+): PaletteRow[] => {
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const recent = recentIds
     .map((id) => byId.get(id))
@@ -446,7 +487,7 @@ const buildEmptyStateRows = (entries: readonly PaletteEntry[], recentIds: readon
   const rows: PaletteRow[] = [];
 
   if (recent.length > 0) {
-    rows.push({ id: `label:${RECENT_GROUP}`, kind: 'label', label: RECENT_GROUP });
+    rows.push({ id: `label:${RECENT_GROUP}`, kind: 'label', label: recentLabel });
 
     for (const entry of recent) {
       rows.push({ entry, id: `recent:${entry.id}`, kind: 'entry' });
@@ -479,7 +520,11 @@ export const searchPaletteRows = (
   entries: readonly PaletteEntry[],
   query: string,
   recentIds: readonly string[],
-  { commandsOnly = false, showAllOnEmpty = false }: { commandsOnly?: boolean; showAllOnEmpty?: boolean } = {}
+  {
+    commandsOnly = false,
+    recentLabel = RECENT_GROUP,
+    showAllOnEmpty = false,
+  }: { commandsOnly?: boolean; recentLabel?: string; showAllOnEmpty?: boolean } = {}
 ): PaletteRow[] => {
   const searchable = commandsOnly ? entries.filter((entry) => entry.group !== 'Settings') : entries;
   const trimmed = query.trim();
@@ -497,7 +542,7 @@ export const searchPaletteRows = (
       return toGroupedRows(all);
     }
 
-    return buildEmptyStateRows(searchable, recentIds);
+    return buildEmptyStateRows(searchable, recentIds, recentLabel);
   }
 
   const results = fuzzysort.go(trimmed, searchable, {
@@ -543,7 +588,7 @@ export const searchPaletteRows = (
 export const STAGE_ENTRY_ID_PREFIX = 'stage:';
 
 /** Turn a value-picker stage into filterable entry rows; picking applies and pops. */
-export const buildStageEntries = (stage: PaletteStage, onApplied: () => void): PaletteEntry[] =>
+export const buildStageEntries = (stage: PaletteStage, onApplied: () => void, t?: TFunction): PaletteEntry[] =>
   stage.options.map((option) => ({
     group: stage.title,
     id: `${STAGE_ENTRY_ID_PREFIX}${option.id}`,
@@ -553,14 +598,17 @@ export const buildStageEntries = (stage: PaletteStage, onApplied: () => void): P
       void option.apply();
       onApplied();
     },
-    subtitle: option.isCurrent ? 'Current' : undefined,
+    subtitle: option.isCurrent ? (t?.('commandPalette.settings.current') ?? 'Current') : undefined,
     title: option.label,
   }));
 
 export interface ProviderResultSection {
   provider: Pick<PaletteSearchProvider, 'providerKey' | 'label'>;
   entries: PaletteEntry[];
+  isError: boolean;
   isFetching: boolean;
+  isWaitingForDebounce: boolean;
+  retry: () => void;
 }
 
 /**
@@ -570,24 +618,46 @@ export interface ProviderResultSection {
  */
 export const buildProviderSectionRows = (
   sections: readonly ProviderResultSection[],
-  cap: number | null = PROVIDER_ROOT_RESULT_CAP
+  cap: number | null = PROVIDER_ROOT_RESULT_CAP,
+  t?: TFunction
 ): PaletteRow[] => {
   const rows: PaletteRow[] = [];
 
   for (const section of sections) {
+    if (cap === null && section.isError) {
+      // Scoped mode owns the full-width error and Retry presentation.
+      continue;
+    }
+
     const visible = cap === null ? section.entries : section.entries.slice(0, cap);
 
-    if (visible.length === 0 && !section.isFetching) {
+    if (visible.length === 0 && !section.isFetching && !section.isWaitingForDebounce && !section.isError) {
       continue;
     }
 
     rows.push({
       id: `label:provider:${section.provider.providerKey}`,
       kind: 'label',
-      label: section.isFetching ? `${section.provider.label} — Searching…` : section.provider.label,
+      label:
+        section.isFetching || section.isWaitingForDebounce
+          ? (t?.('commandPalette.states.searchingSection', { label: section.provider.label }) ??
+            `${section.provider.label} — Searching…`)
+          : section.provider.label,
     });
 
-    for (const entry of visible) {
+    if (section.isError && cap !== null) {
+      rows.push({
+        id: getPaletteContributionKey('provider-error', section.provider.providerKey),
+        kind: 'provider-error',
+        label:
+          t?.('commandPalette.states.retrySearch', { label: section.provider.label.toLowerCase() }) ??
+          `Retry ${section.provider.label.toLowerCase()} search`,
+        providerKey: section.provider.providerKey,
+        retry: section.retry,
+      });
+    }
+
+    for (const entry of section.isWaitingForDebounce ? [] : visible) {
       rows.push({
         entry,
         id: getPaletteContributionKey('provider-row', `${section.provider.providerKey}:${entry.id}`),
@@ -606,7 +676,8 @@ export const buildProviderSectionRows = (
  */
 export const buildScopeRows = (
   providers: ReadonlyArray<Pick<PaletteSearchProvider, 'providerKey' | 'label'>>,
-  query: string
+  query: string,
+  t?: TFunction
 ): PaletteRow[] => {
   if (providers.length === 0) {
     return [];
@@ -615,14 +686,16 @@ export const buildScopeRows = (
   return [
     // Distinct id: the scope-command *group* label ("label:Search in") can
     // render in the same list when a query fuzzy-matches those commands.
-    { id: 'label:scope-rows', kind: 'label', label: SEARCH_SCOPE_GROUP },
+    { id: 'label:scope-rows', kind: 'label', label: t?.('commandPalette.search.in') ?? SEARCH_SCOPE_GROUP },
     ...providers.map<PaletteRow>((provider) => ({
       id: getPaletteContributionKey('scope', provider.providerKey),
       kind: 'scope',
       label:
         query.length === 0
-          ? `Search ${provider.label.toLowerCase()} by date`
-          : `Search ${provider.label.toLowerCase()} for “${query}”`,
+          ? (t?.('commandPalette.search.byDate', { label: provider.label.toLowerCase() }) ??
+            `Search ${provider.label.toLowerCase()} by date`)
+          : (t?.('commandPalette.search.forQuery', { label: provider.label.toLowerCase(), query }) ??
+            `Search ${provider.label.toLowerCase()} for “${query}”`),
       providerKey: provider.providerKey,
     })),
   ];

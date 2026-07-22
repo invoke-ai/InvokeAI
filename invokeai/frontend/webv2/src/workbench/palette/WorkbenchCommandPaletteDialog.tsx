@@ -1,26 +1,25 @@
-import type {
-  getQueueQueryScope as GetQueueQueryScope,
-  getQueueReadModelOptions as GetQueueReadModelOptions,
-} from '@features/queue/queries';
+import type { QueueQueryScope, QueueReadModel } from '@features/queue/contracts';
 import type { HotkeyDefinition } from '@workbench/hotkeys/types';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { openWidgetPlacement as OpenWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widgetRegistry';
+import type { TFunction } from 'i18next';
 
 import { getPromptHistoryRecallPatch } from '@features/generation/settings';
 import { useModelsSnapshot } from '@features/models';
-import { requestQueueItemReveal } from '@features/queue/reveal';
 import { queryClient } from '@platform/query/client';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
 import { buildCatalogCommandEntries, buildSettingsEntries } from './entries';
 import { buildExtensionPaletteEntry, createExtensionSearchProvider } from './extensionPaletteAdapters';
+import { getObjectIdentity } from './objectIdentity';
 import {
   createBoardsProvider,
   createImagesProvider,
@@ -30,23 +29,25 @@ import {
   createWorkflowsProvider,
 } from './paletteProviders';
 
-const STATIC_APP_ENTRIES: PaletteEntry[] = [
+const buildStaticAppEntries = (t: TFunction): PaletteEntry[] => [
   {
     group: 'App',
+    groupLabel: t('commandPalette.groups.app'),
     id: 'app.openSettings',
     isPersistentRecent: true,
     keywords: 'preferences options',
     run: () => openWorkbenchSettings(),
     showInEmptyState: true,
-    title: 'Open Settings',
+    title: t('commandPalette.appEntries.openSettings'),
   },
   {
     group: 'App',
+    groupLabel: t('commandPalette.groups.app'),
     id: 'app.openHotkeySettings',
     isPersistentRecent: true,
     keywords: 'hotkeys keybindings shortcuts',
     run: () => openWorkbenchSettings('hotkeys'),
-    title: 'Keyboard Shortcuts',
+    title: t('commandPalette.appEntries.keyboardShortcuts'),
   },
 ];
 
@@ -54,26 +55,27 @@ const STATIC_APP_ENTRIES: PaletteEntry[] = [
 const WorkbenchCommandPaletteDialog = ({
   catalog,
   formatHotkey,
-  getQueueQueryScope,
-  getQueueReadModelOptions,
   getWidgetsForRegion,
+  loadQueueReadModel,
   modifierKeyLabel,
   onClose,
   openWidgetPlacement,
   preferences,
+  requestQueueItemReveal,
   settingsEntryDeps,
 }: {
   catalog: readonly HotkeyDefinition[];
-  formatHotkey: (key: string) => string[];
-  getQueueQueryScope: typeof GetQueueQueryScope;
-  getQueueReadModelOptions: typeof GetQueueReadModelOptions;
+  formatHotkey: (hotkey: string) => string[];
   getWidgetsForRegion: typeof GetWidgetsForRegion;
+  loadQueueReadModel: (scope: QueueQueryScope) => Promise<QueueReadModel>;
   modifierKeyLabel: string;
   onClose: () => void;
   openWidgetPlacement: typeof OpenWidgetPlacement;
   preferences: WorkbenchPreferences;
+  requestQueueItemReveal: (itemId: number) => void;
   settingsEntryDeps: SettingsEntryDeps;
 }) => {
+  const { i18n, t } = useTranslation();
   const extensions = useWorkbenchExtensions();
   const modelsSnapshot = useModelsSnapshot();
   const models = modelsSnapshot.status === 'loaded' ? modelsSnapshot.models : undefined;
@@ -105,12 +107,13 @@ const WorkbenchCommandPaletteDialog = ({
         catalog,
         formatHotkey,
         presentWidgetTypeIds: new Set(presentWidgetTypeIds),
+        t,
       }),
       ...paletteContributions.map((contribution) =>
         buildExtensionPaletteEntry(contribution, extensions.commands.executeForSource)
       ),
-      ...STATIC_APP_ENTRIES,
-      ...buildSettingsEntries(preferences, settingsEntryDeps),
+      ...buildStaticAppEntries(t),
+      ...buildSettingsEntries(preferences, settingsEntryDeps, t),
     ],
     [
       catalog,
@@ -121,16 +124,18 @@ const WorkbenchCommandPaletteDialog = ({
       preferences,
       presentWidgetTypeIds,
       settingsEntryDeps,
+      t,
     ]
   );
 
   const workbenchCommands = useWorkbenchCommands();
   const searchStore = extensions.stores.search;
   const extensionSearchProviders = useSyncExternalStore(searchStore.subscribe, searchStore.list, searchStore.list);
-  const promptRecallContextKey = useMemo(() => JSON.stringify([generateValues, models]), [generateValues, models]);
+  const promptRecallContextKey = `${getObjectIdentity(generateValues, 'generation')}:${getObjectIdentity(models, 'models')}`;
   const queueScope = useMemo(
-    () => getQueueQueryScope({ projectId, queueJobsScope: preferences.queueJobsScope }),
-    [getQueueQueryScope, preferences.queueJobsScope, projectId]
+    () =>
+      preferences.queueJobsScope === 'active-project' && projectId ? { originPrefix: `webv2:p:${projectId}:q:` } : {},
+    [preferences.queueJobsScope, projectId]
   );
   const providers = useMemo<PaletteSearchProvider[]>(() => {
     const { gallery, widgets } = workbenchCommands;
@@ -150,27 +155,37 @@ const WorkbenchCommandPaletteDialog = ({
       });
 
     return [
-      createWorkflowsProvider({ openWorkflowWidget: () => openWidget('workflow') }),
+      createWorkflowsProvider({ openWorkflowWidget: () => openWidget('workflow'), t }),
       createBoardsProvider({
         openGalleryWidget: () => openWidget('gallery'),
         selectBoard: (boardId) => gallery.selectBoard(boardId),
+        t,
       }),
       createModelsProvider({
         applyModel: (model) => widgets.patchValues('generate', { model, modelKey: model.key }, projectId),
         openGenerateWidget: () => openWidget('generate'),
         openModelManager: () => void executeCommand('app.selectModelsTab'),
+        t,
       }),
       createImagesProvider({
         openGalleryWidget: () => openWidget('gallery'),
         openPreviewWidget: () => openWidget('preview'),
         selectBoard: (boardId) => gallery.selectBoard(boardId),
         selectImage: (image) => gallery.selectImage(image),
+        locale: i18n.resolvedLanguage,
+        t,
       }),
       createQueueItemsProvider({
-        contextKey: JSON.stringify(queueScope),
-        loadQueue: () => queryClient.fetchQuery(getQueueReadModelOptions(queueScope)),
+        contextKey: queueScope.originPrefix ?? 'all-projects',
+        loadQueue: () =>
+          queryClient.fetchQuery({
+            queryFn: () => loadQueueReadModel(queueScope),
+            queryKey: ['queue', 'read-model', queueScope.originPrefix ?? 'all'],
+            staleTime: 5_000,
+          }),
         openQueueWidget: () => openWidget('queue'),
         revealItem: requestQueueItemReveal,
+        t,
       }),
       createPromptHistoryProvider({
         openGenerateWidget: () => openWidget('generate'),
@@ -184,6 +199,7 @@ const WorkbenchCommandPaletteDialog = ({
             widgets.patchValues('generate', patch, projectId);
           }
         },
+        t,
       }),
       ...extensionSearchProviders.map((provider) =>
         createExtensionSearchProvider(provider, extensions.commands.executeForSource)
@@ -194,14 +210,17 @@ const WorkbenchCommandPaletteDialog = ({
     extensionSearchProviders,
     extensions,
     generateValues,
-    getWidgetsForRegion,
-    getQueueReadModelOptions,
+    i18n.resolvedLanguage,
     models,
+    getWidgetsForRegion,
     openWidgetPlacement,
     projectId,
     promptHistory,
     promptRecallContextKey,
     queueScope,
+    loadQueueReadModel,
+    requestQueueItemReveal,
+    t,
     workbenchCommands,
   ]);
 

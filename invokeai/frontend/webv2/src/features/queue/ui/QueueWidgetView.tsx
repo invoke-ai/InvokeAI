@@ -62,7 +62,7 @@ const QueueContent = () => {
     <Stack gap="3" p="3">
       <QueueStats />
       <QueueFilterTabs value={filter} onChange={setFilter} />
-      <CurrentBatchSection />
+      <CurrentBatchSection revealRequest={revealRequest} />
       <RecentSection filter={filter} revealRequest={revealRequest} />
     </Stack>
   );

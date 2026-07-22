@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { DEFAULT_PREFERENCES } from '@workbench/settings/store';
@@ -25,6 +27,35 @@ import {
  */
 
 const noop = () => undefined;
+const translations: Record<string, string> = {
+  'commandPalette.actions.openInSettings': 'Open in Settings',
+  'commandPalette.groups.app': 'App',
+  'commandPalette.groups.canvas': 'Canvas',
+  'commandPalette.groups.generation': 'Generation',
+  'commandPalette.groups.navigation': 'Navigation',
+  'commandPalette.groups.settings': 'Settings',
+  'commandPalette.settings.off': 'Off',
+  'commandPalette.settings.on': 'On',
+  'commandPalette.settings.settingsSection': 'Settings: {{section}}',
+  'commandPalette.settings.values.activeProject': 'Active Project',
+  'commandPalette.settings.values.allProjects': 'All Projects',
+  'commandPalette.settings.values.curved': 'Curved',
+  'commandPalette.settings.values.language': 'Language',
+  'commandPalette.settings.values.queueJobsScope': 'Queue Jobs Scope',
+  'commandPalette.settings.values.square': 'Square',
+  'commandPalette.settings.values.theme': 'Theme',
+  'commandPalette.settings.values.workflowEdgeStyle': 'Workflow Edge Style',
+};
+const t = ((key: string, options?: Record<string, unknown>) => {
+  let value =
+    translations[key] ?? (typeof options?.defaultValue === 'string' ? options.defaultValue : key.split('.').at(-1));
+
+  for (const [name, replacement] of Object.entries(options ?? {})) {
+    value = value?.replace(`{{${name}}}`, String(replacement));
+  }
+
+  return value;
+}) as TFunction;
 const settingsEntryDeps = {
   languageOptions: [{ label: 'English', value: 'en' as const }],
   openSettingsSection: vi.fn(),
@@ -46,6 +77,7 @@ describe('buildCatalogCommandEntries', () => {
       execute,
       formatHotkey: formatHotkeyForPlatform,
       presentWidgetTypeIds,
+      t,
     });
 
   it('surfaces implemented app commands with palette-facing titles and groups', () => {
@@ -83,6 +115,7 @@ describe('buildCatalogCommandEntries', () => {
       execute,
       formatHotkey: formatHotkeyForPlatform,
       presentWidgetTypeIds: new Set(),
+      t,
     });
     const invoke = entries.find((entry) => entry.id === 'app.invoke');
     const clearQueue = entries.find((entry) => entry.id === 'app.clearQueue');
@@ -100,7 +133,8 @@ describe('buildSettingsEntries', () => {
     const patchPreferences = vi.fn();
     const entries = buildSettingsEntries(
       { ...DEFAULT_PREFERENCES, reduceMotion: false },
-      { ...settingsEntryDeps, openSettingsSection: vi.fn(), patchPreferences }
+      { ...settingsEntryDeps, openSettingsSection: vi.fn(), patchPreferences },
+      t
     );
     const reduceMotion = entries.find((entry) => entry.id === 'setting.reduceMotion');
 
@@ -112,11 +146,15 @@ describe('buildSettingsEntries', () => {
 
   it('deep-links enum preferences and sections to the settings dialog', () => {
     const openSettingsSection = vi.fn();
-    const entries = buildSettingsEntries(DEFAULT_PREFERENCES, {
-      ...settingsEntryDeps,
-      openSettingsSection,
-      patchPreferences: vi.fn(),
-    });
+    const entries = buildSettingsEntries(
+      DEFAULT_PREFERENCES,
+      {
+        ...settingsEntryDeps,
+        openSettingsSection,
+        patchPreferences: vi.fn(),
+      },
+      t
+    );
     const theme = entries.find((entry) => entry.id === 'setting.themeId');
     const workflowSection = entries.find((entry) => entry.id === 'settings.section.workflow');
 
@@ -133,7 +171,8 @@ describe('buildSettingsEntries', () => {
     const patchPreferences = vi.fn();
     const entries = buildSettingsEntries(
       { ...DEFAULT_PREFERENCES, workflowEdgeStyle: 'curved' },
-      { ...settingsEntryDeps, openSettingsSection: vi.fn(), patchPreferences }
+      { ...settingsEntryDeps, openSettingsSection: vi.fn(), patchPreferences },
+      t
     );
     const edgeStyle = entries.find((entry) => entry.id === 'setting.workflowEdgeStyle');
 
@@ -150,13 +189,17 @@ describe('buildSettingsEntries', () => {
   it('wires theme stage preview hooks only when the host provides them', () => {
     const previewTheme = vi.fn();
     const clearThemePreview = vi.fn();
-    const withPreview = buildSettingsEntries(DEFAULT_PREFERENCES, {
-      ...settingsEntryDeps,
-      clearThemePreview,
-      openSettingsSection: vi.fn(),
-      patchPreferences: vi.fn(),
-      previewTheme,
-    });
+    const withPreview = buildSettingsEntries(
+      DEFAULT_PREFERENCES,
+      {
+        ...settingsEntryDeps,
+        clearThemePreview,
+        openSettingsSection: vi.fn(),
+        patchPreferences: vi.fn(),
+        previewTheme,
+      },
+      t
+    );
     const theme = withPreview.find((entry) => entry.id === 'setting.themeId');
 
     theme?.stage?.preview?.('light');
@@ -164,11 +207,15 @@ describe('buildSettingsEntries', () => {
     expect(previewTheme).toHaveBeenCalledWith('light');
     expect(clearThemePreview).toHaveBeenCalled();
 
-    const withoutPreview = buildSettingsEntries(DEFAULT_PREFERENCES, {
-      ...settingsEntryDeps,
-      openSettingsSection: vi.fn(),
-      patchPreferences: vi.fn(),
-    });
+    const withoutPreview = buildSettingsEntries(
+      DEFAULT_PREFERENCES,
+      {
+        ...settingsEntryDeps,
+        openSettingsSection: vi.fn(),
+        patchPreferences: vi.fn(),
+      },
+      t
+    );
     const bareTheme = withoutPreview.find((entry) => entry.id === 'setting.themeId');
 
     expect(bareTheme?.stage?.preview).toBeUndefined();
@@ -198,8 +245,11 @@ describe('provider row assembly', () => {
     entries: Array.from({ length: count }, (_, index) =>
       makeEntry({ group: id, id: `${id}:${index}`, title: `${id} ${index}` })
     ),
+    isError: false,
     isFetching,
+    isWaitingForDebounce: false,
     provider: { label: id, providerKey: id },
+    retry: vi.fn(),
   });
 
   it('caps sections in root mode and drops empty settled sections', () => {

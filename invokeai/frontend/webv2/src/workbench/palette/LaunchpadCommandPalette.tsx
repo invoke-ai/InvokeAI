@@ -8,14 +8,14 @@ import { tinykeys } from 'tinykeys';
 
 import type { SettingsEntryDeps } from './entries';
 
-import { closeCommandPalette, commandPaletteStore, toggleCommandPalette } from './paletteStore';
+import { closeCommandPalette, toggleCommandPalette, useIsCommandPaletteOpen } from './paletteStore';
 import { SETTINGS_ENTRY_DEPS } from './settingsEntryDeps';
 
 const LazyLaunchpadCommandPaletteDialog = lazy(() => import('./LaunchpadCommandPaletteDialog'));
 
 /** Lightweight Launchpad runtime and lazy dialog host. */
 export const LaunchpadCommandPalette = () => {
-  const isOpen = commandPaletteStore.useSelector((snapshot) => snapshot.isOpen);
+  const isOpen = useIsCommandPaletteOpen();
   const preferences = useWorkbenchPreferences();
 
   useMountEffect(() =>
@@ -30,8 +30,8 @@ export const LaunchpadCommandPalette = () => {
   return isOpen ? (
     <Suspense fallback={null}>
       <LazyLaunchpadCommandPaletteDialog
+        modifierKeyLabel={formatHotkeyForPlatform('mod')[0]!}
         preferences={preferences as WorkbenchPreferences}
-        modifierKeyLabel={formatHotkeyForPlatform('mod')[0] ?? 'ctrl'}
         settingsEntryDeps={SETTINGS_ENTRY_DEPS as SettingsEntryDeps}
         onClose={closeCommandPalette}
       />

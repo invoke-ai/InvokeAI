@@ -19,13 +19,15 @@ const extensionProvider = (instanceId: string): WidgetSearchProvider => ({
   source: source(instanceId),
 });
 
+const searchContext = () => ({ signal: new AbortController().signal });
+
 describe('extension palette adapters', () => {
   it('keeps providers, query keys, scopes, and results collision-free per widget source', async () => {
     const execute = vi.fn();
     const first = createExtensionSearchProvider(extensionProvider('one'), execute);
     const second = createExtensionSearchProvider(extensionProvider('two'), execute);
-    const [firstResult] = await first.search({ text: 'query' });
-    const [secondResult] = await second.search({ text: 'query' });
+    const [firstResult] = await first.search({ text: 'query' }, searchContext());
+    const [secondResult] = await second.search({ text: 'query' }, searchContext());
 
     expect(first.providerKey).not.toBe(second.providerKey);
     expect(getPaletteProviderQueryKey(first, { text: 'query' })).not.toEqual(
@@ -38,9 +40,10 @@ describe('extension palette adapters', () => {
     const search = vi.fn(() => [{ commandId: 'run', id: 'shared-result-id', title: 'Result' }]);
     const provider = createExtensionSearchProvider({ ...extensionProvider('one'), search }, vi.fn());
 
-    await provider.search({ range: { from: '2026-07-14', to: '2026-07-21' }, text: 'sunset' });
+    const context = searchContext();
+    await provider.search({ range: { from: '2026-07-14', to: '2026-07-21' }, text: 'sunset' }, context);
 
-    expect(search).toHaveBeenCalledWith('sunset');
+    expect(search).toHaveBeenCalledWith('sunset', context);
     expect(provider.supportsCreatedAtRange).toBeUndefined();
   });
 
@@ -56,6 +59,41 @@ describe('extension palette adapters', () => {
         getPaletteProviderQueryKey(provider, { text: 'same query' })
       );
     }
+  });
+
+  it('keeps one registration stable and gives replacement registrations new identities', () => {
+    const registration = extensionProvider('one');
+    const firstAdaptation = createExtensionSearchProvider(registration, vi.fn());
+    const secondAdaptation = createExtensionSearchProvider(registration, vi.fn());
+    const replacement = createExtensionSearchProvider({ ...registration }, vi.fn());
+
+    expect(firstAdaptation.contextKey).toBe(secondAdaptation.contextKey);
+    expect(replacement.contextKey).not.toBe(firstAdaptation.contextKey);
+  });
+
+  it('includes the explicit extension context key in palette query identity', () => {
+    const registration = extensionProvider('one');
+    const first = createExtensionSearchProvider({ ...registration, contextKey: 'revision-1' }, vi.fn());
+    const second = createExtensionSearchProvider({ ...registration, contextKey: 'revision-2' }, vi.fn());
+
+    expect(first.contextKey).not.toBe(second.contextKey);
+  });
+
+  it('omits informational results without commands', async () => {
+    const provider = createExtensionSearchProvider(
+      {
+        ...extensionProvider('one'),
+        search: () => [
+          { id: 'info', title: 'Informational result' },
+          { commandId: 'run', id: 'action', title: 'Action result' },
+        ],
+      },
+      vi.fn()
+    );
+
+    const results = await provider.search({ text: '' }, searchContext());
+
+    expect(results.map((result) => result.title)).toEqual(['Action result']);
   });
 
   it('differentiates query keys by resolved date range', () => {

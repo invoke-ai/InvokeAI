@@ -271,6 +271,54 @@ def test_get_image_names_forwards_created_range(monkeypatch: Any, mock_invoker: 
     assert kwargs["created_to"] == "2026-07-15"
 
 
+@pytest.mark.parametrize("path", ["/api/v1/images/", "/api/v1/images/names"])
+@pytest.mark.parametrize("board_id", ["all", "none"])
+def test_list_image_sentinel_scopes_skip_concrete_board_access_check(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, board_id: str
+) -> None:
+    prepare_created_range_test(monkeypatch, mock_invoker)
+    access_check = MagicMock()
+    monkeypatch.setattr("invokeai.app.api.routers.images._assert_board_read_access", access_check)
+
+    response = client.get(path, params={"board_id": board_id})
+
+    assert response.status_code == 200
+    access_check.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/images/", "/api/v1/images/names"])
+def test_list_image_concrete_board_requires_read_access(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str
+) -> None:
+    prepare_created_range_test(monkeypatch, mock_invoker)
+    access_check = MagicMock()
+    monkeypatch.setattr("invokeai.app.api.routers.images._assert_board_read_access", access_check)
+
+    response = client.get(path, params={"board_id": "board-123"})
+
+    assert response.status_code == 200
+    access_check.assert_called_once()
+    assert access_check.call_args.args[0] == "board-123"
+
+
+@pytest.mark.parametrize("path", ["/api/v1/images/", "/api/v1/images/names"])
+def test_list_image_all_scope_combines_with_created_range(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str
+) -> None:
+    mock_get_many, mock_get_image_names = prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get(
+        path,
+        params={"board_id": "all", "created_from": "2026-07-01", "created_to": "2026-07-15"},
+    )
+
+    assert response.status_code == 200
+    service_call = mock_get_image_names if path.endswith("/names") else mock_get_many
+    assert service_call.call_args.kwargs["board_id"] == "all"
+    assert service_call.call_args.kwargs["created_from"] == "2026-07-01"
+    assert service_call.call_args.kwargs["created_to"] == "2026-07-15"
+
+
 def test_get_bulk_download_image_image_deleted_after_response(
     monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
 ) -> None:

@@ -96,6 +96,22 @@ describe('listGalleryImages created-at range', () => {
     expect(params.get('created_to')).toBe('2026-07-15');
   });
 
+  it('sends the explicit all-readable scope and forwards cancellation', async () => {
+    const controller = new AbortController();
+
+    await listGalleryImages({
+      boardId: 'all',
+      galleryView: 'images',
+      searchTerm: 'sunset',
+      signal: controller.signal,
+    });
+
+    const [url, init] = mocks.apiFetchJson.mock.calls[0] as [string, RequestInit];
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('board_id')).toBe('all');
+    expect(init.signal).toBe(controller.signal);
+  });
+
   it('omits the range params when no range is given', async () => {
     await listGalleryImages({ boardId: 'board-1', galleryView: 'images', searchTerm: 'sunset' });
 

@@ -15,6 +15,15 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // The palette's tiny global state is an external-store selector;
+          // retain the established shared request instead of creating another.
+          if (id.endsWith('/platform/state/selectors.ts') || id.endsWith('/workbench/palette/paletteStore.ts')) {
+            return 'selectors';
+          }
+          if (id.endsWith('/platform/search/dateTokens.ts')) {
+            return 'vendor';
+          }
+
           if (!id.includes('/node_modules/')) {
             return undefined;
           }

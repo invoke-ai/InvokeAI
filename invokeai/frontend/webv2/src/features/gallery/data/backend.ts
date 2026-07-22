@@ -31,6 +31,7 @@ interface BackendBoardDTO {
  * grouping images by creation date (id 'by_date:YYYY-MM-DD').
  */
 const DATE_BOARD_ID_PREFIX = 'by_date:';
+export const ALL_READABLE_BOARDS_ID = 'all';
 
 export const isDateBoardId = (boardId: string): boolean => boardId.startsWith(DATE_BOARD_ID_PREFIX);
 
@@ -93,7 +94,15 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   ownerName: board.owner_username ?? null,
 });
 
-const getGalleryTotal = async ({ boardId, categories }: { boardId: string; categories: string[] }): Promise<number> => {
+const getGalleryTotal = async ({
+  boardId,
+  categories,
+  signal,
+}: {
+  boardId: string;
+  categories: string[];
+  signal?: AbortSignal;
+}): Promise<number> => {
   const query = toSearchParams({
     board_id: boardId,
     categories,
@@ -101,7 +110,7 @@ const getGalleryTotal = async ({ boardId, categories }: { boardId: string; categ
     limit: 0,
     offset: 0,
   });
-  const body = await apiFetchJson<Pick<ListImagesResponse, 'total'>>(`/api/v1/images/?${query}`);
+  const body = await apiFetchJson<Pick<ListImagesResponse, 'total'>>(`/api/v1/images/?${query}`, { signal });
 
   return body.total;
 };
@@ -126,10 +135,12 @@ export const listGalleryBoards = async ({
   includeArchived = false,
   orderBy = 'created_at',
   orderDir = 'DESC',
+  signal,
 }: {
   includeArchived?: boolean;
   orderBy?: GalleryBoardOrderBy;
   orderDir?: GalleryOrderDir;
+  signal?: AbortSignal;
 } = {}): Promise<GalleryBoard[]> => {
   const boardsQuery = toSearchParams({
     all: true,
@@ -138,13 +149,14 @@ export const listGalleryBoards = async ({
     order_by: orderBy,
   });
   const boardsBodyPromise = apiFetchJson<BackendBoardDTO[] | { items?: BackendBoardDTO[] }>(
-    `/api/v1/boards/?${boardsQuery}`
+    `/api/v1/boards/?${boardsQuery}`,
+    { signal }
   );
 
   const [body, uncategorizedImageCount, uncategorizedAssetCount] = await Promise.all([
     boardsBodyPromise,
-    getGalleryTotal({ boardId: 'none', categories: imageCategories }),
-    getGalleryTotal({ boardId: 'none', categories: assetCategories }),
+    getGalleryTotal({ boardId: 'none', categories: imageCategories, signal }),
+    getGalleryTotal({ boardId: 'none', categories: assetCategories, signal }),
   ]);
   const boards = Array.isArray(body) ? body : (body.items ?? []);
 
@@ -217,6 +229,7 @@ const listGalleryDateBoardImages = async ({
   offset,
   orderDir,
   searchTerm,
+  signal,
   starredFirst,
 }: {
   boardId: string;
@@ -227,6 +240,7 @@ const listGalleryDateBoardImages = async ({
   offset: number;
   orderDir: GalleryOrderDir;
   searchTerm: string;
+  signal?: AbortSignal;
   starredFirst: boolean;
 }): Promise<GalleryImagesPage> => {
   // The board already pins a single day; a date filter either contains that
@@ -245,7 +259,8 @@ const listGalleryDateBoardImages = async ({
     starred_first: starredFirst,
   });
   const body = await apiFetchJson<{ image_names: string[]; total_count: number }>(
-    `/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`
+    `/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`,
+    { signal }
   );
   const images = await getGalleryImagesByNames(body.image_names.slice(offset, offset + limit));
 
@@ -261,10 +276,10 @@ export const listGalleryImages = async ({
   offset = 0,
   orderDir = 'DESC',
   searchTerm,
+  signal,
   starredFirst = false,
 }: {
-  /** Omit to list across every board the user can see. */
-  boardId?: string;
+  boardId: string;
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
@@ -272,6 +287,7 @@ export const listGalleryImages = async ({
   offset?: number;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
+  signal?: AbortSignal;
   starredFirst?: boolean;
 }): Promise<GalleryImagesPage> => {
   if (boardId !== undefined && isDateBoardId(boardId)) {
@@ -284,6 +300,7 @@ export const listGalleryImages = async ({
       offset,
       orderDir,
       searchTerm,
+      signal,
       starredFirst,
     });
   }
@@ -300,7 +317,7 @@ export const listGalleryImages = async ({
     search_term: searchTerm.trim() || undefined,
     starred_first: starredFirst,
   });
-  const body = await apiFetchJson<ListImagesResponse | BackendImageDTO[]>(`/api/v1/images/?${query}`);
+  const body = await apiFetchJson<ListImagesResponse | BackendImageDTO[]>(`/api/v1/images/?${query}`, { signal });
   const items = Array.isArray(body) ? body : (body.items ?? []);
 
   return {

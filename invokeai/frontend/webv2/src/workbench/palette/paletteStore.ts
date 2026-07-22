@@ -1,4 +1,5 @@
-import { createExternalStore } from '@platform/state/externalStore';
+import { createExternalStoreCore } from '@platform/state/externalStoreCore';
+import { useSyncExternalStore } from 'react';
 
 /**
  * Open/close state for the command palette, addressable from anywhere: the
@@ -8,9 +9,27 @@ import { createExternalStore } from '@platform/state/externalStore';
  * launchpad) and subscribes to this store.
  */
 
-export const commandPaletteStore = createExternalStore<{ isOpen: boolean }>({ isOpen: false });
+export const commandPaletteStore = createExternalStoreCore<{ isOpen: boolean }>({ isOpen: false });
+
+export const useIsCommandPaletteOpen = (): boolean =>
+  useSyncExternalStore(commandPaletteStore.subscribe, commandPaletteStore.getSnapshot, commandPaletteStore.getSnapshot)
+    .isOpen;
+
+let returnFocusElement: HTMLElement | null = null;
+
+const captureReturnFocusElement = (): void => {
+  const activeElement = document.activeElement;
+
+  returnFocusElement = activeElement instanceof HTMLElement ? activeElement : null;
+};
+
+export const getCommandPaletteReturnFocusElement = (): HTMLElement | null =>
+  returnFocusElement?.isConnected ? returnFocusElement : null;
 
 export const openCommandPalette = (): void => {
+  if (!commandPaletteStore.getSnapshot().isOpen) {
+    captureReturnFocusElement();
+  }
   commandPaletteStore.setSnapshot({ isOpen: true });
 };
 
@@ -19,5 +38,9 @@ export const closeCommandPalette = (): void => {
 };
 
 export const toggleCommandPalette = (): void => {
-  commandPaletteStore.setSnapshot({ isOpen: !commandPaletteStore.getSnapshot().isOpen });
+  if (commandPaletteStore.getSnapshot().isOpen) {
+    closeCommandPalette();
+  } else {
+    openCommandPalette();
+  }
 };

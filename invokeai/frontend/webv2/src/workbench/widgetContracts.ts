@@ -224,10 +224,16 @@ export interface WidgetSearchApi {
   registerProvider: (provider: WidgetSearchProvider) => () => void;
 }
 
+export interface WidgetSearchContext {
+  signal?: AbortSignal;
+}
+
 export interface WidgetSearchProvider {
+  /** Identifies mutable inputs that affect results for the same query. */
+  contextKey?: string;
   id: string;
   label: string;
-  search: (query: string) => Promise<WidgetSearchResult[]> | WidgetSearchResult[];
+  search: (query: string, context?: WidgetSearchContext) => Promise<WidgetSearchResult[]> | WidgetSearchResult[];
   source?: WidgetContributionSource;
 }
 
@@ -235,6 +241,7 @@ export interface WidgetSearchResult {
   id: string;
   title: string;
   subtitle?: string;
+  /** Commandless results are informational and are omitted from the command palette. */
   commandId?: string;
 }
 

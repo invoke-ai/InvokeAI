@@ -1,4 +1,158 @@
 {
+  "commandPalette": {
+    "title": "Command palette",
+    "buttonLabel": "Command palette",
+    "buttonTooltip": "Command palette ({{hotkey}})",
+    "inputLabel": "Search commands and settings",
+    "placeholders": {
+      "root": "Search commands, settings, and more…",
+      "scope": "Search {{label}}…",
+      "stage": "Pick a value…"
+    },
+    "actions": {
+      "backToAll": "Back to all results",
+      "closeScope": "Close {{label}} — back to all results",
+      "openInSettings": "Open in Settings",
+      "openModelManager": "Open in Model Manager",
+      "revealInGallery": "Reveal in Gallery"
+    },
+    "footer": {
+      "back": "Back",
+      "close": "Close",
+      "navigate": "Navigate",
+      "pick": "Pick",
+      "run": "Run",
+      "scope": "Scope"
+    },
+    "states": {
+      "couldNotSearch": "Couldn't search {{label}}",
+      "invalidDate": "Invalid date: “{{value}}”",
+      "noItemsYet": "No {{label}} yet",
+      "noResults": "No results for “{{query}}”",
+      "partialFailure": "{{count}} results. {{failed}} searches failed.",
+      "resultCount": "{{count}} results.",
+      "retrySearch": "Retry {{label}} search",
+      "searching": "Searching…",
+      "searchingSection": "{{label}} — Searching…"
+    },
+    "date": {
+      "aWeekAgo": "A week ago",
+      "date": "Date",
+      "formatHint": "Or type a date — YYYY-MM-DD, 7d, 2w, 1m",
+      "from": "From {{date}}",
+      "pastWeek": "Past week",
+      "range": "{{from}} – {{to}}",
+      "through": "Through {{date}}",
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "syntax": {
+      "commands": "Type > for commands",
+      "commandsAndDates": "Type > for commands · from:/date: to filter by date"
+    },
+    "search": {
+      "byDate": "Search {{label}} by date",
+      "forQuery": "Search {{label}} for “{{query}}”",
+      "in": "Search in",
+      "provider": "Search {{label}}…"
+    },
+    "groups": {
+      "app": "App",
+      "boards": "Boards",
+      "canvas": "Canvas",
+      "commands": "Commands",
+      "date": "Date",
+      "gallery": "Gallery",
+      "generation": "Generation",
+      "images": "Images",
+      "layout": "Layout",
+      "models": "Models",
+      "navigation": "Navigation",
+      "promptHistory": "Prompt history",
+      "queue": "Queue",
+      "queueItems": "Queue items",
+      "recent": "Recent",
+      "settings": "Settings",
+      "viewer": "Viewer",
+      "workflows": "Workflows"
+    },
+    "launchpad": {
+      "goToModels": "Go to Models",
+      "goToNodes": "Go to Nodes",
+      "goToProjects": "Go to Projects",
+      "goToUsers": "Go to Users",
+      "openEditor": "Open Editor",
+      "openSettings": "Open Settings"
+    },
+    "appEntries": {
+      "keyboardShortcuts": "Keyboard Shortcuts",
+      "openSettings": "Open Settings"
+    },
+    "providers": {
+      "boardSubtitle": "Board · {{count}} image",
+      "boardSubtitle_other": "Board · {{count}} images",
+      "defaultWorkflow": "Default workflow",
+      "images": "Images",
+      "models": "Models",
+      "noTitle": "Untitled generation",
+      "promptHistory": "Prompt history",
+      "queueItems": "Queue items",
+      "uncategorized": "Uncategorized",
+      "workflow": "Workflow",
+      "workflows": "Workflows"
+    },
+    "queueStatuses": {
+      "canceled": "Canceled",
+      "completed": "Completed",
+      "failed": "Failed",
+      "in_progress": "In progress",
+      "pending": "Pending",
+      "waiting": "Waiting"
+    },
+    "settings": {
+      "current": "Current",
+      "off": "Off",
+      "on": "On",
+      "sections": {
+        "appearance": "Appearance",
+        "behavior": "Behavior",
+        "developer": "Developer",
+        "hotkeys": "Hotkeys",
+        "project": "Project",
+        "queue": "Queue",
+        "workflow": "Workflow",
+        "workspace": "Workspace"
+      },
+      "settingsSection": "Settings: {{section}}",
+      "toggles": {
+        "confirmImageDeletion": "Confirm Image Deletion",
+        "developerLogEnabled": "Developer Logging",
+        "enableInformationalPopovers": "Informational Popovers",
+        "enableModelDescriptions": "Model Descriptions",
+        "reduceMotion": "Reduce Motion",
+        "showFocusRegionHighlight": "Show Focus Region Highlight",
+        "workflowShowMinimap": "Show Workflow Minimap",
+        "workflowSnapToGrid": "Snap Workflow Nodes to Grid",
+        "workflowValidateConnections": "Validate Workflow Connections"
+      },
+      "values": {
+        "activeProject": "Active Project",
+        "allProjects": "All Projects",
+        "curved": "Curved",
+        "language": "Language",
+        "queueJobsScope": "Queue Jobs Scope",
+        "square": "Square",
+        "theme": "Theme",
+        "workflowEdgeStyle": "Workflow Edge Style"
+      }
+    },
+    "workflowLoad": {
+      "couldNotLoad": "Could not load the workflow.",
+      "failed": "Failed to load workflow",
+      "loaded": "Loaded “{{name}}” from library",
+      "warning": "Workflow load warning"
+    }
+  },
   "common": {
     "actions": "Actions",
     "active": "Active",

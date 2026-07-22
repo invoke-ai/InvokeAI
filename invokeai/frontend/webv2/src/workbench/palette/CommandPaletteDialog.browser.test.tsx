@@ -1,18 +1,71 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import i18n from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
+import { closeCommandPalette, openCommandPalette, useIsCommandPaletteOpen } from './paletteStore';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+let diagnostics: string[] = [];
+let consoleErrorSpy: ReturnType<typeof vi.spyOn> | null = null;
+let consoleWarnSpy: ReturnType<typeof vi.spyOn> | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const i18nReady = fetch('/locales/en.json')
+  .then((response) => response.json())
+  .then((translation) =>
+    i18n.use(initReactI18next).init({
+      fallbackLng: 'en',
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation } },
+    })
+  );
+
+const waitFor = async <Value,>(assertion: () => Value): Promise<Value> => {
+  let value: Value | undefined;
+
+  await act(async () => {
+    value = await vi.waitFor(assertion);
+  });
+
+  return value as Value;
+};
+
+const waitForDebounce = () =>
+  act(
+    () =>
+      new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 250);
+      })
+  );
+
+const formatDiagnostic = (value: unknown): string =>
+  value instanceof Error ? (value.stack ?? value.message) : String(value);
+const onPageError = (event: ErrorEvent) =>
+  diagnostics.push(`page error: ${formatDiagnostic(event.error ?? event.message)}`);
+const onUnhandledRejection = (event: PromiseRejectionEvent) =>
+  diagnostics.push(`unhandled rejection: ${formatDiagnostic(event.reason)}`);
+
+beforeEach(() => {
+  diagnostics = [];
+  consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
+    diagnostics.push(`console.error: ${args.map(formatDiagnostic).join(' ')}`);
+  });
+  consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation((...args) => {
+    diagnostics.push(`console.warn: ${args.map(formatDiagnostic).join(' ')}`);
+  });
+  window.addEventListener('error', onPageError);
+  window.addEventListener('unhandledrejection', onUnhandledRejection);
+});
 
 const entry = (id: string, title: string, run = vi.fn()): PaletteEntry => ({
   group: 'Commands',
@@ -23,6 +76,23 @@ const entry = (id: string, title: string, run = vi.fn()): PaletteEntry => ({
   title,
 });
 
+const storeHostEntries = [entry('first', 'First command')];
+
+const StorePaletteHost = () => {
+  const isOpen = useIsCommandPaletteOpen();
+
+  return (
+    <>
+      <button type="button" onClick={openCommandPalette}>
+        Open palette
+      </button>
+      {isOpen ? (
+        <CommandPaletteDialog entries={storeHostEntries} isOpen modifierKeyLabel="ctrl" onClose={closeCommandPalette} />
+      ) : null}
+    </>
+  );
+};
+
 const renderPalette = async ({
   entries,
   onClose = vi.fn(),
@@ -32,27 +102,33 @@ const renderPalette = async ({
   onClose?: () => void;
   providers?: PaletteSearchProvider[];
 }) => {
+  await i18nReady;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
-  await act(() => {
+  await act(async () => {
     root?.render(
-      <ChakraProvider value={system}>
-        <QueryClientProvider client={new QueryClient()}>
-          <CommandPaletteDialog
-            entries={entries}
-            isOpen
-            modifierKeyLabel="ctrl"
-            providers={providers}
-            onClose={onClose}
-          />
-        </QueryClientProvider>
-      </ChakraProvider>
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={new QueryClient()}>
+            <CommandPaletteDialog
+              entries={entries}
+              isOpen
+              modifierKeyLabel="ctrl"
+              providers={providers}
+              onClose={onClose}
+            />
+          </QueryClientProvider>
+        </ChakraProvider>
+      </I18nextProvider>
     );
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
   });
 
-  const input = await vi.waitFor(() => {
+  const input = await waitFor(() => {
     const node = document.querySelector<HTMLInputElement>('[name="command-palette-query"]');
     expect(node).not.toBeNull();
     return node!;
@@ -62,14 +138,63 @@ const renderPalette = async ({
 };
 
 afterEach(async () => {
-  await act(() => root?.unmount());
+  await act(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+    root?.unmount();
+    await Promise.resolve();
+  });
   host?.remove();
   host = null;
   root = null;
   window.localStorage.clear();
+  window.removeEventListener('error', onPageError);
+  window.removeEventListener('unhandledrejection', onUnhandledRejection);
+  consoleErrorSpy?.mockRestore();
+  consoleWarnSpy?.mockRestore();
+  consoleErrorSpy = null;
+  consoleWarnSpy = null;
+  closeCommandPalette();
+  expect(diagnostics, diagnostics.join('\n\n')).toEqual([]);
 });
 
 describe('CommandPaletteDialog interaction', () => {
+  it('restores focus through the store-driven host lifecycle and preserves the first return target', async () => {
+    await i18nReady;
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={new QueryClient()}>
+              <StorePaletteHost />
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+    const button = document.querySelector<HTMLButtonElement>('button');
+    expect(button).not.toBeNull();
+
+    await act(() => userEvent.click(button!));
+    const input = await waitFor(() => {
+      const node = document.querySelector<HTMLInputElement>('[name="command-palette-query"]');
+      expect(node).not.toBeNull();
+      return node!;
+    });
+    expect(document.activeElement).toBe(input);
+
+    await act(() => openCommandPalette());
+    await act(() => userEvent.keyboard('{Escape}'));
+    await waitFor(() => expect(document.activeElement).toBe(button));
+  });
+
   it('exposes an accessible focused search field and runs the stable highlighted command in bare > mode', async () => {
     const firstRun = vi.fn();
     const secondRun = vi.fn();
@@ -104,9 +229,7 @@ describe('CommandPaletteDialog interaction', () => {
     expect(document.body.textContent).toContain('Second command');
     expect(document.body.textContent).not.toContain('Hidden setting');
 
-    await new Promise((resolve) => {
-      globalThis.setTimeout(resolve, 250);
-    });
+    await waitForDebounce();
     expect(providerSearch).not.toHaveBeenCalled();
 
     await act(() => userEvent.keyboard('{ArrowDown}{Enter}'));
@@ -126,7 +249,7 @@ describe('CommandPaletteDialog interaction', () => {
 
     await act(() => userEvent.fill(input, 'zz'));
     await act(() => userEvent.keyboard('{Tab}'));
-    const retry = await vi.waitFor(() => {
+    const retry = await waitFor(() => {
       const node = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Retry');
       expect(node).toBeDefined();
       return node!;
@@ -136,7 +259,95 @@ describe('CommandPaletteDialog interaction', () => {
     expect(document.activeElement).toBe(retry);
 
     await act(() => userEvent.click(retry));
-    await vi.waitFor(() => expect(document.activeElement).toBe(input));
+    await waitFor(() => expect(document.activeElement).toBe(input));
+  });
+
+  it('keeps successful root sections and retries only a failed provider', async () => {
+    const retryResult = entry('recovered', 'Recovered result');
+    const failedSearch = vi.fn().mockRejectedValueOnce(new Error('failed')).mockResolvedValueOnce([retryResult]);
+    const successfulSearch = vi.fn(() => [entry('success', 'Successful result')]);
+    const providers: PaletteSearchProvider[] = [
+      { contextKey: 'failed', label: 'Broken', providerKey: 'broken', search: failedSearch },
+      { contextKey: 'success', label: 'Working', providerKey: 'working', search: successfulSearch },
+    ];
+    const { input, onClose } = await renderPalette({ entries: [], providers });
+
+    await act(() => userEvent.fill(input, 'zz'));
+    await waitForDebounce();
+    const retryOption = await waitFor(() => {
+      expect(document.body.textContent).toContain('Successful result');
+      const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
+        option.textContent?.includes('Retry broken search')
+      );
+      expect(node).toBeDefined();
+      return node!;
+    });
+
+    await act(() => userEvent.click(retryOption));
+    await waitFor(() => expect(document.body.textContent).toContain('Recovered result'));
+    expect(failedSearch).toHaveBeenCalledTimes(2);
+    expect(successfulSearch).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('marks the listbox busy while a provider is pending and announces completion', async () => {
+    let resolveSearch: ((entries: PaletteEntry[]) => void) | undefined;
+    const search = vi.fn(
+      () =>
+        new Promise<PaletteEntry[]>((resolve) => {
+          resolveSearch = resolve;
+        })
+    );
+    const { input } = await renderPalette({
+      entries: [],
+      providers: [{ contextKey: 'pending', label: 'Entities', providerKey: 'entities', search }],
+    });
+
+    await act(() => userEvent.fill(input, 'zz'));
+    const listbox = await waitFor(() => {
+      const node = document.querySelector<HTMLElement>('[role="listbox"]');
+      expect(node?.getAttribute('aria-busy')).toBe('true');
+      expect(document.body.textContent).toContain('Searching…');
+      return node!;
+    });
+
+    await waitForDebounce();
+    await waitFor(() => expect(search).toHaveBeenCalledOnce());
+    await act(() => resolveSearch?.([entry('found', 'Found result')]));
+    await waitFor(() => expect(listbox.getAttribute('aria-busy')).toBe('false'));
+    expect(document.body.textContent).toContain('1 results.');
+  });
+
+  it('does not expose or activate provider entries from the pre-debounce query', async () => {
+    const oldRun = vi.fn();
+    const search = vi.fn((query: { text: string }) =>
+      query.text === 'old' ? [entry('old-result', 'Old result', oldRun)] : []
+    );
+    const { input } = await renderPalette({
+      entries: [],
+      providers: [{ contextKey: 'context', label: 'Entities', providerKey: 'entities', search }],
+    });
+
+    await act(() => userEvent.fill(input, 'old'));
+    await waitForDebounce();
+    await waitFor(() => expect(document.body.textContent).toContain('Old result'));
+
+    await act(() => userEvent.fill(input, 'new'));
+    expect(document.body.textContent).not.toContain('Old result');
+    await act(() => userEvent.keyboard('{Enter}'));
+    expect(oldRun).not.toHaveBeenCalled();
+  });
+
+  it('renders no interactive descendants inside listbox options', async () => {
+    const withSecondary: PaletteEntry = {
+      ...entry('first', 'First command'),
+      secondary: { label: 'Open Elsewhere', run: vi.fn() },
+    };
+    await renderPalette({ entries: [withSecondary] });
+
+    for (const option of document.querySelectorAll('[role="option"]')) {
+      expect(option.querySelector('button, a, input, select, textarea')).toBeNull();
+    }
   });
 
   it('shows key-specific date suggestions while typing a token, without flashing an error', async () => {
@@ -179,11 +390,14 @@ describe('CommandPaletteDialog interaction', () => {
 
     expect(input.value).toBe('from:yesterday ');
     expect(onClose).not.toHaveBeenCalled();
-    await vi.waitFor(() => {
-      expect(providerSearch).toHaveBeenCalledWith({
-        range: { from: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), to: undefined },
-        text: '',
-      });
+    await waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith(
+        {
+          range: { from: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), to: undefined },
+          text: '',
+        },
+        { signal: expect.any(AbortSignal) }
+      );
     });
     expect(document.body.textContent).toContain('Search images by date');
   });
@@ -207,11 +421,9 @@ describe('CommandPaletteDialog interaction', () => {
     const { input } = await renderPalette({ entries: [], providers: [capable, dateLess] });
 
     await act(() => userEvent.fill(input, 'from:7d'));
-    await new Promise((resolve) => {
-      globalThis.setTimeout(resolve, 250);
-    });
+    await waitForDebounce();
 
-    await vi.waitFor(() => expect(capableSearch).toHaveBeenCalled());
+    await waitFor(() => expect(capableSearch).toHaveBeenCalled());
     expect(dateLessSearch).not.toHaveBeenCalled();
   });
 
@@ -249,14 +461,15 @@ describe('CommandPaletteDialog interaction', () => {
     expect(document.body.textContent).not.toContain('Or type a date');
 
     await act(() => userEvent.fill(input, 'from:7d'));
-    await new Promise((resolve) => {
-      globalThis.setTimeout(resolve, 250);
-    });
+    await waitForDebounce();
 
     // No acknowledgment chip, and the provider receives the literal text.
     expect(document.getElementById('command-palette-date-hint')).toBeNull();
-    await vi.waitFor(() => {
-      expect(dateLessSearch).toHaveBeenCalledWith({ range: undefined, text: 'from:7d' });
+    await waitFor(() => {
+      expect(dateLessSearch).toHaveBeenCalledWith(
+        { range: undefined, text: 'from:7d' },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 
@@ -303,8 +516,8 @@ describe('CommandPaletteDialog interaction', () => {
 
     expect(input.value).toBe('');
     expect(onClose).not.toHaveBeenCalled();
-    await vi.waitFor(() => {
-      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: '' });
+    await waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: '' }, { signal: expect.any(AbortSignal) });
     });
     expect(document.body.textContent).toContain('Entity One');
 
@@ -313,7 +526,7 @@ describe('CommandPaletteDialog interaction', () => {
     await act(() => userEvent.fill(input, '>search ent'));
     await act(() => userEvent.keyboard('{Enter}'));
     expect(input.value).toBe('');
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Entity One'));
+    await waitFor(() => expect(document.body.textContent).toContain('Entity One'));
   });
 
   it('keeps the query when entering a scope through a Tab scope row', async () => {
@@ -332,8 +545,11 @@ describe('CommandPaletteDialog interaction', () => {
     await act(() => userEvent.keyboard('{Tab}'));
 
     expect(input.value).toBe('zz');
-    await vi.waitFor(() => {
-      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: 'zz' });
+    await waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith(
+        { range: undefined, text: 'zz' },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 
@@ -348,20 +564,19 @@ describe('CommandPaletteDialog interaction', () => {
     const { input } = await renderPalette({ entries: [], providers: [provider] });
 
     await act(() => userEvent.fill(input, 'e'));
-    await new Promise((resolve) => {
-      globalThis.setTimeout(resolve, 250);
-    });
+    await waitForDebounce();
     expect(providerSearch).not.toHaveBeenCalled();
 
     await act(() => userEvent.fill(input, ''));
     await act(() => userEvent.keyboard('{Enter}'));
-    await vi.waitFor(() => {
-      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: '' });
+    await waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: '' }, { signal: expect.any(AbortSignal) });
     });
 
     await act(() => userEvent.fill(input, 'a'));
-    await vi.waitFor(() => {
-      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: 'a' });
+    await waitForDebounce();
+    await waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: 'a' }, { signal: expect.any(AbortSignal) });
     });
   });
 
@@ -375,10 +590,11 @@ describe('CommandPaletteDialog interaction', () => {
     const { input } = await renderPalette({ entries: [], providers: [provider] });
 
     await act(() => userEvent.keyboard('{Enter}'));
-    await vi.waitFor(() => expect(document.body.textContent).toContain('No entities yet'));
+    await waitFor(() => expect(document.body.textContent).toContain('No entities yet'));
 
     await act(() => userEvent.fill(input, 'x'));
-    await vi.waitFor(() => expect(document.body.textContent).toContain('No results for “x”'));
+    await waitForDebounce();
+    await waitFor(() => expect(document.body.textContent).toContain('No results for “x”'));
   });
 
   it('keeps the error state and Retry for an empty scope', async () => {
@@ -391,7 +607,7 @@ describe('CommandPaletteDialog interaction', () => {
     await renderPalette({ entries: [], providers: [provider] });
 
     await act(() => userEvent.keyboard('{Enter}'));
-    await vi.waitFor(() => expect(document.body.textContent).toContain("Couldn't search entities"));
+    await waitFor(() => expect(document.body.textContent).toContain("Couldn't search entities"));
     expect([...document.querySelectorAll('button')].some((button) => button.textContent === 'Retry')).toBe(true);
   });
 
@@ -448,7 +664,7 @@ describe('CommandPaletteDialog interaction', () => {
 
     await act(() => userEvent.fill(input, 'search ent'));
     await act(() => userEvent.keyboard('{Enter}'));
-    const chip = await vi.waitFor(() => {
+    const chip = await waitFor(() => {
       const node = [...document.querySelectorAll('button')].find((button) => button.textContent?.includes('Entities'));
       expect(node).toBeDefined();
       return node!;
@@ -458,10 +674,10 @@ describe('CommandPaletteDialog interaction', () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('First command');
     expect(input.value).toBe('');
-    await vi.waitFor(() => expect(document.activeElement).toBe(input));
+    await waitFor(() => expect(document.activeElement).toBe(input));
   });
 
-  it('runs the highlighted row secondary action from its pointer affordance', async () => {
+  it('runs the highlighted row secondary action with Mod+Enter and exposes no nested button', async () => {
     const secondaryRun = vi.fn();
     const withSecondary: PaletteEntry = {
       ...entry('first', 'First command'),
@@ -469,13 +685,8 @@ describe('CommandPaletteDialog interaction', () => {
     };
     const { onClose } = await renderPalette({ entries: [withSecondary] });
 
-    const secondaryButton = await vi.waitFor(() => {
-      const node = document.querySelector<HTMLButtonElement>('button[aria-label="Open Elsewhere"]');
-      expect(node).not.toBeNull();
-      return node!;
-    });
-
-    await act(() => userEvent.click(secondaryButton));
+    expect(document.querySelector('button[aria-label="Open Elsewhere"]')).toBeNull();
+    await act(() => userEvent.keyboard('{Control>}{Enter}{/Control}'));
     expect(secondaryRun).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -506,8 +717,11 @@ describe('CommandPaletteDialog interaction', () => {
     await act(() => userEvent.keyboard('{Tab}'));
 
     expect(input.value).toBe('sunset');
-    await vi.waitFor(() => {
-      expect(dateLessSearch).toHaveBeenCalledWith({ range: undefined, text: 'sunset' });
+    await waitFor(() => {
+      expect(dateLessSearch).toHaveBeenCalledWith(
+        { range: undefined, text: 'sunset' },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 

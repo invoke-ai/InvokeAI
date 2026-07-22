@@ -1,10 +1,10 @@
 import type { ReactNode, Ref } from 'react';
 
 import { Box, HStack, Icon, Kbd, ScrollArea, Spacer, Text, chakra } from '@chakra-ui/react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { dropdownGroupLabel } from '@theme/recipes';
-import { ArrowUpRightIcon, CheckIcon } from 'lucide-react';
+import { CheckIcon } from 'lucide-react';
 import { useCallback, useImperativeHandle, useState } from 'react';
-import { useVirtualizer } from 'react-hook-tanstack-virtual';
 
 import type { PaletteEntry, PaletteRow } from './entries';
 
@@ -16,8 +16,6 @@ const VIRTUALIZER_INITIAL_RECT = { height: 384, width: 0 };
 export const getCommandPaletteRowDomId = (rowId: string): string => `${RESULT_LIST_ID}-${encodeURIComponent(rowId)}`;
 
 const preventFocusSteal = (event: { preventDefault: () => void }) => event.preventDefault();
-
-const SECONDARY_BUTTON_HOVER_STYLE = { color: 'fg' };
 
 const renderTitle = (title: string, matchIndexes?: readonly number[]): ReactNode => {
   if (!matchIndexes || matchIndexes.length === 0) {
@@ -48,8 +46,7 @@ const renderTitle = (title: string, matchIndexes?: readonly number[]): ReactNode
   return segments;
 };
 
-// Rows are divs, not buttons: they stay out of the tab order (combobox
-// aria-activedescendant pattern) and may nest a real secondary-action button.
+// Rows stay out of the tab order for the combobox aria-activedescendant pattern.
 const rowButtonProps = {
   cursor: 'pointer',
   gap: '2.5',
@@ -67,7 +64,6 @@ const EntryRow = ({
   matchIndexes,
   onActive,
   onRun,
-  onRunSecondary,
 }: {
   domId: string;
   entry: PaletteEntry;
@@ -75,16 +71,7 @@ const EntryRow = ({
   matchIndexes?: readonly number[];
   onActive: () => void;
   onRun: () => void;
-  onRunSecondary: () => void;
 }) => {
-  const onSecondaryClick = useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation();
-      onRunSecondary();
-    },
-    [onRunSecondary]
-  );
-
   return (
     <HStack
       {...rowButtonProps}
@@ -110,25 +97,6 @@ const EntryRow = ({
         </Text>
       ) : null}
       <Spacer />
-      {entry.secondary && isActive ? (
-        <chakra.button
-          aria-label={entry.secondary.label}
-          color="fg.muted"
-          cursor="pointer"
-          display="inline-flex"
-          flexShrink={0}
-          p="1"
-          rounded="sm"
-          tabIndex={-1}
-          title={entry.secondary.label}
-          type="button"
-          _hover={SECONDARY_BUTTON_HOVER_STYLE}
-          onClick={onSecondaryClick}
-          onMouseDown={preventFocusSteal}
-        >
-          <Icon as={ArrowUpRightIcon} boxSize="3.5" />
-        </chakra.button>
-      ) : null}
       {entry.keys ? (
         <HStack flexShrink={0} gap="0.5">
           {entry.keys.map((part) => (
@@ -141,6 +109,36 @@ const EntryRow = ({
     </HStack>
   );
 };
+
+const ProviderErrorRow = ({
+  domId,
+  isActive,
+  label,
+  onActive,
+  onRun,
+}: {
+  domId: string;
+  isActive: boolean;
+  label: string;
+  onActive: () => void;
+  onRun: () => void;
+}) => (
+  <HStack
+    {...rowButtonProps}
+    id={domId}
+    aria-selected={isActive}
+    bg={isActive ? 'bg.error' : undefined}
+    color="fg.error"
+    role="option"
+    onClick={onRun}
+    onMouseDown={preventFocusSteal}
+    onMouseMove={onActive}
+  >
+    <Text fontSize="sm" truncate>
+      {label}
+    </Text>
+  </HStack>
+);
 
 const ScopeRow = ({
   domId,
@@ -183,7 +181,6 @@ const VirtualPaletteRow = ({
   virtualStart,
   onActive,
   onRun,
-  onRunSecondary,
 }: {
   activeRowId: string | null;
   measureElement: (node: Element | null) => void;
@@ -192,11 +189,9 @@ const VirtualPaletteRow = ({
   virtualStart: number;
   onActive: (rowId: string) => void;
   onRun: (row: PaletteRow) => void;
-  onRunSecondary: (row: PaletteRow) => void;
 }) => {
   const handleActive = useCallback(() => onActive(row.id), [onActive, row.id]);
   const handleRun = useCallback(() => onRun(row), [onRun, row]);
-  const handleRunSecondary = useCallback(() => onRunSecondary(row), [onRunSecondary, row]);
   const isActive = row.id === activeRowId;
 
   return (
@@ -221,6 +216,14 @@ const VirtualPaletteRow = ({
           onActive={handleActive}
           onRun={handleRun}
         />
+      ) : row.kind === 'provider-error' ? (
+        <ProviderErrorRow
+          domId={getCommandPaletteRowDomId(row.id)}
+          isActive={isActive}
+          label={row.label}
+          onActive={handleActive}
+          onRun={handleRun}
+        />
       ) : (
         <EntryRow
           domId={getCommandPaletteRowDomId(row.id)}
@@ -229,7 +232,6 @@ const VirtualPaletteRow = ({
           matchIndexes={row.matchIndexes}
           onActive={handleActive}
           onRun={handleRun}
-          onRunSecondary={handleRunSecondary}
         />
       )}
     </Box>
@@ -240,20 +242,21 @@ export interface CommandPaletteRowsHandle {
   scrollToIndex: (index: number) => void;
 }
 
+// eslint-disable-next-line react/react-compiler -- TanStack Virtual exposes imperative functions that the compiler cannot memoize safely.
 export const CommandPaletteRows = ({
   activeRowId,
+  isBusy,
   ref,
   rows,
   onActive,
   onRun,
-  onRunSecondary,
 }: {
   activeRowId: string | null;
+  isBusy: boolean;
   ref?: Ref<CommandPaletteRowsHandle>;
   rows: PaletteRow[];
   onActive: (rowId: string) => void;
   onRun: (row: PaletteRow) => void;
-  onRunSecondary: (row: PaletteRow) => void;
 }) => {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const estimateRowSize = useCallback(
@@ -278,9 +281,9 @@ export const CommandPaletteRows = ({
   return (
     <ScrollArea.Root maxH="min(400px, 55dvh)" size="xs" variant="hover" w="full">
       <ScrollArea.Viewport ref={setScrollElement} aria-label="Command palette results" maxH="inherit" w="full">
-        <ScrollArea.Content id={RESULT_LIST_ID} pb="1.5" role="listbox" w="full">
-          <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
-            {virtualizer.virtualItems.map((virtualRow) => {
+        <ScrollArea.Content id={RESULT_LIST_ID} aria-busy={isBusy} pb="1.5" role="listbox" w="full">
+          <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
+            {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = rows[virtualRow.index];
 
               return row ? (
@@ -293,7 +296,6 @@ export const CommandPaletteRows = ({
                   virtualStart={virtualRow.start}
                   onActive={onActive}
                   onRun={onRun}
-                  onRunSecondary={onRunSecondary}
                 />
               ) : null;
             })}

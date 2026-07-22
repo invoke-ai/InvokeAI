@@ -8,6 +8,7 @@ and that get_many()/get_image_names() enforce per-user ownership isolation.
 import pytest
 
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -270,6 +271,159 @@ class TestOwnershipFilteringOmittedBoard:
         result = image_store.get_image_names(board_id="none", user_id="user1", is_admin=False)
 
         assert result.image_names == ["u1-uncat.png"]
+
+
+class TestAllReadableBoardsFiltering:
+    def _seed_visibility_matrix(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> None:
+        image_store, board_store, board_image_store = stores
+
+        def add_boarded_image(
+            image_name: str,
+            *,
+            owner: str,
+            visibility: BoardVisibility = BoardVisibility.Private,
+            archived: bool = False,
+        ) -> str:
+            _save(image_store, image_name, user_id=owner)
+            board = board_store.save(board_name=image_name, user_id=owner)
+            board_store.update(
+                board.board_id,
+                BoardChanges(board_visibility=visibility, archived=archived),
+            )
+            board_image_store.add_image_to_board(board_id=board.board_id, image_name=image_name)
+            return board.board_id
+
+        add_boarded_image("own-private.png", owner="user1")
+        shared_private_id = add_boarded_image("explicit-share.png", owner="user2")
+        add_boarded_image("shared-visibility.png", owner="user2", visibility=BoardVisibility.Shared)
+        add_boarded_image("public-visibility.png", owner="user2", visibility=BoardVisibility.Public)
+        add_boarded_image("other-private.png", owner="user2")
+        add_boarded_image("own-archived.png", owner="user1", archived=True)
+        add_boarded_image(
+            "other-archived-public.png", owner="user2", visibility=BoardVisibility.Public, archived=True
+        )
+        _save(image_store, "own-uncategorized.png", user_id="user1")
+        _save(image_store, "other-uncategorized.png", user_id="user2")
+
+        with image_store._db.transaction() as cursor:
+            cursor.execute(
+                "INSERT OR IGNORE INTO users (user_id, email, password_hash) VALUES (?, ?, ?)",
+                ("user1", "user1@example.com", "unused"),
+            )
+            cursor.execute(
+                "INSERT OR IGNORE INTO shared_boards (board_id, user_id) VALUES (?, ?)",
+                (shared_private_id, "user1"),
+            )
+
+    @pytest.mark.parametrize(
+        ("user_id", "is_admin", "expected"),
+        [
+            (
+                "user1",
+                False,
+                {
+                    "own-private.png",
+                    "explicit-share.png",
+                    "shared-visibility.png",
+                    "public-visibility.png",
+                    "own-uncategorized.png",
+                },
+            ),
+            (
+                "admin",
+                True,
+                {
+                    "own-private.png",
+                    "explicit-share.png",
+                    "shared-visibility.png",
+                    "public-visibility.png",
+                    "other-private.png",
+                    "own-uncategorized.png",
+                    "other-uncategorized.png",
+                },
+            ),
+        ],
+    )
+    def test_all_scope_authorization_and_counts_are_consistent(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        user_id: str,
+        is_admin: bool,
+        expected: set[str],
+    ) -> None:
+        self._seed_visibility_matrix(stores)
+        image_store = stores[0]
+        with image_store._db.transaction() as cursor:
+            cursor.executemany(
+                "UPDATE images SET starred = TRUE WHERE image_name = ?",
+                [("own-private.png",), ("other-private.png",)],
+            )
+
+        dtos = image_store.get_many(limit=100, board_id="all", user_id=user_id, is_admin=is_admin)
+        names = image_store.get_image_names(board_id="all", user_id=user_id, is_admin=is_admin)
+
+        assert {image.image_name for image in dtos.items} == expected
+        assert set(names.image_names) == expected
+        assert dtos.total == names.total_count == len(expected)
+        assert names.starred_count == len(expected & {"own-private.png", "other-private.png"})
+
+    def test_all_scope_combines_with_inclusive_date_filters(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> None:
+        self._seed_visibility_matrix(stores)
+        image_store = stores[0]
+        _set_created_at(image_store, "own-private.png", "2026-06-01 00:00:00.000")
+        _set_created_at(image_store, "explicit-share.png", "2026-06-01 23:59:59.999")
+        _set_created_at(image_store, "public-visibility.png", "2026-06-02 00:00:00.000")
+
+        dtos = image_store.get_many(
+            limit=100,
+            board_id="all",
+            user_id="user1",
+            created_from="2026-06-01",
+            created_to="2026-06-01",
+        )
+        names = image_store.get_image_names(
+            board_id="all",
+            user_id="user1",
+            created_from="2026-06-01",
+            created_to="2026-06-01",
+        )
+
+        assert {image.image_name for image in dtos.items} == {"own-private.png", "explicit-share.png"}
+        assert set(names.image_names) == {"own-private.png", "explicit-share.png"}
+        assert dtos.total == names.total_count == 2
+
+    @pytest.mark.parametrize(("user_id", "is_admin"), [("user1", False), ("admin", True)])
+    def test_all_scope_excludes_dangling_board_associations(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        user_id: str,
+        is_admin: bool,
+    ) -> None:
+        image_store = stores[0]
+        _save(image_store, "dangling.png", user_id="user1")
+        # Production foreign keys prevent this state, but imported/legacy DBs
+        # may contain it. Seed it deliberately to lock down fail-closed reads.
+        image_store._db._conn.execute("PRAGMA foreign_keys = OFF")
+        image_store._db._conn.execute(
+            "INSERT INTO board_images (board_id, image_name) VALUES (?, ?)",
+            ("deleted-board", "dangling.png"),
+        )
+        image_store._db._conn.commit()
+        image_store._db._conn.execute("PRAGMA foreign_keys = ON")
+
+        dtos = image_store.get_many(limit=100, board_id="all", user_id=user_id, is_admin=is_admin)
+        names = image_store.get_image_names(board_id="all", user_id=user_id, is_admin=is_admin)
+
+        assert dtos.items == []
+        assert dtos.total == 0
+        assert names.image_names == []
+        assert names.total_count == names.starred_count == 0
 
 
 def _set_created_at(store: SqliteImageRecordStorage, name: str, created_at: str) -> None:

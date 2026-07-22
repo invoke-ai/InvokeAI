@@ -134,13 +134,16 @@ export const useRegisterFirstPartyCommands = () => {
     }
   });
 
+  useMountEffect(() =>
+    commandApi.register({
+      handler: toggleCommandPalette,
+      id: 'app.openCommandPalette',
+      title: 'Open Command Palette',
+    })
+  );
+
   useEffect(() => {
     const disposers = [
-      commandApi.register({
-        handler: toggleCommandPalette,
-        id: 'app.openCommandPalette',
-        title: 'Open Command Palette',
-      }),
       commandApi.register({ handler: submitInvocation, id: 'app.invoke', title: 'Invoke' }),
       commandApi.register({ handler: submitInvocation, id: 'app.invokeFront', title: 'Invoke front' }),
       commandApi.register({

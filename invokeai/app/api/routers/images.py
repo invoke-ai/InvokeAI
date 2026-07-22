@@ -447,7 +447,11 @@ async def list_image_dtos(
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
     board_id: Optional[str] = Query(
         default=None,
-        description="The board id to filter by. Use 'none' to find images without a board.",
+        description=(
+            "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for "
+            "images on every readable, non-archived board plus authorized uncategorized images. If omitted, "
+            "non-admin results remain limited to images owned by the current user."
+        ),
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
@@ -464,8 +468,8 @@ async def list_image_dtos(
     """Gets a list of image DTOs for the current user"""
 
     # Validate that the caller can read from this board before listing its images.
-    # "none" is a sentinel for uncategorized images and is handled by the SQL layer.
-    if board_id is not None and board_id != "none":
+    # "none" and "all" are sentinels handled by the SQL layer.
+    if board_id is not None and board_id not in {"none", "all"}:
         _assert_board_read_access(board_id, current_user)
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
@@ -737,7 +741,11 @@ async def get_image_names(
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
     board_id: Optional[str] = Query(
         default=None,
-        description="The board id to filter by. Use 'none' to find images without a board.",
+        description=(
+            "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for "
+            "images on every readable, non-archived board plus authorized uncategorized images. If omitted, "
+            "non-admin results remain limited to images owned by the current user."
+        ),
     ),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
@@ -752,7 +760,7 @@ async def get_image_names(
     """Gets ordered list of image names with metadata for optimistic updates"""
 
     # Validate that the caller can read from this board before listing its images.
-    if board_id is not None and board_id != "none":
+    if board_id is not None and board_id not in {"none", "all"}:
         _assert_board_read_access(board_id, current_user)
 
     try:

@@ -7,6 +7,7 @@ import type {
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { getPaletteContributionKey } from './contributionKey';
+import { getObjectIdentity } from './objectIdentity';
 
 type ExecuteExtensionCommand = (
   commandId: string,
@@ -33,22 +34,24 @@ export const createExtensionSearchProvider = (
   const providerKey = getPaletteContributionKey('provider', provider.id, provider.source);
 
   return {
-    contextKey: providerKey,
+    contextKey: `${providerKey}:${getObjectIdentity(provider, 'registration')}:${provider.contextKey ?? 'default'}`,
     label: provider.label,
     providerKey,
     // Extensions keep their plain-string search contract; they receive the
     // query text with date tokens stripped and never see the range.
-    search: async (query) => {
-      const results = await provider.search(query.text);
+    search: async (query, { signal }) => {
+      const results = await provider.search(query.text, { signal });
 
-      return results.map<PaletteEntry>((result) => ({
-        group: provider.label,
-        id: getPaletteContributionKey('provider-result', `${providerKey}:${result.id}`, provider.source),
-        isPersistentRecent: false,
-        run: () => (result.commandId ? execute(result.commandId, provider.source ?? null, result.id) : undefined),
-        subtitle: result.subtitle,
-        title: result.title,
-      }));
+      return results
+        .filter((result) => result.commandId !== undefined)
+        .map<PaletteEntry>((result) => ({
+          group: provider.label,
+          id: getPaletteContributionKey('provider-result', `${providerKey}:${result.id}`, provider.source),
+          isPersistentRecent: false,
+          run: () => execute(result.commandId!, provider.source ?? null, result.id),
+          subtitle: result.subtitle,
+          title: result.title,
+        }));
     },
   };
 };

@@ -1,19 +1,18 @@
 import type { DateTokenKey } from '@platform/search/dateTokens';
-/* eslint-disable react/react-compiler */
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   completeTrailingDateToken,
-  formatDateRangeLabel,
+  formatIsoDate,
   isPossibleDatePrefix,
   matchTrailingDateToken,
   parseDateTokens,
 } from '@platform/search/dateTokens';
-import { useQueries } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import type { PaletteEntry, PaletteRow, PaletteSearchProvider, PaletteStage, ProviderResultSection } from './entries';
+import type { PaletteEntry, PaletteProviderQuery, PaletteRow, PaletteSearchProvider, PaletteStage } from './entries';
 
 import { getPaletteContributionKey } from './contributionKey';
 import {
@@ -26,36 +25,45 @@ import {
   searchPaletteRows,
   STAGE_ENTRY_ID_PREFIX,
 } from './entries';
-import { getPaletteProviderQueryKey } from './providerQueryKey';
+import { PaletteDebouncer } from './paletteDebouncer';
+import {
+  changePaletteSelection,
+  commitPaletteQuery,
+  createInitialPaletteState,
+  enterPaletteScope,
+  enterPaletteStage,
+  replacePaletteQuery,
+  returnPaletteToRoot,
+} from './paletteState';
 import { getRecentEntryIds, recordRecentEntry } from './recents';
+import { usePaletteProviderSections } from './usePaletteProviderSections';
 
 const PAGE_JUMP_ROWS = 8;
 const PROVIDER_DEBOUNCE_MS = 200;
 const NO_PROVIDERS: PaletteSearchProvider[] = [];
+export const COMMAND_PALETTE_INPUT_ID = 'command-palette-query';
 
 /**
  * Completions offered while a date token is being typed. `Nd` resolves to a
  * single date N days ago, so the labels are key-specific: `from:7d` is a
  * starting point ("Past week"), while `date:7d` is one day ("A week ago").
  */
-const DATE_TOKEN_SUGGESTIONS: Record<DateTokenKey, ReadonlyArray<{ label: string; value: string }>> = {
+const DATE_TOKEN_SUGGESTIONS: Record<DateTokenKey, ReadonlyArray<{ labelKey: string; value: string }>> = {
   date: [
-    { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
-    { label: 'A week ago', value: '7d' },
+    { labelKey: 'commandPalette.date.today', value: 'today' },
+    { labelKey: 'commandPalette.date.yesterday', value: 'yesterday' },
+    { labelKey: 'commandPalette.date.aWeekAgo', value: '7d' },
   ],
   from: [
-    { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
-    { label: 'Past week', value: '7d' },
+    { labelKey: 'commandPalette.date.today', value: 'today' },
+    { labelKey: 'commandPalette.date.yesterday', value: 'yesterday' },
+    { labelKey: 'commandPalette.date.pastWeek', value: '7d' },
   ],
   to: [
-    { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
+    { labelKey: 'commandPalette.date.today', value: 'today' },
+    { labelKey: 'commandPalette.date.yesterday', value: 'yesterday' },
   ],
 };
-
-const DATE_FORMAT_HINT = 'Or type a date — YYYY-MM-DD, 7d, 2w, 1m';
 
 type ScrollToIndex = (index: number) => void;
 
@@ -75,8 +83,6 @@ export interface CommandPaletteController {
   onRetry: () => void;
   onRowActive: (rowId: string) => void;
   onRowRun: (row: PaletteRow) => void;
-  /** Run a row's mod+Enter secondary action (row-level pointer affordance). */
-  onRowRunSecondary: (row: PaletteRow) => void;
   onSearchChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>, scrollToIndex: ScrollToIndex) => void;
   placeholder: string;
@@ -86,9 +92,10 @@ export interface CommandPaletteController {
   scopeIsFetching: boolean;
   scopeLabel: string | null;
   secondaryHint: string | undefined;
-  setInputElement: (node: HTMLInputElement | null) => void;
   stage: PaletteStage | null;
   trimmedQuery: string;
+  statusMessage: string;
+  isBusy: boolean;
 }
 
 export const useCommandPaletteController = ({
@@ -100,38 +107,32 @@ export const useCommandPaletteController = ({
   onClose: () => void;
   providers: PaletteSearchProvider[];
 }): CommandPaletteController => {
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [activeRowId, setActiveRowId] = useState<string | null>(null);
-  const [stage, setStage] = useState<PaletteStage | null>(null);
-  const [scopeProviderKey, setScopeProviderKey] = useState<string | null>(null);
+  const { i18n, t } = useTranslation();
+  const [paletteState, setPaletteState] = useState(createInitialPaletteState);
   const [recentIds] = useState(getRecentEntryIds);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const debounceTimerRef = useRef<number | null>(null);
+  const [debouncer] = useState(
+    () =>
+      new PaletteDebouncer(PROVIDER_DEBOUNCE_MS, (value) => {
+        setPaletteState((current) => commitPaletteQuery(current, value));
+      })
+  );
 
-  useMountEffect(() => () => {
-    if (debounceTimerRef.current !== null) {
-      window.clearTimeout(debounceTimerRef.current);
-    }
-  });
+  useMountEffect(() => debouncer.cancel);
 
-  const setInputElement = useCallback((node: HTMLInputElement | null) => {
-    inputRef.current = node;
-    node?.focus();
-  }, []);
   const focusInput = useCallback(() => {
-    window.requestAnimationFrame(() => inputRef.current?.focus());
+    window.requestAnimationFrame(() => document.getElementById(COMMAND_PALETTE_INPUT_ID)?.focus());
   }, []);
-  const clearDebounce = useCallback(() => {
-    if (debounceTimerRef.current !== null) {
-      window.clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-  }, []);
+  const clearDebounce = debouncer.cancel;
 
-  const scopeProvider = scopeProviderKey
-    ? (providers.find((provider) => provider.providerKey === scopeProviderKey) ?? null)
+  const requestedScopeProviderKey = paletteState.mode.kind === 'scoped' ? paletteState.mode.providerKey : null;
+  const scopeProvider = requestedScopeProviderKey
+    ? (providers.find((provider) => provider.providerKey === requestedScopeProviderKey) ?? null)
     : null;
+  const resolvedMode =
+    paletteState.mode.kind === 'scoped' && scopeProvider === null ? { kind: 'root' as const } : paletteState.mode;
+  const stage = resolvedMode.kind === 'stage' ? resolvedMode.stage : null;
+  const scopeProviderKey = resolvedMode.kind === 'scoped' ? resolvedMode.providerKey : null;
+  const { activeRowId, debouncedQuery, query } = paletteState;
   const isCommandsScope = !stage && !scopeProvider && query.startsWith('>');
   const localQuery = isCommandsScope ? query.slice(1) : query;
   const trimmedQuery = localQuery.trim();
@@ -151,23 +152,34 @@ export const useCommandPaletteController = ({
     () => (datesEnabled ? parseDateTokens(debouncedQuery) : null),
     [datesEnabled, debouncedQuery]
   );
-  const providerQuery = useMemo(
-    () => ({ range: debouncedParse?.range, text: debouncedParse === null ? debouncedQuery : debouncedParse.text }),
+  const providerQuery = useMemo<PaletteProviderQuery>(
+    () => ({
+      range: debouncedParse?.range,
+      text: (debouncedParse === null ? debouncedQuery : debouncedParse.text).trim(),
+    }),
     [debouncedParse, debouncedQuery]
   );
+  const liveProviderQuery = useMemo<PaletteProviderQuery>(
+    () => ({ range: dateParse?.range, text: (dateParse === null ? localQuery : dateParse.text).trim() }),
+    [dateParse, localQuery]
+  );
+  const isWaitingForDebounce =
+    providerQuery.text !== liveProviderQuery.text ||
+    providerQuery.range?.from !== liveProviderQuery.range?.from ||
+    providerQuery.range?.to !== liveProviderQuery.range?.to;
   // A valid date range is a complete query on its own — it bypasses the
   // minimum text length so `from:7d` alone searches. An active scope is a
   // committed search context: it searches at any length, including empty
   // (initial recent results) and one character.
   const shouldSearchProviders =
     (scopeProvider !== null ||
-      providerQuery.text.length >= PROVIDER_MIN_QUERY_LENGTH ||
-      providerQuery.range !== undefined) &&
+      liveProviderQuery.text.length >= PROVIDER_MIN_QUERY_LENGTH ||
+      liveProviderQuery.range !== undefined) &&
     !stage &&
     !isCommandsScope;
   // Pure date query (range, no text): only range-capable providers run —
   // the rest would return broad, unfiltered results for empty text.
-  const isPureDateQuery = providerQuery.range !== undefined && providerQuery.text.length === 0;
+  const isPureDateQuery = liveProviderQuery.range !== undefined && liveProviderQuery.text.length === 0;
   const activeProviders = useMemo(() => {
     if (stage || isCommandsScope) {
       return NO_PROVIDERS;
@@ -178,40 +190,17 @@ export const useCommandPaletteController = ({
     return isPureDateQuery ? base.filter((provider) => provider.supportsCreatedAtRange) : base;
   }, [isCommandsScope, isPureDateQuery, providers, scopeProvider, stage]);
 
-  const providerResults = useQueries({
-    combine: (results) =>
-      results.map((result) => ({
-        data: result.data,
-        isError: result.isError,
-        isFetching: result.isFetching,
-        refetch: result.refetch,
-      })),
-    queries: activeProviders.map((provider) => ({
-      enabled: shouldSearchProviders,
-      queryFn: () => Promise.resolve(provider.search(providerQuery)),
-      queryKey: getPaletteProviderQueryKey(provider, providerQuery),
-      retry: false,
-      staleTime: 30_000,
-    })),
+  const { results: providerResults, sections: providerSections } = usePaletteProviderSections({
+    enabled: shouldSearchProviders && !isWaitingForDebounce,
+    isWaitingForDebounce: shouldSearchProviders && isWaitingForDebounce,
+    providerQuery,
+    providers: activeProviders,
   });
-  const providerSections = useMemo<ProviderResultSection[]>(
-    () =>
-      activeProviders.map((provider, index) => ({
-        entries: providerResults[index]?.data ?? [],
-        isFetching: shouldSearchProviders && (providerResults[index]?.isFetching ?? false),
-        provider,
-      })),
-    [activeProviders, providerResults, shouldSearchProviders]
-  );
   const scopedQueryResult = scopeProvider ? providerResults[0] : undefined;
 
   const resetOverlayState = useCallback(() => {
     clearDebounce();
-    setStage(null);
-    setScopeProviderKey(null);
-    setQuery('');
-    setDebouncedQuery('');
-    setActiveRowId(null);
+    setPaletteState(returnPaletteToRoot());
   }, [clearDebounce]);
   const popOverlay = useCallback(() => {
     resetOverlayState();
@@ -244,8 +233,7 @@ export const useCommandPaletteController = ({
       const nextLocalQuery = !stage && !scopeProvider && nextQuery.startsWith('>') ? nextQuery.slice(1) : nextQuery;
       const nextTrimmedQuery = nextLocalQuery.trim();
 
-      setQuery(nextQuery);
-      setActiveRowId(null);
+      setPaletteState((current) => replacePaletteQuery(current, nextQuery));
       clearDebounce();
 
       if (stage) {
@@ -256,16 +244,13 @@ export const useCommandPaletteController = ({
       }
 
       if (immediate) {
-        setDebouncedQuery(nextTrimmedQuery);
+        debouncer.commit(nextTrimmedQuery);
         return;
       }
 
-      debounceTimerRef.current = window.setTimeout(() => {
-        debounceTimerRef.current = null;
-        setDebouncedQuery(nextTrimmedQuery);
-      }, PROVIDER_DEBOUNCE_MS);
+      debouncer.schedule(nextTrimmedQuery);
     },
-    [clearDebounce, onStageApplied, previewRow, scopeProvider, stage]
+    [clearDebounce, debouncer, onStageApplied, previewRow, scopeProvider, stage]
   );
 
   // Completion rows for an in-progress trailing token (`from:` → Today /
@@ -284,7 +269,7 @@ export const useCommandPaletteController = ({
 
     const partial = trailing.partialValue.toLowerCase();
     const options = DATE_TOKEN_SUGGESTIONS[trailing.key].filter((option) => option.value.startsWith(partial));
-    const rows: PaletteRow[] = [{ id: 'label:date-suggestions', kind: 'label', label: 'Date' }];
+    const rows: PaletteRow[] = [{ id: 'label:date-suggestions', kind: 'label', label: t('commandPalette.date.date') }];
 
     for (const option of options) {
       const id = `date-suggestion:${trailing.key}:${option.value}`;
@@ -292,22 +277,23 @@ export const useCommandPaletteController = ({
       rows.push({
         entry: {
           group: 'Date',
+          groupLabel: t('commandPalette.groups.date'),
           id,
           isPersistentRecent: false,
           keepOpen: true,
           run: () => replaceQuery(completeTrailingDateToken(query, option.value), { immediate: true }),
           subtitle: `${trailing.key}:${option.value}`,
-          title: option.label,
+          title: t(option.labelKey),
         },
         id,
         kind: 'entry',
       });
     }
 
-    rows.push({ id: 'label:date-format-hint', kind: 'label', label: DATE_FORMAT_HINT });
+    rows.push({ id: 'label:date-format-hint', kind: 'label', label: t('commandPalette.date.formatHint') });
 
     return rows;
-  }, [datesEnabled, query, replaceQuery]);
+  }, [datesEnabled, query, replaceQuery, t]);
 
   const enterScope = useCallback(
     (providerKey: string, { resetQuery = false }: { resetQuery?: boolean } = {}) => {
@@ -317,10 +303,7 @@ export const useCommandPaletteController = ({
       const keptQuery = !target?.supportsCreatedAtRange && dateParse !== null ? dateParse.text.trim() : trimmedQuery;
 
       clearDebounce();
-      setScopeProviderKey(providerKey);
-      setQuery(resetQuery ? '' : keptQuery);
-      setDebouncedQuery(resetQuery ? '' : keptQuery);
-      setActiveRowId(null);
+      setPaletteState(enterPaletteScope(providerKey, resetQuery ? '' : keptQuery));
       focusInput();
     },
     [clearDebounce, dateParse, focusInput, providers, trimmedQuery]
@@ -335,25 +318,26 @@ export const useCommandPaletteController = ({
     () =>
       providers.map((provider) => ({
         group: SEARCH_SCOPE_GROUP,
+        groupLabel: t('commandPalette.search.in'),
         id: getPaletteContributionKey('scope-command', provider.providerKey),
         isPersistentRecent: true,
         keepOpen: true,
         keywords: `search find browse ${provider.label.toLowerCase()}`,
         run: () => enterScope(provider.providerKey, { resetQuery: true }),
         showInEmptyState: true,
-        title: `Search ${provider.label.toLowerCase()}…`,
+        title: t('commandPalette.search.provider', { label: provider.label.toLowerCase() }),
       })),
-    [enterScope, providers]
+    [enterScope, providers, t]
   );
   const allEntries = useMemo(() => [...entries, ...scopeCommandEntries], [entries, scopeCommandEntries]);
 
   const rows = useMemo<PaletteRow[]>(() => {
     if (stage) {
-      return searchPaletteRows(buildStageEntries(stage, onStageApplied), query, [], { showAllOnEmpty: true });
+      return searchPaletteRows(buildStageEntries(stage, onStageApplied, t), query, [], { showAllOnEmpty: true });
     }
 
     if (scopeProvider) {
-      return buildProviderSectionRows(providerSections, null);
+      return buildProviderSectionRows(providerSections, null, t);
     }
 
     const matchText = dateParse === null ? localQuery : dateParse.text;
@@ -365,6 +349,7 @@ export const useCommandPaletteController = ({
       ? []
       : searchPaletteRows(allEntries, matchText, recentIds, {
           commandsOnly: isCommandsScope,
+          recentLabel: t('commandPalette.groups.recent'),
           showAllOnEmpty: isCommandsScope && trimmedQuery.length === 0,
         });
 
@@ -376,8 +361,8 @@ export const useCommandPaletteController = ({
       // Quiet trailing tip in the launcher — the only place the query syntax
       // is advertised before it is typed.
       const syntaxHint = providers.some((provider) => provider.supportsCreatedAtRange)
-        ? 'Type > for commands · from:/date: to filter by date'
-        : 'Type > for commands';
+        ? t('commandPalette.syntax.commandsAndDates')
+        : t('commandPalette.syntax.commands');
 
       return [...localRows, { id: 'label:syntax-hint', kind: 'label', label: syntaxHint }];
     }
@@ -388,9 +373,9 @@ export const useCommandPaletteController = ({
       ...dateSuggestionRows,
       ...localRows,
       ...(matchText.trim().length >= PROVIDER_MIN_QUERY_LENGTH || hasLiveRange
-        ? buildProviderSectionRows(providerSections)
+        ? buildProviderSectionRows(providerSections, undefined, t)
         : []),
-      ...buildScopeRows(scopeProviders, isLivePureDate ? '' : matchText.trim()),
+      ...buildScopeRows(scopeProviders, isLivePureDate ? '' : matchText.trim(), t),
     ];
   }, [
     allEntries,
@@ -406,6 +391,7 @@ export const useCommandPaletteController = ({
     scopeProvider,
     stage,
     trimmedQuery,
+    t,
   ]);
   const navigableRows = useMemo(
     () => rows.flatMap((row, index) => (row.kind === 'label' ? [] : [{ index, row }])),
@@ -426,6 +412,12 @@ export const useCommandPaletteController = ({
         return;
       }
 
+      if (row.kind === 'provider-error') {
+        row.retry();
+        focusInput();
+        return;
+      }
+
       if (row.entry.isPersistentRecent) {
         recordRecentEntry(row.entry);
       }
@@ -435,10 +427,9 @@ export const useCommandPaletteController = ({
         const currentOption = nextStage.options.find((option) => option.isCurrent);
 
         clearDebounce();
-        setStage(nextStage);
-        setQuery('');
-        setDebouncedQuery('');
-        setActiveRowId(currentOption ? `${STAGE_ENTRY_ID_PREFIX}${currentOption.id}` : null);
+        setPaletteState(
+          enterPaletteStage(nextStage, currentOption ? `${STAGE_ENTRY_ID_PREFIX}${currentOption.id}` : null)
+        );
         focusInput();
         return;
       }
@@ -470,15 +461,6 @@ export const useCommandPaletteController = ({
     [onClose]
   );
 
-  const onRowRunSecondary = useCallback(
-    (row: PaletteRow) => {
-      if (row.kind === 'entry' && row.entry.secondary) {
-        runSecondary(row.entry);
-      }
-    },
-    [runSecondary]
-  );
-
   const moveActive = useCallback(
     (offset: number, scrollToIndex: ScrollToIndex) => {
       if (navigableRows.length === 0) {
@@ -498,7 +480,7 @@ export const useCommandPaletteController = ({
         return;
       }
 
-      setActiveRowId(next.row.id);
+      setPaletteState((current) => changePaletteSelection(current, next.row.id));
       previewRow(next.row);
       scrollToIndex(next.index);
     },
@@ -571,14 +553,14 @@ export const useCommandPaletteController = ({
   const onRowActive = useCallback(
     (rowId: string) => {
       const row = rows.find((candidate) => candidate.id === rowId);
-      setActiveRowId(rowId);
+      setPaletteState((current) => changePaletteSelection(current, rowId));
       previewRow(row);
     },
     [previewRow, rows]
   );
 
   const onRetry = useCallback(() => {
-    void scopedQueryResult?.refetch();
+    scopedQueryResult?.retry();
     focusInput();
   }, [focusInput, scopedQueryResult]);
 
@@ -602,9 +584,30 @@ export const useCommandPaletteController = ({
         )
     );
 
-    return invalid ? `Invalid date: “${invalid.raw}”` : null;
-  }, [dateParse, localQuery]);
-  const dateSummary = dateParse?.range && dateInvalidHint === null ? formatDateRangeLabel(dateParse.range) : null;
+    return invalid ? t('commandPalette.states.invalidDate', { value: invalid.raw }) : null;
+  }, [dateParse, localQuery, t]);
+  const dateSummary =
+    dateParse?.range && dateInvalidHint === null
+      ? dateParse.range.from && dateParse.range.to
+        ? t('commandPalette.date.range', {
+            from: formatIsoDate(dateParse.range.from, i18n.resolvedLanguage),
+            to: formatIsoDate(dateParse.range.to, i18n.resolvedLanguage),
+          })
+        : dateParse.range.from
+          ? t('commandPalette.date.from', { date: formatIsoDate(dateParse.range.from, i18n.resolvedLanguage) })
+          : dateParse.range.to
+            ? t('commandPalette.date.through', { date: formatIsoDate(dateParse.range.to, i18n.resolvedLanguage) })
+            : null
+      : null;
+
+  const isBusy = providerSections.some((section) => section.isFetching || section.isWaitingForDebounce);
+  const failedProviderCount = providerSections.filter((section) => section.isError).length;
+  const providerResultCount = providerSections.reduce((count, section) => count + section.entries.length, 0);
+  const statusMessage = isBusy
+    ? t('commandPalette.states.searching')
+    : failedProviderCount > 0
+      ? t('commandPalette.states.partialFailure', { count: providerResultCount, failed: failedProviderCount })
+      : t('commandPalette.states.resultCount', { count: providerResultCount });
 
   return {
     dateInvalidHint,
@@ -613,28 +616,28 @@ export const useCommandPaletteController = ({
     activeRowId: effectiveActiveRowId,
     chipLabel: stage ? stage.title : (scopeProvider?.label ?? null),
     hasScopeRows: rows.some((row) => row.kind === 'scope'),
-    isOverlayOpen: Boolean(stage || scopeProviderKey),
+    isOverlayOpen: resolvedMode.kind !== 'root',
+    isBusy,
     onContentKeyDown,
     onPopOverlay: popOverlay,
     onRetry,
     onRowActive,
     onRowRun: runRow,
-    onRowRunSecondary,
     onSearchChange,
     onSearchKeyDown,
     placeholder: stage
-      ? 'Pick a value…'
+      ? t('commandPalette.placeholders.stage')
       : scopeProvider
-        ? `Search ${scopeProvider.label.toLowerCase()}…`
-        : 'Search commands, settings, and more…',
+        ? t('commandPalette.placeholders.scope', { label: scopeProvider.label.toLowerCase() })
+        : t('commandPalette.placeholders.root'),
     query,
     rows,
     scopeIsError: Boolean(scopeProvider && scopedQueryResult?.isError),
-    scopeIsFetching: Boolean(scopeProvider && scopedQueryResult?.isFetching),
+    scopeIsFetching: Boolean(scopeProvider && (scopedQueryResult?.isFetching || isWaitingForDebounce)),
     scopeLabel: scopeProvider?.label.toLowerCase() ?? null,
     secondaryHint: activeRow?.kind === 'entry' ? activeRow.entry.secondary?.label : undefined,
-    setInputElement,
     stage,
+    statusMessage,
     trimmedQuery,
   };
 };

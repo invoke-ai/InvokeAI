@@ -4,6 +4,7 @@ import { useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContex
 import { parseWorkflowJson } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
+import { useTranslation } from 'react-i18next';
 
 import { startWorkflowUiPendingLoadRuntime } from './pendingLibraryWorkflowLoadRuntime';
 
@@ -14,6 +15,7 @@ import { startWorkflowUiPendingLoadRuntime } from './pendingLibraryWorkflowLoadR
  * load path as WorkflowLibraryDialog, minus the dialog.
  */
 export const PendingLibraryWorkflowLoader = () => {
+  const { t } = useTranslation();
   const { replace } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
   useMountEffect(() =>
@@ -23,17 +25,20 @@ export const PendingLibraryWorkflowLoader = () => {
         const { document, warnings } = parseWorkflowJson(raw);
         const name = typeof raw.name === 'string' && raw.name.length > 0 ? raw.name : 'workflow';
 
-        replace(document, `Loaded "${name}" from library`);
+        replace(document, t('commandPalette.workflowLoad.loaded', { name }));
 
         for (const warning of warnings) {
-          notify.info('Workflow load warning', warning);
+          notify.info(t('commandPalette.workflowLoad.warning'), warning);
         }
 
         void touchLibraryWorkflowOpenedAt(workflowId).catch(() => {
           // Recency bookkeeping only; loading already succeeded.
         });
       } catch (error) {
-        notify.error('Failed to load workflow', getApiErrorMessage(error, 'Could not load the workflow.'));
+        notify.error(
+          t('commandPalette.workflowLoad.failed'),
+          getApiErrorMessage(error, t('commandPalette.workflowLoad.couldNotLoad'))
+        );
       }
     })
   );

@@ -1,4 +1,3 @@
-/* eslint-disable react/react-compiler */
 import type { ReactNode } from 'react';
 
 import { Dialog, HStack, Icon, Kbd, Portal, Spacer, Text, chakra } from '@chakra-ui/react';
@@ -7,12 +6,14 @@ import { Button } from '@platform/ui/Button';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { CommandPaletteRowsHandle } from './CommandPaletteRows';
 import type { PaletteEntry, PaletteSearchProvider, PaletteStage } from './entries';
 
 import { CommandPaletteRows, getCommandPaletteRowDomId } from './CommandPaletteRows';
-import { useCommandPaletteController } from './useCommandPaletteController';
+import { getCommandPaletteReturnFocusElement } from './paletteStore';
+import { COMMAND_PALETTE_INPUT_ID, useCommandPaletteController } from './useCommandPaletteController';
 
 const INPUT_PLACEHOLDER_STYLE = { color: 'fg.subtle' };
 const INPUT_FOCUS_WITHIN_STYLE = { outlineColor: 'accent.focusRing' };
@@ -65,8 +66,10 @@ export const CommandPaletteDialog = ({
   return (
     <Dialog.Root
       closeOnEscape={false}
+      finalFocusEl={getCommandPaletteReturnFocusElement}
       lazyMount
       open={isOpen}
+      restoreFocus
       scrollBehavior="inside"
       unmountOnExit
       onOpenChange={onDialogOpenChange}
@@ -96,13 +99,15 @@ const CommandPaletteContent = ({
   onClose: () => void;
   providers: PaletteSearchProvider[];
 }) => {
+  const { t } = useTranslation();
   const controller = useCommandPaletteController({ entries, onClose, providers });
   const rowsRef = useRef<CommandPaletteRowsHandle>(null);
   const modEnterHintKeys = useMemo(() => [modifierKeyLabel, '↵'], [modifierKeyLabel]);
+  const handleSearchKeyDown = controller.onSearchKeyDown;
   const onSearchKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) =>
-      controller.onSearchKeyDown(event, (index) => rowsRef.current?.scrollToIndex(index)),
-    [controller]
+      handleSearchKeyDown(event, (index) => rowsRef.current?.scrollToIndex(index)),
+    [handleSearchKeyDown]
   );
 
   let emptyState: ReactNode = null;
@@ -110,18 +115,22 @@ const CommandPaletteContent = ({
   if (controller.rows.length === 0) {
     if (controller.scopeIsError && controller.scopeLabel) {
       emptyState = (
-        <EmptyState danger py="6" title={`Couldn't search ${controller.scopeLabel}`}>
+        <EmptyState danger py="6" title={t('commandPalette.states.couldNotSearch', { label: controller.scopeLabel })}>
           <Button size="xs" variant="subtle" onClick={controller.onRetry}>
-            Retry
+            {t('common.retry')}
           </Button>
         </EmptyState>
       );
     } else if (controller.scopeLabel && controller.scopeIsFetching) {
-      emptyState = <EmptyState py="6" title="Searching…" />;
+      emptyState = <EmptyState py="6" title={t('commandPalette.states.searching')} />;
     } else if (controller.scopeLabel && controller.trimmedQuery.length === 0) {
-      emptyState = <EmptyState py="6" title={`No ${controller.scopeLabel} yet`} />;
+      emptyState = (
+        <EmptyState py="6" title={t('commandPalette.states.noItemsYet', { label: controller.scopeLabel })} />
+      );
     } else {
-      emptyState = <EmptyState py="6" title={`No results for “${controller.trimmedQuery}”`} />;
+      emptyState = (
+        <EmptyState py="6" title={t('commandPalette.states.noResults', { query: controller.trimmedQuery })} />
+      );
     }
   }
 
@@ -138,7 +147,7 @@ const CommandPaletteContent = ({
           w="min(560px, calc(100vw - 32px))"
           onKeyDown={controller.onContentKeyDown}
         >
-          <Dialog.Title srOnly>Command palette</Dialog.Title>
+          <Dialog.Title srOnly>{t('commandPalette.title')}</Dialog.Title>
           <HStack
             borderBottomWidth="1px"
             borderColor="border.emphasized"
@@ -154,7 +163,7 @@ const CommandPaletteContent = ({
             {controller.chipLabel ? (
               <chakra.button
                 alignItems="center"
-                aria-label={`Close ${controller.chipLabel} — back to all results`}
+                aria-label={t('commandPalette.actions.closeScope', { label: controller.chipLabel })}
                 bg="bg.emphasized"
                 borderRadius="sm"
                 color="fg"
@@ -166,7 +175,7 @@ const CommandPaletteContent = ({
                 gap="1"
                 px="1.5"
                 py="0.5"
-                title="Back to all results"
+                title={t('commandPalette.actions.backToAll')}
                 type="button"
                 onClick={controller.onPopOverlay}
               >
@@ -175,9 +184,9 @@ const CommandPaletteContent = ({
               </chakra.button>
             ) : null}
             <chakra.input
-              ref={controller.setInputElement}
               autoComplete="off"
               autoFocus
+              id={COMMAND_PALETTE_INPUT_ID}
               name="command-palette-query"
               spellCheck={false}
               type="search"
@@ -188,7 +197,7 @@ const CommandPaletteContent = ({
               aria-describedby={controller.dateInvalidHint ? DATE_HINT_ID : undefined}
               aria-expanded="true"
               aria-invalid={controller.dateInvalidHint ? true : undefined}
-              aria-label="Search commands and settings"
+              aria-label={t('commandPalette.inputLabel')}
               bg="transparent"
               color="fg"
               flex="1"
@@ -222,16 +231,19 @@ const CommandPaletteContent = ({
               </Text>
             ) : null}
           </HStack>
+          <Text aria-live="polite" role="status" srOnly>
+            {controller.statusMessage}
+          </Text>
           {controller.rows.length === 0 ? (
             emptyState
           ) : (
             <CommandPaletteRows
               ref={rowsRef}
               activeRowId={controller.activeRowId}
+              isBusy={controller.isBusy}
               rows={controller.rows}
               onActive={controller.onRowActive}
               onRun={controller.onRowRun}
-              onRunSecondary={controller.onRowRunSecondary}
             />
           )}
           <HStack
@@ -245,16 +257,20 @@ const CommandPaletteContent = ({
             hideBelow="sm"
             px="3"
           >
-            <FooterHint keys={NAV_HINT_KEYS}>Navigate</FooterHint>
-            <FooterHint keys={ENTER_HINT_KEYS}>{controller.stage ? 'Pick' : 'Run'}</FooterHint>
+            <FooterHint keys={NAV_HINT_KEYS}>{t('commandPalette.footer.navigate')}</FooterHint>
+            <FooterHint keys={ENTER_HINT_KEYS}>
+              {controller.stage ? t('commandPalette.footer.pick') : t('commandPalette.footer.run')}
+            </FooterHint>
             {controller.secondaryHint ? (
               <FooterHint keys={modEnterHintKeys}>{controller.secondaryHint}</FooterHint>
             ) : null}
             {controller.hasScopeRows || controller.activeRow?.kind === 'scope' ? (
-              <FooterHint keys={TAB_HINT_KEYS}>Scope</FooterHint>
+              <FooterHint keys={TAB_HINT_KEYS}>{t('commandPalette.footer.scope')}</FooterHint>
             ) : null}
             <Spacer />
-            <FooterHint keys={ESC_HINT_KEYS}>{controller.isOverlayOpen ? 'Back' : 'Close'}</FooterHint>
+            <FooterHint keys={ESC_HINT_KEYS}>
+              {controller.isOverlayOpen ? t('commandPalette.footer.back') : t('commandPalette.footer.close')}
+            </FooterHint>
           </HStack>
         </Dialog.Content>
       </Dialog.Positioner>
