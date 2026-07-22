@@ -31,6 +31,7 @@ import {
   clampDimension,
   DEFAULT_REFERENCE_IMAGE_LIMIT,
   deriveAspectRatioId,
+  isGenerateSettings,
   isLoraCompatibleWithModel,
   MAX_DIMENSION,
   MIN_DIMENSION,
@@ -635,9 +636,9 @@ export interface ComponentSectionPolicy {
   validate: (ctx: ComponentPolicyContext) => string[];
 }
 
-export interface GenerateSettingsCompatibilityResult {
+export interface GenerateModelSelectionResult {
   settings: GenerateSettings;
-  clearedLabels: string[];
+  clearedLabels: readonly string[];
 }
 
 const TYPE_CLIP_EMBED: ModelTaxonomyType[] = ['clip_embed'];
@@ -1143,11 +1144,11 @@ export const getCompatibleReferenceImages = (
   return didChange ? next : referenceImages;
 };
 
-export const getSettingsWithCompatibleModelSelections = (
+const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
   models: readonly ReferenceModelCandidate[]
-): GenerateSettingsCompatibilityResult => {
+): GenerateModelSelectionResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
   const clearedLabels: string[] = [];
   const compatibleLoras = settings.loras.filter((lora) => isLoraCompatibleWithModel(lora.model, model));
@@ -1228,6 +1229,36 @@ export const getSettingsWithCompatibleModelSelections = (
   }
 
   return { settings: nextSettings, clearedLabels };
+};
+
+/**
+ * Canonical transition for every Generate model-selection entry point.
+ * Normalizes persisted values, reconciles incompatible selections, and applies
+ * automatic component-source policy before callers persist the result.
+ */
+export const getGenerateModelSelectionResult = ({
+  currentValues,
+  model,
+  models,
+}: {
+  currentValues: unknown;
+  model: GenerateModelConfig;
+  models: readonly ModelConfig[];
+}): GenerateModelSelectionResult => {
+  const currentSettings = isGenerateSettings(currentValues)
+    ? currentValues
+    : (normalizeGenerateSettings(currentValues) ?? getDefaultGenerateSettings(model));
+  const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models);
+  const componentSourceModel = getAutoFlux2ComponentSourceModel(model, result.settings, models);
+
+  if (componentSourceModel === undefined || componentSourceModel?.key === result.settings.componentSourceModel?.key) {
+    return result;
+  }
+
+  return {
+    ...result,
+    settings: { ...result.settings, componentSourceModel },
+  };
 };
 
 const hasModelKey = (models: readonly ModelConfig[], key: string, type?: string): boolean =>

@@ -83,13 +83,13 @@ def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) 
     - The board visibility is Shared or Public.
     - The board is explicitly shared with the user.
     """
-    if current_user.is_admin:
-        return
-
     try:
         board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
     except Exception:
         raise HTTPException(status_code=404, detail="Board not found")
+
+    if current_user.is_admin:
+        return
 
     if board.user_id == current_user.user_id:
         return

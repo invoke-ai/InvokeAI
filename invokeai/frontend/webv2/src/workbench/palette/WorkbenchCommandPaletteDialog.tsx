@@ -4,13 +4,21 @@ import type { openWidgetPlacement as OpenWidgetPlacement } from '@workbench/widg
 import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widgetRegistry';
 import type { TFunction } from 'i18next';
 
+import { flushGenerateDrafts, notifyGenerateModelSelectionCleared } from '@features/generation/react';
 import { getPromptHistoryRecallPatch } from '@features/generation/settings';
 import { useModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
+import { selectProjectGenerateModel } from '@workbench/generationModelSelection';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchExtensions,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -66,6 +74,8 @@ const WorkbenchCommandPaletteDialog = ({
 }) => {
   const { i18n, t } = useTranslation();
   const extensions = useWorkbenchExtensions();
+  const notify = useNotify();
+  const workbenchQueries = useWorkbenchQueries();
   const modelsSnapshot = useModelsSnapshot();
   const models = modelsSnapshot.status === 'loaded' ? modelsSnapshot.models : undefined;
   const projectId = useActiveProjectSelector((project) => project.id);
@@ -126,7 +136,7 @@ const WorkbenchCommandPaletteDialog = ({
     [preferences.queueJobsScope, projectId]
   );
   const providers = useMemo<PaletteSearchProvider[]>(() => {
-    const { gallery, widgets } = workbenchCommands;
+    const { gallery, generation, widgets } = workbenchCommands;
     const openWidget = (typeId: 'workflow' | 'gallery' | 'generate' | 'preview' | 'queue') =>
       openWidgetPlacement({
         getWidgetsForRegion,
@@ -150,7 +160,25 @@ const WorkbenchCommandPaletteDialog = ({
         t,
       }),
       createModelsProvider({
-        applyModel: (model) => widgets.patchValues('generate', { model, modelKey: model.key }, projectId),
+        applyModel: (model, catalogModels) => {
+          flushGenerateDrafts();
+          const project = workbenchQueries.getSnapshot().activeProject;
+          const result = selectProjectGenerateModel({
+            currentValues: getProjectWidgetValues(project, 'generate'),
+            generation,
+            model,
+            models: catalogModels,
+            projectId: project.id,
+          });
+
+          notifyGenerateModelSelectionCleared({
+            clearedLabels: result.clearedLabels,
+            locale: i18n.resolvedLanguage,
+            modelName: model.name,
+            notifications: notify,
+            t,
+          });
+        },
         openGenerateWidget: () => openWidget('generate'),
         openModelManager: () => void executeCommand('app.selectModelsTab'),
         t,
@@ -195,6 +223,7 @@ const WorkbenchCommandPaletteDialog = ({
     generateValues,
     i18n.resolvedLanguage,
     models,
+    notify,
     getWidgetsForRegion,
     openWidgetPlacement,
     projectId,
@@ -204,6 +233,7 @@ const WorkbenchCommandPaletteDialog = ({
     requestQueueItemReveal,
     t,
     workbenchCommands,
+    workbenchQueries,
   ]);
 
   return (

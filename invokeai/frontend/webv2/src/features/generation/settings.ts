@@ -34,6 +34,7 @@ export {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getDefaultReferenceImageConfig,
+  getGenerateModelSelectionResult,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
@@ -45,6 +46,7 @@ export {
   isReferenceImageSupported,
   isSupportedGenerateModel,
   SCHEDULER_OPTIONS,
+  type GenerateModelSelectionResult,
 } from './core/baseGenerationPolicies';
 export { isVaeCompatibleWithGenerateModel } from './core/componentCompatibility';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';

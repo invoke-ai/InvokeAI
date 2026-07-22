@@ -431,6 +431,19 @@ def test_list_board_image_names_admin_can_access_any_board(client: TestClient, a
     assert response.status_code == status.HTTP_200_OK
 
 
+def test_list_board_image_names_missing_board_returns_404_for_admin(
+    client: TestClient, admin_token: str, mock_invoker: Invoker
+):
+    """Admins must not enumerate image names for a board that does not exist."""
+    response = client.get(
+        "/api/v1/boards/missing-board/image_names",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    mock_invoker.services.board_images.get_all_board_image_names_for_board.assert_not_called()
+
+
 def test_list_board_image_names_none_board_no_auth_check(enable_multiuser_for_tests: Any, client: TestClient):
     """Test that listing image names for the 'none' board requires auth but no ownership check."""
     # The 'none' board is the uncategorized images board — no ownership check needed,

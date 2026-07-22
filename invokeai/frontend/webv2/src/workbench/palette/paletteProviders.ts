@@ -1,4 +1,5 @@
 import type { GalleryBoard, GalleryImage } from '@features/gallery/contracts';
+import type { GenerateModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { QueueReadModel } from '@features/queue/contracts';
 import type { PromptHistoryItem } from '@workbench/projectContracts';
@@ -7,6 +8,7 @@ import type { TFunction } from 'i18next';
 import { ALL_READABLE_BOARDS_ID, listGalleryImages } from '@features/gallery/paletteSearch';
 import { galleryBoardsOptions } from '@features/gallery/queries';
 import { focusPositivePrompt } from '@features/generation/react';
+import { isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, getModelBaseLabel, getModelsSnapshot } from '@features/models';
 import { extractGenerationMeta, getResultImageName } from '@features/queue/contracts';
 import { listLibraryWorkflows } from '@features/workflow/paletteSearch';
@@ -173,15 +175,13 @@ export const createPromptHistoryProvider = ({
   },
 });
 
-const GENERATE_MODEL_TYPES = new Set(['external_image_generator', 'main']);
-
 export const createModelsProvider = ({
   applyModel,
   openGenerateWidget,
   openModelManager,
   t,
 }: {
-  applyModel: (model: ModelConfig) => void;
+  applyModel: (model: GenerateModelConfig, models: readonly ModelConfig[]) => void;
   openGenerateWidget: () => void;
   openModelManager: () => void;
   t: TFunction;
@@ -197,9 +197,8 @@ export const createModelsProvider = ({
     const models = snapshot.status === 'loaded' ? snapshot.models : [];
 
     return models
-      .filter(
-        (model) => GENERATE_MODEL_TYPES.has(model.type) && matchesTerms(`${model.name} ${model.base}`, query.text)
-      )
+      .filter(isSupportedGenerateModel)
+      .filter((model) => matchesTerms(`${model.name} ${model.base}`, query.text))
       .map<PaletteEntry>((model) => ({
         group: 'Models',
         groupLabel: t('commandPalette.groups.models'),
@@ -207,8 +206,8 @@ export const createModelsProvider = ({
         isPersistentRecent: false,
         keywords: model.base,
         run: () => {
+          applyModel(model, models);
           openGenerateWidget();
-          applyModel(model);
         },
         secondary: { label: t('commandPalette.actions.openModelManager'), run: openModelManager },
         subtitle: getModelBaseLabel(model.base),

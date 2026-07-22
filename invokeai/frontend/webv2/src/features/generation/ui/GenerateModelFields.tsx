@@ -6,7 +6,7 @@ import { HStack, NumberInput, Stack, Switch } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
   getGenerationModelPolicy,
-  getSettingsWithCompatibleModelSelections,
+  getGenerateModelSelectionResult,
   isGenerateModelSelectable,
 } from '@features/generation/core/baseGenerationPolicies';
 import { isGenerateModelConfig, SEED_MAX } from '@features/generation/core/settings';
@@ -16,12 +16,10 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
+import { notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { ModelDefaultButton } from './shared/ModelDefaultButton';
 import { SliderNumberField } from './shared/SliderNumberField';
-
-const formatClearedSettings = (labels: readonly string[]) =>
-  labels.length <= 1 ? labels[0] : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
 
 const STEPS_SLIDER_MAX = 100;
 
@@ -40,7 +38,7 @@ export const GenerateModelFields = ({
   selectedModel,
   settings,
 }: GenerateModelFieldsProps) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { notifications } = useGenerationUi();
   // The switch shares the seed Field.Root with the number input; an explicit id
   // keeps its label bound to its own hidden input instead of the Field's control id.
@@ -63,20 +61,16 @@ export const GenerateModelFields = ({
     };
 
   const selectModel = (model: GenerateModelConfig) => {
-    const result = getSettingsWithCompatibleModelSelections(settings, model, models);
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model, models });
 
     onCommitSettings(result.settings);
-
-    if (result.clearedLabels.length > 0) {
-      notifications.info(
-        t('widgets.generate.incompatibleSettingsCleared'),
-        t('widgets.generate.incompatibleSettingsClearedDescription', {
-          count: result.clearedLabels.length,
-          labels: formatClearedSettings(result.clearedLabels),
-          name: model.name,
-        })
-      );
-    }
+    notifyGenerateModelSelectionCleared({
+      clearedLabels: result.clearedLabels,
+      locale: i18n.resolvedLanguage,
+      modelName: model.name,
+      notifications,
+      t,
+    });
   };
 
   return (

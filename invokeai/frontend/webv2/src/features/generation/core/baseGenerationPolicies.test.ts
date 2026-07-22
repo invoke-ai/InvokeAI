@@ -15,13 +15,13 @@ import {
   getComponentSectionPolicy,
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
+  getGenerateModelSelectionResult,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,
   getGenerationModelPolicy,
   getGenerationValidationReasons,
   getMaxReferenceImages,
   getPromptPolicy,
-  getSettingsWithCompatibleModelSelections,
   getSettingsWithModelDefaults,
   isReferenceImageSupported,
   isSupportedGenerateModel,
@@ -418,7 +418,7 @@ describe('component policies', () => {
       vae: sdxlVae,
     });
 
-    const result = getSettingsWithCompatibleModelSelections(settings, model, []);
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
 
     expect(result.settings.modelKey).toBe(model.key);
     expect(result.settings.loras.map((lora) => lora.model.key)).toEqual(['sdxl-lora']);
@@ -430,10 +430,65 @@ describe('component policies', () => {
     expect(result.clearedLabels).toEqual(['LoRAs', 'T5 Encoder', 'CLIP skip', 'CFG rescale']);
   });
 
+  it('initializes empty and malformed values from the selected model defaults', () => {
+    const model = createModel('cogview4', { default_settings: { steps: 17 } });
+
+    for (const currentValues of [{}, { batchCount: 8 }]) {
+      const result = getGenerateModelSelectionResult({ currentValues, model, models: [] });
+
+      expect(result.settings).toMatchObject({
+        batchCount: 1,
+        height: 1024,
+        modelKey: model.key,
+        steps: 17,
+        width: 1024,
+      });
+      expect(result.clearedLabels).toEqual([]);
+    }
+  });
+
+  it('preserves model-independent and compatible settings across a model selection', () => {
+    const model = createModel('sdxl', { key: 'sdxl-other' });
+    const settings = createSettings(createModel('sdxl'), {
+      batchCount: 4,
+      negativePrompt: 'blurry',
+      positivePrompt: 'a lighthouse',
+      seed: 1234,
+      shouldRandomizeSeed: false,
+      vae: sdxlVae,
+    });
+
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
+
+    expect(result.settings).toMatchObject({
+      batchCount: 4,
+      modelKey: model.key,
+      negativePrompt: 'blurry',
+      positivePrompt: 'a lighthouse',
+      seed: 1234,
+      shouldRandomizeSeed: false,
+      vae: sdxlVae,
+    });
+    expect(result.clearedLabels).toEqual([]);
+  });
+
+  it('applies automatic FLUX.2 component sources as part of model selection', () => {
+    const model = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+    const source = createModel('flux2', { format: 'diffusers', key: 'flux2-source', variant: 'klein_9b' });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl')),
+      model,
+      models: [source],
+    });
+
+    expect(result.settings.componentSourceModel).toBe(source);
+  });
+
   it('reconciles dimensions to the new model grid when the selected model changes', () => {
     const model = createModel('cogview4');
     const settings = createSettings(createModel('sdxl'), { height: 520, width: 520 });
-    const result = getSettingsWithCompatibleModelSelections(settings, model, []);
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
 
     expect(result.settings.width).toBe(512);
     expect(result.settings.height).toBe(512);
@@ -479,7 +534,7 @@ describe('component policies', () => {
       vae: flux2Vae,
     });
 
-    const result = getSettingsWithCompatibleModelSelections(settings, model, []);
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
 
     expect(result.settings.qwen3EncoderModel).toBeNull();
     expect(result.settings.vae).toEqual(flux2Vae);
@@ -555,7 +610,11 @@ describe('component policies', () => {
       ],
     });
 
-    const result = getSettingsWithCompatibleModelSelections(settings, createModel('cogview4'), [sdxlIpAdapter]);
+    const result = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: createModel('cogview4'),
+      models: [sdxlIpAdapter],
+    });
 
     expect(result.settings.referenceImages).toEqual([]);
     expect(result.clearedLabels).toContain('Reference Images');
@@ -580,10 +639,11 @@ describe('component policies', () => {
       ],
     });
 
-    const result = getSettingsWithCompatibleModelSelections(settings, createModel('sd-1'), [
-      sd1IpAdapter,
-      sdxlIpAdapter,
-    ]);
+    const result = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: createModel('sd-1'),
+      models: [sd1IpAdapter, sdxlIpAdapter],
+    });
 
     expect(result.settings.referenceImages).toEqual([
       {
@@ -612,7 +672,11 @@ describe('component policies', () => {
       ],
     });
 
-    const toSdxl = getSettingsWithCompatibleModelSelections(settings, sdxlModel, [sdxlIpAdapter]);
+    const toSdxl = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: sdxlModel,
+      models: [sdxlIpAdapter],
+    });
 
     expect(toSdxl.settings.referenceImages[0]?.config).toMatchObject({
       image: referenceImage,
@@ -620,7 +684,11 @@ describe('component policies', () => {
       type: 'ip_adapter',
     });
 
-    const backToFlux2 = getSettingsWithCompatibleModelSelections(toSdxl.settings, flux2Model, [sdxlIpAdapter]);
+    const backToFlux2 = getGenerateModelSelectionResult({
+      currentValues: toSdxl.settings,
+      model: flux2Model,
+      models: [sdxlIpAdapter],
+    });
 
     expect(backToFlux2.settings.referenceImages).toEqual([
       { id: 'ref-1', isEnabled: true, config: { image: referenceImage, type: 'flux2_reference_image' } },
@@ -645,9 +713,11 @@ describe('component policies', () => {
     ];
     const settings = createSettings(createModel('sdxl'), { referenceImages });
 
-    const result = getSettingsWithCompatibleModelSelections(settings, createModel('sdxl', { key: 'sdxl-other' }), [
-      sdxlIpAdapter,
-    ]);
+    const result = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: createModel('sdxl', { key: 'sdxl-other' }),
+      models: [sdxlIpAdapter],
+    });
 
     expect(result.settings.referenceImages).toBe(referenceImages);
     expect(result.clearedLabels).not.toContain('Reference Images');

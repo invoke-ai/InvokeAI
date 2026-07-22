@@ -48,17 +48,21 @@ def test_download_images_from_board_id_empty_image_name_list(
         return BoardRecord(board_id="12345", board_name=expected_board_name, created_at="None", updated_at="None")
 
     monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_get)
+    mock_get_dto = MagicMock(return_value=object())
+    monkeypatch.setattr(mock_invoker.services.boards, "get_dto", mock_get_dto)
     prepare_download_images_test(monkeypatch, mock_invoker)
 
     response = client.post("/api/v1/images/download", json={"board_id": "test"})
     json_response = response.json()
     assert response.status_code == 202
     assert json_response["bulk_download_item_name"] == "test.zip"
+    mock_get_dto.assert_called_once_with(board_id="test")
 
 
 def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
     monkeypatch.setattr(
         "invokeai.app.api.routers.images.ApiDependencies.invoker.services.bulk_download.generate_item_id",
