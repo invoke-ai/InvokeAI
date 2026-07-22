@@ -12,7 +12,7 @@ import { extractGenerationMeta, getResultImageName } from '@features/queue/contr
 import { listLibraryWorkflows } from '@features/workflow/paletteSearch';
 import { requestLibraryWorkflowLoad } from '@features/workflow/react';
 import { queryClient } from '@platform/query/client';
-import { formatIsoDate, isTimestampInRange } from '@platform/search/dateTokens';
+import { isTimestampInRange } from '@platform/search/dateTokens';
 import { absolutizeApiUrl } from '@platform/transport/http';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
@@ -308,27 +308,39 @@ export const createImagesProvider = ({
       loadActiveBoards(),
     ]);
     const boardNames = new Map(boards.map((board: GalleryBoard) => [board.id, board.name]));
+    // Images carry no prompt, so the creation date+time is the title; the time
+    // keeps same-day results (the common case for 20 recents) distinguishable.
+    const titleFormatter = new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      month: 'short',
+    });
 
-    return page.images.map<PaletteEntry>((image) => ({
-      group: 'Images',
-      groupLabel: t('commandPalette.groups.images'),
-      id: `image:${image.imageName}`,
-      isPersistentRecent: false,
-      run: () => {
-        openPreviewWidget();
-        selectImage(image);
-      },
-      secondary: {
-        label: t('commandPalette.actions.revealInGallery'),
+    return page.images.map<PaletteEntry>((image) => {
+      const createdAt = new Date(image.queuedAt);
+
+      return {
+        group: 'Images',
+        groupLabel: t('commandPalette.groups.images'),
+        id: `image:${image.imageName}`,
+        isPersistentRecent: false,
         run: () => {
-          openGalleryWidget();
-          selectBoard(image.boardId);
+          openPreviewWidget();
           selectImage(image);
         },
-      },
-      subtitle: `${boardNames.get(image.boardId) ?? t('commandPalette.providers.uncategorized')} · ${formatIsoDate(image.queuedAt.slice(0, 10), locale)} · ${image.width}×${image.height}`,
-      thumbnailUrl: image.thumbnailUrl,
-      title: image.imageName,
-    }));
+        secondary: {
+          label: t('commandPalette.actions.revealInGallery'),
+          run: () => {
+            openGalleryWidget();
+            selectBoard(image.boardId);
+            selectImage(image);
+          },
+        },
+        subtitle: `${boardNames.get(image.boardId) ?? t('commandPalette.providers.uncategorized')} · ${image.width}×${image.height}`,
+        thumbnailUrl: image.thumbnailUrl,
+        title: Number.isNaN(createdAt.getTime()) ? image.imageName : titleFormatter.format(createdAt),
+      };
+    });
   },
 });
