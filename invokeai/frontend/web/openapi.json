@@ -78724,7 +78724,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a LoRA to the Wan 2.2 transformer(s).\n\nFor A14B (dual expert) the LoRA's recorded ``expert`` field determines\nwhich expert list it lands in: ``\"high\"`` -> primary list, ``\"low\"`` ->\nlow-noise list, ``None`` (untagged) -> both lists. Use the ``target``\nfield to override.\n\nFor TI2V-5B (single transformer) only the primary list is used at denoise\ntime; the low-noise routing is harmless but ignored.",
+        "description": "Apply a LoRA to the Wan 2.2 transformer(s).\n\nFor A14B (dual expert) the LoRA's recorded ``expert`` field determines\nwhich expert list it lands in: ``\"high\"`` -> primary list, ``\"low\"`` ->\nlow-noise list, ``None`` (untagged) -> both lists. Use the ``target``\nfield to override.\n\nFor TI2V-5B (single transformer) only the primary list is used at denoise\ntime; a LoRA routed only to the low-noise list would be inert, so that\nrouting logs a warning.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -79066,7 +79066,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "VAE-encode a reference image into Wan 2.2 I2V conditioning.\n\nOutput is a ``[1, 20, T_lat, height // 8, width // 8]`` condition tensor\nthat the denoise loop concatenates to the 16-channel noise latents each\nstep, producing the 36-channel input the I2V-A14B transformer expects.\n\nFor image (single-frame) I2V leave ``num_frames=1`` (T_lat=1). For video\nI2V set ``num_frames`` to match the value on the video-denoise node\n(e.g. 81 for the Wan 2.2 reference defaults).\n\nSupply an optional ``end_image`` for **first-last-frame interpolation\n(FLF2V)** \u2014 the model then interpolates the motion from ``image`` (first\nframe) to ``end_image`` (final frame). FLF2V is I2V-A14B video only\n(``num_frames > 1``); it is not supported for TI2V-5B or single-frame I2V.\n\nOnly works with I2V-A14B (the denoise loop's variant gate enforces this).\nFor T2V or TI2V-5B, omit this node entirely.",
+        "description": "VAE-encode a reference image into Wan 2.2 I2V conditioning.\n\nThe wired VAE selects the output shape. With the 16-channel A14B VAE the\noutput is a ``[1, 20, T_lat, height // 8, width // 8]`` condition (4-ch\nfirst-frame mask + 16-ch image latents) that the denoise loop concatenates\nto the noise latents each step, producing the 36-channel input the\nI2V-A14B transformer expects. With the 48-channel TI2V-5B VAE the output\nis a ``[1, 48, 1, height // 16, width // 16]`` condition that the denoise\nloop blends into the noisy latents at every step.\n\nFor image (single-frame) I2V leave ``num_frames=1`` (T_lat=1). For A14B\nvideo I2V set ``num_frames`` to match the value on the video-denoise node\n(e.g. 81 for the Wan 2.2 reference defaults); TI2V-5B always uses the\nsingle-frame condition.\n\nSupply an optional ``end_image`` for **first-last-frame interpolation\n(FLF2V)** \u2014 the model then interpolates the motion from ``image`` (first\nframe) to ``end_image`` (final frame). FLF2V is I2V-A14B video only\n(``num_frames > 1``); it is not supported for TI2V-5B or single-frame I2V.\n\nFor T2V (no reference image), omit this node entirely.",
         "node_pack": "invokeai",
         "properties": {
           "id": {

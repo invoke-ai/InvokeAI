@@ -7,8 +7,13 @@ import { clearNodesVideoFields } from 'features/deleteVideoModal/store/state';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { videosApi } from 'services/api/endpoints/videos';
+import {
+  getTagsToInvalidateForImageMutation,
+  getTagsToInvalidateForVideoMutation,
+} from 'services/api/util/tagInvalidation';
 
 const getDeletedNamesFromDeleteBoardAction = (payload: unknown, key: 'deleted_images' | 'deleted_videos'): string[] => {
   if (!payload || typeof payload !== 'object') {
@@ -40,6 +45,19 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
     effect: (action, { dispatch, getState }) => {
       const deletedImages = getDeletedImagesFromDeleteBoardAction(action.payload);
       const deletedVideos = getDeletedVideosFromDeleteBoardAction(action.payload);
+
+      // On a *partial* board deletion the mutation rejects, so its invalidatesTags run
+      // with no result and only the static list tags fire — the per-item caches
+      // (Image/ImageMetadata/ImageWorkflow, Video/...) of the confirmed-deleted media
+      // would otherwise stay readable. We already parsed the confirmed names out of the
+      // 500's detail above, so invalidate them here (harmlessly redundant on success).
+      const itemTags = [
+        ...getTagsToInvalidateForImageMutation(deletedImages),
+        ...getTagsToInvalidateForVideoMutation(deletedVideos),
+      ];
+      if (itemTags.length > 0) {
+        dispatch(api.util.invalidateTags(itemTags));
+      }
 
       // Remove all deleted images from the UI
 

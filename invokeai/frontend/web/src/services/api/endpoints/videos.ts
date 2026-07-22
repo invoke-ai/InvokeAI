@@ -182,6 +182,10 @@ export const videosApi = api.injectEndpoints({
         return [
           ...getTagsToInvalidateForVideoMutation([result.video_name]),
           ...getTagsToInvalidateForBoardAffectingMutation([result.board_id ?? 'none']),
+          // Board-scoped lists are covered by the Board tag above, but a listVideos
+          // query with board_id omitted (all boards) provides Board:'none' and would
+          // miss it — the LIST_TAG closes that gap for any future caller.
+          { type: 'VideoList', id: LIST_TAG },
         ];
       },
     }),

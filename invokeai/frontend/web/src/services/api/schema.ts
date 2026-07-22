@@ -34669,7 +34669,8 @@ export type components = {
          *     field to override.
          *
          *     For TI2V-5B (single transformer) only the primary list is used at denoise
-         *     time; the low-noise routing is harmless but ignored.
+         *     time; a LoRA routed only to the low-noise list would be inert, so that
+         *     routing logs a warning.
          */
         WanLoRALoaderInvocation: {
             /**
@@ -34891,21 +34892,25 @@ export type components = {
          * Reference Image - Wan 2.2
          * @description VAE-encode a reference image into Wan 2.2 I2V conditioning.
          *
-         *     Output is a ``[1, 20, T_lat, height // 8, width // 8]`` condition tensor
-         *     that the denoise loop concatenates to the 16-channel noise latents each
-         *     step, producing the 36-channel input the I2V-A14B transformer expects.
+         *     The wired VAE selects the output shape. With the 16-channel A14B VAE the
+         *     output is a ``[1, 20, T_lat, height // 8, width // 8]`` condition (4-ch
+         *     first-frame mask + 16-ch image latents) that the denoise loop concatenates
+         *     to the noise latents each step, producing the 36-channel input the
+         *     I2V-A14B transformer expects. With the 48-channel TI2V-5B VAE the output
+         *     is a ``[1, 48, 1, height // 16, width // 16]`` condition that the denoise
+         *     loop blends into the noisy latents at every step.
          *
-         *     For image (single-frame) I2V leave ``num_frames=1`` (T_lat=1). For video
-         *     I2V set ``num_frames`` to match the value on the video-denoise node
-         *     (e.g. 81 for the Wan 2.2 reference defaults).
+         *     For image (single-frame) I2V leave ``num_frames=1`` (T_lat=1). For A14B
+         *     video I2V set ``num_frames`` to match the value on the video-denoise node
+         *     (e.g. 81 for the Wan 2.2 reference defaults); TI2V-5B always uses the
+         *     single-frame condition.
          *
          *     Supply an optional ``end_image`` for **first-last-frame interpolation
          *     (FLF2V)** — the model then interpolates the motion from ``image`` (first
          *     frame) to ``end_image`` (final frame). FLF2V is I2V-A14B video only
          *     (``num_frames > 1``); it is not supported for TI2V-5B or single-frame I2V.
          *
-         *     Only works with I2V-A14B (the denoise loop's variant gate enforces this).
-         *     For T2V or TI2V-5B, omit this node entirely.
+         *     For T2V (no reference image), omit this node entirely.
          */
         WanRefImageEncoderInvocation: {
             /**

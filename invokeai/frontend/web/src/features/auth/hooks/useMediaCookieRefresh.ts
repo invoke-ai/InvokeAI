@@ -4,6 +4,11 @@ import { notifyMediaCookieRefreshed } from 'features/auth/store/mediaCookieRefre
 import { useEffect, useRef } from 'react';
 import { useRefreshMediaCookieMutation } from 'services/api/endpoints/auth';
 
+// Bounded backoff for transient failures (network hiccup, server 5xx during app
+// load). Two retries is enough to ride out a restart; anything longer-lived needs a
+// reload anyway.
+const RETRY_DELAYS_MS = [2_000, 10_000];
+
 /**
  * Self-heal the media cookie for restored sessions.
  *
@@ -13,25 +18,61 @@ import { useRefreshMediaCookieMutation } from 'services/api/endpoints/auth';
  * each `<video>` request 401s and the player renders black with 0:00 duration.
  * Re-issuing the cookie from the Bearer token on app load closes that gap.
  *
- * Fires once per app load when an authenticated session exists (fresh logins get
- * the cookie from the login response too — the repeat is a harmless no-op). In
- * single-user mode `isAuthenticated` is never set, and media routes don't require
- * the cookie anyway. Failures are ignored: a 401 here means the session itself is
- * expired, which the global 401 handling already deals with.
+ * Runs when an authenticated session exists (fresh logins get the cookie from the
+ * login response too — the repeat is a harmless no-op). In single-user mode
+ * `isAuthenticated` is never set, and media routes don't require the cookie anyway.
+ *
+ * Transient failures retry on a short bounded backoff — a network error or 5xx
+ * during app load must not leave an otherwise-valid session unable to load media
+ * until a full reload. A 401 is not retried: the session itself is expired, which
+ * the global 401 handling already deals with, and retrying would loop.
  */
 export const useMediaCookieRefresh = () => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const [refreshMediaCookie] = useRefreshMediaCookieMutation();
-  const hasRefreshed = useRef(false);
+  const hasSucceeded = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated || hasRefreshed.current) {
+    if (!isAuthenticated || hasSucceeded.current) {
       return;
     }
-    hasRefreshed.current = true;
-    void refreshMediaCookie()
-      .unwrap()
-      .then(notifyMediaCookieRefreshed)
-      .catch(() => undefined);
+
+    let canceled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const attempt = (attemptIndex: number) => {
+      refreshMediaCookie()
+        .unwrap()
+        .then(() => {
+          if (canceled) {
+            return;
+          }
+          hasSucceeded.current = true;
+          notifyMediaCookieRefreshed();
+        })
+        .catch((error: unknown) => {
+          if (canceled) {
+            return;
+          }
+          const status = (error as { status?: unknown } | null)?.status;
+          if (status === 401) {
+            return;
+          }
+          const delay = RETRY_DELAYS_MS[attemptIndex];
+          if (delay === undefined) {
+            return;
+          }
+          timeoutId = setTimeout(() => attempt(attemptIndex + 1), delay);
+        });
+    };
+
+    attempt(0);
+
+    return () => {
+      canceled = true;
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [isAuthenticated, refreshMediaCookie]);
 };

@@ -1,7 +1,8 @@
-import { Flex, Image, Text } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { useTranslation } from 'react-i18next';
+import { PiImageSquare } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 import type { BoardDTO } from 'services/api/types';
@@ -37,6 +38,14 @@ export const BoardTooltip = ({ board, boardCounts }: Props) => {
           aspectRatio="1/1"
           borderRadius="base"
           borderBottomRadius="lg"
+          // Thumbnail generation is best-effort on the backend (a video can exist whose
+          // thumbnail 404s) — degrade to an icon rather than a broken image.
+          fallbackStrategy="onError"
+          fallback={
+            <Flex w={150} aspectRatio="1/1" justifyContent="center" alignItems="center">
+              <Icon boxSize={16} as={PiImageSquare} opacity={0.7} color="base.500" />
+            </Flex>
+          }
         />
       )}
       <Flex flexDir="column" alignItems="center">

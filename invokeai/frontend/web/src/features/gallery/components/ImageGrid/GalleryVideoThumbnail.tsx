@@ -1,5 +1,6 @@
 import { Box, Image } from '@invoke-ai/ui-library';
 import { getMediaUrl, useMediaCookieRefreshVersion } from 'features/auth/store/mediaCookieRefresh';
+import type { SyntheticEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
 
 type Props = {
@@ -34,6 +35,20 @@ export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) =>
     [mediaCookieVersion, thumbnailUrl]
   );
 
+  // With preload="metadata" some browsers populate dimensions/duration but don't decode
+  // and paint the first frame until playback or a seek — the tile would just show its
+  // black background. Mirror CurrentVideoPreview's near-zero seek to nudge the decoder.
+  const onLoadedMetadata = useCallback((e: SyntheticEvent<HTMLElement>) => {
+    const el = e.currentTarget as HTMLVideoElement;
+    if (el.currentTime === 0) {
+      try {
+        el.currentTime = 0.0001;
+      } catch {
+        // Some browsers throw if metadata isn't fully ready yet; harmless.
+      }
+    }
+  }, []);
+
   if (getVideoThumbnailMode(thumbnailUrl, failedThumbnail, mediaCookieVersion) === 'video') {
     return (
       <Box
@@ -47,6 +62,7 @@ export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) =>
         maxW="full"
         maxH="full"
         borderRadius="base"
+        onLoadedMetadata={onLoadedMetadata}
       />
     );
   }

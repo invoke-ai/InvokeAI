@@ -120,7 +120,19 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     setIsPlaying(true);
     // The ref points at the same element we'll re-render with controls/audio; calling
     // play() here keeps the user gesture wired to playback without waiting for React.
-    void videoRef.current?.play();
+    // A rejected play() (blocked autoplay, codec error, missing media cookie) must roll
+    // the state back — otherwise the overlay stays hidden over a dead element and the
+    // rejection surfaces as an unhandled promise.
+    videoRef.current?.play().catch(() => {
+      setIsPlaying(false);
+    });
+  }, []);
+
+  // A media error (unsupported codec, failed request) mid-playback would leave the
+  // controls shown over a dead black element. Drop back to the non-playing state so the
+  // play overlay returns and offers a retry.
+  const handleVideoError = useCallback(() => {
+    setIsPlaying(false);
   }, []);
 
   // Close: stop playback and drop back to the first-frame preview + play overlay. We
@@ -311,6 +323,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         playsInline
         controls={isPlaying}
         onLoadedMetadata={handleLoadedMetadata}
+        onError={handleVideoError}
         style={{
           maxWidth: '100%',
           maxHeight: '100%',

@@ -169,11 +169,15 @@ const slice = createSlice({
     },
   },
   extraReducers(builder) {
-    // Clear board-related state on logout to prevent stale data when switching users
+    // Clear board-related state on logout to prevent stale data when switching users.
+    // `selection` holds only item-name strings (never persisted, and the DTOs behind
+    // them are wiped by the store-level resetApiState on logout), but clear it anyway
+    // so the next user never sees the previous user's selection highlighted.
     builder.addCase(logout, (state) => {
       state.selectedBoardId = 'none';
       state.autoAddBoardId = 'none';
       state.boardSearchText = '';
+      state.selection = [];
     });
   },
 });

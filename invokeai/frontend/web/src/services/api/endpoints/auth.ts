@@ -83,7 +83,11 @@ export const authApi = api.injectEndpoints({
         url: 'api/v1/auth/logout',
         method: 'POST',
       }),
-      // Invalidate boards and images cache on logout to clear stale data
+      // NOTE: cross-user cache clearing does NOT rely on this list. A store-level
+      // listener (see store.ts) dispatches api.util.resetApiState() on the logout /
+      // sessionExpiredLogout actions, dropping EVERY cached query — video, gallery,
+      // and any future tag types included. These tags are a redundant belt-and-braces
+      // for the brief window before that action fires.
       invalidatesTags: ['Board', 'Image', 'ImageList', 'ImageNameList', 'ImageCollection', 'ImageMetadata'],
     }),
     /**

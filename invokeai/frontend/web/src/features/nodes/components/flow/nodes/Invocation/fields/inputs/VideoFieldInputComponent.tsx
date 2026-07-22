@@ -1,4 +1,4 @@
-import { Flex, Image, Text } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -11,6 +11,7 @@ import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { VideoFieldInputInstance, VideoFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiVideo } from 'react-icons/pi';
 import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 import { $isConnected } from 'services/events/stores';
 
@@ -76,7 +77,20 @@ const VideoFieldInputComponent = (props: FieldComponentProps<VideoFieldInputInst
       {videoDTO && (
         <>
           <Flex borderRadius="base" borderWidth={1} borderStyle="solid" overflow="hidden">
-            <Image src={thumbnailUrl} objectFit="contain" maxW="full" maxH="full" />
+            <Image
+              src={thumbnailUrl}
+              objectFit="contain"
+              maxW="full"
+              maxH="full"
+              // Thumbnail generation is best-effort on the backend (a video can exist
+              // whose thumbnail 404s) — degrade to an icon rather than a broken image.
+              fallbackStrategy="onError"
+              fallback={
+                <Flex w="full" h="full" minW={24} alignItems="center" justifyContent="center">
+                  <Icon boxSize={10} as={PiVideo} opacity={0.7} color="base.500" />
+                </Flex>
+              }
+            />
           </Flex>
           <Text
             position="absolute"

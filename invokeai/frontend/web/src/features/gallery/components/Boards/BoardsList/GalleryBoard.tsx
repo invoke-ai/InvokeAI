@@ -154,6 +154,15 @@ const CoverImage = ({ board }: { board: BoardDTO }) => {
   const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
   const refreshedThumbnailUrl = useMediaUrl(thumbnailUrl);
 
+  // Also used as the Image's error fallback: thumbnail generation is best-effort on the
+  // backend (a video can exist whose thumbnail 404s), so a broken URL must degrade to
+  // the same icon as a missing one.
+  const fallbackIcon = (
+    <Flex w={10} h={10} justifyContent="center" alignItems="center">
+      <Icon boxSize={10} as={PiImageSquare} opacity={0.7} color="base.500" />
+    </Flex>
+  );
+
   if (refreshedThumbnailUrl) {
     return (
       <Image
@@ -164,13 +173,11 @@ const CoverImage = ({ board }: { board: BoardDTO }) => {
         h={10}
         borderRadius="base"
         borderBottomRadius="lg"
+        fallbackStrategy="onError"
+        fallback={fallbackIcon}
       />
     );
   }
 
-  return (
-    <Flex w={10} h={10} justifyContent="center" alignItems="center">
-      <Icon boxSize={10} as={PiImageSquare} opacity={0.7} color="base.500" />
-    </Flex>
-  );
+  return fallbackIcon;
 };
