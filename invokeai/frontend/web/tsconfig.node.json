@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
     "composite": true,
+    "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["vite.config.mts", "vite-plugin-logger-context.ts"]
+  "include": ["vite.config.mts", "vite-plugin-logger-context.ts", "*.d.ts"]
 }

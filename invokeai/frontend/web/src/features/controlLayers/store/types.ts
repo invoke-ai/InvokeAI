@@ -255,12 +255,15 @@ const zCanvasEraserLineWithPressureState = z.object({
 });
 export type CanvasEraserLineWithPressureState = z.infer<typeof zCanvasEraserLineWithPressureState>;
 
+const zCanvasShapeCompositeOperation = z.enum(['source-over', 'source-atop', 'destination-out']);
+
 const zCanvasRectState = z.object({
   id: zId,
   type: z.literal('rect'),
   rect: zRect,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
+  clip: zRect.nullable().default(null),
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
@@ -283,7 +286,8 @@ const zCanvasOvalState = z.object({
   type: z.literal('oval'),
   rect: zRect,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
+  clip: zRect.nullable().default(null),
 });
 export type CanvasOvalState = z.infer<typeof zCanvasOvalState>;
 
@@ -292,7 +296,7 @@ const zCanvasPolygonState = z.object({
   type: z.literal('polygon'),
   points: zPoints,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
   previewPoint: zCoordinate.optional(),
 });
 export type CanvasPolygonState = z.infer<typeof zCanvasPolygonState>;
@@ -315,6 +319,7 @@ const zCanvasLinearGradientState = z.object({
   bboxRect: zRect,
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
+  globalCompositeOperation: z.string().optional(),
 });
 const zCanvasRadialGradientState = z.object({
   id: zId,
@@ -329,6 +334,7 @@ const zCanvasRadialGradientState = z.object({
   bboxRect: zRect,
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
+  globalCompositeOperation: z.string().optional(),
 });
 const zCanvasGradientState = z.discriminatedUnion('gradientType', [
   zCanvasLinearGradientState,
@@ -530,6 +536,14 @@ const zZImageControlConfig = z.object({
 });
 export type ZImageControlConfig = z.infer<typeof zZImageControlConfig>;
 
+const zAnimaLLLiteConfig = z.object({
+  type: z.literal('anima_lllite'),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(0).lte(2),
+  beginEndStepPct: zBeginEndStepPct,
+});
+export type AnimaLLLiteConfig = z.infer<typeof zAnimaLLLiteConfig>;
+
 /**
  * All simple params normalized to `[-1, 1]` except sharpness `[0, 1]`.
  *
@@ -652,6 +666,7 @@ const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
     zT2IAdapterConfig,
     zControlLoRAConfig,
     zZImageControlConfig,
+    zAnimaLLLiteConfig,
   ]),
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
@@ -687,7 +702,7 @@ export const zLoRA = z.object({
   id: z.string(),
   isEnabled: z.boolean(),
   model: zModelIdentifierField,
-  weight: z.number().gte(-10).lte(10),
+  weight: z.number(),
 });
 export type LoRA = z.infer<typeof zLoRA>;
 
@@ -841,6 +856,8 @@ export const zParamsState = z.object({
   animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
   animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
   animaScheduler: zParameterAnimaScheduler,
+  animaLLLiteModel: zModelIdentifierField.nullable().default(null), // Optional: ControlNet-LLLite inpaint adapter for Anima
+  animaLLLiteWeight: z.number().min(-10).max(10).default(1),
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
@@ -927,6 +944,8 @@ export const getInitialParamsState = (): ParamsState => ({
   animaVaeModel: null,
   animaQwen3EncoderModel: null,
   animaScheduler: 'euler',
+  animaLLLiteModel: null,
+  animaLLLiteWeight: 1,
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
   qwenImageComponentSource: null,

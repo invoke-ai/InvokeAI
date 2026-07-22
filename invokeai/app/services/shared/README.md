@@ -58,6 +58,19 @@ Runs a sequence of checks:
 
 1. **Type compatibility** `get_output_field_type` vs `get_input_field_type` and `are_connection_types_compatible`.
 
+   Special case:
+
+   - `call_saved_workflow` currently accepts dynamic destination handles of the form
+     `saved_workflow_input::{childNodeId}::{childFieldName}` as part of its temporary call-boundary contract.
+   - Those handles are allowed through graph validation even though they are not static Python model fields on the
+     invocation class.
+   - Runtime later validates them against the selected child workflow's exposed callable interface before applying
+     values to the child graph.
+   - The editor preserves dynamic caller values only while the exposed field type remains compatible; type drift at the
+     same child node/field path resets to the selected workflow's current initial value.
+   - Saved-workflow picker search is server-backed so large workflow libraries do not require scrolling every page
+     before selecting a workflow by name.
+
 1. **Iterator / collector structure** Enforce special rules:
 
    - Iterator's input must be `collection`; its outgoing edges use `item`.
@@ -105,19 +118,60 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 - `prepared_source_mapping: dict[str, str]` - exec id -> source id.
 - `source_prepared_mapping: dict[str, set[str]]` - source id -> exec ids.
 - `indegree: dict[str, int]` - unmet inputs per exec node.
+- Workflow-call runtime state:
+  - `workflow_call_stack` - active parent call frames.
+  - `workflow_call_history` - completed or failed workflow-call relationships observed by this execution state.
+  - `workflow_call_parent` - parent workflow-call relationship metadata when this execution state is a child session.
+  - `waiting_workflow_call` - the call frame currently suspending this execution state, if any.
+  - `waiting_workflow_call_execution` - the active parent/child workflow-call relationship record for the waiting call.
+  - `waiting_workflow_call_child_session` - attached child execution state for the waiting workflow call, if any.
+  - `max_workflow_call_depth` - runtime guardrail for nested or recursive workflow calls.
 - Prepared exec metadata caches:
   - source node id
   - iteration path
   - runtime state such as pending, ready, executed, or skipped
 - **Ready queues grouped by class** (private attrs): `_ready_queues: dict[class_name, deque[str]]`,
-  `_active_class: Optional[str]`. Optional `ready_order: list[str]` to prioritize classes.
+  `_active_class: Optional[str]`. Optional `ready_order: list[str]` to prioritize classes. Queues are rebuilt from
+  persisted execution state when a session is deserialized.
 
 ### 4.2 Core methods
 
 - `next()` Returns the next ready exec node. If none are ready, it asks the materializer to expand more source nodes and
-  then retries. Before returning a node, the runtime helper deep-copies inbound values into the node fields.
+  then retries. If the execution state is paused on a workflow call boundary, it returns `None` without scheduling more
+  work. Before returning a node, the runtime helper deep-copies inbound values into the node fields.
 - `complete(node_id, output)` Records the result, marks the exec node executed, marks the source node executed once all
   of its prepared exec copies are done, then decrements downstream indegrees and enqueues newly ready nodes.
+
+Workflow-call note:
+
+- `GraphExecutionState` can represent a paused parent execution plus an attached child execution state, but it does not
+  itself orchestrate child execution.
+- In the current implementation, `DefaultSessionRunner.run_node()` establishes the workflow call boundary and attaches
+  the child execution state, while `WorkflowCallCoordinator` handles call-specific setup and
+  `WorkflowCallQueueLifecycle` later resumes or fails the parent based on that child queue row's outcome.
+- Child `SessionQueueItem` rows created by the coordinator now carry explicit relationship metadata such as
+  `workflow_call_id`, `parent_item_id`, `parent_session_id`, `root_item_id`, and `workflow_call_depth`, even though the
+  higher-level scheduler semantics are still evolving.
+- The `session_queue` schema now has matching columns for those relationship fields, and parent queue items can enter a
+  `waiting` status while suspended on a child workflow execution.
+- Queue lifecycle semantics are now partially defined for workflow-call chains:
+  - child success resumes the waiting parent
+  - multiple child queue rows may complete under one waiting parent when the called workflow contains direct batch
+    nodes; the parent resumes only after all expected child rows complete
+  - child failure fails the waiting parent and can cascade upward through ancestors
+  - failing child rows cancel their remaining workflow-call siblings before the parent is failed
+  - cancelation is chain-aware across parents and children, including nested descendants of batched siblings
+  - "all except current" queue actions preserve the active current item plus its workflow-call chain, while still
+    canceling or deleting unrelated waiting chains
+  - startup recovery cancels interrupted `in_progress` or `waiting` workflow-call chains, including pending descendants
+  - deleting a workflow-call queue row currently deletes the whole parent/child chain rather than leaving orphaned rows
+    behind
+  - retry is root-oriented and should not be exposed directly on child queue rows in the UI
+  - child queue-row creation is cleaned up on boundary-setup failure and child fan-out is bounded by remaining queue
+    capacity
+  - child workflows that mix supported batch nodes with unrelated generator nodes are rejected for now
+- This is still an intermediate architecture step and should eventually be replaced by a more general parent/child
+  execution mechanism rather than workflow-call-specific queue lifecycle handling.
 
 ### 4.3 Runtime helper classes
 
@@ -126,12 +180,18 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 - `_PreparedExecRegistry` Owns the relationship between source graph nodes and prepared execution graph nodes, plus
   cached metadata such as iteration path and runtime state.
 - `_ExecutionMaterializer` Expands source graph nodes into concrete execution graph nodes when the scheduler runs out of
-  ready work. When matching prepared parents for a downstream exec node, skipped prepared exec nodes are ignored and
-  cannot be selected as live inputs.
+  ready work. It owns iterator expansion, collector grouping, prepared-parent selection, and creation of execution-graph
+  edges. When matching prepared parents for a downstream exec node, skipped prepared exec nodes are ignored and cannot
+  be selected as live inputs.
 - `_ExecutionScheduler` Owns indegree transitions, ready queues, class batching, and downstream release on completion.
-- `_ExecutionRuntime` Owns iteration-path lookup and input hydration for prepared exec nodes.
+- `_ExecutionRuntime` Owns iteration-path lookup, collect input ordering, and input hydration for prepared exec nodes.
 - `_IfBranchScheduler` Applies lazy `If` semantics by deferring branch-local work until the condition is known, then
   releasing the selected branch and skipping the unselected branch.
+
+`GraphExecutionState.model_post_init()` rehydrates private runtime helpers and caches after normal construction or a
+JSON/model round trip. Rehydration reconstructs prepared exec metadata, cached iteration paths, resolved `If` branch
+state when the condition is already available, and ready queues from `execution_graph`, `indegree`, `executed`, and
+`results`. This keeps persisted sessions resumable without persisting private helper objects.
 
 ### 4.4 Preparation (`_prepare()`)
 
@@ -143,14 +203,21 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
   1. if it is an iterator, *its inputs are already executed*,
   1. it has *no unexecuted iterator ancestors*.
 
-- If the node is a **CollectInvocation**: collapse all prepared parents into one mapping and create **one** exec node.
+- If the node is a **CollectInvocation**: group prepared parent exec nodes by iteration path and create one collector
+  exec node per group. A collector collapses the immediate iterator that feeds its `item` input, but preserves enclosing
+  iterator paths. This lets a shape such as `outer_iter -> inner_collection -> inner_iter -> collect -> consumer`
+  produce one collected result per outer iteration instead of mixing all inner items into one global collection.
+  Incoming `collection` inputs are treated as ancestor groups and are copied into each matching descendant item group.
 
 - Otherwise: compute all combinations of prepared iterator ancestors. For each combination, choose the prepared parent
-  for each upstream by matching iterator ancestry, then create **one** exec node.
+  for each upstream by matching iterator ancestry, then create **one** exec node. If a node no longer has visible
+  iterator ancestors because the source path crosses a collector, prepared parent iteration paths are still used to
+  materialize one downstream exec node for each preserved collector path.
 
 - For each new exec node:
 
   - Deep-copy the source node; assign a fresh ID (and `index` for iterators).
+  - Cache the preserved iteration path when the materializer has one, such as for grouped collectors.
   - Wire edges from chosen prepared parents.
   - Set `indegree = number of unmet inputs` (i.e., parents not yet executed).
   - Try to resolve any `If`-specific scheduling state.
@@ -160,9 +227,10 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 
 - `_enqueue_if_ready(nid)` enqueues by class name only when `indegree == 0`, the node has not already executed, and the
   node is not deferred by an unresolved `If`.
-- `_get_next_node()` drains the `_active_class` queue FIFO; when empty, selects the next nonempty class queue (by
-  `ready_order` if set, else alphabetical), and continues. Optional fairness knobs can limit batch size per class;
-  default is drain fully.
+- `_get_next_node()` drains the `_active_class` queue; when empty, selects the next nonempty class queue (by
+  `ready_order` if set, else alphabetical), and continues. Within each class queue, ready exec nodes are ordered by
+  iteration path so expanded iterator work runs in a stable outer-to-inner order. Optional fairness knobs can limit
+  batch size per class; default is drain fully.
 
 #### 4.5.1 Indegree (what it is and how it's used)
 
@@ -179,9 +247,10 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 
 ### 4.6 Input hydration (`_prepare_inputs()`)
 
-- For **CollectInvocation**: gather all incoming `item` values into `collection`, sorting inputs by iteration path so
-  collected results are stable across expanded iterations. Incoming `collection` values are merged first, then incoming
-  `item` values are appended.
+- For **CollectInvocation**: gather the materialized incoming `item` values into `collection`, sorting inputs by
+  iteration path so collected results are stable across expanded iterations. Incoming `collection` values are merged
+  first, then incoming `item` values are appended. By the time hydration runs, the materializer has already selected the
+  iteration group for this collector exec node, so hydration only sees inputs that belong to that group.
 - For **IfInvocation**: hydrate only `condition` and the selected branch input. As a defensive guard against
   inconsistent runtime or deserialized session state, the runtime raises if the selected input edge points at an exec
   node with no stored runtime output. In normal scheduling this path should be unreachable.
@@ -218,7 +287,7 @@ This behavior is implemented in the runtime scheduler, not in the invocation bod
    - Execute node externally -> `output`.
    - `state.complete(node.id, output)` -> updates indegrees, `If` state, and ready queues.
 
-1. Finish when `next()` returns `None`.
+1. Finish when `next()` returns `None` and the execution state is not paused waiting on a workflow call boundary.
 
 In normal execution, all runtime expansion occurs in `execution_graph` with traceability back to source nodes.
 
@@ -229,6 +298,8 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
 - Nodes are enqueued only when `indegree == 0` and they are not deferred by an unresolved `If`.
 - `results` and `errors` are keyed by **exec node id**.
 - Collectors aggregate `item` inputs and may also merge incoming `collection` inputs during runtime hydration.
+  Collectors nested under iterators preserve enclosing iteration paths, so downstream consumers materialize per enclosing
+  iteration instead of receiving a mixed collection from unrelated outer iterations.
 - Branch-exclusive nodes behind an unselected `If` branch are skipped, not failed.
 
 ## 7) Extensibility
@@ -239,6 +310,35 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
   complexity.
 - **Dynamic behaviors** (future): can be added in `GraphExecutionState` by creating exec nodes and edges at `complete()`
   time, as long as the DAG invariant holds.
+- **Workflow call boundaries**: `GraphExecutionState` can suspend a parent execution state on a workflow call, attach a
+  child execution state, and later resume the parent without mutating the source graph.
+
+Current limitation:
+
+- Child workflow executions are now represented as first-class queue items. Parent resume/failure is intentionally
+  handled by a dedicated workflow-call queue lifecycle component for this PR because no other feature currently needs a
+  generalized dependent-queue scheduler.
+- Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
+- A single `workflow_return_value.value` may connect directly to `workflow_return.values`; multiple named return members
+  should be collected and then connected to `workflow_return.values`.
+- Direct batch-special child workflows are now supported by expanding them into multiple child queue rows.
+- Batch outputs may feed a named `workflow_return_value.value` directly. Parent resume aggregates named return maps as
+  `values: dict[str, list[Any]]`, and all rows in one batch call must return the same key set.
+- Generator-backed batch child workflows are now supported when the batch node is fed directly by a supported integer,
+  float, string, or image generator.
+- Connected batch child inputs produced by ordinary non-generator upstream nodes are still rejected before any child
+  queue row is created.
+- Workflow library API responses now include compatibility metadata so the frontend can disable unsupported callees
+  before execution rather than failing only at runtime.
+- Workflow library list compatibility uses structural generator-backed batch validation so list and picker rendering do
+  not enumerate every image in board-backed generators; workflow detail and runtime execution still resolve real
+  generator values.
+- Batch-specific compatibility failures, including multiple connected inputs to one batch field, are reported as
+  `unsupported_batch_input` rather than generic unsupported-node failures.
+- The workflow library list also surfaces that metadata as an informational unsupported state; workflows remain
+  viewable/editable even when they are not currently callable by `call_saved_workflow`.
+- Single-user workflow CRUD socket events emit only to the admin room because every single-user socket already joins
+  that room, avoiding duplicate delivery through both `user:system` and `admin`.
 
 ## 8) Error Model (selected)
 

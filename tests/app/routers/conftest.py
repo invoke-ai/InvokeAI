@@ -55,7 +55,10 @@ _PATCHED_API_DEPENDENCIES_MODULES = (
     "invokeai.app.api.routers.utilities",
     "invokeai.app.api.routers.virtual_boards",
     "invokeai.app.api.routers.images",
+    "invokeai.app.api.routers.workflows",
     "invokeai.app.api.routers._access",
+    "invokeai.app.api.routers.model_manager",
+    "invokeai.app.api.routers.app_info",
 )
 
 
@@ -105,6 +108,7 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
     mock_invoker.services.style_preset_image_files = MagicMock()
     mock_invoker.services.model_relationships = MagicMock()
     mock_invoker.services.model_manager = MagicMock()
+    mock_invoker.services.workflow_thumbnails = MagicMock()
 
     # Style preset records uses a real SQLite-backed storage on the same in-memory
     # database that image_records was wired up against. This lets cross-user tests
