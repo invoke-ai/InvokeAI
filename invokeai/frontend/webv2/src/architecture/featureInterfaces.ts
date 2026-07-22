@@ -12,5 +12,5 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
   nodes: [],
   queue: ['contracts', 'menu', 'react', 'utility', 'widget'],
   upscale: ['widget'],
-  workflow: ['contracts', 'graph', 'preview', 'react', 'utility', 'widget'],
+  workflow: ['contracts', 'graph', 'preview', 'queries', 'react', 'utility', 'widget'],
 };

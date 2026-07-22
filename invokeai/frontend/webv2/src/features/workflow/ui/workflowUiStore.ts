@@ -31,6 +31,8 @@ export interface WorkflowUiSnapshot {
   isNewWorkflowConfirmOpen: boolean;
   /** Bumped to ask the dialog host to open the JSON file picker. */
   importRequestCount: number;
+  /** Library workflow a shell surface (command palette) asked to load; consumed by the widget chrome. */
+  pendingLibraryWorkflowId: string | null;
 }
 
 export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>({
@@ -40,6 +42,7 @@ export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>({
   isAddNodeOpen: false,
   isLibraryOpen: false,
   isNewWorkflowConfirmOpen: false,
+  pendingLibraryWorkflowId: null,
 });
 
 export const setWorkflowLibraryOpen = (isOpen: boolean): void => {
@@ -60,6 +63,14 @@ export const setAddNodeOpen = (
 
 export const setNewWorkflowConfirmOpen = (isOpen: boolean): void => {
   workflowUiStore.patchSnapshot({ isNewWorkflowConfirmOpen: isOpen });
+};
+
+export const requestLibraryWorkflowLoad = (workflowId: string): void => {
+  workflowUiStore.patchSnapshot({ pendingLibraryWorkflowId: workflowId });
+};
+
+export const clearPendingLibraryWorkflowLoad = (): void => {
+  workflowUiStore.patchSnapshot({ pendingLibraryWorkflowId: null });
 };
 
 export const requestWorkflowImport = (): void => {

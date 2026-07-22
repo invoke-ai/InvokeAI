@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PaletteEntry } from './entries';
 
-import { buildCatalogCommandEntries, buildSettingsEntries, searchPaletteRows } from './entries';
+import {
+  buildCatalogCommandEntries,
+  buildProviderSectionRows,
+  buildScopeRows,
+  buildSettingsEntries,
+  buildStageEntries,
+  searchPaletteRows,
+} from './entries';
 
 /**
  * The palette's source aggregation and ranking contract: unimplemented and
@@ -97,6 +104,75 @@ describe('buildSettingsEntries', () => {
     workflowSection?.run();
     expect(openSettingsSection).toHaveBeenCalledWith('workflow');
   });
+
+  it('carries a value-picker stage on enum preferences that applies and marks the current value', () => {
+    const patchPreferences = vi.fn();
+    const entries = buildSettingsEntries(
+      { ...DEFAULT_PREFERENCES, workflowEdgeStyle: 'curved' },
+      { openSettingsSection: vi.fn(), patchPreferences }
+    );
+    const edgeStyle = entries.find((entry) => entry.id === 'setting.workflowEdgeStyle');
+
+    expect(edgeStyle?.stage?.options.map((option) => [option.label, option.isCurrent])).toEqual([
+      ['Curved', true],
+      ['Square', false],
+    ]);
+    expect(edgeStyle?.secondary?.label).toBe('Open in Settings');
+
+    edgeStyle?.stage?.options[1]?.apply();
+    expect(patchPreferences).toHaveBeenCalledWith({ workflowEdgeStyle: 'square' });
+  });
+});
+
+describe('buildStageEntries', () => {
+  it('turns options into keep-open rows that apply then pop', () => {
+    const apply = vi.fn();
+    const onApplied = vi.fn();
+    const entries = buildStageEntries(
+      { options: [{ apply, id: 'a', isCurrent: true, label: 'Alpha' }], title: 'Theme' },
+      onApplied
+    );
+
+    expect(entries[0]).toMatchObject({ group: 'Theme', keepOpen: true, subtitle: 'Current', title: 'Alpha' });
+
+    entries[0]?.run();
+    expect(apply).toHaveBeenCalled();
+    expect(onApplied).toHaveBeenCalled();
+  });
+});
+
+describe('provider row assembly', () => {
+  const section = (id: string, count: number, isFetching = false) => ({
+    entries: Array.from({ length: count }, (_, index) =>
+      makeEntry({ group: id, id: `${id}:${index}`, title: `${id} ${index}` })
+    ),
+    isFetching,
+    provider: { id, label: id },
+  });
+
+  it('caps sections in root mode and drops empty settled sections', () => {
+    const rows = buildProviderSectionRows([section('workflows', 5), section('boards', 0)]);
+
+    expect(rows.map((row) => row.id)).toEqual([
+      'label:provider:workflows',
+      'workflows:0',
+      'workflows:1',
+      'workflows:2',
+    ]);
+  });
+
+  it('renders uncapped in scoped mode and labels in-flight sections', () => {
+    const rows = buildProviderSectionRows([section('workflows', 5, true)], null);
+
+    expect(rows).toHaveLength(6);
+    expect(rows[0]).toMatchObject({ kind: 'label', label: 'workflows — Searching…' });
+  });
+
+  it('builds one trailing scope row per provider', () => {
+    const rows = buildScopeRows([{ id: 'boards', label: 'Boards' }], 'sunset');
+
+    expect(rows[0]).toMatchObject({ kind: 'scope', label: 'Search boards for “sunset”', providerId: 'boards' });
+  });
 });
 
 describe('searchPaletteRows', () => {
@@ -146,5 +222,12 @@ describe('searchPaletteRows', () => {
 
   it('returns no rows for a junk query', () => {
     expect(searchPaletteRows(entries, 'zzzzqqq', [])).toEqual([]);
+  });
+
+  it('excludes settings entries in commands-only mode (the ">" alias)', () => {
+    const rows = searchPaletteRows(entries, 'o', [], { commandsOnly: true });
+
+    expect(rows.map((row) => row.id)).not.toContain('setting.reduceMotion');
+    expect(rows.map((row) => row.id)).toContain('app.invoke');
   });
 });

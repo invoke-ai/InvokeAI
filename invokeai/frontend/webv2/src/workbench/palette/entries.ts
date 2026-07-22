@@ -2,7 +2,8 @@ import type { CustomHotkeys, HotkeyDefinition } from '@workbench/hotkeys/types';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { SettingsSectionId } from '@workbench/widgetContracts';
 
-import { THEMES_BY_ID } from '@theme/themes';
+import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
+import { THEMES, THEMES_BY_ID } from '@theme/themes';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import fuzzysort from 'fuzzysort';
@@ -14,6 +15,19 @@ import fuzzysort from 'fuzzysort';
  * is fuzzy (fuzzysort) *within* a section; section order itself is fixed so
  * the list reads spatially — commands above settings, always.
  */
+
+export interface PaletteStageOption {
+  id: string;
+  label: string;
+  isCurrent: boolean;
+  apply: () => unknown;
+}
+
+/** An inline value-picker pushed over the list (enum settings). */
+export interface PaletteStage {
+  title: string;
+  options: PaletteStageOption[];
+}
 
 export interface PaletteEntry {
   id: string;
@@ -30,12 +44,29 @@ export interface PaletteEntry {
   keepOpen?: boolean;
   /** Show in the empty-query launcher state (navigation entries). */
   showInEmptyState?: boolean;
+  /** Enter pushes this value-picker stage instead of running the entry. */
+  stage?: PaletteStage;
+  /** mod+Enter alternative, advertised in the footer while highlighted. */
+  secondary?: { label: string; run: () => unknown };
   run: () => unknown;
+}
+
+/** An async entity source the palette can query (workflows, boards, …). */
+export interface PaletteSearchProvider {
+  id: string;
+  label: string;
+  search: (query: string) => Promise<PaletteEntry[]> | PaletteEntry[];
 }
 
 export type PaletteRow =
   | { kind: 'label'; id: string; label: string }
-  | { kind: 'entry'; id: string; entry: PaletteEntry; matchIndexes?: readonly number[] };
+  | { kind: 'entry'; id: string; entry: PaletteEntry; matchIndexes?: readonly number[] }
+  | { kind: 'scope'; id: string; providerId: string; label: string };
+
+/** Max rows an entity section shows in root mode; depth lives behind the scope. */
+export const PROVIDER_ROOT_RESULT_CAP = 3;
+/** Entity providers only fire at this query length. */
+export const PROVIDER_MIN_QUERY_LENGTH = 2;
 
 const PALETTE_GROUP_ORDER = [
   'Recent',
@@ -214,41 +245,88 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
     title,
   }));
 
-  // Multi-value preferences deep-link to their settings section; the palette
-  // links to complex pickers rather than replicating them.
+  // Multi-value preferences push an inline value-picker stage; mod+Enter (or
+  // the section deep-link rows) still reaches the full settings dialog.
+  const enumEntry = ({
+    id,
+    keywords,
+    options,
+    sectionId,
+    subtitle,
+    title,
+  }: {
+    id: string;
+    keywords: string;
+    options: PaletteStageOption[];
+    sectionId: SettingsSectionId;
+    subtitle: string;
+    title: string;
+  }): PaletteEntry => ({
+    group: 'Settings',
+    id,
+    keywords,
+    run: () => deps.openSettingsSection(sectionId),
+    secondary: { label: 'Open in Settings', run: () => deps.openSettingsSection(sectionId) },
+    stage: { options, title },
+    subtitle,
+    title,
+  });
+
   const enums: PaletteEntry[] = [
-    {
-      group: 'Settings',
+    enumEntry({
       id: 'setting.themeId',
       keywords: 'appearance color dark light',
-      run: () => deps.openSettingsSection('appearance'),
+      options: THEMES.map((theme) => ({
+        apply: () => deps.patchPreferences({ themeId: theme.id }),
+        id: theme.id,
+        isCurrent: theme.id === preferences.themeId,
+        label: theme.label,
+      })),
+      sectionId: 'appearance',
       subtitle: THEMES_BY_ID[preferences.themeId]?.label ?? preferences.themeId,
       title: 'Theme',
-    },
-    {
-      group: 'Settings',
+    }),
+    enumEntry({
       id: 'setting.language',
       keywords: 'locale translation',
-      run: () => deps.openSettingsSection('appearance'),
-      subtitle: preferences.language,
+      options: WORKBENCH_LANGUAGE_OPTIONS.map((language) => ({
+        apply: () => deps.patchPreferences({ language: language.value }),
+        id: language.value,
+        isCurrent: language.value === preferences.language,
+        label: language.label,
+      })),
+      sectionId: 'appearance',
+      subtitle:
+        WORKBENCH_LANGUAGE_OPTIONS.find((language) => language.value === preferences.language)?.label ??
+        preferences.language,
       title: 'Language',
-    },
-    {
-      group: 'Settings',
+    }),
+    enumEntry({
       id: 'setting.workflowEdgeStyle',
       keywords: 'workflow editor connections',
-      run: () => deps.openSettingsSection('workflow'),
+      options: (['curved', 'square'] as const).map((style) => ({
+        apply: () => deps.patchPreferences({ workflowEdgeStyle: style }),
+        id: style,
+        isCurrent: style === preferences.workflowEdgeStyle,
+        label: style === 'square' ? 'Square' : 'Curved',
+      })),
+      sectionId: 'workflow',
       subtitle: preferences.workflowEdgeStyle === 'square' ? 'Square' : 'Curved',
       title: 'Workflow Edge Style',
-    },
-    {
-      group: 'Settings',
+    }),
+    enumEntry({
       id: 'setting.queueJobsScope',
       keywords: 'queue filter',
-      run: () => deps.openSettingsSection('queue'),
+      options: (['active-project', 'all'] as const).map((scope) => ({
+        apply: () => deps.patchPreferences({ queueJobsScope: scope }),
+        id: scope,
+        isCurrent: scope === preferences.queueJobsScope,
+        label: scope === 'all' ? 'All Projects' : 'Active Project',
+      })),
+      sectionId: 'queue',
       subtitle: preferences.queueJobsScope === 'all' ? 'All Projects' : 'Active Project',
       title: 'Queue Jobs Scope',
-    },
+    }),
   ];
 
   const sections = SETTINGS_SECTIONS.map<PaletteEntry>(({ id, title }) => ({
@@ -334,15 +412,29 @@ const buildEmptyStateRows = (entries: readonly PaletteEntry[], recentIds: readon
 export const searchPaletteRows = (
   entries: readonly PaletteEntry[],
   query: string,
-  recentIds: readonly string[]
+  recentIds: readonly string[],
+  { commandsOnly = false, showAllOnEmpty = false }: { commandsOnly?: boolean; showAllOnEmpty?: boolean } = {}
 ): PaletteRow[] => {
+  const searchable = commandsOnly ? entries.filter((entry) => entry.group !== 'Settings') : entries;
   const trimmed = query.trim();
 
   if (trimmed.length === 0) {
-    return buildEmptyStateRows(entries, recentIds);
+    // Stage mode lists every option before the user types; the root palette
+    // shows the curated launcher instead.
+    if (showAllOnEmpty) {
+      const all = new Map<string, RankedEntry[]>();
+
+      for (const entry of searchable) {
+        all.set(entry.group, [...(all.get(entry.group) ?? []), { entry, score: 0 }]);
+      }
+
+      return toGroupedRows(all);
+    }
+
+    return buildEmptyStateRows(searchable, recentIds);
   }
 
-  const results = fuzzysort.go(trimmed, entries, {
+  const results = fuzzysort.go(trimmed, searchable, {
     keys: [(entry) => entry.title, (entry) => entry.keywords ?? '', (entry) => entry.subtitle ?? ''],
     scoreFn: (result) => Math.max(result[0]?.score ?? 0, (result[1]?.score ?? 0) * 0.9, (result[2]?.score ?? 0) * 0.5),
     threshold: MATCH_THRESHOLD,
@@ -376,3 +468,71 @@ export const searchPaletteRows = (
 
   return toGroupedRows(groups);
 };
+
+// ---------------------------------------------------------------------------
+// Stage / provider row assembly
+// ---------------------------------------------------------------------------
+
+/** Turn a value-picker stage into filterable entry rows; picking applies and pops. */
+export const buildStageEntries = (stage: PaletteStage, onApplied: () => void): PaletteEntry[] =>
+  stage.options.map((option) => ({
+    group: stage.title,
+    id: `stage:${option.id}`,
+    keepOpen: true,
+    run: () => {
+      void option.apply();
+      onApplied();
+    },
+    subtitle: option.isCurrent ? 'Current' : undefined,
+    title: option.label,
+  }));
+
+export interface ProviderResultSection {
+  provider: Pick<PaletteSearchProvider, 'id' | 'label'>;
+  entries: PaletteEntry[];
+  isFetching: boolean;
+}
+
+/**
+ * Entity sections render below local sections as each provider resolves.
+ * Empty non-fetching sections drop silently in root mode; `cap` bounds root
+ * mode to a teaser (depth lives behind the scope), null means uncapped.
+ */
+export const buildProviderSectionRows = (
+  sections: readonly ProviderResultSection[],
+  cap: number | null = PROVIDER_ROOT_RESULT_CAP
+): PaletteRow[] => {
+  const rows: PaletteRow[] = [];
+
+  for (const section of sections) {
+    const visible = cap === null ? section.entries : section.entries.slice(0, cap);
+
+    if (visible.length === 0 && !section.isFetching) {
+      continue;
+    }
+
+    rows.push({
+      id: `label:provider:${section.provider.id}`,
+      kind: 'label',
+      label: section.isFetching ? `${section.provider.label} — Searching…` : section.provider.label,
+    });
+
+    for (const entry of visible) {
+      rows.push({ entry, id: entry.id, kind: 'entry' });
+    }
+  }
+
+  return rows;
+};
+
+/** Trailing escape hatches into scoped mode, one per provider. */
+export const buildScopeRows = (
+  providers: ReadonlyArray<Pick<PaletteSearchProvider, 'id' | 'label'>>,
+  query: string
+): PaletteRow[] =>
+  providers.map((provider) => ({
+    id: `scope:${provider.id}`,
+    kind: 'scope',
+    label: `Search ${provider.label.toLowerCase()} for “${query}”`,
+    providerId: provider.id,
+  }));

@@ -1,12 +1,20 @@
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { patchWorkbenchPreferences, useWorkbenchPreferences } from '@workbench/settings/store';
-import { useActiveProjectSelector, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
+import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import {
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchExtensions,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
-import type { PaletteEntry } from './entries';
+import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
 import { buildCatalogCommandEntries, buildSettingsEntries } from './entries';
+import { createBoardsProvider, createPromptHistoryProvider, createWorkflowsProvider } from './paletteProviders';
 import { closeCommandPalette, commandPaletteStore } from './paletteStore';
 
 /**
@@ -83,5 +91,44 @@ export const WorkbenchCommandPalette = () => {
     [executeCommand, extensions, paletteContributions, preferences, presentWidgetTypeIds]
   );
 
-  return <CommandPaletteDialog entries={entries} isOpen={isOpen} onClose={closeCommandPalette} />;
+  const workbenchCommands = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
+  const providers = useMemo<PaletteSearchProvider[]>(() => {
+    const { gallery, widgets } = workbenchCommands;
+    const openWidget = (typeId: 'workflow' | 'gallery' | 'generate') =>
+      openWidgetPlacement({
+        getWidgetsForRegion,
+        options:
+          typeId === 'workflow'
+            ? { preferredRegions: ['center'], requireCenterView: true }
+            : { preferredRegions: typeId === 'gallery' ? ['center', 'right'] : ['left'] },
+        typeId,
+        widgets,
+      });
+
+    return [
+      createWorkflowsProvider({ openWorkflowWidget: () => openWidget('workflow') }),
+      createBoardsProvider({
+        openGalleryWidget: () => openWidget('gallery'),
+        selectBoard: (boardId) => gallery.selectBoard(boardId),
+      }),
+      createPromptHistoryProvider({
+        getPromptHistory: () => queries.getSnapshot().activeProject.promptHistory,
+        openGenerateWidget: () => openWidget('generate'),
+        recallPrompt: (item) => {
+          const project = queries.getSnapshot().activeProject;
+          const patch: Record<string, unknown> = { positivePrompt: item.positivePrompt };
+
+          if (item.negativePrompt) {
+            patch.negativePrompt = item.negativePrompt;
+            patch.negativePromptEnabled = true;
+          }
+
+          widgets.patchValues('generate', patch, project.id);
+        },
+      }),
+    ];
+  }, [queries, workbenchCommands]);
+
+  return <CommandPaletteDialog entries={entries} isOpen={isOpen} providers={providers} onClose={closeCommandPalette} />;
 };

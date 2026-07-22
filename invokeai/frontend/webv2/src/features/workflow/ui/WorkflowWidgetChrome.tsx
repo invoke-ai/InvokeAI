@@ -25,6 +25,7 @@ import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contra
 import { AddNodeDialog } from './editor/AddNodeDialog';
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
+import { PendingLibraryWorkflowLoader } from './PendingLibraryWorkflowLoader';
 import { copyWorkflowJson, downloadWorkflowJson } from './workflowTransfer';
 import {
   useWorkflowHostCommands,
@@ -401,6 +402,7 @@ export const WorkflowDialogHost = () => {
         onOpenChange={setAddNodeOpen}
       />
       <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+      <PendingLibraryWorkflowLoader />
       <ConfirmDialog
         body="Replace the project graph with an empty workflow? The current graph is saved to graph history first."
         confirmLabel="New workflow"
