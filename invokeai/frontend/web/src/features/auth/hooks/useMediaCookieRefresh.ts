@@ -13,6 +13,12 @@ let pauseRefreshHandler: (() => Promise<() => void>) | null = null;
 type PendingRefresh = { promise: Promise<void>; abort: () => void };
 const pendingRefreshes = new Set<PendingRefresh>();
 
+// True while the self-heal (initial attempt, retries, or a paused retry) is still
+// expected to re-mint the cookie. Media consumers use this to treat a 401-style load
+// error as transient rather than surfacing an error to the user.
+let selfHealPending = false;
+export const isMediaCookieSelfHealPending = () => selfHealPending;
+
 export const abortAndWaitForPendingRefreshes = async (pending: Set<PendingRefresh>) => {
   for (const refresh of pending) {
     refresh.abort();
@@ -69,24 +75,33 @@ export const useMediaCookieRefresh = () => {
             return;
           }
           hasSucceeded.current = true;
+          selfHealPending = false;
           notifyMediaCookieRefreshed();
         })
         .catch((error: unknown) => {
           if (canceled) {
             return;
           }
+          if (paused) {
+            // Deliberate abort from a logout pause, not a real failure: resume must
+            // retry this same attempt rather than consuming a retry slot — and on the
+            // final attempt there is no "next" index, which would otherwise leave
+            // resume with nothing to run.
+            nextAttemptIndex = attemptIndex;
+            return;
+          }
           const status = (error as { status?: unknown } | null)?.status;
           if (status === 401) {
+            selfHealPending = false;
             return;
           }
           const delay = RETRY_DELAYS_MS[attemptIndex];
           if (delay === undefined) {
+            selfHealPending = false;
             return;
           }
           nextAttemptIndex = attemptIndex + 1;
-          if (!paused) {
-            timeoutId = setTimeout(() => attempt(attemptIndex + 1), delay);
-          }
+          timeoutId = setTimeout(() => attempt(attemptIndex + 1), delay);
         });
       const pendingRefresh = { promise: refreshPromise, abort: request.abort };
       pendingRefreshes.add(pendingRefresh);
@@ -112,15 +127,24 @@ export const useMediaCookieRefresh = () => {
     };
 
     pauseRefreshHandler = pause;
+    selfHealPending = true;
     attempt(0);
 
     return () => {
       canceled = true;
+      selfHealPending = false;
       if (pauseRefreshHandler === pause) {
         pauseRefreshHandler = null;
       }
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
+      }
+      // Every logout path flips isAuthenticated and lands here — abort any in-flight
+      // refresh so its response can't re-mint the HttpOnly cookie after auth state is
+      // cleared. (UserMenu's logout additionally pauses and awaits these before the
+      // server call; this is the backstop for sessionExpiredLogout and direct logout.)
+      for (const refresh of pendingRefreshes) {
+        refresh.abort();
       }
     };
   }, [isAuthenticated, refreshMediaCookie]);

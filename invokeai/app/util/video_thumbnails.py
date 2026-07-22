@@ -38,8 +38,18 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 VIDEO_DECODE_TIMEOUT_SECONDS = 30.0
 MAX_DECODED_FRAME_RECORD_BYTES = 256 * 1024 * 1024
 MAX_DECODE_STDERR_BYTES = 16 * 1024
-MAX_VIDEO_DECODE_WORKER_RSS_BYTES = 1024 * 1024 * 1024
-WORKER_MEMORY_POLL_SECONDS = 0.05
+# Resident-memory kill threshold for a decode worker *tree* (the worker plus its
+# ffmpeg child). Sized for a legal max-size decode, not a typical one: a
+# MAX_VIDEO_FRAME_PIXELS RGB frame is 192 MiB, the worker's emit path holds ~4
+# frame-sized copies at once (~768 MiB), and the ffmpeg child keeps its own output
+# frame plus YUV reference frames (several hundred MiB more) — so a 1 GiB bound would
+# kill decodes of videos the frame-size validators explicitly accept. This is an
+# anti-runaway bound, not a budget. Keep in sync with WORKER_MEMORY_HEADROOM_BYTES in
+# video_decode_worker.py (the worker-side address-space bound).
+MAX_VIDEO_DECODE_WORKER_RSS_BYTES = 3 * 1024 * 1024 * 1024
+# A bound this size doesn't need 50 ms granularity; each poll walks the process tree
+# via psutil, so a coarser period keeps sustained streaming decodes cheap.
+WORKER_MEMORY_POLL_SECONDS = 0.25
 # Upper bound on decoded frame size (~8K video). Decoder-reported dimensions are
 # untrusted metadata: a tiny crafted container can claim absurd dimensions whose full
 # frame is only allocated at decode time. probe_video rejects such files before the
@@ -48,6 +58,15 @@ WORKER_MEMORY_POLL_SECONDS = 0.05
 MAX_VIDEO_FRAME_PIXELS = 64 * 1024 * 1024
 
 _WORKER_PATH = Path(__file__).parent / "video_decode_worker.py"
+
+
+class VideoDecodeTimeoutError(TimeoutError):
+    """The decode worker did not finish within its time budget.
+
+    A timeout is contention (or an adversarial file), not evidence the video is
+    undecodable — callers that gate acceptance on decodability must treat it as
+    inconclusive rather than as a failed decode.
+    """
 
 
 def get_video_thumbnail_name(video_name: str) -> str:
@@ -144,17 +163,24 @@ def _start_worker_memory_monitor(
     return stopped, exceeded, thread
 
 
-def _run_worker(args: list[str], timeout: float) -> Optional[dict[str, Any]]:
-    """Runs the decode worker; returns its parsed JSON output, or None on failure or timeout."""
+def _run_worker(args: list[str], timeout: float, raise_on_timeout: bool = False) -> Optional[dict[str, Any]]:
+    """Runs the decode worker; returns its parsed JSON output, or None on failure or timeout.
+
+    With ``raise_on_timeout``, a timeout raises VideoDecodeTimeoutError instead of
+    returning None, letting callers distinguish "could not decode" from "ran out of
+    time on a loaded machine".
+    """
     monitor_stop: threading.Event | None = None
     monitor: threading.Thread | None = None
     try:
         proc = _spawn_worker(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         monitor_stop, _memory_exceeded, monitor = _start_worker_memory_monitor(proc)
         stdout, _ = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as error:
         _terminate_process_tree(proc)
         proc.communicate()
+        if raise_on_timeout:
+            raise VideoDecodeTimeoutError(f"Video decode worker timed out after {timeout}s") from error
         return None
     except Exception:
         return None
@@ -283,18 +309,27 @@ def iter_video_frames(
 
 
 def extract_video_frame(
-    video_path: Path, frame_index: int = 0, timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS
+    video_path: Path,
+    frame_index: int = 0,
+    timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS,
+    raise_on_timeout: bool = False,
 ) -> Optional[Image.Image]:
-    """Extracts a single frame from a video file as a PIL Image. Returns None on failure or timeout."""
+    """Extracts a single frame from a video file as a PIL Image. Returns None on failure or timeout.
+
+    With ``raise_on_timeout``, a timeout raises VideoDecodeTimeoutError instead of
+    returning None.
+    """
     fd, tmp_name = tempfile.mkstemp(prefix="invokeai_frame_", suffix=".png")
     os.close(fd)
     try:
-        result = _run_worker(["frame", str(video_path), str(frame_index), tmp_name], timeout)
+        result = _run_worker(["frame", str(video_path), str(frame_index), tmp_name], timeout, raise_on_timeout)
         if result is None:
             return None
         with Image.open(tmp_name) as image:
             image.load()
         return image
+    except VideoDecodeTimeoutError:
+        raise
     except Exception:
         return None
     finally:

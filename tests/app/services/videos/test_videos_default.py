@@ -60,13 +60,15 @@ class TestDeleteVideosOnBoardContract:
         ]
         invoker.services.video_files.stage_delete.side_effect = [object(), Exception("disk error")]
 
-        deleted = video_service.delete_videos_on_board("board-1")
+        deleted, failed = video_service.delete_videos_on_board("board-1")
 
         # Only the video whose file we successfully removed should have its record deleted.
         invoker.services.video_records.delete_many.assert_called_once_with(["good.mp4"])
-        # The method must also surface the truthful set to the caller so the API response can
-        # avoid claiming the preserved record was deleted (JPPhoto PR #9163 May-22 follow-up).
+        # The method must also surface the truthful sets to the caller so the API response can
+        # avoid claiming the preserved record was deleted (JPPhoto PR #9163 May-22 follow-up)
+        # and can report the failure without racily diffing a board listing.
         assert deleted == ["good.mp4"]
+        assert failed == ["bad.mp4"]
 
     def test_file_cleanup_failure_does_not_raise(self, video_service: VideoService):
         """A single file-delete failure must not surface as a 500 to the user — the rest of
@@ -78,11 +80,12 @@ class TestDeleteVideosOnBoardContract:
         invoker.services.video_files.stage_delete.side_effect = Exception("permission denied")
 
         # Should not raise
-        deleted = video_service.delete_videos_on_board("board-1")
+        deleted, failed = video_service.delete_videos_on_board("board-1")
 
         # And the failing video's record must be preserved.
         invoker.services.video_records.delete_many.assert_called_once_with([])
         assert deleted == []
+        assert failed == ["v.mp4"]
 
     def test_all_records_deleted_on_full_success(self, video_service: VideoService):
         invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
@@ -96,10 +99,11 @@ class TestDeleteVideosOnBoardContract:
         ]
         invoker.services.video_files.stage_delete.side_effect = [object(), object()]
 
-        deleted = video_service.delete_videos_on_board("board-1")
+        deleted, failed = video_service.delete_videos_on_board("board-1")
 
         invoker.services.video_records.delete_many.assert_called_once_with(["a.mp4", "b.mp4"])
         assert deleted == ["a.mp4", "b.mp4"]
+        assert failed == []
 
     def test_staging_cleanup_failure_is_deferred_after_records_are_deleted(self, video_service: VideoService):
         invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
@@ -108,9 +112,10 @@ class TestDeleteVideosOnBoardContract:
         invoker.services.video_files.stage_delete.return_value = object()
         invoker.services.video_files.commit_delete.side_effect = OSError("staging directory busy")
 
-        deleted = video_service.delete_videos_on_board("board-1")
+        deleted, failed = video_service.delete_videos_on_board("board-1")
 
         assert deleted == ["v.mp4"]
+        assert failed == []
         invoker.services.video_records.delete_many.assert_called_once_with(["v.mp4"])
         invoker.services.logger.error.assert_called()
 

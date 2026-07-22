@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.security.utils import get_authorization_scheme_param
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -127,7 +128,11 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
 
                     token_data = verify_token(token)
                     if token_data is not None:
-                        user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+                        # The user lookup is a synchronous SQLite query behind a
+                        # process-wide lock; run it off the event loop so a contended
+                        # lock (e.g. generation-result writes) can't stall every
+                        # concurrent request from inside this per-mutation middleware.
+                        user = await run_in_threadpool(ApiDependencies.invoker.services.users.get, token_data.user_id)
                         if user is None or not user.is_active:
                             return response
                         # Use the remember_me claim from the token to determine the

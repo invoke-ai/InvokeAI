@@ -59,10 +59,11 @@ import type { AppStore } from 'app/store/store';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
+import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { toast } from 'features/toast/toast';
 import { videosApi } from 'services/api/endpoints/videos';
 
-import { handleDeletions } from './state';
+import { cancelDeletion, confirmDeletion, deleteVideosWithDialog, handleDeletions } from './state';
 
 const buildVideoFieldNode = (nodeId: string, videoName: string) => ({
   type: 'invocation',
@@ -228,10 +229,44 @@ describe('handleDeletions node VideoField cleanup', () => {
 });
 
 describe('delete dialog dismissal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(selectCachedGalleryItemNames).mockReturnValue(['a.mp4']);
+    vi.mocked(selectLastSelectedItem).mockReturnValue(undefined);
+  });
+
   it('routes generic dialog closure through cancellation so callers settle', () => {
     const source = readFileSync(fileURLToPath(new URL('../components/DeleteVideoModal.tsx', import.meta.url)), 'utf8');
 
     expect(source).toContain('onClose={api.cancel}');
     expect(source).not.toContain('onClose={api.close}');
+  });
+
+  it('rejects the caller when the dialog is dismissed without confirming', async () => {
+    vi.mocked(selectSystemShouldConfirmOnDelete).mockReturnValue(true);
+    const { store } = buildStore([], new Set());
+
+    const promise = deleteVideosWithDialog(['a.mp4'], store);
+    cancelDeletion();
+
+    await expect(promise).rejects.toBe('User canceled');
+    expect(videosApi.endpoints.deleteVideos.initiate).not.toHaveBeenCalled();
+  });
+
+  it('resolves a confirmed deletion even though the accept path also fires onClose (cancel)', async () => {
+    // ConfirmationAlertDialog's accept button invokes acceptCallback() and then
+    // onClose() synchronously, without awaiting the callback. With onClose bound to
+    // cancel, that cancel must be a no-op after confirm — not a rejection of the
+    // deletion the user just accepted.
+    vi.mocked(selectSystemShouldConfirmOnDelete).mockReturnValue(true);
+    const { store } = buildStore([], new Set());
+
+    const promise = deleteVideosWithDialog(['a.mp4'], store);
+    const confirming = confirmDeletion(store);
+    cancelDeletion();
+    await confirming;
+
+    await expect(promise).resolves.toBeUndefined();
+    expect(videosApi.endpoints.deleteVideos.initiate).toHaveBeenCalledTimes(1);
   });
 });

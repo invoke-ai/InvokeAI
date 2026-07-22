@@ -36,14 +36,21 @@ describe('refreshed token consumers', () => {
     expect(profileSource).not.toContain('setCredentials({');
   });
 
-  it('commits a refreshed bearer token only after its media cookie is synchronized', () => {
+  it('attempts the media-cookie sync before committing a refreshed bearer token', () => {
     const apiSource = readFileSync(fileURLToPath(new URL('../../../services/api/index.ts', import.meta.url)), 'utf8');
     const cookieWrite = apiSource.indexOf('const mediaCookieResponse = await fetch');
     const tokenCommit = apiSource.indexOf('api.dispatch(tokenRefreshed(refreshedToken))');
 
     expect(cookieWrite).toBeGreaterThan(-1);
     expect(tokenCommit).toBeGreaterThan(cookieWrite);
-    expect(apiSource).toContain('if (!mediaCookieResponse.ok');
     expect(apiSource.slice(cookieWrite, tokenCommit)).toContain('/api/v1/auth/media-cookie');
+    // The commit is refused only when the server rejects the refreshed token itself
+    // (401/403); a 5xx or network failure must NOT discard the token — dropping it
+    // would hard-expire an active session over a transient cookie-endpoint problem,
+    // while the media cookie itself self-heals on later refreshes.
+    expect(apiSource.slice(cookieWrite, tokenCommit)).toContain('mediaCookieResponse.status === 401');
+    // The sync fetch is time-bounded so the exclusive cross-tab media-auth lock
+    // (shared with login/logout) can never be held indefinitely by a stalled request.
+    expect(apiSource).toContain('AbortSignal.timeout(MEDIA_COOKIE_SYNC_TIMEOUT_MS)');
   });
 });

@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Optional
 
+from PIL import Image
+
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -51,6 +53,7 @@ class VideoService(VideoServiceABC):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
+        first_frame: Optional[Image.Image] = None,
     ) -> VideoDTO:
         if video_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -108,6 +111,7 @@ class VideoService(VideoServiceABC):
                 metadata=metadata,
                 workflow=workflow,
                 graph=graph,
+                first_frame=first_frame,
             )
 
             video_dto = self.get_dto(video_name)
@@ -315,7 +319,7 @@ class VideoService(VideoServiceABC):
             self.__invoker.services.logger.error("Problem deleting video record and file")
             raise e
 
-    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> list[str]:
+    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
         try:
             # When ``user_id`` is set the lookup filters to videos owned by that user so the
             # cascade doesn't destroy other users' contributions to a public/shared board.
@@ -329,6 +333,7 @@ class VideoService(VideoServiceABC):
             # caller, so any preserved records cascade to "uncategorized" via the
             # board_videos FK.
             deleted_video_names: list[str] = []
+            failed_video_names: list[str] = []
             staged_deletes: list[tuple[str, object]] = []
             for video_name in video_names:
                 try:
@@ -339,6 +344,7 @@ class VideoService(VideoServiceABC):
                     staged_deletes.append((video_name, token))
                     deleted_video_names.append(video_name)
                 except Exception as e:
+                    failed_video_names.append(video_name)
                     self.__invoker.services.logger.error(
                         f"Failed to delete video file {video_name}; keeping record: {str(e)}"
                     )
@@ -360,7 +366,7 @@ class VideoService(VideoServiceABC):
                     self.__invoker.services.logger.error(f"Failed to purge staged video files: {cleanup_error}")
             for video_name in deleted_video_names:
                 self._on_deleted(video_name)
-            return deleted_video_names
+            return deleted_video_names, failed_video_names
         except VideoRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete video records")
             raise

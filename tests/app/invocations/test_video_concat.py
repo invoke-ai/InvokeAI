@@ -211,6 +211,16 @@ class TestFrameRateValidation:
         with pytest.raises(ValueError, match="frame rates"):
             invocation._resolve_output_fps([16.0, 24.0])
 
+    def test_unknown_rate_mixed_with_agreeing_known_rates_uses_known_rate(self) -> None:
+        # probe_video reports None for metadata-poor containers; that must not fail a
+        # concat whose known rates agree — only disagreement between known rates errors.
+        invocation = _invocation("cut", 0)
+        assert invocation._resolve_output_fps([16.0, None, 16.0]) == 16.0
+
+    def test_all_unknown_rates_fall_back_to_default(self) -> None:
+        invocation = _invocation("cut", 0)
+        assert invocation._resolve_output_fps([None, None]) == 16.0
+
     def test_explicit_output_rate_allows_retiming(self) -> None:
         invocation = VideoConcatInvocation(
             videos=[VideoField(video_name="a"), VideoField(video_name="b")],

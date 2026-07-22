@@ -26,6 +26,7 @@ from invokeai.app.api_app import (
     _identify_video_upload_user,
 )
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
+from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 
 MAX_BODY = 1024  # tiny cap for tests
@@ -34,17 +35,31 @@ MAX_CONCURRENT = 2
 
 def test_upload_probe_requires_a_decodable_frame(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(videos, "probe_video", lambda path: (48, 32, 1.0, 8.0))
-    monkeypatch.setattr(videos, "extract_video_frame", lambda path, frame_index=0: None)
+    monkeypatch.setattr(videos, "extract_video_frame", lambda path, frame_index=0, raise_on_timeout=False: None)
 
     with pytest.raises(ValueError, match="decodable frame"):
         videos._probe_decodable_video(Path("metadata-only.mp4"))
 
 
 def test_upload_probe_accepts_valid_metadata_and_frame(monkeypatch: pytest.MonkeyPatch):
+    frame = MagicMock()
     monkeypatch.setattr(videos, "probe_video", lambda path: (48, 32, 1.0, 8.0))
-    monkeypatch.setattr(videos, "extract_video_frame", lambda path, frame_index=0: MagicMock())
+    monkeypatch.setattr(videos, "extract_video_frame", lambda path, frame_index=0, raise_on_timeout=False: frame)
 
-    assert videos._probe_decodable_video(Path("valid.mp4")) == (48, 32, 1.0, 8.0)
+    assert videos._probe_decodable_video(Path("valid.mp4")) == ((48, 32, 1.0, 8.0), frame)
+
+
+def test_upload_probe_timeout_is_inconclusive_not_a_rejection(monkeypatch: pytest.MonkeyPatch):
+    """A decode-worker timeout is server contention, not evidence the video is bad — the
+    upload must proceed (without a pre-extracted frame) rather than 415."""
+
+    def _timeout(path, frame_index=0, raise_on_timeout=False):
+        raise VideoDecodeTimeoutError("decode worker timed out")
+
+    monkeypatch.setattr(videos, "probe_video", lambda path: (48, 32, 1.0, 8.0))
+    monkeypatch.setattr(videos, "extract_video_frame", _timeout)
+
+    assert videos._probe_decodable_video(Path("busy-server.mp4")) == ((48, 32, 1.0, 8.0), None)
 
 
 def _build_app() -> tuple[FastAPI, list[str]]:

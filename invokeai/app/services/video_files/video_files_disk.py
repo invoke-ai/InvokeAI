@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
 
+from PIL import Image
+
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.video_files.video_files_base import VideoFileStorageBase
 from invokeai.app.services.video_files.video_files_common import (
@@ -48,6 +50,7 @@ class DiskVideoFileStorage(VideoFileStorageBase):
         metadata: Optional[str] = None,
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
+        first_frame: Optional[Image.Image] = None,
     ) -> None:
         logger = InvokeAILogger.get_logger()
         try:
@@ -73,12 +76,15 @@ class DiskVideoFileStorage(VideoFileStorageBase):
             # Thumbnail extraction is best-effort — if both imageio and cv2 fail, we still want
             # the video record + file in place and the invocation to complete. A missing
             # thumbnail leaves the gallery with a broken-image placeholder for that item, which
-            # is annoying but not fatal.
-            try:
-                frame = extract_video_frame(video_path, frame_index=0)
-            except Exception as e:
-                logger.warning(f"Thumbnail extraction raised for {video_name}: {e}")
-                frame = None
+            # is annoying but not fatal. The upload path already decoded frame 0 to prove
+            # decodability and passes it in, saving a decode-worker subprocess per upload.
+            frame = first_frame
+            if frame is None:
+                try:
+                    frame = extract_video_frame(video_path, frame_index=0)
+                except Exception as e:
+                    logger.warning(f"Thumbnail extraction raised for {video_name}: {e}")
+                    frame = None
             if frame is not None:
                 thumbnail = make_thumbnail(frame, thumbnail_size)
                 thumbnail.save(thumbnail_path, "WEBP")

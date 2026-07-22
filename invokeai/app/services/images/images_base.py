@@ -148,12 +148,16 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> list[str]:
-        """Deletes all images on a board.
+    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+        """Deletes all images on a board; returns ``(deleted_names, failed_names)``.
 
         When ``user_id`` is provided, only images owned by that user are deleted (other users'
         contributions to a public/shared board are preserved). Pass ``None`` for the admin
         path to delete every image on the board regardless of uploader.
+
+        ``failed_names`` is the service's ground truth for per-image failures — callers must
+        not reconstruct it by diffing their own board listing against ``deleted_names``, which
+        races with concurrent moves/deletes.
         """
         pass
 

@@ -37,7 +37,15 @@ from PIL import Image
 # Keep in sync with MAX_VIDEO_FRAME_PIXELS in video_thumbnails.py (this script must not
 # import the invokeai package).
 MAX_FRAME_PIXELS = 64 * 1024 * 1024
-WORKER_MEMORY_HEADROOM_BYTES = 1024 * 1024 * 1024
+# Address-space headroom for everything allocated after startup. Must accommodate a
+# legal max-size decode, not just a typical one: a MAX_FRAME_PIXELS RGB frame is
+# 192 MiB and the emit path holds ~4 frame-sized copies at once (~768 MiB), on top of
+# which RLIMIT_AS also counts the lazily-imported cv2's library mappings, glibc
+# per-thread arenas, and the codec's reference-frame buffers — address space routinely
+# exceeds resident memory by a wide margin. Keep in sync with
+# MAX_VIDEO_DECODE_WORKER_RSS_BYTES in video_thumbnails.py (the parent-side resident
+# bound; this script must not import the invokeai package).
+WORKER_MEMORY_HEADROOM_BYTES = 4 * 1024 * 1024 * 1024
 
 
 def _limit_worker_memory() -> None:

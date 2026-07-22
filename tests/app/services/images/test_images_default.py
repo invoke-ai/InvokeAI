@@ -223,10 +223,11 @@ class TestDeleteImagesOnBoardContract:
         # File staging succeeds for first, fails for second
         invoker.services.image_files.stage_delete.side_effect = [object(), Exception("disk error")]
 
-        deleted = image_service.delete_images_on_board("board-1")
+        deleted, failed = image_service.delete_images_on_board("board-1")
 
         invoker.services.image_records.delete_many.assert_called_once_with(["good.png"])
         assert deleted == ["good.png"]
+        assert failed == ["bad.png"]
 
     def test_file_cleanup_failure_does_not_raise(self, image_service: ImageService):
         """File cleanup errors are swallowed, not propagated."""
@@ -237,10 +238,11 @@ class TestDeleteImagesOnBoardContract:
         invoker.services.image_records.get.return_value = record
         invoker.services.image_files.stage_delete.side_effect = Exception("permission denied")
 
-        deleted = image_service.delete_images_on_board("board-1")
+        deleted, failed = image_service.delete_images_on_board("board-1")
 
         invoker.services.image_records.delete_many.assert_called_once_with([])
         assert deleted == []
+        assert failed == ["img.png"]
 
     def test_record_lookup_failure_does_not_block_others(self, image_service: ImageService):
         """If getting the record for one image fails, other images are still processed."""
@@ -253,12 +255,13 @@ class TestDeleteImagesOnBoardContract:
         ok_record = _make_record(image_name="ok.png", image_subfolder="")
         invoker.services.image_records.get.side_effect = [Exception("not found"), ok_record]
 
-        deleted = image_service.delete_images_on_board("board-1")
+        deleted, failed = image_service.delete_images_on_board("board-1")
 
         # File staging was attempted for the second image only
         invoker.services.image_files.stage_delete.assert_called_once_with("ok.png", image_subfolder="")
         invoker.services.image_records.delete_many.assert_called_once_with(["ok.png"])
         assert deleted == ["ok.png"]
+        assert failed == ["missing.png"]
 
     def test_database_failure_restores_staged_files(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore

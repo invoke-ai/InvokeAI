@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable, Optional
 
+from PIL import Image
+
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -58,8 +60,14 @@ class VideoServiceABC(ABC):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
+        first_frame: Optional[Image.Image] = None,
     ) -> VideoDTO:
-        """Creates a video by moving/copying the file at `source_path` into storage and recording it."""
+        """Creates a video by moving/copying the file at `source_path` into storage and recording it.
+
+        ``first_frame``, when provided (e.g. the upload path already decoded frame 0 to
+        prove decodability), is used as the thumbnail source instead of spawning another
+        decode worker.
+        """
         pass
 
     @abstractmethod
@@ -126,16 +134,18 @@ class VideoServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> list[str]:
-        """Deletes all videos on a board and returns the names that were actually removed.
+    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+        """Deletes all videos on a board; returns ``(deleted_names, failed_names)``.
 
         When ``user_id`` is provided, only videos owned by that user are deleted (other users'
         contributions to a public/shared board are preserved). Pass ``None`` for the admin
         path to delete every video on the board regardless of uploader.
 
         Videos whose backing file deletion fails are intentionally retained (their DB records
-        survive and cascade to "uncategorized" via the board_videos FK), so the returned list
-        is the authoritative ``deleted_videos`` for the caller's response.
+        survive and cascade to "uncategorized" via the board_videos FK), so the returned lists
+        are the authoritative ``deleted_videos``/``failed_videos`` for the caller's response —
+        callers must not reconstruct failures by diffing their own board listing, which races
+        with concurrent moves/deletes.
         """
         pass
 

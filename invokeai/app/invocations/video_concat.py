@@ -192,10 +192,13 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         known_rates = [rate for rate in source_rates if rate is not None and rate > 0]
         if not known_rates:
             return 16.0
-        if len(known_rates) != len(source_rates) or any(
-            not math.isclose(rate, known_rates[0], rel_tol=1e-3) for rate in known_rates[1:]
-        ):
-            raise ValueError("Input videos have different or unknown frame rates; set Output FPS to retime them.")
+        if any(not math.isclose(rate, known_rates[0], rel_tol=1e-3) for rate in known_rates[1:]):
+            raise ValueError("Input videos have different frame rates; set Output FPS to retime them.")
+        # An unknown rate mixed with agreeing known ones is not an error: probe_video
+        # deliberately reports None for metadata-poor containers (VFR flags, missing
+        # avg_frame_rate) whose real rate is usually the same as their neighbours'.
+        # Erroring here would break previously-working concat workflows over a metadata
+        # quirk; disagreement between *known* rates is the case that silently retimes.
         return known_rates[0]
 
     def _validate_transition_memory(self, width: int, height: int) -> None:

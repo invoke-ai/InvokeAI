@@ -145,40 +145,27 @@ async def delete_board(
     try:
         if include_images is True:
             assert_image_move_maintenance_inactive()
-            target_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
-                board_id=board_id,
-                categories=None,
-                is_intermediate=None,
-                user_id=cascade_user_id,
-            )
-            target_videos = ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
-                board_id=board_id,
-                categories=None,
-                is_intermediate=None,
-                user_id=cascade_user_id,
-            )
-            deleted_images = ApiDependencies.invoker.services.images.delete_images_on_board(
+            # The services report both outcomes: records whose file delete failed are
+            # preserved (they cascade to "uncategorized" via the board FKs when the
+            # board is deleted below) and returned as failures. This is the ground
+            # truth — reconstructing failures by diffing a router-side board listing
+            # against the deleted names would double the DB work and misreport items
+            # moved or deleted concurrently between the two queries.
+            deleted_images, failed_images = ApiDependencies.invoker.services.images.delete_images_on_board(
                 board_id=board_id, user_id=cascade_user_id
             )
-            # Use the service-returned list as the authoritative ``deleted_videos``.
-            # delete_videos_on_board now preserves DB records when the underlying file
-            # delete fails (so the API doesn't lie about a file that is still orphaned
-            # on disk), and the preserved records cascade to "uncategorized" via the
-            # board_videos FK when the board itself is deleted below.
-            deleted_videos = ApiDependencies.invoker.services.videos.delete_videos_on_board(
+            deleted_videos, failed_videos = ApiDependencies.invoker.services.videos.delete_videos_on_board(
                 board_id=board_id, user_id=cascade_user_id
             )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
-            deleted_image_names = set(deleted_images)
-            deleted_video_names = set(deleted_videos)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=[],
                 deleted_images=deleted_images,
                 deleted_board_videos=[],
                 deleted_videos=deleted_videos,
-                failed_images=[name for name in target_images if name not in deleted_image_names],
-                failed_videos=[name for name in target_videos if name not in deleted_video_names],
+                failed_images=failed_images,
+                failed_videos=failed_videos,
             )
         else:
             deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(

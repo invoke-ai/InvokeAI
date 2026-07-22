@@ -90,12 +90,12 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     # delete_videos_on_board now returns the authoritative ``deleted_videos`` list (only the
     # videos whose file deletion actually succeeded). Default to an empty list so pydantic
     # validation on ``DeleteBoardResult`` doesn't reject the MagicMock auto-return.
-    mock_invoker.services.videos.delete_videos_on_board.return_value = []
+    mock_invoker.services.videos.delete_videos_on_board.return_value = ([], [])
     # The images service is a real ImageService instance in mock_services; the delete-board
     # cascade calls ``delete_images_on_board`` on it, which fails without an initialized
     # invoker. Stub it so the multiuser router tests can assert the cascade args.
     mock_invoker.services.images = MagicMock()
-    mock_invoker.services.images.delete_images_on_board.return_value = []
+    mock_invoker.services.images.delete_images_on_board.return_value = ([], [])
 
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
@@ -716,7 +716,7 @@ def test_delete_board_with_include_images_cascades_videos(client: TestClient, mo
     # The cascade returns the names of videos it actually deleted; the router must surface
     # *that* list (not the pre-delete enumeration) so the response can't claim a video was
     # destroyed when its DB record was preserved due to a file-delete failure.
-    mock_invoker.services.videos.delete_videos_on_board.return_value = ["video_a.mp4", "video_b.mp4"]
+    mock_invoker.services.videos.delete_videos_on_board.return_value = (["video_a.mp4", "video_b.mp4"], [])
 
     response = client.delete(
         f"/api/v1/boards/{board_id}?include_images=true",
@@ -749,17 +749,10 @@ def test_delete_board_with_partial_video_file_delete_failure_reports_only_actual
     board_id = create.json()["board_id"]
 
     # The service deleted "good.mp4" successfully but preserved "stuck.mp4" because its
-    # file delete failed. The router must NOT claim "stuck.mp4" was deleted.
-    mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = [
-        "good.png",
-        "stuck.png",
-    ]
-    mock_invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = [
-        "good.mp4",
-        "stuck.mp4",
-    ]
-    mock_invoker.services.images.delete_images_on_board.return_value = ["good.png"]
-    mock_invoker.services.videos.delete_videos_on_board.return_value = ["good.mp4"]
+    # file delete failed. The router must NOT claim "stuck.mp4" was deleted, and must
+    # report the failure from the service's own accounting (not a racy listing diff).
+    mock_invoker.services.images.delete_images_on_board.return_value = (["good.png"], ["stuck.png"])
+    mock_invoker.services.videos.delete_videos_on_board.return_value = (["good.mp4"], ["stuck.mp4"])
 
     response = client.delete(
         f"/api/v1/boards/{board_id}?include_images=true",
@@ -783,8 +776,8 @@ def test_delete_board_reports_partial_cascade_completion(
     )
     assert create.status_code == status.HTTP_201_CREATED
     board_id = create.json()["board_id"]
-    mock_invoker.services.images.delete_images_on_board.return_value = ["deleted.png"]
-    mock_invoker.services.videos.delete_videos_on_board.return_value = ["deleted.mp4"]
+    mock_invoker.services.images.delete_images_on_board.return_value = (["deleted.png"], [])
+    mock_invoker.services.videos.delete_videos_on_board.return_value = (["deleted.mp4"], [])
     if failure_phase == "videos":
         mock_invoker.services.videos.delete_videos_on_board.side_effect = RuntimeError("video delete failed")
 

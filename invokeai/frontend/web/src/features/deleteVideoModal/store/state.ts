@@ -37,7 +37,7 @@ const getInitialState = (): DeleteVideosModalState => ({
 
 const $deleteModalState = atom<DeleteVideosModalState>(getInitialState());
 
-const deleteVideosWithDialog = async (video_names: string[], store: AppStore): Promise<void> => {
+export const deleteVideosWithDialog = async (video_names: string[], store: AppStore): Promise<void> => {
   const { getState } = store;
   const shouldConfirmOnDelete = selectSystemShouldConfirmOnDelete(getState());
 
@@ -136,14 +136,18 @@ export const handleDeletions = async (video_names: string[], store: AppStore) =>
   }
 };
 
-const confirmDeletion = async (store: AppStore) => {
+export const confirmDeletion = async (store: AppStore) => {
   const state = $deleteModalState.get();
+  // Detach the promise callbacks before any async work: ConfirmationAlertDialog's accept
+  // button invokes acceptCallback() and then onClose() (bound to cancel) synchronously,
+  // and that cancel must not reject a deletion the user just confirmed. Dismissal still
+  // rejects — cancelDeletion only finds a live `reject` when no confirm has run.
+  closeSilently();
   await handleDeletions(state.video_names, store);
   state.resolve?.();
-  closeSilently();
 };
 
-const cancelDeletion = () => {
+export const cancelDeletion = () => {
   const state = $deleteModalState.get();
   state.reject?.('User canceled');
   closeSilently();

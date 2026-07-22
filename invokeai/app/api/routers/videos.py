@@ -8,6 +8,7 @@ from fastapi import Body, HTTPException, Query, Request, Response, UploadFile
 from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
+from PIL import Image as PILImage
 from pydantic import BaseModel, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
@@ -28,7 +29,7 @@ from invokeai.app.services.videos.videos_common import (
     VideoDTO,
     VideoUrlsDTO,
 )
-from invokeai.app.util.video_thumbnails import extract_video_frame, probe_video
+from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError, extract_video_frame, probe_video
 
 videos_router = APIRouter(prefix="/v1/videos", tags=["videos"])
 
@@ -187,11 +188,23 @@ def _is_mp4_file(path: Path) -> bool:
     return False
 
 
-def _probe_decodable_video(path: Path) -> tuple[int, int, float, Optional[float]]:
+def _probe_decodable_video(path: Path) -> tuple[tuple[int, int, float, Optional[float]], Optional[PILImage.Image]]:
+    """Probes metadata and proves the video has a decodable first frame.
+
+    Returns the metadata plus the decoded frame so the save path can reuse it as the
+    thumbnail source instead of spawning another decode worker. A decode timeout is
+    contention on a loaded server, not evidence the video is bad — probe_video already
+    succeeded — so it yields (metadata, None) and the upload proceeds, with save-time
+    thumbnail extraction as the backstop.
+    """
     metadata = probe_video(path)
-    if extract_video_frame(path, frame_index=0) is None:
+    try:
+        first_frame = extract_video_frame(path, frame_index=0, raise_on_timeout=True)
+    except VideoDecodeTimeoutError:
+        return metadata, None
+    if first_frame is None:
         raise ValueError("Video has no decodable frame")
-    return metadata
+    return metadata, first_frame
 
 
 @videos_router.post(
@@ -269,7 +282,7 @@ async def upload_video(
             raise HTTPException(status_code=415, detail="Not an MP4 video file")
 
         try:
-            width, height, duration, fps = await run_in_threadpool(_probe_decodable_video, tmp_path)
+            (width, height, duration, fps), first_frame = await run_in_threadpool(_probe_decodable_video, tmp_path)
         except Exception:
             ApiDependencies.invoker.services.logger.error(traceback.format_exc())
             raise HTTPException(status_code=415, detail="Failed to read video")
@@ -282,6 +295,7 @@ async def upload_video(
                     height=height,
                     duration=duration,
                     fps=fps,
+                    first_frame=first_frame,
                     video_origin=ResourceOrigin.EXTERNAL,
                     video_category=video_category,
                     session_id=session_id,
@@ -351,6 +365,11 @@ async def delete_videos_from_list(
     # discard the response payload for items the caller had already legitimately deleted.
     # Without this, the client cache never learns about the partial successes and the
     # already-deleted records reappear in the UI until the next full refresh.
+    #
+    # HTTPException here means an intentional skip (a foreign name, or a 404 because a
+    # concurrent session deleted it first) — not a failed deletion. Reporting those in
+    # failed_videos would toast a spurious "could not be deleted" warning; the images
+    # endpoints skip them silently, and mixed selections must behave consistently.
     deleted_videos: set[str] = set()
     failed_videos: set[str] = set()
     affected_boards: set[str] = set()
@@ -363,7 +382,6 @@ async def delete_videos_from_list(
             deleted_videos.add(video_name)
             affected_boards.add(board_id)
         except HTTPException:
-            failed_videos.add(video_name)
             continue
         except Exception:
             failed_videos.add(video_name)
@@ -398,8 +416,8 @@ async def delete_uncategorized_videos(
             deleted_videos.add(video_name)
             affected_boards.add("none")
         except HTTPException:
-            # Skip videos not owned by the current user
-            failed_videos.add(video_name)
+            # Skip videos not owned by the current user — an intentional skip, not a
+            # failed deletion, so it must not be reported (and toasted) as one.
             continue
         except Exception:
             failed_videos.add(video_name)

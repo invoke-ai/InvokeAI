@@ -5,6 +5,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useClipboard } from 'common/hooks/useClipboard';
 import { useDownloadItem } from 'common/hooks/useDownloadImage';
+import { isMediaCookieSelfHealPending } from 'features/auth/hooks/useMediaCookieRefresh';
 import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
@@ -118,6 +119,12 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
 
   const handleVideoError = useCallback(() => {
     setIsPlaying(false);
+    // A restored session's <video> request can 401 before the media-cookie self-heal
+    // completes; the URL version bumps and the element reloads once the cookie lands.
+    // Surfacing an error toast for that transient window would be a false alarm.
+    if (isMediaCookieSelfHealPending()) {
+      return;
+    }
     toast({
       id: 'VIDEO_PLAYBACK_FAILED',
       status: 'error',
@@ -132,8 +139,15 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     // play() here keeps the user gesture wired to playback without waiting for React.
     // A rejected play() (blocked autoplay, codec error, missing media cookie) must roll
     // the state back — otherwise the overlay stays hidden over a dead element and the
-    // rejection surfaces as an unhandled promise.
-    videoRef.current?.play().catch(handleVideoError);
+    // rejection surfaces as an unhandled promise. An AbortError is benign — pause(),
+    // close, or navigating away interrupted a pending play() — so roll back silently.
+    videoRef.current?.play().catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setIsPlaying(false);
+        return;
+      }
+      handleVideoError();
+    });
   }, [handleVideoError]);
 
   // Close: stop playback and drop back to the first-frame preview + play overlay. We

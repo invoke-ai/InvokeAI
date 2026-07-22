@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
+from PIL import Image
+
 
 class VideoFileStorageBase(ABC):
     """Low-level service responsible for storing and retrieving video files."""
@@ -21,9 +23,11 @@ class VideoFileStorageBase(ABC):
         metadata: Optional[str] = None,
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
+        first_frame: Optional[Image.Image] = None,
     ) -> None:
         """Saves a video by moving/copying the file at `source_path` into storage, then writes a sibling
         WEBP thumbnail extracted from the first frame, plus an optional sidecar JSON of metadata/workflow/graph.
+        A caller that already decoded frame 0 can pass it as `first_frame` to skip the extraction.
         """
         pass
 

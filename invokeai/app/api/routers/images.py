@@ -503,6 +503,7 @@ async def delete_images_from_list(
         # Without this, the client cache never learns about the partial successes and the
         # already-deleted records reappear in the UI until the next full refresh.
         deleted_images: set[str] = set()
+        failed_images: set[str] = set()
         affected_boards: set[str] = set()
         for image_name in image_names:
             try:
@@ -515,9 +516,12 @@ async def delete_images_from_list(
             except HTTPException:
                 continue
             except Exception:
-                pass
+                # A genuine deletion failure (not an auth/404 skip) — report it so the
+                # client can surface a partial-failure warning, matching the video path.
+                failed_images.add(image_name)
         return DeleteImagesResult(
             deleted_images=list(deleted_images),
+            failed_images=list(failed_images),
             affected_boards=list(affected_boards),
         )
     except HTTPException:
