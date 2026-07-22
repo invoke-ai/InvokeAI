@@ -226,15 +226,19 @@ def test_drip_feed_upload_cannot_hold_capacity_past_absolute_timeout():
         "root_path": "",
         "headers": [],
     }
+    # The absolute deadline must dwarf the per-chunk delay: Windows event-loop timers
+    # have ~15.6 ms granularity, so a 20 ms deadline could expire before the first
+    # "5 ms" chunk was ever delivered, ending the request at receive_calls == 1 and
+    # proving nothing about the drip-feed case.
     middleware = VideoUploadLimitASGIMiddleware(
         app,
         max_body_bytes=MAX_BODY,
         max_concurrent=1,
-        idle_timeout_seconds=0.05,
-        max_upload_duration_seconds=0.02,
+        idle_timeout_seconds=1.0,
+        max_upload_duration_seconds=0.25,
     )
 
-    asyncio.run(asyncio.wait_for(middleware(scope, receive, send), timeout=1))  # type: ignore[arg-type]
+    asyncio.run(asyncio.wait_for(middleware(scope, receive, send), timeout=5))  # type: ignore[arg-type]
 
     assert receive_calls > 1
     assert middleware._active == 0
