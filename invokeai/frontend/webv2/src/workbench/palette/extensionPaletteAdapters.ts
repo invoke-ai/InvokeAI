@@ -36,8 +36,10 @@ export const createExtensionSearchProvider = (
     contextKey: providerKey,
     label: provider.label,
     providerKey,
+    // Extensions keep their plain-string search contract; they receive the
+    // query text with date tokens stripped and never see the range.
     search: async (query) => {
-      const results = await provider.search(query);
+      const results = await provider.search(query.text);
 
       return results.map<PaletteEntry>((result) => ({
         group: provider.label,

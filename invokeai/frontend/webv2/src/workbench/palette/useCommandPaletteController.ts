@@ -2,6 +2,7 @@
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { parseDateTokens } from '@platform/search/dateTokens';
 import { useQueries } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
@@ -93,11 +94,32 @@ export const useCommandPaletteController = ({
   const isCommandsScope = !stage && !scopeProvider && query.startsWith('>');
   const localQuery = isCommandsScope ? query.slice(1) : query;
   const trimmedQuery = localQuery.trim();
-  const shouldSearchProviders = debouncedQuery.length >= PROVIDER_MIN_QUERY_LENGTH && !stage && !isCommandsScope;
-  const activeProviders = useMemo(
-    () => (stage || isCommandsScope ? NO_PROVIDERS : scopeProvider ? [scopeProvider] : providers),
-    [isCommandsScope, providers, scopeProvider, stage]
+  // In commands scope date tokens are literal text; everywhere else the raw
+  // query stays the source of truth and the parse is derived alongside it.
+  const dateParse = useMemo(
+    () => (isCommandsScope ? null : parseDateTokens(localQuery)),
+    [isCommandsScope, localQuery]
   );
+  const debouncedParse = useMemo(() => parseDateTokens(debouncedQuery), [debouncedQuery]);
+  const providerQuery = useMemo(() => ({ range: debouncedParse.range, text: debouncedParse.text }), [debouncedParse]);
+  // A valid date range is a complete query on its own — it bypasses the
+  // minimum text length so `from:7d` alone searches.
+  const shouldSearchProviders =
+    (debouncedParse.text.length >= PROVIDER_MIN_QUERY_LENGTH || debouncedParse.range !== undefined) &&
+    !stage &&
+    !isCommandsScope;
+  // Pure date query (range, no text): only range-capable providers run —
+  // the rest would return broad, unfiltered results for empty text.
+  const isPureDateQuery = debouncedParse.range !== undefined && debouncedParse.text.length === 0;
+  const activeProviders = useMemo(() => {
+    if (stage || isCommandsScope) {
+      return NO_PROVIDERS;
+    }
+
+    const base = scopeProvider ? [scopeProvider] : providers;
+
+    return isPureDateQuery ? base.filter((provider) => provider.supportsCreatedAtRange) : base;
+  }, [isCommandsScope, isPureDateQuery, providers, scopeProvider, stage]);
 
   const providerResults = useQueries({
     combine: (results) =>
@@ -109,8 +131,8 @@ export const useCommandPaletteController = ({
       })),
     queries: activeProviders.map((provider) => ({
       enabled: shouldSearchProviders,
-      queryFn: () => Promise.resolve(provider.search(debouncedQuery)),
-      queryKey: getPaletteProviderQueryKey(provider, debouncedQuery),
+      queryFn: () => Promise.resolve(provider.search(providerQuery)),
+      queryKey: getPaletteProviderQueryKey(provider, providerQuery),
       retry: false,
       staleTime: 30_000,
     })),
@@ -149,21 +171,33 @@ export const useCommandPaletteController = ({
       return buildProviderSectionRows(providerSections, null);
     }
 
-    const localRows = searchPaletteRows(entries, localQuery, recentIds, {
-      commandsOnly: isCommandsScope,
-      showAllOnEmpty: isCommandsScope && trimmedQuery.length === 0,
-    });
+    const matchText = dateParse === null ? localQuery : dateParse.text;
+    const hasLiveRange = dateParse !== null && dateParse.range !== undefined;
+    const isLivePureDate = hasLiveRange && matchText.trim().length === 0;
+    // A pure date query must not fall back to the recents launcher; its rows
+    // are provider results (and their scopes) only.
+    const localRows = isLivePureDate
+      ? []
+      : searchPaletteRows(entries, matchText, recentIds, {
+          commandsOnly: isCommandsScope,
+          showAllOnEmpty: isCommandsScope && trimmedQuery.length === 0,
+        });
 
     if (trimmedQuery.length === 0 || isCommandsScope) {
       return localRows;
     }
 
+    const scopeProviders = isLivePureDate ? providers.filter((provider) => provider.supportsCreatedAtRange) : providers;
+
     return [
       ...localRows,
-      ...(trimmedQuery.length >= PROVIDER_MIN_QUERY_LENGTH ? buildProviderSectionRows(providerSections) : []),
-      ...buildScopeRows(providers, trimmedQuery),
+      ...(matchText.trim().length >= PROVIDER_MIN_QUERY_LENGTH || hasLiveRange
+        ? buildProviderSectionRows(providerSections)
+        : []),
+      ...buildScopeRows(scopeProviders, isLivePureDate ? '' : matchText.trim()),
     ];
   }, [
+    dateParse,
     entries,
     isCommandsScope,
     localQuery,
@@ -350,9 +384,12 @@ export const useCommandPaletteController = ({
     [activeRow, enterScope, moveActive, popOverlay, query.length, runRow, runSecondary, scopeProviderKey, stage]
   );
 
-  const onSearchChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const nextQuery = event.currentTarget.value;
+  // The single write path for the query: every mutation (typing, programmatic
+  // completion) must go through here so the debounced provider query can never
+  // go stale relative to the input. `immediate` skips the debounce for
+  // discrete completions (suggestion rows) where results should refresh now.
+  const replaceQuery = useCallback(
+    (nextQuery: string, { immediate = false }: { immediate?: boolean } = {}) => {
       const nextLocalQuery = !stage && !scopeProvider && nextQuery.startsWith('>') ? nextQuery.slice(1) : nextQuery;
       const nextTrimmedQuery = nextLocalQuery.trim();
 
@@ -367,12 +404,22 @@ export const useCommandPaletteController = ({
         previewRow(nextRows.find((row) => row.kind !== 'label'));
       }
 
+      if (immediate) {
+        setDebouncedQuery(nextTrimmedQuery);
+        return;
+      }
+
       debounceTimerRef.current = window.setTimeout(() => {
         debounceTimerRef.current = null;
         setDebouncedQuery(nextTrimmedQuery);
       }, PROVIDER_DEBOUNCE_MS);
     },
     [clearDebounce, onStageApplied, previewRow, scopeProvider, stage]
+  );
+
+  const onSearchChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => replaceQuery(event.currentTarget.value),
+    [replaceQuery]
   );
 
   const onRowActive = useCallback(

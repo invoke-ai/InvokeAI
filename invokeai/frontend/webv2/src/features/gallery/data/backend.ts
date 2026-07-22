@@ -20,6 +20,7 @@ interface BackendBoardDTO {
   asset_count: number;
   archived: boolean;
   cover_image_name?: string | null;
+  created_at?: string | null;
   /** Board owner's display name; populated only for admins on multi-user backends. */
   owner_username?: string | null;
 }
@@ -84,6 +85,7 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   assetCount: board.asset_count,
   coverImageName: board.cover_image_name,
   coverThumbnailUrl: board.cover_image_name ? getGalleryImageThumbnailUrl(board.cover_image_name) : undefined,
+  createdAt: board.created_at ?? null,
   id: board.board_id,
   imageCount: board.image_count,
   kind: 'board',

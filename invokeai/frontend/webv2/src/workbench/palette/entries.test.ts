@@ -224,6 +224,12 @@ describe('provider row assembly', () => {
 
     expect(rows[0]).toMatchObject({ kind: 'scope', label: 'Search boards for “sunset”', providerKey: 'boards' });
   });
+
+  it('labels scope rows as by-date searches when only a date filter is active', () => {
+    const rows = buildScopeRows([{ label: 'Images', providerKey: 'images' }], '');
+
+    expect(rows[0]).toMatchObject({ kind: 'scope', label: 'Search images by date', providerKey: 'images' });
+  });
 });
 
 describe('searchPaletteRows', () => {

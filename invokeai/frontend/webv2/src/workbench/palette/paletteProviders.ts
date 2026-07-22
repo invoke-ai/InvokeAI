@@ -10,6 +10,7 @@ import { extractGenerationMeta, getResultImageName } from '@features/queue/contr
 import { listLibraryWorkflows } from '@features/workflow/queries';
 import { requestLibraryWorkflowLoad } from '@features/workflow/react';
 import { queryClient } from '@platform/query/client';
+import { isTimestampInRange } from '@platform/search/dateTokens';
 import { absolutizeApiUrl } from '@platform/transport/http';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
@@ -42,8 +43,8 @@ export const createWorkflowsProvider = ({
   providerKey: getPaletteContributionKey('provider', 'workflows'),
   search: async (query) => {
     const [user, defaults] = await Promise.all([
-      listLibraryWorkflows({ category: 'user', page: 0, perPage: PROVIDER_PAGE_SIZE, query }),
-      listLibraryWorkflows({ category: 'default', page: 0, perPage: PROVIDER_PAGE_SIZE, query }),
+      listLibraryWorkflows({ category: 'user', page: 0, perPage: PROVIDER_PAGE_SIZE, query: query.text }),
+      listLibraryWorkflows({ category: 'default', page: 0, perPage: PROVIDER_PAGE_SIZE, query: query.text }),
     ]);
 
     return [...user.items, ...defaults.items].map<PaletteEntry>((item) => ({
@@ -71,11 +72,18 @@ export const createBoardsProvider = ({
   contextKey: 'global',
   label: 'Boards',
   providerKey: getPaletteContributionKey('provider', 'boards'),
+  supportsCreatedAtRange: true,
   search: async (query) => {
     const boards = await queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false }));
 
     return boards
-      .filter((board: GalleryBoard) => matchesTerms(board.name, query))
+      .filter(
+        (board: GalleryBoard) =>
+          matchesTerms(board.name, query.text) &&
+          // Boards without a creation date (uncategorized, date virtual
+          // boards) are excluded only while a date range is active.
+          (query.range === undefined || isTimestampInRange(board.createdAt ?? '', query.range))
+      )
       .map<PaletteEntry>((board) => ({
         group: 'Boards',
         id: `board:${board.id}`,
@@ -113,7 +121,9 @@ export const createPromptHistoryProvider = ({
     for (const [index, item] of promptHistory.entries()) {
       const dedupeKey = `${item.positivePrompt}\n${item.negativePrompt ?? ''}`;
 
-      if (seen.has(dedupeKey) || !matchesTerms(`${item.positivePrompt} ${item.negativePrompt ?? ''}`, query)) {
+      // Prompt history items carry no timestamp, so this provider is text-only
+      // (not range-capable); it never sees pure-date queries.
+      if (seen.has(dedupeKey) || !matchesTerms(`${item.positivePrompt} ${item.negativePrompt ?? ''}`, query.text)) {
         continue;
       }
 
@@ -156,7 +166,9 @@ export const createModelsProvider = ({
     const models = snapshot.status === 'loaded' ? snapshot.models : [];
 
     return models
-      .filter((model) => GENERATE_MODEL_TYPES.has(model.type) && matchesTerms(`${model.name} ${model.base}`, query))
+      .filter(
+        (model) => GENERATE_MODEL_TYPES.has(model.type) && matchesTerms(`${model.name} ${model.base}`, query.text)
+      )
       .map<PaletteEntry>((model) => ({
         group: 'Models',
         id: `model:${model.key}`,
@@ -196,18 +208,22 @@ export const createQueueItemsProvider = ({
   contextKey,
   label: 'Queue items',
   providerKey: getPaletteContributionKey('provider', 'queue-items'),
+  supportsCreatedAtRange: true,
   search: async (query) => {
     // The queue read model is a recent window with no server-side text search;
-    // filter the fetched window client-side.
+    // filter the fetched window client-side. Items without a timestamp fail
+    // closed while a date range is active.
     const model = await loadQueue();
 
     return model.items
       .map((item) => ({ item, meta: extractGenerationMeta(item) }))
-      .filter(({ item, meta }) =>
-        matchesTerms(
-          `${meta.positivePrompt ?? ''} ${meta.negativePrompt ?? ''} ${QUEUE_STATUS_LABELS[item.status]} ${item.userDisplayName ?? ''}`,
-          query
-        )
+      .filter(
+        ({ item, meta }) =>
+          matchesTerms(
+            `${meta.positivePrompt ?? ''} ${meta.negativePrompt ?? ''} ${QUEUE_STATUS_LABELS[item.status]} ${item.userDisplayName ?? ''}`,
+            query.text
+          ) &&
+          (query.range === undefined || isTimestampInRange(item.createdAt, query.range))
       )
       .map<PaletteEntry>(({ item, meta }) => {
         const resultImageName = getResultImageName(item);
@@ -246,15 +262,18 @@ export const createImagesProvider = ({
   contextKey: selectedBoardId,
   label: 'Images',
   providerKey: getPaletteContributionKey('provider', 'images'),
+  supportsCreatedAtRange: true,
   search: async (query) => {
     // The images endpoint is board-scoped; the palette searches the board the
-    // gallery is currently on.
+    // gallery is currently on. The date range filters server-side.
     const page = await queryClient.fetchQuery(
       galleryImagesOptions({
         boardId: selectedBoardId,
+        createdFrom: query.range?.from,
+        createdTo: query.range?.to,
         galleryView: 'images',
         limit: 20,
-        searchTerm: query,
+        searchTerm: query.text,
       })
     );
 

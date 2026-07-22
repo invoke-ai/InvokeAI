@@ -1,3 +1,4 @@
+import type { DateRange } from '@platform/search/dateTokens';
 import type { CustomHotkeys, HotkeyDefinition } from '@workbench/hotkeys/types';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { SettingsSectionId } from '@workbench/widgetContracts';
@@ -57,6 +58,13 @@ export interface PaletteEntry {
   run: () => unknown;
 }
 
+/** The structured query providers receive: text with date tokens stripped. */
+export interface PaletteProviderQuery {
+  text: string;
+  /** Resolved created-at bounds; only range-capable providers apply it. */
+  range?: DateRange;
+}
+
 /** An async entity source the palette can query (workflows, boards, …). */
 export interface PaletteSearchProvider {
   /** Globally unique, stable identity (including extension source identity). */
@@ -64,7 +72,13 @@ export interface PaletteSearchProvider {
   /** Immutable snapshot of every host value that can affect search results. */
   contextKey: string;
   label: string;
-  search: (query: string) => Promise<PaletteEntry[]> | PaletteEntry[];
+  /**
+   * Provider filters by created-at date range. Date-less providers are
+   * skipped entirely for pure-date queries (empty text + range), where they
+   * could only return broad unfiltered results.
+   */
+  supportsCreatedAtRange?: boolean;
+  search: (query: PaletteProviderQuery) => Promise<PaletteEntry[]> | PaletteEntry[];
 }
 
 export type PaletteRow =
@@ -578,7 +592,10 @@ export const buildProviderSectionRows = (
   return rows;
 };
 
-/** Trailing escape hatches into scoped mode, one per provider. */
+/**
+ * Trailing escape hatches into scoped mode, one per provider. An empty query
+ * means a pure date filter is active — the scope searches "by date".
+ */
 export const buildScopeRows = (
   providers: ReadonlyArray<Pick<PaletteSearchProvider, 'providerKey' | 'label'>>,
   query: string
@@ -586,6 +603,9 @@ export const buildScopeRows = (
   providers.map((provider) => ({
     id: getPaletteContributionKey('scope', provider.providerKey),
     kind: 'scope',
-    label: `Search ${provider.label.toLowerCase()} for “${query}”`,
+    label:
+      query.length === 0
+        ? `Search ${provider.label.toLowerCase()} by date`
+        : `Search ${provider.label.toLowerCase()} for “${query}”`,
     providerKey: provider.providerKey,
   }));
