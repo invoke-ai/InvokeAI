@@ -103,10 +103,23 @@ const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): Ho
   };
 };
 
+// The palette must open while typing and toggle closed above its own modal
+// layer, so it opts into both editable and modal contexts.
+export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
+  allowInEditable: true,
+  allowInModal: true,
+  category: 'app',
+  commandId: 'app.openCommandPalette',
+  defaultKeys: ['mod+k'],
+  id: 'app.openCommandPalette',
+  implemented: true,
+  preventDefault: true,
+  scope: { kind: 'global' },
+  title: 'Open Command Palette',
+};
+
 export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
-  // The palette must open while typing and toggle closed above its own modal
-  // layer, so it opts into both editable and modal contexts.
-  { ...hotkey('app', 'openCommandPalette', ['mod+k']), allowInEditable: true, allowInModal: true },
+  OPEN_COMMAND_PALETTE_HOTKEY,
   hotkey('app', 'invoke', ['mod+enter']),
   hotkey('app', 'invokeFront', ['mod+shift+enter']),
   hotkey('app', 'cancelQueueItem', ['shift+x']),

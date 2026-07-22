@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstPartyHotkeyCatalog } from './catalog';
+import { firstPartyHotkeyCatalog, OPEN_COMMAND_PALETTE_HOTKEY } from './catalog';
 
 describe('firstPartyHotkeyCatalog', () => {
   it('keeps legacy default hotkey parity', () => {
@@ -15,5 +15,11 @@ describe('firstPartyHotkeyCatalog', () => {
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('gallery.galleryNavLeft');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('gallery.remix');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('viewer.deleteImage');
+  });
+
+  it('uses the exported command-palette definition as the catalog entry', () => {
+    expect(firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.openCommandPalette')).toBe(
+      OPEN_COMMAND_PALETTE_HOTKEY
+    );
   });
 });
