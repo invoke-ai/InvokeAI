@@ -9,6 +9,12 @@ import { useRefreshMediaCookieMutation } from 'services/api/endpoints/auth';
 // reload anyway.
 const RETRY_DELAYS_MS = [2_000, 10_000];
 
+let pauseRefreshHandler: (() => Promise<() => void>) | null = null;
+const pendingRefreshes = new Set<Promise<void>>();
+
+export const pauseMediaCookieRefreshForLogout = (): Promise<() => void> =>
+  pauseRefreshHandler?.() ?? Promise.resolve(() => undefined);
+
 /**
  * Self-heal the media cookie for restored sessions.
  *
@@ -38,10 +44,16 @@ export const useMediaCookieRefresh = () => {
     }
 
     let canceled = false;
+    let paused = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let nextAttemptIndex: number | null = null;
 
     const attempt = (attemptIndex: number) => {
-      refreshMediaCookie()
+      if (canceled || paused) {
+        return;
+      }
+      nextAttemptIndex = null;
+      const refreshPromise = refreshMediaCookie()
         .unwrap()
         .then(() => {
           if (canceled) {
@@ -62,14 +74,41 @@ export const useMediaCookieRefresh = () => {
           if (delay === undefined) {
             return;
           }
-          timeoutId = setTimeout(() => attempt(attemptIndex + 1), delay);
+          nextAttemptIndex = attemptIndex + 1;
+          if (!paused) {
+            timeoutId = setTimeout(() => attempt(attemptIndex + 1), delay);
+          }
         });
+      pendingRefreshes.add(refreshPromise);
+      void refreshPromise.finally(() => pendingRefreshes.delete(refreshPromise));
     };
 
+    const pause = async () => {
+      paused = true;
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+      await Promise.all(pendingRefreshes);
+      return () => {
+        if (canceled || hasSucceeded.current) {
+          return;
+        }
+        paused = false;
+        if (nextAttemptIndex !== null) {
+          attempt(nextAttemptIndex);
+        }
+      };
+    };
+
+    pauseRefreshHandler = pause;
     attempt(0);
 
     return () => {
       canceled = true;
+      if (pauseRefreshHandler === pause) {
+        pauseRefreshHandler = null;
+      }
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
       }

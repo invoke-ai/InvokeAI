@@ -50,6 +50,11 @@ class WanLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
+        if latents.ndim not in (4, 5):
+            raise ValueError(
+                f"Wan latents-to-image expects a 4D or 5D latent tensor [B, C, (T), H, W]; got {tuple(latents.shape)}."
+            )
+
         # This node decodes exactly one image. Multi-frame video latents would otherwise
         # run the full (expensive) multi-frame VAE decode — under a working-memory
         # estimate that assumed one frame — and then die in an opaque einops rank error

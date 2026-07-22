@@ -283,14 +283,25 @@ class TestWorkerDecodeBounds:
         with pytest.raises(ValueError, match="exceed the maximum decodable size"):
             worker._assert_decodable_dims(Path("fake.mp4"))
 
-    def test_unprobeable_file_is_not_blocked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_unprobeable_file_is_refused_before_decode(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from invokeai.app.util import video_decode_worker as worker
 
         def _raise(path: Path):
             raise FileNotFoundError("no metadata")
 
         monkeypatch.setattr(worker, "_probe", _raise)
-        worker._assert_decodable_dims(Path("fake.mp4"))  # must not raise
+        with pytest.raises(ValueError, match="Unable to validate video dimensions"):
+            worker._assert_decodable_dims(Path("fake.mp4"))
+
+    @pytest.mark.parametrize("width,height", [(0, 32), (48, 0), (-1, 32), (48, -1)])
+    def test_non_positive_dims_refused_before_decode(
+        self, monkeypatch: pytest.MonkeyPatch, width: int, height: int
+    ) -> None:
+        from invokeai.app.util import video_decode_worker as worker
+
+        monkeypatch.setattr(worker, "_probe", lambda path: (width, height, 1.0, 8.0))
+        with pytest.raises(ValueError, match="invalid dimensions"):
+            worker._assert_decodable_dims(Path("fake.mp4"))
 
     def test_in_bounds_dims_pass(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from invokeai.app.util import video_decode_worker as worker
@@ -332,6 +343,18 @@ class TestStreamBackendFallback:
             yield  # pragma: no cover - makes this a generator
 
         monkeypatch.setattr(worker.iio, "imiter", _imiter_fails)
+
+        frames = self._collect_stream(monkeypatch, synthetic_mp4)
+
+        assert len(frames) == FRAMES
+        assert frames[0].shape == (32, 48, 3)
+
+    def test_falls_back_to_cv2_when_imageio_stream_is_empty(
+        self, monkeypatch: pytest.MonkeyPatch, synthetic_mp4: Path
+    ) -> None:
+        from invokeai.app.util import video_decode_worker as worker
+
+        monkeypatch.setattr(worker.iio, "imiter", lambda *args, **kwargs: iter(()))
 
         frames = self._collect_stream(monkeypatch, synthetic_mp4)
 

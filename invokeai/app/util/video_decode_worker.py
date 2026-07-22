@@ -42,14 +42,16 @@ MAX_FRAME_PIXELS = 64 * 1024 * 1024
 def _assert_decodable_dims(video_path: Path) -> None:
     """Refuses to decode frames from a video whose reported dimensions exceed the bound.
 
-    If the dimensions cannot be probed at all the decode proceeds — the parent's frame
-    record bound and PIL's decompression-bomb check still backstop the frame path.
+    If the dimensions cannot be probed, decoding is refused because the parent's frame
+    record bound and PIL checks run only after the decoder has allocated the frame.
     """
     try:
         width, height, _duration, _fps = _probe(video_path)
-    except Exception:
-        return
-    if width > 0 and height > 0 and width * height > MAX_FRAME_PIXELS:
+    except Exception as error:
+        raise ValueError(f"Unable to validate video dimensions for {video_path}") from error
+    if width <= 0 or height <= 0:
+        raise ValueError(f"Video reports invalid dimensions {width}x{height}")
+    if width * height > MAX_FRAME_PIXELS:
         raise ValueError(f"Video dimensions {width}x{height} exceed the maximum decodable size")
 
 
@@ -186,10 +188,11 @@ def _stream(video_path: Path) -> None:
         for frame in iio.imiter(video_path, plugin="FFMPEG"):
             _emit_stream_frame(frame)
             emitted = True
-        return
     except Exception:
         if emitted:
             raise
+    if emitted:
+        return
 
     import cv2
 

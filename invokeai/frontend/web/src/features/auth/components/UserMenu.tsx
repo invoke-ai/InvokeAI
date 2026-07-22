@@ -1,5 +1,6 @@
 import { Badge, Flex, IconButton, Menu, MenuButton, MenuItem, MenuList, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { pauseMediaCookieRefreshForLogout } from 'features/auth/hooks/useMediaCookieRefresh';
 import { logout, selectCurrentUser } from 'features/auth/store/authSlice';
 import { logoutAfterServerConfirmation } from 'features/auth/store/logoutAfterServerConfirmation';
 import { toast } from 'features/toast/toast';
@@ -22,7 +23,8 @@ export const UserMenu = memo(() => {
       () => {
         dispatch(logout());
         navigate('/login');
-      }
+      },
+      pauseMediaCookieRefreshForLogout
     ).catch(() => {
       // Local auth state is deliberately kept when the server can't confirm the logout
       // (the media cookie may still be live) — but silently doing nothing leaves the
