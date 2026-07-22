@@ -3,6 +3,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { getShouldUsePressureForBrush } from 'features/controlLayers/konva/pressure';
+import { getTransparencyLockedCompositeOperation } from 'features/controlLayers/konva/CanvasTool/transparencyLocking';
 import {
   alignCoordForTool,
   getLastPointOfLastLine,
@@ -212,10 +213,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
-    // When transparency is locked on a raster layer, use 'source-atop' to only paint on existing opaque pixels
-    const isTransparencyLocked =
-      selectedEntity.state.type === 'raster_layer' && selectedEntity.state.isTransparencyLocked;
-    const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
+    const globalCompositeOperation = getTransparencyLockedCompositeOperation(selectedEntity.state);
 
     const shouldUsePressure =
       e.evt.pointerType === 'pen' &&
@@ -282,10 +280,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
-    // When transparency is locked on a raster layer, use 'source-atop' to only paint on existing opaque pixels
-    const isTransparencyLocked =
-      selectedEntity.state.type === 'raster_layer' && selectedEntity.state.isTransparencyLocked;
-    const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
+    const globalCompositeOperation = getTransparencyLockedCompositeOperation(selectedEntity.state);
 
     const shouldUsePressure =
       e.evt.pointerType === 'pen' &&
