@@ -1,6 +1,5 @@
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
-import { loadPaletteQueueReadModel } from '@features/queue/paletteSearch';
 import { requestQueueItemReveal } from '@features/queue/reveal';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
@@ -38,7 +37,6 @@ const OpenWorkbenchCommandPalette = ({ preferences }: { preferences: WorkbenchPr
         modifierKeyLabel={formatHotkeyForPlatform('mod')[0]!}
         openWidgetPlacement={openWidgetPlacement}
         preferences={preferences}
-        loadQueueReadModel={loadPaletteQueueReadModel}
         requestQueueItemReveal={requestQueueItemReveal}
         settingsEntryDeps={SETTINGS_ENTRY_DEPS as SettingsEntryDeps}
         onClose={closeCommandPalette}

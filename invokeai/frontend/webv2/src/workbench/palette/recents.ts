@@ -6,6 +6,8 @@
  * entry list at render time.
  */
 
+import type { PaletteEntry } from './entries';
+
 const STORAGE_KEY = 'invokeai:v7:webv2:palette-recents';
 const MAX_RECORDS = 40;
 
@@ -104,4 +106,3 @@ export const recordRecentEntry = (entry: Pick<PaletteEntry, 'id' | 'isPersistent
     // Quota or private-mode failures are non-fatal; recents are a convenience.
   }
 };
-import type { PaletteEntry } from './entries';

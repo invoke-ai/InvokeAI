@@ -36,8 +36,6 @@ export interface DateTokenParse {
   /** Resolved bounds; present only when at least one valid token resolved. */
   range?: DateRange;
   invalidTokens: readonly InvalidDateToken[];
-  /** Any from:/to:/date: token present, valid or not. */
-  hasDateTokens: boolean;
 }
 
 const TOKEN_PATTERN = /(^|\s)(from|to|date):(\S*)/gi;
@@ -103,11 +101,9 @@ export const parseDateTokens = (query: string, now: Date = new Date()): DateToke
   let from: string | undefined;
   let to: string | undefined;
   let hasValidToken = false;
-  let hasDateTokens = false;
 
   const text = query
     .replace(TOKEN_PATTERN, (match, boundary: string, rawKey: string, rawValue: string) => {
-      hasDateTokens = true;
       const key = rawKey.toLowerCase() as DateTokenKey;
       const resolved = resolveDateValue(rawValue, now);
 
@@ -136,7 +132,6 @@ export const parseDateTokens = (query: string, now: Date = new Date()): DateToke
   }
 
   return {
-    hasDateTokens,
     invalidTokens,
     range: hasValidToken ? { from, to } : undefined,
     text,
@@ -268,27 +263,4 @@ export const formatIsoDate = (isoDate: string, locale?: string): string => {
   const local = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
 
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(local);
-};
-
-/**
- * Human-readable label for an applied range, e.g. "From Jul 14",
- * "Through Jul 21", "Jul 14 – Jul 21", or "Jul 21" for a single day.
- * English-only; i18n surfaces compose their own labels from formatIsoDate.
- */
-export const formatDateRangeLabel = (range: DateRange, locale?: string): string => {
-  if (range.from !== undefined && range.to !== undefined) {
-    return range.from === range.to
-      ? formatIsoDate(range.from, locale)
-      : `${formatIsoDate(range.from, locale)} – ${formatIsoDate(range.to, locale)}`;
-  }
-
-  if (range.from !== undefined) {
-    return `From ${formatIsoDate(range.from, locale)}`;
-  }
-
-  if (range.to !== undefined) {
-    return `Through ${formatIsoDate(range.to, locale)}`;
-  }
-
-  return '';
 };

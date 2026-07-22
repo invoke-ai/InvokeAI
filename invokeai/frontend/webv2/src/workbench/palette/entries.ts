@@ -42,6 +42,8 @@ export interface PaletteEntry {
   groupLabel?: string;
   /** Trailing muted text: a setting's current value, an entity's metadata. */
   subtitle?: string;
+  /** Currently applied stage option; renders a check instead of the subtitle. */
+  isCurrent?: boolean;
   /** Leading 28×28 thumbnail (image results). */
   thumbnailUrl?: string;
   /** Extra match terms, never rendered. */
@@ -245,21 +247,20 @@ export const buildCatalogCommandEntries = ({
     .map((definition) => {
       const widgetGroup = WIDGET_CATEGORY_GROUPS[definition.category];
       const rawGroup = widgetGroup?.group ?? APP_COMMAND_GROUPS[definition.commandId] ?? 'App';
-      const group = rawGroup;
       const groupLabel = t(
         `commandPalette.groups.${rawGroup.replaceAll(' ', '').replace(/^./, (char) => char.toLowerCase())}`,
         { defaultValue: rawGroup }
       );
 
       return {
-        group,
+        group: rawGroup,
         groupLabel,
         id: definition.commandId,
         isPersistentRecent: true,
         keys: getEntryKeys(definition, customHotkeys, formatHotkey),
         keywords: widgetGroup?.group,
         run: () => execute(definition.commandId),
-        showInEmptyState: group === 'Navigation',
+        showInEmptyState: rawGroup === 'Navigation',
         title: t(`commandPalette.commands.${definition.commandId.replace('.', '_')}`, {
           defaultValue: TITLE_OVERRIDES[definition.commandId] ?? definition.title,
         }),
@@ -592,6 +593,7 @@ export const buildStageEntries = (stage: PaletteStage, onApplied: () => void, t?
   stage.options.map((option) => ({
     group: stage.title,
     id: `${STAGE_ENTRY_ID_PREFIX}${option.id}`,
+    isCurrent: option.isCurrent,
     isPersistentRecent: false,
     keepOpen: true,
     run: () => {

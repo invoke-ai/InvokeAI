@@ -232,7 +232,13 @@ describe('buildStageEntries', () => {
       onApplied
     );
 
-    expect(entries[0]).toMatchObject({ group: 'Theme', keepOpen: true, subtitle: 'Current', title: 'Alpha' });
+    expect(entries[0]).toMatchObject({
+      group: 'Theme',
+      isCurrent: true,
+      keepOpen: true,
+      subtitle: 'Current',
+      title: 'Alpha',
+    });
 
     entries[0]?.run();
     expect(apply).toHaveBeenCalled();

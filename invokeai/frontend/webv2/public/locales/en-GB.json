@@ -4,6 +4,7 @@
     "buttonLabel": "Command palette",
     "buttonTooltip": "Command palette ({{hotkey}})",
     "inputLabel": "Search commands and settings",
+    "resultsLabel": "Command palette results",
     "placeholders": {
       "root": "Search commands, settings, and more…",
       "scope": "Search {{label}}…",

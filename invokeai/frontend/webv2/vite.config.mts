@@ -15,13 +15,15 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // The palette's tiny global state is an external-store selector;
-          // retain the established shared request instead of creating another.
-          if (id.endsWith('/platform/state/selectors.ts') || id.endsWith('/workbench/palette/paletteStore.ts')) {
-            return 'selectors';
-          }
-          if (id.endsWith('/platform/search/dateTokens.ts')) {
-            return 'vendor';
+          // Tiny first-party modules imported by both the eager shell and lazy
+          // feature chunks (store selectors, the palette's open state, the
+          // date-token parser); one shared chunk instead of a file per module.
+          if (
+            id.endsWith('/platform/state/selectors.ts') ||
+            id.endsWith('/workbench/palette/paletteStore.ts') ||
+            id.endsWith('/platform/search/dateTokens.ts')
+          ) {
+            return 'shared';
           }
 
           if (!id.includes('/node_modules/')) {

@@ -5,6 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { dropdownGroupLabel } from '@theme/recipes';
 import { CheckIcon } from 'lucide-react';
 import { useCallback, useImperativeHandle, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { PaletteEntry, PaletteRow } from './entries';
 
@@ -89,7 +90,7 @@ const EntryRow = ({
       <Text fontSize="sm" truncate>
         {renderTitle(entry.title, matchIndexes)}
       </Text>
-      {entry.subtitle === 'Current' ? (
+      {entry.isCurrent ? (
         <Icon as={CheckIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
       ) : entry.subtitle ? (
         <Text color="fg.subtle" flexShrink={0} fontSize="xs" maxW="45%" truncate>
@@ -258,6 +259,7 @@ export const CommandPaletteRows = ({
   onActive: (rowId: string) => void;
   onRun: (row: PaletteRow) => void;
 }) => {
+  const { t } = useTranslation();
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const estimateRowSize = useCallback(
     (index: number) => (rows[index]?.kind === 'label' ? LABEL_ROW_HEIGHT_PX : ENTRY_ROW_HEIGHT_PX),
@@ -280,7 +282,7 @@ export const CommandPaletteRows = ({
 
   return (
     <ScrollArea.Root maxH="min(400px, 55dvh)" size="xs" variant="hover" w="full">
-      <ScrollArea.Viewport ref={setScrollElement} aria-label="Command palette results" maxH="inherit" w="full">
+      <ScrollArea.Viewport ref={setScrollElement} aria-label={t('commandPalette.resultsLabel')} maxH="inherit" w="full">
         <ScrollArea.Content id={RESULT_LIST_ID} aria-busy={isBusy} pb="1.5" role="listbox" w="full">
           <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
             {virtualizer.getVirtualItems().map((virtualRow) => {

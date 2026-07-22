@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   completeTrailingDateToken,
-  formatDateRangeLabel,
   formatIsoDate,
   isPossibleDatePrefix,
   isTimestampInRange,
@@ -18,7 +17,6 @@ describe('parseDateTokens', () => {
     const parse = parseDateTokens('sunset boulevard', NOW);
 
     expect(parse).toEqual({
-      hasDateTokens: false,
       invalidTokens: [],
       range: undefined,
       text: 'sunset boulevard',
@@ -30,7 +28,6 @@ describe('parseDateTokens', () => {
 
     expect(parse.range).toEqual({ from: '2026-07-01', to: '2026-07-15' });
     expect(parse.text).toBe('sunset boulevard');
-    expect(parse.hasDateTokens).toBe(true);
     expect(parse.invalidTokens).toEqual([]);
   });
 
@@ -85,7 +82,6 @@ describe('parseDateTokens', () => {
 
     expect(parse.range).toBeUndefined();
     expect(parse.text).toBe('sunset from:lastweek');
-    expect(parse.hasDateTokens).toBe(true);
     expect(parse.invalidTokens).toEqual([{ key: 'from', raw: 'lastweek' }]);
   });
 
@@ -107,7 +103,8 @@ describe('parseDateTokens', () => {
   it('ignores tokens without a leading boundary', () => {
     const parse = parseDateTokens('wherefrom:2026-07-01', NOW);
 
-    expect(parse.hasDateTokens).toBe(false);
+    expect(parse.range).toBeUndefined();
+    expect(parse.invalidTokens).toEqual([]);
     expect(parse.text).toBe('wherefrom:2026-07-01');
   });
 
@@ -181,19 +178,11 @@ describe('isPossibleDatePrefix', () => {
   });
 });
 
-describe('formatIsoDate / formatDateRangeLabel', () => {
+describe('formatIsoDate', () => {
   it('formats the calendar day itself regardless of timezone offset', () => {
     // A UTC-based Date('2026-07-21') would render Jul 20 in negative offsets;
     // parts-based construction must always yield the written day.
     expect(formatIsoDate('2026-07-21', 'en-US')).toBe('Jul 21');
     expect(formatIsoDate('2026-07-21', 'de-DE')).toBe('21. Juli');
-  });
-
-  it('covers all four range shapes', () => {
-    expect(formatDateRangeLabel({ from: '2026-07-14', to: '2026-07-21' }, 'en-US')).toBe('Jul 14 – Jul 21');
-    expect(formatDateRangeLabel({ from: '2026-07-14' }, 'en-US')).toBe('From Jul 14');
-    expect(formatDateRangeLabel({ to: '2026-07-21' }, 'en-US')).toBe('Through Jul 21');
-    expect(formatDateRangeLabel({ from: '2026-07-21', to: '2026-07-21' }, 'en-US')).toBe('Jul 21');
-    expect(formatDateRangeLabel({}, 'en-US')).toBe('');
   });
 });

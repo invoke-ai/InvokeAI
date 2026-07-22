@@ -1,4 +1,3 @@
-import type { QueueQueryScope, QueueReadModel } from '@features/queue/contracts';
 import type { HotkeyDefinition } from '@workbench/hotkeys/types';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { openWidgetPlacement as OpenWidgetPlacement } from '@workbench/widgetPlacementCommands';
@@ -7,6 +6,7 @@ import type { TFunction } from 'i18next';
 
 import { getPromptHistoryRecallPatch } from '@features/generation/settings';
 import { useModelsSnapshot } from '@features/models';
+import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -56,7 +56,6 @@ const WorkbenchCommandPaletteDialog = ({
   catalog,
   formatHotkey,
   getWidgetsForRegion,
-  loadQueueReadModel,
   modifierKeyLabel,
   onClose,
   openWidgetPlacement,
@@ -67,7 +66,6 @@ const WorkbenchCommandPaletteDialog = ({
   catalog: readonly HotkeyDefinition[];
   formatHotkey: (hotkey: string) => string[];
   getWidgetsForRegion: typeof GetWidgetsForRegion;
-  loadQueueReadModel: (scope: QueueQueryScope) => Promise<QueueReadModel>;
   modifierKeyLabel: string;
   onClose: () => void;
   openWidgetPlacement: typeof OpenWidgetPlacement;
@@ -133,8 +131,7 @@ const WorkbenchCommandPaletteDialog = ({
   const extensionSearchProviders = useSyncExternalStore(searchStore.subscribe, searchStore.list, searchStore.list);
   const promptRecallContextKey = `${getObjectIdentity(generateValues, 'generation')}:${getObjectIdentity(models, 'models')}`;
   const queueScope = useMemo(
-    () =>
-      preferences.queueJobsScope === 'active-project' && projectId ? { originPrefix: `webv2:p:${projectId}:q:` } : {},
+    () => getQueueQueryScope({ projectId, queueJobsScope: preferences.queueJobsScope }),
     [preferences.queueJobsScope, projectId]
   );
   const providers = useMemo<PaletteSearchProvider[]>(() => {
@@ -177,12 +174,7 @@ const WorkbenchCommandPaletteDialog = ({
       }),
       createQueueItemsProvider({
         contextKey: queueScope.originPrefix ?? 'all-projects',
-        loadQueue: () =>
-          queryClient.fetchQuery({
-            queryFn: () => loadQueueReadModel(queueScope),
-            queryKey: ['queue', 'read-model', queueScope.originPrefix ?? 'all'],
-            staleTime: 5_000,
-          }),
+        loadQueue: () => queryClient.fetchQuery(getQueueReadModelOptions(queueScope)),
         openQueueWidget: () => openWidget('queue'),
         revealItem: requestQueueItemReveal,
         t,
@@ -218,7 +210,6 @@ const WorkbenchCommandPaletteDialog = ({
     promptHistory,
     promptRecallContextKey,
     queueScope,
-    loadQueueReadModel,
     requestQueueItemReveal,
     t,
     workbenchCommands,

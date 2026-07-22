@@ -1,3 +1,5 @@
+import type { WorkbenchPreferences } from '@workbench/settings/contracts';
+
 import { useCapabilities } from '@features/identity';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
@@ -66,4 +68,3 @@ const LaunchpadCommandPaletteDialog = ({
 };
 
 export default LaunchpadCommandPaletteDialog;
-import type { WorkbenchPreferences } from '@workbench/settings/contracts';
