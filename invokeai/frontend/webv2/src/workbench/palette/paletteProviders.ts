@@ -13,6 +13,7 @@ import { listLibraryWorkflows } from '@features/workflow/paletteSearch';
 import { requestLibraryWorkflowLoad } from '@features/workflow/react';
 import { queryClient } from '@platform/query/client';
 import { isTimestampInRange } from '@platform/search/dateTokens';
+import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 import { absolutizeApiUrl } from '@platform/transport/http';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
@@ -318,7 +319,7 @@ export const createImagesProvider = ({
     });
 
     return page.images.map<PaletteEntry>((image) => {
-      const createdAt = new Date(image.queuedAt);
+      const createdAt = new Date(normalizeServerTimestamp(image.queuedAt));
 
       return {
         group: 'Images',
