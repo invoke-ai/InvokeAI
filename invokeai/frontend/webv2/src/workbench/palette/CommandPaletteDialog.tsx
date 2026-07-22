@@ -5,7 +5,7 @@ import { Dialog, HStack, Icon, Kbd, Portal, Spacer, Text, chakra } from '@chakra
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { EmptyState } from '@platform/ui/EmptyState';
-import { SearchIcon } from 'lucide-react';
+import { SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
 
 import type { CommandPaletteRowsHandle } from './CommandPaletteRows';
@@ -152,18 +152,27 @@ const CommandPaletteContent = ({
           >
             <Icon as={SearchIcon} boxSize="4" color="fg.muted" flexShrink={0} />
             {controller.chipLabel ? (
-              <Text
+              <chakra.button
+                alignItems="center"
+                aria-label={`Close ${controller.chipLabel} — back to all results`}
                 bg="bg.emphasized"
                 borderRadius="sm"
                 color="fg"
+                cursor="pointer"
+                display="inline-flex"
                 flexShrink={0}
                 fontSize="xs"
                 fontWeight="600"
+                gap="1"
                 px="1.5"
                 py="0.5"
+                title="Back to all results"
+                type="button"
+                onClick={controller.onPopOverlay}
               >
                 {controller.chipLabel}
-              </Text>
+                <Icon as={XIcon} boxSize="3" color="fg.muted" />
+              </chakra.button>
             ) : null}
             <chakra.input
               ref={controller.setInputElement}
@@ -222,6 +231,7 @@ const CommandPaletteContent = ({
               rows={controller.rows}
               onActive={controller.onRowActive}
               onRun={controller.onRowRun}
+              onRunSecondary={controller.onRowRunSecondary}
             />
           )}
           <HStack

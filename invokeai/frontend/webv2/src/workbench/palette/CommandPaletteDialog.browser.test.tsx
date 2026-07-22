@@ -410,8 +410,105 @@ describe('CommandPaletteDialog interaction', () => {
 
     await renderPalette({ entries: [], providers: [provider] });
     expect(document.body.textContent).toContain('Recent');
-    // Deliberately listed twice: once under Recent, once under Search in.
-    expect(document.body.textContent?.match(/Search entities…/g)).toHaveLength(2);
+    // Listed once, under Recent — the launcher groups don't repeat recents.
+    expect(document.body.textContent?.match(/Search entities…/g)).toHaveLength(1);
+  });
+
+  it('advertises the query syntax in the empty launcher, scaled to host capabilities', async () => {
+    const capable: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Images',
+      providerKey: 'images',
+      search: vi.fn(() => []),
+      supportsCreatedAtRange: true,
+    };
+    await renderPalette({ entries: [entry('first', 'First command')], providers: [capable] });
+    expect(document.body.textContent).toContain('Type > for commands · from:/date: to filter by date');
+
+    await act(() => root?.unmount());
+    host?.remove();
+
+    // Launchpad shape: no providers → no date-token hint, `>` still advertised.
+    await renderPalette({ entries: [entry('first', 'First command')] });
+    expect(document.body.textContent).toContain('Type > for commands');
+    expect(document.body.textContent).not.toContain('filter by date');
+  });
+
+  it('closes a scope from the chip and returns to the root palette with focus', async () => {
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Entities',
+      providerKey: 'entities',
+      search: vi.fn(() => []),
+    };
+    const { input, onClose } = await renderPalette({
+      entries: [entry('first', 'First command')],
+      providers: [provider],
+    });
+
+    await act(() => userEvent.fill(input, 'search ent'));
+    await act(() => userEvent.keyboard('{Enter}'));
+    const chip = await vi.waitFor(() => {
+      const node = [...document.querySelectorAll('button')].find((button) => button.textContent?.includes('Entities'));
+      expect(node).toBeDefined();
+      return node!;
+    });
+
+    await act(() => userEvent.click(chip));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('First command');
+    expect(input.value).toBe('');
+    await vi.waitFor(() => expect(document.activeElement).toBe(input));
+  });
+
+  it('runs the highlighted row secondary action from its pointer affordance', async () => {
+    const secondaryRun = vi.fn();
+    const withSecondary: PaletteEntry = {
+      ...entry('first', 'First command'),
+      secondary: { label: 'Open Elsewhere', run: secondaryRun },
+    };
+    const { onClose } = await renderPalette({ entries: [withSecondary] });
+
+    const secondaryButton = await vi.waitFor(() => {
+      const node = document.querySelector<HTMLButtonElement>('button[aria-label="Open Elsewhere"]');
+      expect(node).not.toBeNull();
+      return node!;
+    });
+
+    await act(() => userEvent.click(secondaryButton));
+    expect(secondaryRun).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('hands a date-less scope the token-stripped text its scope row advertised', async () => {
+    const capableSearch = vi.fn(() => []);
+    const dateLessSearch = vi.fn(() => []);
+    const capable: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Images',
+      providerKey: 'images',
+      search: capableSearch,
+      supportsCreatedAtRange: true,
+    };
+    const dateLess: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Workflows',
+      providerKey: 'workflows',
+      search: dateLessSearch,
+    };
+    const { input } = await renderPalette({ entries: [], providers: [capable, dateLess] });
+
+    await act(() => userEvent.fill(input, 'from:7d sunset'));
+    expect(document.body.textContent).toContain('Search workflows for “sunset”');
+
+    // The workflows scope row is the last navigable row; ArrowUp wraps to it.
+    await act(() => userEvent.keyboard('{ArrowUp}'));
+    await act(() => userEvent.keyboard('{Tab}'));
+
+    expect(input.value).toBe('sunset');
+    await vi.waitFor(() => {
+      expect(dateLessSearch).toHaveBeenCalledWith({ range: undefined, text: 'sunset' });
+    });
   });
 
   it('drives stage preview from navigation and restores it on Escape and unmount', async () => {

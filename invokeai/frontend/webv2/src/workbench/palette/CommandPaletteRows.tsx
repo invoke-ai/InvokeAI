@@ -2,7 +2,7 @@ import type { ReactNode, Ref } from 'react';
 
 import { Box, HStack, Icon, Kbd, ScrollArea, Spacer, Text, chakra } from '@chakra-ui/react';
 import { dropdownGroupLabel } from '@theme/recipes';
-import { CheckIcon } from 'lucide-react';
+import { ArrowUpRightIcon, CheckIcon } from 'lucide-react';
 import { useCallback, useImperativeHandle, useState } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 
@@ -16,6 +16,8 @@ const VIRTUALIZER_INITIAL_RECT = { height: 384, width: 0 };
 export const getCommandPaletteRowDomId = (rowId: string): string => `${RESULT_LIST_ID}-${encodeURIComponent(rowId)}`;
 
 const preventFocusSteal = (event: { preventDefault: () => void }) => event.preventDefault();
+
+const SECONDARY_BUTTON_HOVER_STYLE = { color: 'fg' };
 
 const renderTitle = (title: string, matchIndexes?: readonly number[]): ReactNode => {
   if (!matchIndexes || matchIndexes.length === 0) {
@@ -46,14 +48,14 @@ const renderTitle = (title: string, matchIndexes?: readonly number[]): ReactNode
   return segments;
 };
 
+// Rows are divs, not buttons: they stay out of the tab order (combobox
+// aria-activedescendant pattern) and may nest a real secondary-action button.
 const rowButtonProps = {
-  as: 'button',
   cursor: 'pointer',
   gap: '2.5',
   h: `${ENTRY_ROW_HEIGHT_PX}px`,
   px: '3',
   rounded: 'sm',
-  tabIndex: -1,
   textAlign: 'start',
   w: 'full',
 } as const;
@@ -65,6 +67,7 @@ const EntryRow = ({
   matchIndexes,
   onActive,
   onRun,
+  onRunSecondary,
 }: {
   domId: string;
   entry: PaletteEntry;
@@ -72,42 +75,72 @@ const EntryRow = ({
   matchIndexes?: readonly number[];
   onActive: () => void;
   onRun: () => void;
-}) => (
-  <HStack
-    {...rowButtonProps}
-    id={domId}
-    aria-selected={isActive}
-    bg={isActive ? 'bg.emphasized' : undefined}
-    role="option"
-    onClick={onRun}
-    onMouseDown={preventFocusSteal}
-    onMouseMove={onActive}
-  >
-    {entry.thumbnailUrl ? (
-      <chakra.img alt="" boxSize="7" flexShrink={0} objectFit="cover" rounded="sm" src={entry.thumbnailUrl} />
-    ) : null}
-    <Text fontSize="sm" truncate>
-      {renderTitle(entry.title, matchIndexes)}
-    </Text>
-    {entry.subtitle === 'Current' ? (
-      <Icon as={CheckIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
-    ) : entry.subtitle ? (
-      <Text color="fg.subtle" flexShrink={0} fontSize="xs" maxW="45%" truncate>
-        {entry.subtitle}
+  onRunSecondary: () => void;
+}) => {
+  const onSecondaryClick = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      onRunSecondary();
+    },
+    [onRunSecondary]
+  );
+
+  return (
+    <HStack
+      {...rowButtonProps}
+      id={domId}
+      aria-selected={isActive}
+      bg={isActive ? 'bg.emphasized' : undefined}
+      role="option"
+      onClick={onRun}
+      onMouseDown={preventFocusSteal}
+      onMouseMove={onActive}
+    >
+      {entry.thumbnailUrl ? (
+        <chakra.img alt="" boxSize="7" flexShrink={0} objectFit="cover" rounded="sm" src={entry.thumbnailUrl} />
+      ) : null}
+      <Text fontSize="sm" truncate>
+        {renderTitle(entry.title, matchIndexes)}
       </Text>
-    ) : null}
-    <Spacer />
-    {entry.keys ? (
-      <HStack flexShrink={0} gap="0.5">
-        {entry.keys.map((part) => (
-          <Kbd key={part} size="sm" textTransform="lowercase">
-            {part}
-          </Kbd>
-        ))}
-      </HStack>
-    ) : null}
-  </HStack>
-);
+      {entry.subtitle === 'Current' ? (
+        <Icon as={CheckIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
+      ) : entry.subtitle ? (
+        <Text color="fg.subtle" flexShrink={0} fontSize="xs" maxW="45%" truncate>
+          {entry.subtitle}
+        </Text>
+      ) : null}
+      <Spacer />
+      {entry.secondary && isActive ? (
+        <chakra.button
+          aria-label={entry.secondary.label}
+          color="fg.muted"
+          cursor="pointer"
+          display="inline-flex"
+          flexShrink={0}
+          p="1"
+          rounded="sm"
+          tabIndex={-1}
+          title={entry.secondary.label}
+          type="button"
+          _hover={SECONDARY_BUTTON_HOVER_STYLE}
+          onClick={onSecondaryClick}
+          onMouseDown={preventFocusSteal}
+        >
+          <Icon as={ArrowUpRightIcon} boxSize="3.5" />
+        </chakra.button>
+      ) : null}
+      {entry.keys ? (
+        <HStack flexShrink={0} gap="0.5">
+          {entry.keys.map((part) => (
+            <Kbd key={part} size="sm" textTransform="lowercase">
+              {part}
+            </Kbd>
+          ))}
+        </HStack>
+      ) : null}
+    </HStack>
+  );
+};
 
 const ScopeRow = ({
   domId,
@@ -150,6 +183,7 @@ const VirtualPaletteRow = ({
   virtualStart,
   onActive,
   onRun,
+  onRunSecondary,
 }: {
   activeRowId: string | null;
   measureElement: (node: Element | null) => void;
@@ -158,9 +192,11 @@ const VirtualPaletteRow = ({
   virtualStart: number;
   onActive: (rowId: string) => void;
   onRun: (row: PaletteRow) => void;
+  onRunSecondary: (row: PaletteRow) => void;
 }) => {
   const handleActive = useCallback(() => onActive(row.id), [onActive, row.id]);
   const handleRun = useCallback(() => onRun(row), [onRun, row]);
+  const handleRunSecondary = useCallback(() => onRunSecondary(row), [onRunSecondary, row]);
   const isActive = row.id === activeRowId;
 
   return (
@@ -193,6 +229,7 @@ const VirtualPaletteRow = ({
           matchIndexes={row.matchIndexes}
           onActive={handleActive}
           onRun={handleRun}
+          onRunSecondary={handleRunSecondary}
         />
       )}
     </Box>
@@ -209,12 +246,14 @@ export const CommandPaletteRows = ({
   rows,
   onActive,
   onRun,
+  onRunSecondary,
 }: {
   activeRowId: string | null;
   ref?: Ref<CommandPaletteRowsHandle>;
   rows: PaletteRow[];
   onActive: (rowId: string) => void;
   onRun: (row: PaletteRow) => void;
+  onRunSecondary: (row: PaletteRow) => void;
 }) => {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const estimateRowSize = useCallback(
@@ -254,6 +293,7 @@ export const CommandPaletteRows = ({
                   virtualStart={virtualRow.start}
                   onActive={onActive}
                   onRun={onRun}
+                  onRunSecondary={onRunSecondary}
                 />
               ) : null;
             })}

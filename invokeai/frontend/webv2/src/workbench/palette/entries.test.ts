@@ -220,16 +220,21 @@ describe('provider row assembly', () => {
     expect(rows[0]).toMatchObject({ kind: 'label', label: 'workflows — Searching…' });
   });
 
-  it('builds one trailing scope row per provider', () => {
+  it('builds one trailing scope row per provider under a "Search in" header', () => {
     const rows = buildScopeRows([{ label: 'Boards', providerKey: 'boards' }], 'sunset');
 
-    expect(rows[0]).toMatchObject({ kind: 'scope', label: 'Search boards for “sunset”', providerKey: 'boards' });
+    expect(rows[0]).toMatchObject({ kind: 'label', label: SEARCH_SCOPE_GROUP });
+    expect(rows[1]).toMatchObject({ kind: 'scope', label: 'Search boards for “sunset”', providerKey: 'boards' });
+  });
+
+  it('builds no rows — not even the header — without providers', () => {
+    expect(buildScopeRows([], 'sunset')).toEqual([]);
   });
 
   it('labels scope rows as by-date searches when only a date filter is active', () => {
     const rows = buildScopeRows([{ label: 'Images', providerKey: 'images' }], '');
 
-    expect(rows[0]).toMatchObject({ kind: 'scope', label: 'Search images by date', providerKey: 'images' });
+    expect(rows[1]).toMatchObject({ kind: 'scope', label: 'Search images by date', providerKey: 'images' });
   });
 });
 
@@ -256,6 +261,12 @@ describe('searchPaletteRows', () => {
     const rows = searchPaletteRows(entries, '', ['no.longer.exists']);
 
     expect(rows.map((row) => row.id)).toEqual(['label:Navigation', 'app.selectCanvasTab']);
+  });
+
+  it('does not repeat a recent entry in its launcher group', () => {
+    const rows = searchPaletteRows(entries, '', ['app.selectCanvasTab']);
+
+    expect(rows.map((row) => row.id)).toEqual(['label:Recent', 'recent:app.selectCanvasTab']);
   });
 
   it('ranks fuzzy matches within their section and drops non-matches', () => {

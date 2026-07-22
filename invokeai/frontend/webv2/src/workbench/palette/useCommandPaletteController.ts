@@ -70,9 +70,13 @@ export interface CommandPaletteController {
   hasScopeRows: boolean;
   isOverlayOpen: boolean;
   onContentKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
+  /** Pop the active scope/stage back to the root palette (chip dismiss). */
+  onPopOverlay: () => void;
   onRetry: () => void;
   onRowActive: (rowId: string) => void;
   onRowRun: (row: PaletteRow) => void;
+  /** Run a row's mod+Enter secondary action (row-level pointer affordance). */
+  onRowRunSecondary: (row: PaletteRow) => void;
   onSearchChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>, scrollToIndex: ScrollToIndex) => void;
   placeholder: string;
@@ -307,16 +311,19 @@ export const useCommandPaletteController = ({
 
   const enterScope = useCallback(
     (providerKey: string, { resetQuery = false }: { resetQuery?: boolean } = {}) => {
+      // A date-less scope cannot apply date tokens; hand it the token-stripped
+      // text its scope row advertised, not the raw token text.
+      const target = providers.find((provider) => provider.providerKey === providerKey);
+      const keptQuery = !target?.supportsCreatedAtRange && dateParse !== null ? dateParse.text.trim() : trimmedQuery;
+
       clearDebounce();
       setScopeProviderKey(providerKey);
-      if (resetQuery) {
-        setQuery('');
-      }
-      setDebouncedQuery(resetQuery ? '' : trimmedQuery);
+      setQuery(resetQuery ? '' : keptQuery);
+      setDebouncedQuery(resetQuery ? '' : keptQuery);
       setActiveRowId(null);
       focusInput();
     },
-    [clearDebounce, focusInput, trimmedQuery]
+    [clearDebounce, dateParse, focusInput, providers, trimmedQuery]
   );
 
   // One "Search images…"-style command per provider, merged into the local
@@ -361,8 +368,18 @@ export const useCommandPaletteController = ({
           showAllOnEmpty: isCommandsScope && trimmedQuery.length === 0,
         });
 
-    if (trimmedQuery.length === 0 || isCommandsScope) {
+    if (isCommandsScope) {
       return localRows;
+    }
+
+    if (trimmedQuery.length === 0) {
+      // Quiet trailing tip in the launcher — the only place the query syntax
+      // is advertised before it is typed.
+      const syntaxHint = providers.some((provider) => provider.supportsCreatedAtRange)
+        ? 'Type > for commands · from:/date: to filter by date'
+        : 'Type > for commands';
+
+      return [...localRows, { id: 'label:syntax-hint', kind: 'label', label: syntaxHint }];
     }
 
     const scopeProviders = isLivePureDate ? providers.filter((provider) => provider.supportsCreatedAtRange) : providers;
@@ -451,6 +468,15 @@ export const useCommandPaletteController = ({
       void entry.secondary.run();
     },
     [onClose]
+  );
+
+  const onRowRunSecondary = useCallback(
+    (row: PaletteRow) => {
+      if (row.kind === 'entry' && row.entry.secondary) {
+        runSecondary(row.entry);
+      }
+    },
+    [runSecondary]
   );
 
   const moveActive = useCallback(
@@ -589,9 +615,11 @@ export const useCommandPaletteController = ({
     hasScopeRows: rows.some((row) => row.kind === 'scope'),
     isOverlayOpen: Boolean(stage || scopeProviderKey),
     onContentKeyDown,
+    onPopOverlay: popOverlay,
     onRetry,
     onRowActive,
     onRowRun: runRow,
+    onRowRunSecondary,
     onSearchChange,
     onSearchKeyDown,
     placeholder: stage

@@ -175,6 +175,7 @@ const APP_COMMAND_GROUPS: Record<string, string> = {
   'app.selectGenerateTab': 'Navigation',
   'app.selectModelsTab': 'Navigation',
   'app.selectQueueTab': 'Navigation',
+  'app.selectUpscalingTab': 'Navigation',
   'app.selectWorkflowsTab': 'Navigation',
   'app.toggleLeftPanel': 'Layout',
   'app.togglePanels': 'Layout',
@@ -189,6 +190,7 @@ const TITLE_OVERRIDES: Record<string, string> = {
   'app.selectGenerateTab': 'Go to Generate',
   'app.selectModelsTab': 'Go to Models',
   'app.selectQueueTab': 'Go to Queue',
+  'app.selectUpscalingTab': 'Go to Upscaling',
   'app.selectWorkflowsTab': 'Go to Workflows',
 };
 
@@ -451,10 +453,12 @@ const buildEmptyStateRows = (entries: readonly PaletteEntry[], recentIds: readon
     }
   }
 
+  // Entries already shown under Recent don't repeat in their launcher group.
+  const shownRecentIds = new Set(recent.map((entry) => entry.id));
   const launcher = new Map<string, RankedEntry[]>();
 
   for (const entry of entries) {
-    if (!entry.showInEmptyState) {
+    if (!entry.showInEmptyState || shownRecentIds.has(entry.id)) {
       continue;
     }
 
@@ -596,19 +600,30 @@ export const buildProviderSectionRows = (
 };
 
 /**
- * Trailing escape hatches into scoped mode, one per provider. An empty query
- * means a pure date filter is active — the scope searches "by date".
+ * Trailing escape hatches into scoped mode, one per provider, under a shared
+ * "Search in" header. An empty query means a pure date filter is active — the
+ * scope searches "by date".
  */
 export const buildScopeRows = (
   providers: ReadonlyArray<Pick<PaletteSearchProvider, 'providerKey' | 'label'>>,
   query: string
-): PaletteRow[] =>
-  providers.map((provider) => ({
-    id: getPaletteContributionKey('scope', provider.providerKey),
-    kind: 'scope',
-    label:
-      query.length === 0
-        ? `Search ${provider.label.toLowerCase()} by date`
-        : `Search ${provider.label.toLowerCase()} for “${query}”`,
-    providerKey: provider.providerKey,
-  }));
+): PaletteRow[] => {
+  if (providers.length === 0) {
+    return [];
+  }
+
+  return [
+    // Distinct id: the scope-command *group* label ("label:Search in") can
+    // render in the same list when a query fuzzy-matches those commands.
+    { id: 'label:scope-rows', kind: 'label', label: SEARCH_SCOPE_GROUP },
+    ...providers.map<PaletteRow>((provider) => ({
+      id: getPaletteContributionKey('scope', provider.providerKey),
+      kind: 'scope',
+      label:
+        query.length === 0
+          ? `Search ${provider.label.toLowerCase()} by date`
+          : `Search ${provider.label.toLowerCase()} for “${query}”`,
+      providerKey: provider.providerKey,
+    })),
+  ];
+};
