@@ -39,4 +39,10 @@ describe('palette state transitions', () => {
   it('returns to a fresh root state', () => {
     expect(returnPaletteToRoot()).toEqual(createInitialPaletteState());
   });
+
+  it('preserves state identity when the requested row is already selected', () => {
+    const state = changePaletteSelection(createInitialPaletteState(), 'row-1');
+
+    expect(changePaletteSelection(state, 'row-1')).toBe(state);
+  });
 });

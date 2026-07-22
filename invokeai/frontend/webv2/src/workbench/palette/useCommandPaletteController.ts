@@ -82,9 +82,10 @@ export const useCommandPaletteController = ({
     window.requestAnimationFrame(() => document.getElementById(COMMAND_PALETTE_INPUT_ID)?.focus());
   }, []);
   const clearDebounce = debouncer.cancel;
+  const { activeRowId, debouncedQuery, mode, query } = paletteState;
   const queryModel = useMemo(
-    () => derivePaletteQueryModel({ providers, state: paletteState }),
-    [paletteState, providers]
+    () => derivePaletteQueryModel({ providers, state: { debouncedQuery, mode, query } }),
+    [debouncedQuery, mode, providers, query]
   );
   const {
     activeProviders,
@@ -99,8 +100,6 @@ export const useCommandPaletteController = ({
     stage,
     trimmedQuery,
   } = queryModel;
-  const { activeRowId, query } = paletteState;
-
   const { results: providerResults, sections: providerSections } = usePaletteProviderSections({
     enabled: shouldSearchProviders && !isWaitingForDebounce,
     isWaitingForDebounce: shouldSearchProviders && isWaitingForDebounce,

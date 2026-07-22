@@ -5,7 +5,7 @@ import { useCallback, useMemo } from 'react';
 import type { PaletteEntry, PaletteRow, PaletteStage } from './entries';
 import type { PaletteState } from './paletteState';
 
-import { resolveActivePaletteRow, STAGE_ENTRY_ID_PREFIX } from './entries';
+import { getNavigablePaletteRows, resolveActivePaletteRow, STAGE_ENTRY_ID_PREFIX } from './entries';
 import { changePaletteSelection, enterPaletteStage } from './paletteState';
 import { recordRecentEntry } from './recents';
 
@@ -40,11 +40,11 @@ export const usePaletteNavigation = ({
   setPaletteState: Dispatch<SetStateAction<PaletteState>>;
   stage: PaletteStage | null;
 }) => {
-  const navigableRows = useMemo(
-    () => rows.flatMap((row, index) => (row.kind === 'label' ? [] : [{ index, row }])),
-    [rows]
+  const navigableRows = useMemo(() => getNavigablePaletteRows(rows), [rows]);
+  const effectiveActive = useMemo(
+    () => resolveActivePaletteRow(navigableRows, activeRowId),
+    [activeRowId, navigableRows]
   );
-  const effectiveActive = useMemo(() => resolveActivePaletteRow(rows, activeRowId), [activeRowId, rows]);
   const activeRow = effectiveActive?.row;
 
   const runRow = useCallback(
@@ -193,11 +193,15 @@ export const usePaletteNavigation = ({
 
   const onRowActive = useCallback(
     (rowId: string) => {
+      if (rowId === effectiveActive?.row.id) {
+        return;
+      }
+
       const row = rows.find((candidate) => candidate.id === rowId);
       setPaletteState((current) => changePaletteSelection(current, rowId));
       previewRow(row);
     },
-    [previewRow, rows, setPaletteState]
+    [effectiveActive, previewRow, rows, setPaletteState]
   );
 
   return {

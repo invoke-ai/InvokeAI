@@ -5,11 +5,10 @@ import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widg
 import type { TFunction } from 'i18next';
 
 import { flushGenerateDrafts, notifyGenerateModelSelectionCleared } from '@features/generation/react';
-import { getPromptHistoryRecallPatch } from '@features/generation/settings';
-import { useModelsSnapshot } from '@features/models';
+import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
-import { selectProjectGenerateModel } from '@workbench/generationModelSelection';
+import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from '@workbench/generationSettingsOrchestration';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -27,7 +26,6 @@ import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './e
 import { CommandPaletteDialog } from './CommandPaletteDialog';
 import { buildCatalogCommandEntries, buildOpenSettingsEntry, buildSettingsEntries } from './entries';
 import { buildExtensionPaletteEntry, createExtensionSearchProvider } from './extensionPaletteAdapters';
-import { getObjectIdentity } from './objectIdentity';
 import {
   createBoardsProvider,
   createImagesProvider,
@@ -76,11 +74,8 @@ const WorkbenchCommandPaletteDialog = ({
   const extensions = useWorkbenchExtensions();
   const notify = useNotify();
   const workbenchQueries = useWorkbenchQueries();
-  const modelsSnapshot = useModelsSnapshot();
-  const models = modelsSnapshot.status === 'loaded' ? modelsSnapshot.models : undefined;
   const projectId = useActiveProjectSelector((project) => project.id);
   const promptHistory = useActiveProjectSelector((project) => project.promptHistory);
-  const generateValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'generate'));
   const presentWidgetTypeIds = useActiveProjectSelector((project) =>
     [...new Set(Object.values(project.widgetInstances).map((instance) => instance.typeId))].sort()
   );
@@ -130,7 +125,15 @@ const WorkbenchCommandPaletteDialog = ({
   const workbenchCommands = useWorkbenchCommands();
   const searchStore = extensions.stores.search;
   const extensionSearchProviders = useSyncExternalStore(searchStore.subscribe, searchStore.list, searchStore.list);
-  const promptRecallContextKey = `${getObjectIdentity(generateValues, 'generation')}:${getObjectIdentity(models, 'models')}`;
+  const readCurrentGenerateContext = useCallback(() => {
+    flushGenerateDrafts();
+    const project = workbenchQueries.getSnapshot().activeProject;
+
+    return {
+      currentValues: getProjectWidgetValues(project, 'generate'),
+      projectId: project.id,
+    };
+  }, [workbenchQueries]);
   const queueScope = useMemo(
     () => getQueueQueryScope({ projectId, queueJobsScope: preferences.queueJobsScope }),
     [preferences.queueJobsScope, projectId]
@@ -161,14 +164,13 @@ const WorkbenchCommandPaletteDialog = ({
       }),
       createModelsProvider({
         applyModel: (model, catalogModels) => {
-          flushGenerateDrafts();
-          const project = workbenchQueries.getSnapshot().activeProject;
+          const { currentValues, projectId } = readCurrentGenerateContext();
           const result = selectProjectGenerateModel({
-            currentValues: getProjectWidgetValues(project, 'generate'),
+            currentValues,
             generation,
             model,
             models: catalogModels,
-            projectId: project.id,
+            projectId,
           });
 
           notifyGenerateModelSelectionCleared({
@@ -202,13 +204,17 @@ const WorkbenchCommandPaletteDialog = ({
         openGenerateWidget: () => openWidget('generate'),
         projectId,
         promptHistory,
-        recallContextKey: promptRecallContextKey,
         recallPrompt: (item) => {
-          const patch = getPromptHistoryRecallPatch({ item, models, values: generateValues });
+          const { currentValues, projectId } = readCurrentGenerateContext();
+          const modelsSnapshot = getModelsSnapshot();
 
-          if (patch) {
-            widgets.patchValues('generate', patch, projectId);
-          }
+          recallProjectPromptHistoryItem({
+            currentValues,
+            generation,
+            item,
+            models: modelsSnapshot.status === 'loaded' ? modelsSnapshot.models : undefined,
+            projectId,
+          });
         },
         t,
       }),
@@ -220,20 +226,17 @@ const WorkbenchCommandPaletteDialog = ({
     executeCommand,
     extensionSearchProviders,
     extensions,
-    generateValues,
     i18n.resolvedLanguage,
-    models,
     notify,
     getWidgetsForRegion,
     openWidgetPlacement,
     projectId,
     promptHistory,
-    promptRecallContextKey,
     queueScope,
+    readCurrentGenerateContext,
     requestQueueItemReveal,
     t,
     workbenchCommands,
-    workbenchQueries,
   ]);
 
   return (

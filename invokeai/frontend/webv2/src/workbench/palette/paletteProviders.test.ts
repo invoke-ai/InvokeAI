@@ -15,7 +15,9 @@ vi.mock('@features/models', () => ({
   getModelsSnapshot,
 }));
 
-import { createModelsProvider } from './paletteProviders';
+vi.mock('@features/generation/react', () => ({ focusPositivePrompt: vi.fn() }));
+
+import { createModelsProvider, createPromptHistoryProvider } from './paletteProviders';
 
 const model = (key: string, base: string, type = 'main'): ModelConfig =>
   ({ base, key, name: key, type }) as unknown as ModelConfig;
@@ -73,5 +75,50 @@ describe('createModelsProvider', () => {
     expect((await provider.search({ text: 'flux' }, searchContext())).map((entry) => entry.title)).toEqual([
       'fast-flux',
     ]);
+    expect((await provider.search({ text: 'SDXL CINEMATIC' }, searchContext())).map((entry) => entry.title)).toEqual([
+      'cinematic-xl',
+    ]);
+    expect(await provider.search({ text: 'cinematic flux' }, searchContext())).toEqual([]);
+  });
+});
+
+describe('createPromptHistoryProvider', () => {
+  const history = [
+    { negativePrompt: 'fog', positivePrompt: 'Red Mountain' },
+    { negativePrompt: 'fog', positivePrompt: 'Red Mountain' },
+    { negativePrompt: null, positivePrompt: 'Blue Ocean' },
+  ];
+
+  it('deduplicates results, preserves AND matching, and executes the selected item', async () => {
+    const openGenerateWidget = vi.fn();
+    const recallPrompt = vi.fn();
+    const provider = createPromptHistoryProvider({
+      openGenerateWidget,
+      projectId: 'project-1',
+      promptHistory: history,
+      recallPrompt,
+      t,
+    });
+
+    const entries = await provider.search({ text: 'MoUnTaIn ReD' }, searchContext());
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.title).toBe('Red Mountain');
+    vi.stubGlobal('window', { requestAnimationFrame: vi.fn() });
+    entries[0]?.run();
+    expect(openGenerateWidget).toHaveBeenCalledOnce();
+    expect(recallPrompt).toHaveBeenCalledWith(history[0]);
+    vi.unstubAllGlobals();
+  });
+
+  it('keys search results only by project and prompt-history identity', () => {
+    const createProvider = (projectId: string, promptHistory: typeof history, recallPrompt = vi.fn()) =>
+      createPromptHistoryProvider({ openGenerateWidget: vi.fn(), projectId, promptHistory, recallPrompt, t });
+
+    const first = createProvider('project-1', history, vi.fn());
+
+    expect(createProvider('project-1', history, vi.fn()).contextKey).toBe(first.contextKey);
+    expect(createProvider('project-2', history).contextKey).not.toBe(first.contextKey);
+    expect(createProvider('project-1', [...history]).contextKey).not.toBe(first.contextKey);
   });
 });

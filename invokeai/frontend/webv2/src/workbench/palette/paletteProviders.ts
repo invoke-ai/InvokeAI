@@ -39,11 +39,14 @@ const PROVIDER_PAGE_SIZE = 8;
 const loadActiveBoards = (): Promise<GalleryBoard[]> =>
   queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false }));
 
-const matchesTerms = (haystack: string, query: string): boolean => {
+const createTermsMatcher = (query: string): ((haystack: string) => boolean) => {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const lower = haystack.toLowerCase();
 
-  return terms.every((term) => lower.includes(term));
+  return (haystack) => {
+    const lower = haystack.toLowerCase();
+
+    return terms.every((term) => lower.includes(term));
+  };
 };
 
 export const createWorkflowsProvider = ({
@@ -96,13 +99,14 @@ export const createBoardsProvider = ({
   supportsCreatedAtRange: true,
   search: async (query, { signal }) => {
     const boards = await loadActiveBoards();
+    const matchesQuery = createTermsMatcher(query.text);
 
     signal.throwIfAborted();
 
     return boards
       .filter(
         (board: GalleryBoard) =>
-          matchesTerms(board.name, query.text) &&
+          matchesQuery(board.name) &&
           // Boards without a creation date (uncategorized, date virtual
           // boards) are excluded only while a date range is active.
           (query.range === undefined || isTimestampInRange(board.createdAt ?? '', query.range))
@@ -126,31 +130,30 @@ export const createPromptHistoryProvider = ({
   openGenerateWidget,
   projectId,
   promptHistory,
-  recallContextKey,
   recallPrompt,
   t,
 }: {
   openGenerateWidget: () => void;
   projectId: string;
   promptHistory: readonly PromptHistoryItem[];
-  recallContextKey: string;
   recallPrompt: (item: PromptHistoryItem) => void;
   t: TFunction;
 }): PaletteSearchProvider => ({
-  contextKey: `${projectId}:${getObjectIdentity(promptHistory, 'history')}:${recallContextKey}`,
+  contextKey: `${projectId}:${getObjectIdentity(promptHistory, 'history')}`,
   label: t('commandPalette.providers.promptHistory'),
   providerKey: getPaletteContributionKey('provider', 'prompt-history'),
   search: (query, { signal }) => {
     signal.throwIfAborted();
     const seen = new Set<string>();
     const entries: PaletteEntry[] = [];
+    const matchesQuery = createTermsMatcher(query.text);
 
     for (const [index, item] of promptHistory.entries()) {
       const dedupeKey = `${item.positivePrompt}\n${item.negativePrompt ?? ''}`;
 
       // Prompt history items carry no timestamp, so this provider is text-only
       // (not range-capable); it never sees pure-date queries.
-      if (seen.has(dedupeKey) || !matchesTerms(`${item.positivePrompt} ${item.negativePrompt ?? ''}`, query.text)) {
+      if (seen.has(dedupeKey) || !matchesQuery(`${item.positivePrompt} ${item.negativePrompt ?? ''}`)) {
         continue;
       }
 
@@ -195,10 +198,11 @@ export const createModelsProvider = ({
     signal.throwIfAborted();
     const snapshot = getModelsSnapshot();
     const models = snapshot.status === 'loaded' ? snapshot.models : [];
+    const matchesQuery = createTermsMatcher(query.text);
 
     return models
       .filter(isSupportedGenerateModel)
-      .filter((model) => matchesTerms(`${model.name} ${model.base}`, query.text))
+      .filter((model) => matchesQuery(`${model.name} ${model.base}`))
       .map<PaletteEntry>((model) => ({
         group: 'Models',
         groupLabel: t('commandPalette.groups.models'),
@@ -239,15 +243,15 @@ export const createQueueItemsProvider = ({
     // closed while a date range is active.
     signal.throwIfAborted();
     const model = await loadQueue();
+    const matchesQuery = createTermsMatcher(query.text);
     signal.throwIfAborted();
 
     return model.items
       .map((item) => ({ item, meta: extractGenerationMeta(item) }))
       .filter(
         ({ item, meta }) =>
-          matchesTerms(
-            `${meta.positivePrompt ?? ''} ${meta.negativePrompt ?? ''} ${t(`commandPalette.queueStatuses.${item.status}`)} ${item.userDisplayName ?? ''}`,
-            query.text
+          matchesQuery(
+            `${meta.positivePrompt ?? ''} ${meta.negativePrompt ?? ''} ${t(`commandPalette.queueStatuses.${item.status}`)} ${item.userDisplayName ?? ''}`
           ) &&
           (query.range === undefined || isTimestampInRange(item.createdAt, query.range))
       )
@@ -287,60 +291,62 @@ export const createImagesProvider = ({
   selectImage: (image: GalleryImage) => void;
   locale?: string;
   t: TFunction;
-}): PaletteSearchProvider => ({
-  contextKey: 'global',
-  label: t('commandPalette.providers.images'),
-  providerKey: getPaletteContributionKey('provider', 'images'),
-  supportsCreatedAtRange: true,
-  search: async (query, { signal }) => {
-    // Search the explicit all-readable scope. The endpoint excludes archived
-    // and inaccessible boards; the active board list supplies display labels.
-    const [page, boards] = await Promise.all([
-      listGalleryImages({
-        boardId: ALL_READABLE_BOARDS_ID,
-        createdFrom: query.range?.from,
-        createdTo: query.range?.to,
-        galleryView: 'images',
-        limit: 20,
-        searchTerm: query.text,
-        signal,
-      }),
-      loadActiveBoards(),
-    ]);
-    const boardNames = new Map(boards.map((board: GalleryBoard) => [board.id, board.name]));
-    // Images carry no prompt, so the creation date+time is the title; the time
-    // keeps same-day results (the common case for 20 recents) distinguishable.
-    const titleFormatter = new Intl.DateTimeFormat(locale, {
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      month: 'short',
-    });
+}): PaletteSearchProvider => {
+  const titleFormatter = new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    month: 'short',
+  });
 
-    return page.images.map<PaletteEntry>((image) => {
-      const createdAt = new Date(normalizeServerTimestamp(image.queuedAt));
+  return {
+    contextKey: 'global',
+    label: t('commandPalette.providers.images'),
+    providerKey: getPaletteContributionKey('provider', 'images'),
+    supportsCreatedAtRange: true,
+    search: async (query, { signal }) => {
+      // Search the explicit all-readable scope. The endpoint excludes archived
+      // and inaccessible boards; the active board list supplies display labels.
+      const [page, boards] = await Promise.all([
+        listGalleryImages({
+          boardId: ALL_READABLE_BOARDS_ID,
+          createdFrom: query.range?.from,
+          createdTo: query.range?.to,
+          galleryView: 'images',
+          limit: 20,
+          searchTerm: query.text,
+          signal,
+        }),
+        loadActiveBoards(),
+      ]);
+      const boardNames = new Map(boards.map((board: GalleryBoard) => [board.id, board.name]));
+      // Images carry no prompt, so the creation date+time is the title; the time
+      // keeps same-day results (the common case for 20 recents) distinguishable.
+      return page.images.map<PaletteEntry>((image) => {
+        const createdAt = new Date(normalizeServerTimestamp(image.queuedAt));
 
-      return {
-        group: 'Images',
-        groupLabel: t('commandPalette.groups.images'),
-        id: `image:${image.imageName}`,
-        isPersistentRecent: false,
-        run: () => {
-          openPreviewWidget();
-          selectImage(image);
-        },
-        secondary: {
-          label: t('commandPalette.actions.revealInGallery'),
+        return {
+          group: 'Images',
+          groupLabel: t('commandPalette.groups.images'),
+          id: `image:${image.imageName}`,
+          isPersistentRecent: false,
           run: () => {
-            openGalleryWidget();
-            selectBoard(image.boardId);
+            openPreviewWidget();
             selectImage(image);
           },
-        },
-        subtitle: `${boardNames.get(image.boardId) ?? t('commandPalette.providers.uncategorized')} · ${image.width}×${image.height}`,
-        thumbnailUrl: image.thumbnailUrl,
-        title: Number.isNaN(createdAt.getTime()) ? image.imageName : titleFormatter.format(createdAt),
-      };
-    });
-  },
-});
+          secondary: {
+            label: t('commandPalette.actions.revealInGallery'),
+            run: () => {
+              openGalleryWidget();
+              selectBoard(image.boardId);
+              selectImage(image);
+            },
+          },
+          subtitle: `${boardNames.get(image.boardId) ?? t('commandPalette.providers.uncategorized')} · ${image.width}×${image.height}`,
+          thumbnailUrl: image.thumbnailUrl,
+          title: Number.isNaN(createdAt.getTime()) ? image.imageName : titleFormatter.format(createdAt),
+        };
+      });
+    },
+  };
+};

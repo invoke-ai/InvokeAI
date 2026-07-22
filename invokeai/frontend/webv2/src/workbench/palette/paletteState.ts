@@ -46,7 +46,5 @@ export const enterPaletteStage = (stage: PaletteStage, activeRowId: string | nul
 
 export const returnPaletteToRoot = (): PaletteState => createInitialPaletteState();
 
-export const changePaletteSelection = (state: PaletteState, activeRowId: string | null): PaletteState => ({
-  ...state,
-  activeRowId,
-});
+export const changePaletteSelection = (state: PaletteState, activeRowId: string | null): PaletteState =>
+  state.activeRowId === activeRowId ? state : { ...state, activeRowId };

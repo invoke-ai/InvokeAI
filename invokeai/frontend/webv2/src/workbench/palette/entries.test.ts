@@ -16,6 +16,7 @@ import {
   buildStageEntries,
   SEARCH_SCOPE_GROUP,
   searchPaletteRows,
+  getNavigablePaletteRows,
   resolveActivePaletteRow,
 } from './entries';
 
@@ -405,7 +406,7 @@ describe('stable active row identity', () => {
       { entry: makeEntry({ group: 'Provider', id: 'async', title: 'Async' }), id: 'async-row', kind: 'entry' as const },
       ...initial,
     ];
-    const active = resolveActivePaletteRow(withAsyncInsertion, 'selected');
+    const active = resolveActivePaletteRow(getNavigablePaletteRows(withAsyncInsertion), 'selected');
 
     expect(active?.row.id).toBe('selected');
     if (active?.row.kind === 'entry') {

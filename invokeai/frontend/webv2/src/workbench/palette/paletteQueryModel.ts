@@ -33,7 +33,7 @@ export const derivePaletteQueryModel = ({
   state,
 }: {
   providers: PaletteSearchProvider[];
-  state: PaletteState;
+  state: Pick<PaletteState, 'debouncedQuery' | 'mode' | 'query'>;
 }): PaletteQueryModel => {
   const requestedScopeProviderKey = state.mode.kind === 'scoped' ? state.mode.providerKey : null;
   const scopeProvider = requestedScopeProviderKey

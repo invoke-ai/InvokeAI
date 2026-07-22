@@ -101,15 +101,15 @@ export interface ActivePaletteRow {
   row: Exclude<PaletteRow, { kind: 'label' }>;
 }
 
+export const getNavigablePaletteRows = (rows: readonly PaletteRow[]): ActivePaletteRow[] =>
+  rows.flatMap((row, index): ActivePaletteRow[] => (row.kind === 'label' ? [] : [{ index, row }]));
+
 /** Resolve selection by stable row id, falling back to the first actionable row. */
 export const resolveActivePaletteRow = (
-  rows: readonly PaletteRow[],
+  navigableRows: readonly ActivePaletteRow[],
   activeRowId: string | null
-): ActivePaletteRow | undefined => {
-  const navigable = rows.flatMap((row, index): ActivePaletteRow[] => (row.kind === 'label' ? [] : [{ index, row }]));
-
-  return (activeRowId ? navigable.find((candidate) => candidate.row.id === activeRowId) : undefined) ?? navigable[0];
-};
+): ActivePaletteRow | undefined =>
+  (activeRowId ? navigableRows.find((candidate) => candidate.row.id === activeRowId) : undefined) ?? navigableRows[0];
 
 /** Max rows an entity section shows in root mode; depth lives behind the scope. */
 export const PROVIDER_ROOT_RESULT_CAP = 3;
