@@ -57,6 +57,8 @@ _PATCHED_API_DEPENDENCIES_MODULES = (
     "invokeai.app.api.routers.images",
     "invokeai.app.api.routers.workflows",
     "invokeai.app.api.routers._access",
+    "invokeai.app.api.routers.model_manager",
+    "invokeai.app.api.routers.app_info",
 )
 
 

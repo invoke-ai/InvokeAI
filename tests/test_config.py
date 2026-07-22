@@ -374,3 +374,35 @@ def test_deny_nodes(patch_rootdir):
     # Reset the config so that it doesn't affect other tests
     get_config.cache_clear()
     InvocationRegistry.invalidate_invocation_typeadapter()
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("/invoke", "/invoke"),
+        ("invoke", "/invoke"),
+        ("invoke/", "/invoke"),
+        ("/invoke/", "/invoke"),
+        ("//invoke//", "/invoke"),
+        (" /invoke ", "/invoke"),
+        ("/invoke/sub", "/invoke/sub"),
+        ("", None),
+        ("/", None),
+        ("   ", None),
+        (None, None),
+    ],
+)
+def test_base_url_validator_normalizes(raw: str | None, expected: str | None, patch_rootdir: None):
+    """`base_url` is normalized to a single leading slash with no trailing slash; empty/`/` disable it."""
+    config = InvokeAIAppConfig(base_url=raw)
+    assert config.base_url == expected
+
+
+@pytest.mark.parametrize(
+    "reserved",
+    ["/api", "api", "/ws", "/static", "/docs", "/redoc", "/openapi.json", "/locales", "/assets", "/api/foo"],
+)
+def test_base_url_validator_rejects_reserved_prefix(reserved: str, patch_rootdir: None):
+    """A `base_url` whose first segment collides with a real route prefix must fail fast, not brick the server."""
+    with pytest.raises(ValidationError, match="reserved path segment"):
+        InvokeAIAppConfig(base_url=reserved)

@@ -1,6 +1,7 @@
 """FastAPI routes for custom node management."""
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,7 @@ logger = InvokeAILogger.get_logger()
 # were imported by that pack. Used on uninstall to delete only pack-imported workflows
 # — deleting by tag alone is unsafe because users can edit tags on their own workflows.
 PACK_MANIFEST_FILENAME = ".invokeai_pack_manifest.json"
+PACK_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 class NodePackInfo(BaseModel):
@@ -82,6 +84,27 @@ def _get_custom_nodes_path() -> Path:
     """Returns the configured custom nodes directory path."""
     config = get_config()
     return config.custom_nodes_path
+
+
+def _validate_pack_name(pack_name: str) -> str:
+    """Validate pack directory names before using them in filesystem paths."""
+    if (
+        not pack_name
+        or pack_name in {".", ".."}
+        or "/" in pack_name
+        or "\\" in pack_name
+        or not PACK_NAME_RE.fullmatch(pack_name)
+    ):
+        raise ValueError("Invalid node pack name.")
+    return pack_name
+
+
+def _extract_pack_name_from_source(source: str) -> str:
+    """Derive a safe node pack name from a git source string."""
+    pack_name = source.rstrip("/").split("/")[-1]
+    if pack_name.endswith(".git"):
+        pack_name = pack_name[:-4]
+    return _validate_pack_name(pack_name)
 
 
 def _get_installed_packs() -> list[NodePackInfo]:
@@ -156,10 +179,15 @@ async def install_custom_node_pack(
 
     source = request.source.strip()
 
-    # Extract pack name from URL
-    pack_name = source.rstrip("/").split("/")[-1]
-    if pack_name.endswith(".git"):
-        pack_name = pack_name[:-4]
+    # Extract and validate pack name before using it in filesystem paths.
+    try:
+        pack_name = _extract_pack_name_from_source(source)
+    except ValueError as exc:
+        return InstallNodePackResponse(
+            name="",
+            success=False,
+            message=str(exc),
+        )
 
     target_dir = custom_nodes_path / pack_name
 
@@ -266,6 +294,11 @@ async def uninstall_custom_node_pack(
     Note: A restart is required for the node removal to take full effect.
     Installed nodes from the pack will remain registered until restart.
     """
+    try:
+        pack_name = _validate_pack_name(pack_name)
+    except ValueError as exc:
+        return UninstallNodePackResponse(name=pack_name, success=False, message=str(exc))
+
     custom_nodes_path = _get_custom_nodes_path()
     target_dir = custom_nodes_path / pack_name
 

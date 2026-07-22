@@ -106,6 +106,16 @@ Invoke's open-source development is powered by our sponsors. If Invoke is valuab
 
 [![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
 
+We very much thank the following sponsors:
+
+### Backers ($15/mo)
+
+* [apokolypsse](https://github.com/apokolypsse)
+
+### Power Users ($50/mo)
+
+* [mickr777](https://github.com/mickr777)
+
 ## Thanks
 
 Invoke is a combined effort of [passionate and talented people from across the world][contributors]. We thank them for their time, hard work and effort.

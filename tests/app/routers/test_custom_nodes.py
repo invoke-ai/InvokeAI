@@ -1,5 +1,6 @@
 """Tests for the custom nodes router."""
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -7,13 +8,16 @@ from unittest.mock import MagicMock, patch
 
 from invokeai.app.api.routers.custom_nodes import (
     PACK_MANIFEST_FILENAME,
+    _extract_pack_name_from_source,
     _get_installed_packs,
     _import_workflows_from_pack,
     _load_node_pack,
     _purge_pack_modules,
     _read_pack_manifest,
     _remove_workflows_by_ids,
+    _validate_pack_name,
     _write_pack_manifest,
+    uninstall_custom_node_pack,
 )
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -75,6 +79,67 @@ class TestGetInstalledPacks:
             packs = _get_installed_packs()
         assert len(packs) == 3
         assert [p.name for p in packs] == ["alpha_pack", "middle_pack", "zebra_pack"]
+
+
+class TestPackNameValidation:
+    """Tests for safely deriving node pack directory names from install sources."""
+
+    def test_validate_pack_name_accepts_safe_names(self) -> None:
+        assert _validate_pack_name("good_pack") == "good_pack"
+        assert _validate_pack_name("pack-1.2") == "pack-1.2"
+
+    def test_validate_pack_name_rejects_path_segments(self) -> None:
+        for pack_name in ("", ".", "..", "foo/bar", "..\\outside", "foo\nbar"):
+            try:
+                _validate_pack_name(pack_name)
+            except ValueError:
+                continue
+            raise AssertionError(f"Expected {pack_name!r} to be rejected")
+
+    def test_extracts_pack_name_from_git_url(self) -> None:
+        assert _extract_pack_name_from_source("https://github.com/example/my-pack.git") == "my-pack"
+
+    def test_rejects_empty_pack_name(self) -> None:
+        try:
+            _extract_pack_name_from_source("")
+        except ValueError:
+            return
+        raise AssertionError("Expected empty pack name to be rejected")
+
+    def test_rejects_dot_segments(self) -> None:
+        for source in ("https://github.com/example/..", "https://github.com/example/.git"):
+            try:
+                _extract_pack_name_from_source(source)
+            except ValueError:
+                continue
+            raise AssertionError(f"Expected {source!r} to be rejected")
+
+    def test_rejects_windows_path_separator_traversal(self) -> None:
+        try:
+            _extract_pack_name_from_source("https://github.com/example/..\\outside.git")
+        except ValueError:
+            return
+        raise AssertionError("Expected Windows path separator traversal to be rejected")
+
+
+class TestUninstallPackNameValidation:
+    """Tests that uninstall validates direct path parameters before deleting files."""
+
+    def test_rejects_invalid_pack_names_before_filesystem_side_effects(self) -> None:
+        for pack_name in ("..", ".", "foo/bar", "..\\outside"):
+            with (
+                patch("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path") as mock_get_path,
+                patch("invokeai.app.api.routers.custom_nodes.shutil.rmtree") as mock_rmtree,
+                patch("invokeai.app.api.routers.custom_nodes._remove_workflows_by_ids") as mock_remove_workflows,
+            ):
+                response = asyncio.run(uninstall_custom_node_pack(MagicMock(), pack_name))
+
+            assert response.name == pack_name
+            assert response.success is False
+            assert response.message == "Invalid node pack name."
+            mock_get_path.assert_not_called()
+            mock_rmtree.assert_not_called()
+            mock_remove_workflows.assert_not_called()
 
 
 class TestImportWorkflowsFromPack:

@@ -56,6 +56,15 @@ describe('getCanvasToolModifierHintIds', () => {
     ]);
   });
 
+  it('adds fine-grid hint for the move tool', () => {
+    expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'move' }))).toEqual([
+      'arrowKeysNudgeSelection',
+      'modFineGrid',
+      'spacePan',
+      'altPickColor',
+    ]);
+  });
+
   it('only shows text-session hints when a text session is active', () => {
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'text', hasActiveTextSession: true }))).toEqual([
       'enterCommitText',
