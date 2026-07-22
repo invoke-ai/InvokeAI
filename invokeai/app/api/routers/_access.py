@@ -49,6 +49,7 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
     - The user is an admin.
     - The user owns the image.
     - The image sits on a shared or public board.
+    - The image sits on a board explicitly shared with the user.
     """
     if current_user.is_admin:
         return
@@ -67,6 +68,8 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
                 return
         except Exception:
             pass
+        if ApiDependencies.invoker.services.board_records.is_board_shared_with_user(board_id, current_user.user_id):
+            return
 
     raise HTTPException(status_code=403, detail="Not authorized to access this image")
 
@@ -78,6 +81,7 @@ def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) 
     - The user is an admin.
     - The user owns the board.
     - The board visibility is Shared or Public.
+    - The board is explicitly shared with the user.
     """
     if current_user.is_admin:
         return
@@ -91,6 +95,9 @@ def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) 
         return
 
     if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
+        return
+
+    if ApiDependencies.invoker.services.board_records.is_board_shared_with_user(board_id, current_user.user_id):
         return
 
     raise HTTPException(status_code=403, detail="Not authorized to access this board")

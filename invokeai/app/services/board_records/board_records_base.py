@@ -40,6 +40,11 @@ class BoardRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def is_board_shared_with_user(self, board_id: str, user_id: str) -> bool:
+        """Checks whether a board has been explicitly shared with a specific user."""
+        pass
+
+    @abstractmethod
     def get_many(
         self,
         user_id: str,
