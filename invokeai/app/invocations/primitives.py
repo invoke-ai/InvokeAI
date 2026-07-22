@@ -29,10 +29,14 @@ from invokeai.app.invocations.fields import (
     SD3ConditioningField,
     TensorField,
     UIComponent,
+    VideoField,
+    WanConditioningField,
+    WanRefImageConditioningField,
     ZImageConditioningField,
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.services.videos.videos_common import VideoDTO
 
 """
 Primitives: Boolean, Integer, Float, String, Image, Latents, Conditioning, Color
@@ -510,6 +514,44 @@ class AnimaConditioningOutput(BaseInvocationOutput):
         return cls(conditioning=AnimaConditioningField(conditioning_name=conditioning_name))
 
 
+@invocation_output("wan_conditioning_output")
+class WanConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Wan 2.2 text conditioning tensor."""
+
+    conditioning: WanConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "WanConditioningOutput":
+        return cls(conditioning=WanConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("wan_ref_image_output")
+class WanRefImageOutput(BaseInvocationOutput):
+    """Output of a Wan 2.2 reference-image VAE-encoder."""
+
+    ref_image: WanRefImageConditioningField = OutputField(
+        description="VAE-latent reference-image conditioning for Wan 2.2 I2V.",
+        title="Reference Image",
+    )
+
+    @classmethod
+    def build(
+        cls,
+        condition_tensor_name: str,
+        width: int,
+        height: int,
+        num_frames: int = 1,
+    ) -> "WanRefImageOutput":
+        return cls(
+            ref_image=WanRefImageConditioningField(
+                condition_tensor_name=condition_tensor_name,
+                width=width,
+                height=height,
+                num_frames=num_frames,
+            )
+        )
+
+
 @invocation_output("conditioning_output")
 class ConditioningOutput(BaseInvocationOutput):
     """Base class for nodes that output a single conditioning tensor"""
@@ -519,6 +561,57 @@ class ConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "ConditioningOutput":
         return cls(conditioning=ConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("video_output")
+class VideoOutput(BaseInvocationOutput):
+    """Output of a node that produces a video file (e.g. Wan 2.2 latents-to-video)."""
+
+    video: VideoField = OutputField(description="The output video")
+    width: int = OutputField(description="The width of the video in pixels")
+    height: int = OutputField(description="The height of the video in pixels")
+    num_frames: int = OutputField(description="The number of frames in the video")
+    fps: float = OutputField(description="The frames-per-second of the video")
+    duration: float = OutputField(description="The duration of the video in seconds")
+
+    @classmethod
+    def build(cls, video_dto: VideoDTO, num_frames: Optional[int] = None) -> "VideoOutput":
+        # Frame count isn't stored on the DTO; derive it from duration * fps when fps is known.
+        fps = video_dto.fps or 0.0
+        if num_frames is None:
+            num_frames = int(round(video_dto.duration * fps)) if fps > 0 else 0
+        return cls(
+            video=VideoField(video_name=video_dto.video_name),
+            width=video_dto.width,
+            height=video_dto.height,
+            num_frames=num_frames,
+            fps=fps,
+            duration=video_dto.duration,
+        )
+
+
+@invocation(
+    "video",
+    title="Video Primitive",
+    tags=["primitives", "video"],
+    category="primitives",
+    version="1.0.0",
+)
+class VideoInvocation(BaseInvocation):
+    """A video primitive value. Drop a video onto the field to make it available as an input
+    to downstream nodes (e.g. Frame from Video, Concatenate Videos)."""
+
+    video: VideoField = InputField(description="The video to load")
+
+    # Return annotation is a real class (not a forward-ref string) because a previous
+    # `from __future__ import annotations` left wan_l2v with a stringified annotation
+    # and crashed the output-class registry on startup (commit cac366229a).
+    def invoke(self, context: InvocationContext) -> VideoOutput:
+        from invokeai.app.util.video_thumbnails import decoder_frame_count
+
+        video_dto = context.videos.get_dto(self.video.video_name)
+        num_frames = decoder_frame_count(context.videos.get_path(self.video.video_name))
+        return VideoOutput.build(video_dto=video_dto, num_frames=num_frames)
 
 
 @invocation_output("conditioning_collection_output")

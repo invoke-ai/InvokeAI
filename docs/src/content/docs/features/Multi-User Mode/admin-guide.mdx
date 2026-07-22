@@ -219,10 +219,13 @@ If no arguments are provided, the script will run in interactive mode.
 
 :::danger[Data Loss]
 Deleting a user removes the user record and cascades to their sessions, board shares, sent
-invitations, and per-user client state. It does **not** delete the boards, images, workflows, queue
-items, or style presets they created — those rows remain in the database, owned by a user_id that no
-longer exists, and will not appear in any user's gallery. Physical image files in `outputs/images`
-are also left in place until a gallery maintenance script is run to remove orphan images.
+invitations, and per-user client state. It does **not** delete the boards, images, videos,
+workflows, queue items, or style presets they created — those rows remain in the database, owned by
+a user_id that no longer exists, and will not appear in other (non-admin) users' galleries.
+Administrators keep gallery visibility of the orphaned images and videos and can review or delete
+them from there. Physical media files in `outputs/images` and `outputs/videos` are also left in
+place: orphan image files can be removed with a gallery maintenance script, while video files should
+be deleted through the gallery (which removes the file along with the record) or cleaned up manually.
 
 If you want their content gone as well, reassign or delete it before deleting the user. Back up the
 database first if recovery might be needed.

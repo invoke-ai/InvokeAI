@@ -11,8 +11,12 @@ import {
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
+import {
+  pickSelectionAfterDelete,
+  selectCachedGalleryItemNames,
+} from 'features/gallery/store/selectCachedGalleryItemNames';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
@@ -76,30 +80,45 @@ const deleteImagesWithDialog = async (image_names: string[], store: AppStore): P
   });
 };
 
-const handleDeletions = async (image_names: string[], store: AppStore) => {
+export const handleDeletions = async (image_names: string[], store: AppStore) => {
   try {
     const { dispatch, getState } = store;
     const state = getState();
-    const { data } = imagesApi.endpoints.getImageNames.select(selectGetImageNamesQueryArgs(state))(state);
-    const index = data?.image_names.findIndex((name) => name === image_names[0]);
-    const { deleted_images } = await dispatch(
+
+    // Snapshot the polymorphic gallery list (images + videos, in display order) and the
+    // currently-displayed item *before* the delete fires. Once the request resolves the
+    // cache will have shifted, so the index computed afterwards would be wrong.
+    const galleryItemNames = selectCachedGalleryItemNames(state);
+    const lastSelected = selectLastSelectedItem(state);
+    const lastSelectedIndex =
+      lastSelected && image_names.includes(lastSelected) ? galleryItemNames.indexOf(lastSelected) : -1;
+
+    const result = await dispatch(
       imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })
     ).unwrap();
+    // Only the images the server confirmed deleted count: a partial failure means the
+    // survivor still exists, so the selection must not jump away from it and it remains
+    // a valid replacement candidate. Mirrors deleteVideoModal/store/state.ts.
+    const deletedNames = new Set(result.deleted_images);
 
-    const newImageNames = data?.image_names.filter((name) => !deleted_images.includes(name)) || [];
-    const newSelectedImage = newImageNames[index ?? 0] || null;
-
-    if (intersection(state.gallery.selection, image_names).length > 0) {
-      if (newSelectedImage) {
-        // Some selected images were deleted, clear selection
-        dispatch(imageSelected(newSelectedImage));
+    if (intersection(getState().gallery.selection, [...deletedNames]).length > 0) {
+      if (lastSelected && !deletedNames.has(lastSelected)) {
+        // The displayed item survived — either it wasn't part of this deletion (e.g. a
+        // video displayed while images were deleted, or a hover-delete of another item)
+        // or its own delete failed. Keep viewing it and just prune the deleted items
+        // from the multi-selection.
+        dispatch(imageSelected(lastSelected));
       } else {
-        dispatch(imageSelected(null));
+        // Advance to a still-living neighbour (prev > next) so the Viewer keeps a real
+        // selection. May pick a video — the polymorphic list intentionally allows that.
+        const replacement =
+          lastSelectedIndex >= 0 ? pickSelectionAfterDelete(galleryItemNames, lastSelectedIndex, deletedNames) : null;
+        dispatch(imageSelected(replacement));
       }
     }
 
     // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
-    for (const image_name of image_names) {
+    for (const image_name of deletedNames) {
       deleteNodesImages(state, dispatch, image_name);
       deleteControlLayerImages(state, dispatch, image_name);
       deleteReferenceImages(state, dispatch, image_name);

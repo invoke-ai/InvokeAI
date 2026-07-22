@@ -5,12 +5,18 @@ import string
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Body, HTTPException, Path, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, field_validator
 
-from invokeai.app.api.auth_dependencies import AdminUser, CurrentUser
+from invokeai.app.api.auth_dependencies import MEDIA_TOKEN_COOKIE, AdminUser, CurrentUser, security
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.auth.token_service import TokenData, create_access_token
+from invokeai.app.services.auth.token_service import (
+    TokenData,
+    create_access_token,
+    get_token_remaining_seconds,
+    verify_token,
+)
 from invokeai.app.services.users.users_common import (
     UserCreateRequest,
     UserDTO,
@@ -74,6 +80,40 @@ class LogoutResponse(BaseModel):
     success: bool = Field(description="Whether logout was successful")
 
 
+class MediaCookieResponse(BaseModel):
+    """Response from refreshing the media cookie."""
+
+    success: bool = Field(description="Whether the media cookie was set (always true in single-user mode)")
+
+
+def _media_cookie_path(request: Request) -> str:
+    """Public path prefix the media cookie is scoped to.
+
+    Behind a sub-path reverse proxy the browser sees routes under e.g. `/invoke/api/v1`,
+    so the cookie path must include the proxy prefix (advertised via `root_path` by
+    SubPathASGIMiddleware) or browsers will omit the cookie from media requests.
+    """
+    return request.scope.get("root_path", "") + "/api/v1"
+
+
+def _set_media_cookie(request: Request, response: Response, token: str, max_age_seconds: int) -> None:
+    """Set the HttpOnly cookie that authenticates <video>/<img> media requests.
+
+    Media elements can't send Authorization headers, so the image and video media routes
+    accept the JWT via this path-scoped cookie instead. Shared by login and
+    /media-cookie so the cookie attributes can't drift between the two.
+    """
+    response.set_cookie(
+        MEDIA_TOKEN_COOKIE,
+        token,
+        max_age=max_age_seconds,
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path=_media_cookie_path(request),
+    )
+
+
 class SetupStatusResponse(BaseModel):
     """Response for setup status check."""
 
@@ -119,7 +159,9 @@ async def get_setup_status() -> SetupStatusResponse:
 
 @auth_router.post("/login", response_model=LoginResponse)
 async def login(
-    request: Annotated[LoginRequest, Body(description="Login credentials")],
+    login_request: Annotated[LoginRequest, Body(description="Login credentials")],
+    request: Request,
+    response: Response,
 ) -> LoginResponse:
     """Authenticate user and return access token.
 
@@ -143,7 +185,7 @@ async def login(
         )
 
     user_service = ApiDependencies.invoker.services.users
-    user = user_service.authenticate(request.email, request.password)
+    user = user_service.authenticate(login_request.email, login_request.password)
 
     if user is None:
         raise HTTPException(
@@ -156,14 +198,17 @@ async def login(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled")
 
     # Create token with appropriate expiration
-    expires_delta = timedelta(days=TOKEN_EXPIRATION_REMEMBER_ME if request.remember_me else TOKEN_EXPIRATION_NORMAL)
+    expires_delta = timedelta(
+        days=TOKEN_EXPIRATION_REMEMBER_ME if login_request.remember_me else TOKEN_EXPIRATION_NORMAL
+    )
     token_data = TokenData(
         user_id=user.user_id,
         email=user.email,
         is_admin=user.is_admin,
-        remember_me=request.remember_me,
+        remember_me=login_request.remember_me,
     )
     token = create_access_token(token_data, expires_delta)
+    _set_media_cookie(request, response, token, int(expires_delta.total_seconds()))
 
     return LoginResponse(
         token=token,
@@ -175,6 +220,8 @@ async def login(
 @auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(
     current_user: CurrentUser,
+    request: Request,
+    response: Response,
 ) -> LogoutResponse:
     """Logout current user.
 
@@ -193,7 +240,61 @@ async def logout(
     """
     # TODO: Implement token invalidation when server-side session management is added
     # For now, this is a no-op since we use stateless JWT tokens
+    response.delete_cookie(MEDIA_TOKEN_COOKIE, path=_media_cookie_path(request))
     return LogoutResponse(success=True)
+
+
+@auth_router.post("/media-cookie", response_model=MediaCookieResponse)
+async def refresh_media_cookie(
+    request: Request,
+    response: Response,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+) -> MediaCookieResponse:
+    """Re-issue the media cookie from a valid Bearer token.
+
+    The media cookie is normally set at login, but a session can hold a valid JWT
+    without it — the session may predate the cookie's introduction, or the cookie
+    may have been cleared while the JWT (in client storage) survived. Media
+    elements can't send Authorization headers, so such sessions silently fail to
+    load videos (black player) while every other API call works. The frontend
+    calls this on app load so an existing session self-heals without re-login.
+
+    The cookie's lifetime is clamped to the presented token's remaining validity —
+    it is the same JWT, so a longer-lived cookie would just yield 401s after
+    expiry anyway.
+
+    Returns:
+        MediaCookieResponse indicating the cookie was set. In single-user mode the
+        media routes don't require authentication, so this is a successful no-op.
+
+    Raises:
+        HTTPException: 401 if the Bearer token is missing, invalid, or expired, or
+        the user no longer exists or is inactive.
+    """
+    config = ApiDependencies.invoker.services.configuration
+    if not config.multiuser:
+        return MediaCookieResponse(success=True)
+
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
+    token = credentials.credentials
+    token_data = verify_token(token)
+    if token_data is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    # Mirror get_current_user: the token alone isn't enough — the user must still
+    # exist and be active, since the cookie grants access to media routes.
+    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+
+    remaining = get_token_remaining_seconds(token)
+    if remaining is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    _set_media_cookie(request, response, token, remaining)
+    return MediaCookieResponse(success=True)
 
 
 @auth_router.get("/me", response_model=UserDTO)

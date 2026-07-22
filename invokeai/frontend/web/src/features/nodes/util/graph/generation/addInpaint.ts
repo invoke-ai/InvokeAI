@@ -33,6 +33,7 @@ type AddInpaintArg = {
     | 'qwen_image_i2l'
     | 'z_image_i2l'
     | 'anima_i2l'
+    | 'wan_i2l'
   >;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
@@ -72,7 +73,8 @@ export const addInpaint = async ({
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
     denoise.type === 'z_image_denoise' ||
-    denoise.type === 'anima_denoise'
+    denoise.type === 'anima_denoise' ||
+    denoise.type === 'wan_denoise'
   ) {
     denoise.width = scaledSize.width;
     denoise.height = scaledSize.height;

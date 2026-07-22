@@ -1,17 +1,22 @@
 """Tests for ImageService (images_default.py).
 
-Covers subfolder forwarding for all strategies and the delete_images_on_board
-silent-failure contract (Points 2 & 3 from PR review).
+Covers subfolder forwarding for all strategies, the delete_images_on_board
+silent-failure contract (Points 2 & 3 from PR review), and the transactional
+staged-deletion contracts of delete() and delete_intermediates().
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
 
+from invokeai.app.services.image_files.image_files_common import ImageFileDeleteException
+from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
+    ImageRecordDeleteException,
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_default import ImageService
@@ -182,12 +187,15 @@ class TestDeleteForwardsSubfolder:
 
         image_service.delete("test.png")
 
-        invoker.services.image_files.delete.assert_called_once_with("test.png", image_subfolder="2026/04/05")
+        invoker.services.image_files.stage_delete.assert_called_once_with("test.png", image_subfolder="2026/04/05")
         invoker.services.image_records.delete.assert_called_once_with("test.png")
+        invoker.services.image_files.commit_delete.assert_called_once_with(
+            invoker.services.image_files.stage_delete.return_value
+        )
 
     def test_delete_intermediates_forwards_subfolder(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.delete_intermediates.return_value = [
+        invoker.services.image_records.get_intermediates.return_value = [
             ("img1.png", "intermediate"),
             ("img2.png", "intermediate"),
         ]
@@ -195,22 +203,21 @@ class TestDeleteForwardsSubfolder:
         count = image_service.delete_intermediates()
 
         assert count == 2
-        calls = invoker.services.image_files.delete.call_args_list
+        calls = invoker.services.image_files.stage_delete.call_args_list
         assert calls[0].args == ("img1.png",)
         assert calls[0].kwargs == {"image_subfolder": "intermediate"}
         assert calls[1].args == ("img2.png",)
         assert calls[1].kwargs == {"image_subfolder": "intermediate"}
+        invoker.services.image_records.delete_many.assert_called_once_with(["img1.png", "img2.png"])
 
 
 # ── Point 3: delete_images_on_board silent-failure contract ──
 
 
 class TestDeleteImagesOnBoardContract:
-    """Tests for the silent-failure behavior of delete_images_on_board."""
+    """A file-delete failure must preserve the corresponding database record."""
 
-    def test_db_rows_deleted_even_when_file_delete_fails(self, image_service: ImageService):
-        """Current behavior: DB rows are deleted even if file cleanup fails for some images.
-        This test documents the contract so any change is intentional."""
+    def test_record_preserved_when_file_delete_fails(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.board_image_records.get_all_board_image_names_for_board.return_value = [
             "good.png",
@@ -222,13 +229,13 @@ class TestDeleteImagesOnBoardContract:
         bad_record = _make_record(image_name="bad.png", image_subfolder="bad/path")
 
         invoker.services.image_records.get.side_effect = [good_record, bad_record]
-        # File delete succeeds for first, fails for second
-        invoker.services.image_files.delete.side_effect = [None, Exception("disk error")]
+        # File staging succeeds for first, fails for second
+        invoker.services.image_files.stage_delete.side_effect = [object(), Exception("disk error")]
 
-        image_service.delete_images_on_board("board-1")
+        deleted = image_service.delete_images_on_board("board-1")
 
-        # DB rows are still deleted for all images
-        invoker.services.image_records.delete_many.assert_called_once_with(["good.png", "bad.png"])
+        invoker.services.image_records.delete_many.assert_called_once_with(["good.png"])
+        assert deleted == ["good.png"]
 
     def test_file_cleanup_failure_does_not_raise(self, image_service: ImageService):
         """File cleanup errors are swallowed, not propagated."""
@@ -237,13 +244,12 @@ class TestDeleteImagesOnBoardContract:
 
         record = _make_record(image_name="img.png", image_subfolder="sub")
         invoker.services.image_records.get.return_value = record
-        invoker.services.image_files.delete.side_effect = Exception("permission denied")
+        invoker.services.image_files.stage_delete.side_effect = Exception("permission denied")
 
-        # Should not raise
-        image_service.delete_images_on_board("board-1")
+        deleted = image_service.delete_images_on_board("board-1")
 
-        # DB delete still happens
-        invoker.services.image_records.delete_many.assert_called_once()
+        invoker.services.image_records.delete_many.assert_called_once_with([])
+        assert deleted == []
 
     def test_record_lookup_failure_does_not_block_others(self, image_service: ImageService):
         """If getting the record for one image fails, other images are still processed."""
@@ -256,9 +262,271 @@ class TestDeleteImagesOnBoardContract:
         ok_record = _make_record(image_name="ok.png", image_subfolder="")
         invoker.services.image_records.get.side_effect = [Exception("not found"), ok_record]
 
-        image_service.delete_images_on_board("board-1")
+        deleted = image_service.delete_images_on_board("board-1")
 
-        # File delete was attempted for the second image only
-        invoker.services.image_files.delete.assert_called_once_with("ok.png", image_subfolder="")
-        # DB rows are still deleted for all
-        invoker.services.image_records.delete_many.assert_called_once_with(["missing.png", "ok.png"])
+        # File staging was attempted for the second image only
+        invoker.services.image_files.stage_delete.assert_called_once_with("ok.png", image_subfolder="")
+        invoker.services.image_records.delete_many.assert_called_once_with(["ok.png"])
+        assert deleted == ["ok.png"]
+
+    def test_database_failure_restores_staged_files(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.board_image_records.get_all_board_image_names_for_board.return_value = ["img.png"]
+        invoker.services.image_records.get.return_value = _make_record(image_name="img.png", image_subfolder="general")
+        token = object()
+        invoker.services.image_files.stage_delete.return_value = token
+        invoker.services.image_records.delete_many.side_effect = RuntimeError("database unavailable")
+
+        with pytest.raises(RuntimeError, match="database unavailable"):
+            image_service.delete_images_on_board("board-1")
+
+        invoker.services.image_files.rollback_delete.assert_called_once_with(token)
+        invoker.services.image_files.commit_delete.assert_not_called()
+
+
+# ── Transactional staged deletion (single image and intermediates) ──
+
+
+@pytest.fixture
+def disk_image_service(tmp_path: Path) -> ImageService:
+    """ImageService wired to a real DiskImageFileStorage; all other services are mocks."""
+    svc = ImageService()
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 1
+    storage = DiskImageFileStorage(tmp_path / "outputs")
+    invoker.services.image_files = storage
+    storage.start(invoker)
+    svc.start(invoker)
+    return svc
+
+
+def _save_image_file(storage: DiskImageFileStorage, image_name: str, image_subfolder: str = "") -> None:
+    storage.save(image=Image.new("RGB", (64, 64)), image_name=image_name, image_subfolder=image_subfolder)
+
+
+def _staging_dirs(storage: DiskImageFileStorage) -> list[Path]:
+    return list(storage.image_root.glob(".delete_*"))
+
+
+class TestDeleteTransactional:
+    """delete() must stage files, delete the record, then commit — never losing files on failure."""
+
+    def test_delete_success_removes_files_record_and_fires_callback_once(self, disk_image_service: ImageService):
+        invoker = disk_image_service._ImageService__invoker  # type: ignore
+        storage = invoker.services.image_files
+        _save_image_file(storage, "img.png")
+        invoker.services.image_records.get.return_value = _make_record(image_name="img.png")
+        deleted_callbacks: list[str] = []
+        disk_image_service.on_deleted(deleted_callbacks.append)
+
+        disk_image_service.delete("img.png")
+
+        assert not storage.get_path("img.png").exists()
+        assert not storage.get_path("img.png", thumbnail=True).exists()
+        invoker.services.image_records.delete.assert_called_once_with("img.png")
+        assert deleted_callbacks == ["img.png"]
+        assert _staging_dirs(storage) == []
+
+    def test_delete_staging_failure_keeps_record_and_raises(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_files.stage_delete.side_effect = ImageFileDeleteException("disk error")
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ImageFileDeleteException):
+            image_service.delete("test.png")
+
+        invoker.services.image_records.delete.assert_not_called()
+        invoker.services.image_files.commit_delete.assert_not_called()
+        assert deleted_callbacks == []
+
+    def test_delete_db_failure_restores_files_and_raises(self, disk_image_service: ImageService):
+        invoker = disk_image_service._ImageService__invoker  # type: ignore
+        storage = invoker.services.image_files
+        _save_image_file(storage, "img.png")
+        invoker.services.image_records.get.return_value = _make_record(image_name="img.png")
+        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+        deleted_callbacks: list[str] = []
+        disk_image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ImageRecordDeleteException):
+            disk_image_service.delete("img.png")
+
+        # The image and its thumbnail must be restored to their original paths.
+        assert storage.get_path("img.png").exists()
+        assert storage.get_path("img.png", thumbnail=True).exists()
+        assert deleted_callbacks == []
+        assert _staging_dirs(storage) == []
+
+    def test_delete_rollback_failure_still_raises_db_error(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+        invoker.services.image_files.rollback_delete.side_effect = ImageFileDeleteException("rollback broken")
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ImageRecordDeleteException):
+            image_service.delete("test.png")
+
+        invoker.services.image_files.rollback_delete.assert_called_once_with(
+            invoker.services.image_files.stage_delete.return_value
+        )
+        invoker.services.image_files.commit_delete.assert_not_called()
+        assert deleted_callbacks == []
+
+    def test_delete_commit_failure_is_logged_not_raised(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_files.commit_delete.side_effect = ImageFileDeleteException("purge failed")
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        image_service.delete("test.png")
+
+        invoker.services.image_records.delete.assert_called_once_with("test.png")
+        invoker.services.image_files.rollback_delete.assert_not_called()
+        assert deleted_callbacks == ["test.png"]
+        invoker.services.logger.error.assert_called()
+
+
+class TestDeleteIntermediatesTransactional:
+    """delete_intermediates() must be all-or-nothing: stage everything, delete records once, commit."""
+
+    def test_success_deletes_multiple_intermediates(self, disk_image_service: ImageService):
+        invoker = disk_image_service._ImageService__invoker  # type: ignore
+        storage = invoker.services.image_files
+        names = ["tmp1.png", "tmp2.png", "tmp3.png"]
+        for name in names:
+            _save_image_file(storage, name)
+        invoker.services.image_records.get_intermediates.return_value = [(name, "") for name in names]
+        deleted_callbacks: list[str] = []
+        disk_image_service.on_deleted(deleted_callbacks.append)
+
+        count = disk_image_service.delete_intermediates()
+
+        assert count == 3
+        for name in names:
+            assert not storage.get_path(name).exists()
+            assert not storage.get_path(name, thumbnail=True).exists()
+        invoker.services.image_records.delete_many.assert_called_once_with(names)
+        assert deleted_callbacks == names
+        assert _staging_dirs(storage) == []
+
+    def test_first_staging_failure_aborts_without_db_delete(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
+        invoker.services.image_files.stage_delete.side_effect = ImageFileDeleteException("disk error")
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ImageFileDeleteException):
+            image_service.delete_intermediates()
+
+        invoker.services.image_records.delete_many.assert_not_called()
+        # Nothing was staged, so nothing needs rolling back.
+        invoker.services.image_files.rollback_delete.assert_not_called()
+        invoker.services.image_files.commit_delete.assert_not_called()
+        assert deleted_callbacks == []
+
+    def test_later_staging_failure_rolls_back_earlier_stages(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
+        token1 = object()
+        invoker.services.image_files.stage_delete.side_effect = [token1, ImageFileDeleteException("disk error")]
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ImageFileDeleteException):
+            image_service.delete_intermediates()
+
+        invoker.services.image_records.delete_many.assert_not_called()
+        invoker.services.image_files.rollback_delete.assert_called_once_with(token1)
+        invoker.services.image_files.commit_delete.assert_not_called()
+        assert deleted_callbacks == []
+
+    def test_later_staging_failure_restores_earlier_files_on_disk(self, disk_image_service: ImageService):
+        invoker = disk_image_service._ImageService__invoker  # type: ignore
+        storage = invoker.services.image_files
+        _save_image_file(storage, "tmp1.png")
+        # The second entry's subfolder fails path validation, so staging it raises after
+        # tmp1.png has already been staged.
+        invoker.services.image_records.get_intermediates.return_value = [
+            ("tmp1.png", ""),
+            ("tmp2.png", "bad\\path"),
+        ]
+        deleted_callbacks: list[str] = []
+        disk_image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ValueError):
+            disk_image_service.delete_intermediates()
+
+        assert storage.get_path("tmp1.png").exists()
+        assert storage.get_path("tmp1.png", thumbnail=True).exists()
+        invoker.services.image_records.delete_many.assert_not_called()
+        assert deleted_callbacks == []
+        assert _staging_dirs(storage) == []
+
+    def test_db_failure_restores_all_staged_files(self, disk_image_service: ImageService):
+        invoker = disk_image_service._ImageService__invoker  # type: ignore
+        storage = invoker.services.image_files
+        names = ["tmp1.png", "tmp2.png"]
+        for name in names:
+            _save_image_file(storage, name)
+        invoker.services.image_records.get_intermediates.return_value = [(name, "") for name in names]
+        invoker.services.image_records.delete_many.side_effect = ImageRecordDeleteException()
+        deleted_callbacks: list[str] = []
+        disk_image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ImageRecordDeleteException):
+            disk_image_service.delete_intermediates()
+
+        for name in names:
+            assert storage.get_path(name).exists()
+            assert storage.get_path(name, thumbnail=True).exists()
+        assert deleted_callbacks == []
+        assert _staging_dirs(storage) == []
+
+    def test_one_rollback_failure_does_not_abandon_other_rollbacks(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get_intermediates.return_value = [
+            ("tmp1.png", ""),
+            ("tmp2.png", ""),
+            ("tmp3.png", ""),
+        ]
+        tokens = [object(), object(), object()]
+        invoker.services.image_files.stage_delete.side_effect = tokens
+        invoker.services.image_records.delete_many.side_effect = ImageRecordDeleteException()
+        invoker.services.image_files.rollback_delete.side_effect = [
+            ImageFileDeleteException("rollback broken"),
+            None,
+            None,
+        ]
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ImageRecordDeleteException):
+            image_service.delete_intermediates()
+
+        # Every staged item must have a rollback attempt, even after one fails.
+        rollback_tokens = [call.args[0] for call in invoker.services.image_files.rollback_delete.call_args_list]
+        assert rollback_tokens == tokens
+        invoker.services.image_files.commit_delete.assert_not_called()
+        assert deleted_callbacks == []
+
+    def test_commit_failure_is_logged_and_remaining_commits_attempted(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
+        tokens = [object(), object()]
+        invoker.services.image_files.stage_delete.side_effect = tokens
+        invoker.services.image_files.commit_delete.side_effect = [ImageFileDeleteException("purge failed"), None]
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        count = image_service.delete_intermediates()
+
+        assert count == 2
+        commit_tokens = [call.args[0] for call in invoker.services.image_files.commit_delete.call_args_list]
+        assert commit_tokens == tokens
+        # Records were deleted, so the deletions are committed and callbacks must fire.
+        assert deleted_callbacks == ["tmp1.png", "tmp2.png"]
+        invoker.services.logger.error.assert_called()
+        invoker.services.image_files.rollback_delete.assert_not_called()

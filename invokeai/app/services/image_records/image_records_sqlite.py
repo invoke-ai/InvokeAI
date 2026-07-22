@@ -302,30 +302,20 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             count = cast(int, cursor.fetchone()[0])
         return count
 
-    def delete_intermediates(self) -> list[tuple[str, str]]:
-        """Deletes all intermediate image records.
+    def get_intermediates(self) -> list[tuple[str, str]]:
+        """Gets all intermediate image records without deleting them.
 
-        Returns a list of (image_name, image_subfolder) tuples for file cleanup.
+        Returns a list of (image_name, image_subfolder) tuples for staged file deletion.
         """
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    SELECT image_name, image_subfolder FROM images
-                    WHERE is_intermediate = TRUE;
-                    """
-                )
-                result = cast(list[sqlite3.Row], cursor.fetchall())
-                image_name_subfolder_pairs = [(r[0], r[1]) for r in result]
-                cursor.execute(
-                    """--sql
-                    DELETE FROM images
-                    WHERE is_intermediate = TRUE;
-                    """
-                )
-            except sqlite3.Error as e:
-                raise ImageRecordDeleteException from e
-        return image_name_subfolder_pairs
+            cursor.execute(
+                """--sql
+                SELECT image_name, image_subfolder FROM images
+                WHERE is_intermediate = TRUE;
+                """
+            )
+            result = cast(list[sqlite3.Row], cursor.fetchall())
+        return [(r[0], r[1]) for r in result]
 
     def save(
         self,

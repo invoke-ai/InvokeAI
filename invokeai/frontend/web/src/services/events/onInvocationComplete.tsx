@@ -10,15 +10,18 @@ import {
 } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
-import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
+import { isImageField, isImageFieldCollection, isVideoField } from 'features/nodes/types/common';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
+import { galleryApi } from 'services/api/endpoints/gallery';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import type { ImageDTO, S } from 'services/api/types';
+import { getVideoDTOSafe } from 'services/api/endpoints/videos';
+import type { ImageDTO, S, VideoDTO } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
+import { getTagsToInvalidateForBoardAffectingMutation } from 'services/api/util/tagInvalidation';
 import { getUpdatedNodeExecutionStateOnInvocationComplete } from 'services/events/nodeExecutionState';
 import { $lastProgressEvent } from 'services/events/stores';
 import stableHash from 'stable-hash';
@@ -163,6 +166,17 @@ export const buildOnInvocationComplete = (
       dispatch(imagesApi.util.invalidateTags(['VirtualBoards']));
     }
 
+    // The optimistic updates above only touch the image-only ``getImageNames`` cache. The
+    // gallery grid actually subscribes to the polymorphic ``getGalleryItemNames`` endpoint
+    // (which interleaves images and videos by created_at), so without invalidating its tag
+    // a freshly generated image never appears in the grid until the user reloads — even
+    // though it lands correctly in board totals, image DTO cache, etc. Mirrors the same
+    // invalidation in addVideosToGallery below. A future optimization could insert into the
+    // polymorphic cache shape directly, but the refetch cost is a single HTTP round-trip.
+    if (imageDTOs.length > 0) {
+      dispatch(galleryApi.util.invalidateTags(['GalleryItemNameList', 'GalleryItemList']));
+    }
+
     const autoSwitch = selectAutoSwitch(getState());
 
     if (!autoSwitch) {
@@ -226,6 +240,92 @@ export const buildOnInvocationComplete = (
     return imageDTOs;
   };
 
+  const getResultVideoDTOs = async (data: S['InvocationCompleteEvent']): Promise<VideoDTO[]> => {
+    const { result } = data;
+    const videoDTOs: VideoDTO[] = [];
+    for (const [_name, value] of objectEntries(result)) {
+      if (isVideoField(value)) {
+        const videoDTO = await getVideoDTOSafe(value.video_name);
+        if (videoDTO) {
+          videoDTOs.push(videoDTO);
+        }
+      }
+    }
+    return videoDTOs;
+  };
+
+  // Counterpart to addImagesToGallery for VideoField outputs (e.g. Wan 2.2 latents-to-video).
+  // Two key differences from the image path:
+  //   1. The gallery view uses the polymorphic getGalleryItemNames endpoint and we have no
+  //      cheap optimistic-insert here, so we invalidate the GalleryItemNameList/GalleryItemList
+  //      tags to force a refetch.
+  //   2. The ImageViewerContext's local $progressEvent/$progressImage atoms expect onLoadImage
+  //      (DndImage onLoad) to clear them. When auto-switching to a video, the viewer swaps
+  //      CurrentImagePreview for CurrentVideoPreview, which unmounts the stale progress overlay
+  //      so the stuck "Saving video" spinner goes away on its own.
+  const addVideosToGallery = async (data: S['InvocationCompleteEvent']) => {
+    if (nodeTypeDenylist.includes(data.invocation.type)) {
+      return;
+    }
+
+    const videoDTOs = await getResultVideoDTOs(data);
+    if (videoDTOs.length === 0) {
+      return;
+    }
+
+    const nonIntermediate = videoDTOs.filter((v) => !v.is_intermediate);
+    if (nonIntermediate.length === 0) {
+      return;
+    }
+
+    // Force the polymorphic gallery list to refetch so the new video shows up. Note: this is
+    // a tag invalidation, not an optimistic insert (the image path has a `insertImageIntoNamesResult`
+    // helper, but the polymorphic `GetGalleryItemNamesResult` has a different shape and we don't
+    // have an equivalent yet). The viewer selection below applies immediately, so the user sees
+    // their video right away; the *gallery grid* scroll-to-selection is delayed by one refetch
+    // because `useKeepSelectedImageInView` re-runs when `imageNames` updates and only then can
+    // it find the new name in the list. Worth a follow-up if the scroll lag becomes noticeable.
+    //
+    // The board-affecting helper also invalidates each board's `Board` tag (listAllBoards →
+    // video_count and cover_video_name), `BoardVideosTotal`, and `VirtualBoards`, so board
+    // counts and cover thumbnails don't lag behind the gallery grid until the next mutation.
+    const affectedBoards = [...new Set(nonIntermediate.map((v) => v.board_id ?? 'none'))];
+    dispatch(galleryApi.util.invalidateTags(getTagsToInvalidateForBoardAffectingMutation(affectedBoards)));
+
+    const autoSwitch = selectAutoSwitch(getState());
+    if (!autoSwitch) {
+      return;
+    }
+
+    const lastVideoDTO = nonIntermediate.at(-1);
+    if (!lastVideoDTO) {
+      return;
+    }
+
+    const { video_name } = lastVideoDTO;
+    const board_id = lastVideoDTO.board_id ?? 'none';
+
+    // Selection is a polymorphic string[]; useGalleryItemDTO discriminates by filename extension.
+    const selectedBoardId = selectSelectedBoardId(getState());
+    if (board_id !== selectedBoardId) {
+      dispatch(
+        boardIdSelected({
+          boardId: board_id,
+          select: {
+            selection: [video_name],
+            galleryView: 'images',
+          },
+        })
+      );
+    } else {
+      const galleryView = selectGalleryView(getState());
+      if (galleryView !== 'images') {
+        dispatch(galleryViewChanged('images'));
+      }
+      dispatch(imageSelected(video_name));
+    }
+  };
+
   const clearCanvasWorkflowIntegrationProcessing = (data: S['InvocationCompleteEvent']) => {
     // Check if this is a canvas workflow integration result
     // Results go to staging area automatically via destination = canvasSessionId
@@ -273,6 +373,7 @@ export const buildOnInvocationComplete = (
 
     // Add images to gallery (canvas workflow integration results go to staging area automatically)
     await addImagesToGallery(data);
+    await addVideosToGallery(data);
 
     $lastProgressEvent.set(null);
   };
@@ -287,6 +388,10 @@ export const buildOnInvocationComplete = (
 export const FOREIGN_GALLERY_REFRESH_TAGS: ApiTagDescription[] = [
   'ImageNameList',
   'BoardImagesTotal',
+  'VideoNameList',
+  'BoardVideosTotal',
+  'GalleryItemList',
+  'GalleryItemNameList',
   { type: 'Board', id: LIST_TAG },
   'VirtualBoards',
 ];
@@ -312,10 +417,10 @@ export const buildOnForeignInvocationComplete = (dispatch: AppDispatch) => {
       return;
     }
 
-    const hasImageOutput = objectEntries(data.result).some(
-      ([_name, value]) => isImageField(value) || isImageFieldCollection(value)
+    const hasGalleryOutput = objectEntries(data.result).some(
+      ([_name, value]) => isImageField(value) || isImageFieldCollection(value) || isVideoField(value)
     );
-    if (!hasImageOutput) {
+    if (!hasGalleryOutput) {
       return;
     }
 

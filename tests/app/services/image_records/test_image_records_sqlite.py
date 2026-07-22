@@ -1,7 +1,7 @@
 """DB-backed tests for SqliteImageRecordStorage.
 
 Verifies that image_subfolder round-trips correctly through save(), get(),
-get_many(), and delete_intermediates() against a real (in-memory) SQLite database,
+get_many(), and get_intermediates() against a real (in-memory) SQLite database,
 and that get_many()/get_image_names() enforce per-user ownership isolation.
 """
 
@@ -93,15 +93,15 @@ class TestGetManySubfolder:
         assert by_name["hashed.png"] == "ab"
 
 
-class TestDeleteIntermediatesSubfolder:
-    """delete_intermediates() returns (name, subfolder) pairs and removes rows."""
+class TestGetIntermediatesSubfolder:
+    """get_intermediates() returns (name, subfolder) pairs without deleting rows."""
 
     def test_returns_subfolder_pairs(self, store: SqliteImageRecordStorage) -> None:
         _save(store, "keep.png", subfolder="general", is_intermediate=False)
         _save(store, "tmp1.png", subfolder="intermediate", is_intermediate=True)
         _save(store, "tmp2.png", subfolder="intermediate", is_intermediate=True)
 
-        pairs = store.delete_intermediates()
+        pairs = store.get_intermediates()
 
         # Should return only intermediate images with their subfolders
         assert len(pairs) == 2
@@ -113,9 +113,18 @@ class TestDeleteIntermediatesSubfolder:
         record = store.get("keep.png")
         assert record.image_subfolder == "general"
 
-    def test_intermediates_are_deleted(self, store: SqliteImageRecordStorage) -> None:
+    def test_get_intermediates_does_not_delete(self, store: SqliteImageRecordStorage) -> None:
         _save(store, "tmp.png", subfolder="x", is_intermediate=True)
-        store.delete_intermediates()
+        store.get_intermediates()
+
+        # Listing intermediates must not remove them.
+        record = store.get("tmp.png")
+        assert record.image_subfolder == "x"
+
+    def test_intermediates_are_deleted_via_delete_many(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "tmp.png", subfolder="x", is_intermediate=True)
+        pairs = store.get_intermediates()
+        store.delete_many([name for name, _ in pairs])
 
         from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 
