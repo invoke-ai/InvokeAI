@@ -6,7 +6,7 @@ import { useConnectionStatusSelector } from '@platform/transport/connectionStore
 import { Button } from '@platform/ui';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link, useSearch } from '@tanstack/react-router';
-import { PaletteButton } from '@workbench/palette';
+import { PaletteButton } from '@workbench/palette/PaletteButton';
 import { SettingsButton } from '@workbench/settings/SettingsDialog';
 import { ArrowLeftIcon } from 'lucide-react';
 import { useMemo } from 'react';

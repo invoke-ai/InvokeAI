@@ -1,5 +1,6 @@
 import { Icon } from '@chakra-ui/react';
-import { IconButton, Tooltip } from '@platform/ui';
+import { IconButton } from '@platform/ui/Button';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { SearchIcon } from 'lucide-react';
 

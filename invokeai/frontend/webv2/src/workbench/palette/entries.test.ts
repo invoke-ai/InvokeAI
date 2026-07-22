@@ -1,8 +1,11 @@
+import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
+import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { DEFAULT_PREFERENCES } from '@workbench/settings/store';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PaletteEntry } from './entries';
 
+import { getPaletteContributionKey } from './contributionKey';
 import {
   buildCatalogCommandEntries,
   buildProviderSectionRows,
@@ -10,6 +13,7 @@ import {
   buildSettingsEntries,
   buildStageEntries,
   searchPaletteRows,
+  resolveActivePaletteRow,
 } from './entries';
 
 /**
@@ -20,15 +24,28 @@ import {
  */
 
 const noop = () => undefined;
+const settingsEntryDeps = {
+  languageOptions: [{ label: 'English', value: 'en' as const }],
+  openSettingsSection: vi.fn(),
+  patchPreferences: vi.fn(),
+  themes: [{ id: 'classic' as const, label: 'Classic' }],
+};
 
 const makeEntry = (overrides: Partial<PaletteEntry> & Pick<PaletteEntry, 'id' | 'title' | 'group'>): PaletteEntry => ({
+  isPersistentRecent: true,
   run: noop,
   ...overrides,
 });
 
 describe('buildCatalogCommandEntries', () => {
   const build = (presentWidgetTypeIds: ReadonlySet<string>, execute: (commandId: string) => unknown = noop) =>
-    buildCatalogCommandEntries({ customHotkeys: {}, execute, presentWidgetTypeIds });
+    buildCatalogCommandEntries({
+      catalog: firstPartyHotkeyCatalog,
+      customHotkeys: {},
+      execute,
+      formatHotkey: formatHotkeyForPlatform,
+      presentWidgetTypeIds,
+    });
 
   it('surfaces implemented app commands with palette-facing titles and groups', () => {
     const entries = build(new Set());
@@ -60,8 +77,10 @@ describe('buildCatalogCommandEntries', () => {
   it('formats the bound hotkey (custom overrides win) and executes by command id', () => {
     const execute = vi.fn();
     const entries = buildCatalogCommandEntries({
+      catalog: firstPartyHotkeyCatalog,
       customHotkeys: { 'app.clearQueue': ['mod+shift+q'] },
       execute,
+      formatHotkey: formatHotkeyForPlatform,
       presentWidgetTypeIds: new Set(),
     });
     const invoke = entries.find((entry) => entry.id === 'app.invoke');
@@ -80,7 +99,7 @@ describe('buildSettingsEntries', () => {
     const patchPreferences = vi.fn();
     const entries = buildSettingsEntries(
       { ...DEFAULT_PREFERENCES, reduceMotion: false },
-      { openSettingsSection: vi.fn(), patchPreferences }
+      { ...settingsEntryDeps, openSettingsSection: vi.fn(), patchPreferences }
     );
     const reduceMotion = entries.find((entry) => entry.id === 'setting.reduceMotion');
 
@@ -92,7 +111,11 @@ describe('buildSettingsEntries', () => {
 
   it('deep-links enum preferences and sections to the settings dialog', () => {
     const openSettingsSection = vi.fn();
-    const entries = buildSettingsEntries(DEFAULT_PREFERENCES, { openSettingsSection, patchPreferences: vi.fn() });
+    const entries = buildSettingsEntries(DEFAULT_PREFERENCES, {
+      ...settingsEntryDeps,
+      openSettingsSection,
+      patchPreferences: vi.fn(),
+    });
     const theme = entries.find((entry) => entry.id === 'setting.themeId');
     const workflowSection = entries.find((entry) => entry.id === 'settings.section.workflow');
 
@@ -109,7 +132,7 @@ describe('buildSettingsEntries', () => {
     const patchPreferences = vi.fn();
     const entries = buildSettingsEntries(
       { ...DEFAULT_PREFERENCES, workflowEdgeStyle: 'curved' },
-      { openSettingsSection: vi.fn(), patchPreferences }
+      { ...settingsEntryDeps, openSettingsSection: vi.fn(), patchPreferences }
     );
     const edgeStyle = entries.find((entry) => entry.id === 'setting.workflowEdgeStyle');
 
@@ -127,6 +150,7 @@ describe('buildSettingsEntries', () => {
     const previewTheme = vi.fn();
     const clearThemePreview = vi.fn();
     const withPreview = buildSettingsEntries(DEFAULT_PREFERENCES, {
+      ...settingsEntryDeps,
       clearThemePreview,
       openSettingsSection: vi.fn(),
       patchPreferences: vi.fn(),
@@ -140,6 +164,7 @@ describe('buildSettingsEntries', () => {
     expect(clearThemePreview).toHaveBeenCalled();
 
     const withoutPreview = buildSettingsEntries(DEFAULT_PREFERENCES, {
+      ...settingsEntryDeps,
       openSettingsSection: vi.fn(),
       patchPreferences: vi.fn(),
     });
@@ -173,7 +198,7 @@ describe('provider row assembly', () => {
       makeEntry({ group: id, id: `${id}:${index}`, title: `${id} ${index}` })
     ),
     isFetching,
-    provider: { id, label: id },
+    provider: { label: id, providerKey: id },
   });
 
   it('caps sections in root mode and drops empty settled sections', () => {
@@ -181,9 +206,9 @@ describe('provider row assembly', () => {
 
     expect(rows.map((row) => row.id)).toEqual([
       'label:provider:workflows',
-      'workflows:0',
-      'workflows:1',
-      'workflows:2',
+      getPaletteContributionKey('provider-row', 'workflows:workflows:0'),
+      getPaletteContributionKey('provider-row', 'workflows:workflows:1'),
+      getPaletteContributionKey('provider-row', 'workflows:workflows:2'),
     ]);
   });
 
@@ -195,9 +220,9 @@ describe('provider row assembly', () => {
   });
 
   it('builds one trailing scope row per provider', () => {
-    const rows = buildScopeRows([{ id: 'boards', label: 'Boards' }], 'sunset');
+    const rows = buildScopeRows([{ label: 'Boards', providerKey: 'boards' }], 'sunset');
 
-    expect(rows[0]).toMatchObject({ kind: 'scope', label: 'Search boards for “sunset”', providerId: 'boards' });
+    expect(rows[0]).toMatchObject({ kind: 'scope', label: 'Search boards for “sunset”', providerKey: 'boards' });
   });
 });
 
@@ -255,5 +280,35 @@ describe('searchPaletteRows', () => {
 
     expect(rows.map((row) => row.id)).not.toContain('setting.reduceMotion');
     expect(rows.map((row) => row.id)).toContain('app.invoke');
+  });
+
+  it('lists every non-setting command for a bare commands scope', () => {
+    const rows = searchPaletteRows(entries, '', [], { commandsOnly: true, showAllOnEmpty: true });
+
+    expect(rows.filter((row) => row.kind === 'entry').map((row) => row.entry.id)).toEqual([
+      'app.invoke',
+      'app.invokeFront',
+      'app.selectCanvasTab',
+    ]);
+  });
+});
+
+describe('stable active row identity', () => {
+  it('preserves the selected action when async rows are inserted before it', () => {
+    const selectedRun = vi.fn();
+    const selected = makeEntry({ group: 'Commands', id: 'selected', run: selectedRun, title: 'Selected' });
+    const initial = searchPaletteRows([selected], 'selected', []);
+    const withAsyncInsertion = [
+      { id: 'label:provider', kind: 'label' as const, label: 'Provider' },
+      { entry: makeEntry({ group: 'Provider', id: 'async', title: 'Async' }), id: 'async-row', kind: 'entry' as const },
+      ...initial,
+    ];
+    const active = resolveActivePaletteRow(withAsyncInsertion, 'selected');
+
+    expect(active?.row.id).toBe('selected');
+    if (active?.row.kind === 'entry') {
+      active.row.entry.run();
+    }
+    expect(selectedRun).toHaveBeenCalledOnce();
   });
 });

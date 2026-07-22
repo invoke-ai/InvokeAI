@@ -2,11 +2,9 @@ import type { CustomHotkeys, HotkeyDefinition } from '@workbench/hotkeys/types';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { SettingsSectionId } from '@workbench/widgetContracts';
 
-import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
-import { THEMES, THEMES_BY_ID } from '@theme/themes';
-import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
-import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import fuzzysort from 'fuzzysort';
+
+import { getPaletteContributionKey } from './contributionKey';
 
 /**
  * Palette content model: every source (catalog commands, extension palette
@@ -50,6 +48,8 @@ export interface PaletteEntry {
   keepOpen?: boolean;
   /** Show in the empty-query launcher state (navigation entries). */
   showInEmptyState?: boolean;
+  /** Durable entry whose stable id may be persisted in palette recents. */
+  isPersistentRecent: boolean;
   /** Enter pushes this value-picker stage instead of running the entry. */
   stage?: PaletteStage;
   /** mod+Enter alternative, advertised in the footer while highlighted. */
@@ -59,7 +59,10 @@ export interface PaletteEntry {
 
 /** An async entity source the palette can query (workflows, boards, …). */
 export interface PaletteSearchProvider {
-  id: string;
+  /** Globally unique, stable identity (including extension source identity). */
+  providerKey: string;
+  /** Immutable snapshot of every host value that can affect search results. */
+  contextKey: string;
   label: string;
   search: (query: string) => Promise<PaletteEntry[]> | PaletteEntry[];
 }
@@ -67,7 +70,22 @@ export interface PaletteSearchProvider {
 export type PaletteRow =
   | { kind: 'label'; id: string; label: string }
   | { kind: 'entry'; id: string; entry: PaletteEntry; matchIndexes?: readonly number[] }
-  | { kind: 'scope'; id: string; providerId: string; label: string };
+  | { kind: 'scope'; id: string; providerKey: string; label: string };
+
+export interface ActivePaletteRow {
+  index: number;
+  row: Exclude<PaletteRow, { kind: 'label' }>;
+}
+
+/** Resolve selection by stable row id, falling back to the first actionable row. */
+export const resolveActivePaletteRow = (
+  rows: readonly PaletteRow[],
+  activeRowId: string | null
+): ActivePaletteRow | undefined => {
+  const navigable = rows.flatMap((row, index): ActivePaletteRow[] => (row.kind === 'label' ? [] : [{ index, row }]));
+
+  return (activeRowId ? navigable.find((candidate) => candidate.row.id === activeRowId) : undefined) ?? navigable[0];
+};
 
 /** Max rows an entity section shows in root mode; depth lives behind the scope. */
 export const PROVIDER_ROOT_RESULT_CAP = 3;
@@ -165,21 +183,27 @@ const WIDGET_CATEGORY_GROUPS: Record<string, { group: string; typeId: string }> 
   workflows: { group: 'Workflows', typeId: 'workflow' },
 };
 
-const getEntryKeys = (definition: HotkeyDefinition, customHotkeys: CustomHotkeys): string[] | undefined => {
+const getEntryKeys = (
+  definition: HotkeyDefinition,
+  customHotkeys: CustomHotkeys,
+  formatHotkey: (key: string) => string[]
+): string[] | undefined => {
   const keys = customHotkeys[definition.id] ?? definition.defaultKeys;
 
-  return keys[0] ? formatHotkeyForPlatform(keys[0]) : undefined;
+  return keys[0] ? formatHotkey(keys[0]) : undefined;
 };
 
 export const buildCatalogCommandEntries = ({
-  catalog = firstPartyHotkeyCatalog,
+  catalog,
   customHotkeys,
   execute,
+  formatHotkey,
   presentWidgetTypeIds,
 }: {
-  catalog?: HotkeyDefinition[];
+  catalog: readonly HotkeyDefinition[];
   customHotkeys: CustomHotkeys;
   execute: (commandId: string) => unknown;
+  formatHotkey: (key: string) => string[];
   presentWidgetTypeIds: ReadonlySet<string>;
 }): PaletteEntry[] =>
   catalog
@@ -196,7 +220,8 @@ export const buildCatalogCommandEntries = ({
       return {
         group,
         id: definition.commandId,
-        keys: getEntryKeys(definition, customHotkeys),
+        isPersistentRecent: true,
+        keys: getEntryKeys(definition, customHotkeys, formatHotkey),
         keywords: widgetGroup?.group,
         run: () => execute(definition.commandId),
         showInEmptyState: group === 'Navigation',
@@ -242,12 +267,15 @@ export interface SettingsEntryDeps {
   previewTheme?: (themeId: string) => void;
   /** Revert a theme preview to the stored preference. */
   clearThemePreview?: () => void;
+  languageOptions: ReadonlyArray<{ label: string; value: WorkbenchPreferences['language'] }>;
+  themes: ReadonlyArray<{ id: WorkbenchPreferences['themeId']; label: string }>;
 }
 
 export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: SettingsEntryDeps): PaletteEntry[] => {
   const toggles = SETTING_TOGGLES.map<PaletteEntry>(({ key, keywords, title }) => ({
     group: 'Settings',
     id: `setting.${key}`,
+    isPersistentRecent: true,
     keepOpen: true,
     keywords: keywords ? `${keywords} toggle` : 'toggle',
     run: () => deps.patchPreferences({ [key]: !preferences[key] }),
@@ -276,6 +304,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
   }): PaletteEntry => ({
     group: 'Settings',
     id,
+    isPersistentRecent: true,
     keywords,
     run: () => deps.openSettingsSection(sectionId),
     secondary: { label: 'Open in Settings', run: () => deps.openSettingsSection(sectionId) },
@@ -288,7 +317,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
     enumEntry({
       id: 'setting.themeId',
       keywords: 'appearance color dark light',
-      options: THEMES.map((theme) => ({
+      options: deps.themes.map((theme) => ({
         apply: () => deps.patchPreferences({ themeId: theme.id }),
         id: theme.id,
         isCurrent: theme.id === preferences.themeId,
@@ -299,13 +328,13 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
         deps.previewTheme && deps.clearThemePreview
           ? { clearPreview: deps.clearThemePreview, preview: deps.previewTheme }
           : undefined,
-      subtitle: THEMES_BY_ID[preferences.themeId]?.label ?? preferences.themeId,
+      subtitle: deps.themes.find((theme) => theme.id === preferences.themeId)?.label ?? preferences.themeId,
       title: 'Theme',
     }),
     enumEntry({
       id: 'setting.language',
       keywords: 'locale translation',
-      options: WORKBENCH_LANGUAGE_OPTIONS.map((language) => ({
+      options: deps.languageOptions.map((language) => ({
         apply: () => deps.patchPreferences({ language: language.value }),
         id: language.value,
         isCurrent: language.value === preferences.language,
@@ -313,8 +342,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
       })),
       sectionId: 'appearance',
       subtitle:
-        WORKBENCH_LANGUAGE_OPTIONS.find((language) => language.value === preferences.language)?.label ??
-        preferences.language,
+        deps.languageOptions.find((language) => language.value === preferences.language)?.label ?? preferences.language,
       title: 'Language',
     }),
     enumEntry({
@@ -348,6 +376,7 @@ export const buildSettingsEntries = (preferences: WorkbenchPreferences, deps: Se
   const sections = SETTINGS_SECTIONS.map<PaletteEntry>(({ id, title }) => ({
     group: 'Settings',
     id: `settings.section.${id}`,
+    isPersistentRecent: true,
     keywords: 'settings preferences open',
     run: () => deps.openSettingsSection(id),
     title: `Settings: ${title}`,
@@ -497,6 +526,7 @@ export const buildStageEntries = (stage: PaletteStage, onApplied: () => void): P
   stage.options.map((option) => ({
     group: stage.title,
     id: `${STAGE_ENTRY_ID_PREFIX}${option.id}`,
+    isPersistentRecent: false,
     keepOpen: true,
     run: () => {
       void option.apply();
@@ -507,7 +537,7 @@ export const buildStageEntries = (stage: PaletteStage, onApplied: () => void): P
   }));
 
 export interface ProviderResultSection {
-  provider: Pick<PaletteSearchProvider, 'id' | 'label'>;
+  provider: Pick<PaletteSearchProvider, 'providerKey' | 'label'>;
   entries: PaletteEntry[];
   isFetching: boolean;
 }
@@ -531,13 +561,17 @@ export const buildProviderSectionRows = (
     }
 
     rows.push({
-      id: `label:provider:${section.provider.id}`,
+      id: `label:provider:${section.provider.providerKey}`,
       kind: 'label',
       label: section.isFetching ? `${section.provider.label} — Searching…` : section.provider.label,
     });
 
     for (const entry of visible) {
-      rows.push({ entry, id: entry.id, kind: 'entry' });
+      rows.push({
+        entry,
+        id: getPaletteContributionKey('provider-row', `${section.provider.providerKey}:${entry.id}`),
+        kind: 'entry',
+      });
     }
   }
 
@@ -546,12 +580,12 @@ export const buildProviderSectionRows = (
 
 /** Trailing escape hatches into scoped mode, one per provider. */
 export const buildScopeRows = (
-  providers: ReadonlyArray<Pick<PaletteSearchProvider, 'id' | 'label'>>,
+  providers: ReadonlyArray<Pick<PaletteSearchProvider, 'providerKey' | 'label'>>,
   query: string
 ): PaletteRow[] =>
   providers.map((provider) => ({
-    id: `scope:${provider.id}`,
+    id: getPaletteContributionKey('scope', provider.providerKey),
     kind: 'scope',
     label: `Search ${provider.label.toLowerCase()} for “${query}”`,
-    providerId: provider.id,
+    providerKey: provider.providerKey,
   }));

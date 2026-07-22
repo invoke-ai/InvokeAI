@@ -4,7 +4,7 @@ import { ModelsPage } from '@features/models';
 import { NodesPage } from '@features/nodes';
 import { Tabs } from '@platform/ui';
 import { useLocation, useNavigate } from '@tanstack/react-router';
-import { LaunchpadCommandPalette } from '@workbench/palette';
+import { LaunchpadCommandPalette } from '@workbench/palette/LaunchpadCommandPalette';
 import { BoxIcon, BlocksIcon, FolderIcon, UsersIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';

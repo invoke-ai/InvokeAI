@@ -1,19 +1,20 @@
 import type { GalleryBoard, GalleryImage } from '@features/gallery/contracts';
 import type { ModelConfig } from '@features/models';
-import type { QueueItemStatus, QueueQueryScope } from '@features/queue/contracts';
+import type { QueueItemStatus, QueueReadModel } from '@features/queue/contracts';
 import type { PromptHistoryItem } from '@workbench/projectContracts';
 
 import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/queries';
 import { focusPositivePrompt } from '@features/generation/react';
 import { ensureModelsLoaded, getModelBaseLabel, getModelsSnapshot } from '@features/models';
 import { extractGenerationMeta, getResultImageName } from '@features/queue/contracts';
-import { getQueueReadModelOptions } from '@features/queue/queries';
 import { listLibraryWorkflows } from '@features/workflow/queries';
 import { requestLibraryWorkflowLoad } from '@features/workflow/react';
 import { queryClient } from '@platform/query/client';
 import { absolutizeApiUrl } from '@platform/transport/http';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
+
+import { getPaletteContributionKey } from './contributionKey';
 
 /**
  * First-party entity providers behind the palette's scoped search. Each is a
@@ -36,8 +37,9 @@ export const createWorkflowsProvider = ({
 }: {
   openWorkflowWidget: () => void;
 }): PaletteSearchProvider => ({
-  id: 'workflows',
+  contextKey: 'global',
   label: 'Workflows',
+  providerKey: getPaletteContributionKey('provider', 'workflows'),
   search: async (query) => {
     const [user, defaults] = await Promise.all([
       listLibraryWorkflows({ category: 'user', page: 0, perPage: PROVIDER_PAGE_SIZE, query }),
@@ -47,6 +49,7 @@ export const createWorkflowsProvider = ({
     return [...user.items, ...defaults.items].map<PaletteEntry>((item) => ({
       group: 'Workflows',
       id: `workflow:${item.workflow_id}`,
+      isPersistentRecent: false,
       keywords: item.tags ?? undefined,
       run: () => {
         openWorkflowWidget();
@@ -65,8 +68,9 @@ export const createBoardsProvider = ({
   openGalleryWidget: () => void;
   selectBoard: (boardId: string) => void;
 }): PaletteSearchProvider => ({
-  id: 'boards',
+  contextKey: 'global',
   label: 'Boards',
+  providerKey: getPaletteContributionKey('provider', 'boards'),
   search: async (query) => {
     const boards = await queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false }));
 
@@ -75,6 +79,7 @@ export const createBoardsProvider = ({
       .map<PaletteEntry>((board) => ({
         group: 'Boards',
         id: `board:${board.id}`,
+        isPersistentRecent: false,
         run: () => {
           openGalleryWidget();
           selectBoard(board.id);
@@ -86,21 +91,26 @@ export const createBoardsProvider = ({
 });
 
 export const createPromptHistoryProvider = ({
-  getPromptHistory,
   openGenerateWidget,
+  projectId,
+  promptHistory,
+  recallContextKey,
   recallPrompt,
 }: {
-  getPromptHistory: () => readonly PromptHistoryItem[];
   openGenerateWidget: () => void;
+  projectId: string;
+  promptHistory: readonly PromptHistoryItem[];
+  recallContextKey: string;
   recallPrompt: (item: PromptHistoryItem) => void;
 }): PaletteSearchProvider => ({
-  id: 'prompt-history',
+  contextKey: JSON.stringify([projectId, promptHistory, recallContextKey]),
   label: 'Prompt history',
+  providerKey: getPaletteContributionKey('provider', 'prompt-history'),
   search: (query) => {
     const seen = new Set<string>();
     const entries: PaletteEntry[] = [];
 
-    for (const [index, item] of getPromptHistory().entries()) {
+    for (const [index, item] of promptHistory.entries()) {
       const dedupeKey = `${item.positivePrompt}\n${item.negativePrompt ?? ''}`;
 
       if (seen.has(dedupeKey) || !matchesTerms(`${item.positivePrompt} ${item.negativePrompt ?? ''}`, query)) {
@@ -111,6 +121,7 @@ export const createPromptHistoryProvider = ({
       entries.push({
         group: 'Prompt history',
         id: `prompt:${index}`,
+        isPersistentRecent: false,
         run: () => {
           openGenerateWidget();
           recallPrompt(item);
@@ -136,8 +147,9 @@ export const createModelsProvider = ({
   openGenerateWidget: () => void;
   openModelManager: () => void;
 }): PaletteSearchProvider => ({
-  id: 'models',
+  contextKey: 'global',
   label: 'Models',
+  providerKey: getPaletteContributionKey('provider', 'models'),
   search: async (query) => {
     await ensureModelsLoaded();
     const snapshot = getModelsSnapshot();
@@ -148,6 +160,7 @@ export const createModelsProvider = ({
       .map<PaletteEntry>((model) => ({
         group: 'Models',
         id: `model:${model.key}`,
+        isPersistentRecent: false,
         keywords: model.base,
         run: () => {
           openGenerateWidget();
@@ -170,20 +183,23 @@ const QUEUE_STATUS_LABELS: Record<QueueItemStatus, string> = {
 };
 
 export const createQueueItemsProvider = ({
-  getScope,
+  contextKey,
+  loadQueue,
   openQueueWidget,
   revealItem,
 }: {
-  getScope: () => QueueQueryScope;
+  contextKey: string;
+  loadQueue: () => Promise<QueueReadModel>;
   openQueueWidget: () => void;
   revealItem: (itemId: number) => void;
 }): PaletteSearchProvider => ({
-  id: 'queue-items',
+  contextKey,
   label: 'Queue items',
+  providerKey: getPaletteContributionKey('provider', 'queue-items'),
   search: async (query) => {
     // The queue read model is a recent window with no server-side text search;
     // filter the fetched window client-side.
-    const model = await queryClient.fetchQuery(getQueueReadModelOptions(getScope()));
+    const model = await loadQueue();
 
     return model.items
       .map((item) => ({ item, meta: extractGenerationMeta(item) }))
@@ -199,6 +215,7 @@ export const createQueueItemsProvider = ({
         return {
           group: 'Queue items',
           id: `queue-item:${item.id}`,
+          isPersistentRecent: false,
           run: () => {
             openQueueWidget();
             revealItem(item.id);
@@ -214,26 +231,27 @@ export const createQueueItemsProvider = ({
 });
 
 export const createImagesProvider = ({
-  getSelectedBoardId,
   openGalleryWidget,
   openPreviewWidget,
+  selectedBoardId,
   selectBoard,
   selectImage,
 }: {
-  getSelectedBoardId: () => string;
   openGalleryWidget: () => void;
   openPreviewWidget: () => void;
+  selectedBoardId: string;
   selectBoard: (boardId: string) => void;
   selectImage: (image: GalleryImage) => void;
 }): PaletteSearchProvider => ({
-  id: 'images',
+  contextKey: selectedBoardId,
   label: 'Images',
+  providerKey: getPaletteContributionKey('provider', 'images'),
   search: async (query) => {
     // The images endpoint is board-scoped; the palette searches the board the
     // gallery is currently on.
     const page = await queryClient.fetchQuery(
       galleryImagesOptions({
-        boardId: getSelectedBoardId(),
+        boardId: selectedBoardId,
         galleryView: 'images',
         limit: 20,
         searchTerm: query,
@@ -243,6 +261,7 @@ export const createImagesProvider = ({
     return page.images.map<PaletteEntry>((image) => ({
       group: 'Images',
       id: `image:${image.imageName}`,
+      isPersistentRecent: false,
       run: () => {
         openPreviewWidget();
         selectImage(image);

@@ -86,16 +86,16 @@ export const getRecentEntryIds = (): string[] => {
     .map(({ record }) => record.id);
 };
 
-export const recordRecentEntry = (id: string): void => {
-  if (!isBrowser()) {
+export const recordRecentEntry = (entry: Pick<PaletteEntry, 'id' | 'isPersistentRecent'>): void => {
+  if (!entry.isPersistentRecent || !isBrowser()) {
     return;
   }
 
   const records = readRecords();
-  const existing = records.find((record) => record.id === id);
+  const existing = records.find((record) => record.id === entry.id);
   const next: RecentUse[] = [
-    { id, lastUsedAt: Date.now(), uses: (existing?.uses ?? 0) + 1 },
-    ...records.filter((record) => record.id !== id),
+    { id: entry.id, lastUsedAt: Date.now(), uses: (existing?.uses ?? 0) + 1 },
+    ...records.filter((record) => record.id !== entry.id),
   ].slice(0, MAX_RECORDS);
 
   try {
@@ -104,3 +104,4 @@ export const recordRecentEntry = (id: string): void => {
     // Quota or private-mode failures are non-fatal; recents are a convenience.
   }
 };
+import type { PaletteEntry } from './entries';

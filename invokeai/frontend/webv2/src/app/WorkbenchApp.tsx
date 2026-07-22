@@ -3,7 +3,7 @@ import type { WorkbenchSearch } from '@workbench/projects/session';
 import { SessionExpiryGuard } from '@features/identity';
 import { useSearch } from '@tanstack/react-router';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
-import { WorkbenchCommandPalette } from '@workbench/palette';
+import { WorkbenchCommandPalette } from '@workbench/palette/WorkbenchCommandPalette';
 import { WorkbenchShell } from '@workbench/shell';
 import { WidgetHosts } from '@workbench/widget-frame/WidgetHosts';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';

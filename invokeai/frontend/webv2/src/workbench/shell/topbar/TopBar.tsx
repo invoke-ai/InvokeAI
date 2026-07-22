@@ -2,7 +2,7 @@ import { Flex, HStack, Separator } from '@chakra-ui/react';
 import { AccountMenu, useCapabilities } from '@features/identity';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link } from '@tanstack/react-router';
-import { PaletteButton } from '@workbench/palette';
+import { PaletteButton } from '@workbench/palette/PaletteButton';
 import { ProjectTabs } from '@workbench/projects/components';
 
 import { SettingsButton } from '@/workbench/settings';
