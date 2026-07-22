@@ -378,6 +378,9 @@ export type paths = {
          *
          *     These are models that have database entries but their corresponding
          *     weight files have been deleted externally (not via Model Manager).
+         *
+         *     Available to any authenticated user, not just admins: the frontend's model hooks subtract this
+         *     set from the model list so unusable models are kept out of the generation dropdowns.
          */
         get: operations["list_missing_models"];
         put?: never;
