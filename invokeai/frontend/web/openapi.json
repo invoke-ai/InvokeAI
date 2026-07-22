@@ -23131,10 +23131,18 @@
             "type": "array",
             "title": "Deleted Videos",
             "description": "The names of the videos that were deleted"
+          },
+          "failed_videos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Videos",
+            "description": "The names of videos that were not deleted"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "deleted_videos"],
+        "required": ["affected_boards", "deleted_videos", "failed_videos"],
         "title": "DeleteVideosResult"
       },
       "DenoiseLatentsInvocation": {
