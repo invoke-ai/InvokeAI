@@ -11,6 +11,10 @@ import type {
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
 import {
+  activeProgressTargetStore,
+  type ActiveProgressTargetSink,
+} from '@features/queue/data/activeProgressTargetStore';
+import {
   isTerminalBackendStatus,
   parseQueueItemOrigin,
   type InvocationCompleteEvent,
@@ -26,7 +30,6 @@ import {
   type ProgressImageTarget,
 } from '@features/queue/data/progressImageStore';
 import { queueItemProgressStore, type QueueItemProgressSink } from '@features/queue/data/progressStore';
-import { revealHoldStore, type RevealHoldSink } from '@features/queue/data/revealHoldStore';
 import { ApiError } from '@platform/transport/http';
 
 const GALLERY_REFRESH_COALESCE_MS = 400;
@@ -176,21 +179,21 @@ export const createQueueCoordinator = (
   options: {
     /** One adapter owns Queue HTTP commands and realtime events. */
     backend: QueueCoordinatorBackendPort;
+    activeProgressTarget?: ActiveProgressTargetSink;
     galleryRefreshCoalesceMs?: number;
     modelLoads: QueueModelLoadPort;
     nodeExecution: QueueNodeExecutionPort;
     progress?: QueueItemProgressSink;
     progressImage?: ProgressImageSink;
-    revealHold?: RevealHoldSink;
     sweepIntervalMs?: number;
   }
 ): QueueCoordinator => {
   const backend = options.backend;
+  const activeProgressTarget = options.activeProgressTarget ?? activeProgressTargetStore;
   const progress = options.progress ?? queueItemProgressStore;
   const modelLoads = options.modelLoads;
   const nodeExecution = options.nodeExecution;
   const progressImage = options.progressImage ?? progressImageStore;
-  const revealHold = options.revealHold ?? revealHoldStore;
   const galleryRefreshCoalesceMs = options.galleryRefreshCoalesceMs ?? GALLERY_REFRESH_COALESCE_MS;
   const sweepIntervalMs = options.sweepIntervalMs ?? SAFETY_SWEEP_INTERVAL_MS;
 
@@ -250,12 +253,15 @@ export const createQueueCoordinator = (
       state.activeBackendItemId !== undefined && !terminalBackendItemIds.has(state.activeBackendItemId)
         ? state.activeBackendItemId
         : undefined;
-    const activeItemIndex = activeBackendItemId
-      ? state.backendItemIds.indexOf(activeBackendItemId) + 1
-      : Math.min(terminalBackendItemIds.size + 1, state.backendItemIds.length);
+    // activeItemIndex means "slot currently executing" — omitted while the
+    // item merely waits in the queue, so idle slots never present as live.
+    const activeItemIndex =
+      activeBackendItemId !== undefined
+        ? Math.max(1, state.backendItemIds.indexOf(activeBackendItemId) + 1)
+        : undefined;
 
     progress.set(localQueueItemId, {
-      activeItemIndex: Math.max(1, activeItemIndex),
+      activeItemIndex,
       completedItemCount: terminalBackendItemIds.size,
       message: state.message,
       percentage: state.percentage,
@@ -281,39 +287,33 @@ export const createQueueCoordinator = (
     waits.delete(backendItemId);
     const progressTarget = getProgressImageTarget(wait.localQueueItemId, backendItemId);
     const clearProgressImage = (): void => progressImage.clear(progressTarget);
+    activeProgressTarget.clear(progressTarget);
     const state = runProgress.get(wait.localQueueItemId);
 
     if (state) {
-      state.activeBackendItemId = undefined;
+      if (state.activeBackendItemId === backendItemId) {
+        state.activeBackendItemId = undefined;
+        state.message = '';
+        state.percentage = null;
+      }
       if (outcome.status === 'completed') {
         state.completedBackendItemIds.add(backendItemId);
       }
       if (outcome.status === 'canceled') {
         state.cancelledBackendItemIds.add(backendItemId);
       }
-      state.message = '';
-      state.percentage = null;
       publishRunProgress(wait.localQueueItemId);
     }
 
     if (outcome.status === 'completed') {
       const routingPromise = callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
-      // Reveal window: while sibling items keep generating, hold off the next
-      // live frames briefly so the just-finished result is actually seen.
-      const settleCompleted = (): void => {
-        clearProgressImage();
-
-        if (waits.size > 0) {
-          revealHold.arm();
-        }
-      };
 
       if (routingPromise) {
         void Promise.resolve(routingPromise)
-          .finally(settleCompleted)
+          .finally(clearProgressImage)
           .catch(() => undefined);
       } else {
-        settleCompleted();
+        clearProgressImage();
       }
     }
 
@@ -440,11 +440,11 @@ export const createQueueCoordinator = (
 
     nodeExecution.progress(event.invocation_source_id, event.percentage, event.message);
 
+    const target = getProgressImageTarget(wait.localQueueItemId, event.item_id);
+    activeProgressTarget.set(target);
+
     if (event.image?.dataURL) {
-      progressImage.set(
-        { dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width },
-        getProgressImageTarget(wait.localQueueItemId, event.item_id)
-      );
+      progressImage.set({ dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width }, target);
     }
 
     const state = runProgress.get(wait.localQueueItemId);
@@ -465,6 +465,10 @@ export const createQueueCoordinator = (
    * and, on (re)connect, schedules a gallery refresh and missed-event sweep.
    */
   const handleConnectionChange = (status: BackendConnectionStatus): void => {
+    if (status !== 'connected') {
+      activeProgressTarget.clear();
+      progressImage.clear();
+    }
     progress.clearAll?.();
     nodeExecution.clearAll();
     modelLoads.reset();
@@ -528,6 +532,8 @@ export const createQueueCoordinator = (
   /** Detach generation listeners; the hub keeps the socket alive. */
   const dispose = (): void => {
     isDisposed = true;
+    activeProgressTarget.clear();
+    progressImage.clear();
 
     for (const detach of detachers) {
       detach();

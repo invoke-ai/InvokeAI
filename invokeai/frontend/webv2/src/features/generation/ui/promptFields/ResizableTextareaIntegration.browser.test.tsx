@@ -9,6 +9,7 @@ import { system } from '@theme/system';
 import { act, useCallback, useState, type ChangeEvent } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -50,6 +51,35 @@ afterEach(async () => {
 });
 
 describe('ResizableTextarea', () => {
+  it('keeps its focus border while hovered', async () => {
+    const { textarea } = await renderTextarea();
+
+    await act(async () => {
+      await userEvent.hover(textarea);
+      await userEvent.tab();
+      await new Promise((resolve) => {
+        globalThis.setTimeout(resolve, 200);
+      });
+    });
+    expect(document.activeElement).toBe(textarea);
+    const hoveredFocusBorderColor = getComputedStyle(textarea).borderTopColor;
+    const accentProbe = document.createElement('div');
+    accentProbe.style.border = '1px solid var(--chakra-colors-accent-solid)';
+    document.body.append(accentProbe);
+    const accentBorderColor = getComputedStyle(accentProbe).borderTopColor;
+    accentProbe.remove();
+    expect(getComputedStyle(textarea).outlineStyle).toBe('none');
+    expect(hoveredFocusBorderColor).toBe(accentBorderColor);
+
+    await act(async () => {
+      await userEvent.unhover(textarea);
+      await new Promise((resolve) => {
+        globalThis.setTimeout(resolve, 200);
+      });
+    });
+    expect(getComputedStyle(textarea).borderTopColor).toBe(accentBorderColor);
+  });
+
   it('allows unbounded pointer and keyboard growth while keeping Home at the minimum', async () => {
     const { handle, onResizeEnd, textarea } = await renderTextarea();
 

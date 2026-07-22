@@ -4,7 +4,7 @@ import type { ModelConfig } from '@features/models/core/types';
 import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
 import { deleteModelImage, getModelImageUrl, updateModelImage } from '@features/models/data/api';
 import { markCoverImageChanged, useModelsSelector } from '@features/models/data/modelsStore';
-import { IconButton, Tooltip } from '@platform/ui';
+import { DropZone, IconButton, Tooltip } from '@platform/ui';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -85,20 +85,18 @@ export const ModelImageUpload = ({
   };
 
   return (
-    <Box
+    <DropZone
       aria-busy={isBusy || undefined}
       aria-label={t('models.uploadCoverImageFor', { name: model.name })}
-      bg="bg.emphasized"
-      borderColor={isDropActive ? 'accent.solid' : 'border.subtle'}
+      bg={isDropActive ? 'accent.muted' : 'bg.emphasized'}
       borderStyle={hasImage ? 'solid' : 'dashed'}
-      borderWidth={isDropActive ? '2px' : '1px'}
       boxSize="24"
       cursor="pointer"
       flexShrink={0}
+      isOver={isDropActive}
       overflow="hidden"
       position="relative"
       role="button"
-      rounded="lg"
       tabIndex={0}
       className="group"
       _focusVisible={{ outline: '2px solid {colors.accent.solid}', outlineOffset: '2px' }}
@@ -214,7 +212,7 @@ export const ModelImageUpload = ({
           </Tooltip>
         </Box>
       ) : null}
-    </Box>
+    </DropZone>
   );
 };
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

@@ -1,16 +1,17 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type { GenerateModelConfig, GenerateSettings, VaePrecision } from '@features/generation/core/types';
-import type { ChangeEvent } from 'react';
+import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, HStack, InputGroup, NativeSelect, NumberInput, Switch } from '@chakra-ui/react';
+import { Badge, createListCollection, HStack, Stack, Switch } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { isVaeModelConfig } from '@features/generation/core/settings';
-import { Field } from '@platform/ui';
+import { Field, Select } from '@platform/ui';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { ModelDefaultButton } from './shared/ModelDefaultButton';
+import { SliderNumberField } from './shared/SliderNumberField';
 
 interface GenerateAdvancedFieldsProps {
   settings: GenerateSettings;
@@ -18,6 +19,13 @@ interface GenerateAdvancedFieldsProps {
   onCommit: (patch: Partial<GenerateSettings>) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
+
+const VAE_PRECISION_COLLECTION = createListCollection({
+  items: [
+    { label: 'FP16', value: 'fp16' },
+    { label: 'FP32', value: 'fp32' },
+  ] as const,
+});
 
 const SeamlessSwitch = ({
   checked,
@@ -27,15 +35,27 @@ const SeamlessSwitch = ({
   checked: boolean;
   label: string;
   onCheckedChange: (checked: boolean) => void;
-}) => (
-  <Switch.Root checked={checked} flex="1" size="sm" onCheckedChange={(event) => onCheckedChange(event.checked)}>
-    <Switch.HiddenInput />
-    <Switch.Control _checked={{ bg: 'accent.solid' }}>
-      <Switch.Thumb />
-    </Switch.Control>
-    <Switch.Label fontSize="xs">{label}</Switch.Label>
-  </Switch.Root>
-);
+}) => {
+  // Both axis switches share one Field.Root, which would hand them the same
+  // hidden-input id — explicit ids keep each label bound to its own input.
+  const id = useId();
+
+  return (
+    <Switch.Root
+      checked={checked}
+      flex="1"
+      ids={{ hiddenInput: id, label: `${id}-label` }}
+      size="sm"
+      onCheckedChange={(event) => onCheckedChange(event.checked)}
+    >
+      <Switch.HiddenInput />
+      <Switch.Control _checked={{ bg: 'accent.solid' }}>
+        <Switch.Thumb />
+      </Switch.Control>
+      <Switch.Label fontSize="xs">{label}</Switch.Label>
+    </Switch.Root>
+  );
+};
 
 export const GenerateAdvancedFields = ({
   onCommit,
@@ -49,15 +69,13 @@ export const GenerateAdvancedFields = ({
   const policy = getGenerationUiPolicy(selectedModel, settings);
   const clipSkipMax = policy.clipSkipMax ?? 0;
 
-  const updateNumber =
-    (key: 'cfgRescaleMultiplier' | 'clipSkip', max: number) =>
-    ({ valueAsNumber }: NumberInput.ValueChangeDetails) => {
-      if (!Number.isFinite(valueAsNumber)) {
-        return;
-      }
+  const updateNumber = (key: 'cfgRescaleMultiplier' | 'clipSkip', max: number) => (value: number) => {
+    if (!Number.isFinite(value)) {
+      return;
+    }
 
-      onCommit({ [key]: Math.min(max, Math.max(0, valueAsNumber)) });
-    };
+    onCommit({ [key]: Math.min(max, Math.max(0, value)) });
+  };
 
   const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
 
@@ -86,7 +104,12 @@ export const GenerateAdvancedFields = ({
   );
 
   return (
-    <GenerateCollapsibleSection label={t('widgets.generate.advanced')} defaultOpen={false} badges={badges}>
+    <GenerateCollapsibleSection
+      label={t('widgets.generate.advanced')}
+      defaultOpen={false}
+      badges={badges}
+      sectionId="advanced"
+    >
       {policy.sdVaeVisible || policy.vaePrecisionVisible ? (
         <HStack alignItems="flex-start" gap="2" p="2">
           {policy.sdVaeVisible ? (
@@ -104,39 +127,38 @@ export const GenerateAdvancedFields = ({
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}
                 />
-                <ModelDefaultButton
-                  disabled={!settings.vae}
-                  label={t('widgets.generate.useModelDefaultVae')}
-                  onClick={() => onCommitImmediate({ vae: null })}
-                />
+                {settings.vae ? (
+                  <ModelDefaultButton
+                    label={t('widgets.generate.useModelDefaultVae')}
+                    onClick={() => onCommitImmediate({ vae: null })}
+                  />
+                ) : null}
               </HStack>
             </Field>
           ) : null}
           {policy.vaePrecisionVisible ? (
             <Field flex="1" label={t('widgets.generate.vaePrecision')}>
               <HStack gap="1">
-                <NativeSelect.Root flex="1" size="xs">
-                  <NativeSelect.Field
-                    aria-label={t('widgets.generate.vaePrecision')}
-                    value={settings.vaePrecision}
-                    onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                      onCommit({ vaePrecision: event.currentTarget.value as VaePrecision })
-                    }
-                  >
-                    <option value="fp16">FP16</option>
-                    <option value="fp32">FP32</option>
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                <ModelDefaultButton
-                  disabled={!modelDefaults || settings.vaePrecision === modelDefaults.vaePrecision}
-                  label={t('widgets.generate.useModelDefaultVaePrecision')}
-                  onClick={() => {
-                    if (modelDefaults) {
-                      onCommit({ vaePrecision: modelDefaults.vaePrecision });
+                <Select
+                  aria-label={t('widgets.generate.vaePrecision')}
+                  collection={VAE_PRECISION_COLLECTION}
+                  flex="1"
+                  size="xs"
+                  value={[settings.vaePrecision]}
+                  onValueChange={({ value }) => {
+                    const vaePrecision = value[0];
+
+                    if (vaePrecision === 'fp16' || vaePrecision === 'fp32') {
+                      onCommit({ vaePrecision });
                     }
                   }}
                 />
+                {modelDefaults && settings.vaePrecision !== modelDefaults.vaePrecision ? (
+                  <ModelDefaultButton
+                    label={t('widgets.generate.useModelDefaultVaePrecision')}
+                    onClick={() => onCommit({ vaePrecision: modelDefaults.vaePrecision })}
+                  />
+                ) : null}
               </HStack>
             </Field>
           ) : null}
@@ -144,51 +166,36 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.clipSkipMax || policy.cfgRescaleVisible ? (
-        <HStack gap="2" p="2">
+        <Stack gap="2" p="2">
           {policy.clipSkipMax ? (
             <Field label={t('widgets.generate.clipSkip')}>
-              <NumberInput.Root
+              <SliderNumberField
+                ariaLabel={t('widgets.generate.clipSkip')}
+                defaultValue={modelDefaults?.clipSkip}
                 max={clipSkipMax}
                 min={0}
-                size="xs"
-                value={String(settings.clipSkip)}
-                onValueChange={updateNumber('clipSkip', clipSkipMax)}
-              >
-                <NumberInput.Control />
-                <NumberInput.Input />
-              </NumberInput.Root>
+                resetLabel={t('widgets.generate.useModelDefault')}
+                step={1}
+                value={settings.clipSkip}
+                onChange={updateNumber('clipSkip', clipSkipMax)}
+              />
             </Field>
           ) : null}
           {policy.cfgRescaleVisible ? (
             <Field label={t('widgets.generate.cfgRescale')}>
-              <NumberInput.Root
+              <SliderNumberField
+                ariaLabel={t('widgets.generate.cfgRescale')}
+                defaultValue={modelDefaults?.cfgRescaleMultiplier}
                 max={0.99}
                 min={0}
-                size="xs"
+                resetLabel={t('widgets.generate.useModelDefaultCfgRescale')}
                 step={0.05}
-                value={String(settings.cfgRescaleMultiplier)}
-                onValueChange={updateNumber('cfgRescaleMultiplier', 0.99)}
-              >
-                <InputGroup
-                  endElement={
-                    <ModelDefaultButton
-                      disabled={!modelDefaults || settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier}
-                      label={t('widgets.generate.useModelDefaultCfgRescale')}
-                      onClick={() => {
-                        if (modelDefaults) {
-                          onCommit({ cfgRescaleMultiplier: modelDefaults.cfgRescaleMultiplier });
-                        }
-                      }}
-                    />
-                  }
-                  endElementProps={{ pointerEvents: 'auto' }}
-                >
-                  <NumberInput.Input />
-                </InputGroup>
-              </NumberInput.Root>
+                value={settings.cfgRescaleMultiplier}
+                onChange={updateNumber('cfgRescaleMultiplier', 0.99)}
+              />
             </Field>
           ) : null}
-        </HStack>
+        </Stack>
       ) : null}
 
       {policy.colorCompensationVisible ? (

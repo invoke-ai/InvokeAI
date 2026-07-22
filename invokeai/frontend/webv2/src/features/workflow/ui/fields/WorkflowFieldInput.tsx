@@ -1,11 +1,11 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 
-import { HStack, Input, NativeSelect, Switch, Text } from '@chakra-ui/react';
+import { createListCollection, HStack, Input, Switch, Text } from '@chakra-ui/react';
 import { galleryDestinations, type GalleryBoard, type GeneratedImageContract } from '@features/gallery';
 import { SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
-import { Button, Combobox, ResizableTextarea } from '@platform/ui';
+import { Button, Combobox, ResizableTextarea, Select } from '@platform/ui';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
@@ -144,6 +144,8 @@ const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldI
   );
 };
 
+const SELECT_VALUE_TEXT_PROPS = { placeholder: 'Select…' };
+
 const SelectInput = ({
   id,
   invalid,
@@ -159,31 +161,36 @@ const SelectInput = ({
   title: string;
   value: unknown;
 }) => {
-  const selectedValue = typeof value === 'string' ? value : '';
-  const onSelectChange = useCallback(
-    (event: ChangeEvent<HTMLSelectElement>) => onChange(event.currentTarget.value),
+  const collection = useMemo(() => createListCollection({ items: options }), [options]);
+  const selectedValue = useMemo(
+    () => (typeof value === 'string' && options.some((option) => option.value === value) ? [value] : []),
+    [options, value]
+  );
+  const selectIds = useMemo(() => (id ? { trigger: `${id}-select` } : undefined), [id]);
+  const onSelectValueChange = useCallback(
+    ({ value: next }: { value: string[] }) => {
+      const nextValue = next[0];
+
+      if (nextValue !== undefined) {
+        onChange(nextValue);
+      }
+    },
     [onChange]
   );
 
   return (
-    <NativeSelect.Root className="nodrag" invalid={invalid} size="xs" w="full">
-      <NativeSelect.Field
-        aria-label={title}
-        id={id ? `${id}-select` : undefined}
-        value={selectedValue}
-        onChange={onSelectChange}
-      >
-        {typeof value !== 'string' || !options.some((option) => option.value === value) ? (
-          <option value="">Select…</option>
-        ) : null}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </NativeSelect.Field>
-      <NativeSelect.Indicator />
-    </NativeSelect.Root>
+    <Select
+      aria-label={title}
+      className="nodrag"
+      collection={collection}
+      ids={selectIds}
+      invalid={invalid}
+      size="xs"
+      value={selectedValue}
+      valueTextProps={SELECT_VALUE_TEXT_PROPS}
+      w="full"
+      onValueChange={onSelectValueChange}
+    />
   );
 };
 

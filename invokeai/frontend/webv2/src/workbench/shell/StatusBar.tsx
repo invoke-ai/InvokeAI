@@ -36,7 +36,7 @@ const BOTTOM_MENU_POSITIONING = { placement: 'top-end' } as const;
 const BOTTOM_MENU_TRIGGER = { kind: 'bottom' } as const;
 const COMPACT_ROW_HOVER_PROPS = { color: 'fg' };
 const COMPACT_ROW_ACTIVE_HOVER_PROPS = { color: 'accent.contrast' };
-const TOOLTIP_POSITIONING = { placement: 'top-start' } as const;
+const TOOLTIP_POSITIONING = { placement: 'top' } as const;
 
 export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) => {
   const { t } = useTranslation();
@@ -127,8 +127,6 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
           onSelect={handleSelect}
         />
       ))}
-
-      <Box flex="1" />
 
       <WidgetEnableMenu
         contextTarget={enableMenuTarget}

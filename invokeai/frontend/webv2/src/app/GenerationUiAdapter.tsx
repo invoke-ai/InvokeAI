@@ -4,6 +4,11 @@ import type { ReactNode } from 'react';
 import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
 import { GenerationUiProvider } from '@features/generation/react';
 import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
+import {
+  getWorkbenchPreferences,
+  patchWorkbenchPreferences,
+  useWorkbenchPreferenceSelector,
+} from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -72,6 +77,18 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     () => ({ patchGenerateSettings: generation.patchSettings }),
     [generation]
   );
+  const generateSectionsOpen = useWorkbenchPreferenceSelector((preferences) => preferences.generateSectionsOpen);
+  const sectionPreferencesGroup = useMemo<GenerationUiAdapter['sectionPreferences']>(
+    () => ({
+      sectionsOpen: generateSectionsOpen,
+      setSectionOpen: (sectionId, open) => {
+        void patchWorkbenchPreferences({
+          generateSectionsOpen: { ...getWorkbenchPreferences().generateSectionsOpen, [sectionId]: open },
+        });
+      },
+    }),
+    [generateSectionsOpen]
+  );
 
   const adapter = useMemo<GenerationUiAdapter>(
     () => ({
@@ -81,9 +98,10 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       notifications: notificationsGroup,
       project,
       promptHistory: promptHistoryGroup,
+      sectionPreferences: sectionPreferencesGroup,
       settings: settingsGroup,
     }),
-    [galleryGroup, modelsGroup, notificationsGroup, project, promptHistoryGroup, settingsGroup]
+    [galleryGroup, modelsGroup, notificationsGroup, project, promptHistoryGroup, sectionPreferencesGroup, settingsGroup]
   );
 
   return <GenerationUiProvider adapter={adapter}>{children}</GenerationUiProvider>;

@@ -4,6 +4,8 @@ import type { QueueItem } from '@features/queue/contracts';
 
 import { createContext, use, type ComponentType, type ReactNode } from 'react';
 
+import type { GalleryLiveTarget } from './galleryStateView';
+
 export interface GalleryImageActions {
   deleteImages(imageNames: string[]): Promise<void>;
   moveImagesToBoard(imageNames: string[], boardId: string): Promise<void>;
@@ -73,7 +75,7 @@ export interface GalleryWidgetProps {
 export interface GalleryUiAdapter {
   ImageActionsProvider: ComponentType<GalleryImageActionsOptions & { children: ReactNode }>;
   ImageContextMenu: ComponentType<GalleryImageContextMenuProps>;
-  account: { showProgressImages(): void };
+  account: { enableLiveFollow(): void };
   antialiasProgressImages: boolean;
   gallery: GalleryCommandsPort;
   galleryValues: Record<string, unknown>;
@@ -82,6 +84,8 @@ export interface GalleryUiAdapter {
   projectId: string;
   projectName: string;
   queueItems: QueueItem[];
+  liveFollowEnabled: boolean;
+  liveProgressTarget: GalleryLiveTarget | null;
   widgets: { patchGalleryValues(values: Record<string, unknown>): void };
 }
 

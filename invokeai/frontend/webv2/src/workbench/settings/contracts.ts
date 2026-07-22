@@ -37,4 +37,6 @@ export interface WorkbenchPreferences {
   workflowEdgeStyle: 'curved' | 'square';
   /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
   customHotkeys: Record<string, string[]>;
+  /** Generate panel section open/closed overrides keyed by section id; absent = section default. */
+  generateSectionsOpen: Record<string, boolean>;
 }

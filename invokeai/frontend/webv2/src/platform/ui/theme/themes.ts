@@ -77,7 +77,10 @@ const classic: ThemeColors = {
   success: 'oklch(79.8% 0.1132 141.63)',
   warning: 'oklch(76.62% 0.0612 62.9)',
   inset: 'oklch(21.074% 0.0087 264.37)',
-  fill: 'oklch(31.237% 0.0157 264.32)',
+  // Sits ~7% L above the neutral.800 surface like every other dark theme's
+  // fill; it previously matched neutral.800 exactly, making ghost hovers
+  // invisible on muted surfaces.
+  fill: 'oklch(38.5% 0.0203 264.29)',
   grid: 'oklch(40.619% 0.0221 264.29)',
   control: 'oklch(36.004% 0.019 264.3)',
 };

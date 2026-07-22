@@ -1,6 +1,13 @@
-import type { GalleryBoard, GalleryImage, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
+import type {
+  GalleryBoard,
+  GalleryImage,
+  GalleryOrderDir,
+  GalleryView,
+  GeneratedImageContract,
+} from '@features/gallery/core/types';
 import type { QueueItem } from '@features/queue/contracts';
 
+import { normalizeGalleryImage } from '@features/gallery/core/image';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
@@ -18,6 +25,7 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
  * deliver to the currently viewed board once generation completes.
  */
 export interface GalleryQueuePlaceholder {
+  boardId: string;
   id: string;
   queueItemId: string;
   itemIndex: number;
@@ -25,9 +33,25 @@ export interface GalleryQueuePlaceholder {
   height: number;
 }
 
+export interface GalleryLiveTarget {
+  queueItemId: string;
+  itemIndex: number;
+}
+
+export interface GalleryGenerationSequence {
+  chronologicalSlots: GalleryQueuePlaceholder[];
+  liveSlot: GalleryQueuePlaceholder | null;
+}
+
+export type GalleryCurrentItem =
+  | { kind: 'image'; imageName: string }
+  | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder }
+  | null;
+
 export interface GalleryStateView {
   boards: GalleryBoard[];
   compareImageName: string | null;
+  currentItem: GalleryCurrentItem;
   galleryView: GalleryView;
   images: GalleryImage[];
   isLoading: boolean;
@@ -39,6 +63,124 @@ export interface GalleryStateView {
   selectedImageNames: string[];
   settings: GallerySettings;
 }
+
+interface SortableGalleryQueueSlot {
+  backendItemId: number | null;
+  placeholder: GalleryQueuePlaceholder;
+  submittedAt: string;
+}
+
+interface GalleryOrderImage {
+  starred?: boolean;
+}
+
+export const getGalleryPlaceholderInsertionIndex = (
+  images: GalleryOrderImage[],
+  imageOrderDir: GalleryOrderDir,
+  starredFirst: boolean
+): number => {
+  if (imageOrderDir !== 'DESC') {
+    return images.length;
+  }
+
+  if (!starredFirst) {
+    return 0;
+  }
+
+  const firstUnstarredIndex = images.findIndex((image) => !image.starred);
+
+  return firstUnstarredIndex === -1 ? images.length : firstUnstarredIndex;
+};
+
+export const getGalleryGenerationSequence = (
+  queueItems: QueueItem[],
+  liveTarget: GalleryLiveTarget | null
+): GalleryGenerationSequence => {
+  const sortableSlots: SortableGalleryQueueSlot[] = [];
+
+  for (const item of queueItems) {
+    if ((item.status !== 'pending' && item.status !== 'running') || item.snapshot.destination !== 'gallery') {
+      continue;
+    }
+
+    const boardId = item.snapshot.galleryBoardId ?? 'none';
+    const { width, height } = getQueueItemSnapshotDimensions(item, { height: 1024, width: 1024 });
+    const completedBackendItemIds = new Set(item.completedBackendItemIds ?? []);
+    const cancelledBackendItemIds = new Set(item.cancelledBackendItemIds ?? []);
+    const slotCount = item.backendItemIds?.length ?? getQueueItemSnapshotBatchCount(item);
+
+    for (let index = 0; index < slotCount; index += 1) {
+      const backendItemId = item.backendItemIds?.[index] ?? null;
+
+      if (
+        backendItemId !== null &&
+        (completedBackendItemIds.has(backendItemId) || cancelledBackendItemIds.has(backendItemId))
+      ) {
+        continue;
+      }
+
+      sortableSlots.push({
+        backendItemId,
+        placeholder: {
+          boardId,
+          height,
+          id: `${item.id}:${index}`,
+          itemIndex: index + 1,
+          queueItemId: item.id,
+          width,
+        },
+        submittedAt: item.snapshot.submittedAt,
+      });
+    }
+  }
+
+  sortableSlots.sort((a, b) => {
+    if (a.backendItemId !== null && b.backendItemId !== null) {
+      return a.backendItemId - b.backendItemId;
+    }
+
+    if (a.backendItemId !== null) {
+      return -1;
+    }
+
+    if (b.backendItemId !== null) {
+      return 1;
+    }
+
+    return (
+      a.submittedAt.localeCompare(b.submittedAt) ||
+      a.placeholder.queueItemId.localeCompare(b.placeholder.queueItemId) ||
+      a.placeholder.itemIndex - b.placeholder.itemIndex
+    );
+  });
+
+  const chronologicalSlots = sortableSlots.map(({ placeholder }) => placeholder);
+  const liveSlot = liveTarget
+    ? (chronologicalSlots.find(
+        (slot) => slot.queueItemId === liveTarget.queueItemId && slot.itemIndex === liveTarget.itemIndex
+      ) ?? null)
+    : null;
+
+  return { chronologicalSlots, liveSlot };
+};
+
+export const getGalleryCurrentItem = ({
+  activePlaceholder,
+  isComparisonActive,
+  liveFollowEnabled,
+  selectedImageName,
+}: {
+  activePlaceholder: GalleryQueuePlaceholder | null;
+  isComparisonActive: boolean;
+  liveFollowEnabled: boolean;
+  selectedImageName: string | null;
+}): GalleryCurrentItem => {
+  if (liveFollowEnabled && !isComparisonActive && activePlaceholder) {
+    return { kind: 'placeholder', placeholder: activePlaceholder };
+  }
+
+  return selectedImageName ? { imageName: selectedImageName, kind: 'image' } : null;
+};
 
 export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
   values.galleryView === 'assets' ? 'assets' : 'images';
@@ -111,62 +253,35 @@ export const getGalleryQueuePlaceholders = (
   queueItems: QueueItem[],
   {
     galleryView,
+    imageOrderDir = 'ASC',
     searchTerm,
     selectedBoardId,
-  }: { galleryView: GalleryView; searchTerm: string; selectedBoardId: string }
+  }: { galleryView: GalleryView; imageOrderDir?: GalleryOrderDir; searchTerm: string; selectedBoardId: string }
+): GalleryQueuePlaceholder[] => {
+  return getVisibleGalleryQueuePlaceholders(getGalleryGenerationSequence(queueItems, null).chronologicalSlots, {
+    galleryView,
+    imageOrderDir,
+    searchTerm,
+    selectedBoardId,
+  });
+};
+
+const getVisibleGalleryQueuePlaceholders = (
+  chronologicalSlots: GalleryQueuePlaceholder[],
+  {
+    galleryView,
+    imageOrderDir,
+    searchTerm,
+    selectedBoardId,
+  }: { galleryView: GalleryView; imageOrderDir: GalleryOrderDir; searchTerm: string; selectedBoardId: string }
 ): GalleryQueuePlaceholder[] => {
   if (galleryView !== 'images' || searchTerm.trim() !== '') {
     return [];
   }
 
-  const placeholders: GalleryQueuePlaceholder[] = [];
+  const placeholders = chronologicalSlots.filter((placeholder) => placeholder.boardId === selectedBoardId);
 
-  for (const item of queueItems) {
-    if (item.status !== 'pending' && item.status !== 'running') {
-      continue;
-    }
-
-    if (item.snapshot.destination !== 'gallery') {
-      continue;
-    }
-
-    const targetBoardId = item.snapshot.galleryBoardId ?? 'none';
-
-    if (targetBoardId !== selectedBoardId) {
-      continue;
-    }
-
-    const expectedImageCount = item.backendItemIds?.length
-      ? item.backendItemIds.length
-      : getQueueItemSnapshotBatchCount(item);
-    const { width, height } = getQueueItemSnapshotDimensions(item, { height: 1024, width: 1024 });
-    const completedBackendItemIds = new Set(item.completedBackendItemIds ?? []);
-    const cancelledBackendItemIds = new Set(item.cancelledBackendItemIds ?? []);
-
-    if (item.backendItemIds?.length) {
-      for (let index = 0; index < item.backendItemIds.length; index += 1) {
-        const backendItemId = item.backendItemIds[index];
-
-        if (
-          backendItemId === undefined ||
-          completedBackendItemIds.has(backendItemId) ||
-          cancelledBackendItemIds.has(backendItemId)
-        ) {
-          continue;
-        }
-
-        placeholders.push({ height, id: `${item.id}:${index}`, itemIndex: index + 1, queueItemId: item.id, width });
-      }
-
-      continue;
-    }
-
-    for (let index = 0; index < expectedImageCount; index++) {
-      placeholders.push({ height, id: `${item.id}:${index}`, itemIndex: index + 1, queueItemId: item.id, width });
-    }
-  }
-
-  return placeholders;
+  return imageOrderDir === 'DESC' ? [...placeholders].reverse() : placeholders;
 };
 
 export const getGalleryStateView = (
@@ -174,15 +289,14 @@ export const getGalleryStateView = (
   backendBoards: GalleryBoard[],
   backendImages: GalleryImage[] | null,
   isLoading: boolean,
-  queueItems: QueueItem[] = []
+  queueItems: QueueItem[] = [],
+  liveFollowEnabled = false,
+  liveTarget: GalleryLiveTarget | null = null
 ): GalleryStateView => {
   const localImages = Array.isArray(values.recentImages)
-    ? (values.recentImages as GeneratedImageContract[]).map((image) => ({
-        ...image,
-        boardId: 'none',
-        imageCategory: 'general' as const,
-        starred: false,
-      }))
+    ? (values.recentImages as Array<GeneratedImageContract & Partial<GalleryImage>>).map((image) =>
+        normalizeGalleryImage(image)
+      )
     : [];
   const images = backendImages ?? (isLoading ? [] : localImages);
   const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
@@ -196,15 +310,37 @@ export const getGalleryStateView = (
   const boards = backendBoards.length ? backendBoards : [{ ...UNCATEGORIZED_BOARD, imageCount: images.length }];
   const selectedBoardId = getGallerySelectedBoardId(values, backendBoards);
   const compareImage = getGalleryCompareImage(values);
+  const compareImageName = compareImage?.imageName ?? null;
+  const isComparisonActive =
+    visibleSelectedImageName !== null && compareImageName !== null && compareImageName !== visibleSelectedImageName;
+  const generationSequence = getGalleryGenerationSequence(queueItems, liveTarget);
+  const visibleActivePlaceholder =
+    settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === ''
+      ? generationSequence.liveSlot?.boardId === selectedBoardId
+        ? generationSequence.liveSlot
+        : null
+      : null;
+  const currentItem = getGalleryCurrentItem({
+    activePlaceholder: visibleActivePlaceholder,
+    isComparisonActive,
+    liveFollowEnabled,
+    selectedImageName: visibleSelectedImageName,
+  });
 
   return {
     boards,
-    compareImageName: compareImage?.imageName ?? null,
+    compareImageName,
+    currentItem,
     galleryView,
     images,
     isLoading,
     pendingPlaceholders: settings.showPendingItems
-      ? getGalleryQueuePlaceholders(queueItems, { galleryView, searchTerm, selectedBoardId })
+      ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
+          galleryView,
+          imageOrderDir: settings.imageOrderDir,
+          searchTerm,
+          selectedBoardId,
+        })
       : [],
     projectBoardId: getGalleryProjectBoardId(values),
     searchTerm,

@@ -5,7 +5,7 @@ import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text }
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
-import { IconButton } from '@platform/ui';
+import { DropZone, IconButton } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { StarIcon, UploadIcon } from 'lucide-react';
@@ -28,6 +28,7 @@ import type { GalleryQueuePlaceholder } from './galleryStateView';
 import type { GalleryImageContextMenuTarget } from './GalleryUiContext';
 
 import { getGalleryImageDragData, getGalleryImageDragId } from './galleryDnd';
+import { getGalleryPlaceholderInsertionIndex } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -43,6 +44,7 @@ const THUMBNAIL_BUTTON_STYLE = {
   height: '100%',
   inset: 0,
   minWidth: 0,
+  outline: 'none',
   padding: 0,
   position: 'absolute',
   width: '100%',
@@ -77,6 +79,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     gallery.settings;
   const columnCount = getGalleryColumnCount(imageDensityPercent, layout);
   const selectedNames = useMemo(() => new Set(gallery.selectedImageNames), [gallery.selectedImageNames]);
+  const isFollowingLive = gallery.currentItem?.kind === 'placeholder';
   const isComparisonActive =
     gallery.compareImageName !== null &&
     gallery.selectedImageName !== null &&
@@ -86,21 +89,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     t('widgets.gallery.selectedBoardFallback');
   const isEmpty = gallery.images.length === 0 && gallery.pendingPlaceholders.length === 0;
 
-  // Fresh generations are unstarred, so with newest-first ordering they land
-  // right after the starred block — pending placeholders go there too.
-  const leadingStarredCount = useMemo(() => {
-    if (imageOrderDir !== 'DESC' || !starredFirst) {
-      return 0;
-    }
-
-    let count = 0;
-
-    while (count < gallery.images.length && gallery.images[count].starred) {
-      count += 1;
-    }
-
-    return count;
-  }, [gallery.images, imageOrderDir, starredFirst]);
+  const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(gallery.images, imageOrderDir, starredFirst);
 
   const cells = useMemo<GridCell[]>(() => {
     const imageCells: GridCell[] = gallery.images.map((image, imageIndex) => ({
@@ -113,17 +102,15 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       placeholder,
     }));
 
-    if (imageOrderDir !== 'DESC') {
-      return [...imageCells, ...placeholderCells];
-    }
-
-    return [...imageCells.slice(0, leadingStarredCount), ...placeholderCells, ...imageCells.slice(leadingStarredCount)];
-  }, [gallery.images, gallery.pendingPlaceholders, imageOrderDir, leadingStarredCount]);
+    return [
+      ...imageCells.slice(0, placeholderInsertionIndex),
+      ...placeholderCells,
+      ...imageCells.slice(placeholderInsertionIndex),
+    ];
+  }, [gallery.images, gallery.pendingPlaceholders, placeholderInsertionIndex]);
 
   const getCellIndexForImage = (imageIndex: number): number =>
-    imageOrderDir === 'DESC' && imageIndex >= leadingStarredCount
-      ? imageIndex + gallery.pendingPlaceholders.length
-      : imageIndex;
+    imageIndex >= placeholderInsertionIndex ? imageIndex + gallery.pendingPlaceholders.length : imageIndex;
 
   const rowCount = Math.ceil(cells.length / columnCount);
 
@@ -302,7 +289,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
   );
 
   const handleShowProgressImages = useCallback(() => {
-    account.showProgressImages();
+    account.enableLiveFollow();
   }, [account]);
 
   const handleToggleStarred = useCallback(
@@ -461,6 +448,10 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                             key={cell.placeholder.id}
                             antialiasProgressImages={antialiasProgressImages}
                             fit={thumbnailFit}
+                            isSelected={
+                              gallery.currentItem?.kind === 'placeholder' &&
+                              gallery.currentItem.placeholder.id === cell.placeholder.id
+                            }
                             placeholder={cell.placeholder}
                             onClick={handleShowProgressImages}
                           />
@@ -478,8 +469,8 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                             fit={thumbnailFit}
                             getDragImages={getDragImages}
                             image={cell.image}
-                            isPrimary={cell.image.imageName === gallery.selectedImageName}
-                            isSelected={selectedNames.has(cell.image.imageName)}
+                            isPrimary={!isFollowingLive && cell.image.imageName === gallery.selectedImageName}
+                            isSelected={!isFollowingLive && selectedNames.has(cell.image.imageName)}
                             onClick={handleThumbnailClick}
                             onContextMenu={handleThumbnailContextMenu}
                             onToggleStarred={handleToggleStarred}
@@ -502,26 +493,24 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
         </ScrollArea.Root>
       )}
       {isDropActive && (
-        <Flex
-          align="center"
-          bg="bg.muted/80"
-          borderColor="accent.solid"
-          borderStyle="dashed"
-          borderWidth="2px"
-          direction="column"
+        <DropZone
+          alignItems="center"
+          display="flex"
+          flexDirection="column"
           gap="2"
           inset="0"
-          justify="center"
+          isOver
+          justifyContent="center"
           pointerEvents="none"
           position="absolute"
-          rounded="md"
+          variant="overlay"
           zIndex="1"
         >
           <UploadIcon size="20" />
           <Text fontSize="xs" fontWeight="600">
             {t('widgets.gallery.dropImagesToUploadToBoard', { name: selectedBoardName })}
           </Text>
-        </Flex>
+        </DropZone>
       )}
       <ImageContextMenu
         actions={imageActions}
@@ -536,11 +525,13 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
 const GalleryQueuePlaceholderCell = ({
   antialiasProgressImages,
   fit,
+  isSelected,
   onClick,
   placeholder,
 }: {
   antialiasProgressImages: boolean;
   fit: GalleryThumbnailFit;
+  isSelected: boolean;
   onClick: () => void;
   placeholder: GalleryQueuePlaceholder;
 }) => {
@@ -554,15 +545,17 @@ const GalleryQueuePlaceholderCell = ({
     <Box
       as="button"
       aria-label={t('widgets.preview.showInProgressDiffusion')}
+      aria-selected={isSelected}
       aspectRatio={1}
       bg="bg"
-      borderColor={isActive ? 'accent.solid' : 'border.subtle'}
-      borderWidth="1px"
+      borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
+      borderWidth={isSelected ? '2px' : '1px'}
       cursor="pointer"
       minW="0"
       rounded="md"
       overflow="hidden"
       position="relative"
+      role="option"
       w="full"
       onClick={onClick}
     >

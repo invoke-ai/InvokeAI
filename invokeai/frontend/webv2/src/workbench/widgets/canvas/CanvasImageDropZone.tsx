@@ -1,5 +1,6 @@
-import { Flex, GridItem, Text } from '@chakra-ui/react';
+import { GridItem, Text } from '@chakra-ui/react';
 import { useDroppable } from '@dnd-kit/core';
+import { DropZone } from '@platform/ui/DropZone';
 import { useTranslation } from 'react-i18next';
 
 import type { CanvasImageDropData } from './canvasImageDnd';
@@ -23,24 +24,20 @@ export const CanvasImageDropZone = ({ colSpan, data, id, labelKey, row }: Canvas
 
   return (
     <GridItem ref={setNodeRef} colSpan={colSpan} gridRow={row} position="relative">
-      <Flex
+      <DropZone
         alignItems="center"
-        bg={isOver ? 'accent.subtle' : 'bg.muted'}
-        borderColor={isOver ? 'accent.solid' : 'border.emphasized'}
-        borderStyle="dashed"
-        borderWidth="2px"
+        display="flex"
         inset="0.5"
+        isOver={isOver}
         justifyContent="center"
         opacity={isOver ? 0.98 : 0.88}
         position="absolute"
-        rounded="md"
-        shadow={isOver ? '0 0 0 1px {colors.accent.solid}' : undefined}
-        transition="background var(--wb-motion-duration-fast) ease, border-color var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease, box-shadow var(--wb-motion-duration-fast) ease"
+        variant="overlay"
       >
         <Text color="fg" fontSize="sm" fontWeight="700" textAlign="center">
           {t(labelKey)}
         </Text>
-      </Flex>
+      </DropZone>
     </GridItem>
   );
 };

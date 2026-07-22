@@ -2,8 +2,8 @@ import type { GalleryBoard, GalleryImage } from '@features/gallery';
 /* eslint-disable react/react-compiler */
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
-import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
-import { Button, MenuContent, Tooltip } from '@platform/ui';
+import { HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
+import { ConfirmDialog, MenuContent, Tooltip } from '@platform/ui';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -114,23 +114,55 @@ export const ImageContextMenu = ({
   target: ImageContextMenuTarget | null;
   onClose: () => void;
 }) => {
+  const confirmImageDeletion = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
+  const [pendingDeletion, setPendingDeletion] = useState<string[] | null>(null);
   const images = getImageContextMenuImages(target);
   const image = images[0] ?? null;
 
-  if (!target || !image) {
-    return null;
-  }
+  const requestDeletion = useCallback(
+    (imageNames: string[]) => {
+      if (confirmImageDeletion) {
+        setPendingDeletion([...imageNames]);
+      } else {
+        void actions.deleteImages(imageNames);
+      }
+    },
+    [actions, confirmImageDeletion]
+  );
+  const handleCancelDeletion = useCallback(() => setPendingDeletion(null), []);
+  const handleConfirmDeletion = useCallback(async () => {
+    if (!pendingDeletion) {
+      return;
+    }
+
+    await actions.deleteImages(pendingDeletion);
+  }, [actions, pendingDeletion]);
 
   return (
-    <ImageContextMenuContent
-      key={`${image.imageName}:${images.length}`}
-      actions={actions}
-      boards={boards}
-      image={image}
-      images={images}
-      target={target}
-      onClose={onClose}
-    />
+    <>
+      {target && image && (
+        <ImageContextMenuContent
+          key={`${image.imageName}:${images.length}`}
+          actions={actions}
+          boards={boards}
+          image={image}
+          images={images}
+          target={target}
+          onClose={onClose}
+          onRequestDeletion={requestDeletion}
+        />
+      )}
+      <ConfirmDialog
+        body={`This permanently deletes ${pendingDeletion && pendingDeletion.length > 1 ? 'these images' : 'the image'} from every board and from disk. This cannot be undone. You can disable this confirmation in Settings.`}
+        confirmLabel="Delete"
+        isOpen={pendingDeletion !== null}
+        title={
+          pendingDeletion && pendingDeletion.length > 1 ? `Delete ${pendingDeletion.length} images?` : 'Delete image?'
+        }
+        onClose={handleCancelDeletion}
+        onConfirm={handleConfirmDeletion}
+      />
+    </>
   );
 };
 
@@ -141,6 +173,7 @@ const ImageContextMenuContent = ({
   images,
   target,
   onClose,
+  onRequestDeletion,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
@@ -148,9 +181,8 @@ const ImageContextMenuContent = ({
   images: GalleryImage[];
   target: ImageContextMenuTarget;
   onClose: () => void;
+  onRequestDeletion: (imageNames: string[]) => void;
 }) => {
-  const confirmImageDeletion = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
-  const [pendingDeletion, setPendingDeletion] = useState<string[] | null>(null);
   const [recallCapabilities, setRecallCapabilities] = useState<ImageRecallCapabilities>(
     EMPTY_IMAGE_RECALL_CAPABILITIES
   );
@@ -202,17 +234,6 @@ const ImageContextMenuContent = ({
     };
   }, [getImageRecallCapabilities, recallRequestKey]);
 
-  const requestDeletion = useCallback(
-    (names: string[]) => {
-      if (confirmImageDeletion) {
-        setPendingDeletion(names);
-      } else {
-        void actions.deleteImages(names);
-      }
-    },
-    [actions, confirmImageDeletion]
-  );
-
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => {
@@ -232,81 +253,34 @@ const ImageContextMenuContent = ({
     },
     [onClose]
   );
-  const handleDeleteDialogOpenChange = useCallback((event: { open: boolean }) => {
-    if (!event.open) {
-      setPendingDeletion(null);
-    }
-  }, []);
-  const handleCancelDeletion = useCallback(() => setPendingDeletion(null), []);
-  const handleConfirmDeletion = useCallback(() => {
-    if (pendingDeletion) {
-      void actions.deleteImages(pendingDeletion);
-    }
-
-    setPendingDeletion(null);
-  }, [actions, pendingDeletion]);
-
   return (
-    <>
-      <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={handleOpenChange}>
-        <Portal>
-          <Menu.Positioner>
-            <MenuContent {...MENU_CONTENT_PROPS} maxH="min(28rem, calc(100vh - 2rem))" minW="16rem" overflowY="auto">
-              {isBulk ? (
-                <BulkMenuItems
-                  actions={actions}
-                  boards={boards}
-                  imageNames={imageNames}
-                  images={images}
-                  onRequestDeletion={requestDeletion}
-                />
-              ) : (
-                <SingleImageMenuItems
-                  actions={actions}
-                  boards={boards}
-                  image={image}
-                  images={images}
-                  isLoadingRecallCapabilities={isLoadingRecallCapabilities}
-                  onRequestDeletion={requestDeletion}
-                  recallCapabilities={recallCapabilities}
-                />
-              )}
-            </MenuContent>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
-      <Dialog.Root open={pendingDeletion !== null} role="alertdialog" onOpenChange={handleDeleteDialogOpenChange}>
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content>
-              <Dialog.Header>
-                <Dialog.Title fontSize="sm">
-                  {pendingDeletion && pendingDeletion.length > 1
-                    ? `Delete ${pendingDeletion.length} images?`
-                    : 'Delete image?'}
-                </Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>
-                <Text color="fg.subtle" fontSize="xs">
-                  This permanently deletes{' '}
-                  {pendingDeletion && pendingDeletion.length > 1 ? 'these images' : 'the image'} from every board and
-                  from disk. This cannot be undone. You can disable this confirmation in Settings.
-                </Text>
-              </Dialog.Body>
-              <Dialog.Footer gap="2">
-                <Button size="xs" variant="outline" onClick={handleCancelDeletion}>
-                  Cancel
-                </Button>
-                <Button colorPalette="red" size="xs" onClick={handleConfirmDeletion}>
-                  Delete
-                </Button>
-              </Dialog.Footer>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
-    </>
+    <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={handleOpenChange}>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent {...MENU_CONTENT_PROPS} maxH="min(28rem, calc(100vh - 2rem))" minW="16rem" overflowY="auto">
+            {isBulk ? (
+              <BulkMenuItems
+                actions={actions}
+                boards={boards}
+                imageNames={imageNames}
+                images={images}
+                onRequestDeletion={onRequestDeletion}
+              />
+            ) : (
+              <SingleImageMenuItems
+                actions={actions}
+                boards={boards}
+                image={image}
+                images={images}
+                isLoadingRecallCapabilities={isLoadingRecallCapabilities}
+                onRequestDeletion={onRequestDeletion}
+                recallCapabilities={recallCapabilities}
+              />
+            )}
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
   );
 };
 

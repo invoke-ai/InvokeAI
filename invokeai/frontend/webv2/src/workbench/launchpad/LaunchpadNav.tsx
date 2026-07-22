@@ -36,7 +36,7 @@ export const LaunchpadNav = ({ items }: { items: LaunchpadNavItem[] }) => (
     w={NAV_WIDTH}
   >
     {items.length > 1 ? (
-      <Tabs.List flexShrink={0}>
+      <Tabs.List flexShrink={0} gap="0.5">
         {items.map((item) => (
           <Tabs.Trigger key={item.id} value={item.id}>
             <Icon as={item.icon} boxSize="3.5" flexShrink={0} />

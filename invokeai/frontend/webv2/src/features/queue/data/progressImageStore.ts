@@ -1,4 +1,5 @@
 import type { QueueProgressImage } from '@features/queue/core/progressImage';
+import type { QueueItemProgressTarget } from '@features/queue/core/types';
 
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
@@ -10,10 +11,7 @@ import { createExternalStore, createKeyedTransientStore } from '@platform/state/
 
 export type ProgressImageSnapshot = QueueProgressImage;
 
-export interface ProgressImageTarget {
-  queueItemId: string;
-  itemIndex: number;
-}
+export type ProgressImageTarget = QueueItemProgressTarget;
 
 export type LatestProgressImageSnapshot = ProgressImageSnapshot & { target?: ProgressImageTarget };
 

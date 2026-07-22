@@ -15,7 +15,7 @@ import { FieldDescriptionPopover } from '@features/workflow/ui/fields/FieldDescr
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowHostCommands } from '@features/workflow/ui/WorkflowUiContext';
 import { getFormChildren, getResolvedWorkflowEdges, getWorkflowFieldInvalidReason } from '@features/workflow/utility';
-import { Button, IconButton } from '@platform/ui';
+import { Button, DropZone, IconButton } from '@platform/ui';
 import {
   Columns2Icon,
   CrosshairIcon,
@@ -200,17 +200,13 @@ const ContainerDropZone = ({ container, isEmpty }: { container: ContainerFormEle
   }
 
   return (
-    <Box
+    <DropZone
       alignSelf="stretch"
-      borderColor={isActive ? 'accent.solid' : 'border.subtle'}
-      borderStyle="dashed"
-      borderWidth="1px"
-      color="fg.subtle"
       flex={isEmpty ? '1' : undefined}
       fontSize="2xs"
+      isOver={isActive}
       px="2"
       py="1.5"
-      rounded="md"
       textAlign="center"
       onDragLeave={() => setIsActive(false)}
       onDragOver={(event: DragEvent<HTMLDivElement>) => {
@@ -237,7 +233,7 @@ const ContainerDropZone = ({ container, isEmpty }: { container: ContainerFormEle
       }}
     >
       {canDrop ? 'Drop here' : 'Empty container — drag elements here'}
-    </Box>
+    </DropZone>
   );
 };
 

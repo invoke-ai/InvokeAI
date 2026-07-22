@@ -7,7 +7,7 @@ import type {
   LoraModelConfig,
 } from '@features/generation/core/types';
 
-import { Badge, HStack, InputGroup, NumberInput, Slider, Stack, Switch, Text } from '@chakra-ui/react';
+import { Badge, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   DEFAULT_LORA_WEIGHT_CONFIG,
   getDefaultLoraWeight,
@@ -25,7 +25,7 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { ModelDefaultButton } from './shared/ModelDefaultButton';
+import { SliderNumberField } from './shared/SliderNumberField';
 import { useDebouncedDraftValue } from './useDebouncedDraftValue';
 
 interface GenerateConceptsSectionProps {
@@ -96,7 +96,7 @@ export const GenerateConceptsSection = ({
 
   const badges =
     activeCount > 0 ? (
-      <Badge colorPalette="green" size="xs" variant="surface">
+      <Badge size="xs" variant="surface">
         {t('widgets.generate.activeCount', { count: activeCount })}
       </Badge>
     ) : loras.length > 0 ? (
@@ -106,7 +106,7 @@ export const GenerateConceptsSection = ({
     ) : null;
 
   return (
-    <GenerateCollapsibleSection label={t('widgets.generate.concepts')} defaultOpen badges={badges}>
+    <GenerateCollapsibleSection label={t('widgets.generate.concepts')} defaultOpen badges={badges} sectionId="concepts">
       <Stack gap="2" p="2">
         <Field
           label={t('widgets.generate.addConcept')}
@@ -248,62 +248,20 @@ const LoraRow = ({
         </HStack>
       </HStack>
 
-      <HStack gap="2">
-        <Slider.Root
-          aria-label={[t('widgets.generate.conceptWeight', { name: lora.model.name })]}
-          disabled={!isActive}
-          flex="1"
-          size="sm"
-          max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
-          min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
-          minW="0"
-          step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
-          value={[draftWeight]}
-          onValueChange={({ value }) => {
-            const nextWeight = value[0];
-
-            if (Number.isFinite(nextWeight)) {
-              setWeight(nextWeight as number);
-            }
-          }}
-        >
-          <Slider.Control>
-            <Slider.Track>
-              <Slider.Range />
-            </Slider.Track>
-            <Slider.Thumbs />
-          </Slider.Control>
-          <Slider.Marks marks={LORA_WEIGHT_MARKS} />
-        </Slider.Root>
-
-        <NumberInput.Root
-          max={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
-          min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
-          size="xs"
-          step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
-          value={String(draftWeight)}
-          w="20"
-          disabled={!isActive}
-          onValueChange={({ valueAsNumber }) => {
-            if (Number.isFinite(valueAsNumber)) {
-              setWeight(valueAsNumber);
-            }
-          }}
-        >
-          <InputGroup
-            endElement={
-              <ModelDefaultButton
-                disabled={!isActive || draftWeight === defaultWeight}
-                label={t('widgets.generate.useConceptDefaultWeight')}
-                onClick={() => setWeight(defaultWeight)}
-              />
-            }
-            endElementProps={{ pointerEvents: 'auto' }}
-          >
-            <NumberInput.Input aria-label={t('widgets.generate.conceptWeight', { name: lora.model.name })} />
-          </InputGroup>
-        </NumberInput.Root>
-      </HStack>
+      <SliderNumberField
+        ariaLabel={t('widgets.generate.conceptWeight', { name: lora.model.name })}
+        defaultValue={defaultWeight}
+        disabled={!isActive}
+        marks={LORA_WEIGHT_MARKS}
+        max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
+        min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
+        numberInputMax={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
+        numberInputMin={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
+        resetLabel={t('widgets.generate.useConceptDefaultWeight')}
+        step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+        value={draftWeight}
+        onChange={setWeight}
+      />
     </Stack>
   );
 };

@@ -10,7 +10,9 @@ export default mergeConfig(
     // Hook-bearing dependencies must be prebundled into the initial browser-test
     // graph. An optimization reload can otherwise leave the running suite with
     // two React instances and produce invalid-hook failures.
-    optimizeDeps: { include: ['@dnd-kit/core', '@tanstack/react-query', 'react-hook-tanstack-virtual'] },
+    optimizeDeps: {
+      include: ['@dnd-kit/core', '@tanstack/react-query', 'i18next-http-backend', 'react-hook-tanstack-virtual'],
+    },
     test: {
       browser: {
         enabled: true,

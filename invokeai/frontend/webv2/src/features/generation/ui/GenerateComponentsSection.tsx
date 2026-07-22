@@ -103,7 +103,11 @@ export const GenerateComponentsSection = ({ onCommit, selectedModel, settings }:
   }
 
   return (
-    <GenerateCollapsibleSection label={t('widgets.generate.components')} defaultOpen={policy.defaultOpen}>
+    <GenerateCollapsibleSection
+      label={t('widgets.generate.components')}
+      defaultOpen={policy.defaultOpen}
+      sectionId="components"
+    >
       <Stack gap="2" p="2">
         {policy.slots.map((slot) => (
           <ComponentPickerRow key={slot.key} commitSlotValue={commitSlotValue} ctx={ctx!} slot={slot} />

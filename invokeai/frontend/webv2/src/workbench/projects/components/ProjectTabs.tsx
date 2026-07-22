@@ -158,7 +158,7 @@ export const ProjectTabs = () => {
           <ScrollArea.Root css={TAB_STRIP_CONTAIN_CSS} flex="1 1 auto" minW="0" h="full" size="xs" variant="hover">
             <ScrollArea.Viewport aria-label={t('projects.openProjects')} h="full" w="full">
               <ScrollArea.Content asChild>
-                <Flex align="center" h="full">
+                <Flex align="center" h="full" gap="1">
                   {projectTabSummaries.map((project) => (
                     <ProjectTab
                       key={project.id}

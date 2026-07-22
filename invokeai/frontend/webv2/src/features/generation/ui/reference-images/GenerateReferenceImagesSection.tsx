@@ -8,7 +8,7 @@ import type {
 import type { GenerateSettingsUpdate } from '@features/generation/ui/generateDebounce';
 import type { ChangeEvent } from 'react';
 
-import { Badge, Box, HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { Badge, HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor, useDroppable } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
 import { isGalleryImageDragData } from '@features/gallery/utility';
@@ -23,8 +23,8 @@ import { generatedImageToReferenceImage, getEffectiveReferenceImage } from '@fea
 import { clampDimension, deriveAspectRatioId } from '@features/generation/core/settings';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { GenerateCollapsibleSection } from '@features/generation/ui/shared/GenerateCollapsibleSection';
-import { Button, IconButton, Tooltip } from '@platform/ui';
-import { ScanIcon, UploadIcon } from 'lucide-react';
+import { Button, DropZone } from '@platform/ui';
+import { UploadIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -203,7 +203,7 @@ export const GenerateReferenceImagesSection = ({
 
     if (activeCount > 0) {
       return (
-        <Badge colorPalette="green" size="xs" variant="surface">
+        <Badge size="xs" variant="surface">
           {t('widgets.generate.activeCount', { count: activeCount })}
         </Badge>
       );
@@ -224,7 +224,12 @@ export const GenerateReferenceImagesSection = ({
   // project). No editable cards, no add paths — just the way out.
   if (!isSupported) {
     return (
-      <GenerateCollapsibleSection label={t('widgets.generate.referenceImages')} defaultOpen badges={badges}>
+      <GenerateCollapsibleSection
+        label={t('widgets.generate.referenceImages')}
+        defaultOpen
+        badges={badges}
+        sectionId="reference-images"
+      >
         <HStack gap="2" justify="space-between" p="2">
           <Text color="fg.muted" fontSize="2xs" minW="0">
             {t('widgets.generate.referenceImagesUnsupported')}
@@ -238,49 +243,34 @@ export const GenerateReferenceImagesSection = ({
   }
 
   return (
-    <GenerateCollapsibleSection label={t('widgets.generate.referenceImages')} defaultOpen badges={badges}>
-      <Stack ref={setNodeRef} bg={isOver ? 'accent.muted' : undefined} gap="2" p="2">
+    <GenerateCollapsibleSection
+      label={t('widgets.generate.referenceImages')}
+      defaultOpen
+      badges={badges}
+      sectionId="reference-images"
+    >
+      <Stack ref={setNodeRef} gap="2" p="2">
         <HStack align="stretch" gap="2">
-          <Box
+          <DropZone
             as="button"
             alignItems="center"
-            borderColor={isOver ? 'accent.solid' : 'border.emphasized'}
-            borderStyle="dashed"
-            borderWidth="1px"
-            color="fg.muted"
             cursor={canAdd ? 'pointer' : 'not-allowed'}
             display="flex"
             flex="1"
             fontSize="2xs"
             gap="2"
+            isOver={isOver}
             justifyContent="center"
             minH="12"
             minW="0"
             opacity={canAdd ? 1 : 0.6}
             px="3"
-            rounded="md"
             _hover={canAdd ? UPLOAD_ZONE_HOVER_STYLES : undefined}
             onClick={handleUploadZoneClick}
           >
             <UploadIcon size="14" />
             {t('widgets.generate.referenceImagesHelp')}
-          </Box>
-          {/* The button is disabled (canvas bbox pulls are not wired up yet), so
-              the tooltip hangs off a wrapper — disabled buttons eat pointer events. */}
-          <Tooltip content={t('widgets.generate.pullBboxIntoReferenceImage')}>
-            <Box display="flex" flexShrink="0">
-              <IconButton
-                aria-label={t('widgets.generate.pullBboxIntoReferenceImage')}
-                disabled
-                h="full"
-                minH="12"
-                minW="12"
-                variant="outline"
-              >
-                <ScanIcon />
-              </IconButton>
-            </Box>
-          </Tooltip>
+          </DropZone>
         </HStack>
 
         {referenceImageCount > 0 ? (

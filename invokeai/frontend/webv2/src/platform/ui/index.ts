@@ -2,6 +2,7 @@ export * from './Button';
 export * from './ColorPicker';
 export * from './Combobox';
 export * from './ConfirmDialog';
+export * from './DropZone';
 export * from './Field';
 export * from './JsonPreview';
 export * from './Menu';

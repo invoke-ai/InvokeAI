@@ -505,7 +505,8 @@ const BoardRow = ({
   return (
     <Menu.Item
       ref={setNodeRef}
-      bg={isOver ? 'accent.subtle' : undefined}
+      // DropZone tokens without the DropZone component: an outline (not a border) so the drop affordance never shifts menu layout.
+      bg={isOver ? 'accent.muted' : undefined}
       css={hoverCss}
       outline={canDropImages ? '1px dashed' : undefined}
       outlineColor={canDropImages ? 'accent.solid' : undefined}

@@ -153,6 +153,7 @@ const CanvasHeaderActionsInner = ({
       openNewCanvas();
     }
   });
+
   useEffect(() => {
     const entries = [
       ['canvas.fitBboxToLayers', t('widgets.canvas.controls.fitBboxToLayers'), ['shift+n']],

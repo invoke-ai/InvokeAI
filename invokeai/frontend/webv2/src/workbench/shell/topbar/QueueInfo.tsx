@@ -144,7 +144,10 @@ const QueueInfoTooltip = ({
 
   const prompt = getQueueItemSnapshotPositivePrompt(item).trim();
   const expectedCount = getQueueItemExpectedImageCount(item);
-  const activeItemIndex = Math.min(expectedCount, Math.max(1, progress?.activeItemIndex ?? 1));
+  const activeItemIndex = Math.min(
+    expectedCount,
+    Math.max(1, progress?.activeItemIndex ?? (progress?.completedItemCount ?? 0) + 1)
+  );
   const activeBackendItemId = item.backendItemIds?.[activeItemIndex - 1];
   const progressLabel = modelLoads.length
     ? `Loading ${modelLoads.length} model${modelLoads.length === 1 ? '' : 's'}.`

@@ -44,6 +44,8 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     gallery: galleryCommands,
     galleryValues,
     generateValues,
+    liveFollowEnabled,
+    liveProgressTarget,
     projectId,
     projectName,
     queueItems,
@@ -70,7 +72,15 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
 
   const { loadMore, patchImages, total } = data;
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, data.boards);
-  const gallery = getGalleryStateView(galleryValues, data.boards, data.images, data.isLoadingImages, queueItems);
+  const gallery = getGalleryStateView(
+    galleryValues,
+    data.boards,
+    data.images,
+    data.isLoadingImages,
+    queueItems,
+    liveFollowEnabled,
+    liveProgressTarget
+  );
 
   const onStarredChange = useCallback(
     (imageNames: string[], starred: boolean) => {

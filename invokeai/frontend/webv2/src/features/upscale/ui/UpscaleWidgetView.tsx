@@ -1,5 +1,5 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop */
-import type { GenerateLora, MainModelConfig, PromptHistoryItem, VaePrecision } from '@features/generation/contracts';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
+import type { GenerateLora, MainModelConfig, PromptHistoryItem } from '@features/generation/contracts';
 import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { ModelConfig } from '@features/models';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
@@ -9,12 +9,11 @@ import {
   Badge,
   Box,
   ButtonGroup,
-  chakra,
+  createListCollection,
   DataList,
   HStack,
   Image,
   Input,
-  NativeSelect,
   NumberInput,
   SimpleGrid,
   Spinner,
@@ -58,7 +57,7 @@ import {
   UPSCALE_TILE_SIZE_MIN,
 } from '@features/upscale/core/settings';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { Button, Combobox, Field, IconButton, Slider, Tooltip } from '@platform/ui';
+import { Button, Combobox, DropZone, Field, IconButton, Select, Slider, Tooltip } from '@platform/ui';
 import { toaster } from '@platform/ui/toaster';
 import { DicesIcon, ImagePlusIcon, Trash2Icon, UploadIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -67,6 +66,12 @@ import { useTranslation } from 'react-i18next';
 import { useUpscaleUi } from './UpscaleUiContext';
 
 const DROP_ID = 'upscale-input-image';
+const VAE_PRECISION_COLLECTION = createListCollection({
+  items: [
+    { label: 'FP16', value: 'fp16' },
+    { label: 'FP32', value: 'fp32' },
+  ] as const,
+});
 const LARGE_OUTPUT_MEGAPIXELS = 50;
 const DIMENSION_FORMATTER = new Intl.NumberFormat();
 const MEGAPIXEL_FORMATTER = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
@@ -409,19 +414,17 @@ const UpscaleImageField = ({
 
   return (
     <Stack gap="2">
-      <chakra.button
+      <DropZone
         ref={setNodeRef}
+        as="button"
         aria-busy={isLoading}
         aria-label={inputImage ? t('widgets.upscale.replaceImage') : t('widgets.upscale.uploadImage')}
-        borderColor={isOver ? 'accent.solid' : 'border.emphasized'}
-        borderStyle="dashed"
-        borderWidth="1px"
         cursor="pointer"
-        disabled={isLoading}
+        isOver={isOver}
+        {...(isLoading ? { disabled: true } : undefined)}
         minH="24"
         overflow="hidden"
         position="relative"
-        rounded="md"
         _focusVisible={{
           outlineColor: 'accent.focusRing',
           outlineOffset: '2px',
@@ -429,7 +432,7 @@ const UpscaleImageField = ({
           outlineWidth: '2px',
         }}
         _disabled={{ cursor: 'wait', opacity: 0.7 }}
-        _hover={{ bg: isLoading ? undefined : 'bg.subtle' }}
+        _hover={isLoading ? undefined : { bg: 'bg.muted', color: 'fg' }}
         onClick={() => fileInputRef.current?.click()}
       >
         {inputImage ? (
@@ -447,7 +450,7 @@ const UpscaleImageField = ({
               />
             </Box>
             <Stack align="start" flex="1" gap="1" justify="center" minW="0">
-              <Text fontSize="xs" fontWeight="semibold" truncate>
+              <Text color="fg" fontSize="xs" fontWeight="semibold" truncate>
                 {inputImage.image_name}
               </Text>
               <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
@@ -469,7 +472,7 @@ const UpscaleImageField = ({
             </Text>
           </Stack>
         )}
-      </chakra.button>
+      </DropZone>
       <HStack justify="end">
         {inputImage ? (
           <Button disabled={isLoading} size="xs" variant="ghost" onClick={() => onChange(null)}>
@@ -601,8 +604,14 @@ export const UpscaleWidgetView = () => {
     patch({ loras: values.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)) });
   const selectedLoraKeys = new Set(values.loras.map((lora) => lora.model.key));
 
+  const sharedBadge = (
+    <Badge fontFamily="mono" size="xs">
+      {t('widgets.upscale.shared')}
+    </Badge>
+  );
+
   return (
-    <Stack gap="2" minW="0" p="2">
+    <Stack gap="1" minW="0" p="1">
       <UpscaleModelReconciler
         key={`${selection.projectId}:${modelsStatus}:${modelsFingerprint}`}
         rawValues={selection.rawValues}
@@ -689,7 +698,7 @@ export const UpscaleWidgetView = () => {
         </Stack>
       </GenerationSettingsSection>
 
-      <GenerationSettingsSection badges={t('widgets.upscale.shared')} label={t('widgets.upscale.detailGuidance')}>
+      <GenerationSettingsSection badges={sharedBadge} label={t('widgets.upscale.detailGuidance')}>
         <UpscalePromptFields
           promptDraft={selection.promptDraft}
           projectId={selection.projectId}
@@ -915,19 +924,19 @@ export const UpscaleWidgetView = () => {
               />
             </Field>
             <Field label={t('widgets.upscale.vaePrecision')}>
-              <NativeSelect.Root size="xs">
-                <NativeSelect.Field
-                  aria-label={t('widgets.upscale.vaePrecision')}
-                  value={values.vaePrecision}
-                  onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                    patch({ vaePrecision: event.currentTarget.value as VaePrecision })
+              <Select
+                aria-label={t('widgets.upscale.vaePrecision')}
+                collection={VAE_PRECISION_COLLECTION}
+                size="xs"
+                value={[values.vaePrecision]}
+                onValueChange={({ value }) => {
+                  const vaePrecision = value[0];
+
+                  if (vaePrecision === 'fp16' || vaePrecision === 'fp32') {
+                    patch({ vaePrecision });
                   }
-                >
-                  <option value="fp16">FP16</option>
-                  <option value="fp32">FP32</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
+                }}
+              />
             </Field>
           </SimpleGrid>
           {values.model?.base === 'sd-1' ? (

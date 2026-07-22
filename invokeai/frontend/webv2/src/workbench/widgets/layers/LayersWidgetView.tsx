@@ -43,7 +43,7 @@ export const LayersWidgetView = () => {
   }, []);
 
   return (
-    <Stack gap="3" h="full">
+    <Stack h="full">
       <LayersPanelHeader />
       {groups.length === 0 ? (
         <Flex

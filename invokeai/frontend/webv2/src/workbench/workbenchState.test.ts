@@ -1767,11 +1767,40 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     const updatedProject = getActiveProject(state);
     const galleryValues = getProjectWidgetValues(updatedProject, 'gallery');
+    const expectedImage = {
+      ...createImage('gallery-image.png', queueItem.id),
+      boardId: 'none',
+      imageCategory: 'general',
+      starred: false,
+    };
 
     expect(updatedProject.canvas.stagingArea.pendingImages).toEqual([]);
-    expect(galleryValues.recentImages).toEqual([createImage('gallery-image.png', queueItem.id)]);
-    expect(galleryValues.selectedImage).toEqual(createImage('gallery-image.png', queueItem.id));
+    expect(galleryValues.recentImages).toEqual([expectedImage]);
+    expect(galleryValues.selectedImage).toEqual(expectedImage);
     expect(galleryValues.selectedImageName).toBe('gallery-image.png');
+  });
+
+  it('preserves the destination board on freshly routed Gallery results', () => {
+    let state = primeGenerate();
+
+    state = workbenchReducer(state, { boardId: 'board-1', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+    const image = createImage('board-image.png', queueItem.id);
+    state = workbenchReducer(state, {
+      images: [image],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImage).toMatchObject({
+      boardId: 'board-1',
+      imageName: image.imageName,
+    });
   });
 
   it('appends Gallery destination results for local fallback while backend owns boards', () => {
@@ -1834,6 +1863,164 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect((galleryValues.recentImages as GeneratedImageContract[]).map((image) => image.imageName)).toEqual([
       'gallery-image-1.png',
     ]);
+  });
+
+  it('preserves the last partial Gallery result when the final aggregate repeats the batch', () => {
+    let state = primeGenerate(undefined, { batchCount: 3 });
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+    const images = ['gallery-image-1.png', 'gallery-image-2.png', 'gallery-image-3.png'].map((name) =>
+      createImage(name, queueItem.id)
+    );
+
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12, 13],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+
+    for (const [index, image] of images.entries()) {
+      state = workbenchReducer(state, {
+        backendItemId: 11 + index,
+        images: [image],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemPartialResults',
+      });
+    }
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+
+    state = workbenchReducer(state, {
+      images,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+  });
+
+  it('does not reorder existing results when an older batch final aggregate arrives late', () => {
+    let state = primeGenerate(undefined, { batchCount: 2 });
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const projectId = getActiveProject(state).id;
+    const olderQueueItem = getActiveProject(state).queue.items[0];
+    const olderImage1 = createImage('older-1.png', olderQueueItem.id);
+    const olderImage2 = createImage('older-2.png', olderQueueItem.id);
+
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      images: [olderImage1],
+      projectId,
+      queueItemId: olderQueueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    state = submitGenerate(state);
+
+    const newerQueueItem = getActiveProject(state).queue.items[0];
+    const newerImage = createImage('newer-1.png', newerQueueItem.id);
+
+    state = workbenchReducer(state, {
+      backendItemId: 21,
+      images: [newerImage],
+      projectId,
+      queueItemId: newerQueueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    state = workbenchReducer(state, {
+      images: [olderImage1, olderImage2],
+      projectId,
+      queueItemId: olderQueueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(
+      (getProjectWidgetValues(getActiveProject(state), 'gallery').recentImages as GeneratedImageContract[]).map(
+        (image) => image.imageName
+      )
+    ).toEqual(['older-2.png', 'newer-1.png', 'older-1.png']);
+  });
+
+  it('selects the last image from a final-only Gallery batch', () => {
+    let state = primeGenerate(undefined, { batchCount: 3 });
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      images: ['gallery-image-1.png', 'gallery-image-2.png', 'gallery-image-3.png'].map((name) =>
+        createImage(name, queueItem.id)
+      ),
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+  });
+
+  it('pauses live-follow when the user selects a saved Gallery image', () => {
+    let state = createInitialWorkbenchState();
+
+    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(true);
+
+    state = workbenchReducer(state, { image: createImage('selected.png', 'gallery'), type: 'selectGalleryImage' });
+
+    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('selected.png');
+  });
+
+  it('preserves a manually selected image when later Gallery results arrive', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+    const selectedImage = createImage('selected.png', 'backend-gallery');
+    state = workbenchReducer(state, { image: selectedImage, type: 'selectGalleryImage' });
+    state = workbenchReducer(state, {
+      images: [createImage('completed.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe(selectedImage.imageName);
+  });
+
+  it('pauses live-follow for saved Gallery multi-selection and comparison intents', () => {
+    const primaryImage = createImage('primary.png', 'gallery');
+    const compareImage = createImage('compare.png', 'gallery');
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      imageNames: [primaryImage.imageName, compareImage.imageName],
+      primaryImage,
+      type: 'setGalleryMultiSelection',
+    });
+
+    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+
+    state = workbenchReducer(state, {
+      settings: { showProgressImagesInViewer: true },
+      type: 'setActiveProjectSettings',
+    });
+    state = workbenchReducer(state, { image: compareImage, type: 'setGalleryCompareImage' });
+
+    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
   });
 
   it('stores selected backend board id for gallery submissions', () => {

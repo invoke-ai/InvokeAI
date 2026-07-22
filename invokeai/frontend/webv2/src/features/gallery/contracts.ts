@@ -9,6 +9,7 @@ export type {
   GalleryView,
   GeneratedImageContract,
 } from './core/types';
+export { normalizeGalleryImage } from './core/image';
 export {
   DEFAULT_GALLERY_SETTINGS,
   getGallerySettings,
@@ -18,8 +19,15 @@ export {
 } from './core/settings';
 export {
   getGalleryCompareImage,
+  getGalleryCurrentItem,
+  getGalleryGenerationSequence,
+  getGalleryPlaceholderInsertionIndex,
   getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
   getGalleryRefreshToken,
+  type GalleryCurrentItem,
+  type GalleryGenerationSequence,
+  type GalleryLiveTarget,
+  type GalleryQueuePlaceholder,
 } from './ui/galleryStateView';
 export { getSelectedGalleryImageFromValues } from './core/selection';

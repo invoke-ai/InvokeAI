@@ -108,16 +108,17 @@ describe('getModelPickerGroups', () => {
     expect(result.groups[0]?.models.map((m) => m.key)).toEqual(['c']);
   });
 
-  it('sorts picker results by taxonomy rank then name', () => {
+  it('groups by (type, base) sorted by taxonomy rank, base display order, then name', () => {
     const result = getModelPickerGroups(library, {
       modelTypes: ['main', 'lora', 'vae'],
       searchTerm: '',
     });
 
-    expect(result.groups.map((group) => [group.type, group.models.map((m) => m.key)])).toEqual([
-      ['main', ['b', 'a']],
-      ['lora', ['c']],
-      ['vae', ['d']],
+    expect(result.groups.map((group) => [group.key, group.models.map((m) => m.key)])).toEqual([
+      ['main:sdxl', ['a']],
+      ['main:flux', ['b']],
+      ['lora:sd-1', ['c']],
+      ['vae:any', ['d']],
     ]);
   });
 
@@ -136,7 +137,7 @@ describe('getModelPickerGroups', () => {
       searchTerm: '',
     });
 
-    expect(all.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['b', 'a', 'c', 'd']);
+    expect(all.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['a', 'b', 'c', 'd']);
   });
 
   it('exposes availableBases that stay stable across search and base filtering', () => {

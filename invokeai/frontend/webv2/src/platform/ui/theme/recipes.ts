@@ -1,5 +1,5 @@
 import { defineRecipe, defineSlotRecipe } from '@chakra-ui/react';
-import { slotRecipes as chakraSlotRecipes } from '@chakra-ui/react/theme';
+import { recipes as chakraRecipes, slotRecipes as chakraSlotRecipes } from '@chakra-ui/react/theme';
 
 /**
  * Reusable, theme-aware recipes for the workbench design system.
@@ -24,11 +24,18 @@ import { slotRecipes as chakraSlotRecipes } from '@chakra-ui/react/theme';
  * Built-in component overrides (registered in system.ts)
  * -------------------------------------------------------------------------- */
 
-/** Tooltip chrome: raised surface with a hairline stroke instead of inverted fill. */
+/**
+ * Tooltip chrome: raised surface with a hairline stroke instead of inverted
+ * fill. Extends Chakra's default recipe — replacing it wholesale would drop
+ * the `arrow` slot's `--arrow-size`/`--arrow-background` vars, which renders
+ * arrows at zero size (invisible).
+ */
 export const tooltipSlotRecipe = defineSlotRecipe({
-  slots: ['content', 'arrowTip'],
+  ...chakraSlotRecipes.tooltip,
   base: {
+    ...chakraSlotRecipes.tooltip.base,
     content: {
+      ...chakraSlotRecipes.tooltip.base?.content,
       '--tooltip-bg': 'colors.bg.muted',
       bg: 'var(--tooltip-bg)',
       borderColor: 'border.emphasized',
@@ -37,22 +44,209 @@ export const tooltipSlotRecipe = defineSlotRecipe({
       color: 'fg',
     },
     arrowTip: {
+      ...chakraSlotRecipes.tooltip.base?.arrowTip,
       borderColor: 'border.emphasized',
     },
   },
 });
 
-const dropdownContent = {
+/**
+ * Tabs: quick neutral hover feedback, with accent reserved for selection.
+ * Restricting hover styles to unselected triggers keeps active tabs visually
+ * stable without relying on condition ordering in the generated CSS.
+ */
+export const tabsSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.tabs,
+  base: {
+    ...chakraSlotRecipes.tabs.base,
+    trigger: {
+      ...chakraSlotRecipes.tabs.base?.trigger,
+      transitionDuration: 'faster',
+      transitionProperty: 'background, border-color, color',
+    },
+  },
+  variants: {
+    ...chakraSlotRecipes.tabs.variants,
+    variant: {
+      ...chakraSlotRecipes.tabs.variants?.variant,
+      line: {
+        ...chakraSlotRecipes.tabs.variants?.variant?.line,
+        trigger: {
+          ...chakraSlotRecipes.tabs.variants?.variant?.line?.trigger,
+          _hover: {
+            '&:not([data-selected])': { bg: 'bg.muted/60', color: 'fg' },
+          },
+        },
+      },
+      subtle: {
+        ...chakraSlotRecipes.tabs.variants?.variant?.subtle,
+        trigger: {
+          ...chakraSlotRecipes.tabs.variants?.variant?.subtle?.trigger,
+          _hover: {
+            '&:not([data-selected])': { bg: 'bg.muted' },
+          },
+        },
+      },
+      enclosed: {
+        ...chakraSlotRecipes.tabs.variants?.variant?.enclosed,
+        trigger: {
+          ...chakraSlotRecipes.tabs.variants?.variant?.enclosed?.trigger,
+          _hover: {
+            '&:not([data-selected])': { bg: 'bg.emphasized' },
+          },
+        },
+      },
+      outline: {
+        ...chakraSlotRecipes.tabs.variants?.variant?.outline,
+        trigger: {
+          ...chakraSlotRecipes.tabs.variants?.variant?.outline?.trigger,
+          _hover: {
+            '&:not([data-selected])': {
+              bg: 'bg.muted',
+              borderColor: 'border.emphasized',
+            },
+          },
+        },
+      },
+      plain: {
+        ...chakraSlotRecipes.tabs.variants?.variant?.plain,
+        trigger: {
+          ...chakraSlotRecipes.tabs.variants?.variant?.plain?.trigger,
+          _hover: {
+            '&:not([data-selected])': { bg: 'bg.muted/40', color: 'fg' },
+          },
+        },
+      },
+    },
+  } as typeof chakraSlotRecipes.tabs.variants,
+});
+
+/**
+ * Shared interactive states for every bordered form control — text inputs,
+ * textareas, number inputs, select/combobox triggers, and hand-rolled trigger
+ * buttons (ModelSelect). Idle border is `border`; hover steps to
+ * `border.emphasized`; an open dropdown commits to `accent.solid` so hover and
+ * open remain distinguishable. Focus uses the accent border without adding a
+ * second ring around the control.
+ */
+const formControlFocused = {
+  '--focus-ring-color': 'var(--focus-color) !important',
+  borderColor: 'accent.solid',
+  boxShadow: 'none !important',
+  outline: 'none !important',
+  _invalid: {
+    '--focus-ring-color': 'var(--chakra-colors-border-error) !important',
+    borderColor: 'border.error',
+  },
+};
+
+const formControlNoFocusRing = {
+  focusVisibleRing: undefined,
+  _focusVisible: formControlFocused,
+} as const;
+
+export const formControlInteraction = {
+  '--focus-color': 'var(--chakra-colors-accent-solid)',
+  ...formControlNoFocusRing,
+  transitionDuration: 'fast',
+  transitionProperty: 'border-color, background',
+  _focusVisible: formControlFocused,
+  _invalid: { borderColor: 'border.error' },
+  _hover: {
+    borderColor: 'border.emphasized',
+    _expanded: formControlFocused,
+    _focusVisible: formControlFocused,
+  },
+};
+
+const formControlOpen = { borderColor: 'accent.solid' };
+
+/** Text input: Chakra default plus the shared hover/transition treatment. */
+export const inputRecipe = defineRecipe({
+  ...chakraRecipes.input,
+  variants: {
+    ...chakraRecipes.input.variants,
+    variant: {
+      ...chakraRecipes.input.variants?.variant,
+      outline: { ...chakraRecipes.input.variants?.variant?.outline, ...formControlNoFocusRing },
+      subtle: { ...chakraRecipes.input.variants?.variant?.subtle, ...formControlNoFocusRing },
+    },
+  } as unknown as typeof chakraRecipes.input.variants,
+  base: {
+    ...chakraRecipes.input.base,
+    ...formControlInteraction,
+  },
+});
+
+/** Textarea: Chakra default plus the shared hover/transition treatment. */
+export const textareaRecipe = defineRecipe({
+  ...chakraRecipes.textarea,
+  variants: {
+    ...chakraRecipes.textarea.variants,
+    variant: {
+      ...chakraRecipes.textarea.variants?.variant,
+      outline: { ...chakraRecipes.textarea.variants?.variant?.outline, ...formControlNoFocusRing },
+      subtle: { ...chakraRecipes.textarea.variants?.variant?.subtle, ...formControlNoFocusRing },
+    },
+  } as unknown as typeof chakraRecipes.textarea.variants,
+  base: {
+    ...chakraRecipes.textarea.base,
+    ...formControlInteraction,
+  },
+});
+
+/** Number input: the input slot gets the shared hover/transition treatment. */
+export const numberInputSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.numberInput,
+  variants: {
+    ...chakraSlotRecipes.numberInput.variants,
+    variant: {
+      ...chakraSlotRecipes.numberInput.variants?.variant,
+      outline: {
+        ...chakraSlotRecipes.numberInput.variants?.variant?.outline,
+        input: {
+          ...chakraSlotRecipes.numberInput.variants?.variant?.outline?.input,
+          ...formControlNoFocusRing,
+        },
+      },
+      subtle: {
+        ...chakraSlotRecipes.numberInput.variants?.variant?.subtle,
+        input: {
+          ...chakraSlotRecipes.numberInput.variants?.variant?.subtle?.input,
+          ...formControlNoFocusRing,
+        },
+      },
+    },
+  } as unknown as typeof chakraSlotRecipes.numberInput.variants,
+  base: {
+    ...chakraSlotRecipes.numberInput.base,
+    input: {
+      ...chakraSlotRecipes.numberInput.base?.input,
+      ...formControlInteraction,
+    },
+  },
+});
+
+/** Shared dropdown surface: one look for menu, select, combobox, and hand-rolled poppers (ModelSelect). */
+export const dropdownContent = {
   bg: 'bg.muted',
   borderColor: 'border.emphasized',
-  borderRadius: 'lg',
+  borderRadius: 'md',
   borderWidth: '1px',
   boxShadow: 'lg',
   color: 'fg',
 };
 
-const dropdownItem = {
-  _highlighted: { bg: 'bg.subtle' },
+/**
+ * Shared dropdown item treatment. The highlight sits on `bg.emphasized`: the
+ * content surface is `bg.muted`, and on the dark ramps `bg.subtle` is darker
+ * than the surface, which made the old highlight nearly invisible (classic
+ * theme especially). `bg.emphasized` is one step away from the surface in
+ * every theme, so the highlight reads everywhere.
+ */
+export const dropdownItem = {
+  _highlighted: { bg: 'bg.emphasized' },
+  _hover: { bg: 'bg.emphasized' },
   _focusVisible: {
     outline: '2px solid',
     outlineColor: 'accent.solid',
@@ -60,7 +254,7 @@ const dropdownItem = {
   },
 };
 
-const dropdownGroupLabel = {
+export const dropdownGroupLabel = {
   color: 'fg.subtle',
   fontSize: '2xs',
   fontWeight: '600',
@@ -99,8 +293,38 @@ export const menuSlotRecipe = defineSlotRecipe({
 /** Select dropdown chrome: same surface and item treatment as menus. */
 export const selectSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.select,
+  // The outline variant carries its own `_expanded` (border.emphasized) which
+  // would override a base-level open style, so the accent open state lives on
+  // the variant too. The cast keeps defineSlotRecipe's variant inference
+  // anchored to Chakra's own map, which the spread-with-override loses.
+  variants: {
+    ...chakraSlotRecipes.select.variants,
+    variant: {
+      ...chakraSlotRecipes.select.variants?.variant,
+      outline: {
+        ...chakraSlotRecipes.select.variants?.variant?.outline,
+        trigger: {
+          ...chakraSlotRecipes.select.variants?.variant?.outline?.trigger,
+          ...formControlNoFocusRing,
+          _expanded: formControlOpen,
+        },
+      },
+      subtle: {
+        ...chakraSlotRecipes.select.variants?.variant?.subtle,
+        trigger: {
+          ...chakraSlotRecipes.select.variants?.variant?.subtle?.trigger,
+          ...formControlNoFocusRing,
+        },
+      },
+    },
+  } as typeof chakraSlotRecipes.select.variants,
   base: {
     ...chakraSlotRecipes.select.base,
+    trigger: {
+      ...chakraSlotRecipes.select.base?.trigger,
+      ...formControlInteraction,
+      _expanded: formControlOpen,
+    },
     content: {
       ...chakraSlotRecipes.select.base?.content,
       ...dropdownContent,
@@ -119,6 +343,26 @@ export const selectSlotRecipe = defineSlotRecipe({
 /** Combobox chrome: kept aligned with Select for future searchable fields. */
 export const comboboxSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.combobox,
+  variants: {
+    ...chakraSlotRecipes.combobox.variants,
+    variant: {
+      ...chakraSlotRecipes.combobox.variants?.variant,
+      outline: {
+        ...chakraSlotRecipes.combobox.variants?.variant?.outline,
+        input: {
+          ...chakraSlotRecipes.combobox.variants?.variant?.outline?.input,
+          ...formControlNoFocusRing,
+        },
+      },
+      subtle: {
+        ...chakraSlotRecipes.combobox.variants?.variant?.subtle,
+        input: {
+          ...chakraSlotRecipes.combobox.variants?.variant?.subtle?.input,
+          ...formControlNoFocusRing,
+        },
+      },
+    },
+  } as unknown as typeof chakraSlotRecipes.combobox.variants,
   base: {
     ...chakraSlotRecipes.combobox.base,
     content: {
@@ -127,7 +371,8 @@ export const comboboxSlotRecipe = defineSlotRecipe({
     },
     input: {
       ...chakraSlotRecipes.combobox.base?.input,
-      _hover: { borderColor: 'border.emphasized' },
+      ...formControlInteraction,
+      _expanded: formControlOpen,
     },
     item: {
       ...chakraSlotRecipes.combobox.base?.item,

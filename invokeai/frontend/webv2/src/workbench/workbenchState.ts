@@ -1,4 +1,3 @@
-import type { GallerySettings, GeneratedImageContract } from '@features/gallery/contracts';
 import type { GenerateWidgetValues } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { QueueCompiledSubmission, QueueHistoryItemStatus } from '@features/queue/contracts';
@@ -40,6 +39,13 @@ import type {
   WidgetStateMap,
   WidgetTypeId,
 } from '@workbench/widgetContracts';
+
+import {
+  normalizeGalleryImage,
+  type GalleryImage,
+  type GallerySettings,
+  type GeneratedImageContract,
+} from '@features/gallery/contracts';
 
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
@@ -1618,6 +1624,22 @@ const updateGalleryValues = (
   );
 };
 
+const updateGalleryValuesAndPauseLiveFollow = (
+  state: WorkbenchState,
+  getValues: (values: Record<string, unknown>) => Record<string, unknown>,
+  projectId = state.activeProjectId
+): WorkbenchState =>
+  updateProjectById(state, projectId, (project) =>
+    updateProjectWidgetValues(
+      {
+        ...project,
+        settings: { ...project.settings, showProgressImagesInViewer: false },
+      },
+      'gallery',
+      getValues
+    )
+  );
+
 const refreshProjectBackendData = (project: Project): Project => ({
   ...updateProjectWidgetValues(project, 'gallery', (values) => ({
     ...values,
@@ -1693,16 +1715,24 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
   }
 
   const galleryValues = getWidgetValues(project, 'gallery');
-  const existingImages = getGalleryImages(galleryValues).filter(
-    (image) => !images.some((incomingImage) => incomingImage.imageName === image.imageName)
+  const previousImages = getGalleryImages(galleryValues);
+  const previousImageNames = new Set(previousImages.map((image) => image.imageName));
+  const queueBoardIds = new Map(
+    project.queue.items.map((item) => [item.id, item.snapshot.galleryBoardId ?? 'none'] as const)
   );
+  const newImages: GalleryImage[] = images
+    .filter((image) => !previousImageNames.has(image.imageName))
+    .map((image) => normalizeGalleryImage(image, queueBoardIds.get(image.sourceQueueItemId)));
+  const shouldSelectIncomingImage =
+    project.settings.showProgressImagesInViewer || typeof galleryValues.selectedImageName !== 'string';
+  const nextSelectedImage = shouldSelectIncomingImage ? newImages.at(-1) : undefined;
 
   return updateProjectWidgetValues(project, 'gallery', () => ({
     ...galleryValues,
-    recentImages: [...images, ...existingImages],
-    selectedImage: images[0] ?? galleryValues.selectedImage,
-    selectedImageName: images[0]?.imageName ?? galleryValues.selectedImageName,
-    selectedImageNames: images[0] ? [images[0].imageName] : getGallerySelectedImageNames(galleryValues),
+    recentImages: [...[...newImages].reverse(), ...previousImages],
+    selectedImage: nextSelectedImage ?? galleryValues.selectedImage,
+    selectedImageName: nextSelectedImage?.imageName ?? galleryValues.selectedImageName,
+    selectedImageNames: nextSelectedImage ? [nextSelectedImage.imageName] : getGallerySelectedImageNames(galleryValues),
   }));
 };
 
@@ -2557,7 +2587,7 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       );
     }
     case 'selectGalleryImage': {
-      return updateGalleryValues(
+      return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => ({
           ...values,
@@ -2569,7 +2599,7 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       );
     }
     case 'toggleGalleryImageInSelection': {
-      return updateGalleryValues(
+      return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
           const imageName = action.image.imageName;
@@ -2600,7 +2630,7 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       );
     }
     case 'setGalleryMultiSelection': {
-      return updateGalleryValues(
+      return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => ({
           ...values,
@@ -2612,7 +2642,11 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       );
     }
     case 'setGalleryCompareImage': {
-      return updateGalleryValues(state, (values) => ({ ...values, compareImage: action.image }), action.projectId);
+      const updateValues = (values: Record<string, unknown>) => ({ ...values, compareImage: action.image });
+
+      return action.image
+        ? updateGalleryValuesAndPauseLiveFollow(state, updateValues, action.projectId)
+        : updateGalleryValues(state, updateValues, action.projectId);
     }
     case 'selectGalleryBoard': {
       return updateGalleryValues(

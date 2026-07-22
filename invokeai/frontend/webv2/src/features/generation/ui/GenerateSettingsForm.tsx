@@ -1,11 +1,6 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 /* eslint-disable react/react-compiler */
-import type {
-  GenerateModelConfig,
-  GenerateSettings,
-  LoraModelConfig,
-  VaeModelConfig,
-} from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
 import { Stack, Text } from '@chakra-ui/react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -40,7 +35,6 @@ interface GenerateSettingsFormProps {
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   supportedModels: GenerateModelConfig[];
-  vaeModels: VaeModelConfig[];
   onCommitSettings: (nextSettings: GenerateSettings) => void;
   onPatchSettings: (patch: Partial<GenerateSettings>) => void;
 }
@@ -56,7 +50,6 @@ export const GenerateSettingsForm = ({
   selectedModel,
   settings,
   supportedModels,
-  vaeModels,
 }: GenerateSettingsFormProps) => {
   const [draftSettings, setDraftSettings] = useState(settings);
   const draftSettingsRef = useRef(settings);
@@ -261,7 +254,6 @@ export const GenerateSettingsForm = ({
         models={models}
         selectedModel={selectedModel}
         settings={draftSettings}
-        vaeModels={vaeModels}
         onCommit={commit}
         onCommitSettings={commitSettingsImmediately}
       />
