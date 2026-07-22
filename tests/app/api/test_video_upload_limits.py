@@ -26,8 +26,8 @@ from invokeai.app.api_app import (
     _identify_video_upload_user,
 )
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
-from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError
 from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError
 
 MAX_BODY = 1024  # tiny cap for tests
 MAX_CONCURRENT = 2
