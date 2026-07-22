@@ -39,6 +39,7 @@ export {
   getGenerationUiPolicy,
   getGenerationValidationReasons,
   getMaxReferenceImages,
+  getPromptHistoryRecallPatch,
   getSettingsWithModelDefaults,
   isKnownScheduler,
   isReferenceImageSupported,

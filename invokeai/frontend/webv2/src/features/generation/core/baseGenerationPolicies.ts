@@ -2,6 +2,7 @@ import type {
   GenerationModelCatalogItem as ModelConfig,
   GenerationModelTaxonomyType as ModelTaxonomyType,
   KnownGenerationModelBase as KnownModelBase,
+  PromptHistoryItem,
 } from '@features/generation/core/contracts';
 
 import type {
@@ -33,6 +34,7 @@ import {
   isLoraCompatibleWithModel,
   MAX_DIMENSION,
   MIN_DIMENSION,
+  normalizeGenerateSettings,
   SEED_MAX,
 } from './settings';
 
@@ -466,6 +468,34 @@ export const isSupportedGenerateModel = <T extends { base: string; type: string 
   (model.type === 'external_image_generator' && model.base === 'external');
 
 export const isGenerateModelSelectable = <T extends ModelConfig>(model: T): boolean => isSupportedGenerateModel(model);
+
+/** Pure prompt-history recall patch shared by keyboard and palette entry points. */
+export const getPromptHistoryRecallPatch = ({
+  item,
+  models,
+  values,
+}: {
+  item: PromptHistoryItem;
+  models: readonly ModelConfig[] | undefined;
+  values: Record<string, unknown>;
+}): Record<string, unknown> | null => {
+  const settings = normalizeGenerateSettings(values);
+
+  if (!settings) {
+    return null;
+  }
+
+  const selectedModel = models?.filter(isSupportedGenerateModel).find((model) => model.key === settings.modelKey);
+  const promptPolicy = getPromptPolicy(selectedModel, settings);
+  const patch: Record<string, unknown> = { positivePrompt: item.positivePrompt };
+
+  if (promptPolicy.negativeVisible) {
+    patch.negativePrompt = item.negativePrompt ?? '';
+    patch.negativePromptEnabled = item.negativePrompt ? true : settings.negativePromptEnabled;
+  }
+
+  return patch;
+};
 
 export const EXTERNAL_PROVIDER_NODE_TYPES: Record<string, string> = {
   alibabacloud: 'alibabacloud_image_generation',
