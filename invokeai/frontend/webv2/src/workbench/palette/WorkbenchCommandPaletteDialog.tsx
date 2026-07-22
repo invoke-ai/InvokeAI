@@ -80,11 +80,6 @@ const WorkbenchCommandPaletteDialog = ({
   const projectId = useActiveProjectSelector((project) => project.id);
   const promptHistory = useActiveProjectSelector((project) => project.promptHistory);
   const generateValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'generate'));
-  const selectedBoardId = useActiveProjectSelector((project) => {
-    const boardId = getProjectWidgetValues(project, 'gallery').selectedBoardId;
-
-    return typeof boardId === 'string' ? boardId : 'none';
-  });
   const presentWidgetTypeIds = useActiveProjectSelector((project) =>
     [...new Set(Object.values(project.widgetInstances).map((instance) => instance.typeId))].sort()
   );
@@ -168,7 +163,6 @@ const WorkbenchCommandPaletteDialog = ({
       createImagesProvider({
         openGalleryWidget: () => openWidget('gallery'),
         openPreviewWidget: () => openWidget('preview'),
-        selectedBoardId,
         selectBoard: (boardId) => gallery.selectBoard(boardId),
         selectImage: (image) => gallery.selectImage(image),
       }),
@@ -208,7 +202,6 @@ const WorkbenchCommandPaletteDialog = ({
     promptHistory,
     promptRecallContextKey,
     queueScope,
-    selectedBoardId,
     workbenchCommands,
   ]);
 

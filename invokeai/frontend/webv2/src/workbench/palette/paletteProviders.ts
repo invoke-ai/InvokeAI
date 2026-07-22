@@ -10,7 +10,7 @@ import { extractGenerationMeta, getResultImageName } from '@features/queue/contr
 import { listLibraryWorkflows } from '@features/workflow/queries';
 import { requestLibraryWorkflowLoad } from '@features/workflow/react';
 import { queryClient } from '@platform/query/client';
-import { isTimestampInRange } from '@platform/search/dateTokens';
+import { formatIsoDate, isTimestampInRange } from '@platform/search/dateTokens';
 import { absolutizeApiUrl } from '@platform/transport/http';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
@@ -249,33 +249,34 @@ export const createQueueItemsProvider = ({
 export const createImagesProvider = ({
   openGalleryWidget,
   openPreviewWidget,
-  selectedBoardId,
   selectBoard,
   selectImage,
 }: {
   openGalleryWidget: () => void;
   openPreviewWidget: () => void;
-  selectedBoardId: string;
   selectBoard: (boardId: string) => void;
   selectImage: (image: GalleryImage) => void;
 }): PaletteSearchProvider => ({
-  contextKey: selectedBoardId,
+  contextKey: 'global',
   label: 'Images',
   providerKey: getPaletteContributionKey('provider', 'images'),
   supportsCreatedAtRange: true,
   search: async (query) => {
-    // The images endpoint is board-scoped; the palette searches the board the
-    // gallery is currently on. The date range filters server-side.
-    const page = await queryClient.fetchQuery(
-      galleryImagesOptions({
-        boardId: selectedBoardId,
-        createdFrom: query.range?.from,
-        createdTo: query.range?.to,
-        galleryView: 'images',
-        limit: 20,
-        searchTerm: query.text,
-      })
-    );
+    // Searches every board the user can see (no board_id filter); the cached
+    // boards list labels each result. Text and date range filter server-side.
+    const [page, boards] = await Promise.all([
+      queryClient.fetchQuery(
+        galleryImagesOptions({
+          createdFrom: query.range?.from,
+          createdTo: query.range?.to,
+          galleryView: 'images',
+          limit: 20,
+          searchTerm: query.text,
+        })
+      ),
+      queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false })),
+    ]);
+    const boardNames = new Map(boards.map((board: GalleryBoard) => [board.id, board.name]));
 
     return page.images.map<PaletteEntry>((image) => ({
       group: 'Images',
@@ -293,9 +294,9 @@ export const createImagesProvider = ({
           selectImage(image);
         },
       },
-      subtitle: `${image.width}×${image.height}`,
+      subtitle: `${boardNames.get(image.boardId) ?? 'Uncategorized'} · ${image.width}×${image.height}`,
       thumbnailUrl: image.thumbnailUrl,
-      title: image.imageName,
+      title: formatIsoDate(image.queuedAt.slice(0, 10)),
     }));
   },
 });
