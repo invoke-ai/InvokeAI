@@ -10,7 +10,7 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
   identity: [],
   models: ['react'],
   nodes: [],
-  queue: ['contracts', 'menu', 'queries', 'react', 'utility', 'widget'],
+  queue: ['contracts', 'menu', 'queries', 'react', 'reveal', 'utility', 'widget'],
   upscale: ['widget'],
   workflow: ['contracts', 'graph', 'preview', 'queries', 'react', 'utility', 'widget'],
 };

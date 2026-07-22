@@ -1,20 +1,27 @@
 import { createExternalStore } from '@platform/state/externalStore';
 
-/**
- * Cross-context requests into the queue widget. Shell surfaces (the command
- * palette) can't reach the widget's local state, so they park a request here
- * and the mounted widget consumes it — the same bridge workflowUiStore uses
- * for pending library-workflow loads.
- */
-const queueUiStore = createExternalStore<{ pendingRevealItemId: number | null }>({ pendingRevealItemId: null });
+export interface QueueItemRevealRequest {
+  itemId: number;
+  requestId: number;
+}
+
+let nextRevealRequestId = 0;
+const queueRevealStore = createExternalStore<{ pendingReveal: QueueItemRevealRequest | null }>({
+  pendingReveal: null,
+});
 
 export const requestQueueItemReveal = (itemId: number): void => {
-  queueUiStore.setSnapshot({ pendingRevealItemId: itemId });
+  queueRevealStore.setSnapshot({ pendingReveal: { itemId, requestId: ++nextRevealRequestId } });
 };
 
-export const clearPendingQueueItemReveal = (): void => {
-  queueUiStore.setSnapshot({ pendingRevealItemId: null });
+export const clearPendingQueueItemReveal = (requestId: number): void => {
+  if (queueRevealStore.getSnapshot().pendingReveal?.requestId === requestId) {
+    queueRevealStore.setSnapshot({ pendingReveal: null });
+  }
 };
 
-export const usePendingQueueItemReveal = (): number | null =>
-  queueUiStore.useSelector((snapshot) => snapshot.pendingRevealItemId, Object.is);
+export const getPendingQueueItemReveal = (): QueueItemRevealRequest | null =>
+  queueRevealStore.getSnapshot().pendingReveal;
+
+export const usePendingQueueItemReveal = (): QueueItemRevealRequest | null =>
+  queueRevealStore.useSelector((snapshot) => snapshot.pendingReveal, Object.is);

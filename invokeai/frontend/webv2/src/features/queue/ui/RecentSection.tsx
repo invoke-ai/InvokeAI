@@ -1,5 +1,6 @@
 import { Stack, Text } from '@chakra-ui/react';
-import { useEffect, useMemo } from 'react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { QueueFilterId } from './queueFilters';
@@ -7,7 +8,7 @@ import type { QueueFilterId } from './queueFilters';
 import { useCurrentBatchItems, useQueueLoadState, useRecentItems } from './queueDataStore';
 import { matchesFilter } from './queueFilters';
 import { QueueItemRow } from './QueueItemRow';
-import { clearPendingQueueItemReveal } from './queueUiStore';
+import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
 import { SectionHeader } from './SectionHeader';
 
 /**
@@ -16,10 +17,10 @@ import { SectionHeader } from './SectionHeader';
  */
 export const RecentSection = ({
   filter,
-  revealItemId = null,
+  revealRequest = null,
 }: {
   filter: QueueFilterId;
-  revealItemId?: number | null;
+  revealRequest?: QueueItemRevealRequest | null;
 }) => {
   const { t } = useTranslation();
   const currentBatchItems = useCurrentBatchItems();
@@ -32,20 +33,16 @@ export const RecentSection = ({
     [excluded, filter, items]
   );
 
-  // Reveal requests we can't fulfill must not go stale: an item in the current
-  // batch is already visible in NOW & NEXT, and one pruned past the recent
-  // window is gone. Rows we do render consume the request themselves.
-  useEffect(() => {
-    if (revealItemId === null || loadState !== 'loaded') {
-      return;
-    }
-    if (excluded.has(revealItemId) || !items.some((item) => item.id === revealItemId)) {
-      clearPendingQueueItemReveal();
-    }
-  }, [excluded, items, loadState, revealItemId]);
+  const cannotReveal =
+    revealRequest !== null &&
+    loadState === 'loaded' &&
+    (excluded.has(revealRequest.itemId) || !items.some((item) => item.id === revealRequest.itemId));
 
   return (
     <Stack gap="2">
+      {cannotReveal && revealRequest ? (
+        <UnavailableRevealConsumer key={revealRequest.requestId} request={revealRequest} />
+      ) : null}
       <SectionHeader count={filtered.length} title={t('common.recent')} />
       {filtered.length === 0 ? (
         <Text color={loadState === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="2xs" px="1">
@@ -58,10 +55,20 @@ export const RecentSection = ({
       ) : (
         <Stack gap="1">
           {filtered.map((item) => (
-            <QueueItemRow key={item.id} item={item} revealRequested={item.id === revealItemId} />
+            <QueueItemRow
+              key={item.id}
+              item={item}
+              revealRequest={item.id === revealRequest?.itemId ? revealRequest : null}
+            />
           ))}
         </Stack>
       )}
     </Stack>
   );
+};
+
+const UnavailableRevealConsumer = ({ request }: { request: QueueItemRevealRequest }) => {
+  useMountEffect(() => clearPendingQueueItemReveal(request.requestId));
+
+  return null;
 };

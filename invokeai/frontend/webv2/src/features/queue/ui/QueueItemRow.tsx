@@ -6,7 +6,7 @@ import { extractGenerationMeta, getResultImageName } from '@features/queue/core/
 import { useItemProgress } from '@features/queue/data/itemProgressStore';
 import { Row } from '@platform/ui/Row';
 import { ChevronRightIcon } from 'lucide-react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CancelQueueItemButton } from './CancelQueueItemButton';
@@ -16,7 +16,7 @@ import { QueueItemThumbnail } from './QueueItemThumbnail';
 import { QueueStatusDot } from './QueueStatusDot';
 import { QueueStepProgress } from './QueueStepProgress';
 import { useQueueUi } from './QueueUiContext';
-import { clearPendingQueueItemReveal } from './queueUiStore';
+import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
 import { getStatusMeta } from './statusMeta';
 
 const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
@@ -36,12 +36,12 @@ const QUEUE_ITEM_BUTTON_SX: SystemStyleObject = {
 } as const;
 
 export const QueueItemRow = memo(
-  ({ item, revealRequested }: { item: QueueItemReadModel; revealRequested?: boolean }) => {
+  ({ item, revealRequest }: { item: QueueItemReadModel; revealRequest?: QueueItemRevealRequest | null }) => {
     const { t } = useTranslation();
     const { canManageItem, canViewItemDetails } = useQueueUi();
     const [expanded, setExpanded] = useState(false);
     const toggle = useCallback(() => setExpanded((open) => !open), []);
-    const rootRef = useRef<HTMLDivElement>(null);
+    const consumedRevealRequestIdRef = useRef<number | null>(null);
     const meta = extractGenerationMeta(item);
     const duration = formatDuration(item.startedAt, item.completedAt);
     const age = formatCompactAge(item.completedAt ?? item.createdAt);
@@ -50,26 +50,21 @@ export const QueueItemRow = memo(
     const isCancellable = (item.status === 'pending' || item.status === 'in_progress') && canManageItem(item);
     const canExpand = canViewItemDetails(item);
 
-    // Consume a palette reveal request: expand (when permitted, via a
-    // render-phase adjustment), then bring the row into view and clear the
-    // pending id so the request fires once.
-    const [handledReveal, setHandledReveal] = useState(false);
-    if (revealRequested && !handledReveal) {
-      setHandledReveal(true);
-      if (canExpand) {
-        setExpanded(true);
-      }
-    }
-    if (!revealRequested && handledReveal) {
-      setHandledReveal(false);
-    }
-    useEffect(() => {
-      if (!revealRequested) {
-        return;
-      }
-      rootRef.current?.scrollIntoView({ block: 'nearest' });
-      clearPendingQueueItemReveal();
-    }, [revealRequested]);
+    const consumeReveal = useCallback(
+      (node: HTMLDivElement | null) => {
+        if (!node || !revealRequest || consumedRevealRequestIdRef.current === revealRequest.requestId) {
+          return;
+        }
+
+        consumedRevealRequestIdRef.current = revealRequest.requestId;
+        if (canExpand) {
+          setExpanded(true);
+        }
+        node.scrollIntoView({ block: 'nearest' });
+        clearPendingQueueItemReveal(revealRequest.requestId);
+      },
+      [canExpand, revealRequest]
+    );
 
     const progress = useItemProgress(item.id);
     const liveImage = progress?.image ?? null;
@@ -80,7 +75,7 @@ export const QueueItemRow = memo(
     const borderColor = showBorder ? (isFailed ? 'fg.error' : 'border') : 'transparent';
 
     return (
-      <Box ref={rootRef} overflow="hidden" rounded="md" borderWidth={1} borderColor={borderColor}>
+      <Box ref={consumeReveal} overflow="hidden" rounded="md" borderWidth={1} borderColor={borderColor}>
         <HStack gap="0">
           <Row
             aria-expanded={canExpand ? expanded : undefined}
