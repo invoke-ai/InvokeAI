@@ -73,7 +73,9 @@ def test_session_device_is_thread_local():
 
 
 def test_get_generation_devices_auto_expands_to_all_cuda():
-    """`auto` enumerates every visible CUDA device."""
+    """`auto` enumerates every visible CUDA device (when the legacy `device` is not pinned)."""
+    config = get_config()
+    config.device = "auto"
     with (
         patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
         patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=3),
@@ -85,10 +87,31 @@ def test_get_generation_devices_auto_expands_to_all_cuda():
         ]
 
 
+def test_get_generation_devices_auto_respects_pinned_legacy_device():
+    """An upgraded install that pinned the legacy `device` setting (e.g. to keep generation off a
+    display GPU) must not silently start workers on every GPU: `auto` resolves to the pinned device
+    only. An explicit generation_devices list still overrides the pin."""
+    config = get_config()
+    config.device = "cuda:1"
+    try:
+        with (
+            patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+            patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=3),
+        ):
+            assert TorchDevice.get_generation_devices("auto") == [torch.device("cuda:1")]
+            # An explicit list wins over the legacy pin.
+            assert TorchDevice.get_generation_devices(["cuda:0", "cuda:2"]) == [
+                torch.device("cuda:0"),
+                torch.device("cuda:2"),
+            ]
+    finally:
+        config.device = "auto"
+
+
 def test_get_generation_devices_auto_without_cuda():
     """`auto` falls back to the single best device when CUDA is unavailable."""
     config = get_config()
-    config.device = "cpu"
+    config.device = "auto"
     with (
         patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
         patch("invokeai.backend.util.devices.torch.backends.mps.is_available", return_value=False),

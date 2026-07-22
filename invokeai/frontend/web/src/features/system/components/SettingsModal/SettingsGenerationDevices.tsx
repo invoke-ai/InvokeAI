@@ -11,6 +11,7 @@ import {
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { toast } from 'features/toast/toast';
+import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -221,11 +222,26 @@ const DeviceTag = memo(({ badge, isActive, isClosable, isDisabled, onActivate, o
 
   const isInteractive = !isDisabled && (!isActive || isClosable);
 
+  // role="button" alone is not keyboard-operable — the tag also needs to be focusable and to
+  // respond to Enter/Space like a real button.
+  const onKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        // Space would otherwise scroll the modal.
+        e.preventDefault();
+        onClick();
+      }
+    },
+    [onClick]
+  );
+
   const tag = (
     <Tag
       h="min-content"
       borderRadius="base"
       onClick={onClick}
+      onKeyDown={isInteractive ? onKeyDown : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
       colorScheme={isActive ? 'invokeBlue' : 'base'}
       userSelect="none"
       role={isInteractive ? 'button' : undefined}

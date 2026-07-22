@@ -4,6 +4,7 @@ from typing import Dict, Iterable, Optional, Tuple
 
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -36,19 +37,27 @@ class LayerPatcher:
         # original_modules are stored for unpatching layers that are wrapped.
         original_modules: dict[str, torch.nn.Module] = {}
         try:
-            for patch, patch_weight in patches:
-                LayerPatcher.apply_smart_model_patch(
-                    model=model,
-                    prefix=prefix,
-                    patch=patch,
-                    patch_weight=patch_weight,
-                    original_weights=original_weights,
-                    original_modules=original_modules,
-                    dtype=dtype,
-                    force_direct_patching=force_direct_patching,
-                    force_sidecar_patching=force_sidecar_patching,
-                    suppress_warning_layers=suppress_warning_layers,
-                )
+            # Patching can register new parameters (FLUX Control LoRA shape expansion routes
+            # through nn.Module.register_parameter via setattr). Model construction on another
+            # worker thread monkey-patches register_parameter process-wide (accelerate's
+            # init_empty_weights), which would strand our new parameter on the meta device — so
+            # patch application must exclude construction, like any VRAM load. Read semantics:
+            # patching on different devices may overlap; only construction is exclusive. The lock
+            # is released before the yield — patched inference must not block model loads.
+            with MODEL_LOAD_LOCK.read_lock():
+                for patch, patch_weight in patches:
+                    LayerPatcher.apply_smart_model_patch(
+                        model=model,
+                        prefix=prefix,
+                        patch=patch,
+                        patch_weight=patch_weight,
+                        original_weights=original_weights,
+                        original_modules=original_modules,
+                        dtype=dtype,
+                        force_direct_patching=force_direct_patching,
+                        force_sidecar_patching=force_sidecar_patching,
+                        suppress_warning_layers=suppress_warning_layers,
+                    )
 
             yield
         finally:

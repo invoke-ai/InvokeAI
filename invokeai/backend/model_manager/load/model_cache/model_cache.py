@@ -289,6 +289,9 @@ class ModelCache:
         # - Requests to empty the cache from a separate thread
         self._lock = threading.RLock()
 
+        if ram_budget is not None:
+            ram_budget.register_cache(self)
+
         self._on_cache_hit_callbacks: set[CacheHitCallback] = set()
         self._on_cache_miss_callbacks: set[CacheMissCallback] = set()
         self._on_cache_models_cleared_callbacks: set[CacheModelsClearedCallback] = set()
@@ -344,6 +347,7 @@ class ModelCache:
         computed from their individual sizes (see ModelManagerService.build_model_manager).
         """
         self._ram_budget = ram_budget
+        ram_budget.register_cache(self)
 
     @property
     def local_ram_cache_size_bytes(self) -> int:
@@ -1088,6 +1092,21 @@ class ModelCache:
             else:
                 pos += 1
 
+        if self._ram_budget is not None and bytes_needed > self._get_ram_available():
+            # This cache's own evictable entries are exhausted, but the global budget is still
+            # short: the remaining usage is held by other device caches — e.g. a shared model whose
+            # weights stay live because another (possibly idle) cache retains them. Without
+            # cross-cache eviction the cap would be exceeded for as long as that cache stays idle,
+            # so ask each peer to drop its unlocked entries. Whatever still can't be freed is held
+            # by locked (in-use) entries, which release soon — the same transient overshoot the
+            # single-cache path has always allowed.
+            for peer in self._ram_budget.peer_caches(exclude=self):
+                if bytes_needed <= self._get_ram_available():
+                    break
+                models_cleared += peer.evict_unlocked_for_peer(
+                    is_satisfied=lambda: bytes_needed <= self._get_ram_available()
+                )
+
         if models_cleared > 0:
             # There would likely be some 'garbage' to be collected regardless of whether a model was cleared or not, but
             # there is a significant time cost to calling `gc.collect()`, so we want to use it sparingly. (The time cost
@@ -1114,6 +1133,40 @@ class ModelCache:
         TorchDevice.empty_cache()
         self._logger.debug(f"Dropped {models_cleared} models to free {ram_bytes_freed / MB:.2f}MB of RAM.")
         self._log_cache_state(title="After dropping models:")
+
+    def evict_unlocked_for_peer(self, is_satisfied: Callable[[], bool]) -> int:
+        """Evict this cache's unlocked entries on behalf of another device's cache (best effort).
+
+        Called by a peer whose own eviction stack is exhausted while the shared RamBudget is still
+        over-committed — typically because this cache holds the last reference to shared weights the
+        peer already dropped. `is_satisfied` is re-checked after every eviction so no more entries
+        are dropped than the peer actually needs.
+
+        The peer calls this while holding its own cache lock, so this cache's lock is taken
+        NON-blocking: if it is contended, this device is actively working and the peer simply skips
+        it — blocking here could deadlock two caches making room for each other simultaneously.
+
+        Returns the number of entries evicted.
+        """
+        if not self._lock.acquire(blocking=False):
+            return 0
+        try:
+            models_cleared = 0
+            pos = 0
+            while pos < len(self._cache_stack) and not is_satisfied():
+                cache_entry = self._cached_models[self._cache_stack[pos]]
+                if cache_entry.is_locked:
+                    pos += 1
+                    continue
+                self._logger.debug(
+                    f"Dropping {cache_entry.key} from RAM cache on behalf of a peer device cache "
+                    f"({(cache_entry.cached_model.total_bytes() / MB):.2f}MB)."
+                )
+                self._delete_cache_entry(cache_entry)
+                models_cleared += 1
+            return models_cleared
+        finally:
+            self._lock.release()
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
         """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""

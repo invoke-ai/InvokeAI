@@ -179,7 +179,7 @@ class TorchDevice:
         available-device enumeration, so the suffix does not shift when devices are filtered out of
         `generation_devices`. Mirrors the frontend's device labeling.
         """
-        all_devices = cls.get_generation_devices("auto")
+        all_devices = cls._all_available_devices()
         names = [cls.get_device_name(device) for device in all_devices]
         name_counts = Counter(names)
         ordinals: dict[str, int] = defaultdict(int)
@@ -190,19 +190,32 @@ class TorchDevice:
         return labels
 
     @classmethod
+    def _all_available_devices(cls) -> list[torch.device]:
+        """Every device generation could run on: all visible CUDA devices, or the single best
+        available device (mps/cpu) when CUDA is unavailable. Ignores configuration — used for
+        enumeration/labeling, where filtered-out devices must still be listed."""
+        if torch.cuda.is_available():
+            return [torch.device(f"cuda:{index}") for index in range(torch.cuda.device_count())]
+        return [cls.choose_torch_device()]
+
+    @classmethod
     def get_generation_devices(cls, generation_devices: Union[str, list[str], None]) -> list[torch.device]:
         """Resolve the configured `generation_devices` into a concrete, deduplicated device list.
 
-        - ``"auto"`` (the default) expands to every visible CUDA device, or the single best available
-          device (mps/cpu) when CUDA is unavailable.
-        - An explicit list is normalized and deduplicated, with order preserved.
+        - ``"auto"`` (the default) defers to an explicitly pinned legacy ``device:`` setting (an
+          upgraded install that pinned e.g. ``device: cuda:1`` to avoid its display GPU must not
+          silently start generating on every GPU); otherwise it expands to every visible CUDA
+          device, or the single best available device (mps/cpu) when CUDA is unavailable.
+        - An explicit list is normalized and deduplicated, with order preserved, and overrides the
+          legacy ``device:`` setting.
         - ``None`` or an empty list yields an empty list; the caller decides the single-device fallback.
         """
         if generation_devices == "auto":
-            if torch.cuda.is_available():
-                device_strs: list[str] = [f"cuda:{index}" for index in range(torch.cuda.device_count())]
+            legacy_device = get_config().device
+            if legacy_device != "auto":
+                device_strs: list[str] = [legacy_device]
             else:
-                device_strs = [str(cls.choose_torch_device())]
+                device_strs = [str(device) for device in cls._all_available_devices()]
         elif not generation_devices:
             return []
         else:

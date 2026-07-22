@@ -355,3 +355,79 @@ def test_apply_smart_model_patches_fp8_weights_force_sidecar():
 
     # After exiting the context, the sidecar patch is cleared.
     assert model.linear_layer_1.get_num_patches() == 0
+
+
+def test_shape_expanding_patch_excludes_concurrent_model_construction():
+    """FLUX Control LoRA shape expansion registers a new nn.Parameter (setattr routes through
+    nn.Module.register_parameter). Model construction on another thread monkey-patches
+    register_parameter process-wide (accelerate's init_empty_weights) so that any registered
+    parameter lands on the meta device. Patch application must therefore hold the
+    MODEL_LOAD_LOCK read lock: it must WAIT for an in-flight construction, or the expanded
+    parameter would be stranded on meta ("Cannot copy out of meta tensor")."""
+    import threading
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+    from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
+
+    small_in_features = 4
+    big_in_features = 8
+    out_features = 16
+    rank = 4
+
+    model = DummyModuleWithOneLayer(small_in_features, out_features, "cpu", torch.float32)
+    layer = FluxControlLoRALayer(
+        up=torch.ones(out_features, rank),
+        mid=None,
+        down=torch.ones(rank, big_in_features),
+        alpha=float(rank),
+        bias=None,
+    )
+    patch = ModelPatchRaw({"linear_layer_1": layer})
+
+    hijack_installed = threading.Event()
+    release_construction = threading.Event()
+    original_register_parameter = torch.nn.Module.register_parameter
+
+    def hijacking_register_parameter(module: torch.nn.Module, name: str, param) -> None:
+        # Emulate accelerate.init_empty_weights: while the construction patch is installed, ANY
+        # registered parameter is rerouted to the meta device.
+        if param is not None:
+            param = torch.nn.Parameter(param.to("meta"), requires_grad=param.requires_grad)
+        original_register_parameter(module, name, param)
+
+    def construct_model() -> None:
+        with MODEL_LOAD_LOCK.write_lock():
+            torch.nn.Module.register_parameter = hijacking_register_parameter
+            try:
+                hijack_installed.set()
+                release_construction.wait(timeout=30)
+            finally:
+                torch.nn.Module.register_parameter = original_register_parameter
+
+    result: dict[str, object] = {}
+
+    def apply_patch() -> None:
+        with LayerPatcher.apply_smart_model_patches(
+            model=model, patches=[(patch, 1.0)], prefix="", dtype=torch.float32, force_direct_patching=True
+        ):
+            result["device"] = model.linear_layer_1.weight.device.type
+            result["shape"] = tuple(model.linear_layer_1.weight.shape)
+
+    constructor = threading.Thread(target=construct_model)
+    patcher = threading.Thread(target=apply_patch)
+    try:
+        constructor.start()
+        assert hijack_installed.wait(timeout=10)
+        patcher.start()
+        # The patcher must block behind the construction's write lock (if it ran now, the hijack
+        # would strand its expanded parameter on meta).
+        patcher.join(timeout=0.5)
+        assert patcher.is_alive(), "patch application must wait for an in-flight model construction"
+    finally:
+        release_construction.set()
+        constructor.join(timeout=10)
+        patcher.join(timeout=10)
+
+    assert not patcher.is_alive()
+    assert result["device"] == "cpu"
+    assert result["shape"] == (out_features, big_in_features)

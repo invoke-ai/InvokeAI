@@ -9,6 +9,7 @@ import logging
 import threading
 import time
 from collections.abc import Iterator
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -46,6 +47,9 @@ class _FakeServices:
     def __init__(self, enabled: bool = True):
         self.configuration = _FakeConfig(enabled)
         self.logger = logging.getLogger("test-encoder-offload")
+        # model_manager.load is None-able in production (some tests run without a model manager);
+        # the offload path must tolerate that.
+        self.model_manager = SimpleNamespace(load=None)
 
 
 def _runner(enabled: bool = True) -> DefaultSessionRunner:
@@ -186,6 +190,42 @@ def test_concurrent_workers_never_share_a_gpu():
         t.join()
 
     assert not violations, f"GPU(s) used by two workers at once: {set(violations)}"
+
+
+def test_offloaded_encoder_stats_attributed_to_running_session():
+    """An offloaded encoder's cache activity must land in the RUNNING session's CacheStats.
+    collect_stats() attaches the session's stats to the native device's cache; when the node is
+    re-pinned to a borrowed GPU, the borrowed cache's stats still point at whatever session last
+    ran there. The offload context must temporarily point the borrowed cache at the native cache's
+    stats and restore afterwards."""
+
+    class _FakeCache:
+        def __init__(self, name: str):
+            self.stats = SimpleNamespace(owner=name)
+
+    native_cache = _FakeCache("running-session")
+    borrowed_cache = _FakeCache("stale-previous-session")
+    native_stats = native_cache.stats
+    borrowed_stale_stats = borrowed_cache.stats
+    caches = {"cuda:0": native_cache, "cuda:1": borrowed_cache}
+
+    class _FakeLoad:
+        @property
+        def ram_cache(self):
+            return caches[str(TorchDevice.get_session_device())]
+
+    runner = _runner()
+    runner._services.model_manager = SimpleNamespace(load=_FakeLoad())  # type: ignore[attr-defined]
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    TorchDevice.set_session_device("cuda:0")
+
+    with runner._maybe_offload_to_idle_gpu(_FakeInvocation(True, "flux_text_encoder")):
+        # Encoder loads on the borrowed device now record into the running session's stats object.
+        assert borrowed_cache.stats is native_stats
+
+    # The borrowed cache's own stats pointer is restored; the native one was never touched.
+    assert borrowed_cache.stats is borrowed_stale_stats
+    assert native_cache.stats is native_stats
 
 
 def test_real_nodes_declare_the_marker_correctly():

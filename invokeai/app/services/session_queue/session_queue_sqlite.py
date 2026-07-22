@@ -553,10 +553,35 @@ class SqliteSessionQueue(SessionQueueBase):
         return deduped_chain_item_ids
 
     def _get_current_workflow_call_chain_item_ids(self, queue_id: str) -> set[int]:
-        current_queue_item = self.get_current(queue_id)
-        if current_queue_item is not None:
-            return set(self._get_workflow_call_chain_item_ids(current_queue_item.item_id))
+        """Item ids in the workflow-call chains of every currently executing item.
 
+        With multiple GPU workers, several items can be in_progress at once. Every one of them is
+        "current": the "except current" operations must leave each active worker's complete
+        ancestor/descendant chain intact, not just the chain of one arbitrarily selected item.
+        Waiting chains with no in-progress item remain cancellable backlog, exactly as in
+        single-worker mode.
+        """
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE queue_id = ? AND status = 'in_progress'
+                ORDER BY item_id ASC
+                """,
+                (queue_id,),
+            )
+            in_progress_ids = [cast(int, row[0]) for row in cursor.fetchall()]
+
+        if in_progress_ids:
+            chain_item_ids: set[int] = set()
+            for item_id in in_progress_ids:
+                chain_item_ids.update(self._get_workflow_call_chain_item_ids(item_id))
+            return chain_item_ids
+
+        # Nothing is in progress. A chain can still be mid-execution in the gap between one child
+        # finishing and the next being dequeued (parent 'waiting', next child 'pending'); protect
+        # the chain of the next item that would be dequeued, as before.
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
@@ -759,8 +784,13 @@ class SqliteSessionQueue(SessionQueueBase):
         for item_id in item_ids:
             # _set_queue_item_status no-ops (and returns the existing item) if the item finished
             # between the SELECT and now, so count only the ones we actually moved to 'canceled'.
-            if self._set_queue_item_status(item_id, "canceled").status == "canceled":
-                canceled.append(item_id)
+            # It raises if the row vanished entirely (a concurrent clear/delete); such an item
+            # needs no cancellation, so skip it rather than failing the whole bulk operation.
+            try:
+                if self._set_queue_item_status(item_id, "canceled").status == "canceled":
+                    canceled.append(item_id)
+            except SessionQueueItemNotFoundError:
+                continue
         return canceled
 
     def _collect_item_ids_by_user(

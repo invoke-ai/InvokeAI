@@ -152,12 +152,18 @@ class InvocationProgressEvent(InvocationEventBase):
         percentage: float | None = None,
         image: ProgressImage | None = None,
     ) -> "InvocationProgressEvent":
-        # This is emitted from the session-processor worker thread, which pins its CUDA device via
-        # TorchDevice.set_session_device(). Resolve that here so the UI can label progress by GPU.
-        from invokeai.backend.util.devices import TorchDevice
+        # Report the GPU executing the session. Prefer the queue item's persisted device: the
+        # thread-local session device is temporarily re-pinned to a borrowed idle GPU during
+        # offloaded encoder nodes, and using it here would make the UI's device badge jump to the
+        # borrowed GPU and back within a single queue item.
+        device: str | None = queue_item.device if queue_item.device and queue_item.device.startswith("cuda") else None
+        if device is None:
+            # Legacy single-device mode tags queue items with device=None; fall back to the worker
+            # thread's pinned device (set via TorchDevice.set_session_device()).
+            from invokeai.backend.util.devices import TorchDevice
 
-        session_device = TorchDevice.get_session_device()
-        device = str(session_device) if session_device is not None and session_device.type == "cuda" else None
+            session_device = TorchDevice.get_session_device()
+            device = str(session_device) if session_device is not None and session_device.type == "cuda" else None
 
         return cls(
             queue_id=queue_item.queue_id,

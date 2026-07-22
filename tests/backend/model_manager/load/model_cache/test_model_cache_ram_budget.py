@@ -197,10 +197,11 @@ def test_cache_stats_reflect_shared_global_budget(mock_logger):
         cache_b.shutdown()
 
 
-def test_eviction_cannot_free_ram_held_by_another_device(mock_logger):
-    """If a cache's only droppable model is still held by another device, eviction frees nothing
-    globally (the shared weights stay live) and the new model is still admitted -> transiently over
-    budget until the other device releases. The eviction loop must handle this without spinning."""
+def test_eviction_coordinates_across_device_caches(mock_logger):
+    """RAM held only by another device's cache must still be evictable: after this cache drops its
+    own reference to a shared model, the peer cache's (unlocked, idle) reference is evicted too, so
+    the global budget stays under max_bytes instead of exceeding it for as long as the peer stays
+    idle."""
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
     cache_a = _make_cache(store, budget, mock_logger)
@@ -211,13 +212,39 @@ def test_eviction_cannot_free_ram_held_by_another_device(mock_logger):
         assert budget.total_in_use() == S
 
         cache_a.put("new", DummyModule())  # triggers make_room; "shared" is a's only droppable entry
-        # a dropped its ref to "shared", but b still holds it, so the shared weights weren't freed.
+        # a dropped its ref to "shared"; that alone frees nothing (b still held it), so make_room
+        # asks b — idle, entry unlocked — to drop its reference too, releasing the shared weights.
+        assert "shared" not in cache_a._cached_models
+        assert "shared" not in cache_b._cached_models
+        assert store.refcount("shared") == 0
+        assert "new" in cache_a._cached_models
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_peer_eviction_skips_locked_entries(mock_logger):
+    """A peer's LOCKED entry (a model in active use on that device) is never evicted from under it.
+    The new model is still admitted -> transiently over budget until the peer's lock releases, same
+    as the single-cache behavior when everything is locked."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("shared", DummyModule())
+        cache_b.put("shared", DummyModule())
+        cache_b._cached_models["shared"].lock()
+
+        cache_a.put("new", DummyModule())
+        # b's entry was locked, so the shared weights could not be freed.
         assert "shared" not in cache_a._cached_models
         assert "shared" in cache_b._cached_models
         assert store.refcount("shared") == 1
         assert "new" in cache_a._cached_models
-        # "shared" (still alive via b) + "new" -> over the 1.4*S cap, as expected.
-        assert budget.total_in_use() == 2 * S
+        assert budget.total_in_use() == 2 * S  # transiently over the 1.4*S cap
     finally:
         cache_a.shutdown()
         cache_b.shutdown()

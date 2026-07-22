@@ -128,6 +128,13 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         // Remove this session's tile from the multi-session preview as soon as it reaches a terminal
         // state. The single-image "resolve" illusion below is handled separately via onLoadImage.
         $progressData.setKey(data.item_id, undefined);
+        // The shared $progressEvent/$progressImage globals may currently hold a DIFFERENT session's
+        // latest preview (multi-GPU). Only the item that owns them may clear them — otherwise
+        // canceling item A would blank item B's still-running preview until B's next image event.
+        const globalProgressEvent = $progressEvent.get();
+        if (globalProgressEvent !== null && globalProgressEvent.item_id !== data.item_id) {
+          return;
+        }
         // Completed queue items have the progress event cleared by the onLoadImage callback. This allows the viewer to
         // create the illusion of the progress image "resolving" into the final image. If we cleared the progress image
         // now, there would be a flicker where the progress image disappears before the final image appears, and the

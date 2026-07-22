@@ -139,6 +139,7 @@ generation_devices: [cuda:0, cuda:2]
 
 Notes:
 
+- If the legacy `device` setting is pinned to a specific device (e.g. `device: cuda:1`), `auto` resolves to that single device rather than every GPU. This preserves the behavior of installs that pinned `device` before multi-GPU support existed (for example, to keep generation off a display GPU). An explicit `generation_devices` list overrides `device`.
 - On a system without a CUDA GPU, `auto` resolves to the single best available device (`mps` on Apple Silicon, otherwise `cpu`), so generation runs serially.
 - Each active GPU gets its own model cache, but the CPU (system RAM) copy of each model's weights is shared between the caches, so a model loaded on several GPUs is held in RAM only once. Running many GPUs in parallel can still increase RAM usage (different GPUs may hold different models), so ensure you have ample system memory before enabling a large device list.
 - When a GPU finishes a job, it prefers queued jobs whose models it already has loaded (among the same user's equal-priority jobs) to avoid slow model reloads. Set `session_queue_mode: FIFO` to disable this reordering and enforce strict submission order.

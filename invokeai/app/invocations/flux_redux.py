@@ -92,6 +92,10 @@ class FluxReduxInvocation(BaseInvocation):
         if self.downsampling_factor > 1 or self.weight != 1.0:
             redux_conditioning = self._downsample_weight(context, redux_conditioning)
 
+        # Store on CPU, like the other idle_gpu_offloadable encoders: this node may run on a
+        # borrowed idle GPU, and the consumer (FLUX denoise) runs on the session's GPU.
+        redux_conditioning = redux_conditioning.detach().to("cpu")
+
         tensor_name = context.tensors.save(redux_conditioning)
         return FluxReduxOutput(
             redux_cond=FluxReduxConditioningField(conditioning=TensorField(tensor_name=tensor_name), mask=self.mask)

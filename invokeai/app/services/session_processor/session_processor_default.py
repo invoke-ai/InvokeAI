@@ -203,10 +203,23 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._services.logger.debug(
             f"Running {invocation.get_type()} on idle device {borrowed_device} (session device {native_device})."
         )
+        # Attribute the borrowed cache's activity to the RUNNING session. collect_stats() attached
+        # this session's CacheStats to the native device's cache before we re-pinned; the borrowed
+        # cache's .stats still points at whatever session last ran on that device — possibly an
+        # already-summarized one — so without this swap the encoder's cache hits/misses would be
+        # lost to (or corrupt) another session's numbers.
+        load = self._services.model_manager.load
+        native_cache = load.ram_cache if load is not None else None
         TorchDevice.set_session_device(borrowed_device)
+        borrowed_cache = load.ram_cache if load is not None else None
+        saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
+        if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
+            borrowed_cache.stats = native_cache.stats
         try:
             yield
         finally:
+            if borrowed_cache is not None and borrowed_cache is not native_cache:
+                borrowed_cache.stats = saved_borrowed_stats
             TorchDevice.set_session_device(native_device)
             GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
 
@@ -419,7 +432,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
         Each worker needs its own runner because the runner stores its session's cancel event.
         We carry over the template's callbacks so all workers behave identically.
         """
-        if isinstance(template, DefaultSessionRunner):
+        # `type is`, not isinstance: a subclass would be silently downgraded to a plain
+        # DefaultSessionRunner, losing its overrides.
+        if type(template) is DefaultSessionRunner:
             return DefaultSessionRunner(
                 on_before_run_session_callbacks=list(template._on_before_run_session_callbacks),
                 on_before_run_node_callbacks=list(template._on_before_run_node_callbacks),
@@ -427,8 +442,14 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 on_node_error_callbacks=list(template._on_node_error_callbacks),
                 on_after_run_session_callbacks=list(template._on_after_run_session_callbacks),
             )
-        # Unknown runner implementation — only safe to reuse in single-worker mode.
-        return template
+        # Any other implementation cannot be cloned generically, and sharing one instance across
+        # workers is not safe either: every start() overwrites the runner's stored cancel event, so
+        # only the last worker's cancellation would ever fire. Fail loudly at startup instead.
+        raise ValueError(
+            f"Multiple generation devices require DefaultSessionRunner; got {type(template).__name__}. "
+            "Provide a DefaultSessionRunner (with callbacks), or configure a single device in "
+            "generation_devices."
+        )
 
     def start(self, invoker: Invoker) -> None:
         self._invoker: Invoker = invoker
@@ -637,6 +658,15 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         self._invoker.services.logger.debug(
                             f"Queue item {worker.queue_item.item_id} was canceled before it started; skipping."
                         )
+                        # The cancel_event may have been set by a delayed handler for the PREVIOUS
+                        # item (it matched on the stale worker.queue_item before dequeue replaced
+                        # it). In that case the freshly claimed row is still 'in_progress' and no
+                        # cancellation targeted it — without this write it would be abandoned
+                        # in_progress forever, since dequeue only ever claims 'pending' rows.
+                        # cancel_queue_item no-ops on already-terminal items, so the
+                        # genuinely-canceled case is unaffected.
+                        with suppress(SessionQueueItemNotFoundError):
+                            self._invoker.services.session_queue.cancel_queue_item(worker.queue_item.item_id)
                         continue
 
                     # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.

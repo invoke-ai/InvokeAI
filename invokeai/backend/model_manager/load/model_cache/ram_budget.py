@@ -1,7 +1,11 @@
 import threading
-from typing import Optional
+import weakref
+from typing import TYPE_CHECKING, Optional
 
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
+
+if TYPE_CHECKING:
+    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 
 
 class RamBudget:
@@ -26,9 +30,10 @@ class RamBudget:
     share one RamBudget and make their eviction decisions against it.
 
     Thread-safety / lock ordering: RamBudget guards its own counter with an internal lock and NEVER
-    acquires a ModelCache lock (it only reads the store, which has its own lock). Callers update it
-    while holding their cache lock, so the only lock order is cache-lock -> (store-lock | budget-lock),
-    never the reverse — so it cannot deadlock against the per-device caches.
+    acquires a ModelCache lock (it only reads the store, which has its own lock; the cache registry
+    below stores references without touching cache locks). Callers update it while holding their
+    cache lock, so the only lock order is cache-lock -> (store-lock | budget-lock), never the
+    reverse — so it cannot deadlock against the per-device caches.
     """
 
     def __init__(self, max_bytes: int, shared_store: Optional[SharedCpuWeightsStore]):
@@ -36,6 +41,23 @@ class RamBudget:
         self._store = shared_store
         self._non_shared_bytes = 0
         self._lock = threading.Lock()
+        # The per-device caches attached to this budget. A cache that has exhausted its own
+        # evictable entries uses this to ask its peers to release RAM they are holding (see
+        # ModelCache._make_room_internal). Weak references: the budget must not keep a
+        # shut-down cache alive.
+        self._caches: list[weakref.ReferenceType["ModelCache"]] = []
+
+    def register_cache(self, cache: "ModelCache") -> None:
+        """Register a per-device cache attached to this budget."""
+        with self._lock:
+            self._caches = [ref for ref in self._caches if ref() is not None and ref() is not cache]
+            self._caches.append(weakref.ref(cache))
+
+    def peer_caches(self, exclude: "ModelCache") -> list["ModelCache"]:
+        """The other live caches attached to this budget."""
+        with self._lock:
+            refs = list(self._caches)
+        return [cache for ref in refs if (cache := ref()) is not None and cache is not exclude]
 
     @property
     def max_bytes(self) -> int:
