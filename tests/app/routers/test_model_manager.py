@@ -57,6 +57,7 @@ def test_model_manager_external_config_round_trip(
 
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/", params={"model_type": ModelType.ExternalImageGenerator.value})
 
@@ -99,6 +100,7 @@ def test_model_manager_external_config_preserves_custom_panel_schema(
 
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/i/external_custom_schema")
 
@@ -130,6 +132,7 @@ def test_model_manager_external_starter_model_applies_panel_schema_overrides(
 
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/i/external_starter_schema")
 
@@ -160,6 +163,7 @@ def test_model_manager_gemini_starter_model_applies_reference_and_resolution_ove
 
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/i/external_gemini_schema")
 
