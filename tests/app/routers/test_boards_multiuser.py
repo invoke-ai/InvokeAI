@@ -79,6 +79,7 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.boards.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     yield
 
 

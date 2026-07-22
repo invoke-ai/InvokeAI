@@ -6,8 +6,9 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._access import assert_board_read_access as _assert_board_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
-from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy, BoardVisibility
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -52,22 +53,12 @@ async def get_board(
 ) -> BoardDTO:
     """Gets a board (user must have access to it)"""
 
+    _assert_board_read_access(board_id, current_user)
+
     try:
-        result = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+        return ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
     except Exception:
         raise HTTPException(status_code=404, detail="Board not found")
-
-    # Admins can access any board.
-    # Owners can access their own boards.
-    # Shared and public boards are visible to all authenticated users.
-    if (
-        not current_user.is_admin
-        and result.user_id != current_user.user_id
-        and result.board_visibility == BoardVisibility.Private
-    ):
-        raise HTTPException(status_code=403, detail="Not authorized to access this board")
-
-    return result
 
 
 @boards_router.patch(
@@ -194,17 +185,7 @@ async def list_all_board_image_names(
     """Gets a list of images for a board"""
 
     if board_id != "none":
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-        except Exception:
-            raise HTTPException(status_code=404, detail="Board not found")
-
-        if (
-            not current_user.is_admin
-            and board.user_id != current_user.user_id
-            and board.board_visibility == BoardVisibility.Private
-        ):
-            raise HTTPException(status_code=403, detail="Not authorized to access this board")
+        _assert_board_read_access(board_id, current_user)
 
     image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
         board_id,
