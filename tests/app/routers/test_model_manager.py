@@ -57,6 +57,7 @@ def test_model_manager_external_config_round_trip(
 
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/", params={"model_type": ModelType.ExternalImageGenerator.value})
 
@@ -99,6 +100,7 @@ def test_model_manager_external_config_preserves_custom_panel_schema(
 
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/i/external_custom_schema")
 
@@ -130,6 +132,7 @@ def test_model_manager_external_starter_model_applies_panel_schema_overrides(
 
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/i/external_starter_schema")
 
@@ -160,6 +163,7 @@ def test_model_manager_gemini_starter_model_applies_reference_and_resolution_ove
 
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/i/external_gemini_schema")
 
@@ -199,6 +203,9 @@ def _make_stats_services(ram_caches: dict) -> Any:
     mm.load = load
     services = type("Services", (), {})()
     services.model_manager = mm
+    # The stats route requires auth; in single-user mode the auth dependency only reads
+    # configuration.multiuser before returning the default admin user.
+    services.configuration = type("Config", (), {"multiuser": False})()
     return services
 
 
@@ -223,6 +230,7 @@ def test_get_stats_aggregates_per_device_caches(monkeypatch: Any, client: TestCl
     services = _make_stats_services({"cuda:0": _Cache(stats_0), "cuda:1": _Cache(stats_1)})
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/stats")
 
@@ -250,6 +258,7 @@ def test_get_stats_counts_duplicate_cache_objects_once(monkeypatch: Any, client:
     services = _make_stats_services({"cuda:0": shared, "cpu": shared})
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/stats")
 
@@ -265,6 +274,7 @@ def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClie
     services = _make_stats_services({"cuda:0": _Cache(), "cuda:1": _Cache()})
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
 
     response = client.get("/api/v2/models/stats")
 

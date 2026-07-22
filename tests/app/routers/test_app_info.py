@@ -38,6 +38,7 @@ def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker,
     }
 
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr(mock_invoker.services.external_generation, "get_provider_statuses", lambda: statuses)
 
     response = client.get("/api/v1/app/external_providers/status")
@@ -329,6 +330,7 @@ def test_update_runtime_config_rejects_unavailable_mps_device(
 def test_get_generation_device_options_lists_devices(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient
 ) -> None:
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr(app_info.torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(app_info.torch.cuda, "device_count", lambda: 2)
     monkeypatch.setattr(app_info.torch.cuda, "get_device_name", lambda index: f"GPU {index}")
