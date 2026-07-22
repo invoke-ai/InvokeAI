@@ -200,7 +200,7 @@ export const getCanvasToolModifierHintIds = ({
       'altScaleFromCenter',
       'modFineGrid',
     ],
-    move: () => ['arrowKeysNudgeSelection', ...SHARED_HINT_IDS],
+    move: () => ['arrowKeysNudgeSelection', 'modFineGrid', ...SHARED_HINT_IDS],
     path: ({ isEditingPathSession }) =>
       isEditingPathSession
         ? [

@@ -27,6 +27,7 @@ const WARNINGS = {
   CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'controlLayers.warnings.controlAdapterIncompatibleBaseModel',
   CONTROL_ADAPTER_NO_CONTROL: 'controlLayers.warnings.controlAdapterNoControl',
   FLUX_FILL_NO_WORKY_WITH_CONTROL_LORA: 'controlLayers.warnings.fluxFillIncompatibleWithControlLoRA',
+  CONTROL_ADAPTER_DUPLICATE_ANIMA_LLLITE_MODEL: 'controlLayers.warnings.controlAdapterDuplicateAnimaLLLiteModel',
 } as const;
 
 type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
@@ -61,6 +62,21 @@ export const getRegionalGuidanceWarnings = (
       }
       if (entity.autoNegative) {
         warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
+    if (model.base === 'flux2') {
+      // FLUX.2 Klein applies a single attention mask uniformly across all transformer blocks;
+      // regional negatives / auto-negative are not supported. Reference images (IP Adapters)
+      // are handled via FLUX.2's built-in kontext path, not via regional reference images.
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
       }
     }
 
@@ -172,7 +188,8 @@ export const getGlobalReferenceImageWarnings = (
 
 export const getControlLayerWarnings = (
   entity: CanvasControlLayerState,
-  model: MainOrExternalModelConfig | null | undefined
+  model: MainOrExternalModelConfig | null | undefined,
+  controlLayers?: CanvasControlLayerState[]
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -185,8 +202,13 @@ export const getControlLayerWarnings = (
     // No model selected
     warnings.push(WARNINGS.CONTROL_ADAPTER_NO_MODEL_SELECTED);
   } else if (model) {
-    if (model.base === 'sd-3' || model.base === 'sd-2' || model.base === 'anima') {
+    if (model.base === 'sd-3' || model.base === 'sd-2') {
       // Unsupported model architecture
+      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
+    } else if (model.base === 'anima' && entity.controlAdapter.type !== 'anima_lllite') {
+      // Anima only supports ControlNet-LLLite control layers. This also catches layers persisted with type
+      // 'controlnet' before the anima_lllite adapter type existed - the graph builder ignores them, so they must
+      // warn instead of silently no-oping.
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
     } else if (entity.controlAdapter.model.base !== model.base) {
       // Supported model architecture but doesn't match
@@ -198,6 +220,19 @@ export const getControlLayerWarnings = (
     ) {
       // FLUX inpaint variants are FLUX Fill models - not compatible w/ Control LoRA
       warnings.push(WARNINGS.FLUX_FILL_NO_WORKY_WITH_CONTROL_LORA);
+    } else if (entity.controlAdapter.type === 'anima_lllite' && controlLayers) {
+      // Each Anima ControlNet-LLLite model may only be applied once per generation - the backend rejects duplicates
+      const modelKey = entity.controlAdapter.model.key;
+      const hasDuplicate = controlLayers.some(
+        (other) =>
+          other.id !== entity.id &&
+          other.isEnabled &&
+          other.controlAdapter.type === 'anima_lllite' &&
+          other.controlAdapter.model?.key === modelKey
+      );
+      if (hasDuplicate) {
+        warnings.push(WARNINGS.CONTROL_ADAPTER_DUPLICATE_ANIMA_LLLITE_MODEL);
+      }
     }
   }
 

@@ -2,6 +2,7 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
+import { getTransparencyLockedCompositeOperation } from 'features/controlLayers/konva/CanvasTool/transparencyLocking';
 import {
   alignCoordForTool,
   getLastPointOfLastLine,
@@ -216,10 +217,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntityState.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
-    // When transparency is locked on a raster layer, use 'source-atop' to only paint on existing opaque pixels
-    const isTransparencyLocked =
-      selectedEntityState.type === 'raster_layer' && selectedEntityState.isTransparencyLocked;
-    const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
+    const globalCompositeOperation = getTransparencyLockedCompositeOperation(selectedEntityState);
 
     if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
       // If the pen is down and pressure sensitivity is enabled, add the point with pressure
@@ -285,10 +283,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntityState.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
-    // When transparency is locked on a raster layer, use 'source-atop' to only paint on existing opaque pixels
-    const isTransparencyLocked =
-      selectedEntityState.type === 'raster_layer' && selectedEntityState.isTransparencyLocked;
-    const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
+    const globalCompositeOperation = getTransparencyLockedCompositeOperation(selectedEntityState);
 
     if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
       // We need to get the last point of the last line to create a straight line if shift is held

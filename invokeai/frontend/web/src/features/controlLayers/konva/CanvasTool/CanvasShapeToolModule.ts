@@ -2,6 +2,7 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
+import { getShapeCompositeOperation } from 'features/controlLayers/konva/CanvasTool/shapeCompositeOperation';
 import { shouldPreserveSuspendableShapesSession } from 'features/controlLayers/konva/CanvasTool/toolHotkeys';
 import {
   addCoords,
@@ -576,7 +577,13 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   private updateDragBuffer = async () => {
     const activeEntity = this.getActiveEntityAdapter();
-    if (!activeEntity || !this.dragStartPoint || !this.dragCurrentPoint || !this.shapeId) {
+    if (
+      !activeEntity ||
+      activeEntity.state.type === 'vector_layer' ||
+      !this.dragStartPoint ||
+      !this.dragCurrentPoint ||
+      !this.shapeId
+    ) {
       return;
     }
 
@@ -596,6 +603,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       rect,
       color: this.manager.stateApi.getCurrentColor(),
       compositeOperation: this.getCompositeOperation(),
+      clip: this.manager.stateApi.getSettings().clipToBbox ? this.parent.getClip(activeEntity.state) : null,
     });
   };
 
@@ -658,9 +666,10 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   };
 
   private getCompositeOperation = (): CanvasRectState['compositeOperation'] => {
-    return this.manager.stateApi.$ctrlKey.get() || this.manager.stateApi.$metaKey.get()
-      ? 'destination-out'
-      : 'source-over';
+    return getShapeCompositeOperation(
+      this.getActiveEntityAdapter()?.state,
+      this.manager.stateApi.$ctrlKey.get() || this.manager.stateApi.$metaKey.get()
+    );
   };
 
   private getPolygonPoint = (point: Coordinate, shouldSnap: boolean): Coordinate => {

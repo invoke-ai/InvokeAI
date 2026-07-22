@@ -55,6 +55,7 @@ import {
 } from 'services/api/types';
 
 import type {
+  AnimaLLLiteConfig,
   AspectRatioID,
   BoundingBoxScaleMethod,
   CanvasControlLayerState,
@@ -95,6 +96,7 @@ import {
   getRegionalGuidanceState,
   getVectorLayerState,
   imageDTOToImageWithDims,
+  initialAnimaLLLite,
   initialControlLoRA,
   initialControlNet,
   initialFLUXRedux,
@@ -789,6 +791,8 @@ const slice = createSlice({
         case 'controlnet': {
           // Check if this is a Z-Image ControlNet (base === 'z-image')
           const isZImageControl = layer.controlAdapter.model?.base === 'z-image';
+          // Check if this is an Anima ControlNet-LLLite (base === 'anima')
+          const isAnimaLLLite = layer.controlAdapter.model?.base === 'anima';
 
           if (isZImageControl) {
             // Convert to Z-Image Control adapter
@@ -799,6 +803,15 @@ const slice = createSlice({
                 weight: layer.controlAdapter.weight,
               };
               layer.controlAdapter = zImageControlConfig;
+            }
+          } else if (isAnimaLLLite) {
+            // Convert to Anima ControlNet-LLLite adapter
+            if (layer.controlAdapter.type !== 'anima_lllite') {
+              const animaLLLiteConfig: AnimaLLLiteConfig = {
+                ...initialAnimaLLLite,
+                model: layer.controlAdapter.model,
+              };
+              layer.controlAdapter = animaLLLiteConfig;
             }
           } else {
             // Regular SD/SDXL/Flux ControlNet
@@ -818,8 +831,11 @@ const slice = createSlice({
                 type: 'controlnet',
               };
               layer.controlAdapter = controlNetConfig;
-            } else if (layer.controlAdapter.type === 'z_image_control') {
-              // Converting from Z-Image Control to regular ControlNet
+            } else if (
+              layer.controlAdapter.type === 'z_image_control' ||
+              layer.controlAdapter.type === 'anima_lllite'
+            ) {
+              // Converting from Z-Image Control or Anima ControlNet-LLLite to regular ControlNet
               const controlNetConfig: ControlNetConfig = {
                 ...initialControlNet,
                 model: layer.controlAdapter.model,

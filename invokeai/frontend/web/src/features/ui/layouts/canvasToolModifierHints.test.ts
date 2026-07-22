@@ -67,6 +67,15 @@ describe('getCanvasToolModifierHintIds', () => {
     ]);
   });
 
+  it('adds fine-grid hint for the move tool', () => {
+    expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'move' }))).toEqual([
+      'arrowKeysNudgeSelection',
+      'modFineGrid',
+      'spacePan',
+      'altPickColor',
+    ]);
+  });
+
   it('shows edit hints for path tool while editing a vector layer', () => {
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'path', isEditingPathSession: true }))).toEqual([
       'shiftInsertPathPoint',
