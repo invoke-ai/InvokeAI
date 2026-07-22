@@ -1,6 +1,6 @@
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 
-import { DropZone, type DropZoneProps } from '@platform/ui';
+import { DropZone, type DropZoneProps } from '@platform/ui/DropZone';
 
 const DISALLOWED_STYLES: DropZoneProps = { bg: 'bg.muted', borderColor: 'border.subtle' };
 

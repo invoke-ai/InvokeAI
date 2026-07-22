@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-20",
+  "capturedAt": "2026-07-21",
   "build": {
     "launchpad": {
       "source": "index.html",
@@ -19,11 +19,11 @@
         "baseGenerationPolicies",
         "chakra",
         "client",
-        "contracts",
         "document",
         "externalStore",
         "fields",
         "formatRelativeTime",
+        "galleryStateView",
         "graph",
         "http",
         "identity",
@@ -74,8 +74,6 @@
         "canvasStrength",
         "chakra",
         "client",
-        "contracts",
-        "contracts",
         "document",
         "draftRegistry",
         "externalStore",
@@ -99,6 +97,7 @@
         "react",
         "react",
         "rolldown-runtime",
+        "selection",
         "selectors",
         "settings",
         "settingsDialogStore",

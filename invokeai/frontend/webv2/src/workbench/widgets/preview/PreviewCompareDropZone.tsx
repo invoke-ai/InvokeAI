@@ -1,7 +1,7 @@
 import { Badge } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { isGalleryImageDragData } from '@features/gallery/utility';
-import { DropZone } from '@platform/ui';
+import { DropZone } from '@platform/ui/DropZone';
 import { useTranslation } from 'react-i18next';
 
 import { PREVIEW_COMPARE_DROP_DATA, PREVIEW_COMPARE_DROP_ID } from './previewCompareDnd';

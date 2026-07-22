@@ -1,6 +1,6 @@
 import { GridItem, Text } from '@chakra-ui/react';
 import { useDroppable } from '@dnd-kit/core';
-import { DropZone } from '@platform/ui';
+import { DropZone } from '@platform/ui/DropZone';
 import { useTranslation } from 'react-i18next';
 
 import type { CanvasImageDropData } from './canvasImageDnd';

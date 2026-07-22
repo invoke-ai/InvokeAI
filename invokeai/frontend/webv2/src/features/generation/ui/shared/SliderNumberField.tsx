@@ -1,8 +1,8 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type { SliderMark } from '@platform/ui';
+import type { SliderMark } from '@platform/ui/Slider';
 
 import { HStack, InputGroup, NumberInput } from '@chakra-ui/react';
-import { Slider } from '@platform/ui';
+import { Slider } from '@platform/ui/Slider';
 
 import { ModelDefaultButton } from './ModelDefaultButton';
 
