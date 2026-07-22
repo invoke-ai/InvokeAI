@@ -1,12 +1,14 @@
+import os
 import re
 import tempfile
 import traceback
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Optional
+from typing import BinaryIO, Optional
 
 from fastapi import Body, HTTPException, Query, Request, Response, UploadFile
 from fastapi import Path as PathParam
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRouter
 from PIL import Image as PILImage
 from pydantic import BaseModel, Field, ValidationError
@@ -17,7 +19,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import WorkflowAndGraphResponse, _assert_board_read_access
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoNamesResult, VideoRecordChanges
 from invokeai.app.services.videos.videos_common import (
@@ -277,6 +279,12 @@ async def upload_video(
                 )
             await run_in_threadpool(tmp.write, chunk)
         tmp.close()
+        # Release the multipart spool now that the body is copied: each in-flight
+        # upload otherwise holds TWO on-disk copies (Starlette's spool + our tmp file)
+        # through the probe/thumbnail/create phase — up to 2 x MAX_UPLOAD_SIZE x
+        # MAX_CONCURRENT_VIDEO_UPLOADS of temp disk. Closing shrinks the double-copy
+        # window to the copy loop itself.
+        await file.close()
 
         if not await run_in_threadpool(_is_mp4_file, tmp_path):
             raise HTTPException(status_code=415, detail="Not an MP4 video file")
@@ -373,7 +381,10 @@ async def delete_videos_from_list(
     deleted_videos: set[str] = set()
     failed_videos: set[str] = set()
     affected_boards: set[str] = set()
-    for video_name in video_names:
+    # Dedup while preserving order: a name repeated in the request would otherwise be
+    # processed twice, and the second pass's not-found error would land the same name
+    # in both deleted_videos and failed_videos.
+    for video_name in dict.fromkeys(video_names):
         try:
             _assert_video_owner(video_name, current_user)
             video_dto = ApiDependencies.invoker.services.videos.get_dto(video_name)
@@ -559,62 +570,83 @@ async def get_video_full(
     except Exception:
         raise HTTPException(status_code=404)
 
-    path = Path(path_str)
-    if not path.exists():
+    # Open once and serve every branch from the fd. Deletion stages files away via an
+    # atomic rename, so any later path-based stat/open — including FileResponse's lazy
+    # open after the route returns — races with a concurrent delete and surfaces as an
+    # uncontrolled 500. An open fd is immune: the data stays readable until the handle
+    # closes, even after the path is gone.
+    video_file: Optional[BinaryIO] = None
+    try:
+        video_file = open(path_str, "rb")
+    except OSError:
         raise HTTPException(status_code=404)
 
-    file_size = path.stat().st_size
-    range_header = request.headers.get("range") or request.headers.get("Range")
+    try:
+        file_size = os.fstat(video_file.fileno()).st_size
+        range_header = request.headers.get("range") or request.headers.get("Range")
 
-    common_headers = {
-        "Accept-Ranges": "bytes",
-        "Cache-Control": _get_video_cache_control(),
-        "Content-Disposition": f'inline; filename="{video_name}"',
-    }
+        common_headers = {
+            "Accept-Ranges": "bytes",
+            "Cache-Control": _get_video_cache_control(),
+            "Content-Disposition": f'inline; filename="{video_name}"',
+        }
 
-    # HEAD: respond with metadata only.
-    if request.method == "HEAD":
-        return Response(
-            status_code=200,
-            media_type="video/mp4",
-            headers={**common_headers, "Content-Length": str(file_size)},
-        )
+        # HEAD: respond with metadata only.
+        if request.method == "HEAD":
+            return Response(
+                status_code=200,
+                media_type="video/mp4",
+                headers={**common_headers, "Content-Length": str(file_size)},
+            )
 
-    if range_header is None:
-        # Stream the file via sendfile() rather than reading it into RAM — multi-GB
-        # MP4 downloads (clients without Range, CLI tools, CDN edge fetches) would
-        # otherwise allocate a multi-GB Python bytes object per request.
-        return FileResponse(
-            path,
-            media_type="video/mp4",
-            headers=common_headers,
-        )
+        if range_header is None:
+            # Stream from the already-open fd in bounded chunks rather than reading the
+            # file into RAM — multi-GB MP4 downloads (clients without Range, CLI tools,
+            # CDN edge fetches) would otherwise allocate a multi-GB bytes object. This
+            # trades FileResponse's sendfile() for delete-race immunity.
+            handle = video_file
+            video_file = None  # ownership moves to the streaming iterator
 
-    parsed = _parse_range_header(range_header, file_size)
-    if parsed is None:
-        # Unsatisfiable range.
-        return Response(
-            status_code=416,
-            headers={**common_headers, "Content-Range": f"bytes */{file_size}"},
-        )
-    start, end = parsed
-    length = end - start + 1
-    with open(path, "rb") as f:
-        f.seek(start)
+            def iter_video() -> Iterator[bytes]:
+                try:
+                    while chunk := handle.read(RANGE_CHUNK_SIZE):
+                        yield chunk
+                finally:
+                    handle.close()
+
+            return StreamingResponse(
+                iter_video(),
+                media_type="video/mp4",
+                headers={**common_headers, "Content-Length": str(file_size)},
+            )
+
+        parsed = _parse_range_header(range_header, file_size)
+        if parsed is None:
+            # Unsatisfiable range.
+            return Response(
+                status_code=416,
+                headers={**common_headers, "Content-Range": f"bytes */{file_size}"},
+            )
+        start, end = parsed
+        length = end - start + 1
+        video_file.seek(start)
         # Read at most one chunk; clients ask for more via subsequent ranges.
         read_length = min(length, RANGE_CHUNK_SIZE)
-        chunk = f.read(read_length)
+        chunk = video_file.read(read_length)
         actual_end = start + len(chunk) - 1
-    return Response(
-        chunk,
-        status_code=206,
-        media_type="video/mp4",
-        headers={
-            **common_headers,
-            "Content-Range": f"bytes {start}-{actual_end}/{file_size}",
-            "Content-Length": str(len(chunk)),
-        },
-    )
+        return Response(
+            chunk,
+            status_code=206,
+            media_type="video/mp4",
+            headers={
+                **common_headers,
+                "Content-Range": f"bytes {start}-{actual_end}/{file_size}",
+                "Content-Length": str(len(chunk)),
+            },
+        )
+    finally:
+        if video_file is not None:
+            video_file.close()
 
 
 @videos_router.get(
@@ -673,8 +705,10 @@ async def list_video_dtos(
         default=None,
         description="The board id to filter by. Use 'none' to find videos without a board.",
     ),
-    offset: int = Query(default=0, description="The page offset"),
-    limit: int = Query(default=10, description="The number of videos per page"),
+    # Bounds matter: these flow verbatim into SQL, and a negative LIMIT means
+    # *unlimited* in SQLite — one request would materialize every video row.
+    offset: int = Query(default=0, ge=0, description="The page offset"),
+    limit: int = Query(default=10, ge=0, le=MAX_PAGE_SIZE, description="The number of videos per page"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred videos first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),

@@ -505,7 +505,10 @@ async def delete_images_from_list(
         deleted_images: set[str] = set()
         failed_images: set[str] = set()
         affected_boards: set[str] = set()
-        for image_name in image_names:
+        # Dedup while preserving order: a name repeated in the request would otherwise
+        # be processed twice, and the second pass's not-found error would land the same
+        # name in both deleted_images and failed_images.
+        for image_name in dict.fromkeys(image_names):
             try:
                 _assert_image_owner(image_name, current_user)
                 image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)

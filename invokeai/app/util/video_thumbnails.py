@@ -174,6 +174,9 @@ def _run_worker(args: list[str], timeout: float, raise_on_timeout: bool = False)
     monitor: threading.Thread | None = None
     try:
         proc = _spawn_worker(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    except Exception:
+        return None
+    try:
         monitor_stop, _memory_exceeded, monitor = _start_worker_memory_monitor(proc)
         stdout, _ = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired as error:
@@ -183,6 +186,10 @@ def _run_worker(args: list[str], timeout: float, raise_on_timeout: bool = False)
             raise VideoDecodeTimeoutError(f"Video decode worker timed out after {timeout}s") from error
         return None
     except Exception:
+        # An unexpected failure (e.g. OSError from communicate()) must not leak the
+        # worker tree: the finally below stops the RSS-monitor backstop, so nothing
+        # else would ever reap a still-running worker and its ffmpeg child.
+        _terminate_process_tree(proc)
         return None
     finally:
         if monitor_stop is not None and monitor is not None:

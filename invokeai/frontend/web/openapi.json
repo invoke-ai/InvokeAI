@@ -6539,6 +6539,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "description": "The page offset",
               "default": 0,
               "title": "Offset"
@@ -6551,6 +6552,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 1000,
+              "minimum": 0,
               "description": "The number of videos per page",
               "default": 10,
               "title": "Limit"
@@ -7043,6 +7046,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "description": "The page offset",
               "default": 0,
               "title": "Offset"
@@ -7055,6 +7059,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 1000,
+              "minimum": 0,
               "description": "The number of items per page",
               "default": 10,
               "title": "Limit"

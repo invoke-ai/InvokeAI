@@ -259,6 +259,40 @@ class TestWorkerMemoryMonitor:
         assert not terminated.is_set()
 
 
+class TestRunWorkerUnexpectedFailureCleanup:
+    """An unexpected exception from ``proc.communicate()`` (e.g. OSError on a broken
+    pipe or fd exhaustion) must not leak the worker tree: ``_run_worker``'s finally
+    stops the RSS-monitor backstop, so if the except path doesn't terminate the tree,
+    nothing ever will (JPPhoto non-merge-blocker, 2026-07-22)."""
+
+    def _proc_with_failing_communicate(self, error: Exception) -> MagicMock:
+        proc = MagicMock()
+        proc.communicate.side_effect = error
+        proc.poll.return_value = None
+        return proc
+
+    def test_oserror_from_communicate_terminates_worker_tree(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        proc = self._proc_with_failing_communicate(OSError("broken pipe"))
+        terminated: list[object] = []
+        monkeypatch.setattr(video_thumbnails, "_spawn_worker", lambda *args, **kwargs: proc)
+        monkeypatch.setattr(video_thumbnails, "_worker_tree_rss", lambda worker: 0)
+        monkeypatch.setattr(video_thumbnails, "_terminate_process_tree", terminated.append)
+
+        assert video_thumbnails._run_worker(["probe", "unused"], timeout=1.0) is None
+        assert terminated == [proc]
+
+    def test_spawn_failure_returns_none_without_terminate(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def _fail_spawn(*args: object, **kwargs: object) -> None:
+            raise OSError("fork failed")
+
+        terminated: list[object] = []
+        monkeypatch.setattr(video_thumbnails, "_spawn_worker", _fail_spawn)
+        monkeypatch.setattr(video_thumbnails, "_terminate_process_tree", terminated.append)
+
+        assert video_thumbnails._run_worker(["probe", "unused"], timeout=1.0) is None
+        assert terminated == []
+
+
 class TestProbeMetadataValidation:
     """probe_video must reject decoder-reported metadata no sane video has (JPPhoto
     review 2026-07-21): the upload path persists these values and sizes thumbnail

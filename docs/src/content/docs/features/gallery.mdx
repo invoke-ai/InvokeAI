@@ -57,6 +57,12 @@ Each board has a context menu accessible via right-click (or Ctrl+click).
 Only **Delete Board and Assets** permanently deletes the board's images and videos. This action cannot be undone.
 :::
 
+:::note
+In multi-user deployments, **Delete Board and Assets** only permanently deletes *your own* media on a shared board — other users' contributions are preserved and move to Uncategorized. (Administrators delete everything on the board.)
+
+If any item's files cannot be removed (for example, due to a transient storage error), that item is kept rather than left orphaned on disk: its record moves to Uncategorized, and the app shows a warning with the number of items that could not be deleted.
+:::
+
 ### Image Storage Maintenance
 
 Administrators can use [Image Storage Maintenance](/features/image-storage-maintenance/) to move existing image files and thumbnails into the current image subfolder strategy. This is separate from board organization and does not change image names, boards, generation metadata, or gallery records.

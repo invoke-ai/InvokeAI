@@ -39,7 +39,7 @@ describe('refreshed token consumers', () => {
   it('attempts the media-cookie sync before committing a refreshed bearer token', () => {
     const apiSource = readFileSync(fileURLToPath(new URL('../../../services/api/index.ts', import.meta.url)), 'utf8');
     const cookieWrite = apiSource.indexOf('const mediaCookieResponse = await fetch');
-    const tokenCommit = apiSource.indexOf('api.dispatch(tokenRefreshed(refreshedToken))');
+    const tokenCommit = apiSource.indexOf('dispatch(tokenRefreshed(refreshedToken))');
 
     expect(cookieWrite).toBeGreaterThan(-1);
     expect(tokenCommit).toBeGreaterThan(cookieWrite);

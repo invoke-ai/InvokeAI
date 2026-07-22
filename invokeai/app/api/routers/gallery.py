@@ -8,7 +8,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import _assert_board_read_access
 from invokeai.app.services.gallery.gallery_common import GalleryItem, GalleryItemNamesResult
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 gallery_router = APIRouter(prefix="/v1/gallery", tags=["gallery"])
@@ -31,8 +31,10 @@ async def list_gallery_items(
         default=None,
         description="The board id to filter by. Use 'none' to find items without a board.",
     ),
-    offset: int = Query(default=0, description="The page offset"),
-    limit: int = Query(default=10, description="The number of items per page"),
+    # Bounds matter: these flow verbatim into SQL, and a negative LIMIT means
+    # *unlimited* in SQLite — one request would materialize the entire gallery.
+    offset: int = Query(default=0, ge=0, description="The page offset"),
+    limit: int = Query(default=10, ge=0, le=MAX_PAGE_SIZE, description="The number of items per page"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred items first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),

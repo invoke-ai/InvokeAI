@@ -219,6 +219,31 @@ def test_list_video_dtos_none_board_succeeds_for_any_authed_user(client: TestCli
 # ---------------------------------------------------------------------------
 
 
+def test_delete_videos_from_list_dedupes_repeated_names(client: TestClient, mock_invoker: Invoker, admin_token: str):
+    """A name repeated in the request must be processed once. Previously the second pass
+    hit a not-found error for the already-deleted name (a plain Exception under the admin
+    ownership bypass), landing the same name in BOTH deleted_videos and failed_videos and
+    toasting a spurious partial-failure warning (JPPhoto non-merge-blocker, 2026-07-22).
+    """
+    fake_dto = MagicMock()
+    fake_dto.board_id = None
+    mock_invoker.services.videos.get_dto.return_value = fake_dto
+
+    response = client.post(
+        "/api/v1/videos/delete",
+        json={"video_names": ["dup.mp4", "dup.mp4", "other.mp4"]},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert sorted(body["deleted_videos"]) == ["dup.mp4", "other.mp4"]
+    assert body["failed_videos"] == []
+    # The service must have been asked to delete each unique name exactly once.
+    delete_calls = [call.args[0] for call in mock_invoker.services.videos.delete.call_args_list]
+    assert sorted(delete_calls) == ["dup.mp4", "other.mp4"]
+
+
 def test_delete_videos_from_list_skips_foreign_items_and_returns_owned(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ):

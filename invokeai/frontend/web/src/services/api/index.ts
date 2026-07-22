@@ -148,41 +148,61 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
   // update localStorage so subsequent requests use the new expiry.
   if (!result.error && result.meta?.response) {
     const refreshedToken = result.meta.response.headers.get('X-Refreshed-Token');
-    if (refreshedToken && token && !isTokenRefreshThrottled() && shouldAcceptRefreshedToken(token, requestGeneration)) {
-      await runWithMediaAuthLock(async () => {
-        if (isTokenRefreshThrottled() || !shouldAcceptRefreshedToken(token, requestGeneration)) {
-          return;
-        }
-        try {
-          const mediaCookieResponse = await fetch(`${getBaseUrl()}/api/v1/auth/media-cookie`, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { Authorization: `Bearer ${refreshedToken}` },
-            // Bound the time this exclusive cross-tab lock is held: login and logout
-            // serialize through the same lock, so a black-holed request here must not
-            // wedge auth transitions in every tab.
-            signal: AbortSignal.timeout(MEDIA_COOKIE_SYNC_TIMEOUT_MS),
-          });
-          if (mediaCookieResponse.status === 401 || mediaCookieResponse.status === 403) {
-            // The server rejected the refreshed token itself — don't commit it.
-            return;
-          }
-        } catch {
-          // Cookie sync is best-effort. The token commit below must not depend on it:
-          // tokens expire, cookies self-heal (useMediaCookieRefresh, plus the retry on
-          // the next refreshed-token header), so dropping the token on a 5xx or network
-          // failure would trade a transiently stale media cookie for a hard session
-          // expiry mid-activity.
-        }
-        if (shouldAcceptRefreshedToken(token, requestGeneration)) {
-          markTokenRefreshAccepted();
-          api.dispatch(tokenRefreshed(refreshedToken));
-        }
-      });
+    if (refreshedToken && token) {
+      await acceptRefreshedToken(refreshedToken, token, requestGeneration, api.dispatch);
     }
   }
 
   return result;
+};
+
+/**
+ * Accepts a refreshed bearer token minted by the sliding-window middleware: syncs the
+ * media cookie under the cross-tab lock, then commits the token. Shared by
+ * dynamicBaseQuery and the client-state persistence driver — the driver bypasses RTK
+ * Query with raw fetch, and without this its POSTs would discard every refreshed
+ * token, so a persistence-only session (e.g. canvas tweaking all day) would hard-expire
+ * despite constant activity.
+ */
+export const acceptRefreshedToken = async (
+  refreshedToken: string,
+  requestToken: string,
+  requestGeneration: number,
+  dispatch: (action: ReturnType<typeof tokenRefreshed>) => unknown
+): Promise<void> => {
+  if (isTokenRefreshThrottled() || !shouldAcceptRefreshedToken(requestToken, requestGeneration)) {
+    return;
+  }
+  await runWithMediaAuthLock(async () => {
+    if (isTokenRefreshThrottled() || !shouldAcceptRefreshedToken(requestToken, requestGeneration)) {
+      return;
+    }
+    try {
+      const mediaCookieResponse = await fetch(`${getBaseUrl()}/api/v1/auth/media-cookie`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Authorization: `Bearer ${refreshedToken}` },
+        // Bound the time this exclusive cross-tab lock is held: login and logout
+        // serialize through the same lock, so a black-holed request here must not
+        // wedge auth transitions in every tab.
+        signal: AbortSignal.timeout(MEDIA_COOKIE_SYNC_TIMEOUT_MS),
+      });
+      if (mediaCookieResponse.status === 401 || mediaCookieResponse.status === 403) {
+        // The server rejected the refreshed token itself — don't commit it.
+        return;
+      }
+    } catch {
+      // Cookie sync is best-effort. The token commit below must not depend on it:
+      // tokens expire, cookies self-heal (useMediaCookieRefresh, plus the retry on
+      // the next refreshed-token header), so dropping the token on a 5xx or network
+      // failure would trade a transiently stale media cookie for a hard session
+      // expiry mid-activity.
+    }
+    if (shouldAcceptRefreshedToken(requestToken, requestGeneration)) {
+      markTokenRefreshAccepted();
+      dispatch(tokenRefreshed(refreshedToken));
+    }
+  });
 };
 
 const createLruSelector = createSelectorCreator({
