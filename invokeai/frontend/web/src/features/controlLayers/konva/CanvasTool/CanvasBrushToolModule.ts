@@ -2,8 +2,8 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { getShouldUsePressureForBrush } from 'features/controlLayers/konva/pressure';
 import { getTransparencyLockedCompositeOperation } from 'features/controlLayers/konva/CanvasTool/transparencyLocking';
+import { getShouldUsePressureForBrush } from 'features/controlLayers/konva/pressure';
 import {
   alignCoordForTool,
   getLastPointOfLastLine,
