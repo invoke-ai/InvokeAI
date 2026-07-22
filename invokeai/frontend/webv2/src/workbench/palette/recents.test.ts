@@ -5,16 +5,19 @@ import { getRecentEntryIds, recordRecentEntry } from './recents';
 const STORAGE_KEY = 'invokeai:v7:webv2:palette-recents';
 const storage = new Map<string, string>();
 
-vi.stubGlobal('window', {
-  localStorage: {
-    getItem: (key: string): string | null => storage.get(key) ?? null,
-    setItem: (key: string, value: string): void => {
-      storage.set(key, value);
-    },
+const localStorageStub = {
+  getItem: (key: string): string | null => storage.get(key) ?? null,
+  setItem: (key: string, value: string): void => {
+    storage.set(key, value);
   },
-});
+};
 
-beforeEach(() => storage.clear());
+vi.stubGlobal('window', { localStorage: localStorageStub });
+
+beforeEach(() => {
+  storage.clear();
+  vi.restoreAllMocks();
+});
 
 describe('palette recents', () => {
   it('persists only explicitly durable entries', () => {
@@ -29,5 +32,24 @@ describe('palette recents', () => {
     storage.set(STORAGE_KEY, JSON.stringify(['legacy.command', 'legacy.setting']));
 
     expect(getRecentEntryIds()).toEqual(['legacy.command', 'legacy.setting']);
+  });
+
+  it('returns no recents when storage access throws', () => {
+    vi.spyOn(localStorageStub, 'getItem').mockImplementation(() => {
+      throw new DOMException('Storage disabled', 'SecurityError');
+    });
+
+    expect(getRecentEntryIds()).toEqual([]);
+  });
+
+  it('keeps recording non-fatal when the initial read throws', () => {
+    const getItem = vi.spyOn(localStorageStub, 'getItem').mockImplementation(() => {
+      throw new DOMException('Storage disabled', 'SecurityError');
+    });
+
+    expect(() => recordRecentEntry({ id: 'app.invoke', isPersistentRecent: true })).not.toThrow();
+
+    getItem.mockRestore();
+    expect(getRecentEntryIds()).toEqual(['app.invoke']);
   });
 });

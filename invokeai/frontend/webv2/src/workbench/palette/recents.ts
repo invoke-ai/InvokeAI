@@ -21,8 +21,6 @@ interface RecentUse {
   uses: number;
 }
 
-const isBrowser = (): boolean => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-
 const parseRecords = (raw: string | null): RecentUse[] => {
   if (!raw) {
     return [];
@@ -58,7 +56,21 @@ const parseRecords = (raw: string | null): RecentUse[] => {
   }
 };
 
-const readRecords = (): RecentUse[] => (isBrowser() ? parseRecords(window.localStorage.getItem(STORAGE_KEY)) : []);
+const readRawRecords = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    // Accessing localStorage itself can throw (SecurityError) when storage is
+    // disabled or blocked, not just getItem — keep both inside the guard.
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const readRecords = (): RecentUse[] => parseRecords(readRawRecords());
 
 /** Recency multiplier: recent use outweighs raw counts, but never zeroes them. */
 const recencyWeight = (ageMs: number): number => {
@@ -89,7 +101,7 @@ export const getRecentEntryIds = (): string[] => {
 };
 
 export const recordRecentEntry = (entry: Pick<PaletteEntry, 'id' | 'isPersistentRecent'>): void => {
-  if (!entry.isPersistentRecent || !isBrowser()) {
+  if (!entry.isPersistentRecent || typeof window === 'undefined') {
     return;
   }
 
