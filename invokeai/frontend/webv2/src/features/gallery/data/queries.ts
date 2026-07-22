@@ -14,6 +14,10 @@ export interface GalleryBoardsQuery {
 
 export interface GalleryImagesQuery {
   boardId: string;
+  /** Inclusive lower-bound calendar day (YYYY-MM-DD) on created_at. */
+  createdFrom?: string;
+  /** Inclusive upper-bound calendar day (YYYY-MM-DD) on created_at. */
+  createdTo?: string;
   galleryView: GalleryView;
   limit?: number;
   offset?: number;

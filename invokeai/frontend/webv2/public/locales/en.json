@@ -1698,6 +1698,11 @@
         "toggleStarImage": "Toggle gallery image star"
       },
       "createBoardNamed": "Create board \"{{name}}\"",
+      "dateFilterDay": "{{date}}",
+      "dateFilterFrom": "From {{date}}",
+      "dateFilterInvalid": "Unrecognized date “{{value}}” — use YYYY-MM-DD, today, yesterday, 7d, 2w, 1m",
+      "dateFilterRange": "{{from}} – {{to}}",
+      "dateFilterThrough": "Through {{date}}",
       "deleteBoard": "Delete Board",
       "deleteBoardAndImages": "Delete Board and Images",
       "deleteBoardDescription": "Deleted boards cannot be restored. Choose whether the board's images move to Uncategorized or are permanently deleted with it.",

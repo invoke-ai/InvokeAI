@@ -52,4 +52,18 @@ describe('Gallery query read model', () => {
       galleryImagesOptions({ ...base, revision: 'images:2' }).queryKey
     );
   });
+
+  it('keeps the created-at range in the image query key', () => {
+    const base = {
+      boardId: 'board-1',
+      galleryView: 'images' as const,
+      searchTerm: '',
+    };
+    const ranged = { ...base, createdFrom: '2026-07-01', createdTo: '2026-07-15' };
+
+    expect(galleryImagesOptions(base).queryKey).not.toEqual(galleryImagesOptions(ranged).queryKey);
+    expect(galleryImagesOptions(ranged).queryKey).not.toEqual(
+      galleryImagesOptions({ ...ranged, createdTo: '2026-07-16' }).queryKey
+    );
+  });
 });

@@ -12,7 +12,12 @@ vi.mock('@platform/transport/http', () => ({
   sleep: vi.fn(),
 }));
 
-import { getGalleryImageByName, imageMakeDurableChanges, imageSaveToGalleryChanges } from './backend';
+import {
+  getGalleryImageByName,
+  imageMakeDurableChanges,
+  imageSaveToGalleryChanges,
+  listGalleryImages,
+} from './backend';
 
 describe('getGalleryImageByName', () => {
   beforeEach(() => {
@@ -67,6 +72,65 @@ describe('getGalleryImageByName', () => {
     controller.abort();
 
     await expect(result).rejects.toBe(error);
+  });
+});
+
+describe('listGalleryImages created-at range', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 20, offset: 0, total: 0 });
+  });
+
+  it('sends created_from/created_to as query params', async () => {
+    await listGalleryImages({
+      boardId: 'board-1',
+      createdFrom: '2026-07-01',
+      createdTo: '2026-07-15',
+      galleryView: 'images',
+      searchTerm: '',
+    });
+
+    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('created_from')).toBe('2026-07-01');
+    expect(params.get('created_to')).toBe('2026-07-15');
+  });
+
+  it('omits the range params when no range is given', async () => {
+    await listGalleryImages({ boardId: 'board-1', galleryView: 'images', searchTerm: 'sunset' });
+
+    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.has('created_from')).toBe(false);
+    expect(params.has('created_to')).toBe(false);
+  });
+
+  it('short-circuits a date board that falls outside the range without a request', async () => {
+    await expect(
+      listGalleryImages({
+        boardId: 'by_date:2026-07-18',
+        createdFrom: '2026-07-01',
+        createdTo: '2026-07-15',
+        galleryView: 'images',
+        searchTerm: '',
+      })
+    ).resolves.toEqual({ images: [], total: 0 });
+    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+
+  it('queries a date board normally when its day is inside the range', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ image_names: [], total_count: 0 });
+
+    await expect(
+      listGalleryImages({
+        boardId: 'by_date:2026-07-10',
+        createdFrom: '2026-07-01',
+        createdTo: '2026-07-15',
+        galleryView: 'images',
+        searchTerm: '',
+      })
+    ).resolves.toEqual({ images: [], total: 0 });
+    expect(mocks.apiFetchJson).toHaveBeenCalledOnce();
   });
 });
 

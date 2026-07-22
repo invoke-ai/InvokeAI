@@ -2,8 +2,9 @@ import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryImage, GalleryView } from '@features/gallery/core/types';
 
 import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/data/queries';
+import { parseDateTokens } from '@platform/search/dateTokens';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export const GALLERY_PAGE_SIZE = 60;
 
@@ -62,14 +63,19 @@ export const useGalleryData = ({
   const pageCount = infiniteWindow.baseKey === baseKey ? infiniteWindow.pageCount : 1;
   const offset = isPaginated ? page * GALLERY_PAGE_SIZE : 0;
   const limit = isPaginated ? GALLERY_PAGE_SIZE : pageCount * GALLERY_PAGE_SIZE;
+  // The raw search term stays the source of truth; date tokens are derived
+  // here so both the text filter and the range reach the query together.
+  const dateParse = useMemo(() => parseDateTokens(searchTerm), [searchTerm]);
   const options = galleryImagesOptions({
     boardId,
+    createdFrom: dateParse.range?.from,
+    createdTo: dateParse.range?.to,
     galleryView,
     limit,
     offset,
     orderDir: settings.imageOrderDir,
     revision: `${imageRefreshToken}:${recentImagesKey}`,
-    searchTerm,
+    searchTerm: dateParse.text,
     starredFirst: settings.starredFirst,
   });
   const query = useQuery({ ...options, placeholderData: keepPreviousData });

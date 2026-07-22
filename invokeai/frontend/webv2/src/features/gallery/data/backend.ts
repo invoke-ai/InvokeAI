@@ -8,6 +8,7 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
+import { isTimestampInRange } from '@platform/search/dateTokens';
 import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
 
 import { getGalleryImageThumbnailUrl } from './imageUrls';
@@ -207,6 +208,8 @@ export const getGalleryImageByName = async (imageName: string, signal?: AbortSig
  */
 const listGalleryDateBoardImages = async ({
   boardId,
+  createdFrom,
+  createdTo,
   galleryView,
   limit,
   offset,
@@ -215,6 +218,8 @@ const listGalleryDateBoardImages = async ({
   starredFirst,
 }: {
   boardId: string;
+  createdFrom?: string;
+  createdTo?: string;
   galleryView: GalleryView;
   limit: number;
   offset: number;
@@ -222,6 +227,15 @@ const listGalleryDateBoardImages = async ({
   searchTerm: string;
   starredFirst: boolean;
 }): Promise<GalleryImagesPage> => {
+  // The board already pins a single day; a date filter either contains that
+  // day (and constrains nothing further) or excludes the whole board.
+  if (
+    (createdFrom !== undefined || createdTo !== undefined) &&
+    !isTimestampInRange(getDateFromBoardId(boardId), { from: createdFrom, to: createdTo })
+  ) {
+    return { images: [], total: 0 };
+  }
+
   const query = toSearchParams({
     categories: galleryView === 'assets' ? assetCategories : imageCategories,
     order_dir: orderDir,
@@ -238,6 +252,8 @@ const listGalleryDateBoardImages = async ({
 
 export const listGalleryImages = async ({
   boardId,
+  createdFrom,
+  createdTo,
   galleryView,
   limit = 100,
   offset = 0,
@@ -246,6 +262,8 @@ export const listGalleryImages = async ({
   starredFirst = false,
 }: {
   boardId: string;
+  createdFrom?: string;
+  createdTo?: string;
   galleryView: GalleryView;
   limit?: number;
   offset?: number;
@@ -254,12 +272,24 @@ export const listGalleryImages = async ({
   starredFirst?: boolean;
 }): Promise<GalleryImagesPage> => {
   if (isDateBoardId(boardId)) {
-    return listGalleryDateBoardImages({ boardId, galleryView, limit, offset, orderDir, searchTerm, starredFirst });
+    return listGalleryDateBoardImages({
+      boardId,
+      createdFrom,
+      createdTo,
+      galleryView,
+      limit,
+      offset,
+      orderDir,
+      searchTerm,
+      starredFirst,
+    });
   }
 
   const query = toSearchParams({
     board_id: boardId,
     categories: galleryView === 'assets' ? assetCategories : imageCategories,
+    created_from: createdFrom,
+    created_to: createdTo,
     is_intermediate: false,
     limit,
     offset,
