@@ -10,8 +10,6 @@ import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { lazy, Suspense } from 'react';
 
-import type { SettingsEntryDeps } from './entries';
-
 import { closeCommandPalette, useIsCommandPaletteOpen } from './paletteStore';
 import { SETTINGS_ENTRY_DEPS } from './settingsEntryDeps';
 
@@ -38,7 +36,7 @@ const OpenWorkbenchCommandPalette = ({ preferences }: { preferences: WorkbenchPr
         openWidgetPlacement={openWidgetPlacement}
         preferences={preferences}
         requestQueueItemReveal={requestQueueItemReveal}
-        settingsEntryDeps={SETTINGS_ENTRY_DEPS as SettingsEntryDeps}
+        settingsEntryDeps={SETTINGS_ENTRY_DEPS}
         onClose={closeCommandPalette}
       />
     </Suspense>

@@ -309,6 +309,18 @@ export interface SettingsEntryDeps {
   themes: ReadonlyArray<{ id: WorkbenchPreferences['themeId']; label: string }>;
 }
 
+/** The "Open Settings" entry shared verbatim by both palette hosts. */
+export const buildOpenSettingsEntry = (t: TFunction, openSettings: () => void): PaletteEntry => ({
+  group: 'App',
+  groupLabel: t('commandPalette.groups.app'),
+  id: 'app.openSettings',
+  isPersistentRecent: true,
+  keywords: 'preferences options',
+  run: openSettings,
+  showInEmptyState: true,
+  title: t('commandPalette.appEntries.openSettings'),
+});
+
 export const buildSettingsEntries = (
   preferences: WorkbenchPreferences,
   deps: SettingsEntryDeps,

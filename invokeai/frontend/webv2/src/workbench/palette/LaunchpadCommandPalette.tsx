@@ -1,12 +1,8 @@
-import type { WorkbenchPreferences } from '@workbench/settings/contracts';
-
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
 import { lazy, Suspense } from 'react';
 import { tinykeys } from 'tinykeys';
-
-import type { SettingsEntryDeps } from './entries';
 
 import { closeCommandPalette, toggleCommandPalette, useIsCommandPaletteOpen } from './paletteStore';
 import { SETTINGS_ENTRY_DEPS } from './settingsEntryDeps';
@@ -31,8 +27,8 @@ export const LaunchpadCommandPalette = () => {
     <Suspense fallback={null}>
       <LazyLaunchpadCommandPaletteDialog
         modifierKeyLabel={formatHotkeyForPlatform('mod')[0]!}
-        preferences={preferences as WorkbenchPreferences}
-        settingsEntryDeps={SETTINGS_ENTRY_DEPS as SettingsEntryDeps}
+        preferences={preferences}
+        settingsEntryDeps={SETTINGS_ENTRY_DEPS}
         onClose={closeCommandPalette}
       />
     </Suspense>

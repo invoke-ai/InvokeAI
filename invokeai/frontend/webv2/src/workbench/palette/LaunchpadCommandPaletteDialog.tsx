@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import type { PaletteEntry, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
-import { buildSettingsEntries } from './entries';
+import { buildOpenSettingsEntry, buildSettingsEntries } from './entries';
 
 /** Launchpad-only palette adapter: navigation and settings, no editor providers. */
 const LaunchpadCommandPaletteDialog = ({
@@ -49,16 +49,7 @@ const LaunchpadCommandPaletteDialog = ({
       ...(canManageModels ? [navEntry({ id: 'goToModels', run: () => void navigate({ to: '/models' }) })] : []),
       ...(canManageNodes ? [navEntry({ id: 'goToNodes', run: () => void navigate({ to: '/nodes' }) })] : []),
       ...(canManageUsers ? [navEntry({ id: 'goToUsers', run: () => void navigate({ to: '/users' }) })] : []),
-      {
-        group: 'App',
-        groupLabel: t('commandPalette.groups.app'),
-        id: 'app.openSettings',
-        isPersistentRecent: true,
-        keywords: 'preferences options',
-        run: () => openWorkbenchSettings(),
-        showInEmptyState: true,
-        title: t('commandPalette.appEntries.openSettings'),
-      },
+      buildOpenSettingsEntry(t, () => openWorkbenchSettings()),
     ];
 
     return [...navigation, ...buildSettingsEntries(preferences, settingsEntryDeps, t)];

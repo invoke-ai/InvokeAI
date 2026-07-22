@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
-import { buildCatalogCommandEntries, buildSettingsEntries } from './entries';
+import { buildCatalogCommandEntries, buildOpenSettingsEntry, buildSettingsEntries } from './entries';
 import { buildExtensionPaletteEntry, createExtensionSearchProvider } from './extensionPaletteAdapters';
 import { getObjectIdentity } from './objectIdentity';
 import {
@@ -30,16 +30,7 @@ import {
 } from './paletteProviders';
 
 const buildStaticAppEntries = (t: TFunction): PaletteEntry[] => [
-  {
-    group: 'App',
-    groupLabel: t('commandPalette.groups.app'),
-    id: 'app.openSettings',
-    isPersistentRecent: true,
-    keywords: 'preferences options',
-    run: () => openWorkbenchSettings(),
-    showInEmptyState: true,
-    title: t('commandPalette.appEntries.openSettings'),
-  },
+  buildOpenSettingsEntry(t, () => openWorkbenchSettings()),
   {
     group: 'App',
     groupLabel: t('commandPalette.groups.app'),
