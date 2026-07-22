@@ -489,6 +489,33 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
+    def test_board_owner_can_read_contributor_image_on_private_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """A board owner should be able to read an image another user contributed to
+        their board, even after the board returns to private — matching the visibility
+        the board_id="all" listing already grants."""
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        board_id = _create_board(client, user1_token, "Owner Read Board")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        _save_image(mock_invoker, "contributor-img", user2.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name="contributor-img")
+        _set_board_visibility(client, user1_token, board_id, "private")
+
+        # The owner sees the image in the board_id="all" listing...
+        r = client.get("/api/v1/images/names?board_id=all", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_200_OK
+        assert "contributor-img" in r.json()["image_names"]
+
+        # ...and individual-image authorization agrees with the listing.
+        r = client.get("/api/v1/images/i/contributor-img/metadata", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_200_OK
+
+        # The contributor keeps read access to their own image.
+        r = client.get("/api/v1/images/i/contributor-img/metadata", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
     def test_non_owner_cannot_read_image_metadata(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):

@@ -48,8 +48,12 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
     Access is granted when ANY of these hold:
     - The user is an admin.
     - The user owns the image.
+    - The user owns the board the image sits on.
     - The image sits on a shared or public board.
     - The image sits on a board explicitly shared with the user.
+
+    Board-backed images defer to `assert_board_read_access` so individual image
+    reads stay consistent with board listings (including board_id="all").
     """
     if current_user.is_admin:
         return
@@ -62,14 +66,8 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
 
     board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
     if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        except Exception:
-            pass
-        if ApiDependencies.invoker.services.board_records.is_board_shared_with_user(board_id, current_user.user_id):
-            return
+        assert_board_read_access(board_id, current_user)
+        return
 
     raise HTTPException(status_code=403, detail="Not authorized to access this image")
 
