@@ -1,11 +1,13 @@
 """Regression tests for issue #9373.
 
-When partial loading is active and VRAM pressure has temporarily offloaded *all* of a VAE's weights back to
+When partial loading is active and VRAM pressure has temporarily offloaded *all* of a model's weights back to
 RAM, `get_effective_device(model)` reports CPU (it only inspects current parameter residency). The VAE decode
 invocations used to move the latents to that inferred device, so the whole decode silently ran on the CPU even
-though the model's intended compute device was CUDA.
+though the model's intended compute device was CUDA. The text-encoder invocations shared the same trap for models
+whose modules are all autocast-capable (e.g. CLIP), where `repair_required_tensors_on_device()` pins nothing to
+the compute device.
 
-The fix is to place the latents on the model's *intended* compute device, exposed via
+The fix is to place the inputs on the model's *intended* compute device, exposed via
 `LoadedModel.compute_device` (which is stable regardless of partial-load residency and still respects cpu_only).
 These tests pin down both the plumbing and the underlying mechanism.
 """
@@ -42,8 +44,28 @@ class _ConvModule(torch.nn.Module):
         return self.conv_out(torch.relu(self.conv_in(x)))
 
 
-def _make_loaded_model(compute_device: str) -> tuple[LoadedModelWithoutConfig, CachedModelWithPartialLoad]:
-    model = _ConvModule()
+class _FullyAutocastEncoder(torch.nn.Module):
+    """Mimics a CLIP-style text encoder: only Embedding / Linear / LayerNorm, all autocast-capable.
+
+    Because every module supports autocast, `repair_required_tensors_on_device()` finds nothing to pin to the
+    compute device, so after a full offload `get_effective_device` still reports CPU — the text-encoder variant of
+    #9373.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.embed = torch.nn.Embedding(100, 16)
+        self.linear = torch.nn.Linear(16, 16)
+        self.norm = torch.nn.LayerNorm(16)
+
+    def forward(self, ids: torch.Tensor) -> torch.Tensor:
+        return self.norm(self.linear(self.embed(ids)))
+
+
+def _make_loaded_model(
+    compute_device: str, model: torch.nn.Module | None = None
+) -> tuple[LoadedModelWithoutConfig, CachedModelWithPartialLoad]:
+    model = _ConvModule() if model is None else model
     apply_custom_layers_to_model(model)
     cached_model = CachedModelWithPartialLoad(
         model=model, compute_device=torch.device(compute_device), keep_ram_copy=True
@@ -85,4 +107,27 @@ def test_compute_device_stable_when_all_weights_offloaded(device: str):
 
     # Conversely, following the (wrong) effective device runs the forward entirely on the CPU — the bug.
     out_on_effective_device = cached_model.model(x.to(get_effective_device(cached_model.model)))
+    assert out_on_effective_device.device.type == "cpu"
+
+
+@parameterize_mps_and_cuda
+def test_compute_device_stable_for_fully_autocast_text_encoder(device: str):
+    """Text-encoder variant of #9373: a fully autocast-capable model (CLIP-like) has no tensors for
+    repair_required_tensors_on_device() to pin, so effective-device inference still falls back to CPU after a full
+    offload — but compute_device correctly stays on the accelerator."""
+    loaded_model, cached_model = _make_loaded_model(device, model=_FullyAutocastEncoder())
+
+    cached_model.full_load_to_vram()
+    cached_model.full_unload_from_vram()
+
+    # repair has nothing to do here (every module is autocast-capable), so it does not rescue the effective device.
+    assert cached_model.repair_required_tensors_on_compute_device() == 0
+    assert get_effective_device(cached_model.model) == torch.device("cpu")
+    assert loaded_model.compute_device == torch.device(device)
+
+    ids = torch.randint(0, 100, (1, 8))
+    out_on_compute_device = cached_model.model(ids.to(loaded_model.compute_device))
+    assert out_on_compute_device.device.type == device
+
+    out_on_effective_device = cached_model.model(ids.to(get_effective_device(cached_model.model)))
     assert out_on_effective_device.device.type == "cpu"
