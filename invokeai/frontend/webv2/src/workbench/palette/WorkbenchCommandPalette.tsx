@@ -2,6 +2,7 @@ import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { patchWorkbenchPreferences, useWorkbenchPreferences } from '@workbench/settings/store';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -14,7 +15,13 @@ import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
 import { buildCatalogCommandEntries, buildSettingsEntries } from './entries';
-import { createBoardsProvider, createPromptHistoryProvider, createWorkflowsProvider } from './paletteProviders';
+import {
+  createBoardsProvider,
+  createImagesProvider,
+  createModelsProvider,
+  createPromptHistoryProvider,
+  createWorkflowsProvider,
+} from './paletteProviders';
 import { closeCommandPalette, commandPaletteStore } from './paletteStore';
 
 /**
@@ -93,15 +100,19 @@ export const WorkbenchCommandPalette = () => {
 
   const workbenchCommands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
+  const searchStore = extensions.stores.search;
+  const extensionSearchProviders = useSyncExternalStore(searchStore.subscribe, searchStore.list, searchStore.list);
   const providers = useMemo<PaletteSearchProvider[]>(() => {
     const { gallery, widgets } = workbenchCommands;
-    const openWidget = (typeId: 'workflow' | 'gallery' | 'generate') =>
+    const openWidget = (typeId: 'workflow' | 'gallery' | 'generate' | 'preview') =>
       openWidgetPlacement({
         getWidgetsForRegion,
         options:
           typeId === 'workflow'
             ? { preferredRegions: ['center'], requireCenterView: true }
-            : { preferredRegions: typeId === 'gallery' ? ['center', 'right'] : ['left'] },
+            : typeId === 'generate'
+              ? { preferredRegions: ['left'] }
+              : { preferredRegions: ['center', 'right'] },
         typeId,
         widgets,
       });
@@ -111,6 +122,25 @@ export const WorkbenchCommandPalette = () => {
       createBoardsProvider({
         openGalleryWidget: () => openWidget('gallery'),
         selectBoard: (boardId) => gallery.selectBoard(boardId),
+      }),
+      createModelsProvider({
+        // The same values patch image recall uses for its model fallback; the
+        // generate widget's normalize/sync pass reconciles dependent settings.
+        applyModel: (model) =>
+          widgets.patchValues('generate', { model, modelKey: model.key }, queries.getSnapshot().activeProject.id),
+        openGenerateWidget: () => openWidget('generate'),
+        openModelManager: () => void executeCommand('app.selectModelsTab'),
+      }),
+      createImagesProvider({
+        getSelectedBoardId: () => {
+          const boardId = getProjectWidgetValues(queries.getSnapshot().activeProject, 'gallery').selectedBoardId;
+
+          return typeof boardId === 'string' ? boardId : 'none';
+        },
+        openGalleryWidget: () => openWidget('gallery'),
+        openPreviewWidget: () => openWidget('preview'),
+        selectBoard: (boardId) => gallery.selectBoard(boardId),
+        selectImage: (image) => gallery.selectImage(image),
       }),
       createPromptHistoryProvider({
         getPromptHistory: () => queries.getSnapshot().activeProject.promptHistory,
@@ -127,8 +157,26 @@ export const WorkbenchCommandPalette = () => {
           widgets.patchValues('generate', patch, project.id);
         },
       }),
+      ...extensionSearchProviders.map<PaletteSearchProvider>((provider) => ({
+        id: `ext:${provider.id}`,
+        label: provider.label,
+        search: async (query) => {
+          const results = await provider.search(query);
+
+          return results.map<PaletteEntry>((result) => ({
+            group: provider.label,
+            id: `ext:${provider.id}:${result.id}`,
+            run: () =>
+              result.commandId
+                ? extensions.commands.executeForSource(result.commandId, provider.source ?? null, result.id)
+                : undefined,
+            subtitle: result.subtitle,
+            title: result.title,
+          }));
+        },
+      })),
     ];
-  }, [queries, workbenchCommands]);
+  }, [executeCommand, extensions, extensionSearchProviders, queries, workbenchCommands]);
 
   return <CommandPaletteDialog entries={entries} isOpen={isOpen} providers={providers} onClose={closeCommandPalette} />;
 };

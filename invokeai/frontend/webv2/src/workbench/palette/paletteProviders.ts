@@ -1,8 +1,10 @@
-import type { GalleryBoard } from '@features/gallery/contracts';
+import type { GalleryBoard, GalleryImage } from '@features/gallery/contracts';
+import type { ModelConfig } from '@features/models';
 import type { PromptHistoryItem } from '@workbench/projectContracts';
 
-import { galleryBoardsOptions } from '@features/gallery/queries';
+import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/queries';
 import { focusPositivePrompt } from '@features/generation/react';
+import { ensureModelsLoaded, getModelBaseLabel, getModelsSnapshot } from '@features/models';
 import { listLibraryWorkflows } from '@features/workflow/queries';
 import { requestLibraryWorkflowLoad } from '@features/workflow/react';
 import { queryClient } from '@platform/query/client';
@@ -116,5 +118,89 @@ export const createPromptHistoryProvider = ({
     }
 
     return entries;
+  },
+});
+
+const GENERATE_MODEL_TYPES = new Set(['external_image_generator', 'main']);
+
+export const createModelsProvider = ({
+  applyModel,
+  openGenerateWidget,
+  openModelManager,
+}: {
+  applyModel: (model: ModelConfig) => void;
+  openGenerateWidget: () => void;
+  openModelManager: () => void;
+}): PaletteSearchProvider => ({
+  id: 'models',
+  label: 'Models',
+  search: async (query) => {
+    await ensureModelsLoaded();
+    const snapshot = getModelsSnapshot();
+    const models = snapshot.status === 'loaded' ? snapshot.models : [];
+
+    return models
+      .filter((model) => GENERATE_MODEL_TYPES.has(model.type) && matchesTerms(`${model.name} ${model.base}`, query))
+      .map<PaletteEntry>((model) => ({
+        group: 'Models',
+        id: `model:${model.key}`,
+        keywords: model.base,
+        run: () => {
+          openGenerateWidget();
+          applyModel(model);
+        },
+        secondary: { label: 'Open in Model Manager', run: openModelManager },
+        subtitle: getModelBaseLabel(model.base),
+        title: model.name,
+      }));
+  },
+});
+
+export const createImagesProvider = ({
+  getSelectedBoardId,
+  openGalleryWidget,
+  openPreviewWidget,
+  selectBoard,
+  selectImage,
+}: {
+  getSelectedBoardId: () => string;
+  openGalleryWidget: () => void;
+  openPreviewWidget: () => void;
+  selectBoard: (boardId: string) => void;
+  selectImage: (image: GalleryImage) => void;
+}): PaletteSearchProvider => ({
+  id: 'images',
+  label: 'Images',
+  search: async (query) => {
+    // The images endpoint is board-scoped; the palette searches the board the
+    // gallery is currently on.
+    const page = await queryClient.fetchQuery(
+      galleryImagesOptions({
+        boardId: getSelectedBoardId(),
+        galleryView: 'images',
+        limit: 20,
+        searchTerm: query,
+      })
+    );
+
+    return page.images.map<PaletteEntry>((image) => ({
+      group: 'Images',
+      id: `image:${image.imageName}`,
+      run: () => {
+        openPreviewWidget();
+        selectImage(image);
+      },
+      secondary: {
+        label: 'Reveal in Gallery',
+        run: () => {
+          openGalleryWidget();
+          selectBoard(image.boardId);
+          selectImage(image);
+        },
+      },
+      subtitle: `${image.width}×${image.height}`,
+      thumbnailUrl: image.thumbnailUrl,
+      title: image.imageName,
+    }));
   },
 });

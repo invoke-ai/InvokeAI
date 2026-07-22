@@ -139,6 +139,9 @@ const EntryRow = ({
     onMouseDown={preventFocusSteal}
     onMouseMove={onActive}
   >
+    {entry.thumbnailUrl ? (
+      <chakra.img alt="" boxSize="7" flexShrink={0} objectFit="cover" rounded="sm" src={entry.thumbnailUrl} />
+    ) : null}
     <Text fontSize="sm" truncate>
       {renderTitle(entry.title, matchIndexes)}
     </Text>

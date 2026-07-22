@@ -36,6 +36,8 @@ export interface PaletteEntry {
   group: string;
   /** Trailing muted text: a setting's current value, an entity's metadata. */
   subtitle?: string;
+  /** Leading 28×28 thumbnail (image results). */
+  thumbnailUrl?: string;
   /** Extra match terms, never rendered. */
   keywords?: string;
   /** Platform-formatted key chips for the bound hotkey, e.g. ['cmd', 'k']. */
