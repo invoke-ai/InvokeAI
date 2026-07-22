@@ -32,8 +32,15 @@ export interface WorkflowUiSnapshot {
   /** Bumped to ask the dialog host to open the JSON file picker. */
   importRequestCount: number;
   /** Library workflow a shell surface (command palette) asked to load; consumed by the widget chrome. */
-  pendingLibraryWorkflowId: string | null;
+  pendingLibraryWorkflowLoad: LibraryWorkflowLoadRequest | null;
 }
+
+export interface LibraryWorkflowLoadRequest {
+  requestId: number;
+  workflowId: string;
+}
+
+let nextLibraryWorkflowLoadRequestId = 0;
 
 export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>({
   addNodeConnection: null,
@@ -42,7 +49,7 @@ export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>({
   isAddNodeOpen: false,
   isLibraryOpen: false,
   isNewWorkflowConfirmOpen: false,
-  pendingLibraryWorkflowId: null,
+  pendingLibraryWorkflowLoad: null,
 });
 
 export const setWorkflowLibraryOpen = (isOpen: boolean): void => {
@@ -66,11 +73,16 @@ export const setNewWorkflowConfirmOpen = (isOpen: boolean): void => {
 };
 
 export const requestLibraryWorkflowLoad = (workflowId: string): void => {
-  workflowUiStore.patchSnapshot({ pendingLibraryWorkflowId: workflowId });
+  nextLibraryWorkflowLoadRequestId += 1;
+  workflowUiStore.patchSnapshot({
+    pendingLibraryWorkflowLoad: { requestId: nextLibraryWorkflowLoadRequestId, workflowId },
+  });
 };
 
-export const clearPendingLibraryWorkflowLoad = (): void => {
-  workflowUiStore.patchSnapshot({ pendingLibraryWorkflowId: null });
+export const clearPendingLibraryWorkflowLoad = (requestId: number): void => {
+  if (workflowUiStore.getSnapshot().pendingLibraryWorkflowLoad?.requestId === requestId) {
+    workflowUiStore.patchSnapshot({ pendingLibraryWorkflowLoad: null });
+  }
 };
 
 export const requestWorkflowImport = (): void => {
