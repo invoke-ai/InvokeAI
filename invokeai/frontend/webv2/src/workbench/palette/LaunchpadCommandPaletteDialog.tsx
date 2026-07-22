@@ -27,65 +27,26 @@ const LaunchpadCommandPaletteDialog = ({
   const { canManageModels, canManageNodes, canManageUsers } = useCapabilities();
 
   const entries = useMemo<PaletteEntry[]>(() => {
+    const navEntry = ({ id, keywords, run }: { id: string; keywords?: string; run: () => void }): PaletteEntry => ({
+      group: 'Navigation',
+      groupLabel: t('commandPalette.groups.navigation'),
+      id: `launchpad.${id}`,
+      isPersistentRecent: true,
+      keywords,
+      run,
+      showInEmptyState: true,
+      title: t(`commandPalette.launchpad.${id}`),
+    });
     const navigation: PaletteEntry[] = [
-      {
-        group: 'Navigation',
-        groupLabel: t('commandPalette.groups.navigation'),
-        id: 'launchpad.openEditor',
-        isPersistentRecent: true,
+      navEntry({
+        id: 'openEditor',
         keywords: 'workbench app project',
         run: () => void navigate({ search: search.project ? { project: search.project } : {}, to: '/app' }),
-        showInEmptyState: true,
-        title: t('commandPalette.launchpad.openEditor'),
-      },
-      {
-        group: 'Navigation',
-        groupLabel: t('commandPalette.groups.navigation'),
-        id: 'launchpad.goToProjects',
-        isPersistentRecent: true,
-        run: () => void navigate({ to: '/projects' }),
-        showInEmptyState: true,
-        title: t('commandPalette.launchpad.goToProjects'),
-      },
-      ...(canManageModels
-        ? [
-            {
-              group: 'Navigation',
-              groupLabel: t('commandPalette.groups.navigation'),
-              id: 'launchpad.goToModels',
-              isPersistentRecent: true,
-              run: () => void navigate({ to: '/models' }),
-              showInEmptyState: true,
-              title: t('commandPalette.launchpad.goToModels'),
-            },
-          ]
-        : []),
-      ...(canManageNodes
-        ? [
-            {
-              group: 'Navigation',
-              groupLabel: t('commandPalette.groups.navigation'),
-              id: 'launchpad.goToNodes',
-              isPersistentRecent: true,
-              run: () => void navigate({ to: '/nodes' }),
-              showInEmptyState: true,
-              title: t('commandPalette.launchpad.goToNodes'),
-            },
-          ]
-        : []),
-      ...(canManageUsers
-        ? [
-            {
-              group: 'Navigation',
-              groupLabel: t('commandPalette.groups.navigation'),
-              id: 'launchpad.goToUsers',
-              isPersistentRecent: true,
-              run: () => void navigate({ to: '/users' }),
-              showInEmptyState: true,
-              title: t('commandPalette.launchpad.goToUsers'),
-            },
-          ]
-        : []),
+      }),
+      navEntry({ id: 'goToProjects', run: () => void navigate({ to: '/projects' }) }),
+      ...(canManageModels ? [navEntry({ id: 'goToModels', run: () => void navigate({ to: '/models' }) })] : []),
+      ...(canManageNodes ? [navEntry({ id: 'goToNodes', run: () => void navigate({ to: '/nodes' }) })] : []),
+      ...(canManageUsers ? [navEntry({ id: 'goToUsers', run: () => void navigate({ to: '/users' }) })] : []),
       {
         group: 'App',
         groupLabel: t('commandPalette.groups.app'),
@@ -94,7 +55,7 @@ const LaunchpadCommandPaletteDialog = ({
         keywords: 'preferences options',
         run: () => openWorkbenchSettings(),
         showInEmptyState: true,
-        title: t('commandPalette.launchpad.openSettings'),
+        title: t('commandPalette.appEntries.openSettings'),
       },
     ];
 

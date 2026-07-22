@@ -290,7 +290,7 @@ export const listGalleryImages = async ({
   signal?: AbortSignal;
   starredFirst?: boolean;
 }): Promise<GalleryImagesPage> => {
-  if (boardId !== undefined && isDateBoardId(boardId)) {
+  if (isDateBoardId(boardId)) {
     return listGalleryDateBoardImages({
       boardId,
       createdFrom,

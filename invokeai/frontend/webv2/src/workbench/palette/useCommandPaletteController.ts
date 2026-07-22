@@ -4,8 +4,9 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   completeTrailingDateToken,
+  describeDateRange,
+  findInvalidDateToken,
   formatIsoDate,
-  isPossibleDatePrefix,
   matchTrailingDateToken,
   parseDateTokens,
 } from '@platform/search/dateTokens';
@@ -565,40 +566,26 @@ export const useCommandPaletteController = ({
   }, [focusInput, scopedQueryResult]);
 
   // Quiet acknowledgment of the applied range, and inline feedback for values
-  // that cannot parse. A trailing token that could still become valid
-  // (`from:`, `from:2026-`) is normal typing, not an error. Feedback beats
-  // acknowledgment when both apply.
+  // that cannot parse. Feedback beats acknowledgment when both apply.
   const dateInvalidHint = useMemo(() => {
-    if (dateParse === null) {
-      return null;
-    }
-
-    const trailing = matchTrailingDateToken(localQuery);
-    const invalid = dateParse.invalidTokens.find(
-      (token) =>
-        !(
-          trailing &&
-          token.key === trailing.key &&
-          token.raw === trailing.partialValue &&
-          isPossibleDatePrefix(token.raw)
-        )
-    );
+    const invalid = dateParse === null ? undefined : findInvalidDateToken(localQuery, dateParse);
 
     return invalid ? t('commandPalette.states.invalidDate', { value: invalid.raw }) : null;
   }, [dateParse, localQuery, t]);
+  const dateShape = dateParse?.range && dateInvalidHint === null ? describeDateRange(dateParse.range) : null;
   const dateSummary =
-    dateParse?.range && dateInvalidHint === null
-      ? dateParse.range.from && dateParse.range.to
-        ? t('commandPalette.date.range', {
-            from: formatIsoDate(dateParse.range.from, i18n.resolvedLanguage),
-            to: formatIsoDate(dateParse.range.to, i18n.resolvedLanguage),
-          })
-        : dateParse.range.from
-          ? t('commandPalette.date.from', { date: formatIsoDate(dateParse.range.from, i18n.resolvedLanguage) })
-          : dateParse.range.to
-            ? t('commandPalette.date.through', { date: formatIsoDate(dateParse.range.to, i18n.resolvedLanguage) })
-            : null
-      : null;
+    dateShape === null
+      ? null
+      : dateShape.kind === 'day'
+        ? t('commandPalette.date.day', { date: formatIsoDate(dateShape.date, i18n.resolvedLanguage) })
+        : dateShape.kind === 'range'
+          ? t('commandPalette.date.range', {
+              from: formatIsoDate(dateShape.from, i18n.resolvedLanguage),
+              to: formatIsoDate(dateShape.to, i18n.resolvedLanguage),
+            })
+          : dateShape.kind === 'from'
+            ? t('commandPalette.date.from', { date: formatIsoDate(dateShape.date, i18n.resolvedLanguage) })
+            : t('commandPalette.date.through', { date: formatIsoDate(dateShape.date, i18n.resolvedLanguage) });
 
   const isBusy = providerSections.some((section) => section.isFetching || section.isWaitingForDebounce);
   const failedProviderCount = providerSections.filter((section) => section.isError).length;

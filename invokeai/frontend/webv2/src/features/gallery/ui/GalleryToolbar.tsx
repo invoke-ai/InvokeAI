@@ -15,12 +15,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { isDateBoardId } from '@features/gallery/data/backend';
-import {
-  formatIsoDate,
-  isPossibleDatePrefix,
-  matchTrailingDateToken,
-  parseDateTokens,
-} from '@platform/search/dateTokens';
+import { describeDateRange, findInvalidDateToken, formatIsoDate, parseDateTokens } from '@platform/search/dateTokens';
 import { Button, CloseButton, IconButton, Tabs } from '@platform/ui';
 import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
@@ -91,53 +86,48 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   );
 
   // Derived from the raw search term: an applied-range summary, or invalid-
-  // token feedback. A trailing token that could still become valid (`from:`,
-  // `from:2026-`) is normal typing, not an error.
+  // token feedback.
   const dateHint = useMemo(() => {
     const parse = parseDateTokens(gallery.searchTerm);
-    const trailing = matchTrailingDateToken(gallery.searchTerm);
-    const invalid = parse.invalidTokens.find(
-      (token) =>
-        !(
-          trailing &&
-          token.key === trailing.key &&
-          token.raw === trailing.partialValue &&
-          isPossibleDatePrefix(token.raw)
-        )
-    );
+    const invalid = findInvalidDateToken(gallery.searchTerm, parse);
 
     if (invalid) {
       return { isInvalid: true, label: t('widgets.gallery.dateFilterInvalid', { value: invalid.raw }) };
     }
 
-    if (!parse.range) {
+    const shape = parse.range ? describeDateRange(parse.range) : null;
+
+    if (!shape) {
       return null;
     }
 
     const locale = i18n.language;
-    const { from, to } = parse.range;
 
-    if (from !== undefined && to !== undefined) {
-      return {
-        isInvalid: false,
-        label:
-          from === to
-            ? t('widgets.gallery.dateFilterDay', { date: formatIsoDate(from, locale) })
-            : t('widgets.gallery.dateFilterRange', {
-                from: formatIsoDate(from, locale),
-                to: formatIsoDate(to, locale),
-              }),
-      };
+    switch (shape.kind) {
+      case 'day':
+        return {
+          isInvalid: false,
+          label: t('widgets.gallery.dateFilterDay', { date: formatIsoDate(shape.date, locale) }),
+        };
+      case 'range':
+        return {
+          isInvalid: false,
+          label: t('widgets.gallery.dateFilterRange', {
+            from: formatIsoDate(shape.from, locale),
+            to: formatIsoDate(shape.to, locale),
+          }),
+        };
+      case 'from':
+        return {
+          isInvalid: false,
+          label: t('widgets.gallery.dateFilterFrom', { date: formatIsoDate(shape.date, locale) }),
+        };
+      case 'through':
+        return {
+          isInvalid: false,
+          label: t('widgets.gallery.dateFilterThrough', { date: formatIsoDate(shape.date, locale) }),
+        };
     }
-
-    if (from !== undefined) {
-      return { isInvalid: false, label: t('widgets.gallery.dateFilterFrom', { date: formatIsoDate(from, locale) }) };
-    }
-
-    return {
-      isInvalid: false,
-      label: t('widgets.gallery.dateFilterThrough', { date: formatIsoDate(to ?? '', locale) }),
-    };
   }, [gallery.searchTerm, i18n.language, t]);
 
   const searchInput = useMemo(

@@ -4,12 +4,14 @@ import type { QueueReadModel } from '@features/queue/contracts';
 import type { PromptHistoryItem } from '@workbench/projectContracts';
 import type { TFunction } from 'i18next';
 
-import { ALL_READABLE_BOARDS_ID, listGalleryBoards, listGalleryImages } from '@features/gallery/paletteSearch';
+import { ALL_READABLE_BOARDS_ID, listGalleryImages } from '@features/gallery/paletteSearch';
+import { galleryBoardsOptions } from '@features/gallery/queries';
 import { focusPositivePrompt } from '@features/generation/react';
 import { ensureModelsLoaded, getModelBaseLabel, getModelsSnapshot } from '@features/models';
 import { extractGenerationMeta, getResultImageName } from '@features/queue/contracts';
 import { listLibraryWorkflows } from '@features/workflow/paletteSearch';
 import { requestLibraryWorkflowLoad } from '@features/workflow/react';
+import { queryClient } from '@platform/query/client';
 import { formatIsoDate, isTimestampInRange } from '@platform/search/dateTokens';
 import { absolutizeApiUrl } from '@platform/transport/http';
 
@@ -26,6 +28,13 @@ import { getObjectIdentity } from './objectIdentity';
  */
 
 const PROVIDER_PAGE_SIZE = 8;
+
+/**
+ * Boards back two providers on every debounced keystroke; read them through the
+ * query cache (60s staleTime) instead of refetching per search.
+ */
+const loadActiveBoards = (): Promise<GalleryBoard[]> =>
+  queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false }));
 
 const matchesTerms = (haystack: string, query: string): boolean => {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -53,12 +62,12 @@ export const createWorkflowsProvider = ({
     return [...user.items, ...defaults.items].map<PaletteEntry>((item) => ({
       group: 'Workflows',
       groupLabel: t('commandPalette.groups.workflows'),
-      id: `workflow:${item.workflow_id}`,
+      id: `workflow:${item.workflowId}`,
       isPersistentRecent: false,
-      keywords: item.tags ?? undefined,
+      keywords: item.tags,
       run: () => {
         openWorkflowWidget();
-        requestLibraryWorkflowLoad(item.workflow_id);
+        requestLibraryWorkflowLoad(item.workflowId);
       },
       subtitle:
         item.category === 'default'
@@ -83,7 +92,9 @@ export const createBoardsProvider = ({
   providerKey: getPaletteContributionKey('provider', 'boards'),
   supportsCreatedAtRange: true,
   search: async (query, { signal }) => {
-    const boards = await listGalleryBoards({ includeArchived: false, signal });
+    const boards = await loadActiveBoards();
+
+    signal.throwIfAborted();
 
     return boards
       .filter(
@@ -294,7 +305,7 @@ export const createImagesProvider = ({
         searchTerm: query.text,
         signal,
       }),
-      listGalleryBoards({ includeArchived: false, signal }),
+      loadActiveBoards(),
     ]);
     const boardNames = new Map(boards.map((board: GalleryBoard) => [board.id, board.name]));
 

@@ -36,6 +36,19 @@ class _ImageQueryFilters:
     is_admin: bool = False
 
 
+# Every uncategorized image plus every image on an active (non-archived) board:
+# the board_id="all" visibility scope for admins and single-user installs.
+_ALL_ACTIVE_BOARDS_CONDITION = """(
+                    board_images.board_id IS NULL
+                    OR EXISTS (
+                        SELECT 1
+                        FROM boards
+                        WHERE boards.board_id = board_images.board_id
+                        AND boards.archived = 0
+                    )
+                )"""
+
+
 def _build_image_query_conditions(filters: _ImageQueryFilters) -> tuple[str, list[Union[int, str, bool]]]:
     """Build the shared filters for image-list and image-name queries."""
     conditions: list[str] = []
@@ -62,17 +75,7 @@ def _build_image_query_conditions(filters: _ImageQueryFilters) -> tuple[str, lis
             params.append(filters.user_id)
     elif filters.board_id == "all":
         if filters.is_admin:
-            conditions.append(
-                """(
-                    board_images.board_id IS NULL
-                    OR EXISTS (
-                        SELECT 1
-                        FROM boards
-                        WHERE boards.board_id = board_images.board_id
-                        AND boards.archived = 0
-                    )
-                )"""
-            )
+            conditions.append(_ALL_ACTIVE_BOARDS_CONDITION)
         elif filters.user_id is not None:
             conditions.append(
                 """(
@@ -97,19 +100,8 @@ def _build_image_query_conditions(filters: _ImageQueryFilters) -> tuple[str, lis
             )
             params.extend([filters.user_id, filters.user_id, filters.user_id])
         else:
-            # Single-user mode has no current user. It can read every active board
-            # and every uncategorized image, matching the administrative scope.
-            conditions.append(
-                """(
-                    board_images.board_id IS NULL
-                    OR EXISTS (
-                        SELECT 1
-                        FROM boards
-                        WHERE boards.board_id = board_images.board_id
-                        AND boards.archived = 0
-                    )
-                )"""
-            )
+            # Single-user mode has no current user; it reads the administrative scope.
+            conditions.append(_ALL_ACTIVE_BOARDS_CONDITION)
     elif filters.board_id is not None:
         conditions.append("board_images.board_id = ?")
         params.append(filters.board_id)

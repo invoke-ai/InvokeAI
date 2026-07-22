@@ -206,6 +206,54 @@ export const isPossibleDatePrefix = (partialValue: string): boolean => {
 };
 
 /**
+ * The first invalid token worth surfacing as feedback. A trailing token whose
+ * value could still become valid with more typing (`from:`, `from:2026-`) is
+ * normal entry, not an error, and is exempted.
+ */
+export const findInvalidDateToken = (query: string, parse: DateTokenParse): InvalidDateToken | undefined => {
+  const trailing = matchTrailingDateToken(query);
+
+  return parse.invalidTokens.find(
+    (token) =>
+      !(
+        trailing &&
+        token.key === trailing.key &&
+        token.raw === trailing.partialValue &&
+        isPossibleDatePrefix(token.raw)
+      )
+  );
+};
+
+/**
+ * The label shape an applied range should render as: a single day (both bounds
+ * equal), a closed range, or an open-ended bound. Surfaces map each kind to
+ * their own i18n copy.
+ */
+export type DateRangeShape =
+  | { kind: 'day'; date: string }
+  | { kind: 'range'; from: string; to: string }
+  | { kind: 'from'; date: string }
+  | { kind: 'through'; date: string };
+
+export const describeDateRange = (range: DateRange): DateRangeShape | null => {
+  if (range.from !== undefined && range.to !== undefined) {
+    return range.from === range.to
+      ? { date: range.from, kind: 'day' }
+      : { from: range.from, kind: 'range', to: range.to };
+  }
+
+  if (range.from !== undefined) {
+    return { date: range.from, kind: 'from' };
+  }
+
+  if (range.to !== undefined) {
+    return { date: range.to, kind: 'through' };
+  }
+
+  return null;
+};
+
+/**
  * Formats a YYYY-MM-DD string as a short local date ("Jul 14"). Builds the
  * Date from parts in local time — never via `new Date(isoString)`, which
  * would parse as UTC and shift the day in negative-offset timezones.

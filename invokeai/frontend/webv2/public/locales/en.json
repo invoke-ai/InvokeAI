@@ -38,6 +38,7 @@
     "date": {
       "aWeekAgo": "A week ago",
       "date": "Date",
+      "day": "{{date}}",
       "formatHint": "Or type a date — YYYY-MM-DD, 7d, 2w, 1m",
       "from": "From {{date}}",
       "pastWeek": "Past week",
@@ -81,8 +82,7 @@
       "goToNodes": "Go to Nodes",
       "goToProjects": "Go to Projects",
       "goToUsers": "Go to Users",
-      "openEditor": "Open Editor",
-      "openSettings": "Open Settings"
+      "openEditor": "Open Editor"
     },
     "appEntries": {
       "keyboardShortcuts": "Keyboard Shortcuts",
