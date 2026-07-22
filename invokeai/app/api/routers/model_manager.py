@@ -19,7 +19,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
-from invokeai.app.api.auth_dependencies import AdminUserOrDefault
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
@@ -155,6 +155,7 @@ example_model_input = {
     operation_id="list_model_records",
 )
 async def list_model_records(
+    current_user: CurrentUserOrDefault,
     base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
     model_name: Optional[str] = Query(default=None, description="Exact match on the name of the model"),
@@ -199,11 +200,14 @@ async def list_model_records(
     operation_id="list_missing_models",
     responses={200: {"description": "List of models with missing files"}},
 )
-async def list_missing_models() -> ModelsList:
+async def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
     """Get models whose files are missing from disk.
 
     These are models that have database entries but their corresponding
     weight files have been deleted externally (not via Model Manager).
+
+    Available to any authenticated user, not just admins: the frontend's model hooks subtract this
+    set from the model list so unusable models are kept out of the generation dropdowns.
     """
     record_store = ApiDependencies.invoker.services.model_manager.store
     models_path = ApiDependencies.invoker.services.configuration.models_path
@@ -224,6 +228,7 @@ async def list_missing_models() -> ModelsList:
     response_model=AnyModelConfig,
 )
 async def get_model_records_by_attrs(
+    current_user: CurrentUserOrDefault,
     name: str = Query(description="The name of the model"),
     type: ModelType = Query(description="The type of the model"),
     base: BaseModelType = Query(description="The base model of the model"),
@@ -245,6 +250,7 @@ async def get_model_records_by_attrs(
     response_model=AnyModelConfig,
 )
 async def get_model_records_by_hash(
+    current_user: CurrentUserOrDefault,
     hash: str = Query(description="The hash of the model"),
 ) -> AnyModelConfig:
     """Gets a model by its hash. This is useful for recalling models that were deleted and reinstalled,
@@ -269,6 +275,7 @@ async def get_model_records_by_hash(
     },
 )
 async def get_model_record(
+    current_user: CurrentUserOrDefault,
     key: str = Path(description="Key of the model record to fetch."),
 ) -> AnyModelConfig:
     """Get a model record"""
@@ -341,14 +348,23 @@ class FoundModel(BaseModel):
     response_model=List[FoundModel],
 )
 async def scan_for_models(
+    current_admin: AdminUserOrDefault,
     scan_path: str = Query(description="Directory path to search for models", default=None),
 ) -> List[FoundModel]:
+    # A single generic error is used for every path-validation failure below, so that the response cannot be
+    # used as an existence/readability oracle for arbitrary filesystem paths.
+    scan_failed = HTTPException(
+        status_code=400,
+        detail=f"The search path '{scan_path}' could not be scanned",
+    )
+
+    # Guard before constructing a Path: the query param defaults to None and pathlib.Path(None) raises.
+    if not scan_path:
+        raise scan_failed
+
     path = pathlib.Path(scan_path)
-    if not scan_path or not path.is_dir():
-        raise HTTPException(
-            status_code=400,
-            detail=f"The search path '{scan_path}' does not exist or is not directory",
-        )
+    if not path.is_dir():
+        raise scan_failed
 
     search = ModelSearch()
     try:
@@ -372,11 +388,13 @@ async def scan_for_models(
             found_model = FoundModel(path=path, is_installed=is_installed)
             scan_results.append(found_model)
     except Exception as e:
-        error_type = type(e).__name__
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while searching the directory: {error_type}",
+        ApiDependencies.invoker.services.logger.error(
+            f"Error scanning '{scan_path}' for models: {type(e).__name__}: {e}"
         )
+        # By this point is_dir() has already confirmed the path exists, so a distinct status leaks nothing
+        # new. Keeping 500 (with the details only in the server log) preserves the caller-error vs
+        # server-fault distinction for the admin and for retry logic.
+        raise HTTPException(status_code=500, detail=f"An error occurred while scanning '{scan_path}'")
     return scan_results
 
 
@@ -396,6 +414,7 @@ class HuggingFaceModels(BaseModel):
     response_model=HuggingFaceModels,
 )
 async def get_hugging_face_models(
+    current_admin: AdminUserOrDefault,
     hugging_face_repo: str = Query(description="Hugging face repo to search for models", default=None),
 ) -> HuggingFaceModels:
     try:
@@ -1258,7 +1277,7 @@ def get_is_installed(
 
 
 @model_manager_router.get("/starter_models", operation_id="get_starter_models", response_model=StarterModelResponse)
-async def get_starter_models() -> StarterModelResponse:
+async def get_starter_models(current_admin: AdminUserOrDefault) -> StarterModelResponse:
     installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
     starter_models = deepcopy(STARTER_MODELS)
     starter_bundles = deepcopy(STARTER_BUNDLES)
@@ -1291,7 +1310,7 @@ async def get_starter_models() -> StarterModelResponse:
     response_model=Optional[CacheStats],
     summary="Get model manager RAM cache performance statistics.",
 )
-async def get_stats() -> Optional[CacheStats]:
+async def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
     """Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded."""
 
     return ApiDependencies.invoker.services.model_manager.load.ram_cache.stats
@@ -1341,7 +1360,7 @@ class HFTokenHelper:
 
 
 @model_manager_router.get("/hf_login", operation_id="get_hf_login_status", response_model=HFTokenStatus)
-async def get_hf_login_status() -> HFTokenStatus:
+async def get_hf_login_status(current_admin: AdminUserOrDefault) -> HFTokenStatus:
     token_status = HFTokenHelper.get_status()
 
     if token_status is HFTokenStatus.UNKNOWN:
