@@ -17,6 +17,7 @@ import { useCommandPaletteController } from './useCommandPaletteController';
 
 const INPUT_PLACEHOLDER_STYLE = { color: 'fg.subtle' };
 const INPUT_FOCUS_WITHIN_STYLE = { outlineColor: 'accent.focusRing' };
+const DATE_HINT_ID = 'command-palette-date-hint';
 const NO_PROVIDERS: PaletteSearchProvider[] = [];
 const NAV_HINT_KEYS = ['↑', '↓'];
 const ENTER_HINT_KEYS = ['↵'];
@@ -176,7 +177,9 @@ const CommandPaletteContent = ({
                 controller.activeRowId ? getCommandPaletteRowDomId(controller.activeRowId) : undefined
               }
               aria-controls="command-palette-results"
+              aria-describedby={controller.dateInvalidHint ? DATE_HINT_ID : undefined}
               aria-expanded="true"
+              aria-invalid={controller.dateInvalidHint ? true : undefined}
               aria-label="Search commands and settings"
               bg="transparent"
               color="fg"
@@ -191,6 +194,25 @@ const CommandPaletteContent = ({
               onChange={controller.onSearchChange}
               onKeyDown={onSearchKeyDown}
             />
+            {controller.dateInvalidHint ? (
+              <Text color="fg.error" flexShrink={0} fontSize="xs" id={DATE_HINT_ID} maxW="45%" role="status" truncate>
+                {controller.dateInvalidHint}
+              </Text>
+            ) : controller.dateSummary ? (
+              <Text
+                bg="bg.emphasized"
+                borderRadius="sm"
+                color="fg.muted"
+                flexShrink={0}
+                fontSize="xs"
+                id={DATE_HINT_ID}
+                px="1.5"
+                py="0.5"
+                role="status"
+              >
+                {controller.dateSummary}
+              </Text>
+            ) : null}
           </HStack>
           {controller.rows.length === 0 ? (
             emptyState

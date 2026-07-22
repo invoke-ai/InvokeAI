@@ -139,6 +139,127 @@ describe('CommandPaletteDialog interaction', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(input));
   });
 
+  it('shows key-specific date suggestions while typing a token, without flashing an error', async () => {
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Images',
+      providerKey: 'images',
+      search: vi.fn(() => []),
+      supportsCreatedAtRange: true,
+    };
+    const { input } = await renderPalette({ entries: [entry('first', 'First command')], providers: [provider] });
+
+    await act(() => userEvent.fill(input, 'from:'));
+
+    expect(document.body.textContent).toContain('Today');
+    expect(document.body.textContent).toContain('Yesterday');
+    expect(document.body.textContent).toContain('Past week');
+    expect(document.body.textContent).toContain('Or type a date');
+    expect(document.body.textContent).not.toContain('Invalid date');
+    expect(input.getAttribute('aria-invalid')).toBeNull();
+
+    // `to:` must not offer a span-shaped completion.
+    await act(() => userEvent.fill(input, 'to:'));
+    expect(document.body.textContent).not.toContain('Past week');
+  });
+
+  it('completes a suggestion in place and immediately queries providers with the structured query', async () => {
+    const providerSearch = vi.fn(() => []);
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Images',
+      providerKey: 'images',
+      search: providerSearch,
+      supportsCreatedAtRange: true,
+    };
+    const { input, onClose } = await renderPalette({ entries: [], providers: [provider] });
+
+    await act(() => userEvent.fill(input, 'from:y'));
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(input.value).toBe('from:yesterday ');
+    expect(onClose).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(providerSearch).toHaveBeenCalledWith({
+        range: { from: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), to: undefined },
+        text: '',
+      });
+    });
+    expect(document.body.textContent).toContain('Search images by date');
+  });
+
+  it('fires only range-capable providers for a pure date query', async () => {
+    const capableSearch = vi.fn(() => []);
+    const dateLessSearch = vi.fn(() => []);
+    const capable: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Images',
+      providerKey: 'images',
+      search: capableSearch,
+      supportsCreatedAtRange: true,
+    };
+    const dateLess: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Workflows',
+      providerKey: 'workflows',
+      search: dateLessSearch,
+    };
+    const { input } = await renderPalette({ entries: [], providers: [capable, dateLess] });
+
+    await act(() => userEvent.fill(input, 'from:7d'));
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 250);
+    });
+
+    await vi.waitFor(() => expect(capableSearch).toHaveBeenCalled());
+    expect(dateLessSearch).not.toHaveBeenCalled();
+  });
+
+  it('renders invalid date feedback with combobox aria wiring once the token is settled', async () => {
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Images',
+      providerKey: 'images',
+      search: vi.fn(() => []),
+      supportsCreatedAtRange: true,
+    };
+    const { input } = await renderPalette({ entries: [], providers: [provider] });
+
+    // The trailing space settles the token — no longer an in-progress prefix.
+    await act(() => userEvent.fill(input, 'from:lastweek '));
+
+    const hint = document.getElementById('command-palette-date-hint');
+    expect(hint?.textContent).toContain('Invalid date: “lastweek”');
+    expect(hint?.getAttribute('role')).toBe('status');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(input.getAttribute('aria-describedby')).toBe('command-palette-date-hint');
+  });
+
+  it('treats date tokens as literal text when no range-capable provider is present', async () => {
+    const dateLessSearch = vi.fn(() => []);
+    const dateLess: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Workflows',
+      providerKey: 'workflows',
+      search: dateLessSearch,
+    };
+    const { input } = await renderPalette({ entries: [], providers: [dateLess] });
+
+    await act(() => userEvent.fill(input, 'from:'));
+    expect(document.body.textContent).not.toContain('Or type a date');
+
+    await act(() => userEvent.fill(input, 'from:7d'));
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 250);
+    });
+
+    // No acknowledgment chip, and the provider receives the literal text.
+    expect(document.getElementById('command-palette-date-hint')).toBeNull();
+    await vi.waitFor(() => {
+      expect(dateLessSearch).toHaveBeenCalledWith({ range: undefined, text: 'from:7d' });
+    });
+  });
+
   it('drives stage preview from navigation and restores it on Escape and unmount', async () => {
     const preview = vi.fn();
     const clearPreview = vi.fn();

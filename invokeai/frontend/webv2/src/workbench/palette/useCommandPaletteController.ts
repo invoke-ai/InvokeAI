@@ -1,8 +1,15 @@
+import type { DateTokenKey } from '@platform/search/dateTokens';
 /* eslint-disable react/react-compiler */
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { parseDateTokens } from '@platform/search/dateTokens';
+import {
+  completeTrailingDateToken,
+  formatDateRangeLabel,
+  isPossibleDatePrefix,
+  matchTrailingDateToken,
+  parseDateTokens,
+} from '@platform/search/dateTokens';
 import { useQueries } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
@@ -24,12 +31,40 @@ const PAGE_JUMP_ROWS = 8;
 const PROVIDER_DEBOUNCE_MS = 200;
 const NO_PROVIDERS: PaletteSearchProvider[] = [];
 
+/**
+ * Completions offered while a date token is being typed. `Nd` resolves to a
+ * single date N days ago, so the labels are key-specific: `from:7d` is a
+ * starting point ("Past week"), while `date:7d` is one day ("A week ago").
+ */
+const DATE_TOKEN_SUGGESTIONS: Record<DateTokenKey, ReadonlyArray<{ label: string; value: string }>> = {
+  date: [
+    { label: 'Today', value: 'today' },
+    { label: 'Yesterday', value: 'yesterday' },
+    { label: 'A week ago', value: '7d' },
+  ],
+  from: [
+    { label: 'Today', value: 'today' },
+    { label: 'Yesterday', value: 'yesterday' },
+    { label: 'Past week', value: '7d' },
+  ],
+  to: [
+    { label: 'Today', value: 'today' },
+    { label: 'Yesterday', value: 'yesterday' },
+  ],
+};
+
+const DATE_FORMAT_HINT = 'Or type a date — YYYY-MM-DD, 7d, 2w, 1m';
+
 type ScrollToIndex = (index: number) => void;
 
 export interface CommandPaletteController {
   activeRow: PaletteRow | undefined;
   activeRowId: string | null;
   chipLabel: string | null;
+  /** Inline feedback for an unparseable date token value, or null. */
+  dateInvalidHint: string | null;
+  /** Formatted label of the applied date range, or null. */
+  dateSummary: string | null;
   hasScopeRows: boolean;
   isOverlayOpen: boolean;
   onContentKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
@@ -94,23 +129,35 @@ export const useCommandPaletteController = ({
   const isCommandsScope = !stage && !scopeProvider && query.startsWith('>');
   const localQuery = isCommandsScope ? query.slice(1) : query;
   const trimmedQuery = localQuery.trim();
-  // In commands scope date tokens are literal text; everywhere else the raw
-  // query stays the source of truth and the parse is derived alongside it.
-  const dateParse = useMemo(
-    () => (isCommandsScope ? null : parseDateTokens(localQuery)),
-    [isCommandsScope, localQuery]
+  // Date tokens only mean anything when a provider can apply the range.
+  // Everywhere else — commands scope, date-less scoped searches, hosts with
+  // no capable providers (Launchpad) — they stay literal text, with no
+  // affordances, so a filter is never silently dropped or falsely acknowledged.
+  const datesEnabled =
+    !stage &&
+    !isCommandsScope &&
+    (scopeProvider
+      ? Boolean(scopeProvider.supportsCreatedAtRange)
+      : providers.some((provider) => provider.supportsCreatedAtRange));
+  // The raw query stays the source of truth; the parse is derived alongside it.
+  const dateParse = useMemo(() => (datesEnabled ? parseDateTokens(localQuery) : null), [datesEnabled, localQuery]);
+  const debouncedParse = useMemo(
+    () => (datesEnabled ? parseDateTokens(debouncedQuery) : null),
+    [datesEnabled, debouncedQuery]
   );
-  const debouncedParse = useMemo(() => parseDateTokens(debouncedQuery), [debouncedQuery]);
-  const providerQuery = useMemo(() => ({ range: debouncedParse.range, text: debouncedParse.text }), [debouncedParse]);
+  const providerQuery = useMemo(
+    () => ({ range: debouncedParse?.range, text: debouncedParse === null ? debouncedQuery : debouncedParse.text }),
+    [debouncedParse, debouncedQuery]
+  );
   // A valid date range is a complete query on its own — it bypasses the
   // minimum text length so `from:7d` alone searches.
   const shouldSearchProviders =
-    (debouncedParse.text.length >= PROVIDER_MIN_QUERY_LENGTH || debouncedParse.range !== undefined) &&
+    (providerQuery.text.length >= PROVIDER_MIN_QUERY_LENGTH || providerQuery.range !== undefined) &&
     !stage &&
     !isCommandsScope;
   // Pure date query (range, no text): only range-capable providers run —
   // the rest would return broad, unfiltered results for empty text.
-  const isPureDateQuery = debouncedParse.range !== undefined && debouncedParse.text.length === 0;
+  const isPureDateQuery = providerQuery.range !== undefined && providerQuery.text.length === 0;
   const activeProviders = useMemo(() => {
     if (stage || isCommandsScope) {
       return NO_PROVIDERS;
@@ -162,6 +209,96 @@ export const useCommandPaletteController = ({
   }, [focusInput, resetOverlayState]);
   const onStageApplied = resetOverlayState;
 
+  const previewRow = useCallback(
+    (row: PaletteRow | undefined) => {
+      if (!stage?.preview) {
+        return;
+      }
+
+      if (row?.kind !== 'entry' || !row.entry.id.startsWith(STAGE_ENTRY_ID_PREFIX)) {
+        stage.clearPreview?.();
+        return;
+      }
+
+      stage.preview(row.entry.id.slice(STAGE_ENTRY_ID_PREFIX.length));
+    },
+    [stage]
+  );
+
+  // The single write path for the query: every mutation (typing, programmatic
+  // completion) must go through here so the debounced provider query can never
+  // go stale relative to the input. `immediate` skips the debounce for
+  // discrete completions (suggestion rows) where results should refresh now.
+  const replaceQuery = useCallback(
+    (nextQuery: string, { immediate = false }: { immediate?: boolean } = {}) => {
+      const nextLocalQuery = !stage && !scopeProvider && nextQuery.startsWith('>') ? nextQuery.slice(1) : nextQuery;
+      const nextTrimmedQuery = nextLocalQuery.trim();
+
+      setQuery(nextQuery);
+      setActiveRowId(null);
+      clearDebounce();
+
+      if (stage) {
+        const nextRows = searchPaletteRows(buildStageEntries(stage, onStageApplied), nextQuery, [], {
+          showAllOnEmpty: true,
+        });
+        previewRow(nextRows.find((row) => row.kind !== 'label'));
+      }
+
+      if (immediate) {
+        setDebouncedQuery(nextTrimmedQuery);
+        return;
+      }
+
+      debounceTimerRef.current = window.setTimeout(() => {
+        debounceTimerRef.current = null;
+        setDebouncedQuery(nextTrimmedQuery);
+      }, PROVIDER_DEBOUNCE_MS);
+    },
+    [clearDebounce, onStageApplied, previewRow, scopeProvider, stage]
+  );
+
+  // Completion rows for an in-progress trailing token (`from:` → Today /
+  // Yesterday / …), rendered above all other sections. Selecting one rewrites
+  // the token in place and refreshes provider results immediately.
+  const dateSuggestionRows = useMemo<PaletteRow[]>(() => {
+    if (!datesEnabled) {
+      return [];
+    }
+
+    const trailing = matchTrailingDateToken(query);
+
+    if (!trailing) {
+      return [];
+    }
+
+    const partial = trailing.partialValue.toLowerCase();
+    const options = DATE_TOKEN_SUGGESTIONS[trailing.key].filter((option) => option.value.startsWith(partial));
+    const rows: PaletteRow[] = [{ id: 'label:date-suggestions', kind: 'label', label: 'Date' }];
+
+    for (const option of options) {
+      const id = `date-suggestion:${trailing.key}:${option.value}`;
+
+      rows.push({
+        entry: {
+          group: 'Date',
+          id,
+          isPersistentRecent: false,
+          keepOpen: true,
+          run: () => replaceQuery(completeTrailingDateToken(query, option.value), { immediate: true }),
+          subtitle: `${trailing.key}:${option.value}`,
+          title: option.label,
+        },
+        id,
+        kind: 'entry',
+      });
+    }
+
+    rows.push({ id: 'label:date-format-hint', kind: 'label', label: DATE_FORMAT_HINT });
+
+    return rows;
+  }, [datesEnabled, query, replaceQuery]);
+
   const rows = useMemo<PaletteRow[]>(() => {
     if (stage) {
       return searchPaletteRows(buildStageEntries(stage, onStageApplied), query, [], { showAllOnEmpty: true });
@@ -190,6 +327,7 @@ export const useCommandPaletteController = ({
     const scopeProviders = isLivePureDate ? providers.filter((provider) => provider.supportsCreatedAtRange) : providers;
 
     return [
+      ...dateSuggestionRows,
       ...localRows,
       ...(matchText.trim().length >= PROVIDER_MIN_QUERY_LENGTH || hasLiveRange
         ? buildProviderSectionRows(providerSections)
@@ -198,6 +336,7 @@ export const useCommandPaletteController = ({
     ];
   }, [
     dateParse,
+    dateSuggestionRows,
     entries,
     isCommandsScope,
     localQuery,
@@ -217,22 +356,6 @@ export const useCommandPaletteController = ({
   const effectiveActive = useMemo(() => resolveActivePaletteRow(rows, activeRowId), [activeRowId, rows]);
   const effectiveActiveRowId = effectiveActive?.row.id ?? null;
   const activeRow = effectiveActive?.row;
-
-  const previewRow = useCallback(
-    (row: PaletteRow | undefined) => {
-      if (!stage?.preview) {
-        return;
-      }
-
-      if (row?.kind !== 'entry' || !row.entry.id.startsWith(STAGE_ENTRY_ID_PREFIX)) {
-        stage.clearPreview?.();
-        return;
-      }
-
-      stage.preview(row.entry.id.slice(STAGE_ENTRY_ID_PREFIX.length));
-    },
-    [stage]
-  );
 
   const enterScope = useCallback(
     (providerKey: string) => {
@@ -384,39 +507,6 @@ export const useCommandPaletteController = ({
     [activeRow, enterScope, moveActive, popOverlay, query.length, runRow, runSecondary, scopeProviderKey, stage]
   );
 
-  // The single write path for the query: every mutation (typing, programmatic
-  // completion) must go through here so the debounced provider query can never
-  // go stale relative to the input. `immediate` skips the debounce for
-  // discrete completions (suggestion rows) where results should refresh now.
-  const replaceQuery = useCallback(
-    (nextQuery: string, { immediate = false }: { immediate?: boolean } = {}) => {
-      const nextLocalQuery = !stage && !scopeProvider && nextQuery.startsWith('>') ? nextQuery.slice(1) : nextQuery;
-      const nextTrimmedQuery = nextLocalQuery.trim();
-
-      setQuery(nextQuery);
-      setActiveRowId(null);
-      clearDebounce();
-
-      if (stage) {
-        const nextRows = searchPaletteRows(buildStageEntries(stage, onStageApplied), nextQuery, [], {
-          showAllOnEmpty: true,
-        });
-        previewRow(nextRows.find((row) => row.kind !== 'label'));
-      }
-
-      if (immediate) {
-        setDebouncedQuery(nextTrimmedQuery);
-        return;
-      }
-
-      debounceTimerRef.current = window.setTimeout(() => {
-        debounceTimerRef.current = null;
-        setDebouncedQuery(nextTrimmedQuery);
-      }, PROVIDER_DEBOUNCE_MS);
-    },
-    [clearDebounce, onStageApplied, previewRow, scopeProvider, stage]
-  );
-
   const onSearchChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => replaceQuery(event.currentTarget.value),
     [replaceQuery]
@@ -436,7 +526,33 @@ export const useCommandPaletteController = ({
     focusInput();
   }, [focusInput, scopedQueryResult]);
 
+  // Quiet acknowledgment of the applied range, and inline feedback for values
+  // that cannot parse. A trailing token that could still become valid
+  // (`from:`, `from:2026-`) is normal typing, not an error. Feedback beats
+  // acknowledgment when both apply.
+  const dateInvalidHint = useMemo(() => {
+    if (dateParse === null) {
+      return null;
+    }
+
+    const trailing = matchTrailingDateToken(localQuery);
+    const invalid = dateParse.invalidTokens.find(
+      (token) =>
+        !(
+          trailing &&
+          token.key === trailing.key &&
+          token.raw === trailing.partialValue &&
+          isPossibleDatePrefix(token.raw)
+        )
+    );
+
+    return invalid ? `Invalid date: “${invalid.raw}”` : null;
+  }, [dateParse, localQuery]);
+  const dateSummary = dateParse?.range && dateInvalidHint === null ? formatDateRangeLabel(dateParse.range) : null;
+
   return {
+    dateInvalidHint,
+    dateSummary,
     activeRow,
     activeRowId: effectiveActiveRowId,
     chipLabel: stage ? stage.title : (scopeProvider?.label ?? null),
