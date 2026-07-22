@@ -263,7 +263,8 @@ export const listGalleryImages = async ({
   searchTerm,
   starredFirst = false,
 }: {
-  boardId: string;
+  /** Omit to list across every board the user can see. */
+  boardId?: string;
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
@@ -273,7 +274,7 @@ export const listGalleryImages = async ({
   searchTerm: string;
   starredFirst?: boolean;
 }): Promise<GalleryImagesPage> => {
-  if (isDateBoardId(boardId)) {
+  if (boardId !== undefined && isDateBoardId(boardId)) {
     return listGalleryDateBoardImages({
       boardId,
       createdFrom,
