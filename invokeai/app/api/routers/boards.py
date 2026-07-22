@@ -30,6 +30,14 @@ class DeleteBoardResult(BaseModel):
         default_factory=list,
         description="The names of the videos that were deleted.",
     )
+    failed_images: list[str] = Field(
+        default_factory=list,
+        description="The names of images that could not be deleted and became uncategorized.",
+    )
+    failed_videos: list[str] = Field(
+        default_factory=list,
+        description="The names of videos that could not be deleted and became uncategorized.",
+    )
 
 
 @boards_router.post(
@@ -137,6 +145,18 @@ async def delete_board(
     try:
         if include_images is True:
             assert_image_move_maintenance_inactive()
+            target_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
+                board_id=board_id,
+                categories=None,
+                is_intermediate=None,
+                user_id=cascade_user_id,
+            )
+            target_videos = ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
+                board_id=board_id,
+                categories=None,
+                is_intermediate=None,
+                user_id=cascade_user_id,
+            )
             deleted_images = ApiDependencies.invoker.services.images.delete_images_on_board(
                 board_id=board_id, user_id=cascade_user_id
             )
@@ -149,12 +169,16 @@ async def delete_board(
                 board_id=board_id, user_id=cascade_user_id
             )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
+            deleted_image_names = set(deleted_images)
+            deleted_video_names = set(deleted_videos)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=[],
                 deleted_images=deleted_images,
                 deleted_board_videos=[],
                 deleted_videos=deleted_videos,
+                failed_images=[name for name in target_images if name not in deleted_image_names],
+                failed_videos=[name for name in target_videos if name not in deleted_video_names],
             )
         else:
             deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(

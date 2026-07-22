@@ -36,6 +36,8 @@ import {
 import { useDeleteUncategorizedVideosMutation } from 'services/api/endpoints/videos';
 import type { BoardDTO } from 'services/api/types';
 
+import { getMediaDeletionSummary } from './getMediaDeletionSummary';
+
 export const $boardToDelete = atom<BoardDTO | 'none' | null>(null);
 
 const DeleteBoardModal = () => {
@@ -100,13 +102,23 @@ const DeleteBoardModal = () => {
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardOnly]);
 
-  const handleDeleteBoardAndImages = useCallback(() => {
+  const handleDeleteBoardAndImages = useCallback(async () => {
     if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    deleteBoardAndImages({ board_id: boardToDelete.board_id });
+    const result = await Promise.allSettled([deleteBoardAndImages({ board_id: boardToDelete.board_id }).unwrap()]);
+    const summary = getMediaDeletionSummary(result);
+    if (summary.requestFailed || summary.failedCount > 0) {
+      toast({
+        status: summary.requestFailed ? 'error' : 'warning',
+        title: t('toast.mediaDeleteFailed'),
+        description: summary.requestFailed
+          ? t('toast.mediaDeleteFailedDesc')
+          : t('toast.mediaDeletePartial', { count: summary.failedCount }),
+      });
+    }
     $boardToDelete.set(null);
-  }, [boardToDelete, deleteBoardAndImages]);
+  }, [boardToDelete, deleteBoardAndImages, t]);
 
   const handleDeleteUncategorizedMedia = useCallback(async () => {
     if (!boardToDelete || boardToDelete !== 'none') {
@@ -115,18 +127,18 @@ const DeleteBoardModal = () => {
     // The uncategorized bucket is polymorphic (the button says "Images/Videos"), so both
     // media kinds are deleted. The mutations are independent — a failure in one doesn't
     // block the other.
-    const [, videoResult] = await Promise.allSettled([
+    const results = await Promise.allSettled([
       deleteUncategorizedImages().unwrap(),
       deleteUncategorizedVideos().unwrap(),
     ]);
-    if (videoResult.status === 'rejected' || videoResult.value.failed_videos.length > 0) {
+    const summary = getMediaDeletionSummary(results);
+    if (summary.requestFailed || summary.failedCount > 0) {
       toast({
-        status: videoResult.status === 'rejected' ? 'error' : 'warning',
-        title: t('toast.videoDeleteFailed'),
-        description:
-          videoResult.status === 'rejected'
-            ? t('toast.videoDeleteFailedDesc')
-            : t('toast.videoDeletePartial', { count: videoResult.value.failed_videos.length }),
+        status: summary.requestFailed ? 'error' : 'warning',
+        title: t('toast.mediaDeleteFailed'),
+        description: summary.requestFailed
+          ? t('toast.mediaDeleteFailedDesc')
+          : t('toast.mediaDeletePartial', { count: summary.failedCount }),
       });
     }
     $boardToDelete.set(null);

@@ -8961,6 +8961,16 @@ export type components = {
              * @description The names of the videos that were deleted.
              */
             deleted_videos?: string[];
+            /**
+             * Failed Images
+             * @description The names of images that could not be deleted and became uncategorized.
+             */
+            failed_images?: string[];
+            /**
+             * Failed Videos
+             * @description The names of videos that could not be deleted and became uncategorized.
+             */
+            failed_videos?: string[];
         };
         /**
          * DeleteByDestinationResult
@@ -8985,6 +8995,11 @@ export type components = {
              * @description The names of the images that were deleted
              */
             deleted_images: string[];
+            /**
+             * Failed Images
+             * @description The names of authorized images that could not be deleted
+             */
+            failed_images?: string[];
         };
         /**
          * DeleteOrphanedModelsRequest

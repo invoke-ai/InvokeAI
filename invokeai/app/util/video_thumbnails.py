@@ -38,6 +38,8 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 VIDEO_DECODE_TIMEOUT_SECONDS = 30.0
 MAX_DECODED_FRAME_RECORD_BYTES = 256 * 1024 * 1024
 MAX_DECODE_STDERR_BYTES = 16 * 1024
+MAX_VIDEO_DECODE_WORKER_RSS_BYTES = 1024 * 1024 * 1024
+WORKER_MEMORY_POLL_SECONDS = 0.05
 # Upper bound on decoded frame size (~8K video). Decoder-reported dimensions are
 # untrusted metadata: a tiny crafted container can claim absurd dimensions whose full
 # frame is only allocated at decode time. probe_video rejects such files before the
@@ -104,10 +106,51 @@ def _terminate_process_tree(proc: subprocess.Popen[Any]) -> None:
             pass
 
 
+def _worker_tree_rss(proc: subprocess.Popen[Any]) -> int:
+    """Returns resident memory used by the worker and its decoder children."""
+    try:
+        worker = psutil.Process(proc.pid)
+        processes = [worker, *worker.children(recursive=True)]
+    except psutil.Error:
+        return 0
+    total = 0
+    for process in processes:
+        try:
+            total += process.memory_info().rss
+        except psutil.Error:
+            pass
+    return total
+
+
+def _start_worker_memory_monitor(
+    proc: subprocess.Popen[Any],
+) -> tuple[threading.Event, threading.Event, threading.Thread]:
+    """Kills a decoder process tree when its cross-platform RSS bound is exceeded."""
+    stopped = threading.Event()
+    exceeded = threading.Event()
+
+    def monitor() -> None:
+        while not stopped.is_set():
+            if proc.poll() is not None:
+                return
+            if _worker_tree_rss(proc) > MAX_VIDEO_DECODE_WORKER_RSS_BYTES:
+                exceeded.set()
+                _terminate_process_tree(proc)
+                return
+            stopped.wait(WORKER_MEMORY_POLL_SECONDS)
+
+    thread = threading.Thread(target=monitor, name="video-memory-monitor", daemon=True)
+    thread.start()
+    return stopped, exceeded, thread
+
+
 def _run_worker(args: list[str], timeout: float) -> Optional[dict[str, Any]]:
     """Runs the decode worker; returns its parsed JSON output, or None on failure or timeout."""
+    monitor_stop: threading.Event | None = None
+    monitor: threading.Thread | None = None
     try:
         proc = _spawn_worker(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        monitor_stop, _memory_exceeded, monitor = _start_worker_memory_monitor(proc)
         stdout, _ = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         _terminate_process_tree(proc)
@@ -115,6 +158,10 @@ def _run_worker(args: list[str], timeout: float) -> Optional[dict[str, Any]]:
         return None
     except Exception:
         return None
+    finally:
+        if monitor_stop is not None and monitor is not None:
+            monitor_stop.set()
+            monitor.join(timeout=1)
     if proc.returncode != 0:
         return None
     try:
@@ -139,6 +186,7 @@ def iter_video_frames(
     if proc.stdout is None or proc.stderr is None:
         _terminate_process_tree(proc)
         raise RuntimeError("Unable to open video decoder output stream")
+    memory_monitor_stop, _memory_exceeded, memory_monitor = _start_worker_memory_monitor(proc)
 
     results: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
     stopped = threading.Event()
@@ -222,6 +270,8 @@ def iter_video_frames(
                 raise ValueError(f"{message}: {detail}" if detail else message) from value
             return
     finally:
+        memory_monitor_stop.set()
+        memory_monitor.join(timeout=1)
         stopped.set()
         if proc.poll() is None:
             _terminate_process_tree(proc)

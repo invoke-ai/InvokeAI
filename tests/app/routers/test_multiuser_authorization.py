@@ -670,6 +670,33 @@ class TestImageMutationAuth:
         r = client.delete("/api/v1/images/uncategorized")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
+    def test_delete_uncategorized_reports_owned_images_that_failed(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: pytest.MonkeyPatch,
+        user1_token: str,
+    ):
+        user = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user is not None
+        _save_image(mock_invoker, "deleted.png", user.user_id)
+        _save_image(mock_invoker, "stuck.png", user.user_id)
+        mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = [
+            "deleted.png",
+            "stuck.png",
+        ]
+        monkeypatch.setattr(
+            mock_invoker.services.images,
+            "delete",
+            MagicMock(side_effect=[None, OSError("file busy")]),
+        )
+
+        response = client.delete("/api/v1/images/uncategorized", headers=_auth(user1_token))
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["deleted_images"] == ["deleted.png"]
+        assert response.json()["failed_images"] == ["stuck.png"]
+
     def test_non_owner_cannot_delete_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):

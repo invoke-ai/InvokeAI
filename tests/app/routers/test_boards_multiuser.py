@@ -750,6 +750,15 @@ def test_delete_board_with_partial_video_file_delete_failure_reports_only_actual
 
     # The service deleted "good.mp4" successfully but preserved "stuck.mp4" because its
     # file delete failed. The router must NOT claim "stuck.mp4" was deleted.
+    mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = [
+        "good.png",
+        "stuck.png",
+    ]
+    mock_invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = [
+        "good.mp4",
+        "stuck.mp4",
+    ]
+    mock_invoker.services.images.delete_images_on_board.return_value = ["good.png"]
     mock_invoker.services.videos.delete_videos_on_board.return_value = ["good.mp4"]
 
     response = client.delete(
@@ -758,8 +767,10 @@ def test_delete_board_with_partial_video_file_delete_failure_reports_only_actual
     )
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
+    assert body["deleted_images"] == ["good.png"]
+    assert body["failed_images"] == ["stuck.png"]
     assert body["deleted_videos"] == ["good.mp4"]
-    assert "stuck.mp4" not in body["deleted_videos"]
+    assert body["failed_videos"] == ["stuck.mp4"]
 
 
 @pytest.mark.parametrize("failure_phase", ["videos", "board"])

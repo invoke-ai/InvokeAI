@@ -23032,6 +23032,22 @@
             "type": "array",
             "title": "Deleted Videos",
             "description": "The names of the videos that were deleted."
+          },
+          "failed_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Images",
+            "description": "The names of images that could not be deleted and became uncategorized."
+          },
+          "failed_videos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Videos",
+            "description": "The names of videos that could not be deleted and became uncategorized."
           }
         },
         "type": "object",
@@ -23068,6 +23084,14 @@
             "type": "array",
             "title": "Deleted Images",
             "description": "The names of the images that were deleted"
+          },
+          "failed_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Images",
+            "description": "The names of authorized images that could not be deleted"
           }
         },
         "type": "object",

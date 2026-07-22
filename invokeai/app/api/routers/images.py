@@ -539,6 +539,7 @@ async def delete_uncategorized_images(
 
     try:
         deleted_images: set[str] = set()
+        failed_images: set[str] = set()
         affected_boards: set[str] = set()
         for image_name in image_names:
             try:
@@ -550,9 +551,10 @@ async def delete_uncategorized_images(
                 # Skip images not owned by the current user
                 pass
             except Exception:
-                pass
+                failed_images.add(image_name)
         return DeleteImagesResult(
             deleted_images=list(deleted_images),
+            failed_images=list(failed_images),
             affected_boards=list(affected_boards),
         )
     except Exception:

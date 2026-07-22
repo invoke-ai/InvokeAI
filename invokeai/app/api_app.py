@@ -217,6 +217,7 @@ class VideoUploadLimitASGIMiddleware:
         max_concurrent_per_user: int | None = None,
         identify_user: Callable[[Scope], tuple[bool, str | None]] | None = None,
         idle_timeout_seconds: float = 120.0,
+        max_upload_duration_seconds: float = 30 * 60,
     ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
@@ -224,6 +225,7 @@ class VideoUploadLimitASGIMiddleware:
         self.max_concurrent_per_user = max_concurrent_per_user
         self.identify_user = identify_user
         self.idle_timeout_seconds = idle_timeout_seconds
+        self.max_upload_duration_seconds = max_upload_duration_seconds
         self._active = 0
         self._active_by_user: dict[str, int] = {}
 
@@ -278,6 +280,7 @@ class VideoUploadLimitASGIMiddleware:
         if per_user_key is not None:
             self._active_by_user[per_user_key] = self._active_by_user.get(per_user_key, 0) + 1
         received = 0
+        upload_started_at = asyncio.get_running_loop().time()
 
         async def limited_receive() -> Message:
             # Backstop for clients that omit Content-Length (chunked transfer): count the
@@ -285,8 +288,13 @@ class VideoUploadLimitASGIMiddleware:
             # parser stops spooling. A clean 413 isn't possible mid-parse; the aborted
             # request surfaces to the client as a dropped connection.
             nonlocal received
+            remaining_duration = self.max_upload_duration_seconds - (
+                asyncio.get_running_loop().time() - upload_started_at
+            )
+            if remaining_duration <= 0:
+                return {"type": "http.disconnect"}
             try:
-                message = await asyncio.wait_for(receive(), timeout=self.idle_timeout_seconds)
+                message = await asyncio.wait_for(receive(), timeout=min(self.idle_timeout_seconds, remaining_duration))
             except TimeoutError:
                 return {"type": "http.disconnect"}
             if message["type"] == "http.request":

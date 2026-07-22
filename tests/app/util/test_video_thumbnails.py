@@ -188,6 +188,7 @@ class TestStreamedDecoderIsBounded:
 
         proc.wait.side_effect = wait
         monkeypatch.setattr(video_thumbnails, "_spawn_worker", lambda *args, **kwargs: proc)
+        monkeypatch.setattr(video_thumbnails, "_worker_tree_rss", lambda worker: 0)
         monkeypatch.setattr(video_thumbnails, "_terminate_process_tree", lambda worker: None)
 
         with pytest.raises(TimeoutError, match="decoder worker"):
@@ -217,6 +218,45 @@ def test_timeout_kills_worker_descendants(monkeypatch: pytest.MonkeyPatch, tmp_p
     while video_thumbnails._is_process_running(child_pid) and time.monotonic() < deadline:
         time.sleep(0.05)
     assert not video_thumbnails._is_process_running(child_pid)
+
+
+class TestWorkerMemoryMonitor:
+    def test_terminates_worker_over_memory_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        proc = MagicMock()
+        proc.poll.return_value = None
+        terminated = Event()
+        monkeypatch.setattr(
+            video_thumbnails,
+            "_worker_tree_rss",
+            lambda worker: video_thumbnails.MAX_VIDEO_DECODE_WORKER_RSS_BYTES + 1,
+        )
+        monkeypatch.setattr(video_thumbnails, "_terminate_process_tree", lambda worker: terminated.set())
+
+        stop, exceeded, monitor = video_thumbnails._start_worker_memory_monitor(proc)
+        assert terminated.wait(timeout=1)
+        stop.set()
+        monitor.join(timeout=1)
+
+        assert exceeded.is_set()
+
+    def test_leaves_worker_within_memory_limit_running(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        proc = MagicMock()
+        proc.poll.return_value = None
+        terminated = Event()
+        monkeypatch.setattr(
+            video_thumbnails,
+            "_worker_tree_rss",
+            lambda worker: video_thumbnails.MAX_VIDEO_DECODE_WORKER_RSS_BYTES,
+        )
+        monkeypatch.setattr(video_thumbnails, "_terminate_process_tree", lambda worker: terminated.set())
+
+        stop, exceeded, monitor = video_thumbnails._start_worker_memory_monitor(proc)
+        time.sleep(video_thumbnails.WORKER_MEMORY_POLL_SECONDS * 2)
+        stop.set()
+        monitor.join(timeout=1)
+
+        assert not exceeded.is_set()
+        assert not terminated.is_set()
 
 
 class TestProbeMetadataValidation:

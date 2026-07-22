@@ -187,6 +187,44 @@ def test_idle_chunked_upload_releases_capacity():
     assert any(message.get("status") == 400 for message in messages)
 
 
+def test_drip_feed_upload_cannot_hold_capacity_past_absolute_timeout():
+    receive_calls = 0
+
+    async def app(scope, receive, send):
+        while (await receive())["type"] == "http.request":
+            pass
+        await Response(status_code=400)(scope, receive, send)
+
+    async def receive() -> dict[str, Any]:
+        nonlocal receive_calls
+        receive_calls += 1
+        await asyncio.sleep(0.005)
+        return {"type": "http.request", "body": b"x", "more_body": True}
+
+    async def send(_message: dict[str, Any]) -> None:
+        pass
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/videos/upload",
+        "root_path": "",
+        "headers": [],
+    }
+    middleware = VideoUploadLimitASGIMiddleware(
+        app,
+        max_body_bytes=MAX_BODY,
+        max_concurrent=1,
+        idle_timeout_seconds=0.05,
+        max_upload_duration_seconds=0.02,
+    )
+
+    asyncio.run(asyncio.wait_for(middleware(scope, receive, send), timeout=1))  # type: ignore[arg-type]
+
+    assert receive_calls > 1
+    assert middleware._active == 0
+
+
 def _identify_by_bearer(scope: Any) -> tuple[bool, str | None]:
     """Test identify_user: 'Bearer <name>' authenticates as user <name>."""
     authorization = Headers(scope=scope).get("authorization")

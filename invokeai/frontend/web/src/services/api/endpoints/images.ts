@@ -347,6 +347,8 @@ export const imagesApi = api.injectEndpoints({
         // them). Only server-confirmed deletions are listed in the result.
         ...getTagsToInvalidateForImageMutation(result?.deleted_images ?? []),
         ...getTagsToInvalidateForVideoMutation(result?.deleted_videos ?? []),
+        ...getTagsToInvalidateForImageMutation(result?.failed_images ?? []),
+        ...getTagsToInvalidateForVideoMutation(result?.failed_videos ?? []),
       ],
     }),
     addImageToBoard: build.mutation<
