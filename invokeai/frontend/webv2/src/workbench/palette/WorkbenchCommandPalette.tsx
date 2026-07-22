@@ -1,5 +1,3 @@
-import type { WorkbenchPreferences } from '@workbench/settings/contracts';
-
 import { requestQueueItemReveal } from '@features/queue/reveal';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
@@ -18,12 +16,13 @@ const LazyWorkbenchCommandPaletteDialog = lazy(() => import('./WorkbenchCommandP
 /** Lightweight route host; the palette implementation is loaded only while open. */
 export const WorkbenchCommandPalette = () => {
   const isOpen = useIsCommandPaletteOpen();
-  const preferences = useWorkbenchPreferences();
 
-  return isOpen ? <OpenWorkbenchCommandPalette preferences={preferences} /> : null;
+  return isOpen ? <OpenWorkbenchCommandPalette /> : null;
 };
 
-const OpenWorkbenchCommandPalette = ({ preferences }: { preferences: WorkbenchPreferences }) => {
+const OpenWorkbenchCommandPalette = () => {
+  const preferences = useWorkbenchPreferences();
+
   useMountEffect(() => registerHotkeyModalLayer('command-palette'));
 
   return (

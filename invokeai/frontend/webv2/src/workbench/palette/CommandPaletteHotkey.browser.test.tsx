@@ -8,12 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 const testPreferences = vi.hoisted(() => ({ customHotkeys: {} as Record<string, string[]> }));
+const useWorkbenchPreferencesSpy = vi.hoisted(() => vi.fn(() => testPreferences));
 
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<typeof settingsStoreModule>()),
   useWorkbenchPreferenceSelector: <Selected,>(selector: (preferences: typeof testPreferences) => Selected): Selected =>
     selector(testPreferences),
-  useWorkbenchPreferences: () => testPreferences,
+  useWorkbenchPreferences: useWorkbenchPreferencesSpy,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -65,6 +66,7 @@ const expectPaletteState = (state: 'closed' | 'open'): void => {
 
 beforeEach(() => {
   testPreferences.customHotkeys = {};
+  useWorkbenchPreferencesSpy.mockClear();
   closeCommandPalette();
   host = document.createElement('div');
   document.body.append(host);
@@ -114,6 +116,16 @@ describe('Launchpad command-palette hotkeys', () => {
 
     await press({ code: 'KeyK', ctrlKey: true, key: 'k' });
     expectPaletteState('closed');
+  });
+
+  it('subscribes to full preferences only while the palette is open', async () => {
+    await renderLaunchpad();
+    expectPaletteState('closed');
+    expect(useWorkbenchPreferencesSpy).not.toHaveBeenCalled();
+
+    await press({ code: 'KeyK', ctrlKey: true, key: 'k' });
+    expectPaletteState('open');
+    expect(useWorkbenchPreferencesSpy).toHaveBeenCalled();
   });
 
   it('replaces listeners when preferences change without remounting the Launchpad host', async () => {
