@@ -31,6 +31,16 @@ class MockApiDependencies(ApiDependencies):
         self.invoker = invoker
 
 
+def _non_admin_user() -> Mock:
+    """An active, non-admin user record.
+
+    Authorization is derived from the database record on every request, so the
+    stubbed user must carry concrete field values — a bare ``Mock`` fails
+    ``TokenData`` validation.
+    """
+    return Mock(user_id="user-1", email="user@example.com", is_admin=False, is_active=True)
+
+
 def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
     statuses = {
         "gemini": ExternalProviderStatus(provider_id="gemini", configured=True, message=None),
@@ -278,7 +288,7 @@ def test_update_runtime_config_rejects_non_admin_users(
         "invokeai.app.api.auth_dependencies.verify_token",
         lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=False),
     )
-    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=Mock(is_active=True)))
+    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=_non_admin_user()))
 
     response = client.patch(
         "/api/v1/app/runtime_config",
@@ -300,7 +310,7 @@ def test_set_external_provider_config_rejects_non_admin_users(
         "invokeai.app.api.auth_dependencies.verify_token",
         lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=False),
     )
-    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=Mock(is_active=True)))
+    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=_non_admin_user()))
 
     response = client.post(
         f"/api/v1/app/external_providers/config/{provider_id}",
@@ -322,7 +332,7 @@ def test_reset_external_provider_config_rejects_non_admin_users(
         "invokeai.app.api.auth_dependencies.verify_token",
         lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=False),
     )
-    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=Mock(is_active=True)))
+    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=_non_admin_user()))
 
     response = client.delete(
         f"/api/v1/app/external_providers/config/{provider_id}",

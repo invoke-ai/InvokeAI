@@ -141,6 +141,7 @@ class UIComponent(str, Enum, metaclass=MetaEnum):
     None_ = "none"
     Textarea = "textarea"
     Slider = "slider"
+    VideoFrameIndex = "video-frame-index"
 
 
 class FieldDescriptions:
@@ -174,6 +175,9 @@ class FieldDescriptions:
     z_image_model = "Z-Image model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
+    wan_model = "Wan 2.2 model (Transformer) to load"
+    wan_t5_encoder = "UMT5-XXL tokenizer and text encoder for Wan 2.2"
+    wan_ref_image = "Reference-image (VAE-latent) conditioning for Wan 2.2 I2V."
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -239,6 +243,12 @@ class ImageField(BaseModel):
     """An image primitive field"""
 
     image_name: str = Field(description="The name of the image")
+
+
+class VideoField(BaseModel):
+    """A video primitive field"""
+
+    video_name: str = Field(description="The name of the video")
 
 
 class BoardField(BaseModel):
@@ -362,6 +372,39 @@ class AnimaConditioningField(BaseModel):
         default=None,
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
+    )
+
+
+class WanConditioningField(BaseModel):
+    """A Wan 2.2 conditioning tensor primitive value.
+
+    Wan conditioning is the UMT5-XXL hidden state for the prompt plus an attention
+    mask marking valid (non-padding) tokens.
+    """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class WanRefImageConditioningField(BaseModel):
+    """Reference-image conditioning for Wan 2.2 I2V.
+
+    Carries the 20-channel VAE-latent condition tensor (4-channel first-frame
+    mask + 16-channel ref-image latents). The denoise loop concatenates this
+    to the 16-channel noise latents along the channel dim each step, producing
+    the 36-channel input the I2V-A14B transformer expects.
+
+    Also carries the spatial dims and frame count used to encode the image so
+    the denoise node can sanity-check the user's width/height/num_frames — a
+    latent temporal-dim mismatch is hard to debug from the downstream error.
+    """
+
+    condition_tensor_name: str = Field(description="Name of the saved [1, 20, T_lat, H/8, W/8] condition tensor.")
+    width: int = Field(description="Image width used during VAE encoding (matches denoise width).")
+    height: int = Field(description="Image height used during VAE encoding (matches denoise height).")
+    num_frames: int = Field(
+        default=1,
+        description="Pixel-frame count the condition was built for. 1 for single-frame I2V "
+        "(image output), 81+ for video.",
     )
 
 

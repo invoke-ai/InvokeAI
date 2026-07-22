@@ -26,6 +26,7 @@ import type {
   StringFieldInputTemplate,
   StringGeneratorFieldInputTemplate,
   StylePresetFieldInputTemplate,
+  VideoFieldInputTemplate,
 } from 'features/nodes/types/field';
 import {
   getFloatGeneratorArithmeticSequenceDefaults,
@@ -321,6 +322,20 @@ const buildImageFieldInputTemplate: FieldInputTemplateBuilder<ImageFieldInputTem
   return template;
 };
 
+const buildVideoFieldInputTemplate: FieldInputTemplateBuilder<VideoFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: VideoFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildImageFieldCollectionInputTemplate: FieldInputTemplateBuilder<ImageFieldCollectionInputTemplate> = ({
   schemaObject,
   baseField,
@@ -520,6 +535,7 @@ const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplate
   EnumField: buildEnumFieldInputTemplate,
   FloatField: buildFloatFieldInputTemplate,
   ImageField: buildImageFieldInputTemplate,
+  VideoField: buildVideoFieldInputTemplate,
   IntegerField: buildIntegerFieldInputTemplate,
   // LoRAField is always handled by the collection branch above (COLLECTION / SINGLE_OR_COLLECTION);
   // this entry is a defensive fallback to satisfy the exhaustive builder map.

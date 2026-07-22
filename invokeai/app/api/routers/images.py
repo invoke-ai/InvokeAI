@@ -9,7 +9,7 @@ from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, model_validator
 
-from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
+from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
 from invokeai.app.api.routers._access import (
@@ -46,6 +46,12 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
+
+
+def _get_image_cache_control() -> str:
+    if ApiDependencies.invoker.services.configuration.multiuser:
+        return "private, no-store"
+    return f"max-age={IMAGE_MAX_AGE}"
 
 
 class ResizeToDimensions(BaseModel):
@@ -353,15 +359,15 @@ async def get_image_workflow(
     },
 )
 async def get_image_full(
+    current_user: CurrentMediaUserOrDefault,
     image_name: str = Path(description="The name of full-resolution image file to get"),
 ) -> Response:
     """Gets a full-resolution image file.
 
-    This endpoint is intentionally unauthenticated because browsers load images
-    via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-    providing security through unguessability. Returns 409 while image storage
-    maintenance is active.
+    Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+    Returns 409 while image storage maintenance is active.
     """
+    _assert_image_read_access(image_name, current_user)
     assert_image_move_maintenance_inactive()
 
     try:
@@ -369,7 +375,7 @@ async def get_image_full(
         with open(path, "rb") as f:
             content = f.read()
         response = Response(content, media_type="image/png")
-        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        response.headers["Cache-Control"] = _get_image_cache_control()
         response.headers["Content-Disposition"] = f'inline; filename="{image_name}"'
         return response
     except Exception:
@@ -389,15 +395,15 @@ async def get_image_full(
     },
 )
 async def get_image_thumbnail(
+    current_user: CurrentMediaUserOrDefault,
     image_name: str = Path(description="The name of thumbnail image file to get"),
 ) -> Response:
     """Gets a thumbnail image file.
 
-    This endpoint is intentionally unauthenticated because browsers load images
-    via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-    providing security through unguessability. Returns 409 while image storage
-    maintenance is active.
+    Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+    Returns 409 while image storage maintenance is active.
     """
+    _assert_image_read_access(image_name, current_user)
     assert_image_move_maintenance_inactive()
 
     try:
@@ -405,7 +411,7 @@ async def get_image_thumbnail(
         with open(path, "rb") as f:
             content = f.read()
         response = Response(content, media_type="image/webp")
-        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        response.headers["Cache-Control"] = _get_image_cache_control()
         return response
     except Exception:
         raise HTTPException(status_code=404)
@@ -492,6 +498,10 @@ async def delete_images_from_list(
         raise
 
     try:
+        # Skip — but do not re-raise — auth failures so a foreign name mid-batch doesn't
+        # discard the response payload for items the caller had already legitimately deleted.
+        # Without this, the client cache never learns about the partial successes and the
+        # already-deleted records reappear in the UI until the next full refresh.
         deleted_images: set[str] = set()
         affected_boards: set[str] = set()
         for image_name in image_names:
@@ -503,7 +513,7 @@ async def delete_images_from_list(
                 deleted_images.add(image_name)
                 affected_boards.add(board_id)
             except HTTPException:
-                raise
+                continue
             except Exception:
                 pass
         return DeleteImagesResult(

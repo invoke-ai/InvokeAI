@@ -1,14 +1,14 @@
 ---
 title: Gallery Panel
-description: Learn how to manage, organize, and use your generated images and assets with the Gallery Panel in InvokeAI.
-lastUpdated: 2026-02-19
+description: Learn how to manage, organize, and use your generated images, videos, and assets with the Gallery Panel in InvokeAI.
+lastUpdated: 2026-07-19
 sidebar:
   order: 1
 ---
 
 import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
 
-The Gallery Panel is a fast way to review, find, and make use of images you've generated and loaded. The Gallery is divided into **Boards**. The *Uncategorized* board is always present, but you can create your own for better organization.
+The Gallery Panel is a fast way to review, find, and make use of images and videos you've generated and loaded. The Gallery is divided into **Boards**. The *Uncategorized* board is always present, but you can create your own for better organization. Boards are polymorphic — images and videos coexist on the same board and appear together in the gallery, sorted by creation time.
 
 ![Gallery Panel Overview](./assets/gallery.png)
 
@@ -50,11 +50,11 @@ Each board has a context menu accessible via right-click (or Ctrl+click).
 ![Thumbnail Menu](./assets/thumbnail_menu.png)
 
 - **Auto-add to this Board:** If *Auto-Assign Board on Click* is disabled in settings, use this option to quickly set the selected board as the default destination for new images.
-- **Download Board:** Packages all images within the board into a `.zip` file. A notification link will be provided when the download is ready.
-- **Delete Board:** Permanently removes the board and all of its contents.
+- **Download Board Images:** Packages all images within the board into a `.zip` file. A notification link will be provided when the download is ready. Videos are not included; download them individually from the gallery or viewer.
+- **Delete Board:** Permanently removes the board and all of its contents — both images **and** videos.
 
 :::danger
-Deleting a board will **permanently delete all images** contained within it. Proceed with caution!
+Deleting a board will **permanently delete all images and videos** contained within it. Proceed with caution!
 :::
 
 ### Image Storage Maintenance
@@ -67,22 +67,22 @@ Every board is organized into two distinct tabs:
 
 ![Board Tabs](./assets/board_tabs.png)
 
-1. **Images:** Images generated directly within InvokeAI.
+1. **Images/Videos:** Images and videos generated directly within InvokeAI, shown interleaved by creation time.
 2. **Assets:** External images you have uploaded to use as an [Image Prompt](https://support.invoke.ai/support/solutions/articles/151000159340-using-the-image-prompt-adapter-ip-adapter-) or within the Image to Image tab.
 
 ---
 
 ## Virtual Boards
 
-Virtual boards are read-only board groupings that Invoke computes on-the-fly from your image metadata rather than storing in the database. The first available type groups images **By Date**, creating one sub-board per day on which you generated images.
+Virtual boards are read-only board groupings that Invoke computes on-the-fly from your gallery records rather than storing in the database. The first available type groups media **By Date**, creating one sub-board per day on which you generated images or videos.
 
 Virtual boards are **off by default**. To enable them:
 
 1. Open the **board settings** (gear icon at the top of the Gallery).
 2. Toggle **Virtual Boards** on.
-3. A collapsible **By Date** section appears in the board list, with a sub-board for each day that has images. Each sub-board shows the date, image / asset counts, and a cover thumbnail.
+3. A collapsible **By Date** section appears in the board list, with a sub-board for each day that has images or videos. Each sub-board shows the date, image / asset / video counts, and a cover thumbnail (the newest item of that day, image or video).
 
-Selecting a date sub-board filters the gallery to just the images from that day. The collapse state of the By Date section persists across reloads.
+Selecting a date sub-board filters the gallery to just the images and videos from that day. The collapse state of the By Date section persists across reloads.
 
 ### Limits
 
@@ -90,7 +90,7 @@ Because virtual boards are derived, not stored:
 
 - They are **read-only**: no drag-and-drop, no context menu, no auto-add destination.
 - You cannot rename or delete them.
-- Generating a new image updates the counts immediately, but the image is still saved to your regular auto-add board — virtual boards are a *view*, not a destination.
+- Generating a new image or video updates the counts immediately, but the item is still saved to your regular auto-add board — virtual boards are a *view*, not a destination.
 - Disabling the **Virtual Boards** toggle hides the section and resets the selection to *Uncategorized* if you were viewing a virtual sub-board.
 
 ---
@@ -131,6 +131,27 @@ Additionally, each image has a context menu (right-click or Ctrl+click) with pow
 :::caution
   Selecting **Delete Image** will remove the image entirely from your InvokeAI installation. This action cannot be undone.
 :::
+
+---
+
+## Videos in the Gallery
+
+Videos generated by InvokeAI (currently from the Wan 2.2 model family) appear alongside images in the same gallery view. Each video item displays a first-frame still as its thumbnail with a play badge in the corner; selecting it opens the video in the viewer where you can play it back inline.
+
+### Uploading Videos
+
+You can upload existing videos to a board via the standard drop-or-upload affordance. The upload pipeline accepts **MP4 files only**. Other containers (`.mov`, `.webm`, `.mkv`) are not transcoded on upload and are rejected at the API boundary — re-encode them to MP4 (for example with `ffmpeg -i input.mov -c:v libx264 output.mp4`) before uploading.
+
+### Video Context Menu
+
+Each video has a context menu with the same organization actions as images, plus video-appropriate variants:
+
+- **Open in New Tab / Download:** Opens or saves the raw MP4 file.
+- **Star Video:** Pins the video to the top of the gallery.
+- **Change Board:** Moves the video to a different board. *(Drag-and-drop onto board thumbnails also works.)*
+- **Delete Video:** Permanently deletes the video and its thumbnail.
+
+Videos count toward board contents: a board with two images and three videos shows five items in the polymorphic gallery list and reports both totals in its stats.
 
 ---
 

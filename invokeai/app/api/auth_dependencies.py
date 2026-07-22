@@ -1,18 +1,50 @@
 """FastAPI dependencies for authentication."""
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.auth.token_service import TokenData, verify_token
 from invokeai.backend.util.logging import logging
 
+if TYPE_CHECKING:
+    from invokeai.app.services.users.users_common import UserDTO
+
 logger = logging.getLogger(__name__)
 
 # HTTP Bearer token security scheme
 security = HTTPBearer(auto_error=False)
+MEDIA_TOKEN_COOKIE = "invokeai_media_token"
+
+
+def _validate_token(token: str, invalid_detail: str) -> TokenData:
+    token_data = verify_token(token)
+    if token_data is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=invalid_detail)
+
+    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+    return _db_derived_token_data(token_data, user)
+
+
+def _db_derived_token_data(token_data: TokenData, user: "UserDTO") -> TokenData:
+    """Build TokenData whose authorization fields come from the database record.
+
+    The JWT proves *identity* only. Authorization (``is_admin``) must reflect the
+    current database state on every request; otherwise a demoted administrator
+    keeps admin rights until their token expires — and sliding-window refresh
+    would renew that stale claim indefinitely. A promoted user symmetrically
+    gains admin rights on their next request without re-login.
+    """
+    return TokenData(
+        user_id=user.user_id,
+        email=user.email,
+        is_admin=user.is_admin,
+        remember_me=token_data.remember_me,
+    )
 
 
 async def get_current_user(
@@ -61,7 +93,7 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return token_data
+    return _db_derived_token_data(token_data, user)
 
 
 async def get_current_user_or_default(
@@ -113,7 +145,20 @@ async def get_current_user_or_default(
         # User doesn't exist or is inactive in multiuser mode - reject
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
 
-    return token_data
+    return _db_derived_token_data(token_data, user)
+
+
+async def get_current_media_user_or_default(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+    media_token: Annotated[str | None, Cookie(alias=MEDIA_TOKEN_COOKIE)] = None,
+) -> TokenData:
+    """Authenticate media requests with a Bearer token or the path-scoped login cookie."""
+    if not ApiDependencies.invoker.services.configuration.multiuser:
+        return TokenData(user_id="system", email="system@system.invokeai", is_admin=True)
+    token = credentials.credentials if credentials is not None else media_token
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    return _validate_token(token, "Invalid or expired token")
 
 
 async def require_admin(
@@ -162,5 +207,6 @@ async def require_admin_or_default(
 # Type aliases for convenient use in route dependencies
 CurrentUser = Annotated[TokenData, Depends(get_current_user)]
 CurrentUserOrDefault = Annotated[TokenData, Depends(get_current_user_or_default)]
+CurrentMediaUserOrDefault = Annotated[TokenData, Depends(get_current_media_user_or_default)]
 AdminUser = Annotated[TokenData, Depends(require_admin)]
 AdminUserOrDefault = Annotated[TokenData, Depends(require_admin_or_default)]

@@ -3,6 +3,7 @@ import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
 import { addImageToBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -20,6 +21,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiGlobeBold, PiImageSquare, PiShareNetworkBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import type { BoardDTO } from 'services/api/types';
 
@@ -53,9 +55,13 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     [board.board_id]
   );
 
+  // The tooltip gets split counts so videos aren't mislabeled as images; the headline
+  // number below stays combined (images + videos) so a video-only board doesn't read
+  // as empty in the gallery list.
   const boardCounts = useMemo(
     () => ({
       image_count: board.image_count,
+      video_count: board.video_count ?? 0,
       asset_count: board.asset_count,
     }),
     [board]
@@ -118,7 +124,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               )}
               <Flex justifyContent="flex-end">
                 <Text variant="subtext">
-                  {board.image_count} | {board.asset_count}
+                  {board.image_count + (board.video_count ?? 0)} | {board.asset_count}
                 </Text>
               </Flex>
             </Flex>
@@ -138,12 +144,20 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
 export default memo(GalleryBoard);
 
 const CoverImage = ({ board }: { board: BoardDTO }) => {
-  const { currentData: coverImage } = useGetImageDTOQuery(board.cover_image_name ?? skipToken);
+  // Backend picks a single cover — either an image or a video — so at most one of these
+  // queries fires (the other is `skipToken`). The video case takes precedence when set.
+  const { currentData: coverVideo } = useGetVideoDTOQuery(board.cover_video_name ?? skipToken);
+  const { currentData: coverImage } = useGetImageDTOQuery(
+    board.cover_video_name ? skipToken : (board.cover_image_name ?? skipToken)
+  );
 
-  if (coverImage) {
+  const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
+  const refreshedThumbnailUrl = useMediaUrl(thumbnailUrl);
+
+  if (refreshedThumbnailUrl) {
     return (
       <Image
-        src={coverImage.thumbnail_url}
+        src={refreshedThumbnailUrl}
         draggable={false}
         objectFit="cover"
         w={10}

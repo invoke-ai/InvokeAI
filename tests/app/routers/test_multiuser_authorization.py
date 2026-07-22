@@ -9,6 +9,7 @@ These tests verify the security fixes for:
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -68,6 +69,7 @@ def client():
 def mock_services() -> InvocationServices:
     from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
     from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+    from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
     from invokeai.app.services.boards.boards_default import BoardService
     from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
     from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import (
@@ -78,6 +80,7 @@ def mock_services() -> InvocationServices:
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
     from invokeai.app.services.users.users_default import UserService
+    from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
@@ -116,6 +119,11 @@ def mock_services() -> InvocationServices:
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
         users=UserService(db),
         external_generation=None,  # type: ignore
+        videos=None,  # type: ignore
+        video_files=None,  # type: ignore
+        video_records=SqliteVideoRecordStorage(db=db),
+        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        gallery=None,  # type: ignore
     )
 
 
@@ -396,15 +404,66 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/some-image/metadata")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_get_image_full_is_unauthenticated(self, enable_multiuser: Any, client: TestClient):
-        # Binary image endpoints are intentionally unauthenticated because
-        # browsers load them via <img src> which cannot send Bearer tokens.
-        r = client.get("/api/v1/images/i/some-image/full")
-        assert r.status_code != status.HTTP_401_UNAUTHORIZED
+    @pytest.mark.parametrize("suffix", ["full", "thumbnail"])
+    def test_image_media_requires_auth(self, enable_multiuser: Any, client: TestClient, suffix: str):
+        client.cookies.clear()
 
-    def test_get_image_thumbnail_is_unauthenticated(self, enable_multiuser: Any, client: TestClient):
-        r = client.get("/api/v1/images/i/some-image/thumbnail")
-        assert r.status_code != status.HTTP_401_UNAUTHORIZED
+        r = client.get(f"/api/v1/images/i/some-image/{suffix}")
+
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.parametrize("suffix,thumbnail", [("full", False), ("thumbnail", True)])
+    def test_image_owner_can_load_media_with_login_cookie(
+        self,
+        monkeypatch: Any,
+        client: TestClient,
+        mock_invoker: Invoker,
+        user1_token: str,
+        tmp_path: Path,
+        suffix: str,
+        thumbnail: bool,
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "owned-image", user1.user_id)
+        media_path = tmp_path / ("image.webp" if thumbnail else "image.png")
+        media_path.write_bytes(b"media")
+        get_path = MagicMock(return_value=media_path)
+        monkeypatch.setattr(mock_invoker.services.images, "get_path", get_path)
+        client.cookies.clear()
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "user1@test.com", "password": "TestPass123", "remember_me": False},
+        )
+        assert login.status_code == status.HTTP_200_OK
+
+        r = client.get(f"/api/v1/images/i/owned-image/{suffix}")
+
+        assert r.status_code == status.HTTP_200_OK
+        assert r.headers["cache-control"] == "private, no-store"
+        if thumbnail:
+            get_path.assert_called_once_with("owned-image", thumbnail=True)
+        else:
+            get_path.assert_called_once_with("owned-image")
+
+    def test_non_owner_cannot_load_private_image_media(
+        self,
+        monkeypatch: Any,
+        client: TestClient,
+        mock_invoker: Invoker,
+        user1_token: str,
+        user2_token: str,
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "private-image", user1.user_id)
+        get_path = MagicMock()
+        monkeypatch.setattr(mock_invoker.services.images, "get_path", get_path)
+
+        r = client.get("/api/v1/images/i/private-image/full", headers=_auth(user2_token))
+
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+        get_path.assert_not_called()
 
     def test_get_image_urls_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.get("/api/v1/images/i/some-image/urls")
@@ -689,6 +748,11 @@ class TestImageMutationAuth:
     def test_non_owner_cannot_batch_delete_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
+        """Batch delete tolerates foreign items by skipping them in-loop and returning the
+        per-item delete list to the client. Previously the route re-raised the first 403,
+        dropping any partial successes — see PR #9163 review (finding 3). The non-owner
+        must still not destroy the image; only the response shape changes.
+        """
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "user1-batch-del", user1.user_id)
@@ -698,7 +762,12 @@ class TestImageMutationAuth:
             json={"image_names": ["user1-batch-del"]},
             headers=_auth(user2_token),
         )
-        assert r.status_code == status.HTTP_403_FORBIDDEN
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        # Auth failure must not advertise the foreign image as deleted, and the underlying
+        # record must still exist.
+        assert body["deleted_images"] == []
+        mock_invoker.services.image_records.get("user1-batch-del")
 
     def test_non_owner_can_delete_image_from_public_board(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str

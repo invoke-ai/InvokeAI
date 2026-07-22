@@ -33,6 +33,7 @@ from invokeai.app.services.events.events_common import (
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
+    UserAccessChangedEvent,
     WorkflowCreatedEvent,
     WorkflowDeletedEvent,
     WorkflowUpdatedEvent,
@@ -148,6 +149,14 @@ class EventServiceBase:
     def emit_workflow_deleted(self, workflow_id: str, user_id: str, is_public: bool) -> None:
         """Emitted when a workflow is deleted."""
         self.dispatch(WorkflowDeletedEvent.build(workflow_id=workflow_id, user_id=user_id, is_public=is_public))
+
+    # endregion
+
+    # region User accounts
+
+    def emit_user_access_changed(self, user_id: str, is_admin: bool, is_active: bool) -> None:
+        """Emitted when a user's role or active status changes (server-internal; never sent to clients)."""
+        self.dispatch(UserAccessChangedEvent.build(user_id=user_id, is_admin=is_admin, is_active=is_active))
 
     # endregion
 

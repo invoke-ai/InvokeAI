@@ -12,6 +12,7 @@ from invokeai.app.services.events.events_common import (
     FastAPIEvent,
     QueueClearedEvent,
     QueueItemStatusChangedEvent,
+    UserAccessChangedEvent,
     register_events,
 )
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
@@ -36,6 +37,27 @@ from invokeai.app.services.session_queue.session_queue_common import SessionQueu
 from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
+
+
+def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueueItem) -> bool:
+    """Whether the queue item's owner is still permitted to execute work.
+
+    Deactivating (or deleting) an account must also revoke its queued execution:
+    a queued graph consumes GPU time, reads media, and writes outputs on behalf of
+    its owner. Pending items are rejected at dequeue; running items are stopped at
+    the next node boundary (and immediately mid-node for nodes with step callbacks,
+    via the cancel event set when the item is canceled).
+
+    The ``system`` user represents single-user mode and has no database record, so
+    it is always considered active. The check is skipped entirely when multiuser
+    mode is disabled.
+    """
+    if not services.configuration.multiuser:
+        return True
+    if queue_item.user_id == "system":
+        return True
+    user = services.users.get(queue_item.user_id)
+    return user is not None and user.is_active
 
 
 class DefaultSessionRunner(SessionRunnerBase):
@@ -96,6 +118,17 @@ class DefaultSessionRunner(SessionRunnerBase):
                 break
 
             if invocation is None or self._is_canceled():
+                break
+
+            # Revalidate the owner between nodes: an account deactivated mid-session
+            # must not execute further nodes. Cancel the item so its status reflects
+            # why execution stopped.
+            if not queue_owner_is_active(self._services, queue_item):
+                self._services.logger.warning(
+                    f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated or deleted"
+                )
+                with suppress(SessionQueueItemNotFoundError):
+                    self._services.session_queue.cancel_queue_item(queue_item.item_id)
                 break
 
             self.run_node(invocation, queue_item)
@@ -347,6 +380,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         register_events(QueueClearedEvent, self._on_queue_cleared)
         register_events(BatchEnqueuedEvent, self._on_batch_enqueued)
         register_events(QueueItemStatusChangedEvent, self._on_queue_item_status_changed)
+        register_events(UserAccessChangedEvent, self._on_user_access_changed)
 
         self._thread_semaphore = BoundedSemaphore(self._thread_limit)
 
@@ -398,6 +432,23 @@ class DefaultSessionProcessor(SessionProcessorBase):
     async def _on_batch_enqueued(self, event: FastAPIEvent[BatchEnqueuedEvent]) -> None:
         self._poll_now()
 
+    async def _on_user_access_changed(self, event: FastAPIEvent[UserAccessChangedEvent]) -> None:
+        # If the owner of the currently running queue item was deactivated or deleted,
+        # cancel the item immediately. Canceling emits a QueueItemStatusChangedEvent,
+        # which sets the cancel event (see `_on_queue_item_status_changed`), stopping
+        # long-running nodes at their next step callback rather than waiting for the
+        # node to finish. Pending items are handled at dequeue.
+        event_data = event[1]
+        if event_data.is_active:
+            return
+        queue_item = self._queue_item
+        if queue_item is not None and queue_item.user_id == event_data.user_id:
+            self._invoker.services.logger.warning(
+                f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} was deactivated or deleted"
+            )
+            with suppress(SessionQueueItemNotFoundError):
+                self._invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
+
     async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
         # Make sure the cancel event is for the currently processing queue item
         if self._queue_item and self._queue_item.item_id != event[1].item_id:
@@ -434,6 +485,20 @@ class DefaultSessionProcessor(SessionProcessorBase):
         image_moves = getattr(self._invoker.services, "image_moves", None)
         return image_moves is not None and image_moves.is_maintenance_active()
 
+    def _cancel_queue_item_if_owner_inactive(self, queue_item: SessionQueueItem) -> bool:
+        """Cancel a dequeued item whose owner is deactivated or deleted.
+
+        Returns True if the item was rejected (canceled) and must not be executed.
+        """
+        if queue_owner_is_active(self._invoker.services, queue_item):
+            return False
+        self._invoker.services.logger.warning(
+            f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated or deleted"
+        )
+        with suppress(SessionQueueItemNotFoundError):
+            self._invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
+        return True
+
     def _process(
         self,
         stop_event: ThreadEvent,
@@ -467,6 +532,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         # The queue was empty, wait for next polling interval or event to try again
                         self._invoker.services.logger.debug("Waiting for next polling interval or event")
                         poll_now_event.wait(self._polling_interval)
+                        continue
+
+                    # Reject items whose owner was deactivated or deleted while the item
+                    # was pending — no invocation may run and no output may be saved on
+                    # behalf of a revoked account.
+                    if self._cancel_queue_item_if_owner_inactive(self._queue_item):
+                        self._queue_item = None
                         continue
 
                     # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.
