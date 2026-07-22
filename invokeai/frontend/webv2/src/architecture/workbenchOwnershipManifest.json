@@ -3,21 +3,70 @@
   "currentOwner": "workbench",
   "emptyDirectories": ["i18n"],
   "directoryRules": {
-    "canvas-engine": { "targetOwner": "workbench", "targetPath": "workbench/canvas-engine" },
-    "canvas-operations": { "targetOwner": "workbench", "targetPath": "workbench/canvas-operations" },
-    "components": { "targetOwner": "workbench", "targetPath": "workbench/components" },
-    "diagnostics": { "targetOwner": "workbench", "targetPath": "workbench/diagnostics" },
-    "extensions": { "targetOwner": "workbench", "targetPath": "workbench/extensions" },
-    "hotkeys": { "targetOwner": "workbench", "targetPath": "workbench/hotkeys" },
-    "i18n": { "targetOwner": "workbench", "targetPath": "workbench/i18n" },
-    "image-actions": { "targetOwner": "workbench", "targetPath": "workbench/image-actions" },
-    "launchpad": { "targetOwner": "workbench", "targetPath": "workbench/launchpad" },
-    "projects": { "targetOwner": "workbench", "targetPath": "workbench/projects" },
-    "queue-integration": { "targetOwner": "workbench", "targetPath": "workbench/queue-integration" },
-    "settings": { "targetOwner": "workbench", "targetPath": "workbench/settings" },
-    "shell": { "targetOwner": "workbench", "targetPath": "workbench/shell" },
-    "widget-frame": { "targetOwner": "workbench", "targetPath": "workbench/widget-frame" },
-    "widgets": { "targetOwner": "workbench", "targetPath": "workbench/widgets" }
+    "canvas-engine": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/canvas-engine"
+    },
+    "canvas-operations": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/canvas-operations"
+    },
+    "components": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/components"
+    },
+    "diagnostics": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/diagnostics"
+    },
+    "extensions": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/extensions"
+    },
+    "hotkeys": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/hotkeys"
+    },
+    "i18n": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/i18n"
+    },
+    "image-actions": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/image-actions"
+    },
+    "launchpad": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/launchpad"
+    },
+    "palette": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/palette"
+    },
+    "projects": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/projects"
+    },
+    "queue-integration": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/queue-integration"
+    },
+    "settings": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/settings"
+    },
+    "shell": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/shell"
+    },
+    "widget-frame": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/widget-frame"
+    },
+    "widgets": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/widgets"
+    }
   },
   "overrides": [
     {

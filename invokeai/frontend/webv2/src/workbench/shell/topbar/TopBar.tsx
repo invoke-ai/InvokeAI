@@ -2,6 +2,7 @@ import { Flex, HStack, Separator } from '@chakra-ui/react';
 import { AccountMenu, useCapabilities } from '@features/identity';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link } from '@tanstack/react-router';
+import { PaletteButton } from '@workbench/palette';
 import { ProjectTabs } from '@workbench/projects/components';
 
 import { SettingsButton } from '@/workbench/settings';
@@ -55,6 +56,7 @@ export const TopBar = () => {
       <HStack gap="0.5">
         {canManageNodes ? <NodesManagerButton /> : null}
         {canManageModels ? <ModelManagerButton /> : null}
+        <PaletteButton />
         <SettingsButton />
       </HStack>
       <AccountMenu />

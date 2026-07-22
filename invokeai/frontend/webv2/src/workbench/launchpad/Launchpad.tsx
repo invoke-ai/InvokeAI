@@ -4,6 +4,7 @@ import { ModelsPage } from '@features/models';
 import { NodesPage } from '@features/nodes';
 import { Tabs } from '@platform/ui';
 import { useLocation, useNavigate } from '@tanstack/react-router';
+import { LaunchpadCommandPalette } from '@workbench/palette';
 import { BoxIcon, BlocksIcon, FolderIcon, UsersIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -111,6 +112,7 @@ export const Launchpad = () => {
     <Flex bg="bg" color="fg" direction="column" h="100dvh" overflow="hidden">
       <LaunchpadTopBar />
       <LaunchpadSections sections={filtered} />
+      <LaunchpadCommandPalette />
     </Flex>
   );
 };

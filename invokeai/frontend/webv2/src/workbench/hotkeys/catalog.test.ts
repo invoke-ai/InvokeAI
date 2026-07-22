@@ -5,9 +5,10 @@ import { firstPartyHotkeyCatalog } from './catalog';
 describe('firstPartyHotkeyCatalog', () => {
   it('keeps legacy default hotkey parity', () => {
     // 91 legacy-parity entries + `canvas.newSession` (webv2 new-canvas command,
-    // no default keys — Task 46).
-    expect(firstPartyHotkeyCatalog).toHaveLength(92);
+    // no default keys — Task 46) + `app.openCommandPalette` (webv2-only, mod+k).
+    expect(firstPartyHotkeyCatalog).toHaveLength(93);
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.invoke');
+    expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.openCommandPalette');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('canvas.mergeDown');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('canvas.newSession');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('workflows.copySelection');

@@ -6,6 +6,7 @@ import { useConnectionStatusSelector } from '@platform/transport/connectionStore
 import { Button } from '@platform/ui';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link, useSearch } from '@tanstack/react-router';
+import { PaletteButton } from '@workbench/palette';
 import { SettingsButton } from '@workbench/settings/SettingsDialog';
 import { ArrowLeftIcon } from 'lucide-react';
 import { useMemo } from 'react';
@@ -75,6 +76,7 @@ export const LaunchpadTopBar = () => {
       <HStack gap="2">
         <ConnectionChip />
         <HStack gap="0.5">
+          <PaletteButton />
           <SettingsButton />
           <AccountMenu />
         </HStack>

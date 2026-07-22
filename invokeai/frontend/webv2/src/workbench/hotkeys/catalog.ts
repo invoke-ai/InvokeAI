@@ -10,6 +10,7 @@ const categoryScopes = {
 
 const implemented = new Set([
   'app.cancelQueueItem',
+  'app.openCommandPalette',
   'app.clearQueue',
   'app.focusPrompt',
   'app.invoke',
@@ -103,6 +104,9 @@ const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): Ho
 };
 
 export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
+  // The palette must open while typing and toggle closed above its own modal
+  // layer, so it opts into both editable and modal contexts.
+  { ...hotkey('app', 'openCommandPalette', ['mod+k']), allowInEditable: true, allowInModal: true },
   hotkey('app', 'invoke', ['mod+enter']),
   hotkey('app', 'invokeFront', ['mod+shift+enter']),
   hotkey('app', 'cancelQueueItem', ['shift+x']),

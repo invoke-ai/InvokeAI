@@ -13,6 +13,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { getConnectionStatus } from '@platform/transport/connectionStore';
 import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
 import { submitResolvedInvocation } from '@workbench/invocationSubmit';
+import { toggleCommandPalette } from '@workbench/palette/paletteStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -31,6 +32,7 @@ const imageRecallCommands: Record<string, ImageRecallKind> = {
 export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.invoke',
   'app.invokeFront',
+  'app.openCommandPalette',
   'app.cancelQueueItem',
   'app.clearQueue',
   'app.selectGenerateTab',
@@ -134,6 +136,11 @@ export const useRegisterFirstPartyCommands = () => {
 
   useEffect(() => {
     const disposers = [
+      commandApi.register({
+        handler: toggleCommandPalette,
+        id: 'app.openCommandPalette',
+        title: 'Open Command Palette',
+      }),
       commandApi.register({ handler: submitInvocation, id: 'app.invoke', title: 'Invoke' }),
       commandApi.register({ handler: submitInvocation, id: 'app.invokeFront', title: 'Invoke front' }),
       commandApi.register({
