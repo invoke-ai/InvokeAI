@@ -602,3 +602,53 @@ def test_force_unload_failure_does_not_break_swap():
         model = swapper.get(_ExpertSwapper.LOW)
         assert model is low_info._model
         swapper.close()
+
+
+def test_slots_cleared_when_device_exit_raises():
+    """Counterpart to the LoRA-exit regression (JPPhoto review 2026-07-21): if the
+    *device* context's ``__exit__`` raises, the swapper must still clear every active
+    slot — otherwise a later ``close()`` double-exits the already-exited LoRA context
+    and ``get()`` can hand back a stale model."""
+    log: list[str] = []
+    high_nn = nn.Linear(1, 1)
+
+    class _ExitRaisingDeviceCtx(_FakeModelOnDevice):
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self._log.append(f"device-exit:{self._label}")
+            raise RuntimeError("device teardown blew up")
+
+    class _ExitRaisingInfo(_FakeInfo):
+        def model_on_device(self):
+            return _ExitRaisingDeviceCtx(self._label, self._model, self._log)
+
+    ctx = _FakeContext({"high": _ExitRaisingInfo("HIGH", high_nn, log)}, log)
+    stub, _calls = _stub_lora_context_manager(log)
+    with patch(
+        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        side_effect=stub,
+    ):
+        swapper = _ExpertSwapper(
+            context=ctx,
+            high_model="high",
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            high_lora_factory=_make_factory(log, "HIGH"),
+            low_lora_factory=None,
+        )
+        swapper.get(_ExpertSwapper.HIGH)
+
+        with pytest.raises(RuntimeError, match="device teardown blew up"):
+            swapper.close()
+
+        # Every slot must be cleared despite the device-exit failure...
+        assert swapper._active_device_ctx is None
+        assert swapper._active_lora_ctx is None
+        assert swapper._active_model is None
+        assert swapper._active_label is None
+
+        # ...so a second close is a true no-op: no double LoRA exit, no second
+        # device exit attempt.
+        swapper.close()
+
+    assert log.count("lora-exit") == 1
+    assert log.count("device-exit:HIGH") == 1

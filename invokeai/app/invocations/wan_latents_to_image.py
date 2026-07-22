@@ -50,6 +50,16 @@ class WanLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
+        # This node decodes exactly one image. Multi-frame video latents would otherwise
+        # run the full (expensive) multi-frame VAE decode — under a working-memory
+        # estimate that assumed one frame — and then die in an opaque einops rank error
+        # at the final rearrange. Checked before the VAE is even loaded.
+        if latents.ndim == 5 and latents.shape[2] != 1:
+            raise ValueError(
+                f"These latents hold {latents.shape[2]} frames of video; this node decodes a single "
+                "image. Use 'Latents to Video - Wan 2.2' (wan_l2v) for video latents."
+            )
+
         vae_info = context.models.load(self.vae.vae)
         if not isinstance(vae_info.model, AutoencoderKLWan):
             raise TypeError(f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}.")

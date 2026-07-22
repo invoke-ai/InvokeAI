@@ -28,27 +28,59 @@ from invokeai.backend.model_manager.taxonomy import (
 WanLoRATarget = Literal["auto", "both", "high", "low"]
 
 
-def _assert_lora_variant_matches_main(
-    context: InvocationContext,
-    transformer_field: WanTransformerField,
-    lora_id: ModelIdentifierField,
-) -> None:
+def _assert_is_wan_lora(lora_config: object, lora_key: str) -> None:
+    """Reject an identifier whose *resolved* config is not a Wan LoRA.
+
+    The identifier's own ``base``/``type`` fields are client-supplied and cannot be
+    trusted: a hand-authored workflow can label any existing model key as a Wan LoRA
+    and reach model patching (or fail minutes in, after expensive loading). Only the
+    config the key actually resolves to is authoritative.
+    """
+    config_type = getattr(lora_config, "type", None)
+    config_base = getattr(lora_config, "base", None)
+    if config_type is not ModelType.LoRA or config_base is not BaseModelType.Wan:
+        raise ValueError(
+            f"Model '{lora_key}' is not a Wan LoRA (resolved to "
+            f"type={getattr(config_type, 'value', config_type)}, "
+            f"base={getattr(config_base, 'value', config_base)})."
+        )
+
+
+def _assert_lora_variant_matches_main(lora_config: object, main_config: object, lora_key: str) -> None:
     """Reject an A14B LoRA wired against a 5B main (and vice versa).
 
     A mismatch otherwise crashes deep in the layer patcher mid-denoise with an opaque
     tensor-shape error, after minutes of model loading. Skips silently when either
     variant is unrecorded (e.g. a LoRA whose targeted layers don't pin the inner dim).
     """
-    lora_variant = getattr(context.models.get_config(lora_id), "variant", None)
-    main_variant = getattr(context.models.get_config(transformer_field.transformer), "variant", None)
+    lora_variant = getattr(lora_config, "variant", None)
+    main_variant = getattr(main_config, "variant", None)
     if lora_variant is None or main_variant is None:
         return
     lora_is_5b = lora_variant == WanLoRAVariantType.Wan5B
     main_is_5b = main_variant == WanVariantType.TI2V_5B
     if lora_is_5b != main_is_5b:
         raise ValueError(
-            f"LoRA '{lora_id.key}' targets Wan {lora_variant.value.upper()} models, but the "
+            f"LoRA '{lora_key}' targets Wan {lora_variant.value.upper()} models, but the "
             f"transformer is a {main_variant.value} model. A14B and 5B LoRAs are not interchangeable."
+        )
+
+
+def _warn_if_low_routing_is_inert(
+    context: InvocationContext, main_config: object, lora_key: str, to_primary: bool, to_low_noise: bool
+) -> None:
+    """Warn when a LoRA is routed only to the low-noise list of a TI2V-5B main.
+
+    The single-transformer TI2V-5B denoise path consumes only the primary list, so
+    such a LoRA silently has no effect — the node would otherwise report success
+    while doing nothing.
+    """
+    if to_primary or not to_low_noise:
+        return
+    if getattr(main_config, "variant", None) == WanVariantType.TI2V_5B:
+        context.logger.warning(
+            f"LoRA '{lora_key}' is routed only to the low-noise expert, which the single-transformer "
+            "TI2V-5B variant never uses — the LoRA will have no effect."
         )
 
 
@@ -95,7 +127,8 @@ class WanLoRALoaderInvocation(BaseInvocation):
     field to override.
 
     For TI2V-5B (single transformer) only the primary list is used at denoise
-    time; the low-noise routing is harmless but ignored.
+    time; a LoRA routed only to the low-noise list would be inert, so that
+    routing logs a warning.
     """
 
     lora: ModelIdentifierField = InputField(
@@ -123,15 +156,19 @@ class WanLoRALoaderInvocation(BaseInvocation):
         if not context.models.exists(lora_key):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
+        lora_config = context.models.get_config(self.lora)
+        _assert_is_wan_lora(lora_config, lora_key)
+
         output = WanLoRALoaderOutput()
         if self.transformer is None:
             return output
 
-        _assert_lora_variant_matches_main(context, self.transformer, self.lora)
+        main_config = context.models.get_config(self.transformer.transformer)
+        _assert_lora_variant_matches_main(lora_config, main_config, lora_key)
 
-        lora_config = context.models.get_config(self.lora)
         lora_expert = getattr(lora_config, "expert", None)
         to_primary, to_low_noise = _resolve_target(self.target, lora_expert)
+        _warn_if_low_routing_is_inert(context, main_config, lora_key, to_primary, to_low_noise)
 
         # Reject duplicates on whichever list(s) we're about to append to.
         if to_primary and any(item.lora.key == lora_key for item in self.transformer.loras):
@@ -192,28 +229,33 @@ class WanLoRACollectionLoader(BaseInvocation):
 
         loras = self.loras if isinstance(self.loras, list) else [self.loras]
         added: set[str] = set()
+        main_config = context.models.get_config(self.transformer.transformer)
 
         for lora in loras:
             if lora is None or lora.lora.key in added:
                 continue
 
-            if not context.models.exists(lora.lora.key):
-                raise ValueError(f"Unknown lora: {lora.lora.key}!")
-
-            if lora.lora.base is not BaseModelType.Wan:
-                raise ValueError(
-                    f"LoRA '{lora.lora.key}' is for "
-                    f"{lora.lora.base.value if lora.lora.base else 'unknown'} models, "
-                    "not Wan 2.2."
-                )
-
-            _assert_lora_variant_matches_main(context, self.transformer, lora.lora)
+            lora_key = lora.lora.key
+            if not context.models.exists(lora_key):
+                raise ValueError(f"Unknown lora: {lora_key}!")
 
             lora_config = context.models.get_config(lora.lora)
+            _assert_is_wan_lora(lora_config, lora_key)
+            _assert_lora_variant_matches_main(lora_config, main_config, lora_key)
+
             lora_expert = getattr(lora_config, "expert", None)
             to_primary, to_low_noise = _resolve_target("auto", lora_expert)
+            _warn_if_low_routing_is_inert(context, main_config, lora_key, to_primary, to_low_noise)
 
-            added.add(lora.lora.key)
+            # Reject LoRAs already applied upstream (same invariant the single loader
+            # enforces) — re-appending would silently double the effective weight.
+            # Intra-collection duplicates are skipped via `added` before reaching here.
+            if to_primary and any(item.lora.key == lora_key for item in output.transformer.loras):
+                raise ValueError(f'LoRA "{lora_key}" already applied to primary transformer list.')
+            if to_low_noise and any(item.lora.key == lora_key for item in output.transformer.loras_low_noise):
+                raise ValueError(f'LoRA "{lora_key}" already applied to low-noise transformer list.')
+
+            added.add(lora_key)
 
             if to_primary:
                 output.transformer.loras.append(lora)

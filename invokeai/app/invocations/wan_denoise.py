@@ -255,17 +255,22 @@ class _ExpertSwapper:
         # LoRA context first so weights are restored before the model leaves GPU. The
         # device context must exit even if weight-restore raises — otherwise the cache
         # record stays locked and the expert is pinned in VRAM for the whole process.
+        # The field-clearing sits in its own finally so that a device-exit failure
+        # cannot leave stale contexts behind: a later close() would double-exit the
+        # already-exited LoRA context, and get() could hand back a stale model.
         try:
             if self._active_lora_ctx is not None:
                 self._active_lora_ctx.__exit__(None, None, None)
         finally:
-            if self._active_device_ctx is not None:
-                self._active_device_ctx.__exit__(None, None, None)
-            self._active_label = None
-            self._active_info = None
-            self._active_device_ctx = None
-            self._active_lora_ctx = None
-            self._active_model = None
+            try:
+                if self._active_device_ctx is not None:
+                    self._active_device_ctx.__exit__(None, None, None)
+            finally:
+                self._active_label = None
+                self._active_info = None
+                self._active_device_ctx = None
+                self._active_lora_ctx = None
+                self._active_model = None
 
     def close(self) -> None:
         self._release()
