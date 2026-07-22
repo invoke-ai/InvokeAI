@@ -302,9 +302,7 @@ class TestAllReadableBoardsFiltering:
         add_boarded_image("public-visibility.png", owner="user2", visibility=BoardVisibility.Public)
         add_boarded_image("other-private.png", owner="user2")
         add_boarded_image("own-archived.png", owner="user1", archived=True)
-        add_boarded_image(
-            "other-archived-public.png", owner="user2", visibility=BoardVisibility.Public, archived=True
-        )
+        add_boarded_image("other-archived-public.png", owner="user2", visibility=BoardVisibility.Public, archived=True)
         _save(image_store, "own-uncategorized.png", user_id="user1")
         _save(image_store, "other-uncategorized.png", user_id="user2")
 
