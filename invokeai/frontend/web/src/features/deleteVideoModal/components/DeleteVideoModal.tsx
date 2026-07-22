@@ -28,7 +28,7 @@ export const DeleteVideoModal = memo(() => {
     <ConfirmationAlertDialog
       title={`${t('gallery.deleteVideo', { count: state.video_names.length })}`}
       isOpen={state.isOpen}
-      onClose={api.close}
+      onClose={api.cancel}
       cancelButtonText={t('common.cancel')}
       acceptButtonText={t('common.delete')}
       acceptCallback={api.confirm}

@@ -23,6 +23,7 @@ import { getImageUsage } from 'features/deleteImageModal/store/state';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -107,17 +108,29 @@ const DeleteBoardModal = () => {
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardAndImages]);
 
-  const handleDeleteUncategorizedMedia = useCallback(() => {
+  const handleDeleteUncategorizedMedia = useCallback(async () => {
     if (!boardToDelete || boardToDelete !== 'none') {
       return;
     }
     // The uncategorized bucket is polymorphic (the button says "Images/Videos"), so both
     // media kinds are deleted. The mutations are independent — a failure in one doesn't
     // block the other.
-    deleteUncategorizedImages();
-    deleteUncategorizedVideos();
+    const [, videoResult] = await Promise.allSettled([
+      deleteUncategorizedImages().unwrap(),
+      deleteUncategorizedVideos().unwrap(),
+    ]);
+    if (videoResult.status === 'rejected' || videoResult.value.failed_videos.length > 0) {
+      toast({
+        status: videoResult.status === 'rejected' ? 'error' : 'warning',
+        title: t('toast.videoDeleteFailed'),
+        description:
+          videoResult.status === 'rejected'
+            ? t('toast.videoDeleteFailedDesc')
+            : t('toast.videoDeletePartial', { count: videoResult.value.failed_videos.length }),
+      });
+    }
     $boardToDelete.set(null);
-  }, [boardToDelete, deleteUncategorizedImages, deleteUncategorizedVideos]);
+  }, [boardToDelete, deleteUncategorizedImages, deleteUncategorizedVideos, t]);
 
   const handleClose = useCallback(() => {
     $boardToDelete.set(null);

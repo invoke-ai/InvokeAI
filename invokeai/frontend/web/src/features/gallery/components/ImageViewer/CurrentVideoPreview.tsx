@@ -116,6 +116,16 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     );
   }, [videoDTO, store]);
 
+  const handleVideoError = useCallback(() => {
+    setIsPlaying(false);
+    toast({
+      id: 'VIDEO_PLAYBACK_FAILED',
+      status: 'error',
+      title: t('toast.videoPlaybackFailed'),
+      description: t('toast.videoPlaybackFailedDesc'),
+    });
+  }, [t]);
+
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
     // The ref points at the same element we'll re-render with controls/audio; calling
@@ -123,17 +133,8 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     // A rejected play() (blocked autoplay, codec error, missing media cookie) must roll
     // the state back — otherwise the overlay stays hidden over a dead element and the
     // rejection surfaces as an unhandled promise.
-    videoRef.current?.play().catch(() => {
-      setIsPlaying(false);
-    });
-  }, []);
-
-  // A media error (unsupported codec, failed request) mid-playback would leave the
-  // controls shown over a dead black element. Drop back to the non-playing state so the
-  // play overlay returns and offers a retry.
-  const handleVideoError = useCallback(() => {
-    setIsPlaying(false);
-  }, []);
+    videoRef.current?.play().catch(handleVideoError);
+  }, [handleVideoError]);
 
   // Close: stop playback and drop back to the first-frame preview + play overlay. We
   // explicitly pause() because toggling React's `controls` prop hides the chrome but does

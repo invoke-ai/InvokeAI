@@ -42,6 +42,11 @@ class _FrameWriter(Protocol):
     def append_data(self, frame: np.ndarray) -> None: ...
 
 
+def _validate_video_latent_batch(latents: torch.Tensor) -> None:
+    if latents.ndim in (4, 5) and latents.shape[0] != 1:
+        raise ValueError(f"Wan latents-to-video requires batch size 1; got {latents.shape[0]}.")
+
+
 def _iter_decoded_frames(decoded: torch.Tensor) -> Iterator[np.ndarray]:
     for index in range(decoded.shape[1]):
         frame = decoded[:, index]
@@ -84,6 +89,7 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> VideoOutput:
         latents = context.tensors.load(self.latents.latents_name)
+        _validate_video_latent_batch(latents)
         if latents.ndim == 4:
             # Promote 4D (single-frame) to 5D so this node can also serve as a
             # one-frame "video" encode if someone wires it that way.

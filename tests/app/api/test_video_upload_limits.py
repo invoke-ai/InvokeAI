@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from starlette.datastructures import Headers
 
 from invokeai.app import api_app
+from invokeai.app.api.routers import videos
 from invokeai.app.api.routers.videos import upload_video
 from invokeai.app.api_app import (
     SubPathASGIMiddleware,
@@ -29,6 +30,21 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 
 MAX_BODY = 1024  # tiny cap for tests
 MAX_CONCURRENT = 2
+
+
+def test_upload_probe_requires_a_decodable_frame(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(videos, "probe_video", lambda path: (48, 32, 1.0, 8.0))
+    monkeypatch.setattr(videos, "extract_video_frame", lambda path, frame_index=0: None)
+
+    with pytest.raises(ValueError, match="decodable frame"):
+        videos._probe_decodable_video(Path("metadata-only.mp4"))
+
+
+def test_upload_probe_accepts_valid_metadata_and_frame(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(videos, "probe_video", lambda path: (48, 32, 1.0, 8.0))
+    monkeypatch.setattr(videos, "extract_video_frame", lambda path, frame_index=0: MagicMock())
+
+    assert videos._probe_decodable_video(Path("valid.mp4")) == (48, 32, 1.0, 8.0)
 
 
 def _build_app() -> tuple[FastAPI, list[str]]:
@@ -129,6 +145,46 @@ def test_active_count_released_after_request():
     client.post("/api/v1/videos/upload", content=b"x")
 
     assert middleware._active == 0
+
+
+def test_idle_chunked_upload_releases_capacity():
+    messages: list[dict[str, Any]] = []
+    receive_calls = 0
+
+    async def app(scope, receive, send):
+        while (message := await receive())["type"] == "http.request" and message.get("more_body"):
+            pass
+        await Response(status_code=400)(scope, receive, send)
+
+    async def receive() -> dict[str, Any]:
+        nonlocal receive_calls
+        receive_calls += 1
+        if receive_calls == 1:
+            return {"type": "http.request", "body": b"x", "more_body": True}
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    async def send(message: dict[str, Any]) -> None:
+        messages.append(message)
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/videos/upload",
+        "root_path": "",
+        "headers": [],
+    }
+    middleware = VideoUploadLimitASGIMiddleware(
+        app,
+        max_body_bytes=MAX_BODY,
+        max_concurrent=1,
+        idle_timeout_seconds=0.01,
+    )
+
+    asyncio.run(asyncio.wait_for(middleware(scope, receive, send), timeout=1))  # type: ignore[arg-type]
+
+    assert middleware._active == 0
+    assert any(message.get("status") == 400 for message in messages)
 
 
 def _identify_by_bearer(scope: Any) -> tuple[bool, str | None]:

@@ -10,7 +10,15 @@ import { useRefreshMediaCookieMutation } from 'services/api/endpoints/auth';
 const RETRY_DELAYS_MS = [2_000, 10_000];
 
 let pauseRefreshHandler: (() => Promise<() => void>) | null = null;
-const pendingRefreshes = new Set<Promise<void>>();
+type PendingRefresh = { promise: Promise<void>; abort: () => void };
+const pendingRefreshes = new Set<PendingRefresh>();
+
+export const abortAndWaitForPendingRefreshes = async (pending: Set<PendingRefresh>) => {
+  for (const refresh of pending) {
+    refresh.abort();
+  }
+  await Promise.all([...pending].map((refresh) => refresh.promise));
+};
 
 export const pauseMediaCookieRefreshForLogout = (): Promise<() => void> =>
   pauseRefreshHandler?.() ?? Promise.resolve(() => undefined);
@@ -53,7 +61,8 @@ export const useMediaCookieRefresh = () => {
         return;
       }
       nextAttemptIndex = null;
-      const refreshPromise = refreshMediaCookie()
+      const request = refreshMediaCookie();
+      const refreshPromise = request
         .unwrap()
         .then(() => {
           if (canceled) {
@@ -79,8 +88,9 @@ export const useMediaCookieRefresh = () => {
             timeoutId = setTimeout(() => attempt(attemptIndex + 1), delay);
           }
         });
-      pendingRefreshes.add(refreshPromise);
-      void refreshPromise.finally(() => pendingRefreshes.delete(refreshPromise));
+      const pendingRefresh = { promise: refreshPromise, abort: request.abort };
+      pendingRefreshes.add(pendingRefresh);
+      void refreshPromise.finally(() => pendingRefreshes.delete(pendingRefresh));
     };
 
     const pause = async () => {
@@ -89,7 +99,7 @@ export const useMediaCookieRefresh = () => {
         clearTimeout(timeoutId);
         timeoutId = undefined;
       }
-      await Promise.all(pendingRefreshes);
+      await abortAndWaitForPendingRefreshes(pendingRefreshes);
       return () => {
         if (canceled || hasSucceeded.current) {
           return;

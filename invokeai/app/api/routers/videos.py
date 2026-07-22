@@ -28,7 +28,7 @@ from invokeai.app.services.videos.videos_common import (
     VideoDTO,
     VideoUrlsDTO,
 )
-from invokeai.app.util.video_thumbnails import probe_video
+from invokeai.app.util.video_thumbnails import extract_video_frame, probe_video
 
 videos_router = APIRouter(prefix="/v1/videos", tags=["videos"])
 
@@ -187,6 +187,13 @@ def _is_mp4_file(path: Path) -> bool:
     return False
 
 
+def _probe_decodable_video(path: Path) -> tuple[int, int, float, Optional[float]]:
+    metadata = probe_video(path)
+    if extract_video_frame(path, frame_index=0) is None:
+        raise ValueError("Video has no decodable frame")
+    return metadata
+
+
 @videos_router.post(
     "/upload",
     operation_id="upload_video",
@@ -262,7 +269,7 @@ async def upload_video(
             raise HTTPException(status_code=415, detail="Not an MP4 video file")
 
         try:
-            width, height, duration, fps = await run_in_threadpool(probe_video, tmp_path)
+            width, height, duration, fps = await run_in_threadpool(_probe_decodable_video, tmp_path)
         except Exception:
             ApiDependencies.invoker.services.logger.error(traceback.format_exc())
             raise HTTPException(status_code=415, detail="Failed to read video")
@@ -330,6 +337,7 @@ async def delete_video(
 
     return DeleteVideosResult(
         deleted_videos=[video_name],
+        failed_videos=[],
         affected_boards=[board_id],
     )
 
@@ -344,6 +352,7 @@ async def delete_videos_from_list(
     # Without this, the client cache never learns about the partial successes and the
     # already-deleted records reappear in the UI until the next full refresh.
     deleted_videos: set[str] = set()
+    failed_videos: set[str] = set()
     affected_boards: set[str] = set()
     for video_name in video_names:
         try:
@@ -354,11 +363,13 @@ async def delete_videos_from_list(
             deleted_videos.add(video_name)
             affected_boards.add(board_id)
         except HTTPException:
+            failed_videos.add(video_name)
             continue
         except Exception:
-            pass
+            failed_videos.add(video_name)
     return DeleteVideosResult(
         deleted_videos=list(deleted_videos),
+        failed_videos=list(failed_videos),
         affected_boards=list(affected_boards),
     )
 
@@ -378,6 +389,7 @@ async def delete_uncategorized_videos(
         is_admin=current_user.is_admin,
     )
     deleted_videos: set[str] = set()
+    failed_videos: set[str] = set()
     affected_boards: set[str] = set()
     for video_name in names_result.video_names:
         try:
@@ -387,11 +399,13 @@ async def delete_uncategorized_videos(
             affected_boards.add("none")
         except HTTPException:
             # Skip videos not owned by the current user
+            failed_videos.add(video_name)
             continue
         except Exception:
-            pass
+            failed_videos.add(video_name)
     return DeleteVideosResult(
         deleted_videos=list(deleted_videos),
+        failed_videos=list(failed_videos),
         affected_boards=list(affected_boards),
     )
 

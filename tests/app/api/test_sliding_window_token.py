@@ -1,6 +1,7 @@
 """Tests for SlidingWindowTokenMiddleware and token refresh behavior."""
 
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI, Request, Response
@@ -10,9 +11,25 @@ from invokeai.app.services.auth.token_service import TokenData, create_access_to
 
 
 @pytest.fixture(autouse=True)
-def _setup_jwt_secret():
+def _setup_jwt_secret(monkeypatch: pytest.MonkeyPatch):
     """Ensure JWT secret is set for all tests."""
+    from invokeai.app.api.dependencies import ApiDependencies
+
     set_jwt_secret("test-secret-key-for-sliding-window-tests")
+    user = SimpleNamespace(
+        user_id="test-user",
+        email="test@test.com",
+        is_admin=False,
+        is_active=True,
+    )
+    users = SimpleNamespace(get=lambda user_id: user if user_id == user.user_id else None)
+    monkeypatch.setattr(
+        ApiDependencies,
+        "invoker",
+        SimpleNamespace(services=SimpleNamespace(users=users)),
+        raising=False,
+    )
+    return user
 
 
 def _create_test_app() -> FastAPI:
@@ -45,7 +62,9 @@ def _create_test_app() -> FastAPI:
 
     @test_app.post("/api/v1/auth/media-cookie")
     async def media_cookie_endpoint(request: Request, response: Response):
-        response.set_cookie("invokeai_media_token", request.headers["authorization"][7:], path="/api/v1")
+        from invokeai.app.api.routers.auth import _set_media_cookie
+
+        _set_media_cookie(request, response, request.headers["authorization"][7:], 300)
         return {"ok": True}
 
     @test_app.post("/api/v1/auth/login")
@@ -92,16 +111,15 @@ class TestSlidingWindowTokenMiddleware:
         assert "X-Refreshed-Token" not in response.headers
         assert "set-cookie" not in response.headers
 
-    def test_mutating_request_refreshes_media_cookie_to_same_token(self):
+    def test_mutating_request_does_not_write_media_cookie_directly(self):
         app = _create_test_app()
         client = TestClient(app)
         token = _make_token(expires_delta=timedelta(minutes=5))
 
         response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
 
-        refreshed_token = response.headers["X-Refreshed-Token"]
-        assert response.cookies.get("invokeai_media_token") == refreshed_token
-        assert "Path=/api/v1" in response.headers["set-cookie"]
+        assert "X-Refreshed-Token" in response.headers
+        assert "set-cookie" not in response.headers
 
     @pytest.mark.parametrize("path", ["/api/v1/auth/logout", "/api/v1/auth/media-cookie"])
     def test_cookie_management_endpoints_do_not_refresh_token(self, path: str):
@@ -220,6 +238,39 @@ class TestSlidingWindowTokenMiddleware:
         assert refreshed_data is not None
         assert refreshed_data.remember_me is False
 
+    def test_refresh_uses_current_user_role_and_email(self, _setup_jwt_secret):
+        from invokeai.app.services.auth.token_service import verify_token
+
+        user = _setup_jwt_secret
+        stale_token = create_access_token(
+            TokenData(
+                user_id=user.user_id,
+                email="old@test.com",
+                is_admin=True,
+                remember_me=True,
+            )
+        )
+        user.email = "new@test.com"
+        user.is_admin = False
+
+        response = TestClient(_create_test_app()).post("/test", headers={"Authorization": f"Bearer {stale_token}"})
+
+        refreshed = verify_token(response.headers["X-Refreshed-Token"])
+        assert refreshed is not None
+        assert refreshed.email == "new@test.com"
+        assert refreshed.is_admin is False
+        assert refreshed.remember_me is True
+
+    def test_inactive_or_deleted_user_is_not_refreshed(self, _setup_jwt_secret):
+        user = _setup_jwt_secret
+        token = _make_token()
+        user.is_active = False
+
+        response = TestClient(_create_test_app()).post("/test", headers={"Authorization": f"Bearer {token}"})
+
+        assert "X-Refreshed-Token" not in response.headers
+        assert "set-cookie" not in response.headers
+
 
 class TestSlidingWindowBehindSubPathProxy:
     """Behind a sub-path proxy the middleware sees prefixed public paths; the refreshed
@@ -236,13 +287,14 @@ class TestSlidingWindowBehindSubPathProxy:
         return TestClient(wrapped, base_url=root)
 
     @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
-    def test_refreshed_cookie_is_scoped_to_public_prefix(self, preserve: bool):
+    def test_media_cookie_refresh_is_scoped_to_public_prefix(self, preserve: bool):
         client = self._proxied_client(preserve)
         token = _make_token(expires_delta=timedelta(minutes=5))
 
-        response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
+        mutation_response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
+        refreshed_token = mutation_response.headers["X-Refreshed-Token"]
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": f"Bearer {refreshed_token}"})
 
-        refreshed_token = response.headers["X-Refreshed-Token"]
         assert response.cookies.get("invokeai_media_token") == refreshed_token
         assert f"Path={self.BASE_PATH}/api/v1" in response.headers["set-cookie"]
 

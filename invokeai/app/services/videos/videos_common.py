@@ -43,6 +43,7 @@ class VideoResultWithAffectedBoards(BaseModel):
 
 class DeleteVideosResult(VideoResultWithAffectedBoards):
     deleted_videos: list[str] = Field(description="The names of the videos that were deleted")
+    failed_videos: list[str] = Field(description="The names of videos that were not deleted")
 
 
 class StarredVideosResult(VideoResultWithAffectedBoards):

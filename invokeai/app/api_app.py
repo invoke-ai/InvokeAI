@@ -122,12 +122,14 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                     from invokeai.app.api.routers.auth import (
                         TOKEN_EXPIRATION_NORMAL,
                         TOKEN_EXPIRATION_REMEMBER_ME,
-                        _set_media_cookie,
                     )
-                    from invokeai.app.services.auth.token_service import create_access_token, verify_token
+                    from invokeai.app.services.auth.token_service import TokenData, create_access_token, verify_token
 
                     token_data = verify_token(token)
                     if token_data is not None:
+                        user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+                        if user is None or not user.is_active:
+                            return response
                         # Use the remember_me claim from the token to determine the
                         # correct refresh duration. This avoids the bug where a 7-day
                         # token with <24h remaining would be silently downgraded to 1 day.
@@ -136,9 +138,14 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                         else:
                             expires_delta = timedelta(days=TOKEN_EXPIRATION_NORMAL)
 
-                        new_token = create_access_token(token_data, expires_delta)
+                        refreshed_data = TokenData(
+                            user_id=user.user_id,
+                            email=user.email,
+                            is_admin=user.is_admin,
+                            remember_me=token_data.remember_me,
+                        )
+                        new_token = create_access_token(refreshed_data, expires_delta)
                         response.headers["X-Refreshed-Token"] = new_token
-                        _set_media_cookie(request, response, new_token, int(expires_delta.total_seconds()))
                 except Exception:
                     pass  # Don't fail the request if token refresh fails
 
@@ -209,12 +216,14 @@ class VideoUploadLimitASGIMiddleware:
         max_concurrent: int,
         max_concurrent_per_user: int | None = None,
         identify_user: Callable[[Scope], tuple[bool, str | None]] | None = None,
+        idle_timeout_seconds: float = 120.0,
     ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
         self.max_concurrent = max_concurrent
         self.max_concurrent_per_user = max_concurrent_per_user
         self.identify_user = identify_user
+        self.idle_timeout_seconds = idle_timeout_seconds
         self._active = 0
         self._active_by_user: dict[str, int] = {}
 
@@ -276,7 +285,10 @@ class VideoUploadLimitASGIMiddleware:
             # parser stops spooling. A clean 413 isn't possible mid-parse; the aborted
             # request surfaces to the client as a dropped connection.
             nonlocal received
-            message = await receive()
+            try:
+                message = await asyncio.wait_for(receive(), timeout=self.idle_timeout_seconds)
+            except TimeoutError:
+                return {"type": "http.disconnect"}
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > self.max_body_bytes:

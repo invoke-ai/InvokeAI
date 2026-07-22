@@ -10,6 +10,7 @@ runner. End-to-end tests against real Wan checkpoints are gated behind
 from __future__ import annotations
 
 import os
+from collections import Counter
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -512,8 +513,6 @@ class TestWanDenoiseDualExpert:
         assert total == 12
 
         # Each unique timestep appears twice (cond + uncond) on the same expert.
-        from collections import Counter
-
         high_counts = Counter(high.timesteps_seen)
         low_counts = Counter(low.timesteps_seen)
         assert all(v == 2 for v in high_counts.values()), high_counts
@@ -521,6 +520,35 @@ class TestWanDenoiseDualExpert:
 
         # And the swap actually happened — both experts saw work.
         assert len(high_counts) > 0 and len(low_counts) > 0
+
+    def test_low_noise_cfg_runs_when_primary_scale_is_one(self, fake_model_root) -> None:
+        high = _ZeroTransformer(label="high")
+        low = _ZeroTransformer(label="low")
+        ctx = _build_context(
+            high,
+            transformer_low=low,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=_make_conditioning(),
+        )
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(dual=True, boundary_ratio=0.5),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=WanConditioningField(conditioning_name="neg"),
+            width=64,
+            height=64,
+            steps=6,
+            guidance_scale=1.0,
+            guidance_scale_low_noise=2.0,
+        )
+
+        inv._run_diffusion(ctx)
+
+        assert len(high.timesteps_seen) > 0
+        assert len(low.timesteps_seen) > 0
+        assert all(count == 1 for count in Counter(high.timesteps_seen).values())
+        assert all(count == 2 for count in Counter(low.timesteps_seen).values())
 
 
 @pytest.mark.skipif(
@@ -956,6 +984,37 @@ class TestWanVideoDenoiseMultiFrame:
     TI2V-5B expand-timesteps mask blend), and the zero-velocity noise invariant
     are all checkable on CPU without weights.
     """
+
+    def test_low_noise_cfg_runs_when_primary_scale_is_one(self, fake_model_root: Path) -> None:
+        high = _ZeroTransformer(label="high")
+        low = _ZeroTransformer(label="low")
+        ctx = _build_context(
+            high,
+            transformer_low=low,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=_make_conditioning(),
+        )
+        inv = WanVideoDenoiseInvocation(
+            id="test",
+            transformer=_wan_transformer_field(dual=True, boundary_ratio=0.5),
+            positive_conditioning=WanConditioningField(conditioning_name="pos"),
+            negative_conditioning=WanConditioningField(conditioning_name="neg"),
+            ref_image=None,
+            width=64,
+            height=64,
+            num_frames=5,
+            steps=6,
+            guidance_scale=1.0,
+            guidance_scale_low_noise=2.0,
+            seed=42,
+        )
+
+        inv._run_diffusion(ctx)
+
+        assert all(count == 1 for count in Counter(high.timesteps_seen).values())
+        assert all(count == 2 for count in Counter(low.timesteps_seen).values())
 
     @pytest.mark.parametrize(
         "variant,latent_channels,scale",

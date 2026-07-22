@@ -255,6 +255,7 @@ def test_delete_videos_from_list_skips_foreign_items_and_returns_owned(
     body = response.json()
     # Both owned items must appear; the foreign one must be skipped silently.
     assert set(body["deleted_videos"]) == {"mine_a.mp4", "mine_b.mp4"}
+    assert body["failed_videos"] == ["foreign.mp4"]
     # The service must have been told to delete the owned names but not the foreign one.
     delete_calls = {call.args[0] for call in mock_invoker.services.videos.delete.call_args_list}
     assert delete_calls == {"mine_a.mp4", "mine_b.mp4"}
@@ -391,7 +392,7 @@ def test_upload_video_rejects_non_mp4_container_with_spoofed_mime(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ):
     mock_invoker.services.videos.create.side_effect = AssertionError("non-MP4 payload reached video creation")
-    with patch("invokeai.app.api.routers.videos.probe_video", return_value=(64, 64, 1.0, 8.0)):
+    with patch("invokeai.app.api.routers.videos._probe_decodable_video", return_value=(64, 64, 1.0, 8.0)):
         response = client.post(
             "/api/v1/videos/upload",
             params={"video_category": "general", "is_intermediate": False},
@@ -432,7 +433,7 @@ def test_upload_video_rejects_malformed_metadata_before_create(
     mock_invoker.services.videos.create.return_value = _uploaded_video_dto()
     mp4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 12
 
-    with patch("invokeai.app.api.routers.videos.probe_video", return_value=(64, 64, 1.0, 8.0)):
+    with patch("invokeai.app.api.routers.videos._probe_decodable_video", return_value=(64, 64, 1.0, 8.0)):
         response = client.post(
             "/api/v1/videos/upload",
             params={"video_category": "general", "is_intermediate": False},
@@ -450,7 +451,7 @@ def test_upload_video_accepts_object_metadata(client: TestClient, mock_invoker: 
     mp4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 12
     metadata = '{"seed": 123}'
 
-    with patch("invokeai.app.api.routers.videos.probe_video", return_value=(64, 64, 1.0, 8.0)):
+    with patch("invokeai.app.api.routers.videos._probe_decodable_video", return_value=(64, 64, 1.0, 8.0)):
         response = client.post(
             "/api/v1/videos/upload",
             params={"video_category": "general", "is_intermediate": False},
@@ -771,6 +772,7 @@ def test_delete_uncategorized_videos_deletes_only_owned(client: TestClient, mock
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
     assert set(body["deleted_videos"]) == {"mine_a.mp4", "mine_b.mp4"}
+    assert body["failed_videos"] == ["foreign.mp4"]
     # The service must be scoped to the caller's uncategorized bucket.
     assert mock_invoker.services.videos.get_video_names.call_args.kwargs["board_id"] == "none"
     assert mock_invoker.services.videos.get_video_names.call_args.kwargs["user_id"] == user1.user_id

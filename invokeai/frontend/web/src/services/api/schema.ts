@@ -9027,6 +9027,11 @@ export type components = {
              * @description The names of the videos that were deleted
              */
             deleted_videos: string[];
+            /**
+             * Failed Videos
+             * @description The names of videos that were not deleted
+             */
+            failed_videos: string[];
         };
         /**
          * Denoise - SD1.5, SDXL

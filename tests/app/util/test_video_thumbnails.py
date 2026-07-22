@@ -25,7 +25,7 @@ import numpy as np
 import pytest
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
-from invokeai.app.util import video_thumbnails
+from invokeai.app.util import video_decode_worker, video_thumbnails
 from invokeai.app.util.video_thumbnails import decoder_frame_count, extract_video_frame, iter_video_frames, probe_video
 
 FRAMES = 12
@@ -382,3 +382,24 @@ class TestStreamBackendFallback:
         # the worker must error rather than emit an empty, successful stream.
         with pytest.raises((FileNotFoundError, ValueError)):
             self._collect_stream(monkeypatch, bogus)
+
+
+class TestDecodedFrameValidation:
+    def test_accepts_frame_within_pixel_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(video_decode_worker, "MAX_FRAME_PIXELS", 4)
+
+        video_decode_worker._validate_decoded_frame(np.zeros((2, 2, 3), dtype=np.uint8))
+
+    def test_rejects_later_frame_over_pixel_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(video_decode_worker, "MAX_FRAME_PIXELS", 4)
+
+        with pytest.raises(ValueError, match="Decoded frame dimensions"):
+            video_decode_worker._validate_decoded_frame(np.zeros((3, 2, 3), dtype=np.uint8))
+
+    @pytest.mark.parametrize(
+        "frame",
+        [np.zeros((2, 2), dtype=np.uint8), np.zeros((2, 2, 4), dtype=np.uint8)],
+    )
+    def test_rejects_non_rgb_frames(self, frame: np.ndarray) -> None:
+        with pytest.raises(ValueError, match="RGB"):
+            video_decode_worker._validate_decoded_frame(frame)

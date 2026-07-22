@@ -4,7 +4,11 @@ import numpy as np
 import pytest
 import torch
 
-from invokeai.app.invocations.wan_latents_to_video import _iter_decoded_frames, _write_video_frames
+from invokeai.app.invocations.wan_latents_to_video import (
+    _iter_decoded_frames,
+    _validate_video_latent_batch,
+    _write_video_frames,
+)
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 
 
@@ -44,3 +48,14 @@ def test_decoded_frames_are_converted_lazily_in_temporal_order() -> None:
     assert fourth.tolist() == [[[255, 255, 255]]]
     with pytest.raises(StopIteration):
         next(frames)
+
+
+@pytest.mark.parametrize("shape", [(1, 16, 2, 4, 4), (1, 16, 4, 4)])
+def test_single_video_latent_batch_is_accepted(shape: tuple[int, ...]) -> None:
+    _validate_video_latent_batch(torch.zeros(shape))
+
+
+@pytest.mark.parametrize("shape", [(2, 16, 2, 4, 4), (2, 16, 4, 4)])
+def test_multiple_video_latent_batches_are_rejected(shape: tuple[int, ...]) -> None:
+    with pytest.raises(ValueError, match="batch size 1"):
+        _validate_video_latent_batch(torch.zeros(shape))

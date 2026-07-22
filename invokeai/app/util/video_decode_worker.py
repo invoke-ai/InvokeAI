@@ -37,6 +37,33 @@ from PIL import Image
 # Keep in sync with MAX_VIDEO_FRAME_PIXELS in video_thumbnails.py (this script must not
 # import the invokeai package).
 MAX_FRAME_PIXELS = 64 * 1024 * 1024
+WORKER_MEMORY_HEADROOM_BYTES = 1024 * 1024 * 1024
+
+
+def _limit_worker_memory() -> None:
+    """Bound allocations made after worker startup on Linux."""
+    if sys.platform != "linux":
+        return
+    try:
+        import os
+        import resource
+
+        pages = int(Path("/proc/self/statm").read_text().split()[0])
+        limit = pages * os.sysconf("SC_PAGE_SIZE") + WORKER_MEMORY_HEADROOM_BYTES
+        _soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        if hard != resource.RLIM_INFINITY:
+            limit = min(limit, hard)
+        resource.setrlimit(resource.RLIMIT_AS, (limit, hard))
+    except (OSError, ValueError):
+        pass
+
+
+def _validate_decoded_frame(frame: np.ndarray) -> None:
+    if frame.ndim != 3 or frame.shape[2] != 3:
+        raise ValueError(f"Decoded frame must be RGB; got shape {frame.shape}")
+    height, width = frame.shape[:2]
+    if height <= 0 or width <= 0 or height * width > MAX_FRAME_PIXELS:
+        raise ValueError(f"Decoded frame dimensions {width}x{height} exceed the maximum decodable size")
 
 
 def _assert_decodable_dims(video_path: Path) -> None:
@@ -64,6 +91,7 @@ def _extract_frame(video_path: Path, frame_index: int) -> Optional[Image.Image]:
     try:
         # iio.imread with index=N seeks to that frame directly. Returns RGB HxWxC uint8.
         frame = iio.imread(video_path, plugin="FFMPEG", index=frame_index)
+        _validate_decoded_frame(frame)
         return Image.fromarray(frame)
     except Exception:
         pass
@@ -82,6 +110,7 @@ def _extract_frame(video_path: Path, frame_index: int) -> Optional[Image.Image]:
             if not ok or frame_bgr is None:
                 return None
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            _validate_decoded_frame(frame_rgb)
             return Image.fromarray(frame_rgb)
         finally:
             capture.release()
@@ -166,6 +195,7 @@ def _count(video_path: Path) -> Optional[int]:
 
 
 def _emit_stream_frame(frame: np.ndarray) -> None:
+    _validate_decoded_frame(frame)
     record = io.BytesIO()
     np.save(record, np.ascontiguousarray(frame), allow_pickle=False)
     payload = record.getvalue()
@@ -215,6 +245,7 @@ def _stream(video_path: Path) -> None:
 
 def main(argv: list[str]) -> int:
     try:
+        _limit_worker_memory()
         command = argv[1]
         if command == "stream":
             _assert_decodable_dims(Path(argv[2]))

@@ -199,3 +199,22 @@ class TestResourceBounds:
         v = _invocation("cut", 0)
         with pytest.raises(CanceledException):
             next(v._iter_joined_frames([iter(_clip(200, 10)), iter(_clip(100, 10))], is_canceled=lambda: True))
+
+
+class TestFrameRateValidation:
+    def test_matching_source_rates_use_first_rate(self) -> None:
+        invocation = _invocation("cut", 0)
+        assert invocation._resolve_output_fps([16.0, 16.0]) == 16.0
+
+    def test_mismatched_source_rates_require_explicit_override(self) -> None:
+        invocation = _invocation("cut", 0)
+        with pytest.raises(ValueError, match="frame rates"):
+            invocation._resolve_output_fps([16.0, 24.0])
+
+    def test_explicit_output_rate_allows_retiming(self) -> None:
+        invocation = VideoConcatInvocation(
+            videos=[VideoField(video_name="a"), VideoField(video_name="b")],
+            transition="cut",
+            fps=20,
+        )
+        assert invocation._resolve_output_fps([16.0, 24.0]) == 20.0

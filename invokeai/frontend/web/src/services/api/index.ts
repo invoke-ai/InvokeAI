@@ -8,7 +8,13 @@ import type {
 } from '@reduxjs/toolkit/query/react';
 import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@reduxjs/toolkit/query/react';
 import { getDeploymentBaseUrl } from 'common/util/baseUrl';
-import { sessionExpiredLogout } from 'features/auth/store/authSlice';
+import { sessionExpiredLogout, tokenRefreshed } from 'features/auth/store/authSlice';
+import {
+  beginAuthTransition,
+  captureAuthGeneration,
+  runWithMediaAuthLock,
+  shouldAcceptRefreshedToken,
+} from 'features/auth/store/authTokenRefresh';
 import queryString from 'query-string';
 import stableHash from 'stable-hash';
 
@@ -99,6 +105,13 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
     (typeof args === 'string' && (args.includes('/auth/login') || args.includes('/auth/setup')));
 
   const token = localStorage.getItem('auth_token');
+  const requestUrl = typeof args === 'string' ? args : args.url;
+  const isAuthTransition = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/logout');
+  if (isAuthTransition) {
+    beginAuthTransition();
+  }
+  const requestGeneration = captureAuthGeneration();
+  const changesMediaCookie = isAuthTransition || requestUrl.includes('/auth/media-cookie');
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
     baseUrl: getBaseUrl(),
@@ -118,7 +131,8 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
 
   const rawBaseQuery = fetchBaseQuery(fetchBaseQueryArgs);
 
-  const result = await rawBaseQuery(args, api, extraOptions);
+  const execute = () => rawBaseQuery(args, api, extraOptions);
+  const result = changesMediaCookie ? await runWithMediaAuthLock(execute) : await execute();
 
   // If we sent an auth token but got 401, the token is invalid/expired.
   // Only trigger session expiry when we actually sent a token — unauthenticated
@@ -131,8 +145,25 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
   // update localStorage so subsequent requests use the new expiry.
   if (!result.error && result.meta?.response) {
     const refreshedToken = result.meta.response.headers.get('X-Refreshed-Token');
-    if (refreshedToken) {
-      localStorage.setItem('auth_token', refreshedToken);
+    if (refreshedToken && token && shouldAcceptRefreshedToken(token, requestGeneration)) {
+      await runWithMediaAuthLock(async () => {
+        if (!shouldAcceptRefreshedToken(token, requestGeneration)) {
+          return;
+        }
+        try {
+          const mediaCookieResponse = await fetch(`${getBaseUrl()}/api/v1/auth/media-cookie`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { Authorization: `Bearer ${refreshedToken}` },
+          });
+          if (!mediaCookieResponse.ok || !shouldAcceptRefreshedToken(token, requestGeneration)) {
+            return;
+          }
+          api.dispatch(tokenRefreshed(refreshedToken));
+        } catch {
+          // Keep the old token so a later request can retry both refresh operations.
+        }
+      });
     }
   }
 

@@ -12,6 +12,9 @@
  * Node references (PR #9163 review): workflow nodes take VideoField inputs; references to
  * confirmed-deleted videos are cleared, references to surviving videos are preserved.
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('services/api/endpoints/videos', () => ({
@@ -43,6 +46,8 @@ vi.mock('features/system/store/systemSlice', () => ({
   selectSystemShouldConfirmOnDelete: vi.fn(() => false),
 }));
 
+vi.mock('features/toast/toast', () => ({ toast: vi.fn() }));
+
 // Keep the real pickSelectionAfterDelete (its neighbour-picking is part of the behavior under
 // test) but stub the cache selector, which would otherwise need a live RTK Query store.
 vi.mock('features/gallery/store/selectCachedGalleryItemNames', async (importOriginal) => {
@@ -54,6 +59,7 @@ import type { AppStore } from 'app/store/store';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
+import { toast } from 'features/toast/toast';
 import { videosApi } from 'services/api/endpoints/videos';
 
 import { handleDeletions } from './state';
@@ -80,6 +86,7 @@ const buildStore = (selection: string[], failingNames: Set<string>, nodes: unkno
             ? Promise.reject(new Error('delete failed'))
             : Promise.resolve({
                 deleted_videos: (typed.video_names ?? []).filter((name) => !failingNames.has(name)),
+                failed_videos: (typed.video_names ?? []).filter((name) => failingNames.has(name)),
                 affected_boards: ['none'],
               }),
       };
@@ -119,6 +126,7 @@ describe('handleDeletions batching', () => {
       { video_names: ['a.mp4', 'b.mp4'] },
       { track: false }
     );
+    expect(toast).not.toHaveBeenCalled();
   });
 });
 
@@ -155,6 +163,7 @@ describe('handleDeletions selection behavior on partial failure', () => {
 
     // Before the fix, b.mp4 was excluded as "deleted" and the selection skipped to c.png.
     expect(getSelectionChange(dispatched)?.payload).toBe('b.mp4');
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ status: 'warning' }));
   });
 
   it('keeps viewing the displayed video when its delete fails but another selected video was deleted', async () => {
@@ -215,5 +224,14 @@ describe('handleDeletions node VideoField cleanup', () => {
     await handleDeletions(['a.mp4'], store);
 
     expect(getVideoFieldChanges(dispatched)).toHaveLength(0);
+  });
+});
+
+describe('delete dialog dismissal', () => {
+  it('routes generic dialog closure through cancellation so callers settle', () => {
+    const source = readFileSync(fileURLToPath(new URL('../components/DeleteVideoModal.tsx', import.meta.url)), 'utf8');
+
+    expect(source).toContain('onClose={api.cancel}');
+    expect(source).not.toContain('onClose={api.close}');
   });
 });

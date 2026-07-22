@@ -176,7 +176,13 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         scheduler = scheduler_builder(proxy, context, device)
 
         pos_cond = self._load_conditioning(context, self.positive_conditioning, device=device, dtype=inference_dtype)
-        do_cfg = self.guidance_scale != 1.0 and self.negative_conditioning is not None
+        low_cfg_enabled = (
+            self.transformer.transformer_low_noise is not None
+            and self.guidance_scale_low_noise is not None
+            and self.guidance_scale_low_noise >= 1.0
+            and self.guidance_scale_low_noise != 1.0
+        )
+        do_cfg = self.negative_conditioning is not None and (self.guidance_scale != 1.0 or low_cfg_enabled)
         neg_cond: WanConditioningInfo | None = None
         if do_cfg:
             assert self.negative_conditioning is not None
@@ -347,7 +353,7 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                     return_dict=False,
                 )[0]
 
-                if do_cfg and neg_cond is not None:
+                if neg_cond is not None and active_cfg != 1.0:
                     noise_pred_uncond = transformer(
                         hidden_states=latent_model_input,
                         timestep=timestep,

@@ -94,6 +94,13 @@ export const handleDeletions = async (video_names: string[], store: AppStore) =>
       videosApi.endpoints.deleteVideos.initiate({ video_names }, { track: false })
     ).unwrap();
     deletedNames = new Set(result.deleted_videos);
+    if (result.failed_videos.length > 0) {
+      toast({
+        status: 'warning',
+        title: t('toast.videoDeleteFailed'),
+        description: t('toast.videoDeletePartial', { count: result.failed_videos.length }),
+      });
+    }
   } catch {
     // The whole request failed — nothing was confirmed deleted, so leave selection and
     // node references untouched. The mutation is untracked, so this toast is the only

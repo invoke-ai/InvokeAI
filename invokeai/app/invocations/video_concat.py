@@ -12,6 +12,7 @@ O(transition_frames) even when the inputs are long uploads (the upload cap
 admits files whose decoded frames would run to tens of gigabytes).
 """
 
+import math
 import tempfile
 from collections import deque
 from pathlib import Path
@@ -126,7 +127,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"All inputs must share the same dimensions. Got: "
                 f"{sorted(widths)}. Re-render at a single resolution before concatenating."
             )
-        width, height, _, first_fps = probes[0]
+        width, height, _, _first_fps = probes[0]
         # libx264 + yuv420p needs even dimensions; we encode with macro_block_size=1 to
         # preserve the source dimensions exactly, so reject odd sources with a clear error.
         if width % 2 or height % 2:
@@ -135,7 +136,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                 "Re-encode or crop the sources to even width and height first."
             )
         self._validate_transition_memory(width, height)
-        output_fps = float(self.fps) if self.fps is not None else (first_fps or 16.0)
+        output_fps = self._resolve_output_fps([probe[3] for probe in probes])
 
         context.util.signal_progress(f"Joining {len(self.videos)} clip(s) ({self.transition}) @ {output_fps:.2f} fps")
 
@@ -184,6 +185,18 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         buffered_frames = self.transition_frames * (2 if self.transition == "crossfade" else 1)
         frame_bytes = width * height * 3
         return frame_bytes * (buffered_frames + _BLEND_WORKING_FRAMES)
+
+    def _resolve_output_fps(self, source_rates: list[Optional[float]]) -> float:
+        if self.fps is not None:
+            return float(self.fps)
+        known_rates = [rate for rate in source_rates if rate is not None and rate > 0]
+        if not known_rates:
+            return 16.0
+        if len(known_rates) != len(source_rates) or any(
+            not math.isclose(rate, known_rates[0], rel_tol=1e-3) for rate in known_rates[1:]
+        ):
+            raise ValueError("Input videos have different or unknown frame rates; set Output FPS to retime them.")
+        return known_rates[0]
 
     def _validate_transition_memory(self, width: int, height: int) -> None:
         estimated_bytes = self._estimate_transition_memory(width, height)
