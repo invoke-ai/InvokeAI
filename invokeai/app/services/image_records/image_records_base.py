@@ -56,10 +56,15 @@ class ImageRecordStorageBase(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageRecord]:
-        """Gets a page of image records. When board_id is 'none', filters by user_id for per-user uncategorized images unless is_admin is True."""
+        """Gets a page of image records. When board_id is 'none', filters by user_id for per-user uncategorized images unless is_admin is True.
+
+        created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+        """
         pass
 
     # TODO: The database has a nullable `deleted_at` column, currently unused.
@@ -124,10 +129,15 @@ class ImageRecordStorageBase(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> ImageNamesResult:
-        """Gets ordered list of image names with metadata for optimistic updates."""
+        """Gets ordered list of image names with metadata for optimistic updates.
+
+        created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+        """
         pass
 
     @abstractmethod

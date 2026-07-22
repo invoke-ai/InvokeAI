@@ -4623,6 +4623,44 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created From"
+            },
+            "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created To"
+            },
+            "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
           }
         ],
         "responses": {
@@ -5499,6 +5537,44 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created From"
+            },
+            "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created To"
+            },
+            "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
           }
         ],
         "responses": {

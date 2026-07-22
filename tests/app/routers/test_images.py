@@ -12,7 +12,9 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.board_records.board_records_common import BoardRecord
+from invokeai.app.services.image_records.image_records_common import ImageNamesResult
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -205,6 +207,68 @@ def test_get_bulk_download_image_not_found(monkeypatch: Any, mock_invoker: Invok
     response = client.get("/api/v1/images/download/test.zip")
 
     assert response.status_code == 404
+
+
+def prepare_created_range_test(monkeypatch: Any, mock_invoker: Invoker) -> tuple[MagicMock, MagicMock]:
+    """Patches list endpoints' service calls with capturing mocks; returns (get_many, get_image_names)."""
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+    mock_get_many = MagicMock(return_value=OffsetPaginatedResults(items=[], offset=0, limit=10, total=0))
+    mock_get_image_names = MagicMock(return_value=ImageNamesResult(image_names=[], starred_count=0, total_count=0))
+    monkeypatch.setattr(mock_invoker.services.images, "get_many", mock_get_many)
+    monkeypatch.setattr(mock_invoker.services.images, "get_image_names", mock_get_image_names)
+    return mock_get_many, mock_get_image_names
+
+
+@pytest.mark.parametrize("path", ["/api/v1/images/", "/api/v1/images/names"])
+@pytest.mark.parametrize("bad_value", ["next-tuesday", "2026-02-31"])
+@pytest.mark.parametrize("param", ["created_from", "created_to"])
+def test_list_endpoints_reject_invalid_created_range_dates(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, bad_value: str, param: str
+) -> None:
+    """Malformed shapes and impossible calendar dates are both rejected with 422."""
+    prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get(path, params={param: bad_value})
+
+    assert response.status_code == 422
+
+
+def test_list_image_dtos_forwards_created_range(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    mock_get_many, _ = prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get("/api/v1/images/", params={"created_from": "2026-07-01", "created_to": "2026-07-15"})
+
+    assert response.status_code == 200
+    kwargs = mock_get_many.call_args.kwargs
+    assert kwargs["created_from"] == "2026-07-01"
+    assert kwargs["created_to"] == "2026-07-15"
+
+
+def test_list_image_dtos_omits_created_range_by_default(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    mock_get_many, _ = prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get("/api/v1/images/")
+
+    assert response.status_code == 200
+    kwargs = mock_get_many.call_args.kwargs
+    assert kwargs["created_from"] is None
+    assert kwargs["created_to"] is None
+
+
+def test_get_image_names_forwards_created_range(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    _, mock_get_image_names = prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get("/api/v1/images/names", params={"created_from": "2026-07-01", "created_to": "2026-07-15"})
+
+    assert response.status_code == 200
+    kwargs = mock_get_image_names.call_args.kwargs
+    assert kwargs["created_from"] == "2026-07-01"
+    assert kwargs["created_to"] == "2026-07-15"
 
 
 def test_get_bulk_download_image_image_deleted_after_response(

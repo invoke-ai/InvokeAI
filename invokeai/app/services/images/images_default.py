@@ -249,22 +249,26 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageDTO]:
         try:
             results = self.__invoker.services.image_records.get_many(
-                offset,
-                limit,
-                starred_first,
-                order_dir,
-                image_origin,
-                categories,
-                is_intermediate,
-                board_id,
-                search_term,
-                user_id,
-                is_admin,
+                offset=offset,
+                limit=limit,
+                starred_first=starred_first,
+                order_dir=order_dir,
+                image_origin=image_origin,
+                categories=categories,
+                is_intermediate=is_intermediate,
+                board_id=board_id,
+                search_term=search_term,
+                created_from=created_from,
+                created_to=created_to,
+                user_id=user_id,
+                is_admin=is_admin,
             )
 
             image_dtos = [
@@ -363,6 +367,8 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> ImageNamesResult:
@@ -375,6 +381,8 @@ class ImageService(ImageServiceABC):
                 is_intermediate=is_intermediate,
                 board_id=board_id,
                 search_term=search_term,
+                created_from=created_from,
+                created_to=created_to,
                 user_id=user_id,
                 is_admin=is_admin,
             )

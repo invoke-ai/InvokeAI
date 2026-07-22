@@ -36455,6 +36455,10 @@ export interface operations {
                 starred_first?: boolean;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
+                created_from?: string | null;
+                /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
+                created_to?: string | null;
             };
             header?: never;
             path?: never;
@@ -37076,6 +37080,10 @@ export interface operations {
                 starred_first?: boolean;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
+                created_from?: string | null;
+                /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
+                created_to?: string | null;
             };
             header?: never;
             path?: never;

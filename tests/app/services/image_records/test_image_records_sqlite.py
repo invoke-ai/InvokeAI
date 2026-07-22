@@ -270,3 +270,110 @@ class TestOwnershipFilteringOmittedBoard:
         result = image_store.get_image_names(board_id="none", user_id="user1", is_admin=False)
 
         assert result.image_names == ["u1-uncat.png"]
+
+
+def _set_created_at(store: SqliteImageRecordStorage, name: str, created_at: str) -> None:
+    """created_at is written by a SQL column default; tests override it directly."""
+    with store._db.transaction() as cursor:
+        cursor.execute("UPDATE images SET created_at = ? WHERE image_name = ?", (created_at, name))
+
+
+class TestCreatedAtRangeFiltering:
+    """get_many()/get_image_names() filter by inclusive created_from/created_to dates.
+
+    Bounds are date-only strings compared lexicographically against the ISO text
+    column, which stores both space- and T-separated timestamps.
+    """
+
+    def _seed_dated(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "jan30.png")
+        _save(store, "jan31-morning.png")
+        _save(store, "jan31-last-second.png")
+        _save(store, "feb01-midnight.png")
+        _save(store, "feb15-t-sep.png")
+        _set_created_at(store, "jan30.png", "2026-01-30 12:00:00.000")
+        _set_created_at(store, "jan31-morning.png", "2026-01-31 08:30:00.000")
+        _set_created_at(store, "jan31-last-second.png", "2026-01-31 23:59:59.999")
+        _set_created_at(store, "feb01-midnight.png", "2026-02-01 00:00:00.000")
+        _set_created_at(store, "feb15-t-sep.png", "2026-02-15T10:00:00.000")
+
+    def test_created_from_is_inclusive(self, store: SqliteImageRecordStorage) -> None:
+        self._seed_dated(store)
+
+        result = store.get_many(limit=10, created_from="2026-01-31")
+
+        assert {r.image_name for r in result.items} == {
+            "jan31-morning.png",
+            "jan31-last-second.png",
+            "feb01-midnight.png",
+            "feb15-t-sep.png",
+        }
+
+    def test_created_to_includes_end_of_day_and_excludes_next_midnight(self, store: SqliteImageRecordStorage) -> None:
+        self._seed_dated(store)
+
+        result = store.get_many(limit=10, created_to="2026-01-31")
+
+        assert {r.image_name for r in result.items} == {
+            "jan30.png",
+            "jan31-morning.png",
+            "jan31-last-second.png",
+        }
+
+    def test_created_to_handles_month_rollover(self, store: SqliteImageRecordStorage) -> None:
+        """created_to on the last day of a month must not lexicographically leak into the next month."""
+        self._seed_dated(store)
+
+        result = store.get_many(limit=10, created_from="2026-01-31", created_to="2026-01-31")
+
+        assert {r.image_name for r in result.items} == {"jan31-morning.png", "jan31-last-second.png"}
+
+    def test_range_matches_t_separated_timestamps(self, store: SqliteImageRecordStorage) -> None:
+        self._seed_dated(store)
+
+        result = store.get_many(limit=10, created_from="2026-02-15", created_to="2026-02-15")
+
+        assert {r.image_name for r in result.items} == {"feb15-t-sep.png"}
+
+    def test_range_combines_with_search_term(self, store: SqliteImageRecordStorage) -> None:
+        self._seed_dated(store)
+
+        result = store.get_many(limit=10, created_from="2026-01-31", created_to="2026-02-01", search_term="feb01")
+
+        assert {r.image_name for r in result.items} == set()
+        # search_term matches metadata/created_at, not names; a created_at match works
+        result = store.get_many(limit=10, created_from="2026-01-31", created_to="2026-02-01", search_term="2026-02-01")
+        assert {r.image_name for r in result.items} == {"feb01-midnight.png"}
+
+    def test_range_combines_with_board_filter(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> None:
+        image_store, board_store, board_image_store = stores
+        self._seed_dated(image_store)
+        board = board_store.save(board_name="Dated Board", user_id="user1")
+        board_image_store.add_image_to_board(board_id=board.board_id, image_name="jan30.png")
+        board_image_store.add_image_to_board(board_id=board.board_id, image_name="feb01-midnight.png")
+
+        result = image_store.get_many(limit=10, board_id=board.board_id, created_from="2026-02-01")
+
+        assert {r.image_name for r in result.items} == {"feb01-midnight.png"}
+
+    def test_get_many_total_and_get_image_names_counts_are_consistent(self, store: SqliteImageRecordStorage) -> None:
+        self._seed_dated(store)
+        with store._db.transaction() as cursor:
+            cursor.execute("UPDATE images SET starred = TRUE WHERE image_name = ?", ("jan31-morning.png",))
+
+        dtos = store.get_many(limit=10, created_from="2026-01-31", created_to="2026-02-01")
+        names = store.get_image_names(created_from="2026-01-31", created_to="2026-02-01")
+
+        assert dtos.total == names.total_count == 3
+        assert set(names.image_names) == {r.image_name for r in dtos.items}
+        assert names.starred_count == 1
+
+    def test_no_range_returns_everything(self, store: SqliteImageRecordStorage) -> None:
+        self._seed_dated(store)
+
+        result = store.get_many(limit=10)
+
+        assert result.total == 5

@@ -126,10 +126,15 @@ class ImageServiceABC(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageDTO]:
-        """Gets a paginated list of image DTOs with starred images first when starred_first=True."""
+        """Gets a paginated list of image DTOs with starred images first when starred_first=True.
+
+        created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+        """
         pass
 
     @abstractmethod
@@ -162,8 +167,13 @@ class ImageServiceABC(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> ImageNamesResult:
-        """Gets ordered list of image names with metadata for optimistic updates."""
+        """Gets ordered list of image names with metadata for optimistic updates.
+
+        created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+        """
         pass

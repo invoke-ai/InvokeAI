@@ -1,6 +1,7 @@
 import io
 import json
 import traceback
+from datetime import date
 from typing import ClassVar, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
@@ -453,6 +454,12 @@ async def list_image_dtos(
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs for the current user"""
 
@@ -462,17 +469,19 @@ async def list_image_dtos(
         _assert_board_read_access(board_id, current_user)
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
-        offset,
-        limit,
-        starred_first,
-        order_dir,
-        image_origin,
-        categories,
-        is_intermediate,
-        board_id,
-        search_term,
-        current_user.user_id,
-        current_user.is_admin,
+        offset=offset,
+        limit=limit,
+        starred_first=starred_first,
+        order_dir=order_dir,
+        image_origin=image_origin,
+        categories=categories,
+        is_intermediate=is_intermediate,
+        board_id=board_id,
+        search_term=search_term,
+        created_from=created_from.isoformat() if created_from else None,
+        created_to=created_to.isoformat() if created_to else None,
+        user_id=current_user.user_id,
+        is_admin=current_user.is_admin,
     )
 
     return image_dtos
@@ -733,6 +742,12 @@ async def get_image_names(
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> ImageNamesResult:
     """Gets ordered list of image names with metadata for optimistic updates"""
 
@@ -749,6 +764,8 @@ async def get_image_names(
             is_intermediate=is_intermediate,
             board_id=board_id,
             search_term=search_term,
+            created_from=created_from.isoformat() if created_from else None,
+            created_to=created_to.isoformat() if created_to else None,
             user_id=current_user.user_id,
             is_admin=current_user.is_admin,
         )

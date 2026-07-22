@@ -161,6 +161,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageRecord]:
@@ -245,6 +247,21 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(f"%{search_term.lower()}%")
                 query_params.append(f"%{search_term.lower()}%")
+
+            # created_at is ISO text; date-only lexicographic bounds are safe for
+            # both space- and T-separated stored values. created_to is inclusive,
+            # hence the exclusive < next-day bound.
+            if created_from:
+                query_conditions += """--sql
+                AND images.created_at >= ?
+                """
+                query_params.append(created_from)
+
+            if created_to:
+                query_conditions += """--sql
+                AND images.created_at < DATE(?, '+1 day')
+                """
+                query_params.append(created_to)
 
             if starred_first:
                 query_pagination = f"""--sql
@@ -439,6 +456,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> ImageNamesResult:
@@ -501,6 +520,21 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(f"%{search_term.lower()}%")
                 query_params.append(f"%{search_term.lower()}%")
+
+            # created_at is ISO text; date-only lexicographic bounds are safe for
+            # both space- and T-separated stored values. created_to is inclusive,
+            # hence the exclusive < next-day bound.
+            if created_from:
+                query_conditions += """--sql
+                AND images.created_at >= ?
+                """
+                query_params.append(created_from)
+
+            if created_to:
+                query_conditions += """--sql
+                AND images.created_at < DATE(?, '+1 day')
+                """
+                query_params.append(created_to)
 
             # Get starred count if starred_first is enabled
             starred_count = 0
