@@ -5,14 +5,14 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import {
+  selectBase,
   selectFluxDypePreset,
   selectIsAnima,
-  selectIsCogView4,
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsKrea2,
   selectIsQwenImage,
-  selectIsSD3,
   selectIsZImage,
   selectModelSupportsGuidance,
   selectModelSupportsSteps,
@@ -31,6 +31,7 @@ import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
 import ParamZImageShift from 'features/parameters/components/Core/ParamZImageShift';
+import ParamKrea2EnhancersSettings from 'features/parameters/components/Krea2Enhancers/ParamKrea2EnhancersSettings';
 import ParamZImageSeedVarianceSettings from 'features/parameters/components/SeedVariance/ParamZImageSeedVarianceSettings';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
@@ -40,6 +41,8 @@ import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 import { isFluxFillMainModelModelConfig } from 'services/api/types';
 
+import { shouldShowStandardScheduler } from './generationSettingsVisibility';
+
 const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
@@ -47,13 +50,13 @@ const formLabelProps: FormLabelProps = {
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
+  const base = useAppSelector(selectBase);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isFlux2 = useAppSelector(selectIsFlux2);
-  const isSD3 = useAppSelector(selectIsSD3);
-  const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
+  const isKrea2 = useAppSelector(selectIsKrea2);
   const isAnima = useAppSelector(selectIsAnima);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
   const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
@@ -97,14 +100,7 @@ export const GenerationSettingsAccordion = memo(() => {
           <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
             <Flex gap={4} flexDir="column" pb={4}>
               <FormControlGroup formLabelProps={formLabelProps}>
-                {!isExternal &&
-                  !isFLUX &&
-                  !isFlux2 &&
-                  !isSD3 &&
-                  !isCogView4 &&
-                  !isZImage &&
-                  !isQwenImage &&
-                  !isAnima && <ParamScheduler />}
+                {shouldShowStandardScheduler(base) && <ParamScheduler />}
                 {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
@@ -121,6 +117,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
               </FormControlGroup>
               {!isExternal && isZImage && <ParamZImageSeedVarianceSettings />}
+              {!isExternal && isKrea2 && <ParamKrea2EnhancersSettings />}
             </Flex>
           </Expander>
         )}

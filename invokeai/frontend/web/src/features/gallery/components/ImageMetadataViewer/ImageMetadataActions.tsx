@@ -65,6 +65,14 @@ export const IMAGE_METADATA_ACTION_HANDLERS: ImageMetadataActionHandler[] = [
   ImageMetadataHandlers.RefImages,
   ImageMetadataHandlers.KleinVAEModel,
   ImageMetadataHandlers.KleinQwen3EncoderModel,
+  ImageMetadataHandlers.Krea2VAEModel,
+  ImageMetadataHandlers.Krea2Qwen3VlEncoderModel,
+  ImageMetadataHandlers.Krea2SeedVarianceEnabled,
+  ImageMetadataHandlers.Krea2SeedVarianceStrength,
+  ImageMetadataHandlers.Krea2SeedVarianceRandomizePercent,
+  ImageMetadataHandlers.Krea2RebalanceEnabled,
+  ImageMetadataHandlers.Krea2RebalanceMultiplier,
+  ImageMetadataHandlers.Krea2RebalanceWeights,
   ImageMetadataHandlers.LoRAs,
 ];
 

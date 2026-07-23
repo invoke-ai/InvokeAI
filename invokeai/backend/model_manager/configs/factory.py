@@ -1,3 +1,4 @@
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,6 +52,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Anima_Config,
     LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_FLUX_Config,
+    LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
@@ -65,6 +67,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Anima_Config,
     Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
+    Main_Checkpoint_Krea2_Config,
     Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -74,6 +77,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_CogView4_Config,
     Main_Diffusers_Flux2_Config,
     Main_Diffusers_FLUX_Config,
+    Main_Diffusers_Krea2_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
@@ -83,6 +87,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_ZImage_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
+    Main_GGUF_Krea2_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
@@ -91,6 +96,10 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
     Qwen3Encoder_Qwen3Encoder_Config,
+)
+from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
+    Qwen3VLEncoder_Checkpoint_Config,
+    Qwen3VLEncoder_Qwen3VLEncoder_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
@@ -160,6 +169,56 @@ _MAX_FILES_IN_MODEL_DIR = 50
 # Maximum depth to search for model files in directories
 _MAX_SEARCH_DEPTH = 2
 
+# Classes introduced by the versions pinned by this checkout may not exist in the interpreter used by
+# lightweight config tests. Keep explicit markers only for those newly supported classes; established
+# classes are resolved from the installed Diffusers/Transformers exports below.
+_PINNED_MODEL_CLASS_MARKERS = {"Krea2Pipeline"}
+
+
+def _is_known_model_marker(config_name: str, config: Any) -> bool:
+    """Return whether a root config names a class/model type provided by our model libraries."""
+    import diffusers
+    import transformers
+    from diffusers.models.modeling_utils import ModelMixin
+    from diffusers.pipelines.pipeline_utils import DiffusionPipeline
+    from transformers import PretrainedConfig, PreTrainedModel
+    from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
+
+    if not isinstance(config, dict):
+        return False
+
+    def has_model_export(module: Any, name: Any, expected_bases: tuple[type, ...]) -> bool:
+        if not isinstance(name, str) or not name:
+            return False
+        try:
+            exported = getattr(module, name, None)
+            return (
+                isinstance(exported, type) and exported not in expected_bases and issubclass(exported, expected_bases)
+            )
+        except Exception:
+            return False
+
+    if config_name == "model_index.json":
+        class_name = config.get("_class_name")
+        return class_name in _PINNED_MODEL_CLASS_MARKERS or has_model_export(
+            diffusers, class_name, (DiffusionPipeline,)
+        )
+
+    class_name = config.get("_class_name")
+    if (
+        class_name in _PINNED_MODEL_CLASS_MARKERS
+        or has_model_export(diffusers, class_name, (ModelMixin, DiffusionPipeline))
+        or has_model_export(transformers, class_name, (PreTrainedModel, PretrainedConfig))
+    ):
+        return True
+    model_type = config.get("model_type")
+    if isinstance(model_type, str) and model_type in CONFIG_MAPPING_NAMES:
+        return True
+    architectures = config.get("architectures")
+    return isinstance(architectures, list) and any(
+        has_model_export(transformers, name, (PreTrainedModel,)) for name in architectures
+    )
+
 
 # The types are listed explicitly because IDEs/LSPs can't identify the correct types
 # when AnyModelConfig is constructed dynamically using ModelConfigBase.all_config_classes
@@ -176,6 +235,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
+        Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -187,6 +247,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_FLUX_Config, Main_Checkpoint_FLUX_Config.get_tag()],
         Annotated[Main_Checkpoint_QwenImage_Config, Main_Checkpoint_QwenImage_Config.get_tag()],
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
+        Annotated[Main_Checkpoint_Krea2_Config, Main_Checkpoint_Krea2_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
@@ -196,6 +257,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_FLUX_Config, Main_GGUF_FLUX_Config.get_tag()],
         Annotated[Main_GGUF_QwenImage_Config, Main_GGUF_QwenImage_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
+        Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
         # VAE - checkpoint format
         Annotated[VAE_Checkpoint_SD1_Config, VAE_Checkpoint_SD1_Config.get_tag()],
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],
@@ -229,6 +291,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_Flux2_Config, LoRA_LyCORIS_Flux2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_FLUX_Config.get_tag()],
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_Krea2_Config, LoRA_LyCORIS_Krea2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Anima_Config.get_tag()],
         # LoRA - OMI format
@@ -248,6 +311,11 @@ AnyModelConfig = Annotated[
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
+        # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
+        # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
+        # misclassified as the Z-Image Qwen3 encoder. The VL probe requires the visual tower.
+        Annotated[Qwen3VLEncoder_Checkpoint_Config, Qwen3VLEncoder_Checkpoint_Config.get_tag()],
+        Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
@@ -404,6 +472,26 @@ class ModelConfigFactory:
                     f"Expected one of: {', '.join(sorted(_MODEL_EXTENSIONS))}"
                 )
         else:
+            # Recognized Diffusers/Transformers configs are safe model markers. A generic config.json
+            # is not sufficient because many large application directories contain one.
+            recognized_root_config = False
+            for config_name in _CONFIG_FILES:
+                config_path = path / config_name
+                if not config_path.exists():
+                    continue
+                try:
+                    # Model config.json files are UTF-8; read explicitly so a non-ASCII value does not
+                    # raise UnicodeDecodeError under a cp1252 (Windows) locale and get mis-treated as
+                    # "unrecognized", which would wrongly reject a valid model directory.
+                    config = json.loads(config_path.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                recognized_root_config = _is_known_model_marker(config_name, config)
+                if recognized_root_config:
+                    break
+            if recognized_root_config:
+                return
+
             # For directories, do a quick file count check with early exit
             total_files = 0
             # Ignore hidden files and directories
@@ -421,13 +509,6 @@ class ModelConfigFactory:
                             "This looks like a general-purpose directory rather than a model. "
                             "Please provide a path to a specific model file or model directory."
                         )
-
-            # Check if it has config files at root (diffusers/transformers marker)
-            has_root_config = any((path / config).exists() for config in _CONFIG_FILES)
-
-            if has_root_config:
-                # Has a config file, looks like a valid model directory
-                return
 
             # Otherwise, search for model files within depth limit
             def find_model_files(current_path: Path, depth: int) -> bool:

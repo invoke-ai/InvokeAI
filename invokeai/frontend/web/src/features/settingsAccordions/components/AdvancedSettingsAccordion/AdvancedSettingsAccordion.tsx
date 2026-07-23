@@ -8,6 +8,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsKrea2,
   selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
@@ -21,6 +22,7 @@ import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
+import ParamKrea2ModelSelects from 'features/parameters/components/Advanced/ParamKrea2ModelSelects';
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
@@ -54,43 +56,47 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
+  const isKrea2 = useAppSelector(selectIsKrea2);
 
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector([selectParamsSlice, selectIsFLUX, selectIsFlux2], (params, isFLUX, isFlux2) => {
-        const badges: (string | number)[] = [];
-        // FLUX.2 has VAE built into main model - no badge needed
-        if (isFLUX && !isFlux2) {
-          if (vaeConfig) {
-            let vaeBadge = vaeConfig.name;
-            if (params.vaePrecision === 'fp16') {
-              vaeBadge += ` ${params.vaePrecision}`;
+      createMemoizedSelector(
+        [selectParamsSlice, selectIsFLUX, selectIsFlux2, selectIsKrea2],
+        (params, isFLUX, isFlux2, isKrea2) => {
+          const badges: (string | number)[] = [];
+          // FLUX.2 has VAE built into main model - no badge needed
+          if (isFLUX && !isFlux2) {
+            if (vaeConfig) {
+              let vaeBadge = vaeConfig.name;
+              if (params.vaePrecision === 'fp16') {
+                vaeBadge += ` ${params.vaePrecision}`;
+              }
+              badges.push(vaeBadge);
             }
-            badges.push(vaeBadge);
-          }
-        } else if (!isFlux2) {
-          if (vaeConfig) {
-            let vaeBadge = vaeConfig.name;
-            if (params.vaePrecision === 'fp16') {
-              vaeBadge += ` ${params.vaePrecision}`;
+          } else if (!isFlux2 && !isKrea2) {
+            if (vaeConfig) {
+              let vaeBadge = vaeConfig.name;
+              if (params.vaePrecision === 'fp16') {
+                vaeBadge += ` ${params.vaePrecision}`;
+              }
+              badges.push(vaeBadge);
+            } else if (params.vaePrecision === 'fp16') {
+              badges.push(`VAE ${params.vaePrecision}`);
             }
-            badges.push(vaeBadge);
-          } else if (params.vaePrecision === 'fp16') {
-            badges.push(`VAE ${params.vaePrecision}`);
+            if (params.clipSkip) {
+              badges.push(`Skip ${params.clipSkip}`);
+            }
+            if (params.cfgRescaleMultiplier) {
+              badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
+            }
+            if (params.seamlessXAxis || params.seamlessYAxis) {
+              badges.push('seamless');
+            }
           }
-          if (params.clipSkip) {
-            badges.push(`Skip ${params.clipSkip}`);
-          }
-          if (params.cfgRescaleMultiplier) {
-            badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
-          }
-          if (params.seamlessXAxis || params.seamlessYAxis) {
-            badges.push('seamless');
-          }
-        }
 
-        return badges;
-      }),
+          return badges;
+        }
+      ),
     [vaeConfig]
   );
   const badges = useAppSelector(selectBadges);
@@ -107,13 +113,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isKrea2 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isKrea2 && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -164,6 +170,11 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isAnima && (
           <FormControlGroup>
             <ParamAnimaModelSelect />
+          </FormControlGroup>
+        )}
+        {isKrea2 && (
+          <FormControlGroup>
+            <ParamKrea2ModelSelects />
           </FormControlGroup>
         )}
       </Flex>

@@ -255,7 +255,8 @@ def diffusion_step_callback(
         latent_rgb_factors = SD3_5_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.CogView4:
         latent_rgb_factors = COGVIEW4_LATENT_RGB_FACTORS
-    elif base_model == BaseModelType.QwenImage:
+    elif base_model in [BaseModelType.QwenImage, BaseModelType.Krea2]:
+        # Krea-2 decodes with the Qwen-Image VAE (16 latent channels), so it shares the preview factors.
         latent_rgb_factors = QWEN_IMAGE_LATENT_RGB_FACTORS
         latent_rgb_bias = QWEN_IMAGE_LATENT_RGB_BIAS
     elif base_model == BaseModelType.Flux:

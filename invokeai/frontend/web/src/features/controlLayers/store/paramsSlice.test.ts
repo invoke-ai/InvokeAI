@@ -157,7 +157,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(3);
+    expect(result._version).toBe(4);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     // Existing params should be preserved
@@ -166,6 +166,42 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.shouldRandomizeSeed).toBe(false);
     expect(result.dimensions.width).toBe(768);
     expect(result.dimensions.height).toBe(768);
+  });
+
+  it('backfills Krea-2 fields when migrating from v3 and preserves existing params', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      _version: 3,
+      positivePrompt: 'preserve this prompt',
+      seed: 1234,
+      dimensions: { ...initial.dimensions, width: 640, height: 896 },
+    };
+    delete v3State.krea2VaeModel;
+    delete v3State.krea2Qwen3VlEncoderModel;
+    delete v3State.krea2SeedVarianceEnabled;
+    delete v3State.krea2SeedVarianceStrength;
+    delete v3State.krea2SeedVarianceRandomizePercent;
+    delete v3State.krea2RebalanceEnabled;
+    delete v3State.krea2RebalanceMultiplier;
+    delete v3State.krea2RebalanceWeights;
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(4);
+    expect(result.krea2VaeModel).toBeNull();
+    expect(result.krea2Qwen3VlEncoderModel).toBeNull();
+    expect(result.krea2SeedVarianceEnabled).toBe(false);
+    expect(result.krea2SeedVarianceStrength).toBe(20);
+    expect(result.krea2SeedVarianceRandomizePercent).toBe(50);
+    expect(result.krea2RebalanceEnabled).toBe(false);
+    expect(result.krea2RebalanceMultiplier).toBe(4);
+    expect(result.krea2RebalanceWeights).toBe('1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0');
+    expect(result.positivePrompt).toBe('preserve this prompt');
+    expect(result.seed).toBe(1234);
+    expect(result.dimensions).toMatchObject({ width: 640, height: 896 });
   });
 
   it('migrates old positive prompt history entries to prompt pairs', () => {

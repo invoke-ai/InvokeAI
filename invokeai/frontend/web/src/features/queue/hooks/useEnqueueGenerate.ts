@@ -15,6 +15,7 @@ import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnima
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
+import { buildKrea2Graph } from 'features/nodes/util/graph/generation/buildKrea2Graph';
 import { buildQwenImageGraph } from 'features/nodes/util/graph/generation/buildQwenImageGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
@@ -62,6 +63,8 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
         return await buildQwenImageGraph(graphBuilderArg);
       case 'z-image':
         return await buildZImageGraph(graphBuilderArg);
+      case 'krea-2':
+        return await buildKrea2Graph(graphBuilderArg);
       case 'external':
         return await buildExternalGraph(graphBuilderArg);
       case 'anima':

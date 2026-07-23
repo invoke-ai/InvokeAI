@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
     FluxVariantType,
+    Krea2VariantType,
     ModelFormat,
     ModelType,
     ModelVariantType,
@@ -65,7 +66,12 @@ class MainModelDefaultSettings(BaseModel):
     def from_base(
         cls,
         base: BaseModelType,
-        variant: Flux2VariantType | FluxVariantType | ModelVariantType | ZImageVariantType | None = None,
+        variant: Flux2VariantType
+        | FluxVariantType
+        | ModelVariantType
+        | ZImageVariantType
+        | Krea2VariantType
+        | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -95,6 +101,14 @@ class MainModelDefaultSettings(BaseModel):
                     return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
             case BaseModelType.QwenImage:
                 return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
+            case BaseModelType.Krea2:
+                # Krea-2-Raw (Base, undistilled) needs more steps and CFG; Turbo (distilled) uses 8
+                # steps with CFG disabled. cfg_scale has a floor of 1 (ge=1); 1.0 means "no guidance".
+                if variant == Krea2VariantType.Base:
+                    # Diffusers' Krea-2 guidance 4.5 uses cond + 4.5 * (cond - uncond), which is
+                    # equivalent to InvokeAI's standard CFG convention at scale 5.5.
+                    return cls(steps=28, cfg_scale=5.5, width=1024, height=1024)
+                return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
                 return None
@@ -188,6 +202,77 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
                 return True
 
     return False
+
+
+def _get_krea2_variant_from_name(name: str) -> Krea2VariantType:
+    """Guess the Krea-2 variant from a single-file/GGUF filename.
+
+    Turbo and Raw (Base) share the identical transformer architecture, so a single-file checkpoint
+    cannot be distinguished from its weights. Filenames with a "raw"/"base" token (e.g. "Krea-2-Raw",
+    "krea2_base_q4") indicate the undistilled Base model; everything else defaults to the distilled
+    Turbo. The user can override the variant in the model manager.
+    """
+    lowered = name.lower()
+    # "turbo" is a strong positive signal for the distilled checkpoint and wins outright, so a Turbo file
+    # whose name merely *contains* "base"/"raw" as a substring (e.g. "baseline", "database", "raw_export")
+    # is not misread as Base.
+    if "turbo" in lowered:
+        return Krea2VariantType.Turbo
+    # Otherwise match "raw"/"base" only as a whole token delimited by non-alphanumeric separators
+    # ("-", "_", ".") - not as an arbitrary substring.
+    tokens = re.split(r"[^a-z0-9]+", lowered)
+    if "raw" in tokens or "base" in tokens:
+        return Krea2VariantType.Base
+    return Krea2VariantType.Turbo
+
+
+def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Krea-2 (Krea2Transformer2DModel) transformer keys.
+
+    Krea-2's single-stream MMDiT has a distinctive text-fusion stage; the ``text_fusion.``
+    prefix (with ``layerwise_blocks`` / ``refiner_blocks`` / ``projector``) is unique to it.
+    Returns True only for Krea-2 main models, not LoRAs.
+    """
+    # The text-fusion stage is unique to Krea-2. Diffusers naming uses `text_fusion`/`time_mod_proj`;
+    # the native/ComfyUI GGUF conversion uses the compact `txtfusion`/`tproj` names instead.
+    krea2_specific_keys = {
+        "text_fusion",  # text-fusion stage (diffusers naming) - unique to Krea-2
+        "txtfusion",  # text-fusion stage (native/ComfyUI GGUF naming)
+        "time_mod_proj",  # timestep modulation projection (diffusers)
+    }
+    # Corroborating image-input signals: `img_in` (diffusers) / `first` (native), or the timestep
+    # modulation projection (`tproj` native).
+    krea2_corroborating_keys = {"img_in", "first", "tproj"}
+
+    lora_suffixes = (
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".dora_scale",
+        ".alpha",
+    )
+
+    # If any key has a LoRA suffix, this is a LoRA, not a main model.
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.endswith(lora_suffixes):
+            return False
+
+    has_text_fusion = False
+    has_corroborator = False
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        # Handle both direct keys and ComfyUI-style (model.diffusion_model.*) keys.
+        key_parts = key.split(".")
+        if any(part in krea2_specific_keys for part in key_parts):
+            has_text_fusion = True
+        if any(part in krea2_corroborating_keys for part in key_parts):
+            has_corroborator = True
+    # Require the distinctive text-fusion stage; the image-input key is a corroborating signal.
+    return has_text_fusion and has_corroborator
 
 
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
@@ -1282,6 +1367,120 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
     def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
         has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml_tensors:
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Krea-2 diffusers models (Krea-2-Turbo)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(BaseModelType.Krea2)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "Krea2Pipeline",
+            },
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> Krea2VariantType:
+        """Determine the Krea-2 variant from the pipeline-level ``is_distilled`` flag.
+
+        Krea-2-Turbo sets ``is_distilled=true`` in model_index.json (distilled, 8 steps, CFG off);
+        Krea-2-Raw sets ``is_distilled=false`` (undistilled Base, more steps, CFG on). The transformer
+        architectures are identical, so this flag is the only reliable discriminator.
+        """
+        # model_index.json was already validated by the class-name check in from_model_on_disk, so a
+        # read/parse failure here is a genuine identification error and is allowed to propagate rather
+        # than being silently registered as Turbo (which would give a Raw model the wrong defaults).
+        config = get_config_dict_or_raise(mod.path / "model_index.json")
+        if config.get("is_distilled", False) is False:
+            return Krea2VariantType.Base
+        return Krea2VariantType.Turbo
+
+
+class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Krea-2 single-file checkpoint models (safetensors, etc)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
+
+        cls._validate_looks_like_krea2_model(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_krea2_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_krea2_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Krea-2 model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Krea-2 transformer models (single-file)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_krea2_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_krea2_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_krea2_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Krea-2 model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if not _has_ggml_tensors(mod.load_state_dict()):
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
 

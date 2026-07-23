@@ -9,6 +9,8 @@ import {
   aspectRatioIdChanged,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
+  krea2Qwen3VlEncoderModelSelected,
+  krea2VaeModelSelected,
   modelChanged,
   qwenImageComponentSourceSelected,
   qwenImageQwenVLEncoderModelSelected,
@@ -50,13 +52,14 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import { modelConfigsAdapterSelectors, modelsApi, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
   selectAnimaQwen3EncoderModels,
   selectAnimaVAEModels,
   selectFluxVAEModels,
   selectGlobalRefImageModels,
   selectQwen3EncoderModels,
+  selectQwen3VLEncoderModels,
   selectQwenImageDiffusersModels,
   selectQwenImageVAEModels,
   selectQwenVLEncoderModels,
@@ -65,6 +68,8 @@ import {
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
 import { isExternalApiModelConfig, isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
+
+import { getKrea2ComponentUpdates } from './krea2ComponentSync';
 
 const log = logger('models');
 
@@ -315,6 +320,71 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         }
 
+        // handle incompatible Krea-2 standalone components
+        const { krea2VaeModel, krea2Qwen3VlEncoderModel } = state.params;
+        if (newBase !== 'krea-2') {
+          // Switching away from Krea-2 - clear the standalone VAE / Qwen3-VL encoder selections so they
+          // don't survive onto another model family (or get reused as stale overrides later).
+          if (krea2VaeModel) {
+            dispatch(krea2VaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (krea2Qwen3VlEncoderModel) {
+            dispatch(krea2Qwen3VlEncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        } else {
+          // Switching to Krea-2. A Diffusers pipeline bundles its own VAE + encoder, so clear any
+          // standalone overrides (buildKrea2Graph would otherwise pass stale selections). A single-file /
+          // GGUF transformer ships only the transformer, so auto-select standalone components if the user
+          // hasn't already picked them - this unblocks the readiness check after installing the starter pack.
+          const modelConfigsResult = selectModelConfigsQuery(state);
+          const newModelConfig =
+            (modelConfigsResult.data
+              ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
+              : undefined) ?? modelsApi.endpoints.getModelConfig.select(newModel.key)(state).data;
+          if (!newModelConfig) {
+            // The model list may not be populated yet during startup or metadata recall. Defer component
+            // changes until the selected model's format is known instead of treating unknown as single-file.
+          } else if (newModelConfig.format === 'diffusers') {
+            const updates = getKrea2ComponentUpdates({
+              format: newModelConfig.format,
+              selectedVae: krea2VaeModel,
+              selectedEncoder: krea2Qwen3VlEncoderModel,
+              availableQwenImageVaes: selectQwenImageVAEModels(state),
+              availableAnimaVaes: selectAnimaVAEModels(state),
+              availableEncoders: selectQwen3VLEncoderModels(state),
+            });
+            if ('vae' in updates) {
+              dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
+              modelsUpdatedDisabledOrCleared += 1;
+            }
+            if ('encoder' in updates) {
+              dispatch(
+                krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null)
+              );
+              modelsUpdatedDisabledOrCleared += 1;
+            }
+          } else {
+            const updates = getKrea2ComponentUpdates({
+              format: newModelConfig.format,
+              selectedVae: krea2VaeModel,
+              selectedEncoder: krea2Qwen3VlEncoderModel,
+              availableQwenImageVaes: selectQwenImageVAEModels(state),
+              availableAnimaVaes: selectAnimaVAEModels(state),
+              availableEncoders: selectQwen3VLEncoderModels(state),
+            });
+            if ('vae' in updates) {
+              dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
+            }
+            if ('encoder' in updates) {
+              dispatch(
+                krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null)
+              );
+            }
+          }
+        }
+
         if (newModel.base !== 'external' && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
@@ -528,6 +598,38 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
           if (diffusersModel) {
             dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+          }
+        }
+      }
+
+      // Handle Krea-2 model changes within the same base (e.g. switching GGUF <-> Diffusers). A Diffusers
+      // pipeline bundles its VAE + encoder, so stale standalone overrides must be cleared; a single-file /
+      // GGUF transformer needs standalone components auto-selected so the readiness check passes.
+      if (newBase === 'krea-2' && state.params.model?.base === 'krea-2' && newModel.key !== state.params.model?.key) {
+        const { krea2VaeModel, krea2Qwen3VlEncoderModel } = state.params;
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        const newModelConfig =
+          (modelConfigsResult.data
+            ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
+            : undefined) ?? modelsApi.endpoints.getModelConfig.select(newModel.key)(state).data;
+        if (!newModelConfig) {
+          // Defer until the model format is known.
+        } else {
+          const updates = getKrea2ComponentUpdates({
+            format: newModelConfig.format,
+            selectedVae: krea2VaeModel,
+            selectedEncoder: krea2Qwen3VlEncoderModel,
+            availableQwenImageVaes: selectQwenImageVAEModels(state),
+            availableAnimaVaes: selectAnimaVAEModels(state),
+            availableEncoders: selectQwen3VLEncoderModels(state),
+          });
+          if ('vae' in updates) {
+            dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
+          }
+          if ('encoder' in updates) {
+            dispatch(
+              krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null)
+            );
           }
         }
       }
