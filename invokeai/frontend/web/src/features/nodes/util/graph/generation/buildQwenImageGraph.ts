@@ -11,13 +11,25 @@ import { addImageToImage } from 'features/nodes/util/graph/generation/addImageTo
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import {
+  addPidDecode,
+  addPidImageToImageNative,
+  buildPidDecodeChain,
+} from 'features/nodes/util/graph/generation/addPidDecode';
 import { addQwenImageLoRAs } from 'features/nodes/util/graph/generation/addQwenImageLoRAs';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getOriginalAndScaledSizesForOtherModes,
+  getOriginalAndScaledSizesForTextToImage,
+  selectCanvasOutputFields,
+  selectPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -83,7 +95,7 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
 
   const params = selectParamsSlice(state);
 
-  const { cfgScale: cfg_scale, steps } = params;
+  const { cfgScale: cfg_scale, steps, pidMode } = params;
 
   const prompts = selectPresetModifiedPrompts(state);
 
@@ -240,13 +252,42 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
+  if (pidMode !== 'off') {
+    // Inpaint/outpaint are not wired for PiD yet - only txt2img and img2img are supported (Fit and Native).
+    if (generationMode === 'inpaint' || generationMode === 'outpaint') {
+      throw new UnsupportedGenerationModeError(t('toast.pidUnsupportedMode'));
+    }
+    // PiD decodes at 4x the generation resolution. "Scale Before Processing" (Canvas) would silently inflate
+    // the generation size to the model optimal, blowing up the decode - require it off (scaled == original).
+    const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
+    if (scaledSize.width !== originalSize.width || scaledSize.height !== originalSize.height) {
+      throw new UnsupportedGenerationModeError(t('toast.pidScaleBeforeProcessingOff'));
+    }
+  }
+
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({
-      g,
-      state,
-      denoise,
-      l2i,
-    });
+    if (pidMode !== 'off') {
+      // PiD replaces the VAE decode entirely - drop the unused l2i (and its edges). The Qwen-Image VAE (from the
+      // model loader) is wired so the node reads its per-channel latents_mean / latents_std.
+      g.deleteNode(l2i.id);
+      canvasOutput = addPidDecode({
+        g,
+        state,
+        mode: pidMode,
+        denoise,
+        decodeNodeType: 'qwen_image_pid_decode',
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+      });
+    } else {
+      canvasOutput = addTextToImage({
+        g,
+        state,
+        denoise,
+        l2i,
+      });
+    }
     g.upsertMetadata({ generation_mode: 'qwen_image_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
@@ -255,15 +296,56 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
       id: getPrefixedId('qwen_image_i2l'),
     });
 
-    canvasOutput = await addImageToImage({
-      g,
-      state,
-      manager,
-      denoise,
-      l2i,
-      i2l,
-      vaeSource: modelLoader,
-    });
+    if (pidMode === 'native') {
+      // PiD replaces the VAE decode. Native: the bbox is the 4x target - generate at bbox / 4, PiD decodes
+      // straight back up to the bbox (no downscale), so the full result composites onto the canvas region.
+      g.deleteNode(l2i.id);
+      canvasOutput = await addPidImageToImageNative({
+        g,
+        state,
+        manager,
+        denoise,
+        decodeNodeType: 'qwen_image_pid_decode',
+        i2l,
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+      });
+    } else if (pidMode === 'fit') {
+      // PiD replaces the VAE decode. Fit: generate at the bbox, PiD decodes 4x, then downscale back to the bbox.
+      g.deleteNode(l2i.id);
+      const { originalSize } = getOriginalAndScaledSizesForOtherModes(state);
+      const pidDecode = buildPidDecodeChain({
+        g,
+        state,
+        denoise,
+        decodeNodeType: 'qwen_image_pid_decode',
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+        mode: 'fit',
+        fitSize: originalSize,
+      });
+      canvasOutput = await addImageToImage({
+        g,
+        state,
+        manager,
+        denoise,
+        l2i: pidDecode,
+        i2l,
+        vaeSource: modelLoader,
+      });
+    } else {
+      canvasOutput = await addImageToImage({
+        g,
+        state,
+        manager,
+        denoise,
+        l2i,
+        i2l,
+        vaeSource: modelLoader,
+      });
+    }
     g.upsertMetadata({ generation_mode: 'qwen_image_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);

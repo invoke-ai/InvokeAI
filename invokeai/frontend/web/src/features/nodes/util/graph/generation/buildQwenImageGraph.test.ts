@@ -26,12 +26,14 @@ const defaultParams: {
   qwenImageComponentSource: null;
   qwenImageQuantization: string;
   qwenImageShift: number;
+  pidMode: 'off' | 'fit' | 'native';
 } = {
   cfgScale: 4,
   steps: 20,
   qwenImageComponentSource: null,
   qwenImageQuantization: 'none',
   qwenImageShift: 1,
+  pidMode: 'off',
 };
 
 let params = { ...defaultParams };

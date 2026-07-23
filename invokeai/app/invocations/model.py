@@ -92,6 +92,19 @@ class VAEField(BaseModel):
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
 
 
+class Gemma2EncoderField(BaseModel):
+    """Field for the Gemma-2 text encoder used by PiD decoders."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class PiDDecoderField(BaseModel):
+    """Field for a PiD (Pixel Diffusion Decoder) checkpoint."""
+
+    decoder: ModelIdentifierField = Field(description="Info to load PiD decoder checkpoint")
+
+
 class ControlLoRAField(LoRAField):
     img: ImageField = Field(description="Image to use in structural conditioning")
 

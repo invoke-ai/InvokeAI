@@ -30,6 +30,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelSourceType,
     ModelType,
     ModelVariantType,
+    PiDDecoderVariantType,
     Qwen3VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
@@ -135,6 +136,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | ZImageVariantType
         | QwenImageVariantType
         | Qwen3VariantType
+        | PiDDecoderVariantType
     ] = Field(description="The variant of the model.", default=None)
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None

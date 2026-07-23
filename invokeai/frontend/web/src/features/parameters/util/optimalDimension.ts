@@ -1,14 +1,34 @@
 import type { BaseModelType } from 'features/nodes/types/common';
 
+/** PiD's fixed super-resolution factor (the released FLUX/SD3 checkpoints are 4x). */
+export const PID_SCALE = 4;
+// PiD res2k decoders are trained 512 -> 2048 (4x). In "native" mode the user-facing dimensions are the
+// 4x target, so the optimal *target* dimension is 512 * 4 = 2048, regardless of the base model's own optimum.
+const PID_NATIVE_OPTIMAL_DIMENSION = 512 * PID_SCALE;
+
+/**
+ * Returns the PiD generation scale that the dimension helpers should account for:
+ * - 4 in "native" mode (the user-facing dimensions are the 4x target; generation runs at target / 4)
+ * - 1 otherwise ('off' / 'fit' - dimensions are the generation resolution)
+ */
+export const getPidScale = (pidMode?: string | null): number => (pidMode === 'native' ? PID_SCALE : 1);
+
 /**
  * Gets the optimal dimension for a given base model:
  * - sd-1, sd-2: 512
  * - sdxl, flux, sd-3, cogview4, qwen-image, z-image, anima: 1024
  * - default: 1024
+ *
+ * When `pidScale > 1` (PiD native mode) the user-facing dimensions are the 4x target, so the optimal is the
+ * PiD target dimension (2048) instead of the model's own optimum.
  * @param base The base model
+ * @param pidScale The PiD generation scale (see {@link getPidScale}); defaults to 1 (no PiD)
  * @returns The optimal dimension for the model, defaulting to 1024
  */
-export const getOptimalDimension = (base?: BaseModelType | null): number => {
+export const getOptimalDimension = (base?: BaseModelType | null, pidScale = 1): number => {
+  if (pidScale > 1) {
+    return PID_NATIVE_OPTIMAL_DIMENSION;
+  }
   switch (base) {
     case 'sd-1':
     case 'sd-2':
@@ -66,26 +86,34 @@ export const isInSDXLTrainingDimensions = (width: number, height: number): boole
  * - flux, sd-3, qwen-image, z-image: 16
  * - cogview4: 32
  * - default: 8
+ * When `pidScale > 1` (PiD native mode) the grid is multiplied so the user-facing target snaps to a value
+ * whose `/ pidScale` generation resolution still lands on the model's native grid.
  * @param base The base model
+ * @param pidScale The PiD generation scale (see {@link getPidScale}); defaults to 1 (no PiD)
  * @returns The grid size for the model, defaulting to 8
  */
-export const getGridSize = (base?: BaseModelType | null): number => {
+export const getGridSize = (base?: BaseModelType | null, pidScale = 1): number => {
+  let gridSize: number;
   switch (base) {
     case 'cogview4':
-      return 32;
+      gridSize = 32;
+      break;
     case 'flux':
     case 'flux2':
     case 'sd-3':
     case 'qwen-image':
     case 'z-image':
-      return 16;
+      gridSize = 16;
+      break;
     case 'sd-1':
     case 'sd-2':
     case 'sdxl':
     case 'anima':
     default:
-      return 8;
+      gridSize = 8;
+      break;
   }
+  return gridSize * pidScale;
 };
 
 const MIN_AREA_FACTOR = 0.8;
@@ -117,7 +145,7 @@ export const getIsSizeTooLarge = (width: number, height: number, optimalDimensio
  * @param optimalDimension The optimal dimension
  * @returns Whether the current width and height needs to be resized to the optimal dimension
  */
-export const getIsSizeOptimal = (width: number, height: number, base?: BaseModelType): boolean => {
-  const optimalDimension = getOptimalDimension(base);
+export const getIsSizeOptimal = (width: number, height: number, base?: BaseModelType, pidScale = 1): boolean => {
+  const optimalDimension = getOptimalDimension(base, pidScale);
   return !getIsSizeTooSmall(width, height, optimalDimension) && !getIsSizeTooLarge(width, height, optimalDimension);
 };

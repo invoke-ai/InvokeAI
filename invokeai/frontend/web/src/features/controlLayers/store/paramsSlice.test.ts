@@ -157,7 +157,8 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(3);
+    // v2 migrates all the way through the current chain (v2 -> v3 adds Qwen fields, v3 -> v4 adds PiD fields).
+    expect(result._version).toBe(4);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     // Existing params should be preserved

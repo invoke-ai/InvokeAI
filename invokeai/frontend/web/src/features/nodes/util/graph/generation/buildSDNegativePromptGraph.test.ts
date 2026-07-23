@@ -177,6 +177,7 @@ const buildState = (model: (typeof models)[keyof typeof models]): RootState =>
       model,
       negativePrompt: 'raw negative prompt',
       positivePrompt: 'raw positive prompt',
+      pidMode: 'off',
       refinerModel: null,
       scheduler: 'euler',
       seed: 123,
