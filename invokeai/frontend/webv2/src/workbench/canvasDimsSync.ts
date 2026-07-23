@@ -225,7 +225,8 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
               height: result.height,
               width: result.width,
             },
-            project.id
+            project.id,
+            'system'
           );
         } finally {
           isSyncing = false;

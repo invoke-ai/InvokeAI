@@ -68,7 +68,7 @@ export interface GenerationUiAdapter {
     setSectionOpen(sectionId: string, open: boolean): void;
   };
   settings: {
-    patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string): void;
+    patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string, origin?: 'user' | 'system'): void;
   };
 }
 

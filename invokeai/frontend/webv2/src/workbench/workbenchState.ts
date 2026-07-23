@@ -110,6 +110,9 @@ import { normalizeProjectSettings } from './settings/store';
 
 type QueueGenerateSnapshot = NonNullable<QueueItem['snapshot']['generate']>;
 
+/** Programmatic dispatches (`'system'`) never auto-switch the Invoke route; absent means `'user'`. */
+export type WorkbenchActionOrigin = 'user' | 'system';
+
 type WorkbenchReducerAction =
   | { type: 'createProject' }
   | { type: 'openProject'; project: Project }
@@ -152,14 +155,25 @@ type WorkbenchReducerAction =
     }
   | { type: 'setRegionWidgetCollapsed'; region: WidgetRegion; isCollapsed: boolean }
   | { type: 'setRegionWidgetSize'; region: WidgetRegion; sizePx: number }
-  | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string }
-  | { type: 'patchGenerateSettings'; values: Partial<GenerateWidgetValues>; projectId?: string }
+  | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string; origin?: WorkbenchActionOrigin }
+  | {
+      type: 'patchGenerateSettings';
+      values: Partial<GenerateWidgetValues>;
+      projectId?: string;
+      origin?: WorkbenchActionOrigin;
+    }
   | { type: 'patchProjectPromptDraft'; values: ProjectPromptDraftPatch; projectId?: string }
   | { type: 'setGenerateBatchCount'; batchCount: number; projectId?: string }
   | { type: 'addPromptToHistory'; prompt: PromptHistoryItem; projectId?: string }
   | { type: 'removePromptFromHistory'; prompt: PromptHistoryItem; projectId?: string }
   | { type: 'clearPromptHistory'; projectId?: string }
-  | { type: 'patchWidgetValues'; widgetId: WidgetTypeId; values: Record<string, unknown>; projectId?: string }
+  | {
+      type: 'patchWidgetValues';
+      widgetId: WidgetTypeId;
+      values: Record<string, unknown>;
+      projectId?: string;
+      origin?: WorkbenchActionOrigin;
+    }
   | {
       type: 'patchWidgetInstanceValues';
       instanceId: WidgetInstanceId;

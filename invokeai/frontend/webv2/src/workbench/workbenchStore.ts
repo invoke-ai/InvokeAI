@@ -137,7 +137,11 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       ),
       patchSettings: command(
         'patchGenerateSettings',
-        (values: ActionPayload<'patchGenerateSettings'>['values'], projectId?: string) => ({ projectId, values })
+        (
+          values: ActionPayload<'patchGenerateSettings'>['values'],
+          projectId?: string,
+          origin?: ActionPayload<'patchGenerateSettings'>['origin']
+        ) => ({ origin, projectId, values })
       ),
       removePromptFromHistory: command(
         'removePromptFromHistory',
@@ -153,7 +157,11 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       ),
       setSettings: command(
         'setGenerateSettings',
-        (values: ActionPayload<'setGenerateSettings'>['values'], projectId?: string) => ({ projectId, values })
+        (
+          values: ActionPayload<'setGenerateSettings'>['values'],
+          projectId?: string,
+          origin?: ActionPayload<'setGenerateSettings'>['origin']
+        ) => ({ origin, projectId, values })
       ),
       setSource: command('setInvocationSource', (sourceId: ActionPayload<'setInvocationSource'>['sourceId']) => ({
         sourceId,
@@ -280,8 +288,10 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
         (
           widgetId: ActionPayload<'patchWidgetValues'>['widgetId'],
           values: Record<string, unknown>,
-          projectId?: string
+          projectId?: string,
+          origin?: ActionPayload<'patchWidgetValues'>['origin']
         ) => ({
+          origin,
           projectId,
           values,
           widgetId,

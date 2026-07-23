@@ -10,7 +10,7 @@ import { createContext, use } from 'react';
  */
 export interface UpscaleUiAdapter {
   patchPromptDraft(values: ProjectPromptDraftPatch): void;
-  patchValues(values: Partial<UpscaleWidgetValues>): void;
+  patchValues(values: Partial<UpscaleWidgetValues>, origin?: 'user' | 'system'): void;
   projectId: string;
   promptDraft: ProjectPromptDraft;
   rawValues: Record<string, unknown>;

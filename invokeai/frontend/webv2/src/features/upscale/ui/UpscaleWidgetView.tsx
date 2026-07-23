@@ -192,7 +192,7 @@ const UpscaleModelReconciler = ({
       return;
     }
 
-    patchValues({ ...values });
+    patchValues({ ...values }, 'system');
   });
 
   return null;
