@@ -1,6 +1,6 @@
-import type { CanvasProjectMutation } from './canvasProjectMutations';
-
 import { describe, expect, it } from 'vitest';
+
+import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { isHighConfidenceCanvasEdit } from './canvasProjectMutations';
 
@@ -11,7 +11,6 @@ describe('isHighConfidenceCanvasEdit', () => {
     expect(isHighConfidenceCanvasEdit(mutation({ type: 'addCanvasLayer' }))).toBe(true);
     expect(isHighConfidenceCanvasEdit(mutation({ type: 'updateCanvasLayerSource' }))).toBe(true);
     expect(isHighConfidenceCanvasEdit(mutation({ type: 'updateCanvasLayerConfig' }))).toBe(true);
-    expect(isHighConfidenceCanvasEdit(mutation({ type: 'commitStagedImage' }))).toBe(true);
     expect(isHighConfidenceCanvasEdit(mutation({ type: 'setCanvasBbox' }))).toBe(true);
     expect(isHighConfidenceCanvasEdit(mutation({ type: 'resizeCanvasDocument' }))).toBe(true);
   });
@@ -29,6 +28,8 @@ describe('isHighConfidenceCanvasEdit', () => {
 
   it('ignores selection, visibility, staging review, snapshots, and hydration', () => {
     const excluded: string[] = [
+      'applyCanvasLayerStackMutation',
+      'commitStagedImage',
       'setCanvasSelectedLayer',
       'setCanvasLayersEnabled',
       'setStagedImageIndex',

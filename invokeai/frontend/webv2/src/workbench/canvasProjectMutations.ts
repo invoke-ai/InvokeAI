@@ -138,18 +138,20 @@ export const isCanvasProjectMutation = (value: { type: string }): value is Canva
 
 /**
  * Mutations that count as deliberate canvas content edits for auto-switching
- * the Invoke route. Selection, visibility, staging review/navigation, snapshot
- * management, and document hydration are excluded — they express review or
- * bookkeeping, not editing intent. `applyCanvasLayerStackMutation` also fires
- * on rare error-rollback paths (staged-result commit failures); that false
- * positive is accepted rather than threading an origin through the engine.
+ * the Invoke route. Selection, visibility, staging review/navigation
+ * (including accepting a staged image — the terminal review act, whose failed
+ * mirror acceptance must roll the project back exactly), snapshot management,
+ * and document hydration are excluded — they express review or bookkeeping,
+ * not editing intent. `applyCanvasLayerStackMutation` is excluded because the
+ * engine dispatches the same type for both forward ops (merge/copy/extract)
+ * and their exact-compensation rollbacks; a route flip there would break
+ * transactional restore invariants, and those flows are accompanied by other
+ * high-confidence gestures in practice.
  */
 const HIGH_CONFIDENCE_CANVAS_MUTATION_TYPES: ReadonlySet<CanvasProjectMutation['type']> = new Set<
   CanvasProjectMutation['type']
 >([
   'addCanvasLayer',
-  'applyCanvasLayerStackMutation',
-  'commitStagedImage',
   'convertCanvasLayer',
   'duplicateCanvasLayer',
   'mergeCanvasLayersDown',

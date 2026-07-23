@@ -50,7 +50,11 @@ import {
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
 import { createNewCanvasStateV2, migrateCanvasStateToV2 } from './canvasMigration';
-import { applyCanvasProjectMutation, type CanvasProjectMutation } from './canvasProjectMutations';
+import {
+  applyCanvasProjectMutation,
+  type CanvasProjectMutation,
+  isHighConfidenceCanvasEdit,
+} from './canvasProjectMutations';
 import { getProjectWidgetValues } from './widgetState';
 export { nextLayerName } from './canvasProjectMutations';
 import { compileGenerateGraph, resolveGenerateSeed } from '@features/generation/graph';
@@ -61,6 +65,7 @@ import {
   getGenerationModelAvailabilityReasons,
   getPromptDraftFromValues,
   getPromptHistoryItemFromGenerateSettings,
+  isHighConfidenceGenerateEdit,
   migrateProjectPromptDraft,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
@@ -75,6 +80,7 @@ import {
   compileUpscaleGraph,
   getUpscaleOutputDimensions,
   getUpscaleValidationReasons,
+  isHighConfidenceUpscaleEdit,
   normalizeUpscaleWidgetValues,
   resolveUpscaleSeed,
   syncUpscaleWidgetValuesWithModels,
@@ -99,6 +105,7 @@ import {
 } from './canvasStagingView';
 import {
   defaultInvocationRoute,
+  getRouteAfterHighConfidenceEdit,
   isInvocationRouteValid,
   isInvocationSourceAvailable,
   resolveInvocationRoute,
@@ -106,7 +113,7 @@ import {
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
 import { cloneLayoutPresetWidgetRegions, createLayoutPresetSnapshot } from './layoutPresetSnapshots';
 import { normalizeWorkbenchQueueHistory } from './queueHistoryNormalization';
-import { normalizeProjectSettings } from './settings/store';
+import { getWorkbenchPreferences, normalizeProjectSettings } from './settings/store';
 
 type QueueGenerateSnapshot = NonNullable<QueueItem['snapshot']['generate']>;
 
@@ -1503,6 +1510,33 @@ const updateActiveInvocation = (
     };
   });
 
+/**
+ * Applies the auto-switch route rule to a project after a high-confidence
+ * edit. Deliberately no undo entry or event: the route change rides the
+ * edit's own project update, matching the workflow auto-source precedent.
+ */
+const applyAutoRouteForEdit = (project: Project, sourceId: InvocationSourceId): Project => {
+  if (!getWorkbenchPreferences().autoSwitchInvocationRoute) {
+    return project;
+  }
+
+  const invocation = getRouteAfterHighConfidenceEdit(project.invocation, sourceId);
+
+  return invocation === project.invocation ? project : { ...project, invocation };
+};
+
+/**
+ * The generate widget doubles as Canvas's parameter panel — canvas invocations
+ * compile from generate values (prepareCanvasInvocation) and canvasDimsSync
+ * mirrors generate dims onto the bbox — so generate edits never steal the
+ * route from an active canvas source.
+ */
+const applyAutoRouteForGenerateEdit = (project: Project): Project =>
+  project.invocation.sourceId === 'canvas' ? project : applyAutoRouteForEdit(project, 'generate');
+
+const getChangedValueKeys = (previous: Record<string, unknown>, patch: Record<string, unknown>): string[] =>
+  Object.keys(patch).filter((key) => !Object.is(previous[key], patch[key]));
+
 const compileInvocationSnapshot = (
   project: Project,
   route: InvocationRoute,
@@ -2274,19 +2308,36 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       );
     }
     case 'setGenerateSettings': {
-      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
-        updateProjectWidgetValues(project, 'generate', () => cloneGenerateWidgetValues(action.values))
-      );
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
+        const updated = updateProjectWidgetValues(project, 'generate', () => cloneGenerateWidgetValues(action.values));
+
+        // Whole-values commits come from model selection/recall — always intent-bearing.
+        return updated === project || action.origin === 'system' ? updated : applyAutoRouteForGenerateEdit(updated);
+      });
     }
     case 'patchGenerateSettings': {
-      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
-        updateProjectWidgetValues(project, 'generate', (values) => patchRecord(values, action.values))
-      );
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
+        const updated = updateProjectWidgetValues(project, 'generate', (values) => patchRecord(values, action.values));
+
+        if (updated === project || action.origin === 'system') {
+          return updated;
+        }
+
+        const changedKeys = getChangedValueKeys(getProjectWidgetValues(project, 'generate'), action.values);
+
+        return isHighConfidenceGenerateEdit(changedKeys) ? applyAutoRouteForGenerateEdit(updated) : updated;
+      });
     }
     case 'patchProjectPromptDraft': {
-      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
-        updateProjectWidgetValues(project, 'generate', (values) => applyProjectPromptDraft(values, action.values))
-      );
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
+        const updated = updateProjectWidgetValues(project, 'generate', (values) =>
+          applyProjectPromptDraft(values, action.values)
+        );
+
+        // Only the upscale widget's prompt fields dispatch this action today;
+        // needs a source discriminator if Generate ever adopts the shared draft.
+        return updated === project ? updated : applyAutoRouteForEdit(updated, 'upscale');
+      });
     }
     case 'setGenerateBatchCount': {
       const batchCount = sanitizeBatchCount(action.batchCount);
@@ -2317,9 +2368,26 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
     }
     case 'patchWidgetValues': {
       // Generic widget-owned UI state (panel modes, tabs, sizes). Not undoable.
-      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
-        updateProjectWidgetValues(project, action.widgetId, (values) => patchRecord(values, action.values))
-      );
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
+        const updated = updateProjectWidgetValues(project, action.widgetId, (values) =>
+          patchRecord(values, action.values)
+        );
+
+        if (updated === project || action.origin === 'system') {
+          return updated;
+        }
+
+        const changedKeys = getChangedValueKeys(getProjectWidgetValues(project, action.widgetId), action.values);
+
+        if (action.widgetId === 'generate' && isHighConfidenceGenerateEdit(changedKeys)) {
+          return applyAutoRouteForGenerateEdit(updated);
+        }
+        if (action.widgetId === 'upscale' && isHighConfidenceUpscaleEdit(changedKeys)) {
+          return applyAutoRouteForEdit(updated, 'upscale');
+        }
+
+        return updated;
+      });
     }
     case 'patchWidgetInstanceValues': {
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
@@ -2347,21 +2415,11 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
 
         const undoLabel = getProjectGraphUndoLabel(action.action);
         const nextProject = undoLabel ? pushUndo(project, undoLabel) : project;
-        // Meaningful workflow edits are high-confidence source events: they
-        // steer the global Invoke route to the project graph unless locked.
-        const shouldAutoSetSource =
-          !project.invocation.sourceLocked &&
-          project.invocation.sourceId !== 'workflow' &&
-          isHighConfidenceGraphEdit(action.action) &&
-          isInvocationSourceAvailable('workflow');
+        // Meaningful workflow edits are high-confidence source events that
+        // steer the global Invoke route to the project graph.
+        const updated = { ...nextProject, projectGraph };
 
-        return {
-          ...nextProject,
-          invocation: shouldAutoSetSource
-            ? { ...nextProject.invocation, sourceId: 'workflow' }
-            : nextProject.invocation,
-          projectGraph,
-        };
+        return isHighConfidenceGraphEdit(action.action) ? applyAutoRouteForEdit(updated, 'workflow') : updated;
       });
     }
     case 'replaceProjectGraph': {
@@ -2793,9 +2851,13 @@ export const __workbenchReducerInternal = (state: WorkbenchState, action: Workbe
       return updateGalleryValues(state, (values) => ({ ...values, projectBoardId: action.boardId }), action.projectId);
     }
     case 'applyCanvasProjectMutation': {
-      return updateProjectById(state, action.projectId, (project) =>
-        applyCanvasProjectMutation(project, action.mutation)
-      );
+      return updateProjectById(state, action.projectId, (project) => {
+        const updated = applyCanvasProjectMutation(project, action.mutation);
+
+        return updated !== project && isHighConfidenceCanvasEdit(action.mutation)
+          ? applyAutoRouteForEdit(updated, 'canvas')
+          : updated;
+      });
     }
     case 'submitCanvasInvocationSnapshot': {
       return updateProjectById(state, action.projectId, (project) =>
