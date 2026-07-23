@@ -13,6 +13,7 @@ from invokeai.app.invocations.model import (
     Qwen3EncoderField,
     TransformerField,
     VAEField,
+    is_self_contained_sdnq_pipeline,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
@@ -73,19 +74,29 @@ class ZImageModelLoaderInvocation(BaseInvocation):
 
     qwen3_source_model: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="Diffusers Z-Image model to extract VAE and/or Qwen3 encoder from. "
+        description="Z-Image pipeline model to extract VAE and/or Qwen3 encoder from. "
         "Use this if you don't have separate VAE/Qwen3 models. "
         "Ignored if both VAE and Qwen3 Encoder are provided separately.",
         input=Input.Direct,
         ui_model_base=BaseModelType.ZImage,
         ui_model_type=ModelType.Main,
-        ui_model_format=ModelFormat.Diffusers,
-        title="Qwen3 Source (Diffusers)",
+        # No ui_model_format hint: both plain Diffusers pipelines and SDNQ-quantized ZImagePipeline
+        # folders (which ship VAE/Qwen3 submodels) are valid sources. _validate_diffusers_format
+        # accepts both, so pinning the format here would wrongly filter SDNQ pipelines out of the
+        # generic node/workflow model pickers.
+        title="Qwen3 Source",
     )
 
     def invoke(self, context: InvocationContext) -> ZImageModelLoaderOutput:
         # Transformer always comes from the main model
         transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+
+        # SDNQ Z-Image pipeline installs are self-contained: a single install ships the transformer,
+        # Qwen3 encoder and VAE as submodels of the main model. When the user hasn't selected a
+        # standalone VAE / Qwen3 Encoder or a separate Qwen3 Source, fall back to the main model
+        # itself for those submodels. This lets a freshly installed SDNQ Z-Image pipeline generate
+        # without the user having to manually re-select the same model as a component source.
+        self_contained_source = self._get_self_contained_source(context)
 
         # Determine VAE source
         if self.vae_model is not None:
@@ -95,6 +106,9 @@ class ZImageModelLoaderInvocation(BaseInvocation):
             # Extract from Diffusers Z-Image model
             self._validate_diffusers_format(context, self.qwen3_source_model, "Qwen3 Source")
             vae = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.VAE})
+        elif self_contained_source is not None:
+            # Extract from the self-contained SDNQ main model
+            vae = self_contained_source.model_copy(update={"submodel_type": SubModelType.VAE})
         else:
             raise ValueError(
                 "No VAE source provided. Either set 'VAE' to a FLUX VAE model, "
@@ -111,6 +125,10 @@ class ZImageModelLoaderInvocation(BaseInvocation):
             self._validate_diffusers_format(context, self.qwen3_source_model, "Qwen3 Source")
             qwen3_tokenizer = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             qwen3_encoder = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        elif self_contained_source is not None:
+            # Extract from the self-contained SDNQ main model
+            qwen3_tokenizer = self_contained_source.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            qwen3_encoder = self_contained_source.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:
             raise ValueError(
                 "No Qwen3 Encoder source provided. Either set 'Qwen3 Encoder' to a standalone model, "
@@ -123,13 +141,34 @@ class ZImageModelLoaderInvocation(BaseInvocation):
             vae=VAEField(vae=vae),
         )
 
+    def _get_self_contained_source(self, context: InvocationContext) -> Optional[ModelIdentifierField]:
+        """Return the main model as a submodel source when it is a self-contained pipeline that
+        ships its own VAE and Qwen3 submodels.
+
+        A truthy ``submodels`` dict is not sufficient: Main_SDNQ_Diffusers_ZImage_Config builds
+        whatever submodels it recognizes from model_index.json, so a partial (or partially
+        recognized) pipeline can expose e.g. only the transformer. The loader then loads the VAE /
+        Qwen3 encoder / tokenizer from fixed ``vae`` / ``text_encoder`` / ``tokenizer`` subfolders, so
+        we only treat the main model as self-contained when all of those submodels are present.
+        Otherwise we fall through and require an explicit VAE / Qwen3 source."""
+        config = context.models.get_config(self.model)
+        if is_self_contained_sdnq_pipeline(config):
+            return self.model
+        return None
+
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str
     ) -> None:
-        """Validate that a model is in Diffusers format."""
+        """Validate that a model exposes the diffusers-style submodel layout (transformer / vae /
+        text_encoder / tokenizer subfolders). Plain diffusers Z-Image pipelines satisfy this;
+        SDNQ-quantized ZImagePipeline folders do too, but only when they ship the VAE + Qwen3
+        submodels. Single-file SDNQ Z-Image checkpoints and partial pipelines are rejected."""
         config = context.models.get_config(model)
-        if config.format != ModelFormat.Diffusers:
-            raise ValueError(
-                f"The {model_name} model must be a Diffusers format Z-Image model. "
-                f"The selected model '{config.name}' is in {config.format.value} format."
-            )
+        if config.format == ModelFormat.Diffusers:
+            return
+        if is_self_contained_sdnq_pipeline(config):
+            return
+        raise ValueError(
+            f"The {model_name} model must be a Diffusers-style Z-Image pipeline (with VAE / Qwen3 "
+            f"submodels). The selected model '{config.name}' is in {config.format.value} format."
+        )

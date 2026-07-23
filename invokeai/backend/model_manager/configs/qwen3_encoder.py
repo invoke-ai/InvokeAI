@@ -14,6 +14,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
 def _has_qwen3_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -44,6 +45,22 @@ def _has_qwen3_keys(state_dict: dict[str | int, Any]) -> bool:
 def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict contains GGML tensors (GGUF quantized)."""
     return any(isinstance(v, GGMLTensor) for v in state_dict.values())
+
+
+def _has_sdnq_tensors(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains SDNQTensor instances."""
+    return any(isinstance(v, SDNQTensor) for v in state_dict.values())
+
+
+def _has_sdnq_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict has SDNQ-style keys (weight + scale pairs)."""
+    keys = {k for k in state_dict.keys() if isinstance(k, str)}
+    for key in keys:
+        if key.endswith(".weight"):
+            base = key[:-7]
+            if f"{base}.scale" in keys:
+                return True
+    return False
 
 
 def _has_qwen_vl_visual_tower(state_dict: dict[str | int, Any]) -> bool:
@@ -170,6 +187,22 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError("state dict looks like GGUF quantized")
 
 
+# Transformers architectures the unquantized Qwen3 encoder config accepts.
+_QWEN3_ENCODER_ARCHITECTURES = {
+    "Qwen2VLForConditionalGeneration",
+    "Qwen2ForCausalLM",
+    "Qwen3ForCausalLM",
+}
+
+# Architectures the SDNQ Qwen encoder loaders can actually instantiate. Both the standalone
+# Qwen3EncoderSDNQLoader and the FLUX.2 / Z-Image pipeline loaders reconstruct a text-only
+# Qwen3Config + Qwen3ForCausalLM from the state dict, so they can only load a Qwen3 model: a Qwen2
+# state dict lacks Qwen3-specific parameters (q/k normalization), and a Qwen-VL state dict also
+# carries visual-tower weights. Accepting those classes during identification produces folders the
+# loader's strict incomplete-load guard would reject, so the SDNQ paths must narrow to this set.
+_SDNQ_LOADABLE_QWEN_ARCHITECTURES = {"Qwen3ForCausalLM"}
+
+
 class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
     """Configuration for Qwen3 Encoder models in a diffusers-like format.
 
@@ -223,19 +256,39 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
             )
 
         # Qwen3 uses Qwen2VLForConditionalGeneration or similar
-        raise_for_class_name(
-            expected_config_path,
-            {
-                "Qwen2VLForConditionalGeneration",
-                "Qwen2ForCausalLM",
-                "Qwen3ForCausalLM",
-            },
-        )
+        raise_for_class_name(expected_config_path, _QWEN3_ENCODER_ARCHITECTURES)
+
+        # Reject SDNQ-quantized encoders so Qwen3Encoder_SDNQ_Folder_Config matches them instead.
+        # A real SDNQ Qwen3 encoder has the same Qwen3 config class name as an unquantized one, so
+        # without this guard both configs accept the folder — and since they share the Qwen3Encoder
+        # type, the factory tiebreak is non-deterministic. If it picked this (unquantized) config,
+        # the non-SDNQ loader would then mis-read the packed uint8 weights.
+        cls._reject_if_sdnq_quantized(mod)
 
         # Determine variant from config.json hidden_size
         variant = cls._get_variant_from_config(expected_config_path)
 
         return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _reject_if_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        # Primary signal: quantization_config.json with quant_method="sdnq" (at root or in
+        # text_encoder/). Fallback: SDNQ-style weight+scale key pairs in the state dict. This mirrors
+        # the detection in Qwen3Encoder_SDNQ_Folder_Config so the two stay mutually exclusive.
+        for folder in (mod.path, mod.path / "text_encoder"):
+            quant_config_path = folder / "quantization_config.json"
+            if not quant_config_path.exists():
+                continue
+            try:
+                with open(quant_config_path, "r", encoding="utf-8") as f:
+                    quant_config = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            if quant_config.get("quant_method") == "sdnq":
+                raise NotAMatchError("folder is SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
+
+        if _has_sdnq_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
 
     @classmethod
     def _get_variant_from_config(cls, config_path) -> Qwen3VariantType:
@@ -309,3 +362,186 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         has_ggml = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Qwen3Encoder_SDNQ_Config(Checkpoint_Config_Base, Config_Base):
+    """Configuration for SDNQ-quantized Qwen3 Encoder models (single file)."""
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.Qwen3Encoder] = Field(default=ModelType.Qwen3Encoder)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    variant: Qwen3VariantType = Field(description="Qwen3 model size variant (4B or 8B)")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_qwen3_model(mod)
+
+        cls._validate_looks_like_sdnq_quantized(mod)
+
+        variant = cls._get_variant_or_default(mod)
+
+        return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _get_variant_or_default(cls, mod: ModelOnDisk) -> Qwen3VariantType:
+        """Get variant from state dict, defaulting to 4B if unknown."""
+        state_dict = mod.load_state_dict()
+        variant = _get_qwen3_variant_from_state_dict(state_dict)
+        return variant if variant is not None else Qwen3VariantType.Qwen3_4B
+
+    @classmethod
+    def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:
+        has_qwen3 = _has_qwen3_keys(mod.load_state_dict())
+        if not has_qwen3:
+            raise NotAMatchError("state dict does not look like a Qwen3 model")
+
+    @classmethod
+    def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _has_sdnq_tensors(state_dict) and not _has_sdnq_keys(state_dict):
+            raise NotAMatchError("state dict does not look like SDNQ quantized")
+
+
+class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
+    """Configuration for folder-based SDNQ-quantized Qwen3 Encoder models.
+
+    Used for SDNQ bundles where the text_encoder is a folder containing
+    quantization_config.json and safetensors files with SDNQ keys.
+    """
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.Qwen3Encoder] = Field(default=ModelType.Qwen3Encoder)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    variant: Qwen3VariantType = Field(description="Qwen3 model size variant (4B or 8B)")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        matched = False
+
+        # Check for quantization_config.json with quant_method="sdnq"
+        quant_config_path = mod.path / "quantization_config.json"
+        if quant_config_path.exists():
+            with open(quant_config_path, "r", encoding="utf-8") as f:
+                quant_config = json.load(f)
+            if quant_config.get("quant_method") == "sdnq":
+                matched = True
+
+        # Fallback: check if safetensors files have SDNQ-style keys
+        if not matched:
+            safetensors_files = list(mod.path.glob("*.safetensors"))
+            if safetensors_files:
+                state_dict = mod.load_state_dict()
+                if _has_sdnq_keys(state_dict):
+                    matched = True
+
+        if not matched:
+            raise NotAMatchError("directory does not look like an SDNQ-quantized Qwen3 encoder")
+
+        # A root config.json next to tokenizer files is a complete causal LM (TextLLM), not a Qwen3
+        # *encoder* subfolder. Mirror the guard in Qwen3Encoder_Qwen3Encoder_Config so an SDNQ
+        # causal-LM download is left to the TextLLM path instead of being stored as qwen3_encoder.
+        cls._reject_if_complete_causal_lm(mod)
+
+        # Being SDNQ-quantized is not enough: an SDNQ transformer, VAE or other component folder
+        # also has a quantization_config.json with quant_method="sdnq". Without verifying the folder
+        # is actually a Qwen3 encoder, such a folder would be stored as type=qwen3_encoder and only
+        # blow up later in the loader when Qwen-specific weights are missing. Require either a Qwen3
+        # architecture in the (text_encoder/)config.json or Qwen3-specific state-dict keys.
+        cls._validate_is_qwen3_encoder(mod)
+
+        variant = cls._get_variant_from_dir(mod)
+        return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _reject_if_complete_causal_lm(cls, mod: ModelOnDisk) -> None:
+        # Only applies to the root-config layout: an encoder subfolder (text_encoder/config.json) is
+        # unambiguous. When config.json sits at the root next to tokenizer files, this is a complete
+        # causal LM, not a Qwen3 encoder subfolder (matches Qwen3Encoder_Qwen3Encoder_Config).
+        if (mod.path / "text_encoder" / "config.json").exists():
+            return
+        if not (mod.path / "config.json").exists():
+            return
+        tokenizer_files = ("tokenizer.json", "tokenizer.model", "tokenizer_config.json")
+        if any((mod.path / f).exists() for f in tokenizer_files):
+            raise NotAMatchError(
+                "directory looks like a complete causal LM (config.json and tokenizer files at root), "
+                "not a standalone Qwen3 encoder"
+            )
+
+    @classmethod
+    def _validate_is_qwen3_encoder(cls, mod: ModelOnDisk) -> None:
+        # Strongest signal: a transformers-style config.json naming the architecture. The SDNQ
+        # encoder loader can only build Qwen3ForCausalLM, so we accept only that class here. Crucially,
+        # when a config.json declares a *different* architecture (e.g. Qwen2ForCausalLM or the
+        # multimodal Qwen2VLForConditionalGeneration), we reject rather than falling through to the
+        # key heuristic: the loader would fail on the missing Qwen3 params / extra visual-tower
+        # weights, so identification must not accept a folder it cannot load.
+        for cfg_path in (mod.path / "config.json", mod.path / "text_encoder" / "config.json"):
+            if not cfg_path.exists():
+                continue
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            names: set[str] = set(cfg.get("architectures") or [])
+            class_name = cfg.get("_class_name")
+            if isinstance(class_name, str):
+                names.add(class_name)
+            if not names:
+                continue
+            if names & _SDNQ_LOADABLE_QWEN_ARCHITECTURES:
+                return
+            raise NotAMatchError(
+                f"architecture {sorted(names)} is not loadable by the SDNQ Qwen3 encoder loader "
+                "(only Qwen3ForCausalLM is supported)"
+            )
+
+        # Fallback for folders without a usable config.json architecture: check for Qwen3-specific
+        # state-dict keys (model.layers. / model.embed_tokens.weight). An SDNQ transformer/VAE folder
+        # has transformer_blocks. / decoder. keys instead and is correctly rejected. Loading the state
+        # dict can raise for sharded folders (multiple weight files), so treat that as "no usable
+        # signal" rather than letting it abort identification.
+        try:
+            state_dict = mod.load_state_dict()
+        except Exception:
+            state_dict = {}
+        if _has_qwen3_keys(state_dict):
+            return
+
+        raise NotAMatchError("directory does not look like a Qwen3 encoder (no Qwen3 config class or keys)")
+
+    @classmethod
+    def _get_variant_from_dir(cls, mod: ModelOnDisk) -> Qwen3VariantType:
+        """Determine variant from config.json hidden_size, defaulting to 4B."""
+        QWEN3_06B_HIDDEN_SIZE = 1024
+        QWEN3_4B_HIDDEN_SIZE = 2560
+        QWEN3_8B_HIDDEN_SIZE = 4096
+
+        for cfg_path in (mod.path / "config.json", mod.path / "text_encoder" / "config.json"):
+            if not cfg_path.exists():
+                continue
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            hidden_size = cfg.get("hidden_size")
+            if hidden_size == QWEN3_8B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_8B
+            if hidden_size == QWEN3_4B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_4B
+            if hidden_size == QWEN3_06B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_06B
+            break
+        return Qwen3VariantType.Qwen3_4B

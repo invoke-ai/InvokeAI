@@ -19,6 +19,7 @@ from invokeai.app.invocations.model import (
     Qwen3EncoderField,
     TransformerField,
     VAEField,
+    is_self_contained_sdnq_pipeline,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import (
@@ -94,14 +95,13 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
 
     qwen3_source_model: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="Diffusers Flux2 Klein model to extract VAE and/or Qwen3 encoder from. "
-        "Use this if you don't have separate VAE/Qwen3 models. "
+        description="Diffusers or SDNQ-pipeline Flux2 Klein model to extract VAE and/or Qwen3 "
+        "encoder from. Use this if you don't have separate VAE/Qwen3 models. "
         "Ignored if both VAE and Qwen3 Encoder are provided separately.",
         input=Input.Direct,
         ui_model_base=BaseModelType.Flux2,
         ui_model_type=ModelType.Main,
-        ui_model_format=ModelFormat.Diffusers,
-        title="Qwen3 Source (Diffusers)",
+        title="Qwen3 Source",
     )
 
     max_seq_len: Literal[256, 512] = InputField(
@@ -114,9 +114,14 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
         # Transformer always comes from the main model
         transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
 
-        # Check if main model is Diffusers format (can extract VAE directly)
+        # Check if main model is a pipeline-shaped config we can extract submodels from.
+        # Plain diffusers pipelines satisfy this; so do SDNQ-quantized pipeline folders — but only
+        # when they actually ship the VAE + Qwen3 (text_encoder + tokenizer) submodels. A partial
+        # SDNQ pipeline exposing only the transformer must fall through to the standalone-encoder
+        # branch, otherwise the loader would later request those submodels against fixed subfolders
+        # that don't exist. Single-file SDNQ/GGUF checkpoints have no submodels and also fall through.
         main_config = context.models.get_config(self.model)
-        main_is_diffusers = main_config.format == ModelFormat.Diffusers
+        main_is_diffusers = main_config.format == ModelFormat.Diffusers or is_self_contained_sdnq_pipeline(main_config)
 
         # Determine VAE source
         # IMPORTANT: FLUX.2 Klein uses a 32-channel VAE (AutoencoderKLFlux2), not the 16-channel FLUX.1 VAE.
@@ -173,13 +178,20 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str
     ) -> None:
-        """Validate that a model is in Diffusers format."""
+        """Validate that a model exposes the diffusers-style submodel layout. Plain diffusers
+        pipelines qualify, as do SDNQ-quantized pipeline folders that ship the VAE + Qwen3
+        submodels; single-file SDNQ FLUX.2 checkpoints and partial pipelines (missing VAE / Qwen3
+        submodels) are rejected.
+        """
         config = context.models.get_config(model)
-        if config.format != ModelFormat.Diffusers:
-            raise ValueError(
-                f"The {model_name} model must be a Diffusers format model. "
-                f"The selected model '{config.name}' is in {config.format.value} format."
-            )
+        if config.format == ModelFormat.Diffusers:
+            return
+        if is_self_contained_sdnq_pipeline(config):
+            return
+        raise ValueError(
+            f"The {model_name} model must be a Diffusers-style FLUX.2 pipeline (with VAE / Qwen3 "
+            f"submodels). The selected model '{config.name}' is in {config.format.value} format."
+        )
 
     def _validate_qwen3_encoder_variant(self, context: InvocationContext, main_config) -> None:
         """Validate that the standalone Qwen3 encoder variant matches the FLUX.2 Klein variant.

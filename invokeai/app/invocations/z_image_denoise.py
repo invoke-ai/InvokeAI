@@ -438,7 +438,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
             # slower inference than direct patching, but is agnostic to the quantization format.
             if transformer_config.format in [ModelFormat.Diffusers, ModelFormat.Checkpoint]:
                 model_is_quantized = False
-            elif transformer_config.format in [ModelFormat.GGUFQuantized]:
+            elif transformer_config.format in [ModelFormat.GGUFQuantized, ModelFormat.SDNQQuantized]:
                 model_is_quantized = True
             else:
                 raise ValueError(f"Unsupported Z-Image model format: {transformer_config.format}")

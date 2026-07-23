@@ -13,7 +13,25 @@ from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+
+# An SDNQ-quantized pipeline install (Z-Image / FLUX.2 Klein) is only self-contained when it ships
+# the components its loader reads from fixed subfolders: the VAE and the Qwen3 encoder
+# (text_encoder + tokenizer). A truthy `submodels` dict is not sufficient — Main_SDNQ_Diffusers_*
+# configs record whichever submodels they recognize from model_index.json, so a partial (or
+# partially recognized) pipeline can expose only the transformer. Treating that as self-contained
+# moves the failure from readiness/model-loader validation to runtime submodel loading.
+_REQUIRED_PIPELINE_SUBMODELS = frozenset({SubModelType.VAE, SubModelType.TextEncoder, SubModelType.Tokenizer})
+
+
+def is_self_contained_sdnq_pipeline(config: AnyModelConfig) -> bool:
+    """True if `config` is an SDNQ pipeline that ships its own VAE and Qwen3 (text_encoder +
+    tokenizer) submodels, so a single install can supply every component. Returns False for
+    single-file / GGUF models and for partial pipelines missing any required submodel."""
+    if getattr(config, "format", None) != ModelFormat.SDNQQuantized:
+        return False
+    submodels = getattr(config, "submodels", None) or {}
+    return _REQUIRED_PIPELINE_SUBMODELS.issubset(submodels.keys())
 
 
 class ModelIdentifierField(BaseModel):
