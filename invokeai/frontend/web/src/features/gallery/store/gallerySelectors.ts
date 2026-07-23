@@ -63,6 +63,7 @@ export const selectGalleryImageMinimumWidth = createSelector(
   selectGallerySlice,
   (gallery) => gallery.galleryImageMinimumWidth
 );
+export const selectGalleryLayoutMode = createSelector(selectGallerySlice, (gallery) => gallery.galleryLayoutMode);
 
 export const selectComparisonMode = createSelector(selectGallerySlice, (gallery) => gallery.comparisonMode);
 export const selectComparisonFit = createSelector(selectGallerySlice, (gallery) => gallery.comparisonFit);

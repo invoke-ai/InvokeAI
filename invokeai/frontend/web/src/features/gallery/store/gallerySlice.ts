@@ -10,6 +10,7 @@ import { assert } from 'tsafe';
 import {
   type BoardId,
   type ComparisonMode,
+  type GalleryLayoutMode,
   type GalleryState,
   type GalleryView,
   isVirtualBoardId,
@@ -23,6 +24,7 @@ const getInitialState = (): GalleryState => ({
   autoAssignBoardOnClick: true,
   autoAddBoardId: 'none',
   galleryImageMinimumWidth: 90,
+  galleryLayoutMode: 'grid',
   alwaysShowImageSizeBadge: false,
   selectedBoardId: 'none',
   galleryView: 'images',
@@ -80,6 +82,9 @@ const slice = createSlice({
     },
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
+    },
+    galleryLayoutModeChanged: (state, action: PayloadAction<GalleryLayoutMode>) => {
+      state.galleryLayoutMode = action.payload;
     },
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
@@ -176,6 +181,7 @@ export const {
   shouldAutoSwitchChanged,
   autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
+  galleryLayoutModeChanged,
   boardIdSelected,
   autoAddBoardIdChanged,
   galleryViewChanged,
@@ -215,6 +221,9 @@ export const gallerySliceConfig: SliceConfig<typeof slice> = {
       }
       if (!('virtualBoardsSectionOpen' in state)) {
         state.virtualBoardsSectionOpen = true;
+      }
+      if (!('galleryLayoutMode' in state)) {
+        state.galleryLayoutMode = 'grid';
       }
       return zGalleryState.parse(state);
     },

@@ -3,6 +3,8 @@ import z from 'zod';
 
 const zGalleryView = z.enum(['images', 'assets']);
 export type GalleryView = z.infer<typeof zGalleryView>;
+const zGalleryLayoutMode = z.enum(['grid', 'masonry']);
+export type GalleryLayoutMode = z.infer<typeof zGalleryLayoutMode>;
 const zBoardId = z.string();
 // TS hack to get autocomplete for "none" but accept any string
 export type BoardId = 'none' | (string & {});
@@ -24,6 +26,7 @@ export const zGalleryState = z.object({
   autoAssignBoardOnClick: z.boolean(),
   autoAddBoardId: zBoardId,
   galleryImageMinimumWidth: z.number(),
+  galleryLayoutMode: zGalleryLayoutMode,
   selectedBoardId: zBoardId,
   galleryView: zGalleryView,
   boardSearchText: z.string(),
