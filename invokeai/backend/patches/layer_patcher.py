@@ -37,6 +37,16 @@ class LayerPatcher:
         # original_modules are stored for unpatching layers that are wrapped.
         original_modules: dict[str, torch.nn.Module] = {}
         try:
+            # Materialize the patch iterable BEFORE acquiring the read lock. Callers pass a lazy
+            # generator (e.g. flux_text_encoder._t5_lora_iterator) that constructs each LoRA via
+            # context.models.load() on demand, and a cold-cache construction takes
+            # MODEL_LOAD_LOCK.write_lock(). Because this lock is non-reentrant and write-preferring,
+            # constructing a LoRA while we already held the read lock below would deadlock: the
+            # write acquire waits for readers==0, but this very thread is that reader. Consuming the
+            # iterator here lets every LoRA load take (and release) the write lock first, then we
+            # take the read lock once for patch application only. This is also compatible with
+            # callers that hand us a fresh iterator per call (see wan_denoise.LoRAIteratorFactory).
+            patches = list(patches)
             # Patching can register new parameters (FLUX Control LoRA shape expansion routes
             # through nn.Module.register_parameter via setattr). Model construction on another
             # worker thread monkey-patches register_parameter process-wide (accelerate's

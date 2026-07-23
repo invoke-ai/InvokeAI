@@ -431,3 +431,59 @@ def test_shape_expanding_patch_excludes_concurrent_model_construction():
     assert not patcher.is_alive()
     assert result["device"] == "cpu"
     assert result["shape"] == (out_features, big_in_features)
+
+
+def test_lazy_patch_iterator_that_constructs_a_model_does_not_deadlock():
+    """Regression test for a self-deadlock on cold-cache LoRA patching.
+
+    Callers pass ``patches`` as a lazy generator that constructs each LoRA on demand
+    (e.g. flux_text_encoder._t5_lora_iterator -> context.models.load()); a cold-cache
+    construction takes MODEL_LOAD_LOCK.write_lock(). MODEL_LOAD_LOCK is a non-reentrant,
+    write-preferring readers-writer lock, so consuming such a generator *while the patcher
+    holds the read lock* would deadlock (the write acquire waits for readers==0, but the
+    consuming thread is that reader). apply_smart_model_patches must therefore materialize
+    the iterable before taking the read lock. This test simulates a LoRA load by acquiring
+    (and releasing) the write lock during iteration; it must complete, not hang.
+    """
+    import threading
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+
+    in_features = 4
+    out_features = 16
+    rank = 4
+
+    model = DummyModuleWithOneLayer(in_features, out_features, "cpu", torch.float32)
+    layer = LoRALayer(
+        up=torch.ones(out_features, rank),
+        mid=None,
+        down=torch.ones(rank, in_features),
+        alpha=float(rank),
+        bias=None,
+    )
+    patch = ModelPatchRaw({"linear_layer_1": layer})
+
+    def lazy_patch_iterator():
+        # Emulate a cold-cache model construction (context.models.load) that grabs the write lock
+        # before the patch tuple is available.
+        with MODEL_LOAD_LOCK.write_lock():
+            pass
+        yield (patch, 1.0)
+
+    result: dict[str, object] = {}
+
+    def apply_patch() -> None:
+        with LayerPatcher.apply_smart_model_patches(
+            model=model,
+            patches=lazy_patch_iterator(),
+            prefix="",
+            dtype=torch.float32,
+            force_direct_patching=True,
+        ):
+            result["done"] = True
+
+    patcher = threading.Thread(target=apply_patch)
+    patcher.start()
+    patcher.join(timeout=10)
+    assert not patcher.is_alive(), "patching a lazily-constructed LoRA must not deadlock on MODEL_LOAD_LOCK"
+    assert result.get("done") is True
