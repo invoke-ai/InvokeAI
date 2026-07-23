@@ -30,7 +30,7 @@ class TextLLMPipeline:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
             formatted_prompt: str = self._tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+                messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
             )
         else:
             # Fallback for models without chat template
