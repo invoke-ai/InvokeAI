@@ -47,14 +47,21 @@ Widgets should not mirror Python import execution directly in the browser. The s
 
 This avoids symlink assumptions and lets multi-user/admin rules follow the existing custom-node management pattern.
 
+## Implemented Shell Systems
+
+- Workbench and Launchpad command palette hosts with shared command and settings entries.
+- First-party Workbench search providers for workflows, boards, models, images, queue items, and prompt history.
+- Widget command-palette contributions backed by the per-Workbench extension registry.
+- Widget search-provider aggregation with source-safe identities and result adaptation into palette entries.
+- Scoped provider search, fixed section ordering with ranked results inside each section, and persistent command recents.
+- Created-at date filtering for providers that explicitly advertise range support.
+
 ## Missing Core Systems
 
 The contribution registries exist in `extensionRegistry.ts` (one registry per Workbench mount, constructed by `WorkbenchProvider`), but these systems still need real shell features:
 
 - Command registry UI and lifecycle ownership.
-- Command palette UI.
 - Hotkey manager with context-aware `when` clauses.
-- Global search UI and ranked result aggregation.
 - Menu contribution rendering beyond widget header menus.
 - Toolbar contribution rendering for locations like `center.tabs.trailing` and status bar slots.
 - Extension install/uninstall/reload API for widget packs.

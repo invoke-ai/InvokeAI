@@ -1,4 +1,5 @@
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union, cast
 
@@ -20,6 +21,108 @@ from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
+
+
+@dataclass(frozen=True)
+class _ImageQueryFilters:
+    image_origin: Optional[ResourceOrigin] = None
+    categories: Optional[list[ImageCategory]] = None
+    is_intermediate: Optional[bool] = None
+    board_id: Optional[str] = None
+    search_term: Optional[str] = None
+    created_from: Optional[str] = None
+    created_to: Optional[str] = None
+    user_id: Optional[str] = None
+    is_admin: bool = False
+
+
+# Every uncategorized image plus every image on an active (non-archived) board:
+# the board_id="all" visibility scope for admins and single-user installs.
+_ALL_ACTIVE_BOARDS_CONDITION = """(
+                    board_images.board_id IS NULL
+                    OR EXISTS (
+                        SELECT 1
+                        FROM boards
+                        WHERE boards.board_id = board_images.board_id
+                        AND boards.archived = 0
+                    )
+                )"""
+
+
+def _build_image_query_conditions(filters: _ImageQueryFilters) -> tuple[str, list[Union[int, str, bool]]]:
+    """Build the shared filters for image-list and image-name queries."""
+    conditions: list[str] = []
+    params: list[Union[int, str, bool]] = []
+
+    if filters.image_origin is not None:
+        conditions.append("images.image_origin = ?")
+        params.append(filters.image_origin.value)
+
+    if filters.categories is not None:
+        category_strings = [category.value for category in set(filters.categories)]
+        placeholders = ",".join("?" * len(category_strings))
+        conditions.append(f"images.image_category IN ( {placeholders} )")
+        params.extend(category_strings)
+
+    if filters.is_intermediate is not None:
+        conditions.append("images.is_intermediate = ?")
+        params.append(filters.is_intermediate)
+
+    if filters.board_id == "none":
+        conditions.append("board_images.board_id IS NULL")
+        if filters.user_id is not None and not filters.is_admin:
+            conditions.append("images.user_id = ?")
+            params.append(filters.user_id)
+    elif filters.board_id == "all":
+        if filters.is_admin:
+            conditions.append(_ALL_ACTIVE_BOARDS_CONDITION)
+        elif filters.user_id is not None:
+            conditions.append(
+                """(
+                    (board_images.board_id IS NULL AND images.user_id = ?)
+                    OR EXISTS (
+                        SELECT 1
+                        FROM boards
+                        WHERE boards.board_id = board_images.board_id
+                        AND boards.archived = 0
+                        AND (
+                            boards.user_id = ?
+                            OR boards.board_visibility IN ('shared', 'public')
+                            OR EXISTS (
+                                SELECT 1
+                                FROM shared_boards
+                                WHERE shared_boards.board_id = boards.board_id
+                                AND shared_boards.user_id = ?
+                            )
+                        )
+                    )
+                )"""
+            )
+            params.extend([filters.user_id, filters.user_id, filters.user_id])
+        else:
+            # Single-user mode has no current user; it reads the administrative scope.
+            conditions.append(_ALL_ACTIVE_BOARDS_CONDITION)
+    elif filters.board_id is not None:
+        conditions.append("board_images.board_id = ?")
+        params.append(filters.board_id)
+    elif filters.user_id is not None and not filters.is_admin:
+        conditions.append("images.user_id = ?")
+        params.append(filters.user_id)
+
+    if filters.search_term:
+        conditions.append("(images.metadata LIKE ? OR images.created_at LIKE ?)")
+        search_pattern = f"%{filters.search_term.lower()}%"
+        params.extend([search_pattern, search_pattern])
+
+    if filters.created_from:
+        conditions.append("images.created_at >= ?")
+        params.append(filters.created_from)
+
+    if filters.created_to:
+        conditions.append("images.created_at < DATE(?, '+1 day')")
+        params.append(filters.created_to)
+
+    return "".join(f"\nAND {condition}" for condition in conditions), params
 
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
@@ -161,6 +264,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageRecord]:
@@ -180,71 +285,19 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             WHERE 1=1
             """
 
-            query_conditions = ""
-            query_params: list[Union[int, str, bool]] = []
-
-            if image_origin is not None:
-                query_conditions += """--sql
-                AND images.image_origin = ?
-                """
-                query_params.append(image_origin.value)
-
-            if categories is not None:
-                # Convert the enum values to unique list of strings
-                category_strings = [c.value for c in set(categories)]
-                # Create the correct length of placeholders
-                placeholders = ",".join("?" * len(category_strings))
-
-                query_conditions += f"""--sql
-                AND images.image_category IN ( {placeholders} )
-                """
-
-                # Unpack the included categories into the query params
-                for c in category_strings:
-                    query_params.append(c)
-
-            if is_intermediate is not None:
-                query_conditions += """--sql
-                AND images.is_intermediate = ?
-                """
-
-                query_params.append(is_intermediate)
-
-            # board_id of "none" is reserved for images without a board
-            if board_id == "none":
-                query_conditions += """--sql
-                AND board_images.board_id IS NULL
-                """
-                # For uncategorized images, filter by user_id to ensure per-user isolation
-                # Admin users can see all uncategorized images from all users
-                if user_id is not None and not is_admin:
-                    query_conditions += """--sql
-                    AND images.user_id = ?
-                    """
-                    query_params.append(user_id)
-            elif board_id is not None:
-                query_conditions += """--sql
-                AND board_images.board_id = ?
-                """
-                query_params.append(board_id)
-            elif user_id is not None and not is_admin:
-                # No board_id supplied — still enforce per-user isolation so
-                # non-admins cannot enumerate other users' images
-                query_conditions += """--sql
-                AND images.user_id = ?
-                """
-                query_params.append(user_id)
-
-            # Search term condition
-            if search_term:
-                query_conditions += """--sql
-                AND (
-                    images.metadata LIKE ?
-                    OR images.created_at LIKE ?
+            query_conditions, query_params = _build_image_query_conditions(
+                _ImageQueryFilters(
+                    image_origin=image_origin,
+                    categories=categories,
+                    is_intermediate=is_intermediate,
+                    board_id=board_id,
+                    search_term=search_term,
+                    created_from=created_from,
+                    created_to=created_to,
+                    user_id=user_id,
+                    is_admin=is_admin,
                 )
-                """
-                query_params.append(f"%{search_term.lower()}%")
-                query_params.append(f"%{search_term.lower()}%")
+            )
 
             if starred_first:
                 query_pagination = f"""--sql
@@ -439,68 +492,25 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> ImageNamesResult:
         with self._db.transaction() as cursor:
-            # Build query conditions (reused for both starred count and image names queries)
-            query_conditions = ""
-            query_params: list[Union[int, str, bool]] = []
-
-            if image_origin is not None:
-                query_conditions += """--sql
-                AND images.image_origin = ?
-                """
-                query_params.append(image_origin.value)
-
-            if categories is not None:
-                category_strings = [c.value for c in set(categories)]
-                placeholders = ",".join("?" * len(category_strings))
-                query_conditions += f"""--sql
-                AND images.image_category IN ( {placeholders} )
-                """
-                for c in category_strings:
-                    query_params.append(c)
-
-            if is_intermediate is not None:
-                query_conditions += """--sql
-                AND images.is_intermediate = ?
-                """
-                query_params.append(is_intermediate)
-
-            if board_id == "none":
-                query_conditions += """--sql
-                AND board_images.board_id IS NULL
-                """
-                # For uncategorized images, filter by user_id to ensure per-user isolation
-                # Admin users can see all uncategorized images from all users
-                if user_id is not None and not is_admin:
-                    query_conditions += """--sql
-                    AND images.user_id = ?
-                    """
-                    query_params.append(user_id)
-            elif board_id is not None:
-                query_conditions += """--sql
-                AND board_images.board_id = ?
-                """
-                query_params.append(board_id)
-            elif user_id is not None and not is_admin:
-                # No board_id supplied — still enforce per-user isolation so
-                # non-admins cannot enumerate other users' images
-                query_conditions += """--sql
-                AND images.user_id = ?
-                """
-                query_params.append(user_id)
-
-            if search_term:
-                query_conditions += """--sql
-                AND (
-                    images.metadata LIKE ?
-                    OR images.created_at LIKE ?
+            query_conditions, query_params = _build_image_query_conditions(
+                _ImageQueryFilters(
+                    image_origin=image_origin,
+                    categories=categories,
+                    is_intermediate=is_intermediate,
+                    board_id=board_id,
+                    search_term=search_term,
+                    created_from=created_from,
+                    created_to=created_to,
+                    user_id=user_id,
+                    is_admin=is_admin,
                 )
-                """
-                query_params.append(f"%{search_term.lower()}%")
-                query_params.append(f"%{search_term.lower()}%")
+            )
 
             # Get starred count if starred_first is enabled
             starred_count = 0

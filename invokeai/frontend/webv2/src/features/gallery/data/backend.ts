@@ -8,6 +8,7 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
+import { isTimestampInRange } from '@platform/search/dateTokens';
 import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
 
 import { getGalleryImageThumbnailUrl } from './imageUrls';
@@ -19,6 +20,7 @@ interface BackendBoardDTO {
   asset_count: number;
   archived: boolean;
   cover_image_name?: string | null;
+  created_at?: string | null;
   /** Board owner's display name; populated only for admins on multi-user backends. */
   owner_username?: string | null;
 }
@@ -29,6 +31,7 @@ interface BackendBoardDTO {
  * grouping images by creation date (id 'by_date:YYYY-MM-DD').
  */
 const DATE_BOARD_ID_PREFIX = 'by_date:';
+export const ALL_READABLE_BOARDS_ID = 'all';
 
 export const isDateBoardId = (boardId: string): boolean => boardId.startsWith(DATE_BOARD_ID_PREFIX);
 
@@ -83,6 +86,7 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   assetCount: board.asset_count,
   coverImageName: board.cover_image_name,
   coverThumbnailUrl: board.cover_image_name ? getGalleryImageThumbnailUrl(board.cover_image_name) : undefined,
+  createdAt: board.created_at ?? null,
   id: board.board_id,
   imageCount: board.image_count,
   kind: 'board',
@@ -90,7 +94,15 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   ownerName: board.owner_username ?? null,
 });
 
-const getGalleryTotal = async ({ boardId, categories }: { boardId: string; categories: string[] }): Promise<number> => {
+const getGalleryTotal = async ({
+  boardId,
+  categories,
+  signal,
+}: {
+  boardId: string;
+  categories: string[];
+  signal?: AbortSignal;
+}): Promise<number> => {
   const query = toSearchParams({
     board_id: boardId,
     categories,
@@ -98,7 +110,7 @@ const getGalleryTotal = async ({ boardId, categories }: { boardId: string; categ
     limit: 0,
     offset: 0,
   });
-  const body = await apiFetchJson<Pick<ListImagesResponse, 'total'>>(`/api/v1/images/?${query}`);
+  const body = await apiFetchJson<Pick<ListImagesResponse, 'total'>>(`/api/v1/images/?${query}`, { signal });
 
   return body.total;
 };
@@ -123,10 +135,12 @@ export const listGalleryBoards = async ({
   includeArchived = false,
   orderBy = 'created_at',
   orderDir = 'DESC',
+  signal,
 }: {
   includeArchived?: boolean;
   orderBy?: GalleryBoardOrderBy;
   orderDir?: GalleryOrderDir;
+  signal?: AbortSignal;
 } = {}): Promise<GalleryBoard[]> => {
   const boardsQuery = toSearchParams({
     all: true,
@@ -135,13 +149,14 @@ export const listGalleryBoards = async ({
     order_by: orderBy,
   });
   const boardsBodyPromise = apiFetchJson<BackendBoardDTO[] | { items?: BackendBoardDTO[] }>(
-    `/api/v1/boards/?${boardsQuery}`
+    `/api/v1/boards/?${boardsQuery}`,
+    { signal }
   );
 
   const [body, uncategorizedImageCount, uncategorizedAssetCount] = await Promise.all([
     boardsBodyPromise,
-    getGalleryTotal({ boardId: 'none', categories: imageCategories }),
-    getGalleryTotal({ boardId: 'none', categories: assetCategories }),
+    getGalleryTotal({ boardId: 'none', categories: imageCategories, signal }),
+    getGalleryTotal({ boardId: 'none', categories: assetCategories, signal }),
   ]);
   const boards = Array.isArray(body) ? body : (body.items ?? []);
 
@@ -207,21 +222,36 @@ export const getGalleryImageByName = async (imageName: string, signal?: AbortSig
  */
 const listGalleryDateBoardImages = async ({
   boardId,
+  createdFrom,
+  createdTo,
   galleryView,
   limit,
   offset,
   orderDir,
   searchTerm,
+  signal,
   starredFirst,
 }: {
   boardId: string;
+  createdFrom?: string;
+  createdTo?: string;
   galleryView: GalleryView;
   limit: number;
   offset: number;
   orderDir: GalleryOrderDir;
   searchTerm: string;
+  signal?: AbortSignal;
   starredFirst: boolean;
 }): Promise<GalleryImagesPage> => {
+  // The board already pins a single day; a date filter either contains that
+  // day (and constrains nothing further) or excludes the whole board.
+  if (
+    (createdFrom !== undefined || createdTo !== undefined) &&
+    !isTimestampInRange(getDateFromBoardId(boardId), { from: createdFrom, to: createdTo })
+  ) {
+    return { images: [], total: 0 };
+  }
+
   const query = toSearchParams({
     categories: galleryView === 'assets' ? assetCategories : imageCategories,
     order_dir: orderDir,
@@ -229,7 +259,8 @@ const listGalleryDateBoardImages = async ({
     starred_first: starredFirst,
   });
   const body = await apiFetchJson<{ image_names: string[]; total_count: number }>(
-    `/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`
+    `/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`,
+    { signal }
   );
   const images = await getGalleryImagesByNames(body.image_names.slice(offset, offset + limit));
 
@@ -238,28 +269,47 @@ const listGalleryDateBoardImages = async ({
 
 export const listGalleryImages = async ({
   boardId,
+  createdFrom,
+  createdTo,
   galleryView,
   limit = 100,
   offset = 0,
   orderDir = 'DESC',
   searchTerm,
+  signal,
   starredFirst = false,
 }: {
   boardId: string;
+  createdFrom?: string;
+  createdTo?: string;
   galleryView: GalleryView;
   limit?: number;
   offset?: number;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
+  signal?: AbortSignal;
   starredFirst?: boolean;
 }): Promise<GalleryImagesPage> => {
   if (isDateBoardId(boardId)) {
-    return listGalleryDateBoardImages({ boardId, galleryView, limit, offset, orderDir, searchTerm, starredFirst });
+    return listGalleryDateBoardImages({
+      boardId,
+      createdFrom,
+      createdTo,
+      galleryView,
+      limit,
+      offset,
+      orderDir,
+      searchTerm,
+      signal,
+      starredFirst,
+    });
   }
 
   const query = toSearchParams({
     board_id: boardId,
     categories: galleryView === 'assets' ? assetCategories : imageCategories,
+    created_from: createdFrom,
+    created_to: createdTo,
     is_intermediate: false,
     limit,
     offset,
@@ -267,7 +317,7 @@ export const listGalleryImages = async ({
     search_term: searchTerm.trim() || undefined,
     starred_first: starredFirst,
   });
-  const body = await apiFetchJson<ListImagesResponse | BackendImageDTO[]>(`/api/v1/images/?${query}`);
+  const body = await apiFetchJson<ListImagesResponse | BackendImageDTO[]>(`/api/v1/images/?${query}`, { signal });
   const items = Array.isArray(body) ? body : (body.items ?? []);
 
   return {

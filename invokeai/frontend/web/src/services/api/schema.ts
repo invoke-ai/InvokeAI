@@ -36443,7 +36443,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate images. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find images without a board. */
+                /** @description The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for images on every readable, non-archived board plus authorized uncategorized images. If omitted, non-admin results remain limited to images owned by the current user. */
                 board_id?: string | null;
                 /** @description The page offset */
                 offset?: number;
@@ -36455,6 +36455,10 @@ export interface operations {
                 starred_first?: boolean;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
+                created_from?: string | null;
+                /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
+                created_to?: string | null;
             };
             header?: never;
             path?: never;
@@ -37068,7 +37072,7 @@ export interface operations {
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate images. */
                 is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find images without a board. */
+                /** @description The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for images on every readable, non-archived board plus authorized uncategorized images. If omitted, non-admin results remain limited to images owned by the current user. */
                 board_id?: string | null;
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
@@ -37076,6 +37080,10 @@ export interface operations {
                 starred_first?: boolean;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
+                created_from?: string | null;
+                /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
+                created_to?: string | null;
             };
             header?: never;
             path?: never;

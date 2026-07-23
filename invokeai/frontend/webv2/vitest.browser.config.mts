@@ -7,11 +7,21 @@ import viteConfig from './vite.config.mts';
 export default mergeConfig(
   viteConfig,
   defineConfig({
-    // Hook-bearing dependencies must be prebundled into the initial browser-test
-    // graph. An optimization reload can otherwise leave the running suite with
-    // two React instances and produce invalid-hook failures.
+    // Dependencies reached by browser tests must be prebundled into the initial
+    // graph. Late optimization reloads invalidate active Vitest suites, and
+    // React-bound dependencies can also leave two React instances in the graph
+    // and produce invalid-hook failures.
     optimizeDeps: {
-      include: ['@dnd-kit/core', '@tanstack/react-query', 'i18next-http-backend', 'react-hook-tanstack-virtual'],
+      include: [
+        '@chakra-ui/react',
+        '@chakra-ui/react/theme',
+        '@dnd-kit/core',
+        '@tanstack/react-query',
+        '@tanstack/react-virtual',
+        'i18next-http-backend',
+        'react-hook-tanstack-virtual',
+        'tinykeys',
+      ],
     },
     test: {
       browser: {

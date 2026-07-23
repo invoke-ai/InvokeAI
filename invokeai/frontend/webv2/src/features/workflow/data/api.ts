@@ -32,6 +32,7 @@ export interface ListWorkflowsParams {
   page: number;
   perPage?: number;
   query?: string;
+  signal?: AbortSignal;
 }
 
 export const listLibraryWorkflows = ({
@@ -39,6 +40,7 @@ export const listLibraryWorkflows = ({
   page,
   perPage = 20,
   query,
+  signal,
 }: ListWorkflowsParams): Promise<WorkflowLibraryPage> => {
   const params = new URLSearchParams({
     direction: 'DESC',
@@ -53,7 +55,7 @@ export const listLibraryWorkflows = ({
     params.set('query', query.trim());
   }
 
-  return apiFetchJson<WorkflowLibraryPage>(`/api/v1/workflows/?${params.toString()}`);
+  return apiFetchJson<WorkflowLibraryPage>(`/api/v1/workflows/?${params.toString()}`, { signal });
 };
 
 interface WorkflowRecordDTO {

@@ -1,4 +1,5 @@
 import { shallowEqual } from '@platform/state/selectors';
+import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME, THEMES_BY_ID } from '@theme/system';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useLayoutEffect } from 'react';
@@ -38,15 +39,9 @@ export const ThemeController = () => {
       return;
     }
 
-    const root = document.documentElement;
     const theme = THEMES_BY_ID[themeId] ?? DEFAULT_THEME;
 
-    root.dataset.theme = theme.id;
-    root.style.colorScheme = theme.colorScheme;
-    // Keep the native color-mode class in sync for unthemed browser chrome
-    // (scrollbars, native pickers) and any Chakra defaults we don't override.
-    root.classList.toggle('dark', theme.colorScheme === 'dark');
-    root.classList.toggle('light', theme.colorScheme === 'light');
+    applyThemeToRoot(theme.id);
 
     try {
       window.localStorage.setItem(THEME_HINT_STORAGE_KEY, theme.id);

@@ -214,6 +214,16 @@ def _share_board(client: TestClient, token: str, board_id: str) -> None:
     assert r.status_code == status.HTTP_201_CREATED
 
 
+def _share_board_with_user(mock_invoker: Invoker, board_id: str, user_id: str) -> None:
+    """Insert an explicit per-user share row directly into the shared_boards table."""
+    board_records: Any = mock_invoker.services.board_records
+    with board_records._db.transaction() as cursor:
+        cursor.execute(
+            "INSERT OR IGNORE INTO shared_boards (board_id, user_id) VALUES (?, ?)",
+            (board_id, user_id),
+        )
+
+
 def _set_board_visibility(client: TestClient, token: str, board_id: str, visibility: str) -> None:
     r = client.patch(f"/api/v1/boards/{board_id}", json={"board_visibility": visibility}, headers=_auth(token))
     assert r.status_code == status.HTTP_201_CREATED
@@ -459,6 +469,53 @@ class TestImageReadAuth:
         # Should not be 403 — image is on a shared board
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
+    def test_explicit_share_grants_image_read_to_member(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """An image on a private board explicitly shared with user2 should be readable
+        by user2 — matching the visibility the board_id="all" listing already grants."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "explicit-share-img", user1.user_id)
+        board_id = _create_board(client, user1_token, "Explicit Share Board")
+        mock_invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name="explicit-share-img")
+
+        r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+
+        r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_board_owner_can_read_contributor_image_on_private_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """A board owner should be able to read an image another user contributed to
+        their board, even after the board returns to private — matching the visibility
+        the board_id="all" listing already grants."""
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        board_id = _create_board(client, user1_token, "Owner Read Board")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        _save_image(mock_invoker, "contributor-img", user2.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name="contributor-img")
+        _set_board_visibility(client, user1_token, board_id, "private")
+
+        # The owner sees the image in the board_id="all" listing...
+        r = client.get("/api/v1/images/names?board_id=all", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_200_OK
+        assert "contributor-img" in r.json()["image_names"]
+
+        # ...and individual-image authorization agrees with the listing.
+        r = client.get("/api/v1/images/i/contributor-img/metadata", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_200_OK
+
+        # The contributor keeps read access to their own image.
+        r = client.get("/api/v1/images/i/contributor-img/metadata", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
     def test_non_owner_cannot_read_image_metadata(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
@@ -487,6 +544,43 @@ class TestImageReadAuth:
         _share_board(client, user1_token, board_id)
 
         r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_list_images_explicitly_shared_private_board_allowed_for_member(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to list a private board explicitly shared with them,
+        on both the DTO and names endpoints."""
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        board_id = _create_board(client, user1_token, "Explicit Share Enum Board")
+        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+
+        r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
+        r = client.get(f"/api/v1/images/names?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_explicitly_shared_private_board_dto_and_image_names_allowed_for_member(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to fetch the board DTO and board image_names of a private
+        board explicitly shared with them; a non-member (user1's other boards aside) stays 403."""
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        board_id = _create_board(client, user1_token, "Explicit Share DTO Board")
+
+        r = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+        r = client.get(f"/api/v1/boards/{board_id}/image_names", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+
+        r = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+        r = client.get(f"/api/v1/boards/{board_id}/image_names", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_200_OK
 
     def test_get_image_names_private_board_rejected_for_non_owner(
@@ -1207,6 +1301,35 @@ class TestRecallImageAccess:
         r = client.post(
             "/api/v1/recall/default",
             json={"ip_adapters": [{"model_name": "some-ip-adapter", "image_name": "shared-recall-img"}]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_recall_explicitly_shared_board_image_allowed_for_member(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to reference an image on a private board explicitly shared with them."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "explicit-share-recall-img", user1.user_id)
+        board_id = _create_board(client, user1_token, "Explicit Share Recall Board")
+        mock_invoker.services.board_image_records.add_image_to_board(
+            board_id=board_id, image_name="explicit-share-recall-img"
+        )
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"ip_adapters": [{"model_name": "some-ip-adapter", "image_name": "explicit-share-recall-img"}]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"ip_adapters": [{"model_name": "some-ip-adapter", "image_name": "explicit-share-recall-img"}]},
             headers=_auth(user2_token),
         )
         assert r.status_code != status.HTTP_403_FORBIDDEN

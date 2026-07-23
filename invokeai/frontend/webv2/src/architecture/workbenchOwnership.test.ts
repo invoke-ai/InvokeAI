@@ -20,6 +20,7 @@ const productionSources: Record<string, string> = Object.fromEntries(
     .map(([path, source]) => [toSourcePath(path), source])
     .filter(([path]) => isProduction(path))
 );
+const sourcePaths = Object.keys(sources).map(toSourcePath);
 
 const pathByExtensionlessPath = new Map(Object.keys(productionSources).map((path) => [stripExtension(path), path]));
 
@@ -34,8 +35,7 @@ const resolveSourceFile = (sourcePath: string, specifier: string): string | null
 const getTargetOwner = (path: string) =>
   path.startsWith('workbench/') ? getWorkbenchTargetOwner(path) : getModuleOwner(path);
 
-const collectPublicExports = (source: string, path: string): string[] => {
-  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const collectPublicExports = (sourceFile: ts.SourceFile): string[] => {
   const exports = new Set<string>();
 
   for (const statement of sourceFile.statements) {
@@ -75,8 +75,7 @@ const collectPublicExports = (source: string, path: string): string[] => {
   return [...exports].sort();
 };
 
-const isTypeOnlyModule = (source: string, path: string): boolean => {
-  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const isTypeOnlyModule = (sourceFile: ts.SourceFile): boolean => {
   return sourceFile.statements.every((statement) => {
     if (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) {
       return true;
@@ -138,6 +137,9 @@ const stronglyConnectedComponents = (graph: Map<string, Set<string>>): string[][
 describe('Workbench ownership manifest', () => {
   it('classifies every production Workbench module exactly once and emits an inspectable inventory', () => {
     const workbenchSources = Object.entries(productionSources).filter(([path]) => path.startsWith('workbench/'));
+    const importReferencesByPath = new Map(
+      Object.entries(productionSources).map(([path, source]) => [path, collectImportReferences(source, path)] as const)
+    );
     const actualRootFiles = new Set<string>();
 
     for (const [path] of workbenchSources) {
@@ -165,12 +167,12 @@ describe('Workbench ownership manifest', () => {
     const inbound = new Map<string, Set<string>>();
     const graph = new Map<string, Set<string>>();
 
-    for (const [sourcePath, source] of Object.entries(productionSources)) {
+    for (const [sourcePath] of Object.entries(productionSources)) {
       const sourceOwner = getTargetOwner(sourcePath);
       expect(sourceOwner, `Unclassified source: ${sourcePath}`).not.toBeNull();
       graph.set(sourceOwner!, graph.get(sourceOwner!) ?? new Set<string>());
 
-      for (const reference of collectImportReferences(source, sourcePath)) {
+      for (const reference of importReferencesByPath.get(sourcePath) ?? []) {
         const targetFile = resolveSourceFile(sourcePath, reference.specifier);
         if (!targetFile) {
           continue;
@@ -191,9 +193,10 @@ describe('Workbench ownership manifest', () => {
     const records = workbenchSources.map(([path, source]) => {
       const targetOwner = getWorkbenchTargetOwner(path);
       expect(targetOwner, `Unclassified: ${path}`).not.toBeNull();
+      const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
       const outboundOwners = new Set<string>();
-      for (const reference of collectImportReferences(source, path)) {
+      for (const reference of importReferencesByPath.get(path) ?? []) {
         const targetFile = resolveSourceFile(path, reference.specifier);
         if (!targetFile) {
           continue;
@@ -205,18 +208,17 @@ describe('Workbench ownership manifest', () => {
       }
 
       const stem = stripExtension(path);
-      const testCompanions = Object.keys(sources)
-        .map(toSourcePath)
+      const testCompanions = sourcePaths
         .filter((candidate) => candidate.startsWith(`${stem}.`) && isTest(candidate))
         .sort();
 
       return {
         currentOwner: 'workbench',
         inboundOwners: [] as string[],
-        moduleKind: isTypeOnlyModule(source, path) ? 'type-only' : 'runtime',
+        moduleKind: isTypeOnlyModule(sourceFile) ? 'type-only' : 'runtime',
         outboundOwners: [...outboundOwners].sort(),
         path,
-        publicExports: collectPublicExports(source, path),
+        publicExports: collectPublicExports(sourceFile),
         targetOwner,
         targetPath: getWorkbenchTargetPath(path),
         testCompanions,
@@ -246,7 +248,7 @@ describe('Workbench ownership manifest', () => {
     expect(records.every((record) => record.targetPath)).toBe(true);
     expect(artifact.counts.productionWorkbenchModules).toBe(workbenchSources.length);
     expect(artifact.transitionalCycles).toHaveLength(0);
-  });
+  }, 10_000);
 
   it('rejects responsibility-free target names', () => {
     const paths = [

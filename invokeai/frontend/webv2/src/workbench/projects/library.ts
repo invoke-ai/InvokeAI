@@ -1,5 +1,6 @@
 import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
+import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 
 import {
   createProject as apiCreateProject,
@@ -40,21 +41,6 @@ export interface ProjectLibrarySnapshot {
 }
 
 const store = createExternalStore<ProjectLibrarySnapshot>({ status: 'idle', summaries: [] });
-
-/**
- * The backend stamps timestamps via SQLite ("2026-06-11 09:21:04.123") —
- * UTC, but with no timezone marker, which `Date` would misread as local
- * time. Normalize to ISO once, here at the boundary.
- */
-const normalizeServerTimestamp = (value: string): string => {
-  if (!/^\d{4}-\d{2}-\d{2} /.test(value)) {
-    return value;
-  }
-
-  const date = new Date(`${value.replace(' ', 'T')}Z`);
-
-  return Number.isNaN(date.getTime()) ? value : date.toISOString();
-};
 
 const toSummary = (dto: ProjectSummaryDTO): ProjectSummary => ({
   createdAt: normalizeServerTimestamp(dto.created_at),

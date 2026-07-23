@@ -1,6 +1,7 @@
 import io
 import json
 import traceback
+from datetime import date
 from typing import ClassVar, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
@@ -446,33 +447,45 @@ async def list_image_dtos(
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
     board_id: Optional[str] = Query(
         default=None,
-        description="The board id to filter by. Use 'none' to find images without a board.",
+        description=(
+            "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for "
+            "images on every readable, non-archived board plus authorized uncategorized images. If omitted, "
+            "non-admin results remain limited to images owned by the current user."
+        ),
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs for the current user"""
 
     # Validate that the caller can read from this board before listing its images.
-    # "none" is a sentinel for uncategorized images and is handled by the SQL layer.
-    if board_id is not None and board_id != "none":
+    # "none" and "all" are sentinels handled by the SQL layer.
+    if board_id is not None and board_id not in {"none", "all"}:
         _assert_board_read_access(board_id, current_user)
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
-        offset,
-        limit,
-        starred_first,
-        order_dir,
-        image_origin,
-        categories,
-        is_intermediate,
-        board_id,
-        search_term,
-        current_user.user_id,
-        current_user.is_admin,
+        offset=offset,
+        limit=limit,
+        starred_first=starred_first,
+        order_dir=order_dir,
+        image_origin=image_origin,
+        categories=categories,
+        is_intermediate=is_intermediate,
+        board_id=board_id,
+        search_term=search_term,
+        created_from=created_from.isoformat() if created_from else None,
+        created_to=created_to.isoformat() if created_to else None,
+        user_id=current_user.user_id,
+        is_admin=current_user.is_admin,
     )
 
     return image_dtos
@@ -728,16 +741,26 @@ async def get_image_names(
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
     board_id: Optional[str] = Query(
         default=None,
-        description="The board id to filter by. Use 'none' to find images without a board.",
+        description=(
+            "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for "
+            "images on every readable, non-archived board plus authorized uncategorized images. If omitted, "
+            "non-admin results remain limited to images owned by the current user."
+        ),
     ),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> ImageNamesResult:
     """Gets ordered list of image names with metadata for optimistic updates"""
 
     # Validate that the caller can read from this board before listing its images.
-    if board_id is not None and board_id != "none":
+    if board_id is not None and board_id not in {"none", "all"}:
         _assert_board_read_access(board_id, current_user)
 
     try:
@@ -749,6 +772,8 @@ async def get_image_names(
             is_intermediate=is_intermediate,
             board_id=board_id,
             search_term=search_term,
+            created_from=created_from.isoformat() if created_from else None,
+            created_to=created_to.isoformat() if created_to else None,
             user_id=current_user.user_id,
             is_admin=current_user.is_admin,
         )

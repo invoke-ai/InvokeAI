@@ -155,13 +155,21 @@ describe('dependency policy rules', () => {
 
 describe('feature public-interface registry', () => {
   it('rejects top-level modules a feature has not registered', () => {
-    expect(checkDependency('workbench/shell/View.tsx', '@features/workflow/queries')).toMatchObject([
+    expect(checkDependency('workbench/shell/View.tsx', '@features/workflow/data')).toMatchObject([
       { rule: 'feature-private-interface' },
     ]);
     expect(checkDependency('workbench/shell/View.tsx', '@features/identity/session')).toMatchObject([
       { rule: 'feature-private-interface' },
     ]);
     expect(checkDependency('workbench/shell/View.tsx', '@features/identity')).toEqual([]);
+    expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/workflow/queries')).toEqual([]);
+    expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/workflow/paletteSearch')).toEqual([]);
+    expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/gallery/paletteSearch')).toEqual([]);
+    expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/queue/queries')).toEqual([]);
+    expect(checkDependency('workbench/palette/WorkbenchCommandPaletteDialog.tsx', '@features/queue/queries')).toEqual(
+      []
+    );
+    expect(checkDependency('workbench/palette/WorkbenchCommandPalette.tsx', '@features/queue/reveal')).toEqual([]);
     expect(checkDependency('features/gallery/ui/View.tsx', '@features/queue/publicApi')).toMatchObject([
       { rule: 'feature-public-interface' },
     ]);

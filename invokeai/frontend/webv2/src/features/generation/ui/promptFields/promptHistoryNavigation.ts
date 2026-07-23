@@ -1,7 +1,6 @@
 import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } from '@features/generation/contracts';
-import type { GenerateModelConfig } from '@features/generation/core/types';
 
-import { getPromptPolicy, isSupportedGenerateModel } from '@features/generation/core/baseGenerationPolicies';
+import { getPromptHistoryRecallPatch } from '@features/generation/core/baseGenerationPolicies';
 import { normalizeGenerateSettings } from '@features/generation/core/settings';
 
 import { isPositivePromptFocused } from './promptFocus';
@@ -30,17 +29,6 @@ export interface PromptHistoryNavigation {
   reset(): void;
 }
 
-const getSelectedGenerateModel = (
-  settings: ReturnType<typeof normalizeGenerateSettings>,
-  models: readonly ModelConfig[] | undefined
-): GenerateModelConfig | undefined => {
-  if (!settings || !models) {
-    return undefined;
-  }
-
-  return models.filter(isSupportedGenerateModel).find((model) => model.key === settings.modelKey);
-};
-
 export const createPromptHistoryNavigation = (): PromptHistoryNavigation => {
   let state: NavigationState | null = null;
 
@@ -62,16 +50,11 @@ export const createPromptHistoryNavigation = (): PromptHistoryNavigation => {
       return;
     }
 
-    const selectedModel = getSelectedGenerateModel(settings, models);
-    const promptPolicy = getPromptPolicy(selectedModel, settings);
-    const patch: Record<string, unknown> = { positivePrompt: prompt.positivePrompt };
+    const patch = getPromptHistoryRecallPatch({ item: prompt, models, values });
 
-    if (promptPolicy.negativeVisible) {
-      patch.negativePrompt = prompt.negativePrompt ?? '';
-      patch.negativePromptEnabled = prompt.negativePrompt ? true : settings.negativePromptEnabled;
+    if (patch) {
+      patchValues(patch, projectId);
     }
-
-    patchValues(patch, projectId);
   };
 
   return {

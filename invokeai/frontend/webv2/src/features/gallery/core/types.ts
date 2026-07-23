@@ -25,6 +25,8 @@ export interface GalleryBoard {
   archived: boolean;
   coverImageName?: string | null;
   coverThumbnailUrl?: string;
+  /** ISO creation timestamp; absent for uncategorized and date virtual boards. */
+  createdAt?: string | null;
   ownerName?: string | null;
 }
 

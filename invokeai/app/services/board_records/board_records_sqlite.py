@@ -76,6 +76,19 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             raise BoardRecordNotFoundException
         return BoardRecord(**dict(result))
 
+    def is_board_shared_with_user(self, board_id: str, user_id: str) -> bool:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT 1
+                FROM shared_boards
+                WHERE board_id = ? AND user_id = ?;
+                """,
+                (board_id, user_id),
+            )
+
+            return cursor.fetchone() is not None
+
     def update(
         self,
         board_id: str,

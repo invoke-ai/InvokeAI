@@ -15,6 +15,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { isDateBoardId } from '@features/gallery/data/backend';
+import { describeDateRange, findInvalidDateToken, formatIsoDate, parseDateTokens } from '@platform/search/dateTokens';
 import { Button, CloseButton, IconButton, Tabs } from '@platform/ui';
 import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
@@ -32,9 +33,10 @@ const galleryViewTabs = [
 const UPLOAD_INPUT_STYLE = { display: 'none' } as const;
 const GALLERY_SETTINGS_POSITIONING = { placement: 'bottom-end' } as const;
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} size="sm" />;
+const SEARCH_DATE_HINT_ID = 'gallery-search-date-hint';
 
 export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
   const isWide = layout === 'wide';
 
@@ -83,19 +85,78 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
     []
   );
 
+  // Derived from the raw search term: an applied-range summary, or invalid-
+  // token feedback.
+  const dateHint = useMemo(() => {
+    const parse = parseDateTokens(gallery.searchTerm);
+    const invalid = findInvalidDateToken(gallery.searchTerm, parse);
+
+    if (invalid) {
+      return { isInvalid: true, label: t('widgets.gallery.dateFilterInvalid', { value: invalid.raw }) };
+    }
+
+    const shape = parse.range ? describeDateRange(parse.range) : null;
+
+    if (!shape) {
+      return null;
+    }
+
+    const locale = i18n.language;
+
+    switch (shape.kind) {
+      case 'day':
+        return {
+          isInvalid: false,
+          label: t('widgets.gallery.dateFilterDay', { date: formatIsoDate(shape.date, locale) }),
+        };
+      case 'range':
+        return {
+          isInvalid: false,
+          label: t('widgets.gallery.dateFilterRange', {
+            from: formatIsoDate(shape.from, locale),
+            to: formatIsoDate(shape.to, locale),
+          }),
+        };
+      case 'from':
+        return {
+          isInvalid: false,
+          label: t('widgets.gallery.dateFilterFrom', { date: formatIsoDate(shape.date, locale) }),
+        };
+      case 'through':
+        return {
+          isInvalid: false,
+          label: t('widgets.gallery.dateFilterThrough', { date: formatIsoDate(shape.date, locale) }),
+        };
+    }
+  }, [gallery.searchTerm, i18n.language, t]);
+
   const searchInput = useMemo(
     () => (
-      <InputGroup startElement={SEARCH_START_ELEMENT} endElement={searchClearButton}>
-        <Input
-          aria-label={t('widgets.gallery.searchImagesAriaLabel')}
-          placeholder={t('widgets.gallery.searchImagesPlaceholder')}
-          size="xs"
-          value={gallery.searchTerm}
-          onChange={handleSearchChange}
-        />
-      </InputGroup>
+      <Stack gap="1">
+        <InputGroup startElement={SEARCH_START_ELEMENT} endElement={searchClearButton}>
+          <Input
+            aria-describedby={dateHint?.isInvalid ? SEARCH_DATE_HINT_ID : undefined}
+            aria-invalid={dateHint?.isInvalid || undefined}
+            aria-label={t('widgets.gallery.searchImagesAriaLabel')}
+            placeholder={t('widgets.gallery.searchImagesPlaceholder')}
+            size="xs"
+            value={gallery.searchTerm}
+            onChange={handleSearchChange}
+          />
+        </InputGroup>
+        {dateHint ? (
+          <Text
+            color={dateHint.isInvalid ? 'fg.error' : 'fg.subtle'}
+            fontSize="2xs"
+            id={SEARCH_DATE_HINT_ID}
+            role="status"
+          >
+            {dateHint.label}
+          </Text>
+        ) : null}
+      </Stack>
     ),
-    [gallery.searchTerm, handleSearchChange, searchClearButton, t]
+    [dateHint, gallery.searchTerm, handleSearchChange, searchClearButton, t]
   );
 
   return (

@@ -2,6 +2,7 @@ import type {
   GenerationModelCatalogItem as ModelConfig,
   GenerationModelTaxonomyType as ModelTaxonomyType,
   KnownGenerationModelBase as KnownModelBase,
+  PromptHistoryItem,
 } from '@features/generation/core/contracts';
 
 import type {
@@ -30,9 +31,11 @@ import {
   clampDimension,
   DEFAULT_REFERENCE_IMAGE_LIMIT,
   deriveAspectRatioId,
+  isGenerateSettings,
   isLoraCompatibleWithModel,
   MAX_DIMENSION,
   MIN_DIMENSION,
+  normalizeGenerateSettings,
   SEED_MAX,
 } from './settings';
 
@@ -467,6 +470,34 @@ export const isSupportedGenerateModel = <T extends { base: string; type: string 
 
 export const isGenerateModelSelectable = <T extends ModelConfig>(model: T): boolean => isSupportedGenerateModel(model);
 
+/** Pure prompt-history recall patch shared by keyboard and palette entry points. */
+export const getPromptHistoryRecallPatch = ({
+  item,
+  models,
+  values,
+}: {
+  item: PromptHistoryItem;
+  models: readonly ModelConfig[] | undefined;
+  values: Record<string, unknown>;
+}): Record<string, unknown> | null => {
+  const settings = normalizeGenerateSettings(values);
+
+  if (!settings) {
+    return null;
+  }
+
+  const selectedModel = models?.filter(isSupportedGenerateModel).find((model) => model.key === settings.modelKey);
+  const promptPolicy = getPromptPolicy(selectedModel, settings);
+  const patch: Record<string, unknown> = { positivePrompt: item.positivePrompt };
+
+  if (promptPolicy.negativeVisible) {
+    patch.negativePrompt = item.negativePrompt ?? '';
+    patch.negativePromptEnabled = item.negativePrompt ? true : settings.negativePromptEnabled;
+  }
+
+  return patch;
+};
+
 export const EXTERNAL_PROVIDER_NODE_TYPES: Record<string, string> = {
   alibabacloud: 'alibabacloud_image_generation',
   gemini: 'gemini_image_generation',
@@ -605,9 +636,9 @@ export interface ComponentSectionPolicy {
   validate: (ctx: ComponentPolicyContext) => string[];
 }
 
-export interface GenerateSettingsCompatibilityResult {
+export interface GenerateModelSelectionResult {
   settings: GenerateSettings;
-  clearedLabels: string[];
+  clearedLabels: readonly string[];
 }
 
 const TYPE_CLIP_EMBED: ModelTaxonomyType[] = ['clip_embed'];
@@ -1113,11 +1144,11 @@ export const getCompatibleReferenceImages = (
   return didChange ? next : referenceImages;
 };
 
-export const getSettingsWithCompatibleModelSelections = (
+const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
   models: readonly ReferenceModelCandidate[]
-): GenerateSettingsCompatibilityResult => {
+): GenerateModelSelectionResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
   const clearedLabels: string[] = [];
   const compatibleLoras = settings.loras.filter((lora) => isLoraCompatibleWithModel(lora.model, model));
@@ -1198,6 +1229,36 @@ export const getSettingsWithCompatibleModelSelections = (
   }
 
   return { settings: nextSettings, clearedLabels };
+};
+
+/**
+ * Canonical transition for every Generate model-selection entry point.
+ * Normalizes persisted values, reconciles incompatible selections, and applies
+ * automatic component-source policy before callers persist the result.
+ */
+export const getGenerateModelSelectionResult = ({
+  currentValues,
+  model,
+  models,
+}: {
+  currentValues: unknown;
+  model: GenerateModelConfig;
+  models: readonly ModelConfig[];
+}): GenerateModelSelectionResult => {
+  const currentSettings = isGenerateSettings(currentValues)
+    ? currentValues
+    : (normalizeGenerateSettings(currentValues) ?? getDefaultGenerateSettings(model));
+  const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models);
+  const componentSourceModel = getAutoFlux2ComponentSourceModel(model, result.settings, models);
+
+  if (componentSourceModel === undefined || componentSourceModel?.key === result.settings.componentSourceModel?.key) {
+    return result;
+  }
+
+  return {
+    ...result,
+    settings: { ...result.settings, componentSourceModel },
+  };
 };
 
 const hasModelKey = (models: readonly ModelConfig[], key: string, type?: string): boolean =>

@@ -14,6 +14,10 @@ export interface GalleryBoardsQuery {
 
 export interface GalleryImagesQuery {
   boardId: string;
+  /** Inclusive lower-bound calendar day (YYYY-MM-DD) on created_at. */
+  createdFrom?: string;
+  /** Inclusive upper-bound calendar day (YYYY-MM-DD) on created_at. */
+  createdTo?: string;
   galleryView: GalleryView;
   limit?: number;
   offset?: number;
@@ -31,9 +35,9 @@ export const galleryKeys = {
 
 export const galleryBoardsOptions = (query: GalleryBoardsQuery = {}) =>
   queryOptions({
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [boards, dateBoards] = await Promise.all([
-        listGalleryBoards(query),
+        listGalleryBoards({ ...query, signal }),
         query.includeDateBoards ? listGalleryDateBoards() : Promise.resolve([]),
       ]);
 
@@ -45,7 +49,7 @@ export const galleryBoardsOptions = (query: GalleryBoardsQuery = {}) =>
 
 export const galleryImagesOptions = (query: GalleryImagesQuery) =>
   queryOptions({
-    queryFn: () => listGalleryImages(query),
+    queryFn: ({ signal }) => listGalleryImages({ ...query, signal }),
     queryKey: galleryKeys.images(query),
     staleTime: 60_000,
   });
