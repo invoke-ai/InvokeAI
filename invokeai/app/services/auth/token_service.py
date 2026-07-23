@@ -104,3 +104,23 @@ def verify_token(token: str) -> TokenData | None:
     except Exception:
         # Catch any other exceptions (e.g., Pydantic validation errors)
         return None
+
+
+def get_token_remaining_seconds(token: str) -> int | None:
+    """Return the number of seconds until a *valid* token expires.
+
+    Verifies the token first (signature + expiry + payload shape); returns None if
+    it fails verification. A valid token without an ``exp`` claim gets the default
+    expiration window, matching what ``create_access_token`` would have assigned.
+    """
+    if verify_token(token) is None:
+        return None
+    try:
+        claims = jwt.get_unverified_claims(token)
+    except JWTError:
+        return None
+    exp = claims.get("exp")
+    if exp is None:
+        return int(timedelta(hours=DEFAULT_EXPIRATION_HOURS).total_seconds())
+    remaining = int(cast(float, exp) - datetime.now(timezone.utc).timestamp())
+    return remaining if remaining > 0 else None

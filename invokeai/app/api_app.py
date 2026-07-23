@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,11 +8,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.security.utils import get_authorization_scheme_param
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import invokeai.frontend.web as web_dir
 from invokeai.app.api.dependencies import ApiDependencies
@@ -24,6 +28,7 @@ from invokeai.app.api.routers import (
     client_state,
     custom_nodes,
     download_queue,
+    gallery,
     image_moves,
     images,
     model_manager,
@@ -32,6 +37,7 @@ from invokeai.app.api.routers import (
     session_queue,
     style_presets,
     utilities,
+    videos,
     virtual_boards,
     workflows,
 )
@@ -99,18 +105,36 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
         # genuine user activity. GET requests are often background fetches (RTK Query
         # cache revalidation, refetch-on-focus, etc.) and should not reset the
         # inactivity timer.
-        if response.status_code < 400 and request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        # Behind a sub-path proxy the public path carries the prefix (see SubPathASGIMiddleware),
+        # so strip `root_path` before matching the auth-route exclusions — otherwise a proxied
+        # logout would mint a replacement token/cookie right after the route deleted them.
+        route_path = request.url.path.removeprefix(request.scope.get("root_path", ""))
+        if (
+            response.status_code < 400
+            and request.method in ("POST", "PUT", "PATCH", "DELETE")
+            and route_path not in ("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/media-cookie")
+        ):
             auth_header = request.headers.get("authorization", "")
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
                 try:
                     from datetime import timedelta
 
-                    from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL, TOKEN_EXPIRATION_REMEMBER_ME
-                    from invokeai.app.services.auth.token_service import create_access_token, verify_token
+                    from invokeai.app.api.routers.auth import (
+                        TOKEN_EXPIRATION_NORMAL,
+                        TOKEN_EXPIRATION_REMEMBER_ME,
+                    )
+                    from invokeai.app.services.auth.token_service import TokenData, create_access_token, verify_token
 
                     token_data = verify_token(token)
                     if token_data is not None:
+                        # The user lookup is a synchronous SQLite query behind a
+                        # process-wide lock; run it off the event loop so a contended
+                        # lock (e.g. generation-result writes) can't stall every
+                        # concurrent request from inside this per-mutation middleware.
+                        user = await run_in_threadpool(ApiDependencies.invoker.services.users.get, token_data.user_id)
+                        if user is None or not user.is_active:
+                            return response
                         # Use the remember_me claim from the token to determine the
                         # correct refresh duration. This avoids the bug where a 7-day
                         # token with <24h remaining would be silently downgraded to 1 day.
@@ -119,7 +143,13 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                         else:
                             expires_delta = timedelta(days=TOKEN_EXPIRATION_NORMAL)
 
-                        new_token = create_access_token(token_data, expires_delta)
+                        refreshed_data = TokenData(
+                            user_id=user.user_id,
+                            email=user.email,
+                            is_admin=user.is_admin,
+                            remember_me=token_data.remember_me,
+                        )
+                        new_token = create_access_token(refreshed_data, expires_delta)
                         response.headers["X-Refreshed-Token"] = new_token
                 except Exception:
                     pass  # Don't fail the request if token refresh fails
@@ -146,6 +176,148 @@ class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
         return response
+
+
+def _identify_video_upload_user(scope: Scope) -> tuple[bool, str | None]:
+    """Identify the uploader for auth and per-user slot accounting.
+
+    Returns (authenticated, per_user_key). In single-user mode there is only one
+    tenant, so per_user_key is None — the whole global capacity is theirs and no
+    per-user quota applies.
+    """
+    if not ApiDependencies.invoker.services.configuration.multiuser:
+        return True, None
+
+    scheme, token = get_authorization_scheme_param(Headers(scope=scope).get("authorization"))
+    if scheme.lower() != "bearer":
+        return False, None
+    from invokeai.app.services.auth.token_service import verify_token
+
+    token_data = verify_token(token)
+    if token_data is None:
+        return False, None
+    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+    if user is None or not user.is_active:
+        return False, None
+    return True, token_data.user_id
+
+
+class VideoUploadLimitASGIMiddleware:
+    """Bound video-upload ingress *before* FastAPI's multipart parser runs.
+
+    The upload route's own MAX_UPLOAD_SIZE check only fires after the multipart body has
+    been fully parsed (and spooled to temp storage), so oversized, chunked, or many
+    concurrent uploads could exhaust temp space before ever being rejected. This
+    middleware rejects oversized requests from the Content-Length header, aborts
+    chunked bodies that exceed the cap mid-stream, and bounds concurrent uploads
+    both globally and per user (so one tenant's slow uploads cannot starve the
+    others into 429s).
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        max_body_bytes: int,
+        max_concurrent: int,
+        max_concurrent_per_user: int | None = None,
+        identify_user: Callable[[Scope], tuple[bool, str | None]] | None = None,
+        idle_timeout_seconds: float = 120.0,
+        max_upload_duration_seconds: float = 30 * 60,
+    ) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+        self.max_concurrent = max_concurrent
+        self.max_concurrent_per_user = max_concurrent_per_user
+        self.identify_user = identify_user
+        self.idle_timeout_seconds = idle_timeout_seconds
+        self.max_upload_duration_seconds = max_upload_duration_seconds
+        self._active = 0
+        self._active_by_user: dict[str, int] = {}
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        # Behind a sub-path proxy the public path carries the prefix (see SubPathASGIMiddleware).
+        route_path: str = scope.get("path", "").removeprefix(scope.get("root_path", ""))
+        if not (scope.get("method") == "POST" and route_path == "/api/v1/videos/upload"):
+            return await self.app(scope, receive, send)
+
+        per_user_key: str | None = None
+        if self.identify_user is not None:
+            authenticated, per_user_key = self.identify_user(scope)
+            if not authenticated:
+                response = JSONResponse(
+                    {"detail": "Authentication required"},
+                    status_code=401,
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+                return await response(scope, receive, send)
+
+        content_length = Headers(scope=scope).get("content-length")
+        if content_length is not None and content_length.isdigit() and int(content_length) > self.max_body_bytes:
+            response = JSONResponse(
+                {"detail": f"Video upload exceeds maximum request size ({self.max_body_bytes} bytes)"},
+                status_code=413,
+            )
+            return await response(scope, receive, send)
+
+        if self._active >= self.max_concurrent:
+            response = JSONResponse(
+                {"detail": "Too many concurrent video uploads; try again shortly"},
+                status_code=429,
+                headers={"Retry-After": "5"},
+            )
+            return await response(scope, receive, send)
+
+        if (
+            per_user_key is not None
+            and self.max_concurrent_per_user is not None
+            and self._active_by_user.get(per_user_key, 0) >= self.max_concurrent_per_user
+        ):
+            response = JSONResponse(
+                {"detail": "Too many concurrent video uploads for this user; try again shortly"},
+                status_code=429,
+                headers={"Retry-After": "5"},
+            )
+            return await response(scope, receive, send)
+
+        self._active += 1
+        if per_user_key is not None:
+            self._active_by_user[per_user_key] = self._active_by_user.get(per_user_key, 0) + 1
+        received = 0
+        upload_started_at = asyncio.get_running_loop().time()
+
+        async def limited_receive() -> Message:
+            # Backstop for clients that omit Content-Length (chunked transfer): count the
+            # streamed body and abort the request once it exceeds the cap, so the multipart
+            # parser stops spooling. A clean 413 isn't possible mid-parse; the aborted
+            # request surfaces to the client as a dropped connection.
+            nonlocal received
+            remaining_duration = self.max_upload_duration_seconds - (
+                asyncio.get_running_loop().time() - upload_started_at
+            )
+            if remaining_duration <= 0:
+                return {"type": "http.disconnect"}
+            try:
+                message = await asyncio.wait_for(receive(), timeout=min(self.idle_timeout_seconds, remaining_duration))
+            except TimeoutError:
+                return {"type": "http.disconnect"}
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_body_bytes:
+                    return {"type": "http.disconnect"}
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        finally:
+            self._active -= 1
+            if per_user_key is not None:
+                remaining = self._active_by_user.get(per_user_key, 0) - 1
+                if remaining > 0:
+                    self._active_by_user[per_user_key] = remaining
+                else:
+                    self._active_by_user.pop(per_user_key, None)
 
 
 class SubPathASGIMiddleware:
@@ -191,6 +363,13 @@ class SubPathASGIMiddleware:
 # Add the middleware
 app.add_middleware(RedirectRootWithQueryStringMiddleware)
 app.add_middleware(SlidingWindowTokenMiddleware)
+app.add_middleware(
+    VideoUploadLimitASGIMiddleware,
+    max_body_bytes=videos.MAX_UPLOAD_REQUEST_SIZE,
+    max_concurrent=videos.MAX_CONCURRENT_VIDEO_UPLOADS,
+    max_concurrent_per_user=videos.MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER,
+    identify_user=_identify_video_upload_user,
+)
 
 
 # Add event handler
@@ -223,6 +402,8 @@ app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
+app.include_router(videos.videos_router, prefix="/api")
+app.include_router(gallery.gallery_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
 app.include_router(virtual_boards.virtual_boards_router, prefix="/api")

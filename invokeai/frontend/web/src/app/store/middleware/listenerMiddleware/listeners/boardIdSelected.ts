@@ -2,13 +2,13 @@ import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
 import { selectGetImageNamesQueryArgs, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
-import { imagesApi } from 'services/api/endpoints/images';
+import { galleryApi } from 'services/api/endpoints/gallery';
 
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: isAnyOf(boardIdSelected, galleryViewChanged),
     effect: async (action, { getState, dispatch, condition, cancelActiveListeners }) => {
-      // Cancel any in-progress instances of this listener, we don't want to select an image from a previous board
+      // Cancel any in-progress instances of this listener, we don't want to select an item from a previous board
       cancelActiveListeners();
 
       if (boardIdSelected.match(action) && action.payload.select) {
@@ -20,11 +20,14 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       const board_id = selectSelectedBoardId(state);
 
+      // The grid is now backed by the polymorphic getGalleryItemNames endpoint (the legacy
+      // getImageNames query is no longer dispatched), so the auto-select probe must read its
+      // cache or it will time out and clear the user's selection on every board switch.
       const queryArgs = { ...selectGetImageNamesQueryArgs(state), board_id };
-      // wait until the board has some images - maybe it already has some from a previous fetch
+      // wait until the board has some items - maybe it already has some from a previous fetch
       // must use getState() to ensure we do not have stale state
       const isSuccess = await condition(
-        () => imagesApi.endpoints.getImageNames.select(queryArgs)(getState()).isSuccess,
+        () => galleryApi.endpoints.getGalleryItemNames.select(queryArgs)(getState()).isSuccess,
         5000
       );
 
@@ -33,12 +36,12 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
         return;
       }
 
-      // the board was just changed - we can select the first image
-      const imageNames = imagesApi.endpoints.getImageNames.select(queryArgs)(getState()).data?.image_names;
+      // the board was just changed - we can select the first gallery item (image or video)
+      const items = galleryApi.endpoints.getGalleryItemNames.select(queryArgs)(getState()).data?.items;
 
-      const imageToSelect = imageNames && imageNames.length > 0 ? imageNames[0] : null;
+      const itemToSelect = items && items.length > 0 ? (items[0]?.name ?? null) : null;
 
-      dispatch(imageSelected(imageToSelect ?? null));
+      dispatch(imageSelected(itemToSelect));
     },
   });
 };

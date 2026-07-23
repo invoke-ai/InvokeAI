@@ -30,8 +30,13 @@ class BoardImageRecordStorageBase(ABC):
         board_id: str,
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
+        user_id: Optional[str] = None,
     ) -> list[str]:
-        """Gets all board images for a board, as a list of the image names."""
+        """Gets all board images for a board, as a list of the image names.
+
+        When ``user_id`` is provided, results are restricted to images owned by that user;
+        pass ``None`` for the admin path (no per-user restriction).
+        """
         pass
 
     @abstractmethod

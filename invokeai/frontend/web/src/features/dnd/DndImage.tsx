@@ -3,6 +3,7 @@ import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { ImageProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
 import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNewTab';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
@@ -31,6 +32,8 @@ export const DndImage = memo(
     const ref = useRef<HTMLImageElement>(null);
     useImperativeHandle(forwardedRef, () => ref.current!, []);
     const [dragPreviewState, setDragPreviewState] = useState<DndDragPreviewSingleImageState | null>(null);
+    const imageUrl = useMediaUrl(asThumbnail ? imageDTO.thumbnail_url : imageDTO.image_url);
+    const fallbackUrl = useMediaUrl(asThumbnail ? undefined : imageDTO.thumbnail_url);
 
     useMiddleClickOpenInNewTab(ref, imageDTO.image_url);
 
@@ -70,8 +73,8 @@ export const DndImage = memo(
         <Image
           role="button"
           ref={ref}
-          src={asThumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
-          fallbackSrc={asThumbnail ? undefined : imageDTO.thumbnail_url}
+          src={imageUrl}
+          fallbackSrc={fallbackUrl}
           width={imageDTO.width}
           height={imageDTO.height}
           sx={sx}

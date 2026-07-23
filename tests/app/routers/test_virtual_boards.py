@@ -25,6 +25,21 @@ def _save_image(mock_invoker: Invoker, image_name: str, user_id: str) -> None:
     )
 
 
+def _save_video(mock_invoker: Invoker, video_name: str, user_id: str) -> None:
+    mock_invoker.services.video_records.save(
+        video_name=video_name,
+        video_origin=ResourceOrigin.INTERNAL,
+        video_category=ImageCategory.GENERAL,
+        width=10,
+        height=10,
+        duration=1.0,
+        fps=8.0,
+        has_workflow=False,
+        is_intermediate=False,
+        user_id=user_id,
+    )
+
+
 def test_list_by_date_requires_auth(enable_multiuser: Any, client: TestClient):
     r = client.get("/api/v1/virtual_boards/by_date")
     assert r.status_code == status.HTTP_401_UNAUTHORIZED
@@ -79,3 +94,54 @@ def test_admin_sees_all_dates(
     assert r.status_code == status.HTTP_200_OK
     total = sum(b.get("image_count", 0) for b in r.json())
     assert total >= 2  # admin sees images from both users
+
+
+def test_item_names_by_date_requires_auth(enable_multiuser: Any, client: TestClient):
+    r = client.get("/api/v1/virtual_boards/by_date/2026-05-18/item_names")
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_video_only_date_appears_as_virtual_board(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """A date containing only videos must still surface as a virtual board (video_count > 0)."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_video(mock_invoker, "u1-vid-only.mp4", user1.user_id)
+
+    r = client.get(
+        "/api/v1/virtual_boards/by_date",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    boards = r.json()
+    assert len(boards) == 1
+    assert boards[0]["image_count"] == 0
+    assert boards[0]["video_count"] == 1
+    assert boards[0]["cover_video_name"] == "u1-vid-only.mp4"
+    assert boards[0]["cover_image_name"] is None
+
+
+def test_item_names_by_date_returns_video_refs(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """Selecting a virtual date must return polymorphic refs — videos included, per-user filtered."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_image(mock_invoker, "u1-mixed.png", user1.user_id)
+    _save_video(mock_invoker, "u1-mixed.mp4", user1.user_id)
+
+    r = client.get(
+        "/api/v1/virtual_boards/by_date",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    date = r.json()[0]["date"]
+
+    r = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    refs = {(item["kind"], item["name"]) for item in body["items"]}
+    assert refs == {("image", "u1-mixed.png"), ("video", "u1-mixed.mp4")}
+    assert body["total_count"] == 2

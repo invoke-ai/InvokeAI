@@ -20,6 +20,7 @@ import {
   zModelType,
   zSchedulerField,
   zStylePresetField,
+  zVideoField,
 } from './common';
 
 /**
@@ -50,7 +51,7 @@ import {
 
 // #region Base schemas & misc
 const zFieldInput = z.enum(['connection', 'direct', 'any']);
-const zFieldUIComponent = z.enum(['none', 'textarea', 'slider']);
+const zFieldUIComponent = z.enum(['none', 'textarea', 'slider', 'video-frame-index']);
 const zFieldInputInstanceBase = z.object({
   name: z.string().trim().min(1),
   label: z.string().catch(''),
@@ -156,6 +157,10 @@ const zImageFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zVideoFieldType = zFieldTypeBase.extend({
+  name: z.literal('VideoField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zImageCollectionFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageField'),
   cardinality: z.literal(COLLECTION),
@@ -219,6 +224,7 @@ const zStatefulFieldType = z.union([
   zBooleanFieldType,
   zEnumFieldType,
   zImageFieldType,
+  zVideoFieldType,
   zBoardFieldType,
   zStylePresetFieldType,
   zModelIdentifierFieldType,
@@ -544,6 +550,26 @@ export type EnumFieldInputInstance = z.infer<typeof zEnumFieldInputInstance>;
 export type EnumFieldInputTemplate = z.infer<typeof zEnumFieldInputTemplate>;
 export const isEnumFieldInputInstance = buildInstanceTypeGuard(zEnumFieldInputInstance);
 export const isEnumFieldInputTemplate = buildTemplateTypeGuard<EnumFieldInputTemplate>('EnumField');
+// #endregion
+
+// #region VideoField
+export const zVideoFieldValue = zVideoField.optional();
+const zVideoFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zVideoFieldValue,
+});
+const zVideoFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zVideoFieldType,
+  originalType: zFieldType.optional(),
+  default: zVideoFieldValue,
+});
+const zVideoFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zVideoFieldType,
+});
+export type VideoFieldValue = z.infer<typeof zVideoFieldValue>;
+export type VideoFieldInputInstance = z.infer<typeof zVideoFieldInputInstance>;
+export type VideoFieldInputTemplate = z.infer<typeof zVideoFieldInputTemplate>;
+export const isVideoFieldInputInstance = buildInstanceTypeGuard(zVideoFieldInputInstance);
+export const isVideoFieldInputTemplate = buildTemplateTypeGuard<VideoFieldInputTemplate>('VideoField', ['SINGLE']);
 // #endregion
 
 // #region ImageField
@@ -1367,6 +1393,7 @@ export const zStatefulFieldValue = z.union([
   zEnumFieldValue,
   zImageFieldValue,
   zImageFieldCollectionValue,
+  zVideoFieldValue,
   zBoardFieldValue,
   zStylePresetFieldValue,
   zModelIdentifierFieldValue,
@@ -1397,6 +1424,7 @@ const zStatefulFieldInputInstance = z.union([
   zEnumFieldInputInstance,
   zImageFieldInputInstance,
   zImageFieldCollectionInputInstance,
+  zVideoFieldInputInstance,
   zBoardFieldInputInstance,
   zStylePresetFieldInputInstance,
   zModelIdentifierFieldInputInstance,
@@ -1426,6 +1454,7 @@ const zStatefulFieldInputTemplate = z.union([
   zEnumFieldInputTemplate,
   zImageFieldInputTemplate,
   zImageFieldCollectionInputTemplate,
+  zVideoFieldInputTemplate,
   zBoardFieldInputTemplate,
   zStylePresetFieldInputTemplate,
   zModelIdentifierFieldInputTemplate,
@@ -1455,6 +1484,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zEnumFieldOutputTemplate,
   zImageFieldOutputTemplate,
   zImageFieldCollectionOutputTemplate,
+  zVideoFieldOutputTemplate,
   zBoardFieldOutputTemplate,
   zStylePresetFieldOutputTemplate,
   zModelIdentifierFieldOutputTemplate,

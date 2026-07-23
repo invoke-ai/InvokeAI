@@ -1,5 +1,6 @@
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiStarBold, PiStarFill } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export const GalleryItemStarIconButton = memo(({ imageDTO }: Props) => {
+  const { t } = useTranslation();
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
 
@@ -24,7 +26,7 @@ export const GalleryItemStarIconButton = memo(({ imageDTO }: Props) => {
     <DndImageIcon
       onClick={toggleStarredState}
       icon={imageDTO.starred ? <PiStarFill /> : <PiStarBold />}
-      tooltip={imageDTO.starred ? 'Unstar' : 'Star'}
+      tooltip={imageDTO.starred ? t('gallery.unstarImage') : t('gallery.starImage')}
       position="absolute"
       top={2}
       insetInlineEnd={2}

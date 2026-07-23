@@ -114,7 +114,14 @@ export const WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
   },
   {
     categoryTKey: 'Common Tasks',
-    tags: [{ label: 'Upscaling' }, { label: 'Text to Image' }, { label: 'Image to Image' }],
+    tags: [
+      { label: 'Upscaling' },
+      { label: 'Text to Image' },
+      { label: 'Image to Image' },
+      { label: 'Text to Video' },
+      { label: 'Image to Video' },
+      { label: 'Video to Video' },
+    ],
   },
   {
     categoryTKey: 'Model Architecture',

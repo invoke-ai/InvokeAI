@@ -13,6 +13,7 @@ import {
   selectIsFlux2,
   selectIsQwenImage,
   selectIsSD3,
+  selectIsWan,
   selectIsZImage,
   selectModelSupportsGuidance,
   selectModelSupportsSteps,
@@ -29,6 +30,7 @@ import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamQwenImageShift from 'features/parameters/components/Core/ParamQwenImageShift';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
+import ParamWanGuidanceScaleLowNoise from 'features/parameters/components/Core/ParamWanGuidanceScaleLowNoise';
 import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
 import ParamZImageShift from 'features/parameters/components/Core/ParamZImageShift';
 import ParamZImageSeedVarianceSettings from 'features/parameters/components/SeedVariance/ParamZImageSeedVarianceSettings';
@@ -55,6 +57,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
+  const isWan = useAppSelector(selectIsWan);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
   const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
   const modelSupportsSteps = useAppSelector(selectModelSupportsSteps);
@@ -104,7 +107,8 @@ export const GenerationSettingsAccordion = memo(() => {
                   !isCogView4 &&
                   !isZImage &&
                   !isQwenImage &&
-                  !isAnima && <ParamScheduler />}
+                  !isAnima &&
+                  !isWan && <ParamScheduler />}
                 {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
@@ -114,6 +118,7 @@ export const GenerationSettingsAccordion = memo(() => {
                   <ParamGuidance />
                 )}
                 {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
+                {!isExternal && isWan && <ParamWanGuidanceScaleLowNoise />}
                 {!isExternal && isZImage && <ParamZImageShift />}
                 {!isExternal && isQwenImage && <ParamQwenImageShift />}
                 {!isExternal && isFLUX && <ParamFluxDypePreset />}

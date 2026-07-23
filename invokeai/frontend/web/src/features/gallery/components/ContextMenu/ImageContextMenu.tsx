@@ -5,7 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import MultipleSelectionMenuItems from 'features/gallery/components/ContextMenu/MultipleSelectionMenuItems';
 import SingleSelectionMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionMenuItems';
-import { selectSelectionCount } from 'features/gallery/store/gallerySelectors';
+import { selectSelection } from 'features/gallery/store/gallerySelectors';
 import { map } from 'nanostores';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
@@ -254,14 +254,18 @@ ImageContextMenuEventLogical.displayName = 'ImageContextMenuEventLogical';
 // The content of the context menu, which changes based on the selection count. Split out and memoized to avoid
 // re-rendering the whole context menu too often.
 const MenuContent = memo(() => {
-  const selectionCount = useAppSelector(selectSelectionCount);
+  const selection = useAppSelector(selectSelection);
   const state = useStore($imageContextMenuState);
 
   if (!state.imageDTO) {
     return null;
   }
 
-  if (selectionCount > 1) {
+  // Only show the multi-selection menu when the clicked image is part of the selection —
+  // right-clicking an item outside the selection acts on that item alone. Without this,
+  // right-clicking an image while 2+ videos were selected showed a menu whose every
+  // action was disabled (the multi menu filters the selection down to images).
+  if (selection.length > 1 && selection.includes(state.imageDTO.image_name)) {
     return (
       <MenuList visibility="visible">
         <MultipleSelectionMenuItems />

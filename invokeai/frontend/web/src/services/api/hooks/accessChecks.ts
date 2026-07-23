@@ -2,6 +2,7 @@ import { getStore } from 'app/store/nanostores/store';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
+import { videosApi } from 'services/api/endpoints/videos';
 
 /**
  * Checks if the client has access to a model.
@@ -28,6 +29,22 @@ export const checkImageAccess = async (name: string): Promise<boolean> => {
   const { dispatch } = getStore();
   try {
     const req = dispatch(imagesApi.endpoints.getImageDTO.initiate(name, { forceRefetch: true, subscribe: false }));
+    const result = await req.unwrap();
+    return Boolean(result);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Checks if the client has access to a video.
+ * @param name The video name.
+ * @returns A promise that resolves to true if the client has access, else false.
+ */
+export const checkVideoAccess = async (name: string): Promise<boolean> => {
+  const { dispatch } = getStore();
+  try {
+    const req = dispatch(videosApi.endpoints.getVideoDTO.initiate(name, { forceRefetch: true, subscribe: false }));
     const result = await req.unwrap();
     return Boolean(result);
   } catch {

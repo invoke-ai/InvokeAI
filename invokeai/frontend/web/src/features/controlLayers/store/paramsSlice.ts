@@ -304,6 +304,37 @@ const slice = createSlice({
     qwenImageShiftChanged: (state, action: PayloadAction<number | null>) => {
       state.qwenImageShift = action.payload;
     },
+    wanTransformerLowNoiseSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.wanTransformerLowNoise.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanTransformerLowNoise = result.data;
+    },
+    wanComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.wanComponentSource.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanComponentSource = result.data;
+    },
+    wanVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.wanVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanVaeModel = result.data;
+    },
+    wanT5EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.wanT5EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanT5EncoderModel = result.data;
+    },
+    wanGuidanceScaleLowNoiseChanged: (state, action: PayloadAction<number | null>) => {
+      state.wanGuidanceScaleLowNoise = action.payload;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -636,6 +667,11 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
   newState.qwenImageQuantization = oldState.qwenImageQuantization;
   newState.qwenImageShift = oldState.qwenImageShift;
+  newState.wanTransformerLowNoise = oldState.wanTransformerLowNoise;
+  newState.wanComponentSource = oldState.wanComponentSource;
+  newState.wanVaeModel = oldState.wanVaeModel;
+  newState.wanT5EncoderModel = oldState.wanT5EncoderModel;
+  newState.wanGuidanceScaleLowNoise = oldState.wanGuidanceScaleLowNoise;
   return newState;
 };
 
@@ -688,6 +724,11 @@ export const {
   qwenImageQwenVLEncoderModelSelected,
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
+  wanTransformerLowNoiseSelected,
+  wanComponentSourceSelected,
+  wanVaeModelSelected,
+  wanT5EncoderModelSelected,
+  wanGuidanceScaleLowNoiseChanged,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -779,6 +820,7 @@ export const selectIsAnima = createParamsSelector((params) => params.model?.base
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
+export const selectIsWan = createParamsSelector((params) => params.model?.base === 'wan');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -811,6 +853,11 @@ export const selectQwenImageVaeModel = createParamsSelector((params) => params.q
 export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
 export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
 export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
+export const selectWanTransformerLowNoise = createParamsSelector((params) => params.wanTransformerLowNoise);
+export const selectWanComponentSource = createParamsSelector((params) => params.wanComponentSource);
+export const selectWanVaeModel = createParamsSelector((params) => params.wanVaeModel);
+export const selectWanT5EncoderModel = createParamsSelector((params) => params.wanT5EncoderModel);
+export const selectWanGuidanceScaleLowNoise = createParamsSelector((params) => params.wanGuidanceScaleLowNoise);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
@@ -870,7 +917,16 @@ export const selectModelSupportsRefImages = createSelector(selectModel, selectMo
   if (model.base === 'external') {
     return false;
   }
-  return SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base);
+  if (!SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
+    return false;
+  }
+  // Wan: only the I2V variant of A14B consumes a reference image. T2V and
+  // TI2V-5B ignore ref images, so hide the panel for those.
+  if (model.base === 'wan') {
+    const variant = modelConfig && 'variant' in modelConfig ? modelConfig.variant : null;
+    return variant === 'i2v_a14b';
+  }
+  return true;
 });
 export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,

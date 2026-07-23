@@ -20,7 +20,7 @@ import {
   VStack,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectAuthToken, selectCurrentUser, setCredentials } from 'features/auth/store/authSlice';
+import { currentUserUpdated, selectCurrentUser } from 'features/auth/store/authSlice';
 import { validatePasswordField } from 'features/auth/util/passwordUtils';
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
@@ -38,7 +38,6 @@ const PASSWORD_GRID_COLUMNS = '180px 1fr';
 export const UserProfile = memo(() => {
   const { t } = useTranslation();
   const currentUser = useAppSelector(selectCurrentUser);
-  const currentToken = useAppSelector(selectAuthToken);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
@@ -127,20 +126,15 @@ export const UserProfile = memo(() => {
         const updatedUser = await updateCurrentUser(updatePayload).unwrap();
 
         // Refresh the stored user info so the header reflects the new display name
-        if (currentToken) {
-          dispatch(
-            setCredentials({
-              token: currentToken,
-              user: {
-                user_id: updatedUser.user_id,
-                email: updatedUser.email,
-                display_name: updatedUser.display_name ?? null,
-                is_admin: updatedUser.is_admin ?? false,
-                is_active: updatedUser.is_active ?? true,
-              },
-            })
-          );
-        }
+        dispatch(
+          currentUserUpdated({
+            user_id: updatedUser.user_id,
+            email: updatedUser.email,
+            display_name: updatedUser.display_name ?? null,
+            is_admin: updatedUser.is_admin ?? false,
+            is_active: updatedUser.is_active ?? true,
+          })
+        );
 
         // Navigate back after successful save
         navigate(-1);
@@ -152,17 +146,7 @@ export const UserProfile = memo(() => {
         setErrorMessage(detail);
       }
     },
-    [
-      displayName,
-      currentPassword,
-      newPassword,
-      isPasswordChangeValid,
-      updateCurrentUser,
-      currentToken,
-      dispatch,
-      navigate,
-      t,
-    ]
+    [displayName, currentPassword, newPassword, isPasswordChangeValid, updateCurrentUser, dispatch, navigate, t]
   );
 
   if (!currentUser) {

@@ -1,6 +1,6 @@
 import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useNodeHasImageOutput } from 'features/nodes/hooks/useNodeHasImageOutput';
+import { useNodeHasGalleryOutput } from 'features/nodes/hooks/useNodeHasGalleryOutput';
 import { useNodeIsIntermediate } from 'features/nodes/hooks/useNodeIsIntermediate';
 import { nodeIsIntermediateChanged } from 'features/nodes/store/nodesSlice';
 import { NO_PAN_CLASS } from 'features/nodes/types/constants';
@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const hasImageOutput = useNodeHasImageOutput();
+  const hasGalleryOutput = useNodeHasGalleryOutput();
   const isIntermediate = useNodeIsIntermediate();
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -25,7 +25,7 @@ const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
     [dispatch, nodeId]
   );
 
-  if (!hasImageOutput) {
+  if (!hasGalleryOutput) {
     return null;
   }
 

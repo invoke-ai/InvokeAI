@@ -30,6 +30,7 @@ type AddImageToImageArg = {
     | 'qwen_image_i2l'
     | 'z_image_i2l'
     | 'anima_i2l'
+    | 'wan_i2l'
   >;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
@@ -56,6 +57,7 @@ export const addImageToImage = async ({
     | 'qwen_image_l2i'
     | 'z_image_l2i'
     | 'anima_l2i'
+    | 'wan_l2i'
   >
 > => {
   const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
@@ -71,7 +73,8 @@ export const addImageToImage = async ({
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
     denoise.type === 'z_image_denoise' ||
-    denoise.type === 'anima_denoise'
+    denoise.type === 'anima_denoise' ||
+    denoise.type === 'wan_denoise'
   ) {
     denoise.width = scaledSize.width;
     denoise.height = scaledSize.height;

@@ -87,6 +87,14 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class WanT5EncoderField(BaseModel):
+    """Field for the UMT5-XXL text encoder used by Wan 2.2 models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
@@ -99,6 +107,47 @@ class ControlLoRAField(LoRAField):
 class TransformerField(BaseModel):
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
+
+
+class WanTransformerField(BaseModel):
+    """Transformer field for Wan 2.2 models.
+
+    Wan 2.2 A14B is a Mixture-of-Experts model with two transformer experts:
+    a high-noise expert (active at large timesteps) and a low-noise expert
+    (active at small timesteps). TI2V-5B is a single-transformer model and only
+    populates ``transformer``.
+
+    ``boundary_ratio`` matches Diffusers' ``WanPipeline`` semantics: it's the
+    boundary timestep as a fraction of ``num_train_timesteps`` (typically 1000),
+    so ``boundary_ratio=0.875`` means the high-noise expert handles t >= 875 and
+    the low-noise expert handles t < 875.
+    """
+
+    transformer: ModelIdentifierField = Field(
+        description="Primary transformer submodel. For A14B this is the high-noise expert."
+    )
+    transformer_low_noise: ModelIdentifierField | None = Field(
+        default=None,
+        description="Low-noise transformer expert (Wan 2.2 A14B only). None for TI2V-5B.",
+    )
+    loras: List[LoRAField] = Field(
+        default_factory=list,
+        description="LoRAs to apply to the primary transformer. For A14B applied to the high-noise expert.",
+    )
+    loras_low_noise: List[LoRAField] = Field(
+        default_factory=list,
+        description="LoRAs to apply to the low-noise expert (Wan 2.2 A14B). The Wan LoRA loader "
+        "routes 'both'- and 'low'-targeted LoRAs here; if empty, no LoRAs are applied to the "
+        "low-noise expert (a 'high'-targeted LoRA must not leak onto it).",
+    )
+    boundary_ratio: float = Field(
+        default=0.875,
+        ge=0.0,
+        le=1.0,
+        description="Boundary timestep as a fraction of num_train_timesteps (Wan 2.2 A14B only). "
+        "High-noise expert: t >= boundary_ratio * num_train_timesteps. Low-noise expert: t below. "
+        "Ignored for TI2V-5B.",
+    )
 
 
 @invocation_output("unet_output")

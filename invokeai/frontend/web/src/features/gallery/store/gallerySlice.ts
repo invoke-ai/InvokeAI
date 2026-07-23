@@ -12,6 +12,7 @@ import {
   type ComparisonMode,
   type GalleryState,
   type GalleryView,
+  isVideoName,
   isVirtualBoardId,
   type OrderDir,
   zGalleryState,
@@ -52,12 +53,18 @@ const slice = createSlice({
       } else {
         state.selection = [selectedItem];
       }
+      if (selectedItem && isVideoName(selectedItem)) {
+        state.imageToCompare = null;
+      }
     },
     selectionChanged: (state, action: PayloadAction<string[]>) => {
       state.selection = uniq(action.payload);
+      if (state.selection.some(isVideoName)) {
+        state.imageToCompare = null;
+      }
     },
     imageToCompareChanged: (state, action: PayloadAction<string | null>) => {
-      state.imageToCompare = action.payload;
+      state.imageToCompare = action.payload && !isVideoName(action.payload) ? action.payload : null;
     },
     comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {
       state.comparisonMode = action.payload;
@@ -162,11 +169,15 @@ const slice = createSlice({
     },
   },
   extraReducers(builder) {
-    // Clear board-related state on logout to prevent stale data when switching users
+    // Clear board-related state on logout to prevent stale data when switching users.
+    // `selection` holds only item-name strings (never persisted, and the DTOs behind
+    // them are wiped by the store-level resetApiState on logout), but clear it anyway
+    // so the next user never sees the previous user's selection highlighted.
     builder.addCase(logout, (state) => {
       state.selectedBoardId = 'none';
       state.autoAddBoardId = 'none';
       state.boardSearchText = '';
+      state.selection = [];
     });
   },
 });

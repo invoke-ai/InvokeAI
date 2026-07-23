@@ -4,7 +4,16 @@ import { getListImagesUrl } from 'services/api/util';
 import type { ApiTagDescription } from '..';
 
 export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
-  const tags: ApiTagDescription[] = ['ImageNameList', 'VirtualBoards'];
+  // Whenever an image or video mutation changes a board's contents we also have to refresh
+  // the polymorphic gallery list (and its names companion) since that is what the gallery UI
+  // actually subscribes to once Phase 4 lands.
+  const tags: ApiTagDescription[] = [
+    'ImageNameList',
+    'VirtualBoards',
+    'VideoNameList',
+    'GalleryItemList',
+    'GalleryItemNameList',
+  ];
 
   for (const board_id of affected_boards) {
     tags.push({
@@ -32,6 +41,23 @@ export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: st
       type: 'BoardImagesTotal',
       id: board_id,
     });
+
+    tags.push({
+      type: 'BoardVideosTotal',
+      id: board_id,
+    });
+  }
+
+  return tags;
+};
+
+export const getTagsToInvalidateForVideoMutation = (video_names: string[]): ApiTagDescription[] => {
+  const tags: ApiTagDescription[] = [];
+
+  for (const video_name of video_names) {
+    tags.push({ type: 'Video', id: video_name });
+    tags.push({ type: 'VideoMetadata', id: video_name });
+    tags.push({ type: 'VideoWorkflow', id: video_name });
   }
 
   return tags;

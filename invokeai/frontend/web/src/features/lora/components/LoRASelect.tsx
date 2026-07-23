@@ -44,6 +44,25 @@ const LoRASelect = () => {
       ) {
         return model.variant === currentMainModelConfig.variant;
       }
+      // For Wan: A14B (t2v_a14b/i2v_a14b) and TI2V-5B have different inner
+      // dims (5120 vs 3072) — applying the wrong variant crashes the layer
+      // patcher. LoRAs whose variant couldn't be detected (null) are kept
+      // so we don't silently hide ambiguous ones.
+      if (
+        currentMainModelConfig?.base === 'wan' &&
+        'variant' in currentMainModelConfig &&
+        currentMainModelConfig.variant &&
+        'variant' in model &&
+        model.variant
+      ) {
+        const expected =
+          currentMainModelConfig.variant === 't2v_a14b' || currentMainModelConfig.variant === 'i2v_a14b'
+            ? 'a14b'
+            : currentMainModelConfig.variant === 'ti2v_5b'
+              ? '5b'
+              : null;
+        return expected === null || model.variant === expected;
+      }
       return true;
     });
   }, [modelConfigs, currentBaseModel, currentMainModelConfig]);

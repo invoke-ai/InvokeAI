@@ -2,6 +2,7 @@ import { Box, Flex, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { preventDefault } from 'common/util/stopPropagation';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
@@ -15,6 +16,10 @@ export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: Com
   const comparisonFit = useAppSelector(selectComparisonFit);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const mouseOver = useBoolean(false);
+  const firstImageUrl = useMediaUrl(firstImage.image_url);
+  const firstThumbnailUrl = useMediaUrl(firstImage.thumbnail_url);
+  const secondImageUrl = useMediaUrl(secondImage.image_url);
+  const secondThumbnailUrl = useMediaUrl(secondImage.thumbnail_url);
   const fittedDims = useMemo<Dimensions>(() => {
     if (!rect) {
       return { width: 0, height: 0 };
@@ -51,8 +56,8 @@ export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: Com
         >
           <Image
             id="image-comparison-hover-first-image"
-            src={firstImage.image_url}
-            fallbackSrc={firstImage.thumbnail_url}
+            src={firstImageUrl}
+            fallbackSrc={firstThumbnailUrl}
             w={fittedDims.width}
             h={fittedDims.height}
             maxW="full"
@@ -87,8 +92,8 @@ export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: Com
             <Image
               position="relative"
               id="image-comparison-hover-second-image"
-              src={secondImage.image_url}
-              fallbackSrc={secondImage.thumbnail_url}
+              src={secondImageUrl}
+              fallbackSrc={secondThumbnailUrl}
               w={compareImageDims.width}
               h={compareImageDims.height}
               maxW={fittedDims.width}

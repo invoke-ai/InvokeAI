@@ -31,6 +31,7 @@ export const addTextToImage = ({
   | 'qwen_image_l2i'
   | 'z_image_l2i'
   | 'anima_l2i'
+  | 'wan_l2i'
 > => {
   denoise.denoising_start = 0;
   denoise.denoising_end = 1;
@@ -44,7 +45,8 @@ export const addTextToImage = ({
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
     denoise.type === 'z_image_denoise' ||
-    denoise.type === 'anima_denoise'
+    denoise.type === 'anima_denoise' ||
+    denoise.type === 'wan_denoise'
   ) {
     denoise.width = scaledSize.width;
     denoise.height = scaledSize.height;

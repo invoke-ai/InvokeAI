@@ -10,6 +10,7 @@ import {
   isImageFieldInputInstance,
   isModelFieldType,
   isModelIdentifierFieldInputInstance,
+  isVideoFieldInputInstance,
 } from 'features/nodes/types/field';
 import { getInvocationNodeInputTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
@@ -41,6 +42,7 @@ type ValidateWorkflowArgs = {
   workflow: unknown;
   templates: Templates;
   checkImageAccess: (name: string) => Promise<boolean>;
+  checkVideoAccess: (name: string) => Promise<boolean>;
   checkBoardAccess: (id: string) => Promise<boolean>;
   checkModelAccess: (key: string) => Promise<boolean>;
   getWorkflow?: (workflowId: string) => Promise<NonNullable<Parameters<typeof getSavedWorkflowDynamicFields>[0]>>;
@@ -135,7 +137,8 @@ const refreshCallSavedWorkflowDynamicInputs = async ({
  * @throws {z.ZodError} If there is a validation error.
  */
 export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<ValidateWorkflowResult> => {
-  const { workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess, getWorkflow } = args;
+  const { workflow, templates, checkImageAccess, checkVideoAccess, checkBoardAccess, checkModelAccess, getWorkflow } =
+    args;
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
 
@@ -309,6 +312,14 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
             warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
             input.value = input.value.filter((image) => image.image_name !== image_name);
           }
+        }
+      }
+      if (fieldTemplate.type.name === 'VideoField' && input.value && isVideoFieldInputInstance(input)) {
+        const hasAccess = await checkVideoAccess(input.value.video_name);
+        if (!hasAccess) {
+          const message = t('nodes.videoAccessError', { video_name: input.value.video_name });
+          warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
+          input.value = undefined;
         }
       }
       if (fieldTemplate.type.name === 'BoardField' && input.value && isBoardFieldInputInstance(input)) {

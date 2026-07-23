@@ -163,8 +163,12 @@ export const getGlobalReferenceImageWarnings = (
 
     const { config } = entity;
 
-    // FLUX.2 and Qwen Image Edit reference images don't require a model - it's built-in
-    if (config.type !== 'flux2_reference_image' && config.type !== 'qwen_image_reference_image') {
+    // FLUX.2, Qwen Image Edit and Wan reference images don't require a model - it's built-in
+    if (
+      config.type !== 'flux2_reference_image' &&
+      config.type !== 'qwen_image_reference_image' &&
+      config.type !== 'wan_reference_image'
+    ) {
       if (!('model' in config) || !config.model) {
         // No model selected
         warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
@@ -175,8 +179,10 @@ export const getGlobalReferenceImageWarnings = (
     }
 
     if (!entity.config.image) {
-      // No image selected - for Qwen Image Edit, an image is optional (txt2img works without one)
-      if (config.type !== 'qwen_image_reference_image') {
+      // No image selected - for Qwen Image Edit and Wan, an image is optional at the
+      // entity level. Wan I2V *requires* one but enforcement happens at graph-build
+      // time so the warning doesn't fire on T2V/TI2V variants that ignore ref images.
+      if (config.type !== 'qwen_image_reference_image' && config.type !== 'wan_reference_image') {
         warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
       }
     }

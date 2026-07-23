@@ -63,6 +63,7 @@ import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
 import { addPBRFilterListener } from './middleware/listenerMiddleware/listeners/addPBRFilterListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
+import { addVideoUploadedListeners } from './middleware/listenerMiddleware/listeners/videoUploaded';
 
 const listenerMiddleware = createListenerMiddleware();
 
@@ -272,6 +273,7 @@ startAppListening({
 });
 
 addImageUploadedFulfilledListener(startAppListening);
+addVideoUploadedListeners(startAppListening);
 
 // Image deleted
 addDeleteBoardAndImagesFulfilledListener(startAppListening);

@@ -181,3 +181,27 @@ def test_invocation_cache_memory_status():
     assert status.hits == 0
     assert status.misses == 0
     assert status.max_size == 0
+
+
+def test_invocation_cache_memory_purges_video_outputs_on_video_deletion():
+    """Regression: without the videos.on_deleted hook, a cached VideoOutput outlives the
+    video's deletion — re-running an identical graph then "succeeds" with a 404 video."""
+    from unittest.mock import MagicMock
+
+    from invokeai.app.invocations.fields import VideoField
+    from invokeai.app.invocations.primitives import VideoOutput
+
+    cache = MemoryInvocationCache(max_cache_size=5)
+    invoker = MagicMock()
+    cache.start(invoker)
+    # The video service's on_deleted must be wired to the same purge callback as images.
+    invoker.services.videos.on_deleted.assert_called_once_with(cache._delete_by_match)
+    invoker.services.images.on_deleted.assert_called_once_with(cache._delete_by_match)
+
+    output = VideoOutput(
+        video=VideoField(video_name="clip.mp4"), width=832, height=480, num_frames=81, fps=16.0, duration=5.0625
+    )
+    cache.save(1, output)
+    cache._delete_by_match("clip.mp4")
+    assert cache.get(1) is None
+    assert len(cache._cache) == 0
