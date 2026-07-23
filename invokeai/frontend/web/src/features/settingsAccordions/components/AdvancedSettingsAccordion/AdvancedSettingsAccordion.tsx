@@ -8,6 +8,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsIdeogram4,
   selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
@@ -25,6 +26,10 @@ import ParamQwenImageComponentSourceSelect from 'features/parameters/components/
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
+import ParamIdeogram4ColorPalette from 'features/parameters/components/Core/ParamIdeogram4ColorPalette';
+import ParamIdeogram4GuidanceScale from 'features/parameters/components/Core/ParamIdeogram4GuidanceScale';
+import ParamIdeogram4Mu from 'features/parameters/components/Core/ParamIdeogram4Mu';
+import ParamIdeogram4Steps from 'features/parameters/components/Core/ParamIdeogram4Steps';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamColorCompensation from 'features/parameters/components/VAEModel/ParamColorCompensation';
@@ -51,6 +56,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isFlux2 = useAppSelector(selectIsFlux2);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
+  const isIdeogram4 = useAppSelector(selectIsIdeogram4);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
@@ -107,13 +113,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isIdeogram4 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isIdeogram4 && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -165,6 +171,16 @@ export const AdvancedSettingsAccordion = memo(() => {
           <FormControlGroup>
             <ParamAnimaModelSelect />
           </FormControlGroup>
+        )}
+        {isIdeogram4 && (
+          <>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamIdeogram4Steps />
+              <ParamIdeogram4GuidanceScale />
+              <ParamIdeogram4Mu />
+            </FormControlGroup>
+            <ParamIdeogram4ColorPalette />
+          </>
         )}
       </Flex>
     </StandaloneAccordion>

@@ -39,6 +39,7 @@ import type {
   ParameterControlLoRAModel,
   ParameterFluxDypePreset,
   ParameterGuidance,
+  ParameterIdeogram4SamplerPreset,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterPositivePrompt,
@@ -97,6 +98,21 @@ const slice = createSlice({
     },
     setZImageShift: (state, action: PayloadAction<number | null>) => {
       state.zImageShift = action.payload;
+    },
+    setIdeogram4SamplerPreset: (state, action: PayloadAction<ParameterIdeogram4SamplerPreset>) => {
+      state.ideogram4SamplerPreset = action.payload;
+    },
+    setIdeogram4Steps: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4Steps = action.payload;
+    },
+    setIdeogram4GuidanceScale: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4GuidanceScale = action.payload;
+    },
+    setIdeogram4Mu: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4Mu = action.payload;
+    },
+    setIdeogram4ColorPalette: (state, action: PayloadAction<string[]>) => {
+      state.ideogram4ColorPalette = action.payload;
     },
     setZImageSeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
       state.zImageSeedVarianceEnabled = action.payload;
@@ -660,6 +676,11 @@ export const {
   setFluxDypeExponent,
   setZImageScheduler,
   setZImageShift,
+  setIdeogram4SamplerPreset,
+  setIdeogram4Steps,
+  setIdeogram4GuidanceScale,
+  setIdeogram4Mu,
+  setIdeogram4ColorPalette,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
@@ -775,6 +796,7 @@ export const selectIsFLUX = createParamsSelector((params) => params.model?.base 
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
+export const selectIsIdeogram4 = createParamsSelector((params) => params.model?.base === 'ideogram-4');
 export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
@@ -901,6 +923,10 @@ export const selectModelSupportsSteps = createSelector(selectModel, (model) => {
   if (model.base === 'external') {
     return false;
   }
+  if (model.base === 'ideogram-4') {
+    // Ideogram 4 bundles step count into its sampler preset, so there is no standalone steps control.
+    return false;
+  }
   return true;
 });
 export const selectModelSupportsDimensions = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
@@ -925,6 +951,11 @@ export const selectFluxDypeScale = createParamsSelector((params) => params.fluxD
 export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
 export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
+export const selectIdeogram4SamplerPreset = createParamsSelector((params) => params.ideogram4SamplerPreset);
+export const selectIdeogram4Steps = createParamsSelector((params) => params.ideogram4Steps);
+export const selectIdeogram4GuidanceScale = createParamsSelector((params) => params.ideogram4GuidanceScale);
+export const selectIdeogram4Mu = createParamsSelector((params) => params.ideogram4Mu);
+export const selectIdeogram4ColorPalette = createParamsSelector((params) => params.ideogram4ColorPalette);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(
