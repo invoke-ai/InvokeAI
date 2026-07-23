@@ -158,10 +158,10 @@ def user2_token(enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
     return get_user_token(client, "user2@test.com")
 
 
-def create_workflow(client: TestClient, token: str) -> str:
+def create_workflow(client: TestClient, token: str, workflow_body: dict[str, Any] | None = None) -> str:
     response = client.post(
         "/api/v1/workflows/",
-        json={"workflow": WORKFLOW_BODY},
+        json={"workflow": workflow_body or WORKFLOW_BODY},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200, response.text
@@ -240,6 +240,41 @@ def test_admin_can_delete_any_workflow(client: TestClient, admin_token: str, use
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert response.status_code == 200
+
+
+def test_list_workflows_skips_stale_workflow_rows(
+    client: TestClient, user1_token: str, mock_invoker: Invoker, monkeypatch: Any
+):
+    workflow_id = create_workflow(client, user1_token)
+    stale_id = "stale-workflow"
+    workflow_records = mock_invoker.services.workflow_records
+    existing = workflow_records.get(workflow_id)
+
+    original_get_many = workflow_records.get_many
+    original_get = workflow_records.get
+
+    def fake_get_many(*args, **kwargs):
+        results = original_get_many(*args, **kwargs)
+        return results.model_copy(
+            update={"items": [*results.items, results.items[0].model_copy(update={"workflow_id": stale_id})]}
+        )
+
+    def fake_get(requested_workflow_id: str):
+        if requested_workflow_id == stale_id:
+            from invokeai.app.services.workflow_records.workflow_records_common import WorkflowNotFoundError
+
+            raise WorkflowNotFoundError("stale")
+        return original_get(requested_workflow_id)
+
+    monkeypatch.setattr(workflow_records, "get_many", fake_get_many)
+    monkeypatch.setattr(workflow_records, "get", fake_get)
+
+    response = client.get("/api/v1/workflows/?categories=user", headers={"Authorization": f"Bearer {user1_token}"})
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["total"] == 1
+    assert [item["workflow_id"] for item in payload["items"]] == [existing.workflow_id]
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +368,147 @@ def test_workflow_has_user_id_and_is_public_fields(client: TestClient, user1_tok
     assert "user_id" in data
     assert "is_public" in data
     assert data["is_public"] is False
+
+
+def test_list_workflows_includes_call_saved_workflow_compatibility(client: TestClient, user1_token: str):
+    compatible_workflow_id = create_workflow(
+        client,
+        user1_token,
+        {
+            **WORKFLOW_BODY,
+            "nodes": [
+                {
+                    "id": "return",
+                    "type": "invocation",
+                    "position": {"x": 0, "y": 0},
+                    "data": {
+                        "id": "return",
+                        "type": "workflow_return",
+                        "version": "1.0.0",
+                        "nodePack": "invokeai",
+                        "label": "",
+                        "notes": "",
+                        "isOpen": True,
+                        "isIntermediate": False,
+                        "useCache": True,
+                        "dynamicInputTemplates": {},
+                        "inputs": {"collection": {"value": []}},
+                    },
+                }
+            ],
+        },
+    )
+    incompatible_workflow_id = create_workflow(client, user1_token)
+
+    response = client.get(
+        "/api/v1/workflows/?categories=user",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == 200
+    items_by_id = {item["workflow_id"]: item for item in response.json()["items"]}
+    assert items_by_id[compatible_workflow_id]["call_saved_workflow_compatibility"] == {
+        "is_callable": True,
+        "reason": "ok",
+        "message": None,
+    }
+    assert items_by_id[incompatible_workflow_id]["call_saved_workflow_compatibility"] == {
+        "is_callable": False,
+        "reason": "missing_workflow_return",
+        "message": "The workflow must contain exactly one workflow_return node.",
+    }
+
+
+def _create_callable_workflow(client: TestClient, token: str, name: str) -> str:
+    return create_workflow(
+        client,
+        token,
+        {
+            **WORKFLOW_BODY,
+            "name": name,
+            "nodes": [
+                {
+                    "id": "return",
+                    "type": "invocation",
+                    "position": {"x": 0, "y": 0},
+                    "data": {
+                        "id": "return",
+                        "type": "workflow_return",
+                        "version": "1.0.0",
+                        "nodePack": "invokeai",
+                        "label": "",
+                        "notes": "",
+                        "isOpen": True,
+                        "isIntermediate": False,
+                        "useCache": True,
+                        "dynamicInputTemplates": {},
+                        "inputs": {"values": {"value": []}},
+                    },
+                }
+            ],
+        },
+    )
+
+
+def test_list_workflows_callable_filter_counts_only_callable_workflows(client: TestClient, user1_token: str):
+    callable_a = _create_callable_workflow(client, user1_token, "Callable A")
+    create_workflow(client, user1_token, {**WORKFLOW_BODY, "name": "Not Callable A"})
+    callable_b = _create_callable_workflow(client, user1_token, "Callable B")
+    create_workflow(client, user1_token, {**WORKFLOW_BODY, "name": "Not Callable B"})
+    callable_c = _create_callable_workflow(client, user1_token, "Callable C")
+
+    response = client.get(
+        "/api/v1/workflows/?categories=user&callable=true&per_page=2&page=0&order_by=name&direction=ASC",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["total"] == 3
+    assert payload["pages"] == 2
+    assert payload["per_page"] == 2
+    assert [item["workflow_id"] for item in payload["items"]] == [callable_a, callable_b]
+    assert {item["workflow_id"] for item in payload["items"]}.isdisjoint({callable_c})
+    assert all(item["call_saved_workflow_compatibility"]["is_callable"] for item in payload["items"])
+
+
+def test_list_workflows_callable_filter_paginates_callable_workflows_after_filtering(
+    client: TestClient, user1_token: str
+):
+    _create_callable_workflow(client, user1_token, "Callable A")
+    create_workflow(client, user1_token, {**WORKFLOW_BODY, "name": "Not Callable A"})
+    _create_callable_workflow(client, user1_token, "Callable B")
+    create_workflow(client, user1_token, {**WORKFLOW_BODY, "name": "Not Callable B"})
+    callable_c = _create_callable_workflow(client, user1_token, "Callable C")
+
+    response = client.get(
+        "/api/v1/workflows/?categories=user&callable=true&per_page=2&page=1&order_by=name&direction=ASC",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["total"] == 3
+    assert payload["pages"] == 2
+    assert payload["per_page"] == 2
+    assert [item["workflow_id"] for item in payload["items"]] == [callable_c]
+    assert all(item["call_saved_workflow_compatibility"]["is_callable"] for item in payload["items"])
+
+
+def test_get_workflow_includes_call_saved_workflow_compatibility(client: TestClient, user1_token: str):
+    workflow_id = create_workflow(client, user1_token)
+
+    response = client.get(
+        f"/api/v1/workflows/i/{workflow_id}",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["call_saved_workflow_compatibility"] == {
+        "is_callable": False,
+        "reason": "missing_workflow_return",
+        "message": "The workflow must contain exactly one workflow_return node.",
+    }
 
 
 # ---------------------------------------------------------------------------

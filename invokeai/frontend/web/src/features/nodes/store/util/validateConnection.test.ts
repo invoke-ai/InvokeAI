@@ -1,5 +1,7 @@
 import { deepClone } from 'common/util/deepClone';
 import { set } from 'es-toolkit/compat';
+import { callSavedWorkflowDynamicFieldsChanged, nodesSliceConfig } from 'features/nodes/store/nodesSlice';
+import type { IntegerFieldInputTemplate } from 'features/nodes/types/field';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { describe, expect, it } from 'vitest';
 
@@ -8,7 +10,17 @@ import {
   CONNECTOR_OUTPUT_HANDLE,
   getConnectorDeletionSpliceConnections,
 } from './connectorTopology';
-import { add, buildEdge, buildNode, collect, img_resize, main_model_loader, sub, templates } from './testUtils';
+import {
+  add,
+  buildEdge,
+  buildNode,
+  call_saved_workflow,
+  collect,
+  img_resize,
+  main_model_loader,
+  sub,
+  templates,
+} from './testUtils';
 import { validateConnection } from './validateConnection';
 
 const ifTemplate: InvocationTemplate = {
@@ -147,6 +159,66 @@ const integerCollectionOutputTemplate: InvocationTemplate = {
   classification: 'stable',
 };
 
+const workflowReturnValueTemplate: InvocationTemplate = {
+  title: 'Workflow Return Value',
+  type: 'workflow_return_value',
+  version: '1.0.0',
+  tags: ['workflow', 'return', 'output'],
+  category: 'workflow',
+  description: 'Creates one named value for a callable workflow return.',
+  outputType: 'workflow_return_value_output',
+  inputs: {},
+  outputs: {
+    value: {
+      fieldKind: 'output',
+      name: 'value',
+      title: 'Return Value',
+      description: 'The named workflow return value.',
+      type: {
+        name: 'CollectionItemField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      ui_hidden: false,
+      ui_type: 'CollectionItemField',
+    },
+  },
+  useCache: false,
+  nodePack: 'invokeai',
+  classification: 'beta',
+};
+
+const workflowReturnTemplate: InvocationTemplate = {
+  title: 'Workflow Return',
+  type: 'workflow_return',
+  version: '1.0.0',
+  tags: ['workflow', 'return', 'output'],
+  category: 'workflow',
+  description: 'Defines the explicit named result returned by a callable workflow.',
+  outputType: 'workflow_return_output',
+  inputs: {
+    values: {
+      name: 'values',
+      title: 'Values',
+      required: false,
+      description: 'The named values returned to a calling workflow.',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      type: {
+        name: 'WorkflowReturnValueField',
+        cardinality: 'SINGLE_OR_COLLECTION',
+        batch: false,
+      },
+      default: undefined,
+    },
+  },
+  outputs: {},
+  useCache: false,
+  nodePack: 'invokeai',
+  classification: 'beta',
+};
+
 const buildConnectorNode = (id: string) => ({
   id,
   type: 'connector' as const,
@@ -215,6 +287,64 @@ describe(validateConnection.name, () => {
       const r = validateConnection(c, nodes, [], templates, null);
       expect(r).toEqual('nodes.missingFieldTemplate');
     });
+  });
+
+  it('accepts connections to dynamic saved workflow input fields', () => {
+    const addIntegerInputTemplate = add.inputs.a as IntegerFieldInputTemplate;
+    const state = nodesSliceConfig.getInitialState();
+    const sourceNode = buildNode(add);
+    const targetNode = buildNode(call_saved_workflow);
+    state.nodes.push(sourceNode, targetNode);
+
+    const nextState = nodesSliceConfig.slice.reducer(
+      state,
+      callSavedWorkflowDynamicFieldsChanged({
+        nodeId: targetNode.id,
+        fields: [
+          {
+            fieldName: 'saved_workflow_input::node-1::a',
+            fieldTemplate: {
+              ...addIntegerInputTemplate,
+              name: 'saved_workflow_input::node-1::a',
+              title: 'Left Addend',
+              input: 'any',
+            },
+            label: 'Left Addend',
+            description: 'The first number',
+            initialValue: 23,
+          },
+        ],
+        edgeIdsToRemove: [],
+      })
+    );
+
+    const c = {
+      source: sourceNode.id,
+      sourceHandle: 'value',
+      target: targetNode.id,
+      targetHandle: 'saved_workflow_input::node-1::a',
+    };
+    const r = validateConnection(c, nextState.nodes, [], templates, null);
+    expect(r).toEqual(null);
+  });
+
+  it('accepts a single workflow return value connected directly to workflow_return values', () => {
+    const sourceNode = buildNode(workflowReturnValueTemplate);
+    const targetNode = buildNode(workflowReturnTemplate);
+    const c = { source: sourceNode.id, sourceHandle: 'value', target: targetNode.id, targetHandle: 'values' };
+
+    const r = validateConnection(
+      c,
+      [sourceNode, targetNode],
+      [],
+      {
+        workflow_return_value: workflowReturnValueTemplate,
+        workflow_return: workflowReturnTemplate,
+      },
+      null
+    );
+
+    expect(r).toEqual(null);
   });
 
   describe('duplicate connections', () => {

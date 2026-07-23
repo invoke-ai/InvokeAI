@@ -36,7 +36,12 @@ import {
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
-import { type InvocationNode, type InvocationTemplate, isInvocationNode } from 'features/nodes/types/invocation';
+import {
+  getInvocationNodeInputTemplate,
+  type InvocationNode,
+  type InvocationTemplate,
+  isInvocationNode,
+} from 'features/nodes/types/invocation';
 import { t } from 'i18next';
 import { map } from 'nanostores';
 import { useEffect } from 'react';
@@ -272,7 +277,7 @@ export const getInvocationNodeErrors = (
   }
 
   for (const [fieldName, field] of Object.entries(node.data.inputs)) {
-    const fieldTemplate = nodeTemplate.inputs[fieldName];
+    const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
 
     if (!fieldTemplate) {
       errors.push({ type: 'node-error', nodeId, issue: t('parameters.invoke.missingFieldTemplate') });
@@ -307,7 +312,7 @@ const syncNodeErrors = (nodesState: NodesState, templates: Templates) => {
     }
 
     for (const [fieldName, field] of Object.entries(node.data.inputs)) {
-      const fieldTemplate = nodeTemplate.inputs[fieldName];
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
 
       if (!fieldTemplate) {
         errors.push({ type: 'node-error', nodeId: node.id, issue: t('parameters.invoke.missingFieldTemplate') });

@@ -1,6 +1,7 @@
 import type { ProgressProps } from '@invoke-ai/ui-library';
 import { Progress } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { getUserScopedQueueCounts } from 'features/queue/store/userScopedQueueCounts';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
@@ -12,6 +13,8 @@ const ProgressBar = (props: ProgressProps) => {
   const isConnected = useStore($isConnected);
   const lastProgressEvent = useStore($lastProgressEvent);
   const loadingModelsCount = useStore($loadingModelsCount);
+  // The progress bar reflects the user's own activity, not other users' generations.
+  const inProgressCount = queueStatus ? getUserScopedQueueCounts(queueStatus.queue).inProgress : undefined;
   const value = useMemo(() => {
     if (!lastProgressEvent) {
       return 0;
@@ -28,7 +31,7 @@ const ProgressBar = (props: ProgressProps) => {
       return true;
     }
 
-    if (!queueStatus?.queue.in_progress) {
+    if (!inProgressCount) {
       return false;
     }
 
@@ -45,7 +48,7 @@ const ProgressBar = (props: ProgressProps) => {
     }
 
     return false;
-  }, [isConnected, lastProgressEvent, queueStatus?.queue.in_progress, loadingModelsCount]);
+  }, [isConnected, lastProgressEvent, inProgressCount, loadingModelsCount]);
 
   return (
     <Progress

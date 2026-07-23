@@ -4,7 +4,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodeFieldElements, selectNodes } from 'features/nodes/store/selectors';
-import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import {
+  getInvocationNodeInputTemplate,
+  getInvocationNodeTemplateWithDynamicInputs,
+  type InvocationNode,
+  type InvocationTemplate,
+} from 'features/nodes/types/invocation';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo } from 'react';
@@ -81,8 +86,12 @@ export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWi
       })
     );
     const selectNodeTemplateSafe = getSelectorFromCache(cache, 'selectNodeTemplateSafe', () =>
-      createSelector(selectNodeTypeSafe, (type) => {
-        return type ? (templates[type] ?? null) : null;
+      createSelector(selectNodeDataSafe, (data) => {
+        if (!data) {
+          return null;
+        }
+        const template = templates[data.type];
+        return template ? getInvocationNodeTemplateWithDynamicInputs(data, template) : null;
       })
     );
     const selectNodeInputsSafe = getSelectorFromCache(cache, 'selectNodeInputsSafe', () =>
@@ -129,12 +138,12 @@ export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWi
       })
     );
     const selectNodeTemplateOrThrow = getSelectorFromCache(cache, 'selectNodeTemplateOrThrow', () =>
-      createSelector(selectNodeTypeOrThrow, (type) => {
-        const template = templates[type];
+      createSelector(selectNodeDataOrThrow, (data) => {
+        const template = templates[data.type];
         if (template === undefined) {
-          throw new Error(`Cannot find template for node with id ${nodeId} with type ${type}`);
+          throw new Error(`Cannot find template for node with id ${nodeId} with type ${data.type}`);
         }
-        return template;
+        return getInvocationNodeTemplateWithDynamicInputs(data, template);
       })
     );
     const selectNodeInputsOrThrow = getSelectorFromCache(cache, 'selectNodeInputsOrThrow', () =>
@@ -154,8 +163,8 @@ export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWi
       );
     const buildSelectInputFieldTemplateOrThrow = (fieldName: string) =>
       getSelectorFromCache(cache, `buildSelectInputFieldTemplateOrThrow-${fieldName}`, () =>
-        createSelector(selectNodeTemplateOrThrow, (template) => {
-          const fieldTemplate = template.inputs[fieldName];
+        createSelector(selectNodeDataOrThrow, selectNodeTemplateOrThrow, (data, template) => {
+          const fieldTemplate = getInvocationNodeInputTemplate(data, template, fieldName);
           if (fieldTemplate === undefined) {
             throw new Error(`Cannot find input field template with name ${fieldName} in node ${nodeId}`);
           }

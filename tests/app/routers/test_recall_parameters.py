@@ -89,6 +89,19 @@ def make_load_image_file_stub(
     return _load
 
 
+def test_recall_parameters_is_blocked_during_image_move_maintenance(
+    monkeypatch: Any, patched_dependencies: MockApiDependencies, mock_invoker: Invoker, client: TestClient
+) -> None:
+    mock_invoker.services.image_moves = MagicMock()
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = True
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", patched_dependencies)
+
+    response = client.post("/api/v1/recall/default", json={"positive_prompt": "hello"})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Image storage maintenance is active"
+
+
 class TestReferenceImagesRecall:
     def test_reference_images_forwarded_when_image_exists(
         self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
@@ -694,6 +707,72 @@ class TestStrictMode:
         assert "loras" not in params
         assert "reference_images" not in params
         assert "seed" not in params
+
+
+class TestAppendMode:
+    """Tests for the ``append`` query parameter.
+
+    ``append=true`` asks the frontend to add the recalled reference images to
+    its existing list instead of replacing it.  The flag travels inside the
+    event's ``parameters`` dict (so the generated client schema needs no
+    change) and must never be persisted as a recall parameter.
+    """
+
+    def test_append_flag_rides_in_parameters(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        monkeypatch.setattr(recall_module, "load_image_file", make_load_image_file_stub({"cat.png": (1024, 768)}))
+
+        response = client.post(
+            "/api/v1/recall/default?append=true",
+            json={"reference_images": [{"image_name": "cat.png"}]},
+        )
+        assert response.status_code == 200
+        params = response.json()["parameters"]
+        assert params["append"] is True
+        assert params["reference_images"][0]["image"]["image_name"] == "cat.png"
+
+    def test_append_flag_absent_by_default(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        monkeypatch.setattr(recall_module, "load_image_file", make_load_image_file_stub({"cat.png": (1024, 768)}))
+
+        response = client.post(
+            "/api/v1/recall/default",
+            json={"reference_images": [{"image_name": "cat.png"}]},
+        )
+        assert response.status_code == 200
+        assert "append" not in response.json()["parameters"]
+
+    def test_append_flag_not_persisted(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        """The flag is injected after the persistence loop — only real recall
+        parameters may be written to client state."""
+        monkeypatch.setattr(recall_module, "load_image_file", make_load_image_file_stub({"cat.png": (1024, 768)}))
+        persisted_keys: list[str] = []
+        monkeypatch.setattr(
+            mock_invoker.services.client_state_persistence,
+            "set_by_key",
+            lambda user_id, key, value: persisted_keys.append(key) or value,
+        )
+
+        response = client.post(
+            "/api/v1/recall/default?append=true",
+            json={"reference_images": [{"image_name": "cat.png"}]},
+        )
+        assert response.status_code == 200
+        assert persisted_keys == ["recall_reference_images"]
+
+    def test_append_and_strict_are_mutually_exclusive(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        response = client.post(
+            "/api/v1/recall/default?strict=true&append=true",
+            json={"reference_images": [{"image_name": "cat.png"}]},
+        )
+        assert response.status_code == 400
+        assert "mutually exclusive" in response.json()["detail"]
 
 
 @pytest.fixture

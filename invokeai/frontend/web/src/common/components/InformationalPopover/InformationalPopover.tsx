@@ -95,12 +95,14 @@ const Content = ({ data, feature, hideDisable }: ContentProps) => {
     [feature, t]
   );
 
+  const href = data?.href;
+
   const onClickLearnMore = useCallback(() => {
-    if (!data?.href) {
+    if (!href) {
       return;
     }
-    window.open(data.href);
-  }, [data?.href]);
+    window.open(href);
+  }, [href]);
 
   const onClickDontShowMeThese = useCallback(() => {
     dispatch(setShouldEnableInformationalPopovers(false));

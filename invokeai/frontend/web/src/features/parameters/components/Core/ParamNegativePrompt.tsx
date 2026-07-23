@@ -17,7 +17,7 @@ import {
   selectStylePresetActivePresetId,
   selectStylePresetViewMode,
 } from 'features/stylePresets/store/stylePresetSlice';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
@@ -65,8 +65,23 @@ export const ParamNegativePrompt = memo(() => {
     onPromptChange: (prompt) => dispatch(negativePromptChanged(prompt)),
   });
 
+  const [textareaWidth, setTextareaWidth] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (!element) {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setTextareaWidth(entry.contentBoxSize[0]?.inlineSize);
+      }
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
+    <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaWidth}>
       <Box pos="relative" w="full" pb={`${PROMPT_RESIZE_HANDLE_HEIGHT_PX}px`}>
         <Textarea
           className="negative-prompt-textarea"

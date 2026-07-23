@@ -52,6 +52,11 @@ def sample_session_queue_item() -> SessionQueueItem:
         ],
         session=session,
         workflow=None,
+        workflow_call_id="workflow-call-1",
+        parent_item_id=99,
+        parent_session_id="parent-session-1",
+        root_item_id=1,
+        workflow_call_depth=2,
         created_at=now,
         updated_at=now,
         started_at=None,
@@ -137,6 +142,20 @@ def test_sanitize_preserves_non_sensitive_fields(sample_session_queue_item):
     assert result.user_id == "redacted"
     assert result.user_display_name is None
     assert result.user_email is None
+
+
+def test_sanitize_redacts_workflow_call_metadata_for_different_user(sample_session_queue_item):
+    result = sanitize_queue_item_for_user(
+        queue_item=sample_session_queue_item,
+        current_user_id="different_user",
+        is_admin=False,
+    )
+
+    assert result.workflow_call_id is None
+    assert result.parent_item_id is None
+    assert result.parent_session_id is None
+    assert result.root_item_id is None
+    assert result.workflow_call_depth is None
 
 
 def test_sanitize_system_user_item_for_non_admin(sample_session_queue_item):

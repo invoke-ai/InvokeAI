@@ -34,7 +34,7 @@ export const useSaveLibraryWorkflow = (): UseSaveLibraryWorkflowReturn => {
   const getFormFieldInitialValues = useGetFormFieldInitialValues();
   const [updateWorkflow, { isLoading, isError }] = useUpdateWorkflowMutation();
   const toast = useToast();
-  const toastRef = useRef<ToastId | undefined>();
+  const toastRef = useRef<ToastId | null>(null);
 
   const saveWorkflow = useCallback(
     async (workflow: LibraryWorkflow) => {

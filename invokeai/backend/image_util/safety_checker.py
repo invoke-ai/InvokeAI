@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from PIL import Image, ImageFilter
-from transformers import AutoFeatureExtractor
+from transformers import AutoImageProcessor
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
@@ -36,14 +36,14 @@ class SafetyChecker:
         try:
             model_path = get_config().models_path / CHECKER_PATH
             if model_path.exists():
-                cls.feature_extractor = AutoFeatureExtractor.from_pretrained(model_path)
+                cls.feature_extractor = AutoImageProcessor.from_pretrained(model_path)
                 cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(model_path)
             else:
                 model_path.mkdir(parents=True, exist_ok=True)
-                cls.feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-                cls.feature_extractor.save_pretrained(model_path, safe_serialization=True)
+                cls.feature_extractor = AutoImageProcessor.from_pretrained(repo_id)
+                cls.feature_extractor.save_pretrained(model_path)
                 cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(repo_id)
-                cls.safety_checker.save_pretrained(model_path, safe_serialization=True)
+                cls.safety_checker.save_pretrained(model_path)
         except Exception as e:
             logger.warning(f"Could not load NSFW checker: {str(e)}")
 

@@ -55,7 +55,7 @@ const NodeFieldElementEditModeContent = memo(
     isDragging,
   }: {
     el: NodeFieldElement;
-    dragHandleRef: RefObject<HTMLDivElement>;
+    dragHandleRef: RefObject<HTMLDivElement | null>;
     isDragging: boolean;
   }) => {
     const { id, data } = el;

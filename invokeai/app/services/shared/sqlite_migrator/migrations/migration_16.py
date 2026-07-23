@@ -23,6 +23,8 @@ def build_migration_16() -> Migration:
         - Adds `retried_from_item_id` column to the session queue table.
     """
     migration_16 = Migration(
+        id="migration_16",
+        depends_on="migration_15",
         from_version=15,
         to_version=16,
         callback=Migration16Callback(),

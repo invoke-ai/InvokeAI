@@ -1,5 +1,5 @@
 import { omit, pick } from 'es-toolkit/compat';
-import { schema, templates } from 'features/nodes/store/util/testUtils';
+import { call_saved_workflow, schema, templates, workflow_return } from 'features/nodes/store/util/testUtils';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { describe, expect, it } from 'vitest';
 
@@ -17,5 +17,33 @@ describe('parseSchema', () => {
   it('should include only allowed nodes', () => {
     const parsed = parseSchema(schema, ['add']);
     expect(stripUndefinedDeep(parsed)).toEqual(stripUndefinedDeep(pick(templates, 'add')));
+  });
+  it('should parse the call_saved_workflow node template', () => {
+    const parsed = parseSchema(schema);
+    expect(stripUndefinedDeep(parsed.call_saved_workflow)).toEqual(stripUndefinedDeep(call_saved_workflow));
+    const template = parsed.call_saved_workflow;
+    if (!template) {
+      throw new Error('Expected call_saved_workflow template');
+    }
+    const workflowIdInput = template.inputs.workflow_id;
+    if (!workflowIdInput) {
+      throw new Error('Expected workflow_id input');
+    }
+    expect(workflowIdInput.type.name).toBe('SavedWorkflowField');
+    expect(workflowIdInput.ui_type).toBe('SavedWorkflowField');
+  });
+  it('should parse the workflow_return node template', () => {
+    const parsed = parseSchema(schema);
+    expect(stripUndefinedDeep(parsed.workflow_return)).toEqual(stripUndefinedDeep(workflow_return));
+    const template = parsed.workflow_return;
+    if (!template) {
+      throw new Error('Expected workflow_return template');
+    }
+    const collectionInput = template.inputs.collection;
+    if (!collectionInput) {
+      throw new Error('Expected collection input');
+    }
+    expect(collectionInput.type.name).toBe('CollectionField');
+    expect(collectionInput.ui_type).toBe('CollectionField');
   });
 });

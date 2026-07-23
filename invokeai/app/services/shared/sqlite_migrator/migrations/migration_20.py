@@ -31,6 +31,8 @@ class Migration20Callback:
 
 def build_migration_20() -> Migration:
     return Migration(
+        id="migration_20",
+        depends_on="migration_19",
         from_version=19,
         to_version=20,
         callback=Migration20Callback(),

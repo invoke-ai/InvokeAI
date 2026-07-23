@@ -12,7 +12,7 @@ type UseSubMenuReturn = {
   parentMenuItemProps: Partial<MenuItemProps>;
   menuProps: Partial<MenuProps>;
   menuButtonProps: Partial<MenuButtonProps>;
-  menuListProps: Partial<MenuListProps> & { ref: RefObject<HTMLDivElement> };
+  menuListProps: Partial<MenuListProps> & { ref: RefObject<HTMLDivElement | null> };
 };
 
 /**

@@ -33,7 +33,7 @@ export class CanvasObjectOval extends CanvasModuleBase {
     this.log.debug({ state }, 'Creating module');
 
     this.konva = {
-      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
+      group: new Konva.Group({ name: `${this.type}:group`, clip: state.clip, listening: false }),
       ellipse: new Konva.Ellipse({
         name: `${this.type}:ellipse`,
         listening: false,
@@ -51,6 +51,7 @@ export class CanvasObjectOval extends CanvasModuleBase {
       this.log.trace({ state }, 'Updating oval');
       const { rect, color, compositeOperation } = state;
       const fill = compositeOperation === 'destination-out' ? 'rgba(255,255,255,1)' : rgbaColorToString(color);
+      this.konva.group.setAttrs({ clip: state.clip });
       this.konva.ellipse.setAttrs({
         x: rect.x + rect.width / 2,
         y: rect.y + rect.height / 2,

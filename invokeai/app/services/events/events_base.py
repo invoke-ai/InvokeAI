@@ -29,9 +29,13 @@ from invokeai.app.services.events.events_common import (
     ModelLoadCompleteEvent,
     ModelLoadStartedEvent,
     QueueClearedEvent,
+    QueueItemsCanceledEvent,
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
+    WorkflowCreatedEvent,
+    WorkflowDeletedEvent,
+    WorkflowUpdatedEvent,
 )
 
 if TYPE_CHECKING:
@@ -104,17 +108,46 @@ class EventServiceBase:
         """Emitted when a batch is enqueued"""
         self.dispatch(BatchEnqueuedEvent.build(enqueue_result, user_id))
 
-    def emit_queue_items_retried(self, retry_result: "RetryItemsResult") -> None:
+    def emit_queue_items_retried(
+        self, retry_result: "RetryItemsResult", user_ids: list[str], retried_item_ids_by_user: dict[str, list[int]]
+    ) -> None:
         """Emitted when a list of queue items are retried"""
-        self.dispatch(QueueItemsRetriedEvent.build(retry_result))
+        self.dispatch(QueueItemsRetriedEvent.build(retry_result, user_ids, retried_item_ids_by_user))
 
-    def emit_queue_cleared(self, queue_id: str) -> None:
-        """Emitted when a queue is cleared"""
-        self.dispatch(QueueClearedEvent.build(queue_id))
+    def emit_queue_items_canceled(self, queue_id: str, canceled_item_ids_by_user: dict[str, list[int]]) -> None:
+        """Emitted when queue items are canceled or deleted in bulk without per-item status change events"""
+        self.dispatch(QueueItemsCanceledEvent.build(queue_id, canceled_item_ids_by_user))
+
+    def emit_queue_cleared(self, queue_id: str, user_id: str | None = None) -> None:
+        """Emitted when a queue is cleared. `user_id` scopes the clear to one user's items; None means all."""
+        self.dispatch(QueueClearedEvent.build(queue_id, user_id))
 
     def emit_recall_parameters_updated(self, queue_id: str, user_id: str, parameters: dict) -> None:
         """Emitted when recall parameters are updated"""
         self.dispatch(RecallParametersUpdatedEvent.build(queue_id, user_id, parameters))
+
+    # endregion
+
+    # region Workflow library
+
+    def emit_workflow_created(self, workflow_id: str, user_id: str, is_public: bool) -> None:
+        """Emitted when a workflow is created."""
+        self.dispatch(WorkflowCreatedEvent.build(workflow_id=workflow_id, user_id=user_id, is_public=is_public))
+
+    def emit_workflow_updated(self, workflow_id: str, user_id: str, old_is_public: bool, new_is_public: bool) -> None:
+        """Emitted when a workflow is updated."""
+        self.dispatch(
+            WorkflowUpdatedEvent.build(
+                workflow_id=workflow_id,
+                user_id=user_id,
+                old_is_public=old_is_public,
+                new_is_public=new_is_public,
+            )
+        )
+
+    def emit_workflow_deleted(self, workflow_id: str, user_id: str, is_public: bool) -> None:
+        """Emitted when a workflow is deleted."""
+        self.dispatch(WorkflowDeletedEvent.build(workflow_id=workflow_id, user_id=user_id, is_public=is_public))
 
     # endregion
 
@@ -148,15 +181,17 @@ class EventServiceBase:
 
     # region Model loading
 
-    def emit_model_load_started(self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None) -> None:
+    def emit_model_load_started(
+        self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None, user_id: str = "system"
+    ) -> None:
         """Emitted when a model load is started."""
-        self.dispatch(ModelLoadStartedEvent.build(config, submodel_type))
+        self.dispatch(ModelLoadStartedEvent.build(config, submodel_type, user_id))
 
     def emit_model_load_complete(
-        self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None
+        self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None, user_id: str = "system"
     ) -> None:
         """Emitted when a model load is complete."""
-        self.dispatch(ModelLoadCompleteEvent.build(config, submodel_type))
+        self.dispatch(ModelLoadCompleteEvent.build(config, submodel_type, user_id))
 
     # endregion
 

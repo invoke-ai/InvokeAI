@@ -140,7 +140,6 @@ def test_sd3_t5_encode_uses_effective_device(monkeypatch):
 
     monkeypatch.setattr(f"{module_path}.T5EncoderModel", FakeSd3T5Encoder)
     monkeypatch.setattr(f"{module_path}.T5Tokenizer", FakeT5Tokenizer)
-    monkeypatch.setattr(f"{module_path}.T5TokenizerFast", FakeT5Tokenizer)
 
     invocation = Sd3TextEncoderInvocation.model_construct(
         clip_l=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace(), loras=[]),

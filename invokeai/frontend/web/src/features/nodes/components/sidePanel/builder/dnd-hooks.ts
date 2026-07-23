@@ -383,8 +383,8 @@ export const useBuilderDndMonitor = () => {
  */
 export const useFormElementDnd = (
   elementId: ElementId,
-  draggableRef: RefObject<HTMLElement>,
-  dragHandleRef: RefObject<HTMLElement>
+  draggableRef: RefObject<HTMLElement | null>,
+  dragHandleRef: RefObject<HTMLElement | null>
 ) => {
   const isRootElement = useIsRootElement(elementId);
   const [isDragging, setIsDragging] = useState(false);
@@ -486,7 +486,7 @@ export const useFormElementDnd = (
   return [activeDropRegion, isDragging] as const;
 };
 
-export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement>) => {
+export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement | null>) => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const getElement = useGetElement();
   const getAllowedDropRegions = useGetAllowedDropRegions();
@@ -555,8 +555,8 @@ export const useNodeFieldDnd = (
   nodeId: string,
   fieldName: string,
   fieldTemplate: FieldInputTemplate,
-  draggableRef: RefObject<HTMLElement>,
-  dragHandleRef: RefObject<HTMLElement>
+  draggableRef: RefObject<HTMLElement | null>,
+  dragHandleRef: RefObject<HTMLElement | null>
 ) => {
   const [isDragging, setIsDragging] = useState(false);
 

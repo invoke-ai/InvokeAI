@@ -1,3 +1,4 @@
+import { getUserScopedQueueCounts } from 'features/queue/store/userScopedQueueCounts';
 import queryString from 'query-string';
 import type { components, paths } from 'services/api/schema';
 import type {
@@ -6,6 +7,7 @@ import type {
   GetQueueItemIdsArgs,
   GetQueueItemIdsResult,
 } from 'services/api/types';
+import { getQueueStatusWithObservedEvents } from 'services/events/queueStatusEvents';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 
@@ -152,6 +154,9 @@ export const queueApi = api.injectEndpoints({
         url: buildQueueUrl('status'),
         method: 'GET',
       }),
+      transformResponse: (
+        response: paths['/api/v1/queue/{queue_id}/status']['get']['responses']['200']['content']['application/json']
+      ) => getQueueStatusWithObservedEvents(response),
       providesTags: ['SessionQueueStatus', 'FetchOnReconnect'],
     }),
     getBatchStatus: build.query<
@@ -429,5 +434,8 @@ export const enqueueMutationFixedCacheKeyOptions = {
 
 export const useIsGenerationInProgress = () => {
   const { data } = useGetQueueStatusQuery();
-  return data && data.queue.in_progress > 0;
+  // In multiuser mode the global in_progress count includes other users' generations; this hook
+  // drives personal UI (the progress workspace tabs), so it must react only to the current
+  // user's own activity.
+  return data !== undefined && getUserScopedQueueCounts(data.queue).inProgress > 0;
 };

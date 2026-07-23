@@ -1,5 +1,7 @@
 import type { DockviewApi, GridviewApi } from 'dockview';
 import { DockviewApi as MockedDockviewApi, DockviewPanel, GridviewPanel } from 'dockview';
+import type { Serializable, TabName } from 'features/ui/store/uiTypes';
+import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NavigationAppApi } from './navigation-api';
@@ -90,11 +92,11 @@ const createMockDockPanel = () => {
 
 describe('AppNavigationApi', () => {
   let navigationApi: NavigationApi;
-  let mockSetAppTab: ReturnType<typeof vi.fn>;
-  let mockGetAppTab: ReturnType<typeof vi.fn>;
-  let mockSetStorage: ReturnType<typeof vi.fn>;
-  let mockGetStorage: ReturnType<typeof vi.fn>;
-  let mockDeleteStorage: ReturnType<typeof vi.fn>;
+  let mockSetAppTab: Mock<(tab: TabName) => void>;
+  let mockGetAppTab: Mock<() => TabName>;
+  let mockSetStorage: Mock<(id: string, state: Serializable) => void>;
+  let mockGetStorage: Mock<(id: string) => Serializable | undefined>;
+  let mockDeleteStorage: Mock<(id: string) => void>;
   let mockAppApi: NavigationAppApi;
 
   beforeEach(() => {
@@ -417,16 +419,26 @@ describe('AppNavigationApi', () => {
     });
 
     it('should handle custom timeout', async () => {
-      const start = Date.now();
-      const waitPromise = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID, 200);
+      vi.useFakeTimers();
 
-      await expect(waitPromise).rejects.toThrow(/Panel .* registration timed out after 200ms/);
+      try {
+        const waitPromise = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID, 200);
+        let isSettled = false;
+        void waitPromise.catch(() => {
+          isSettled = true;
+        });
 
-      const elapsed = Date.now() - start;
-      // TODO(psyche): Use vitest's fake timeres
-      // Allow some margin for timer resolution
-      expect(elapsed).toBeGreaterThanOrEqual(190);
-      expect(elapsed).toBeLessThan(210);
+        const assertion = expect(waitPromise).rejects.toThrow(/Panel .* registration timed out after 200ms/);
+
+        await vi.advanceTimersByTimeAsync(199);
+        expect(isSettled).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await assertion;
+      } finally {
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -546,16 +558,16 @@ describe('AppNavigationApi', () => {
       expect(mockPanel.api.setActive).toHaveBeenCalledOnce();
     });
 
-    it('should return false when no active tab', async () => {
-      mockGetAppTab.mockReturnValue(null);
+    it('should return false without app connection', async () => {
+      navigationApi.disconnectFromApp();
 
       const result = await navigationApi.focusPanelInActiveTab(SETTINGS_PANEL_ID);
 
       expect(result).toBe(false);
     });
 
-    it('should work without app connection', async () => {
-      navigationApi.disconnectFromApp();
+    it('should return false when no active tab', async () => {
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = await navigationApi.focusPanelInActiveTab(SETTINGS_PANEL_ID);
 
@@ -648,8 +660,16 @@ describe('AppNavigationApi', () => {
       expect(mockPanel.api.setSize).toHaveBeenCalledWith({ width: 0 });
     });
 
+    it('should return false without app connection', () => {
+      navigationApi.disconnectFromApp();
+
+      const result = navigationApi.toggleLeftPanel();
+
+      expect(result).toBe(false);
+    });
+
     it('should return false when no active tab', () => {
-      mockGetAppTab.mockReturnValue(null);
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = navigationApi.toggleLeftPanel();
 
@@ -710,8 +730,16 @@ describe('AppNavigationApi', () => {
       expect(mockPanel.api.setSize).toHaveBeenCalledWith({ width: 0 });
     });
 
+    it('should return false without app connection', () => {
+      navigationApi.disconnectFromApp();
+
+      const result = navigationApi.toggleRightPanel();
+
+      expect(result).toBe(false);
+    });
+
     it('should return false when no active tab', () => {
-      mockGetAppTab.mockReturnValue(null);
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = navigationApi.toggleRightPanel();
 
@@ -834,8 +862,16 @@ describe('AppNavigationApi', () => {
       });
     });
 
+    it('should return false without app connection', () => {
+      navigationApi.disconnectFromApp();
+
+      const result = navigationApi.toggleLeftAndRightPanels();
+
+      expect(result).toBe(false);
+    });
+
     it('should return false when no active tab', () => {
-      mockGetAppTab.mockReturnValue(null);
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = navigationApi.toggleLeftAndRightPanels();
 
@@ -895,8 +931,16 @@ describe('AppNavigationApi', () => {
       expect(rightPanel.api.setSize).toHaveBeenCalledWith({ width: RIGHT_PANEL_MIN_SIZE_PX });
     });
 
+    it('should return false without app connection', () => {
+      navigationApi.disconnectFromApp();
+
+      const result = navigationApi.resetLeftAndRightPanels();
+
+      expect(result).toBe(false);
+    });
+
     it('should return false when no active tab', () => {
-      mockGetAppTab.mockReturnValue(null);
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = navigationApi.resetLeftAndRightPanels();
 
@@ -1197,8 +1241,16 @@ describe('AppNavigationApi', () => {
       expect(mockViewerPanel.api.setActive).not.toHaveBeenCalled();
     });
 
+    it('should return false without app connection', async () => {
+      navigationApi.disconnectFromApp();
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(false);
+    });
+
     it('should return false when no active tab', async () => {
-      mockGetAppTab.mockReturnValue(null);
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = await navigationApi.toggleViewerPanel();
 

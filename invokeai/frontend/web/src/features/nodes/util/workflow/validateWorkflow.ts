@@ -1,5 +1,7 @@
 import { parseify } from 'common/util/serialize';
+import { getSavedWorkflowDynamicFields } from 'features/nodes/components/flow/nodes/Invocation/callSavedWorkflowFormUtils';
 import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
+import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from 'features/nodes/store/nodesSlice';
 import type { Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import {
@@ -9,6 +11,7 @@ import {
   isModelFieldType,
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
+import { getInvocationNodeInputTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import {
   buildNodeFieldElement,
@@ -16,7 +19,13 @@ import {
   isNodeFieldElement,
   isWorkflowInvocationNode,
 } from 'features/nodes/types/workflow';
-import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
+import {
+  getConnectedInputNames,
+  getNeedsUpdate,
+  getUpdatedFieldName,
+  updateNode,
+} from 'features/nodes/util/node/nodeUpdate';
+import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { t } from 'i18next';
 import type { JsonObject } from 'type-fest';
 
@@ -34,11 +43,86 @@ type ValidateWorkflowArgs = {
   checkImageAccess: (name: string) => Promise<boolean>;
   checkBoardAccess: (id: string) => Promise<boolean>;
   checkModelAccess: (key: string) => Promise<boolean>;
+  getWorkflow?: (workflowId: string) => Promise<NonNullable<Parameters<typeof getSavedWorkflowDynamicFields>[0]>>;
 };
 
 type ValidateWorkflowResult = {
   workflow: WorkflowV3;
   warnings: WorkflowWarning[];
+};
+
+const refreshCallSavedWorkflowDynamicInputs = async ({
+  workflow,
+  templates,
+  getWorkflow,
+  warnings,
+}: {
+  workflow: WorkflowV3;
+  templates: Templates;
+  getWorkflow: ValidateWorkflowArgs['getWorkflow'];
+  warnings: WorkflowWarning[];
+}) => {
+  if (!getWorkflow) {
+    return;
+  }
+
+  for (const node of workflow.nodes) {
+    if (!isWorkflowInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
+      continue;
+    }
+
+    const workflowId = node.data.inputs.workflow_id?.value;
+    if (typeof workflowId !== 'string' || !workflowId) {
+      continue;
+    }
+
+    try {
+      const savedWorkflow = await getWorkflow(workflowId);
+      const fields = getSavedWorkflowDynamicFields(savedWorkflow, templates);
+      const nextFieldNames = new Set(fields.map((field) => field.fieldName));
+
+      for (const fieldName of Object.keys(node.data.inputs)) {
+        if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX) && !nextFieldNames.has(fieldName)) {
+          delete node.data.inputs[fieldName];
+          delete node.data.dynamicInputTemplates[fieldName];
+        }
+      }
+
+      for (const { fieldName, fieldTemplate, label, description, initialValue } of fields) {
+        const existingTemplate = node.data.dynamicInputTemplates[fieldName];
+        node.data.dynamicInputTemplates[fieldName] = fieldTemplate;
+        const existing = node.data.inputs[fieldName];
+        if (existing) {
+          if (
+            existingTemplate?.type.name !== fieldTemplate.type.name ||
+            existingTemplate?.type.cardinality !== fieldTemplate.type.cardinality ||
+            existingTemplate?.type.batch !== fieldTemplate.type.batch
+          ) {
+            const instance = buildFieldInputInstance(fieldName, fieldTemplate);
+            instance.label = label;
+            instance.description = description;
+            instance.value = initialValue;
+            node.data.inputs[fieldName] = instance;
+            continue;
+          }
+          existing.label = label;
+          existing.description = description;
+          continue;
+        }
+
+        const instance = buildFieldInputInstance(fieldName, fieldTemplate);
+        instance.label = label;
+        instance.description = description;
+        instance.value = initialValue;
+        node.data.inputs[fieldName] = instance;
+      }
+    } catch {
+      warnings.push({
+        message: t('toast.problemRetrievingWorkflow'),
+        data: { workflowId },
+      });
+    }
+  }
 };
 
 /**
@@ -51,106 +135,16 @@ type ValidateWorkflowResult = {
  * @throws {z.ZodError} If there is a validation error.
  */
 export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<ValidateWorkflowResult> => {
-  const { workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess } = args;
+  const { workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess, getWorkflow } = args;
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
 
   // Now we can validate the graph
   const { nodes, edges } = _workflow;
   const warnings: WorkflowWarning[] = [];
+  const validEdges: WorkflowV3['edges'] = [];
 
-  for (const node of nodes) {
-    if (!isWorkflowInvocationNode(node)) {
-      // We don't need to validate Note nodes or CurrentImage nodes - only Invocation nodes
-      continue;
-    }
-    const template = templates[node.data.type];
-    if (!template) {
-      // This node's type template does not exist
-      const message = t('nodes.missingTemplate', {
-        node: node.id,
-        type: node.data.type,
-      });
-      warnings.push({
-        message,
-        data: parseify(node),
-      });
-      continue;
-    }
-
-    // This node needs to be updated, based on comparison of its version to the template version
-    if (getNeedsUpdate(node.data, template)) {
-      try {
-        const updatedNode = updateNode(node, template);
-        node.data = updatedNode.data;
-      } catch {
-        const message = t('nodes.unableToUpdateNode', {
-          node: node.id,
-          type: node.data.type,
-        });
-        warnings.push({
-          message,
-          data: parseify({ node, nodeTemplate: template }),
-        });
-        continue;
-      }
-    }
-
-    for (const input of Object.values(node.data.inputs)) {
-      const fieldTemplate = template.inputs[input.name];
-
-      if (!fieldTemplate) {
-        const message = t('nodes.missingFieldTemplate');
-        warnings.push({
-          message,
-          data: parseify({ node, nodeTemplate: template, input }),
-        });
-        continue;
-      }
-
-      // We need to confirm that all images, boards and models are accessible before loading,
-      // else the workflow could end up with stale data an an error state.
-      if (fieldTemplate.type.name === 'ImageField' && input.value && isImageFieldInputInstance(input)) {
-        const hasAccess = await checkImageAccess(input.value.image_name);
-        if (!hasAccess) {
-          const message = t('nodes.imageAccessError', { image_name: input.value.image_name });
-          warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
-          input.value = undefined;
-        }
-      }
-      if (fieldTemplate.type.name === 'ImageField' && input.value && isImageFieldCollectionInputInstance(input)) {
-        for (const { image_name } of [...input.value]) {
-          const hasAccess = await checkImageAccess(image_name);
-          if (!hasAccess) {
-            const message = t('nodes.imageAccessError', { image_name });
-            warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
-            input.value = input.value.filter((image) => image.image_name !== image_name);
-          }
-        }
-      }
-      if (fieldTemplate.type.name === 'BoardField' && input.value && isBoardFieldInputInstance(input)) {
-        if (input.value === 'none' || input.value === 'auto') {
-          continue;
-        }
-        const hasAccess = await checkBoardAccess(input.value.board_id);
-        if (!hasAccess) {
-          const message = t('nodes.boardAccessError', { board_id: input.value.board_id });
-          warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
-          input.value = undefined;
-        }
-      }
-      if (isModelFieldType(fieldTemplate.type) && input.value && isModelIdentifierFieldInputInstance(input)) {
-        const hasAccess = await checkModelAccess(input.value.key);
-        if (!hasAccess) {
-          const message = t('nodes.modelAccessError', { key: input.value.key });
-          warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
-          input.value = undefined;
-        }
-      }
-    }
-  }
-
-  const validEdges = [];
+  await refreshCallSavedWorkflowDynamicInputs({ workflow: _workflow, templates, getWorkflow, warnings });
 
   for (const edge of edges) {
     // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
@@ -208,7 +202,13 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       );
     }
 
-    if (targetNode && targetTemplate && edge.type === 'default' && !(edge.targetHandle in targetTemplate.inputs)) {
+    if (
+      targetNode &&
+      isWorkflowInvocationNode(targetNode) &&
+      targetTemplate &&
+      edge.type === 'default' &&
+      !getInvocationNodeInputTemplate(targetNode.data, targetTemplate, edge.targetHandle)
+    ) {
       // The edge's target/input node field does not exist
       issues.push(
         t('nodes.targetNodeFieldDoesNotExist', {
@@ -227,7 +227,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
 
     if (issues.length) {
       const source = edge.type === 'default' ? `${edge.source}.${edge.sourceHandle}` : edge.source;
-      const target = edge.type === 'default' ? `${edge.source}.${edge.targetHandle}` : edge.target;
+      const target = edge.type === 'default' ? `${edge.target}.${edge.targetHandle}` : edge.target;
       warnings.push({
         message: t('nodes.deletedInvalidEdge', { source, target }),
         issues,
@@ -238,8 +238,119 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
     }
   }
 
-  // Remove invalid edges
+  // Remove invalid edges before node updates so migrations only trust surviving connections.
   _workflow.edges = validEdges;
+
+  for (const node of nodes) {
+    if (!isWorkflowInvocationNode(node)) {
+      // We don't need to validate Note nodes or CurrentImage nodes - only Invocation nodes
+      continue;
+    }
+    const template = templates[node.data.type];
+    if (!template) {
+      // This node's type template does not exist
+      const message = t('nodes.missingTemplate', {
+        node: node.id,
+        type: node.data.type,
+      });
+      warnings.push({
+        message,
+        data: parseify(node),
+      });
+      continue;
+    }
+
+    // This node needs to be updated, based on comparison of its version to the template version
+    if (getNeedsUpdate(node.data, template)) {
+      try {
+        const connectedInputNames = getConnectedInputNames(node.id, validEdges);
+        const updatedNode = updateNode(node, template, { connectedInputNames });
+        node.data = updatedNode.data;
+      } catch {
+        const message = t('nodes.unableToUpdateNode', {
+          node: node.id,
+          type: node.data.type,
+        });
+        warnings.push({
+          message,
+          data: parseify({ node, nodeTemplate: template }),
+        });
+        continue;
+      }
+    }
+
+    for (const input of Object.values(node.data.inputs)) {
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, template, input.name);
+
+      if (!fieldTemplate) {
+        const message = t('nodes.missingFieldTemplate');
+        warnings.push({
+          message,
+          data: parseify({ node, nodeTemplate: template, input }),
+        });
+        continue;
+      }
+
+      // We need to confirm that all images, boards and models are accessible before loading,
+      // else the workflow could end up with stale data an an error state.
+      if (fieldTemplate.type.name === 'ImageField' && input.value && isImageFieldInputInstance(input)) {
+        const hasAccess = await checkImageAccess(input.value.image_name);
+        if (!hasAccess) {
+          const message = t('nodes.imageAccessError', { image_name: input.value.image_name });
+          warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
+          input.value = undefined;
+        }
+      }
+      if (fieldTemplate.type.name === 'ImageField' && input.value && isImageFieldCollectionInputInstance(input)) {
+        for (const { image_name } of [...input.value]) {
+          const hasAccess = await checkImageAccess(image_name);
+          if (!hasAccess) {
+            const message = t('nodes.imageAccessError', { image_name });
+            warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
+            input.value = input.value.filter((image) => image.image_name !== image_name);
+          }
+        }
+      }
+      if (fieldTemplate.type.name === 'BoardField' && input.value && isBoardFieldInputInstance(input)) {
+        if (input.value === 'none' || input.value === 'auto') {
+          continue;
+        }
+        const hasAccess = await checkBoardAccess(input.value.board_id);
+        if (!hasAccess) {
+          const message = t('nodes.boardAccessError', { board_id: input.value.board_id });
+          warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
+          input.value = undefined;
+        }
+      }
+      if (isModelFieldType(fieldTemplate.type) && input.value && isModelIdentifierFieldInputInstance(input)) {
+        const hasAccess = await checkModelAccess(input.value.key);
+        if (!hasAccess) {
+          const message = t('nodes.modelAccessError', { key: input.value.key });
+          warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
+          input.value = undefined;
+        }
+      }
+    }
+  }
+
+  _workflow.exposedFields = _workflow.exposedFields.map((fieldIdentifier) => {
+    const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === fieldIdentifier.nodeId);
+    if (!node) {
+      return fieldIdentifier;
+    }
+    return { ...fieldIdentifier, fieldName: getUpdatedFieldName(node, fieldIdentifier.fieldName) };
+  });
+
+  for (const element of Object.values(_workflow.form.elements)) {
+    if (!isNodeFieldElement(element)) {
+      continue;
+    }
+    const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === element.data.fieldIdentifier.nodeId);
+    if (!node) {
+      continue;
+    }
+    element.data.fieldIdentifier.fieldName = getUpdatedFieldName(node, element.data.fieldIdentifier.fieldName);
+  }
 
   // Migrated exposed fields to form elements if they exist and the form does not
   // Note: If the form is invalid per its zod schema, it will be reset to a default, empty form!
@@ -251,14 +362,14 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
 
     for (const { nodeId, fieldName } of reverseExposedFields) {
       const node = nodes.find(({ id }) => id === nodeId);
-      if (!node) {
+      if (!node || !isWorkflowInvocationNode(node)) {
         continue;
       }
       const nodeTemplate = templates[node.data.type];
       if (!nodeTemplate) {
         continue;
       }
-      const fieldTemplate = nodeTemplate.inputs[fieldName];
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
       if (!fieldTemplate) {
         continue;
       }

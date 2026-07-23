@@ -6,26 +6,27 @@ import { $lastProgressMessage } from 'services/events/stores';
 export const useDeferredModelLoadingInvocationProgressMessage = () => {
   const { t } = useTranslation();
   const invocationProgressMessage = useStore($lastProgressMessage);
-  const [delayedMessage, setDelayedMessage] = useState<string | null>(null);
+  const [didDelayLoadingModelProgressMessage, setDidDelayLoadingModelProgressMessage] = useState(false);
+  const isLoadingModelProgressMessage = invocationProgressMessage?.startsWith('Loading model') ?? false;
 
   useEffect(() => {
-    if (!invocationProgressMessage) {
-      setDelayedMessage(null);
+    if (!isLoadingModelProgressMessage) {
       return;
     }
 
-    if (invocationProgressMessage && !invocationProgressMessage.startsWith('Loading model')) {
-      setDelayedMessage(null);
-      return;
-    }
-
-    // Set a timeout to update delayedMessage after 5 seconds
     const timer = setTimeout(() => {
-      setDelayedMessage(`${t('common.loadingModel')}...`);
+      setDidDelayLoadingModelProgressMessage(true);
     }, 5000);
 
-    return () => clearTimeout(timer); // Cleanup on effect re-run
-  }, [invocationProgressMessage, t]);
+    return () => {
+      clearTimeout(timer);
+      setDidDelayLoadingModelProgressMessage(false);
+    };
+  }, [isLoadingModelProgressMessage]);
 
-  return delayedMessage;
+  if (!isLoadingModelProgressMessage || !didDelayLoadingModelProgressMessage) {
+    return null;
+  }
+
+  return `${t('common.loadingModel')}...`;
 };

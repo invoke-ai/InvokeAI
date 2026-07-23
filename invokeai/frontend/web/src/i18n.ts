@@ -1,3 +1,4 @@
+import { getDeploymentBaseUrl } from 'common/util/baseUrl';
 import i18n from 'i18next';
 import Backend from 'i18next-http-backend';
 import { initReactI18next } from 'react-i18next';
@@ -32,7 +33,7 @@ if (import.meta.env.MODE === 'package') {
       fallbackLng: 'en',
       debug: false,
       backend: {
-        loadPath: `${window.location.origin}/locales/{{lng}}.json`,
+        loadPath: `${getDeploymentBaseUrl()}/locales/{{lng}}.json`,
       },
       interpolation: {
         escapeValue: false,

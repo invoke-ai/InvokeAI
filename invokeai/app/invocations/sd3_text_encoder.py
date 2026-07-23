@@ -8,7 +8,6 @@ from transformers import (
     CLIPTokenizer,
     T5EncoderModel,
     T5Tokenizer,
-    T5TokenizerFast,
 )
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
@@ -103,7 +102,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         ):
             context.util.signal_progress("Running T5 encoder")
             assert isinstance(t5_text_encoder, T5EncoderModel)
-            assert isinstance(t5_tokenizer, (T5Tokenizer, T5TokenizerFast))
+            assert isinstance(t5_tokenizer, T5Tokenizer)
             t5_device = get_effective_device(t5_text_encoder)
 
             text_inputs = t5_tokenizer(

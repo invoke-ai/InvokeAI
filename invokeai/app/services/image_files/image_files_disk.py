@@ -1,4 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
+import io
+import zlib
 from pathlib import Path
 from queue import Queue
 from typing import Optional, Union
@@ -14,6 +16,46 @@ from invokeai.app.services.image_files.image_files_common import (
 )
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
+
+_PNG_RLE_MIN_PIXELS = 512 * 512
+_PNG_RLE_SAMPLE_TILE = 32
+_PNG_RLE_MIN_RAW_SIZE_PERCENT = 30
+_PNG_RLE_MAX_SAMPLE_SIZE_PERCENT = 102
+
+
+def _get_png_size(image: PILImageType, compress_type: Optional[int] = None) -> int:
+    output = io.BytesIO()
+    options = {"compress_level": 1}
+    if compress_type is not None:
+        options["compress_type"] = compress_type
+    image.save(output, "PNG", **options)
+    return output.tell()
+
+
+def _should_use_png_rle(image: PILImageType) -> bool:
+    if image.mode not in {"RGB", "RGBA"} or image.width * image.height < _PNG_RLE_MIN_PIXELS:
+        return False
+
+    # Native-resolution tiles distinguish high-entropy data from filter-friendly structured images.
+    tile_width = min(_PNG_RLE_SAMPLE_TILE, image.width)
+    tile_height = min(_PNG_RLE_SAMPLE_TILE, image.height)
+    x_positions = (0, (image.width - tile_width) // 2, image.width - tile_width)
+    y_positions = (0, (image.height - tile_height) // 2, image.height - tile_height)
+    sample = Image.new(image.mode, (tile_width * 3, tile_height * 3))
+    for row, y in enumerate(y_positions):
+        for column, x in enumerate(x_positions):
+            with image.crop((x, y, x + tile_width, y + tile_height)) as tile:
+                sample.paste(tile, (column * tile_width, row * tile_height))
+
+    try:
+        raw = sample.tobytes()
+        if len(zlib.compress(raw, level=1)) * 100 < len(raw) * _PNG_RLE_MIN_RAW_SIZE_PERCENT:
+            return False
+        default_size = _get_png_size(sample)
+        rle_size = _get_png_size(sample, zlib.Z_RLE)
+        return rle_size * 100 <= default_size * _PNG_RLE_MAX_SAMPLE_SIZE_PERCENT
+    finally:
+        sample.close()
 
 
 class DiskImageFileStorage(ImageFileStorageBase):
@@ -31,6 +73,18 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
+
+    @property
+    def image_root(self) -> Path:
+        return self.__output_folder.resolve()
+
+    @property
+    def thumbnail_root(self) -> Path:
+        return self.__thumbnails_folder.resolve()
+
+    def evict_cache_paths(self, paths: list[Path]) -> None:
+        for path in paths:
+            self.__cache.pop(path.resolve(), None)
 
     def get(self, image_name: str, image_subfolder: str = "") -> PILImageType:
         try:
@@ -78,15 +132,18 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
             # When saving the image, the image object's info field is not populated. We need to set it
             image.info = info_dict
+            compress_level = self.__invoker.services.configuration.pil_compress_level
+            save_options = {"compress_level": compress_level}
+            if compress_level == 1 and _should_use_png_rle(image):
+                save_options["compress_type"] = zlib.Z_RLE
             image.save(
                 image_path,
                 "PNG",
                 pnginfo=pnginfo,
-                compress_level=self.__invoker.services.configuration.pil_compress_level,
+                **save_options,
             )
 
-            thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(thumbnail_name, thumbnail=True, image_subfolder=image_subfolder)
+            thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
 
             # Ensure thumbnail subfolder directories exist
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,8 +165,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             if image_path in self.__cache:
                 del self.__cache[image_path]
 
-            thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(thumbnail_name, True, image_subfolder=image_subfolder)
+            thumbnail_path = self.get_path(image_name, True, image_subfolder=image_subfolder)
 
             if thumbnail_path.exists():
                 thumbnail_path.unlink()

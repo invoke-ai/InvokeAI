@@ -4,40 +4,10 @@ import type { ChangeEvent } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiUploadSimpleBold } from 'react-icons/pi';
-import { useUpdateModelMutation } from 'services/api/endpoints/models';
+import { useUpdateModelImageMutation, useUpdateModelMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
 
-const validateImportData = (data: unknown): data is Record<string, unknown> => {
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-    return false;
-  }
-
-  const obj = data as Record<string, unknown>;
-
-  if ('trigger_phrases' in obj && obj.trigger_phrases !== undefined) {
-    if (!Array.isArray(obj.trigger_phrases) || !obj.trigger_phrases.every((p) => typeof p === 'string')) {
-      return false;
-    }
-  }
-
-  if ('default_settings' in obj && obj.default_settings !== undefined) {
-    if (
-      typeof obj.default_settings !== 'object' ||
-      obj.default_settings === null ||
-      Array.isArray(obj.default_settings)
-    ) {
-      return false;
-    }
-  }
-
-  if ('cpu_only' in obj && obj.cpu_only !== undefined) {
-    if (typeof obj.cpu_only !== 'boolean') {
-      return false;
-    }
-  }
-
-  return true;
-};
+import { dataUrlToFile, isImageDataUrl, validateImportData } from './modelSettingsIO';
 
 type Props = {
   modelConfig: AnyModelConfigWithExternal;
@@ -47,13 +17,21 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [updateModel] = useUpdateModelMutation();
+  const [updateModelImage] = useUpdateModelImageMutation();
 
   const applySettings = useCallback(
     async (data: Record<string, unknown>) => {
       const body: Record<string, unknown> = {};
       const skippedFields: string[] = [];
 
-      const importableFields = ['default_settings', 'trigger_phrases', 'cpu_only'] as const;
+      const importableFields = [
+        'name',
+        'description',
+        'source_url',
+        'default_settings',
+        'trigger_phrases',
+        'cpu_only',
+      ] as const;
 
       for (const field of importableFields) {
         if (!(field in data) || data[field] === undefined || data[field] === null) {
@@ -66,7 +44,12 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
         }
       }
 
-      if (Object.keys(body).length === 0) {
+      const coverImageDataUrl =
+        'cover_image' in data && typeof data.cover_image === 'string' && isImageDataUrl(data.cover_image)
+          ? data.cover_image
+          : null;
+
+      if (Object.keys(body).length === 0 && !coverImageDataUrl) {
         if (skippedFields.length > 0) {
           toast({
             id: 'SETTINGS_IMPORT_INCOMPATIBLE',
@@ -77,35 +60,62 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
         return;
       }
 
-      await updateModel({
-        key: modelConfig.key,
-        body,
-      })
-        .unwrap()
-        .then(() => {
-          if (skippedFields.length > 0) {
-            toast({
-              id: 'SETTINGS_IMPORTED',
-              title: t('modelManager.settingsImportedPartial', { fields: skippedFields.join(', ') }),
-              status: 'warning',
-            });
-          } else {
-            toast({
-              id: 'SETTINGS_IMPORTED',
-              title: t('modelManager.settingsImported'),
-              status: 'success',
-            });
-          }
-        })
-        .catch((_error) => {
+      let appliedAnything = false;
+      if (Object.keys(body).length > 0) {
+        try {
+          await updateModel({
+            key: modelConfig.key,
+            body,
+          }).unwrap();
+          appliedAnything = true;
+        } catch {
           toast({
             id: 'SETTINGS_IMPORT_FAILED',
             title: t('modelManager.settingsImportFailed'),
             status: 'error',
           });
+          return;
+        }
+      }
+
+      if (coverImageDataUrl) {
+        const imageFile = dataUrlToFile(coverImageDataUrl, `${modelConfig.key}.png`);
+        if (!imageFile) {
+          skippedFields.push('cover_image');
+        } else {
+          try {
+            await updateModelImage({ key: modelConfig.key, image: imageFile }).unwrap();
+            appliedAnything = true;
+          } catch {
+            skippedFields.push('cover_image');
+          }
+        }
+      }
+
+      if (!appliedAnything) {
+        toast({
+          id: 'SETTINGS_IMPORT_FAILED',
+          title: t('modelManager.settingsImportFailed'),
+          status: 'error',
         });
+        return;
+      }
+
+      if (skippedFields.length > 0) {
+        toast({
+          id: 'SETTINGS_IMPORTED',
+          title: t('modelManager.settingsImportedPartial', { fields: skippedFields.join(', ') }),
+          status: 'warning',
+        });
+      } else {
+        toast({
+          id: 'SETTINGS_IMPORTED',
+          title: t('modelManager.settingsImported'),
+          status: 'success',
+        });
+      }
     },
-    [modelConfig, updateModel, t]
+    [modelConfig, updateModel, updateModelImage, t]
   );
 
   const handleFileChange = useCallback(

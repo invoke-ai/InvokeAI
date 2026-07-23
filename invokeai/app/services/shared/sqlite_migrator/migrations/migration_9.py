@@ -21,6 +21,8 @@ def build_migration_9() -> Migration:
     - Empties the session queue. This is done to prevent any lingering session queue items from causing pydantic errors due to changed schemas.
     """
     migration_9 = Migration(
+        id="migration_9",
+        depends_on="migration_8",
         from_version=8,
         to_version=9,
         callback=Migration9Callback(),

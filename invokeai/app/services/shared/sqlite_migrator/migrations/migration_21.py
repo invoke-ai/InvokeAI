@@ -34,6 +34,8 @@ def build_migration_21() -> Migration:
     - Adding a trigger to update the `updated_at` field on updates.
     """
     return Migration(
+        id="migration_21",
+        depends_on="migration_20",
         from_version=20,
         to_version=21,
         callback=Migration21Callback(),

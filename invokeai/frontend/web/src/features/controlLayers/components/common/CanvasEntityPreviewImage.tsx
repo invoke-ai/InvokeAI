@@ -40,11 +40,8 @@ export const CanvasEntityPreviewImage = memo(() => {
 
   const updatePreview = useMemo(
     () =>
-      debounce(() => {
-        if (!canvasRef.current) {
-          return;
-        }
-        const ctx = canvasRef.current.getContext('2d');
+      debounce((canvas: HTMLCanvasElement) => {
+        const ctx = canvas.getContext('2d');
         if (!ctx) {
           return;
         }
@@ -60,15 +57,14 @@ export const CanvasEntityPreviewImage = memo(() => {
           pixelRect.width === 0 ||
           pixelRect.height === 0
         ) {
-          // Draw an empty canvas
-          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
           return;
         }
 
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        canvasRef.current.width = pixelRect.width;
-        canvasRef.current.height = pixelRect.height;
+        canvas.width = pixelRect.width;
+        canvas.height = pixelRect.height;
 
         const sx = pixelRect.x - nodeRect.x;
         const sy = pixelRect.y - nodeRect.y;
@@ -90,7 +86,12 @@ export const CanvasEntityPreviewImage = memo(() => {
     [adapter.$canvasCache, adapter.transformer.$nodeRect, adapter.transformer.$pixelRect, maskColor]
   );
 
-  useEffect(updatePreview, [updatePreview, canvasCache, nodeRect, pixelRect]);
+  useEffect(() => {
+    if (!canvasRef.current) {
+      return;
+    }
+    updatePreview(canvasRef.current);
+  }, [updatePreview, canvasCache, nodeRect, pixelRect]);
 
   return (
     <Tooltip label={<TooltipContent canvasRef={canvasRef} />} p={2} closeOnScroll>
@@ -122,7 +123,7 @@ export const CanvasEntityPreviewImage = memo(() => {
 
 CanvasEntityPreviewImage.displayName = 'CanvasEntityPreviewImage';
 
-const TooltipContent = ({ canvasRef }: { canvasRef: React.RefObject<HTMLCanvasElement> }) => {
+const TooltipContent = ({ canvasRef }: { canvasRef: React.RefObject<HTMLCanvasElement | null> }) => {
   const canvasRef2 = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {

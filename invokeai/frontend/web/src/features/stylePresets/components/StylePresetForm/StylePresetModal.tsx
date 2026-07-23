@@ -11,7 +11,6 @@ import {
 import { useStore } from '@nanostores/react';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
-import type { PrefilledFormData } from 'features/stylePresets/store/stylePresetModal';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,32 +39,51 @@ export const StylePresetModal = () => {
   }, []);
 
   useEffect(() => {
-    setFormData(null);
-  }, []);
+    let isActive = true;
+    const data = stylePresetModalState.prefilledFormData;
 
-  useEffect(() => {
-    const convertImageToBlob = async (data: PrefilledFormData | null) => {
-      if (!data) {
-        setFormData(null);
-      } else {
-        let file = null;
-        if (data.imageUrl) {
-          try {
-            const blob = await convertImageUrlToBlob(data.imageUrl);
-            if (blob) {
-              file = new File([blob], 'style_preset.png', { type: 'image/png' });
-            }
-          } catch {
-            // do nothing
-          }
+    if (!data) {
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setFormData(null);
+        }
+      });
+      return () => {
+        isActive = false;
+      };
+    }
+
+    if (!data.imageUrl) {
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setFormData({ ...data, image: null });
+        }
+      });
+      return () => {
+        isActive = false;
+      };
+    }
+
+    void convertImageUrlToBlob(data.imageUrl).then(
+      (blob) => {
+        if (!isActive) {
+          return;
         }
         setFormData({
           ...data,
-          image: file,
+          image: blob ? new File([blob], 'style_preset.png', { type: 'image/png' }) : null,
         });
+      },
+      () => {
+        if (isActive) {
+          setFormData({ ...data, image: null });
+        }
       }
+    );
+
+    return () => {
+      isActive = false;
     };
-    convertImageToBlob(stylePresetModalState.prefilledFormData);
   }, [stylePresetModalState.prefilledFormData]);
 
   return (

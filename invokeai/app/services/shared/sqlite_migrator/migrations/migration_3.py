@@ -62,6 +62,8 @@ def build_migration_3(app_config: InvokeAIAppConfig, logger: Logger) -> Migratio
     - Migrates data from `models.yaml` into the `model_config` table
     """
     migration_3 = Migration(
+        id="migration_3",
+        depends_on="migration_2",
         from_version=2,
         to_version=3,
         callback=Migration3Callback(app_config=app_config, logger=logger),

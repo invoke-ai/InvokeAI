@@ -31,7 +31,14 @@ type Props = {
 
 const ModelImageUpload = ({ model_key, model_image }: Props) => {
   const [image, setImage] = useState<string | null>(model_image || null);
+  const [prevModelImage, setPrevModelImage] = useState(model_image);
   const { t } = useTranslation();
+
+  // Sync local state when the model_image prop changes (e.g. switching models) without a cascading effect.
+  if (model_image !== prevModelImage) {
+    setPrevModelImage(model_image);
+    setImage(model_image || null);
+  }
 
   const [updateModelImage, request] = useUpdateModelImageMutation();
   const [deleteModelImage] = useDeleteModelImageMutation();

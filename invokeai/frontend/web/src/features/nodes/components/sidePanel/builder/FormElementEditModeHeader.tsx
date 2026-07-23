@@ -39,7 +39,7 @@ const sx: SystemStyleObject = {
   },
 };
 
-type Props = Omit<FlexProps, 'sx'> & { element: FormElement; dragHandleRef: RefObject<HTMLDivElement> };
+type Props = Omit<FlexProps, 'sx'> & { element: FormElement; dragHandleRef: RefObject<HTMLDivElement | null> };
 
 export const FormElementEditModeHeader = memo(({ element, dragHandleRef, ...rest }: Props) => {
   const depth = useDepthContext();

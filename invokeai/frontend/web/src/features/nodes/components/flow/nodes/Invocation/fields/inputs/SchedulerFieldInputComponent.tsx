@@ -16,23 +16,26 @@ const SchedulerFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
 
+  const fieldName = field?.name;
+  const fieldValue = field?.value;
+
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
-      if (!isParameterScheduler(v?.value)) {
+      if (!fieldName || !isParameterScheduler(v?.value)) {
         return;
       }
       dispatch(
         fieldSchedulerValueChanged({
           nodeId,
-          fieldName: field.name,
+          fieldName,
           value: v.value,
         })
       );
     },
-    [dispatch, field.name, nodeId]
+    [dispatch, fieldName, nodeId]
   );
 
-  const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === field?.value), [field?.value]);
+  const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === fieldValue), [fieldValue]);
 
   return (
     <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS} ${NO_FIT_ON_DOUBLE_CLICK_CLASS}`}>

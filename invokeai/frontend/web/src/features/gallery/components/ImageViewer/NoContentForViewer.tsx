@@ -1,9 +1,8 @@
 import type { ButtonProps } from '@invoke-ai/ui-library';
 import { Alert, AlertDescription, AlertIcon, Button, Divider, Flex, Link, Spinner, Text } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -18,11 +17,9 @@ export const NoContentForViewer = memo(() => {
   const hasImages = useHasImages();
   const [mainModels, { data }] = useMainModels();
   const { data: setupStatus } = useGetSetupStatusQuery();
-  const user = useAppSelector(selectCurrentUser);
   const { t } = useTranslation();
 
-  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
-  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const isAdmin = useIsAdmin();
   const adminEmail = setupStatus?.admin_email ?? null;
 
   const modelsLoaded = data !== undefined;

@@ -1,3 +1,6 @@
+from typing import Any
+
+
 def get_app():
     """Import the app and event loop. We wrap this in a function to more explicitly control when it happens, because
     importing from api_app does a bunch of stuff - it's more like calling a function than importing a module.
@@ -87,15 +90,29 @@ def run_app() -> None:
         # imported.
         enable_dev_reload(custom_nodes_path=app_config.custom_nodes_path)
 
+    # When running behind a reverse proxy that serves the app under a sub-path (e.g. `/invoke`),
+    # wrap the app so route matching and openapi/docs work for both proxy styles (strip & preserve).
+    # Also honor X-Forwarded-* headers. Only enabled when `base_url` is set, so default installations
+    # are unaffected.
+    from invokeai.app.api_app import SubPathASGIMiddleware
+
+    asgi_app: Any = app
+    proxy_kwargs: dict[str, Any] = {}
+    if app_config.base_url:
+        asgi_app = SubPathASGIMiddleware(app, app_config.base_url)
+        # `proxy_headers=True` is already uvicorn's default; we only need to widen the trusted proxies.
+        proxy_kwargs = {"forwarded_allow_ips": app_config.forwarded_allow_ips}
+
     # Start the server.
     config = uvicorn.Config(
-        app=app,
+        app=asgi_app,
         host=app_config.host,
         port=app_config.port,
         loop="asyncio",
         log_level=app_config.log_level_network,
         ssl_certfile=app_config.ssl_certfile,
         ssl_keyfile=app_config.ssl_keyfile,
+        **proxy_kwargs,
     )
     server = uvicorn.Server(config)
 

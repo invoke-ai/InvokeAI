@@ -39,6 +39,8 @@ def build_migration_18() -> Migration:
             - Adding a new `idx_workflow_library_opened_at` index on the `opened_at` column
     """
     migration_18 = Migration(
+        id="migration_18",
+        depends_on="migration_17",
         from_version=17,
         to_version=18,
         callback=Migration18Callback(),

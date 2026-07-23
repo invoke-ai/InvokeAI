@@ -73,6 +73,102 @@ export const add: InvocationTemplate = {
   category: 'math',
 };
 
+export const call_saved_workflow: InvocationTemplate = {
+  title: 'Call Saved Workflow',
+  type: 'call_saved_workflow',
+  version: '1.0.0',
+  tags: ['workflow', 'saved', 'library'],
+  description: 'Displays and later executes against a selected saved workflow.',
+  category: 'workflow',
+  outputType: 'integer_output',
+  inputs: {
+    workflow_id: {
+      name: 'workflow_id',
+      title: 'Workflow Id',
+      required: false,
+      description: 'The selected saved workflow ID, managed by the workflow editor UI.',
+      fieldKind: 'input',
+      input: 'any',
+      ui_hidden: false,
+      ui_type: 'SavedWorkflowField',
+      type: {
+        name: 'SavedWorkflowField',
+        cardinality: 'SINGLE',
+        batch: false,
+        originalType: {
+          name: 'StringField',
+          cardinality: 'SINGLE',
+          batch: false,
+        },
+      },
+      default: '',
+    },
+  },
+  outputs: {
+    value: {
+      fieldKind: 'output',
+      name: 'value',
+      title: 'Value',
+      description: 'The output integer',
+      type: {
+        name: 'IntegerField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      ui_hidden: false,
+    },
+  },
+  useCache: false,
+  nodePack: 'invokeai',
+  classification: 'beta',
+};
+
+export const workflow_return: InvocationTemplate = {
+  title: 'Workflow Return',
+  type: 'workflow_return',
+  version: '1.0.0',
+  tags: ['workflow', 'return', 'output'],
+  description: 'Defines the explicit collection result returned by a callable workflow.',
+  category: 'workflow',
+  outputType: 'workflow_return_output',
+  inputs: {
+    collection: {
+      name: 'collection',
+      title: 'Collection',
+      required: false,
+      description: 'The collection returned to a calling workflow.',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      ui_type: 'CollectionField',
+      type: {
+        name: 'CollectionField',
+        cardinality: 'COLLECTION',
+        batch: false,
+      },
+      default: undefined,
+    },
+  },
+  outputs: {
+    collection: {
+      fieldKind: 'output',
+      name: 'collection',
+      title: 'Collection',
+      description: 'The workflow return collection',
+      type: {
+        name: 'CollectionField',
+        cardinality: 'COLLECTION',
+        batch: false,
+      },
+      ui_hidden: false,
+      ui_type: 'CollectionField',
+    },
+  },
+  useCache: false,
+  nodePack: 'invokeai',
+  classification: 'beta',
+};
+
 export const sub: InvocationTemplate = {
   title: 'Subtract Integers',
   type: 'sub',
@@ -537,6 +633,8 @@ const iterate: InvocationTemplate = {
 
 export const templates: Templates = {
   add,
+  call_saved_workflow,
+  workflow_return,
   sub,
   collect,
   iterate,
@@ -554,6 +652,146 @@ export const schema = {
   },
   components: {
     schemas: {
+      CallSavedWorkflowInvocation: {
+        properties: {
+          id: {
+            type: 'string',
+            title: 'Id',
+            description: 'The id of this instance of an invocation. Must be unique among all instances of invocations.',
+            field_kind: 'node_attribute',
+          },
+          is_intermediate: {
+            type: 'boolean',
+            title: 'Is Intermediate',
+            description: 'Whether or not this is an intermediate invocation.',
+            default: false,
+            field_kind: 'node_attribute',
+            ui_type: 'IsIntermediate',
+          },
+          use_cache: {
+            type: 'boolean',
+            title: 'Use Cache',
+            description: 'Whether or not to use the cache',
+            default: false,
+            field_kind: 'node_attribute',
+          },
+          workflow_id: {
+            type: 'string',
+            title: 'Workflow Id',
+            description: 'The selected saved workflow ID, managed by the workflow editor UI.',
+            default: '',
+            field_kind: 'input',
+            input: 'any',
+            orig_default: '',
+            orig_required: false,
+            ui_hidden: false,
+            ui_type: 'SavedWorkflowField',
+          },
+          type: {
+            type: 'string',
+            enum: ['call_saved_workflow'],
+            const: 'call_saved_workflow',
+            title: 'type',
+            default: 'call_saved_workflow',
+            field_kind: 'node_attribute',
+          },
+        },
+        type: 'object',
+        required: ['type', 'id'],
+        title: 'Call Saved Workflow',
+        description: 'Displays and later executes against a selected saved workflow.',
+        category: 'workflow',
+        classification: 'beta',
+        node_pack: 'invokeai',
+        tags: ['workflow', 'saved', 'library'],
+        version: '1.0.0',
+        output: {
+          $ref: '#/components/schemas/IntegerOutput',
+        },
+        class: 'invocation',
+      },
+      WorkflowReturnInvocation: {
+        properties: {
+          id: {
+            type: 'string',
+            title: 'Id',
+            description: 'The id of this instance of an invocation. Must be unique among all instances of invocations.',
+            field_kind: 'node_attribute',
+          },
+          is_intermediate: {
+            type: 'boolean',
+            title: 'Is Intermediate',
+            description: 'Whether or not this is an intermediate invocation.',
+            default: false,
+            field_kind: 'node_attribute',
+            ui_type: 'IsIntermediate',
+          },
+          use_cache: {
+            type: 'boolean',
+            title: 'Use Cache',
+            description: 'Whether or not to use the cache',
+            default: false,
+            field_kind: 'node_attribute',
+          },
+          collection: {
+            type: 'array',
+            items: {},
+            title: 'Collection',
+            description: 'The collection returned to a calling workflow.',
+            field_kind: 'input',
+            input: 'connection',
+            orig_required: false,
+            ui_hidden: false,
+            ui_type: 'CollectionField',
+          },
+          type: {
+            type: 'string',
+            enum: ['workflow_return'],
+            const: 'workflow_return',
+            title: 'type',
+            default: 'workflow_return',
+            field_kind: 'node_attribute',
+          },
+        },
+        type: 'object',
+        required: ['type', 'id'],
+        title: 'Workflow Return',
+        description: 'Defines the explicit collection result returned by a callable workflow.',
+        category: 'workflow',
+        classification: 'beta',
+        node_pack: 'invokeai',
+        tags: ['workflow', 'return', 'output'],
+        version: '1.0.0',
+        output: {
+          $ref: '#/components/schemas/WorkflowReturnOutput',
+        },
+        class: 'invocation',
+      },
+      WorkflowReturnOutput: {
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['workflow_return_output'],
+            const: 'workflow_return_output',
+            title: 'type',
+            default: 'workflow_return_output',
+            field_kind: 'node_attribute',
+          },
+          collection: {
+            type: 'array',
+            items: {},
+            title: 'Collection',
+            description: 'The workflow return collection',
+            field_kind: 'output',
+            ui_hidden: false,
+            ui_type: 'CollectionField',
+          },
+        },
+        type: 'object',
+        required: ['type', 'collection'],
+        title: 'Workflow Return Output',
+        class: 'output',
+      },
       AddInvocation: {
         properties: {
           id: {

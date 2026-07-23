@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ImageMetadataHandlers, MetadataUtils } from './parsing';
+import { ImageMetadataHandlers, MetadataUtils, parseMetadataHandler } from './parsing';
 
 const createMockStore = () => ({
   dispatch: vi.fn(),
@@ -13,6 +13,17 @@ const createMockStore = () => ({
 const createStore = () => createMockStore() as any;
 
 describe('Qwen metadata parsing', () => {
+  it('normalizes synchronous parser throws into rejected promises', async () => {
+    const store = createStore();
+    let result: Promise<unknown> | undefined;
+
+    expect(() => {
+      result = parseMetadataHandler({}, ImageMetadataHandlers.RefinerSteps, store);
+    }).not.toThrow();
+
+    await expect(result).rejects.toThrow();
+  });
+
   it('does not report missing Qwen metadata keys as available', async () => {
     const store = createStore();
 

@@ -48,7 +48,11 @@ def extract_metadata_from_image(
     stringified_metadata: str | None = None
 
     # Use the metadata override if provided, else attempt to extract it from the image file.
-    metadata_raw = invokeai_metadata_override or pil_image.info.get("invokeai_metadata", None)
+    metadata_raw = (
+        invokeai_metadata_override
+        if invokeai_metadata_override is not None
+        else pil_image.info.get("invokeai_metadata", None)
+    )
 
     # If the metadata is present in the image file, we will attempt to parse it as JSON. When we create images,
     # we always store metadata as a stringified JSON dict. So, we expect it to be a string here.
@@ -66,7 +70,11 @@ def extract_metadata_from_image(
 
     # We expect the workflow, if embedded in the image, to be a JSON-stringified WorkflowWithoutID. We will store it
     # as a string.
-    workflow_raw: str | None = invokeai_workflow_override or pil_image.info.get("invokeai_workflow", None)
+    workflow_raw: str | None = (
+        invokeai_workflow_override
+        if invokeai_workflow_override is not None
+        else pil_image.info.get("invokeai_workflow", None)
+    )
 
     # The fallback value for workflow is None.
     stringified_workflow: str | None = None
@@ -85,7 +93,9 @@ def extract_metadata_from_image(
 
     # We expect the workflow, if embedded in the image, to be a JSON-stringified Graph. We will store it as a
     # string.
-    graph_raw: str | None = invokeai_graph_override or pil_image.info.get("invokeai_graph", None)
+    graph_raw: str | None = (
+        invokeai_graph_override if invokeai_graph_override is not None else pil_image.info.get("invokeai_graph", None)
+    )
 
     # The fallback value for graph is None.
     stringified_graph: str | None = None

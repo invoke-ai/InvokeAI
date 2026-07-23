@@ -70,7 +70,7 @@ def test_custom_invoke_linear_8bit_lt_all_weights_on_cpu(linear_8bit_lt_layer: I
     linear_8bit_lt_layer.load_state_dict(state_dict)
 
     # Inference of the original layer should fail.
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, ValueError)):
         linear_8bit_lt_layer(x)
 
     # Wrap the InvokeLinear8bitLt layer in a CustomInvokeLinear8bitLt layer, and run inference on it.

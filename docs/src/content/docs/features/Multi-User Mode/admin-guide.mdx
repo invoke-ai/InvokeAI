@@ -42,6 +42,34 @@ Then restart the InvokeAI server backend from the command line or using the laun
 If at any time you wish to revert to single-user mode, simply comment out the `multiuser` line, or change "true" to "false". Then restart the server. Because of the way that browsers cache pages, users with open InvokeAI sessions may need to force-refresh their browsers.
 :::
 
+### Queue Scheduling
+
+The image generation queue is processed by a single worker, so jobs run one at a time. The `session_queue_mode` option controls the order in which pending jobs are selected:
+
+| Mode | Behavior |
+|------|----------|
+| `round_robin` (default) | Interleaves jobs across users — each user is served one job before any user is served a second. A single user enqueuing a large batch can no longer monopolize the queue. |
+| `FIFO` | Strict first-come, first-serve. Jobs run in the order they were enqueued (respecting priority), so a large batch drains completely before the next user's jobs start. |
+
+Set it in `invokeai.yaml`:
+
+```yaml
+multiuser: true
+session_queue_mode: round_robin   # or FIFO
+```
+
+Or via the `INVOKEAI_SESSION_QUEUE_MODE` environment variable:
+
+```bash
+INVOKEAI_SESSION_QUEUE_MODE=FIFO
+```
+
+:::note
+`session_queue_mode` only applies in multiuser mode. In single-user mode the queue is always FIFO regardless of this setting, since all jobs belong to the same account.
+:::
+
+Round-robin fairness is determined from when each user's jobs were last started. Retained terminal queue history (see [`max_queue_history`](#configuration-reference)) does not slow dequeue scheduling — each dequeue's cost scales with the number of users who currently have pending jobs, not with the size of the history.
+
 ### First Administrator Account
 
 When InvokeAI starts for the first time in multi-user mode, you'll see the **Administrator Setup** dialog.
@@ -594,7 +622,7 @@ hashing_algorithm: blake3_multi
 
 ### How many users can InvokeAI support?
 
-The backend will support dozens of concurrent users. However, because the image generation queue is single-threaded, image generation tasks are processed on a first-come, first-serve basis. This means that a user may have to wait for all the other users' image generation jobs to complete before their generation job starts to execute.
+The backend will support dozens of concurrent users. However, because the image generation queue is single-threaded, only one job runs at a time. By default jobs are scheduled **round-robin** across users, so each user is served one job per turn and no single user can monopolize the queue with a large batch. You can switch to strict first-come, first-serve ordering with `session_queue_mode: FIFO` — see [Queue Scheduling](#queue-scheduling).
 
 A future version of InvokeAI may support concurrent execution on systems with multiple GPUs/graphics cards.
 

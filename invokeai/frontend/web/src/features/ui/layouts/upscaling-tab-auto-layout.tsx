@@ -30,6 +30,7 @@ import {
   DOCKVIEW_TAB_ID,
   DOCKVIEW_TAB_LAUNCHPAD_ID,
   DOCKVIEW_TAB_PROGRESS_ID,
+  enforceMainPanelMinWidth,
   GALLERY_PANEL_DEFAULT_HEIGHT_PX,
   GALLERY_PANEL_ID,
   GALLERY_PANEL_MIN_HEIGHT_PX,
@@ -37,6 +38,7 @@ import {
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
   MAIN_PANEL_ID,
+  MAIN_PANEL_MIN_SIZE_PX,
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
@@ -223,6 +225,7 @@ const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
     const main = api.addPanel({
       id: MAIN_PANEL_ID,
       component: MAIN_PANEL_ID,
+      minimumWidth: MAIN_PANEL_MIN_SIZE_PX,
       priority: LayoutPriority.High,
     });
 
@@ -249,6 +252,7 @@ const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
     left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
     right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
   });
+  enforceMainPanelMinWidth(api);
 };
 
 export const UpscalingTabAutoLayout = memo(() => {

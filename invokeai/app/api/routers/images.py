@@ -21,6 +21,7 @@ from invokeai.app.api.routers._access import (
 from invokeai.app.api.routers._access import (
     assert_image_read_access as _assert_image_read_access,
 )
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -108,6 +109,8 @@ async def upload_image(
         ):
             raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
 
+    assert_image_move_maintenance_inactive()
+
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
@@ -179,6 +182,7 @@ class ImageUploadEntry(BaseModel):
 
 @images_router.post("/", operation_id="create_image_upload_entry")
 async def create_image_upload_entry(
+    _: CurrentUserOrDefault,
     width: int = Body(description="The width of the image"),
     height: int = Body(description="The height of the image"),
     board_id: Optional[str] = Body(default=None, description="The board to add this image to, if any"),
@@ -195,6 +199,7 @@ async def delete_image(
 ) -> DeleteImagesResult:
     """Deletes an image"""
     _assert_image_owner(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     deleted_images: set[str] = set()
     affected_boards: set[str] = set()
@@ -222,6 +227,7 @@ async def clear_intermediates(
     """Clears all intermediates. Requires admin."""
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can clear all intermediates")
+    assert_image_move_maintenance_inactive()
 
     try:
         count_deleted = ApiDependencies.invoker.services.images.delete_intermediates()
@@ -255,6 +261,7 @@ async def update_image(
 ) -> ImageDTO:
     """Updates an image"""
     _assert_image_owner(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     try:
         return ApiDependencies.invoker.services.images.update(image_name, image_changes)
@@ -311,6 +318,7 @@ async def get_image_workflow(
     image_name: str = Path(description="The name of image whose workflow to get"),
 ) -> WorkflowAndGraphResponse:
     _assert_image_read_access(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     try:
         workflow = ApiDependencies.invoker.services.images.get_workflow(image_name)
@@ -351,8 +359,11 @@ async def get_image_full(
 
     This endpoint is intentionally unauthenticated because browsers load images
     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-    providing security through unguessability.
+    providing security through unguessability. Returns 409 while image storage
+    maintenance is active.
     """
+    assert_image_move_maintenance_inactive()
+
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name)
         with open(path, "rb") as f:
@@ -384,8 +395,11 @@ async def get_image_thumbnail(
 
     This endpoint is intentionally unauthenticated because browsers load images
     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-    providing security through unguessability.
+    providing security through unguessability. Returns 409 while image storage
+    maintenance is active.
     """
+    assert_image_move_maintenance_inactive()
+
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
         with open(path, "rb") as f:
@@ -459,6 +473,7 @@ async def list_image_dtos(
         board_id,
         search_term,
         current_user.user_id,
+        current_user.is_admin,
     )
 
     return image_dtos
@@ -469,6 +484,13 @@ async def delete_images_from_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
 ) -> DeleteImagesResult:
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
+
     try:
         deleted_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -499,6 +521,7 @@ async def delete_uncategorized_images(
     current_user: CurrentUserOrDefault,
 ) -> DeleteImagesResult:
     """Deletes all uncategorized images owned by the current user (or all if admin)"""
+    assert_image_move_maintenance_inactive()
 
     image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
         board_id="none", categories=None, is_intermediate=None
@@ -536,6 +559,13 @@ async def star_images_in_list(
     image_names: list[str] = Body(description="The list of names of images to star", embed=True),
 ) -> StarredImagesResult:
     try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
+
+    try:
         starred_images: set[str] = set()
         affected_boards: set[str] = set()
         for image_name in image_names:
@@ -565,6 +595,13 @@ async def unstar_images_in_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
 ) -> UnstarredImagesResult:
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
+
     try:
         unstarred_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -623,6 +660,8 @@ async def download_images_from_list(
     if image_names:
         for name in image_names:
             _assert_image_read_access(name, current_user)
+
+    assert_image_move_maintenance_inactive()
 
     bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 
