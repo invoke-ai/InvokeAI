@@ -225,6 +225,60 @@ def test_eviction_coordinates_across_device_caches(mock_logger):
         cache_b.shutdown()
 
 
+def test_contended_peer_reconciles_budget_after_its_operation_completes(mock_logger):
+    """A peer whose cache lock is briefly held at the moment of a cross-cache eviction request
+    must not leave the budget exceeded indefinitely: the request is recorded on the skipped peer,
+    and the peer sheds its unlocked entries as soon as its current (lock-holding) operation
+    completes — every public cache operation releases the lock through the reconcile hook
+    (JPPhoto merge blocker, 2026-07-22)."""
+    import threading
+
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("shared", DummyModule())
+        cache_b.put("shared", DummyModule())
+        assert budget.total_in_use() == S
+
+        # Simulate b being mid-operation on another thread: its lock is contended when a's
+        # make_room asks it to evict. (RLock is reentrant, so the hold must come from a
+        # different thread than the one running a's put.)
+        holding = threading.Event()
+        release = threading.Event()
+
+        def hold_lock() -> None:
+            with cache_b._lock:
+                holding.set()
+                assert release.wait(timeout=10)
+
+        holder = threading.Thread(target=hold_lock)
+        holder.start()
+        assert holding.wait(timeout=10)
+
+        cache_a.put("new", DummyModule())
+        # b was busy: its unlocked "shared" entry could not be dropped, so the budget is
+        # transiently exceeded — but the reconcile request has been recorded on b.
+        assert "shared" in cache_b._cached_models
+        assert budget.total_in_use() == 2 * S
+
+        release.set()
+        holder.join(timeout=10)
+
+        # b's next lock-releasing operation (in production: the operation that was holding
+        # the lock, which always releases via the synchronized hook) triggers the reconcile.
+        _ = cache_b.stats
+
+        assert "shared" not in cache_b._cached_models
+        assert store.refcount("shared") == 0
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
 def test_peer_eviction_skips_locked_entries(mock_logger):
     """A peer's LOCKED entry (a model in active use on that device) is never evicted from under it.
     The new model is still admitted -> transiently over budget until the peer's lock releases, same

@@ -536,10 +536,20 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._poll_now_event.set()
 
     async def _on_queue_cleared(self, event: FastAPIEvent[QueueClearedEvent]) -> None:
-        # Cancel every worker currently running an item from the cleared queue.
+        # Cancel every worker currently running an item covered by the clear. A user-scoped
+        # clear (event.user_id set) covers only that user's items — other users' workers
+        # must keep running; setting their cancel event would stop a session whose row the
+        # clear didn't touch, abandoning it in_progress. (In-progress items in scope were
+        # also individually canceled by the service before the rows were deleted; this is
+        # the backstop for workers that claimed an item after that pass.)
+        payload = event[1]
         canceled = False
         for worker in self._workers:
-            if worker.queue_item and worker.queue_item.queue_id == event[1].queue_id:
+            if (
+                worker.queue_item
+                and worker.queue_item.queue_id == payload.queue_id
+                and (payload.user_id is None or worker.queue_item.user_id == payload.user_id)
+            ):
                 worker.cancel_event.set()
                 canceled = True
         if canceled:
@@ -652,22 +662,39 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                     # A cancellation can race the claim: it may have marked the row terminal before
                     # this worker recorded `queue_item`, so _on_queue_item_status_changed couldn't set
-                    # our cancel_event. Re-check (cancel_event + a fresh DB status read) and skip
-                    # running if the item is already finished, so the cancel is never lost.
-                    if worker.cancel_event.is_set() or self._is_queue_item_terminal(worker.queue_item.item_id):
+                    # our cancel_event. A fresh DB status read is the authority — skip running an
+                    # already-finished item so the cancel is never lost.
+                    if self._is_queue_item_terminal(worker.queue_item.item_id):
                         self._invoker.services.logger.debug(
                             f"Queue item {worker.queue_item.item_id} was canceled before it started; skipping."
                         )
-                        # The cancel_event may have been set by a delayed handler for the PREVIOUS
-                        # item (it matched on the stale worker.queue_item before dequeue replaced
-                        # it). In that case the freshly claimed row is still 'in_progress' and no
-                        # cancellation targeted it — without this write it would be abandoned
-                        # in_progress forever, since dequeue only ever claims 'pending' rows.
-                        # cancel_queue_item no-ops on already-terminal items, so the
-                        # genuinely-canceled case is unaffected.
-                        with suppress(SessionQueueItemNotFoundError):
-                            self._invoker.services.session_queue.cancel_queue_item(worker.queue_item.item_id)
                         continue
+
+                    if worker.cancel_event.is_set():
+                        if stop_event.is_set():
+                            # Shutdown raced the claim: don't start new work, and mark the fresh
+                            # claim canceled so it isn't abandoned in_progress (dequeue only ever
+                            # claims 'pending' rows).
+                            with suppress(SessionQueueItemNotFoundError):
+                                self._invoker.services.session_queue.cancel_queue_item(worker.queue_item.item_id)
+                            continue
+                        # The event was set by a delayed handler for the PREVIOUS item (it matched
+                        # the stale worker.queue_item before dequeue replaced it). No cancellation
+                        # targeted the freshly claimed row — a genuine cancel writes the row
+                        # terminal BEFORE emitting its event, and the terminal check above just
+                        # said this row isn't. Clear the stale signal and run the item rather than
+                        # discarding an unrelated user's queued generation.
+                        worker.cancel_event.clear()
+                        # Close the clear's own race: a genuine cancel for THIS item that landed
+                        # between the terminal check and the clear has already written the row
+                        # terminal (the DB write precedes the event), so one more read catches it.
+                        # A cancel landing after this read re-sets the event via the status-change
+                        # handler (worker.queue_item now IS this item) and the runner catches it.
+                        if self._is_queue_item_terminal(worker.queue_item.item_id):
+                            self._invoker.services.logger.debug(
+                                f"Queue item {worker.queue_item.item_id} was canceled before it started; skipping."
+                            )
+                            continue
 
                     # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.
                     # Most queue items take seconds to execute, so the relative cost of a GC is very small.

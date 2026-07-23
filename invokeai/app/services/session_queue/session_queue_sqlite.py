@@ -630,8 +630,20 @@ class SqliteSessionQueue(SessionQueueBase):
         return IsFullResult(is_full=is_full)
 
     def clear(self, queue_id: str, user_id: Optional[str] = None) -> ClearResult:
+        user_filter = "AND user_id = ?" if user_id is not None else ""
+        # Cancel every in-progress item in scope BEFORE deleting rows, so each running
+        # worker is signaled to stop via its item's own status-changed event. With
+        # multiple workers (multi-GPU) more than one item can be in_progress at once, and
+        # a user-scoped clear must cancel all of that user's running items — and ONLY
+        # that user's: other users' rows are out of scope and their workers must keep
+        # running. See delete_by_destination for the same pattern.
+        match_filter = f"queue_id == ? {user_filter}"
+        cancel_params: list[Any] = [queue_id]
+        if user_id is not None:
+            cancel_params.append(user_id)
+        self._cancel_in_progress_matching(match_filter, cancel_params)
+
         with self._db.transaction() as cursor:
-            user_filter = "AND user_id = ?" if user_id is not None else ""
             where = f"""--sql
                 WHERE queue_id = ?
                 {user_filter}
