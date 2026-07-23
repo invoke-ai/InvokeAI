@@ -31,6 +31,9 @@ class TestZImageWorkingMemory:
         # Create mock vae_info
         mock_vae_info = MagicMock()
         mock_vae_info.model = mock_vae
+        # Decode places latents on the VAE's intended compute device (see #9373); this must be a
+        # real torch.device so `latents.to(device=...)` works instead of raising TypeError.
+        mock_vae_info.compute_device = torch.device("cpu")
 
         # Create mock context manager return value
         mock_cm = MagicMock()
