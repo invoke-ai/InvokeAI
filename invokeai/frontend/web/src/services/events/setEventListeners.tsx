@@ -51,7 +51,7 @@ import { createWorkflowExecutionCoordinator } from 'services/events/workflowExec
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent, $loadingModelsCount } from './stores';
+import { $lastProgressEvent, $loadingModelsCount, clearLLMTaskState, setLLMTaskState } from './stores';
 
 const log = logger('events');
 
@@ -1008,5 +1008,24 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       description: error,
       duration: null,
     });
+  });
+
+  socket.on('llm_task_progress', (data) => {
+    log.trace({ data } as JsonObject, 'LLM task progress');
+    setLLMTaskState(data.task_id, { status: 'progress', payload: data });
+  });
+
+  // Completion/error clear the entry rather than storing a terminal state. Socket
+  // delivery is ordered but independent of the HTTP response, so storing a state here
+  // could re-create an entry after the mutation's finally already cleared it, leaking
+  // one orphan per request. The error text surfaces to the user via the RTK Query toast.
+  socket.on('llm_task_complete', (data) => {
+    log.trace({ data } as JsonObject, 'LLM task complete');
+    clearLLMTaskState(data.task_id);
+  });
+
+  socket.on('llm_task_error', (data) => {
+    log.warn({ data } as JsonObject, 'LLM task error');
+    clearLLMTaskState(data.task_id);
   });
 };

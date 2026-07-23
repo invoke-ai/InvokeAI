@@ -10,6 +10,11 @@ type WorkflowUpdatedEvent = S['WorkflowUpdatedEvent'];
 type WorkflowDeletedEvent = S['WorkflowDeletedEvent'];
 type WorkflowAccessRevokedEvent = S['WorkflowAccessRevokedEvent'];
 
+// LLM utility task events (expand-prompt, image-to-prompt).
+export type LLMTaskProgressEventPayload = S['LLMTaskProgressEvent'];
+type LLMTaskCompleteEventPayload = S['LLMTaskCompleteEvent'];
+type LLMTaskErrorEventPayload = S['LLMTaskErrorEvent'];
+
 export type ServerToClientEvents = {
   invocation_progress: (payload: S['InvocationProgressEvent']) => void;
   invocation_complete: (payload: S['InvocationCompleteEvent']) => void;
@@ -38,6 +43,9 @@ export type ServerToClientEvents = {
   bulk_download_started: (payload: S['BulkDownloadStartedEvent']) => void;
   bulk_download_complete: (payload: S['BulkDownloadCompleteEvent']) => void;
   bulk_download_error: (payload: S['BulkDownloadErrorEvent']) => void;
+  llm_task_progress: (payload: LLMTaskProgressEventPayload) => void;
+  llm_task_complete: (payload: LLMTaskCompleteEventPayload) => void;
+  llm_task_error: (payload: LLMTaskErrorEventPayload) => void;
   workflow_created: (payload: WorkflowCreatedEvent) => void;
   workflow_updated: (payload: WorkflowUpdatedEvent) => void;
   workflow_deleted: (payload: WorkflowDeletedEvent) => void;

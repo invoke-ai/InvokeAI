@@ -18,6 +18,7 @@ import { useDisclosure } from 'common/hooks/useBoolean';
 import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { LLMTaskProgressDisplay } from 'features/prompt/LLMTaskProgressDisplay';
 import { setPromptUndo } from 'features/prompt/promptUndo';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback, useState } from 'react';
@@ -26,6 +27,8 @@ import { PiSparkleBold } from 'react-icons/pi';
 import { useExpandPromptMutation } from 'services/api/endpoints/utilities';
 import { useTextLLMModels } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig } from 'services/api/types';
+import { clearLLMTaskState } from 'services/events/stores';
+import { v4 as uuidv4 } from 'uuid';
 
 const loadingStyles: SystemStyleObject = {
   svg: { animation: spinAnimation },
@@ -38,6 +41,7 @@ export const ExpandPromptButton = memo(() => {
   const [modelConfigs] = useTextLLMModels();
   const popover = useDisclosure(false);
   const [selectedModel, setSelectedModel] = useState<AnyModelConfig | undefined>(undefined);
+  const [taskId, setTaskId] = useState<string | null>(null);
   const [expandPrompt, { isLoading }] = useExpandPromptMutation();
 
   const hasModels = modelConfigs.length > 0;
@@ -50,10 +54,13 @@ export const ExpandPromptButton = memo(() => {
     if (!selectedModel || !prompt.trim()) {
       return;
     }
+    const newTaskId = uuidv4();
+    setTaskId(newTaskId);
     try {
       const result = await expandPrompt({
         prompt,
         model_key: selectedModel.key,
+        task_id: newTaskId,
       }).unwrap();
       if (result.expanded_prompt) {
         setPromptUndo(prompt);
@@ -62,6 +69,9 @@ export const ExpandPromptButton = memo(() => {
       popover.close();
     } catch {
       // Error is handled by RTK Query
+    } finally {
+      clearLLMTaskState(newTaskId);
+      setTaskId(null);
     }
   }, [selectedModel, prompt, expandPrompt, dispatch, popover]);
 
@@ -110,6 +120,7 @@ export const ExpandPromptButton = memo(() => {
                   onChange={handleModelChange}
                   placeholder={t('prompt.selectTextLLM')}
                 />
+                {isLoading ? <LLMTaskProgressDisplay taskId={taskId} /> : null}
                 <Button
                   size="sm"
                   colorScheme="invokeBlue"
