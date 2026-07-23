@@ -1,4 +1,6 @@
 import { useStore } from '@nanostores/react';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
+import { getIsClearInvocationCacheDisabled } from 'features/queue/hooks/invocationCacheControls';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +11,7 @@ export const useClearInvocationCache = () => {
   const { t } = useTranslation();
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
   const isConnected = useStore($isConnected);
+  const isAdmin = useIsAdmin();
   const [_trigger, { isLoading }] = useClearInvocationCacheMutation({
     fixedCacheKey: 'clearInvocationCache',
   });
@@ -30,5 +33,9 @@ export const useClearInvocationCache = () => {
     }
   }, [_trigger, t]);
 
-  return { trigger, isLoading, isDisabled: !isConnected || !cacheStatus?.size };
+  return {
+    trigger,
+    isLoading,
+    isDisabled: getIsClearInvocationCacheDisabled(isAdmin, isConnected, cacheStatus),
+  };
 };
