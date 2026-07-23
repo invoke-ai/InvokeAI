@@ -19,6 +19,8 @@ export interface WorkbenchPreferences {
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
   confirmImageDeletion: boolean;
+  /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
+  autoSwitchInvocationRoute: boolean;
   queueJobsScope: 'active-project' | 'all';
   language: WorkbenchLanguage;
   enableInformationalPopovers: boolean;

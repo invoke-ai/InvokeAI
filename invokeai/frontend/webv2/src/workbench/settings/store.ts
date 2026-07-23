@@ -42,6 +42,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
 };
 
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
+  autoSwitchInvocationRoute: true,
   confirmImageDeletion: true,
   customHotkeys: {},
   developerLogEnabled: true,
@@ -163,6 +164,10 @@ type WorkbenchPreferencesInput = Omit<Partial<WorkbenchPreferences>, 'queueJobsS
 };
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
+  autoSwitchInvocationRoute:
+    typeof preferences?.autoSwitchInvocationRoute === 'boolean'
+      ? preferences.autoSwitchInvocationRoute
+      : DEFAULT_PREFERENCES.autoSwitchInvocationRoute,
   confirmImageDeletion:
     typeof preferences?.confirmImageDeletion === 'boolean'
       ? preferences.confirmImageDeletion
