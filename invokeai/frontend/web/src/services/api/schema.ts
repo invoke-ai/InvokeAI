@@ -378,6 +378,9 @@ export type paths = {
          *
          *     These are models that have database entries but their corresponding
          *     weight files have been deleted externally (not via Model Manager).
+         *
+         *     Available to any authenticated user, not just admins: the frontend's model hooks subtract this
+         *     set from the model list so unusable models are kept out of the generation dropdowns.
          */
         get: operations["list_missing_models"];
         put?: never;
@@ -32791,6 +32794,11 @@ export type components = {
              * @constant
              */
             base: "anima";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Checkpoint_FLUX_Config */
         VAE_Checkpoint_FLUX_Config: {
@@ -32863,6 +32871,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default flux
@@ -32950,6 +32963,11 @@ export type components = {
              * @constant
              */
             base: "flux2";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * VAE_Checkpoint_QwenImage_Config
@@ -33031,6 +33049,11 @@ export type components = {
              * @constant
              */
             base: "qwen-image";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Checkpoint_SD1_Config */
         VAE_Checkpoint_SD1_Config: {
@@ -33103,6 +33126,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sd-1
@@ -33182,6 +33210,11 @@ export type components = {
              */
             format: "checkpoint";
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Base
              * @default sd-2
              * @constant
@@ -33259,6 +33292,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sdxl
@@ -33343,6 +33381,11 @@ export type components = {
              * @constant
              */
             base: "flux2";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** VAE_Diffusers_SD1_Config */
         VAE_Diffusers_SD1_Config: {
@@ -33412,6 +33455,11 @@ export type components = {
              * @constant
              */
             type: "vae";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sd-1
@@ -33487,6 +33535,11 @@ export type components = {
              * @constant
              */
             type: "vae";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sdxl

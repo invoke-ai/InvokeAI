@@ -1,10 +1,14 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { getIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { useMemo } from 'react';
 import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 
 /**
  * Pure decision function: determines whether custom node management is enabled.
+ *
+ * Custom node management is admin-only, so this delegates to the canonical admin predicate
+ * (`getIsAdmin` in features/auth/hooks/useIsAdmin.ts) rather than carrying its own copy of the rule.
  *
  * Returns true if:
  * - Multiuser mode is disabled (single-user mode = always admin)
@@ -13,12 +17,8 @@ import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
  * Returns false if:
  * - Multiuser mode is enabled AND user is not an admin
  */
-export const getIsCustomNodesEnabled = (multiuserEnabled: boolean, isAdmin: boolean | undefined): boolean => {
-  if (!multiuserEnabled) {
-    return true;
-  }
-  return isAdmin ?? false;
-};
+export const getIsCustomNodesEnabled = (multiuserEnabled: boolean, isAdmin: boolean | undefined): boolean =>
+  getIsAdmin({ multiuser_enabled: multiuserEnabled }, isAdmin === undefined ? undefined : { is_admin: isAdmin });
 
 type CustomNodesPermission = {
   /** Whether setup status has loaded and a permission decision can be made. */

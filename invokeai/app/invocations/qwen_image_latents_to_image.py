@@ -17,6 +17,7 @@ from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.krea2.vae_compat import as_qwen_image_vae
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
@@ -56,7 +57,8 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
             # as AutoencoderKLWan; reinterpret it as AutoencoderKLQwenImage (identical weights).
             vae = as_qwen_image_vae(vae)
             with SeamlessExt.static_patch_model(vae, self.vae.seamless_axes):
-                latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
+                # Use the VAE's actual device (may be CPU if the model is configured cpu_only).
+                latents = latents.to(device=get_effective_device(vae), dtype=vae.dtype)
 
                 vae.disable_tiling()
 

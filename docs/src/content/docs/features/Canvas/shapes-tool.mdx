@@ -1,7 +1,7 @@
 ---
 title: Shapes Tool
 description: Learn how to draw filled shapes on raster and inpaint mask layers with the Shapes tool.
-lastUpdated: 2026-05-11
+lastUpdated: 2026-05-29
 sidebar:
   order: 1
 ---
@@ -24,6 +24,8 @@ Shapes always draws into the **active raster target**:
 
 - On a regular raster layer, Shapes adds filled pixels to that layer.
 - On an active inpaint mask layer, Shapes draws directly into the mask.
+- Rect and Oval respect the canvas **Clip Strokes to Bbox** behavior setting. When enabled, any part of the shape outside
+  the current generation bounding box is clipped.
 
 :::note
 Shapes overlaps with some Lasso workflows on mask layers, but the tools are not identical. Lasso is still the more
@@ -41,6 +43,18 @@ specialized masking tool and can create a new mask layer automatically when one 
 - In subtractive mode, alpha is ignored and the shape fully clears pixels.
 - Press <kbd>Esc</kbd> to cancel the current shape session.
 
+## Transparency Lock
+
+When **Transparency Lock** is enabled on the active raster layer, Shapes respects it:
+
+- Added shapes only affect pixels that already have opacity on the layer.
+- Fully transparent areas stay transparent.
+- This applies to **Rect**, **Oval**, **Polygon**, and **Freehand** shapes.
+- Subtractive mode still clears pixels from the active layer.
+
+Use this when you want filled shapes to recolor, shade, or mask existing painted content without spilling into empty
+transparent regions of the layer.
+
 :::tip
 When subtractive mode is active, the canvas cursor shows a small minus badge so you can tell at a glance that the next
 shape will erase instead of fill.
@@ -50,19 +64,21 @@ shape will erase instead of fill.
 
 <CardGrid>
   <Card title="Rect">
-    Drag to draw a rectangle. Hold <kbd>Shift</kbd> to constrain to a square. Hold <kbd>Alt</kbd> to draw from the
-    center instead of from a corner.
+    Drag to draw a rectangle. Hold <kbd>Shift</kbd> to constrain to a square.
+    Hold <kbd>Alt</kbd> to draw from the center instead of from a corner.
   </Card>
   <Card title="Oval">
-    Drag to draw an ellipse. Hold <kbd>Shift</kbd> to constrain to a perfect circle. Hold <kbd>Alt</kbd> to draw from
-    the center.
+    Drag to draw an ellipse. Hold <kbd>Shift</kbd> to constrain to a perfect
+    circle. Hold <kbd>Alt</kbd> to draw from the center.
   </Card>
   <Card title="Polygon">
-    Click to place vertices. Click the first point to close and commit the shape. Hold <kbd>Shift</kbd> to snap the
-    pending edge to horizontal, vertical, and 45 degree angles.
+    Click to place vertices. Click the first point to close and commit the
+    shape. Hold <kbd>Shift</kbd> to snap the pending edge to horizontal,
+    vertical, and 45 degree angles.
   </Card>
   <Card title="Freehand">
-    Click and drag to sketch a filled freehand contour. Release the pointer to commit the shape.
+    Click and drag to sketch a filled freehand contour. Release the pointer to
+    commit the shape.
   </Card>
 </CardGrid>
 
@@ -70,12 +86,10 @@ shape will erase instead of fill.
 
 The Shapes tool supports different <kbd>Space</kbd> behavior depending on the current mode:
 
-- **Rect / Oval:** While the pointer is still down, hold <kbd>Space</kbd> to move the uncommitted shape instead of
-  resizing it. Release <kbd>Space</kbd> to continue resizing.
+- **Rect / Oval:** While still dragging, hold <kbd>Space</kbd> to move the uncommitted shape instead of resizing it.
+  Release <kbd>Space</kbd> to continue resizing.
 - **Polygon / Freehand:** Hold <kbd>Space</kbd> during an active session to pan the viewport without discarding the
-  unfinished shape.
-
-This is especially useful when drawing large shapes that extend beyond the current viewport.
+  unfinished shape. This is especially useful when drawing large shapes that extend beyond the current viewport.
 
 ## Color Picking While Using Shapes
 

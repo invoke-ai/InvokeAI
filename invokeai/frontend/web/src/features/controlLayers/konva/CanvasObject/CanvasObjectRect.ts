@@ -34,7 +34,7 @@ export class CanvasObjectRect extends CanvasModuleBase {
     this.log.debug({ state }, 'Creating module');
 
     this.konva = {
-      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
+      group: new Konva.Group({ name: `${this.type}:group`, clip: state.clip, listening: false }),
       rect: new Konva.Rect({ name: `${this.type}:rect`, listening: false, perfectDrawEnabled: false }),
     };
     this.konva.group.add(this.konva.rect);
@@ -48,6 +48,7 @@ export class CanvasObjectRect extends CanvasModuleBase {
       this.log.trace({ state }, 'Updating rect');
       const { rect, color, compositeOperation } = state;
       const fill = compositeOperation === 'destination-out' ? 'rgba(255,255,255,1)' : rgbaColorToString(color);
+      this.konva.group.setAttrs({ clip: state.clip });
       this.konva.rect.setAttrs({
         x: rect.x,
         y: rect.y,

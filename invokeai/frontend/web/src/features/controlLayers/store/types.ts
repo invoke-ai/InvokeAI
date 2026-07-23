@@ -255,12 +255,15 @@ const zCanvasEraserLineWithPressureState = z.object({
 });
 export type CanvasEraserLineWithPressureState = z.infer<typeof zCanvasEraserLineWithPressureState>;
 
+const zCanvasShapeCompositeOperation = z.enum(['source-over', 'source-atop', 'destination-out']);
+
 const zCanvasRectState = z.object({
   id: zId,
   type: z.literal('rect'),
   rect: zRect,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
+  clip: zRect.nullable().default(null),
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
@@ -283,7 +286,8 @@ const zCanvasOvalState = z.object({
   type: z.literal('oval'),
   rect: zRect,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
+  clip: zRect.nullable().default(null),
 });
 export type CanvasOvalState = z.infer<typeof zCanvasOvalState>;
 
@@ -292,7 +296,7 @@ const zCanvasPolygonState = z.object({
   type: z.literal('polygon'),
   points: zPoints,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
   previewPoint: zCoordinate.optional(),
 });
 export type CanvasPolygonState = z.infer<typeof zCanvasPolygonState>;
@@ -315,6 +319,7 @@ const zCanvasLinearGradientState = z.object({
   bboxRect: zRect,
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
+  globalCompositeOperation: z.string().optional(),
 });
 const zCanvasRadialGradientState = z.object({
   id: zId,
@@ -329,6 +334,7 @@ const zCanvasRadialGradientState = z.object({
   bboxRect: zRect,
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
+  globalCompositeOperation: z.string().optional(),
 });
 const zCanvasGradientState = z.discriminatedUnion('gradientType', [
   zCanvasLinearGradientState,
