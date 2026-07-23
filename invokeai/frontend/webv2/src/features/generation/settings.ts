@@ -13,6 +13,7 @@ export {
   getDefaultLoraWeight,
   getModelDefaultVae,
   hasModelDefaultVae,
+  isHighConfidenceGenerateEdit,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,

@@ -643,3 +643,18 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
 
 export const isGenerateWidgetValues = (values: unknown): values is GenerateWidgetValues =>
   isGenerateSettings(values) && isGenerateModelConfig((values as unknown as Record<string, unknown>).model);
+
+/**
+ * Widget-value keys that carry no generation intent — layout state and the
+ * shared topbar batch count. Any other changed key is a high-confidence edit
+ * for auto-switching the Invoke route, so new settings count by default.
+ */
+const GENERATE_UI_NOISE_KEYS: ReadonlySet<string> = new Set([
+  'aspectRatioIsLocked',
+  'batchCount',
+  'negativePromptHeightPx',
+  'positivePromptHeightPx',
+]);
+
+export const isHighConfidenceGenerateEdit = (changedKeys: readonly string[]): boolean =>
+  changedKeys.some((key) => !GENERATE_UI_NOISE_KEYS.has(key));

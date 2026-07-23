@@ -350,3 +350,17 @@ export const resolveUpscaleSeed = (values: UpscaleWidgetValues): number =>
   values.shouldRandomizeSeed ? Math.floor(Math.random() * SEED_MAX) : values.seed;
 
 export const cloneUpscaleWidgetValues = (values: UpscaleWidgetValues): UpscaleWidgetValues => structuredClone(values);
+
+/**
+ * Widget-value keys that carry no upscale intent — layout state and the shared
+ * topbar batch count. Any other changed key is a high-confidence edit for
+ * auto-switching the Invoke route, so new settings count by default.
+ */
+const UPSCALE_UI_NOISE_KEYS: ReadonlySet<string> = new Set([
+  'batchCount',
+  'negativePromptHeightPx',
+  'positivePromptHeightPx',
+]);
+
+export const isHighConfidenceUpscaleEdit = (changedKeys: readonly string[]): boolean =>
+  changedKeys.some((key) => !UPSCALE_UI_NOISE_KEYS.has(key));

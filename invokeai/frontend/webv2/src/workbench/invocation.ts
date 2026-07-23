@@ -75,6 +75,33 @@ export const defaultInvocationRoute: InvocationRoute = {
   destinationLocked: false,
 };
 
+/** Destination each surface maps to when the source auto-switches. */
+export const autoSwitchDestinations: Record<InvocationSourceId, ResultDestination> = {
+  canvas: 'canvas',
+  generate: 'gallery',
+  upscale: 'gallery',
+  workflow: 'gallery',
+};
+
+/**
+ * Route after a high-confidence edit on `sourceId`; identity-preserving when
+ * nothing changes. The destination remaps only on an actual source transition,
+ * so repeated edits on the same surface never re-force a manually chosen
+ * destination, and locks always win.
+ */
+export const getRouteAfterHighConfidenceEdit = (
+  invocation: InvocationRoute,
+  sourceId: InvocationSourceId
+): InvocationRoute => {
+  if (invocation.sourceLocked || invocation.sourceId === sourceId || !isInvocationSourceAvailable(sourceId)) {
+    return invocation;
+  }
+
+  const destination = invocation.destinationLocked ? invocation.destination : autoSwitchDestinations[sourceId];
+
+  return { ...invocation, destination, sourceId };
+};
+
 const validDestinationIds = new Set(resultDestinations.map((destination) => destination.id));
 
 const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
