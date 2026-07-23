@@ -22,7 +22,7 @@ import { buildGroup, getRegex, isGroup, Picker, usePickerContext } from 'common/
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
 import { uniq } from 'es-toolkit/compat';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { MODEL_BASE_TO_COLOR, MODEL_BASE_TO_LONG_NAME, MODEL_BASE_TO_SHORT_NAME } from 'features/modelManagerV2/models';
@@ -91,10 +91,8 @@ const components = {
 const NoOptionsFallback = memo(({ noOptionsText }: { noOptionsText?: string }) => {
   const { t } = useTranslation();
   const { data: setupStatus } = useGetSetupStatusQuery();
-  const user = useAppSelector(selectCurrentUser);
 
-  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
-  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const isAdmin = useIsAdmin();
   const adminEmail = setupStatus?.admin_email ?? null;
 
   if (!isAdmin) {
