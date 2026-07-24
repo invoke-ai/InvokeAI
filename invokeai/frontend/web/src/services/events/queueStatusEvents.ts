@@ -41,12 +41,29 @@ const recordQueueItemStatusChangedEvent = (event: QueueItemStatusChangedEvent): 
   latestObservedQueueStatus = event.queue_status;
 };
 
+/**
+ * The queue status embedded in a full queue_item_status_changed event carries the OWNER's
+ * per-user counts, so the owner's optimistic cache write below is complete and personal UI
+ * (progress bar, spinner, favicon) updates without waiting for a refetch. Statuses without
+ * per-user counts still occur — the sanitized companion nulls them — and for those, retain the
+ * previous cached per-user counts: for a non-owner recipient they are still accurate, and the
+ * tag invalidation that accompanies every status change refetches fresh counts immediately.
+ */
+const withRetainedUserCounts = (
+  next: S['SessionQueueStatus'],
+  previous: S['SessionQueueStatus']
+): S['SessionQueueStatus'] => ({
+  ...next,
+  user_pending: next.user_pending ?? previous.user_pending,
+  user_in_progress: next.user_in_progress ?? previous.user_in_progress,
+});
+
 export const getQueueStatusWithObservedEvents = (queueStatus: QueueStatusResponse): QueueStatusResponse => {
   const currentItemId = queueStatus.queue.item_id;
   if (latestObservedQueueStatus && currentItemId !== null && observedTerminalItemIds.has(currentItemId)) {
     return {
       ...queueStatus,
-      queue: latestObservedQueueStatus,
+      queue: withRetainedUserCounts(latestObservedQueueStatus, queueStatus.queue),
     };
   }
 
@@ -60,7 +77,7 @@ export const getUpdatedQueueStatusOnQueueItemStatusChanged = (
   recordQueueItemStatusChangedEvent(event);
   return {
     ...queueStatus,
-    queue: event.queue_status,
+    queue: withRetainedUserCounts(event.queue_status, queueStatus.queue),
   };
 };
 

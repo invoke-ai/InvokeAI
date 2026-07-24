@@ -33,7 +33,10 @@ from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEnc
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
+from invokeai.backend.util.vae_working_memory import (
+    estimate_vae_working_memory_anima,
+    estimate_vae_working_memory_flux,
+)
 
 AnimaVAE = Union[AutoencoderKLWan, FluxAutoEncoder]
 
@@ -43,7 +46,7 @@ AnimaVAE = Union[AutoencoderKLWan, FluxAutoEncoder]
     title="Image to Latents - Anima",
     tags=["image", "latents", "vae", "i2l", "anima"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -59,11 +62,19 @@ class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"Expected AutoencoderKLWan or FluxAutoEncoder for Anima VAE, got {type(vae_info.model).__name__}."
             )
 
-        estimated_working_memory = estimate_vae_working_memory_flux(
-            operation="encode",
-            image_tensor=image_tensor,
-            vae=vae_info.model,
-        )
+        if isinstance(vae_info.model, AutoencoderKLWan):
+            estimated_working_memory = estimate_vae_working_memory_anima(
+                operation="encode",
+                image_tensor=image_tensor,
+                vae=vae_info.model,
+                tile_size=None,
+            )
+        else:
+            estimated_working_memory = estimate_vae_working_memory_flux(
+                operation="encode",
+                image_tensor=image_tensor,
+                vae=vae_info.model,
+            )
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             if not isinstance(vae, (AutoencoderKLWan, FluxAutoEncoder)):
@@ -78,6 +89,9 @@ class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
                     generator = torch.Generator(device=TorchDevice.choose_torch_device()).manual_seed(0)
                     latents = vae.encode(image_tensor, sample=True, generator=generator)
                 else:
+                    # The cached VAE instance is shared with the decode invocation, which
+                    # may have enabled tiling — encode untiled for exactness.
+                    vae.disable_tiling()
                     # AutoencoderKLWan expects 5D input [B, C, T, H, W]
                     if image_tensor.ndim == 4:
                         image_tensor = image_tensor.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]

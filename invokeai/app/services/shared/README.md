@@ -131,7 +131,8 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
   - iteration path
   - runtime state such as pending, ready, executed, or skipped
 - **Ready queues grouped by class** (private attrs): `_ready_queues: dict[class_name, deque[str]]`,
-  `_active_class: Optional[str]`. Optional `ready_order: list[str]` to prioritize classes.
+  `_active_class: Optional[str]`. Optional `ready_order: list[str]` to prioritize classes. Queues are rebuilt from
+  persisted execution state when a session is deserialized.
 
 ### 4.2 Core methods
 
@@ -179,12 +180,18 @@ Workflow-call note:
 - `_PreparedExecRegistry` Owns the relationship between source graph nodes and prepared execution graph nodes, plus
   cached metadata such as iteration path and runtime state.
 - `_ExecutionMaterializer` Expands source graph nodes into concrete execution graph nodes when the scheduler runs out of
-  ready work. When matching prepared parents for a downstream exec node, skipped prepared exec nodes are ignored and
-  cannot be selected as live inputs.
+  ready work. It owns iterator expansion, collector grouping, prepared-parent selection, and creation of execution-graph
+  edges. When matching prepared parents for a downstream exec node, skipped prepared exec nodes are ignored and cannot
+  be selected as live inputs.
 - `_ExecutionScheduler` Owns indegree transitions, ready queues, class batching, and downstream release on completion.
-- `_ExecutionRuntime` Owns iteration-path lookup and input hydration for prepared exec nodes.
+- `_ExecutionRuntime` Owns iteration-path lookup, collect input ordering, and input hydration for prepared exec nodes.
 - `_IfBranchScheduler` Applies lazy `If` semantics by deferring branch-local work until the condition is known, then
   releasing the selected branch and skipping the unselected branch.
+
+`GraphExecutionState.model_post_init()` rehydrates private runtime helpers and caches after normal construction or a
+JSON/model round trip. Rehydration reconstructs prepared exec metadata, cached iteration paths, resolved `If` branch
+state when the condition is already available, and ready queues from `execution_graph`, `indegree`, `executed`, and
+`results`. This keeps persisted sessions resumable without persisting private helper objects.
 
 ### 4.4 Preparation (`_prepare()`)
 
@@ -196,14 +203,21 @@ Workflow-call note:
   1. if it is an iterator, *its inputs are already executed*,
   1. it has *no unexecuted iterator ancestors*.
 
-- If the node is a **CollectInvocation**: collapse all prepared parents into one mapping and create **one** exec node.
+- If the node is a **CollectInvocation**: group prepared parent exec nodes by iteration path and create one collector
+  exec node per group. A collector collapses the immediate iterator that feeds its `item` input, but preserves enclosing
+  iterator paths. This lets a shape such as `outer_iter -> inner_collection -> inner_iter -> collect -> consumer`
+  produce one collected result per outer iteration instead of mixing all inner items into one global collection.
+  Incoming `collection` inputs are treated as ancestor groups and are copied into each matching descendant item group.
 
 - Otherwise: compute all combinations of prepared iterator ancestors. For each combination, choose the prepared parent
-  for each upstream by matching iterator ancestry, then create **one** exec node.
+  for each upstream by matching iterator ancestry, then create **one** exec node. If a node no longer has visible
+  iterator ancestors because the source path crosses a collector, prepared parent iteration paths are still used to
+  materialize one downstream exec node for each preserved collector path.
 
 - For each new exec node:
 
   - Deep-copy the source node; assign a fresh ID (and `index` for iterators).
+  - Cache the preserved iteration path when the materializer has one, such as for grouped collectors.
   - Wire edges from chosen prepared parents.
   - Set `indegree = number of unmet inputs` (i.e., parents not yet executed).
   - Try to resolve any `If`-specific scheduling state.
@@ -213,9 +227,10 @@ Workflow-call note:
 
 - `_enqueue_if_ready(nid)` enqueues by class name only when `indegree == 0`, the node has not already executed, and the
   node is not deferred by an unresolved `If`.
-- `_get_next_node()` drains the `_active_class` queue FIFO; when empty, selects the next nonempty class queue (by
-  `ready_order` if set, else alphabetical), and continues. Optional fairness knobs can limit batch size per class;
-  default is drain fully.
+- `_get_next_node()` drains the `_active_class` queue; when empty, selects the next nonempty class queue (by
+  `ready_order` if set, else alphabetical), and continues. Within each class queue, ready exec nodes are ordered by
+  iteration path so expanded iterator work runs in a stable outer-to-inner order. Optional fairness knobs can limit
+  batch size per class; default is drain fully.
 
 #### 4.5.1 Indegree (what it is and how it's used)
 
@@ -232,9 +247,10 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 
 ### 4.6 Input hydration (`_prepare_inputs()`)
 
-- For **CollectInvocation**: gather all incoming `item` values into `collection`, sorting inputs by iteration path so
-  collected results are stable across expanded iterations. Incoming `collection` values are merged first, then incoming
-  `item` values are appended.
+- For **CollectInvocation**: gather the materialized incoming `item` values into `collection`, sorting inputs by
+  iteration path so collected results are stable across expanded iterations. Incoming `collection` values are merged
+  first, then incoming `item` values are appended. By the time hydration runs, the materializer has already selected the
+  iteration group for this collector exec node, so hydration only sees inputs that belong to that group.
 - For **IfInvocation**: hydrate only `condition` and the selected branch input. As a defensive guard against
   inconsistent runtime or deserialized session state, the runtime raises if the selected input edge points at an exec
   node with no stored runtime output. In normal scheduling this path should be unreachable.
@@ -282,6 +298,8 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
 - Nodes are enqueued only when `indegree == 0` and they are not deferred by an unresolved `If`.
 - `results` and `errors` are keyed by **exec node id**.
 - Collectors aggregate `item` inputs and may also merge incoming `collection` inputs during runtime hydration.
+  Collectors nested under iterators preserve enclosing iteration paths, so downstream consumers materialize per enclosing
+  iteration instead of receiving a mixed collection from unrelated outer iterations.
 - Branch-exclusive nodes behind an unselected `If` branch are skipped, not failed.
 
 ## 7) Extensibility

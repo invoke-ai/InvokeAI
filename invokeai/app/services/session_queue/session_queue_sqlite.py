@@ -1,6 +1,7 @@
 import asyncio
 import json
 import sqlite3
+from collections.abc import Sequence
 from typing import Any, Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
@@ -399,7 +400,12 @@ class SqliteSessionQueue(SessionQueueBase):
         # Doing this inside get_queue_status guarantees the redaction decision and the
         # embedded identifiers come from the same get_current() snapshot — eliminating the
         # race where a second read could find None and skip scrubbing stale identifiers.
-        queue_status = self.get_queue_status(queue_id=queue_item.queue_id, acting_user_id=queue_item.user_id)
+        # user_id additionally embeds the owner's per-user counts so the owner's client can
+        # apply the event's queue_status optimistically without waiting for a refetch; the
+        # sanitized companion nulls them before reaching anyone else.
+        queue_status = self.get_queue_status(
+            queue_id=queue_item.queue_id, user_id=queue_item.user_id, acting_user_id=queue_item.user_id
+        )
 
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item
@@ -524,7 +530,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 tuple(params),
             )
-        self.__invoker.services.events.emit_queue_cleared(queue_id)
+        self.__invoker.services.events.emit_queue_cleared(queue_id, user_id)
         return ClearResult(deleted=count)
 
     def delete_queue_items_by_id(self, item_ids: list[int]) -> None:
@@ -622,6 +628,35 @@ class SqliteSessionQueue(SessionQueueBase):
         )
         return queue_item
 
+    def _collect_item_ids_by_user(
+        self, cursor: sqlite3.Cursor, where: str, params: Sequence[Any]
+    ) -> dict[str, list[int]]:
+        """Groups the item ids matched by `where` by their owner's user id.
+
+        Bulk cancel/delete operations mutate many rows in a single SQL statement and therefore
+        emit no per-item queue_item_status_changed events. Call this with the operation's WHERE
+        clause before mutating, then pass the result to _emit_queue_items_canceled after the
+        transaction commits so every affected owner (and everyone's badge counts) can refresh.
+        """
+        cursor.execute(
+            f"""--sql
+            SELECT item_id, user_id
+            FROM session_queue
+            {where};
+            """,
+            tuple(params),
+        )
+        item_ids_by_user: dict[str, list[int]] = {}
+        for item_id, owner_user_id in cursor.fetchall():
+            item_ids_by_user.setdefault(owner_user_id, []).append(item_id)
+        return item_ids_by_user
+
+    def _emit_queue_items_canceled(self, queue_id: str, item_ids_by_user: dict[str, list[int]]) -> None:
+        """Emits queue_items_canceled for a bulk cancel/delete, unless nothing was affected —
+        an empty result must not broadcast a pointless refetch signal to every client."""
+        if item_ids_by_user:
+            self.__invoker.services.events.emit_queue_items_canceled(queue_id, item_ids_by_user)
+
     def cancel_by_batch_ids(
         self, queue_id: str, batch_ids: list[str], user_id: Optional[str] = None
     ) -> CancelByBatchIDsResult:
@@ -646,15 +681,8 @@ class SqliteSessionQueue(SessionQueueBase):
             if user_id is not None:
                 params.append(user_id)
 
-            cursor.execute(
-                f"""--sql
-                SELECT COUNT(*)
-                FROM session_queue
-                {where};
-                """,
-                tuple(params),
-            )
-            count = cursor.fetchone()[0]
+            canceled_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
+            count = sum(len(item_ids) for item_ids in canceled_item_ids_by_user.values())
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
@@ -665,11 +693,13 @@ class SqliteSessionQueue(SessionQueueBase):
                 tuple(params),
             )
 
-        # Handle current item separately - check ownership if user_id is provided
+        # Handle current item separately - check ownership if user_id is provided. This emits a
+        # per-item queue_item_status_changed, so the bulk event below need not include it.
         if current_queue_item is not None and current_queue_item.batch_id in batch_ids:
             if user_id is None or current_queue_item.user_id == user_id:
                 self._set_queue_item_status(current_queue_item.item_id, "canceled")
 
+        self._emit_queue_items_canceled(queue_id, canceled_item_ids_by_user)
         return CancelByBatchIDsResult(canceled=count)
 
     def cancel_by_destination(
@@ -695,15 +725,8 @@ class SqliteSessionQueue(SessionQueueBase):
             if user_id is not None:
                 params.append(user_id)
 
-            cursor.execute(
-                f"""--sql
-                SELECT COUNT(*)
-                FROM session_queue
-                {where};
-                """,
-                tuple(params),
-            )
-            count = cursor.fetchone()[0]
+            canceled_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
+            count = sum(len(item_ids) for item_ids in canceled_item_ids_by_user.values())
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
@@ -714,11 +737,13 @@ class SqliteSessionQueue(SessionQueueBase):
                 tuple(params),
             )
 
-        # Handle current item separately - check ownership if user_id is provided
+        # Handle current item separately - check ownership if user_id is provided. This emits a
+        # per-item queue_item_status_changed, so the bulk event below need not include it.
         if current_queue_item is not None and current_queue_item.destination == destination:
             if user_id is None or current_queue_item.user_id == user_id:
                 self._set_queue_item_status(current_queue_item.item_id, "canceled")
 
+        self._emit_queue_items_canceled(queue_id, canceled_item_ids_by_user)
         return CancelByDestinationResult(canceled=count)
 
     def delete_by_destination(
@@ -727,39 +752,45 @@ class SqliteSessionQueue(SessionQueueBase):
         with self._db.transaction() as cursor:
             current_queue_item = self.get_current(queue_id)
 
-            # Handle current item separately - check ownership if user_id is provided
+            # Handle current item separately - check ownership if user_id is provided. Its cancel
+            # emits a per-item queue_item_status_changed, so the bulk event below must not signal
+            # it a second time. Its row still matches the destination WHERE (the cancel only flips
+            # its status), so it is excluded from the collected ids — but not from the DELETE or
+            # the returned count.
+            canceled_current_item_id: Optional[int] = None
             if current_queue_item is not None and current_queue_item.destination == destination:
                 if user_id is None or current_queue_item.user_id == user_id:
                     self.cancel_queue_item(current_queue_item.item_id)
+                    canceled_current_item_id = current_queue_item.item_id
 
             # Build WHERE clause with optional user_id filter
             user_filter = "AND user_id = ?" if user_id is not None else ""
+            where = f"""--sql
+                WHERE
+                  queue_id == ?
+                  AND destination == ?
+                  {user_filter}
+                """
             params = [queue_id, destination]
             if user_id is not None:
                 params.append(user_id)
 
-            cursor.execute(
-                f"""--sql
-                SELECT COUNT(*)
-                FROM session_queue
-                WHERE
-                  queue_id == ?
-                  AND destination == ?
-                  {user_filter}
-                """,
-                tuple(params),
-            )
-            count = cursor.fetchone()[0]
+            deleted_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
+            count = sum(len(item_ids) for item_ids in deleted_item_ids_by_user.values())
+            if canceled_current_item_id is not None and current_queue_item is not None:
+                owner_item_ids = deleted_item_ids_by_user.get(current_queue_item.user_id)
+                if owner_item_ids is not None and canceled_current_item_id in owner_item_ids:
+                    owner_item_ids.remove(canceled_current_item_id)
+                    if not owner_item_ids:
+                        del deleted_item_ids_by_user[current_queue_item.user_id]
             cursor.execute(
                 f"""--sql
                 DELETE FROM session_queue
-                WHERE
-                  queue_id == ?
-                  AND destination == ?
-                  {user_filter}
+                {where};
                 """,
                 tuple(params),
             )
+        self._emit_queue_items_canceled(queue_id, deleted_item_ids_by_user)
         return DeleteByDestinationResult(deleted=count)
 
     def delete_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> DeleteAllExceptCurrentResult:
@@ -783,15 +814,8 @@ class SqliteSessionQueue(SessionQueueBase):
                 params.append(user_id)
             params.extend(current_chain_item_ids)
 
-            cursor.execute(
-                f"""--sql
-                SELECT COUNT(*)
-                FROM session_queue
-                {where};
-                """,
-                tuple(params),
-            )
-            count = cursor.fetchone()[0]
+            deleted_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
+            count = sum(len(item_ids) for item_ids in deleted_item_ids_by_user.values())
             cursor.execute(
                 f"""--sql
                 DELETE
@@ -800,6 +824,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 tuple(params),
             )
+        self._emit_queue_items_canceled(queue_id, deleted_item_ids_by_user)
         return DeleteAllExceptCurrentResult(deleted=count)
 
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
@@ -815,15 +840,8 @@ class SqliteSessionQueue(SessionQueueBase):
                   AND status != 'in_progress'
                 """
             params = [queue_id]
-            cursor.execute(
-                f"""--sql
-                SELECT COUNT(*)
-                FROM session_queue
-                {where};
-                """,
-                tuple(params),
-            )
-            count = cursor.fetchone()[0]
+            canceled_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
+            count = sum(len(item_ids) for item_ids in canceled_item_ids_by_user.values())
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
@@ -834,8 +852,11 @@ class SqliteSessionQueue(SessionQueueBase):
                 tuple(params),
             )
 
+        # The current item's cancel emits its own queue_item_status_changed; the bulk event
+        # below covers the silently-updated rows.
         if current_queue_item is not None and current_queue_item.queue_id == queue_id:
             self._set_queue_item_status(current_queue_item.item_id, "canceled")
+        self._emit_queue_items_canceled(queue_id, canceled_item_ids_by_user)
         return CancelByQueueIDResult(canceled=count)
 
     def cancel_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> CancelAllExceptCurrentResult:
@@ -859,15 +880,8 @@ class SqliteSessionQueue(SessionQueueBase):
                 params.append(user_id)
             params.extend(current_chain_item_ids)
 
-            cursor.execute(
-                f"""--sql
-                SELECT COUNT(*)
-                FROM session_queue
-                {where};
-                """,
-                tuple(params),
-            )
-            count = cursor.fetchone()[0]
+            canceled_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
+            count = sum(len(item_ids) for item_ids in canceled_item_ids_by_user.values())
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
@@ -877,6 +891,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 tuple(params),
             )
+        self._emit_queue_items_canceled(queue_id, canceled_item_ids_by_user)
         return CancelAllExceptCurrentResult(canceled=count)
 
     def get_queue_item(self, item_id: int) -> SessionQueueItem:
@@ -989,7 +1004,9 @@ class SqliteSessionQueue(SessionQueueBase):
 
         queue_item = self.get_queue_item(item_id)
         batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
-        queue_status = self.get_queue_status(queue_id=queue_item.queue_id, acting_user_id=queue_item.user_id)
+        queue_status = self.get_queue_status(
+            queue_id=queue_item.queue_id, user_id=queue_item.user_id, acting_user_id=queue_item.user_id
+        )
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item
 
@@ -1143,6 +1160,7 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_id: str,
         user_id: Optional[str] = None,
         acting_user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
             # Aggregate counts are always global (across all users). This lets a non-admin's
@@ -1190,11 +1208,13 @@ class SqliteSessionQueue(SessionQueueBase):
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
         # stale identifiers in the result. The aggregate counts stay global; only the current
         # item's identifiers are gated. acting_user_id (event path) takes precedence over
-        # user_id (API path) when deciding the redaction owner; either being None means an
-        # admin/global caller who may see the current item.
+        # user_id (API path) when deciding the redaction owner; either being None means a
+        # global caller who may see the current item. is_admin disables redaction outright so
+        # admin callers can pass their user_id (for the per-user counts) without losing
+        # visibility of other users' current item.
         owner_user_id = user_id if acting_user_id is None else acting_user_id
         show_current_item = current_item is not None and (
-            owner_user_id is None or current_item.user_id == owner_user_id
+            is_admin or owner_user_id is None or current_item.user_id == owner_user_id
         )
 
         return SessionQueueStatus(

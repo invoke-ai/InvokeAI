@@ -87,6 +87,43 @@ def _dequantize_comfyui_fp8(sd: dict, compute_dtype: torch.dtype) -> int:
     return count
 
 
+def _remap_qwen_vl_checkpoint_keys(sd: dict) -> dict:
+    """Remap legacy ComfyUI Qwen2.5-VL single-file keys to the transformers layout.
+
+    ComfyUI single-file checkpoints use the legacy Qwen2.5-VL key layout
+    (`visual.X`, `model.X`); transformers ≥4.50 expects `model.visual.X` and
+    `model.language_model.X`. This applies the same conversion mapping that
+    `Qwen2_5_VLForConditionalGeneration.from_pretrained` would, since
+    `load_state_dict` does not.
+
+    transformers ≤4.x exposed this as `_checkpoint_conversion_mapping`, but 5.x
+    dropped it (returns `{}`), so we fall back to the legacy mapping ourselves. The
+    negative lookahead keeps already-converted keys untouched, so the remap is safe
+    (and idempotent) for both legacy and new-layout single-file checkpoints.
+    """
+    import re
+
+    from transformers import Qwen2_5_VLForConditionalGeneration
+
+    key_mapping = Qwen2_5_VLForConditionalGeneration._checkpoint_conversion_mapping or {
+        r"^visual": "model.visual",
+        r"^model(?!\.(language_model|visual))": "model.language_model",
+    }
+    if not key_mapping:
+        return sd
+
+    remapped_sd: dict = {}
+    for old_key, tensor in sd.items():
+        new_key = old_key
+        if isinstance(old_key, str):
+            for pattern, replacement in key_mapping.items():
+                new_key, n_replace = re.subn(pattern, replacement, new_key)
+                if n_replace > 0:
+                    break
+        remapped_sd[new_key] = tensor
+    return remapped_sd
+
+
 def _strip_quantization_metadata(sd: dict) -> None:
     """Strip ComfyUI fp8 quantization metadata keys in-place."""
     keys_to_drop = [
@@ -415,8 +452,6 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
                 ) from e
 
     def _load_text_encoder_from_singlefile(self, config: QwenVLEncoder_Checkpoint_Config) -> AnyModel:
-        import re
-
         from safetensors.torch import load_file
         from transformers import AutoConfig, Qwen2_5_VLForConditionalGeneration
 
@@ -440,29 +475,9 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         _strip_quantization_metadata(sd)
 
         # ComfyUI single-file checkpoints use the legacy Qwen2.5-VL key layout
-        # (`visual.X`, `model.X`); transformers ≥4.50 expects `model.visual.X` and
-        # `model.language_model.X`. Apply the same conversion mapping that
-        # `Qwen2_5_VLForConditionalGeneration.from_pretrained` would, since
-        # `load_state_dict` does not.
-        #
-        # transformers ≤4.x exposed this as `_checkpoint_conversion_mapping`, but 5.x
-        # dropped it (returns `{}`), so we fall back to the legacy mapping ourselves.
-        # The negative lookahead keeps already-converted checkpoints untouched, so the
-        # remap is safe to apply to both legacy and new-layout single-file checkpoints.
-        key_mapping = Qwen2_5_VLForConditionalGeneration._checkpoint_conversion_mapping or {
-            r"^visual": "model.visual",
-            r"^model(?!\.(language_model|visual))": "model.language_model",
-        }
-        if key_mapping:
-            remapped_sd: dict[str, torch.Tensor] = {}
-            for old_key, tensor in sd.items():
-                new_key = old_key
-                for pattern, replacement in key_mapping.items():
-                    new_key, n_replace = re.subn(pattern, replacement, new_key)
-                    if n_replace > 0:
-                        break
-                remapped_sd[new_key] = tensor
-            sd = remapped_sd
+        # (`visual.X`, `model.X`); remap to the `model.visual.X` / `model.language_model.X`
+        # layout transformers expects. See `_remap_qwen_vl_checkpoint_keys` for details.
+        sd = _remap_qwen_vl_checkpoint_keys(sd)
 
         # Cast to compute dtype (skip integer/index tensors)
         for k in list(sd.keys()):

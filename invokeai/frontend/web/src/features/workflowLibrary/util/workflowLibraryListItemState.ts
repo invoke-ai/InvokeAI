@@ -1,12 +1,7 @@
-import {
-  getWorkflowCallCompatibilityState,
-  type WorkflowCallCompatibilityMessageKey,
-} from 'features/workflowLibrary/util/workflowCallCompatibility';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 type WorkflowLibraryListItemState = {
-  showUnsupportedBadge: boolean;
-  unsupportedMessageKey: WorkflowCallCompatibilityMessageKey | null;
+  showCallableBadge: boolean;
   showSharedBadge: boolean;
   showDefaultIcon: boolean;
 };
@@ -14,11 +9,8 @@ type WorkflowLibraryListItemState = {
 export const getWorkflowLibraryListItemState = (
   workflow: Pick<WorkflowRecordListItemWithThumbnailDTO, 'category' | 'is_public' | 'call_saved_workflow_compatibility'>
 ): WorkflowLibraryListItemState => {
-  const compatibilityState = getWorkflowCallCompatibilityState(workflow);
-
   return {
-    showUnsupportedBadge: compatibilityState.isUnsupported,
-    unsupportedMessageKey: compatibilityState.messageKey,
+    showCallableBadge: workflow.call_saved_workflow_compatibility?.is_callable === true,
     showSharedBadge: workflow.is_public && workflow.category !== 'default',
     showDefaultIcon: workflow.category === 'default',
   };

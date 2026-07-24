@@ -1,11 +1,13 @@
+import hashlib
 import platform
+import zlib
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
 
-from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
 from invokeai.app.util.thumbnails import get_thumbnail_name
 
 
@@ -62,6 +64,96 @@ def test_image_paths_relative_to_storage_dir(tmp_path: Path):
     image_files_disk = DiskImageFileStorage(tmp_path)
     path = image_files_disk.get_path("foo.png")
     assert path.is_relative_to(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("compress_level", "expected_compress_type"),
+    [(0, None), (1, zlib.Z_RLE), (7, None)],
+)
+def test_save_uses_rle_only_for_compression_level_one(
+    tmp_path: Path, compress_level: int, expected_compress_type: int | None
+):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = compress_level
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+
+    with (
+        patch("invokeai.app.services.image_files.image_files_disk._should_use_png_rle", return_value=True),
+        patch.object(Image.Image, "save", autospec=True) as save_mock,
+    ):
+        storage.save(image=Image.new("RGBA", (32, 32)), image_name="test.png")
+
+    png_calls = [call for call in save_mock.call_args_list if len(call.args) > 2 and call.args[2] == "PNG"]
+    assert len(png_calls) == 1
+    assert png_calls[0].kwargs["compress_level"] == compress_level
+    if expected_compress_type is None:
+        assert "compress_type" not in png_calls[0].kwargs
+    else:
+        assert png_calls[0].kwargs["compress_type"] == expected_compress_type
+
+
+def test_png_rle_probe_rejects_structured_images():
+    entropy = Image.frombytes("RGB", (512, 512), hashlib.shake_256(b"png-rle-test").digest(512 * 512 * 3))
+    gradient = Image.linear_gradient("L").resize((512, 512)).convert("RGB")
+
+    assert _should_use_png_rle(entropy)
+    assert not _should_use_png_rle(gradient)
+
+    entropy.close()
+    gradient.close()
+
+
+def _make_round_trip_image(mode: str) -> Image.Image:
+    image = Image.new(mode, (4, 4))
+    if mode == "P":
+        palette = [component for index in range(256) for component in (index, 255 - index, index // 2, index)]
+        image.putpalette(palette, rawmode="RGBA")
+        image.putdata(range(16))
+    else:
+        values = {
+            "1": [0, 1],
+            "L": [0, 255],
+            "LA": [(17, 0), (201, 255)],
+            "RGB": [(1, 2, 3), (251, 252, 253)],
+            "RGBA": [(1, 2, 3, 0), (251, 252, 253, 255)],
+            "I;16": [0, 65535],
+        }
+        image.putdata(values[mode] * 8)
+    return image
+
+
+@pytest.mark.parametrize("mode", ["1", "L", "LA", "P", "RGB", "RGBA", "I;16"])
+def test_level_one_png_round_trip_from_disk(tmp_path: Path, mode: str):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 1
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+
+    image = _make_round_trip_image(mode)
+    expected_bytes = image.tobytes()
+    expected_rgba = image.convert("RGBA").tobytes() if mode == "P" else None
+    metadata = f'{{"mode":"{mode}"}}'
+    image_name = f"round-trip-{mode.replace(';', '-')}.png"
+
+    with patch("invokeai.app.services.image_files.image_files_disk._should_use_png_rle", return_value=True):
+        storage.save(image=image, image_name=image_name, metadata=metadata)
+    image_path = storage.get_path(image_name)
+    storage.evict_cache_paths([image_path])
+
+    with Image.open(image_path) as loaded:
+        loaded.load()
+        assert loaded.format == "PNG"
+        assert loaded.mode == mode
+        assert loaded.tobytes() == expected_bytes
+        assert loaded.info["invokeai_metadata"] == metadata
+        if mode in {"LA", "RGBA"}:
+            assert loaded.getchannel("A").tobytes() == image.getchannel("A").tobytes()
+        if mode == "P":
+            assert loaded.info["transparency"] == bytes(range(256))
+            assert loaded.convert("RGBA").tobytes() == expected_rgba
+
+    image.close()
 
 
 # ── Subfolder validation tests (Point 1) ──

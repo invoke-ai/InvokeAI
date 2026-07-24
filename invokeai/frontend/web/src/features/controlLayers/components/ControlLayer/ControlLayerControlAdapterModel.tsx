@@ -11,6 +11,7 @@ import type {
   ControlNetModelConfig,
   T2IAdapterModelConfig,
 } from 'services/api/types';
+import { isAnimaControlNetModelConfig } from 'services/api/types';
 
 type Props = {
   modelKey: string | null;
@@ -35,6 +36,11 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
 
   const getIsDisabled = useCallback(
     (model: AnyModelConfig): boolean => {
+      if (isAnimaControlNetModelConfig(model) && model.cond_in_channels !== 3) {
+        // Anima inpaint-adapter variants (4-channel or legacy null cond_in_channels) are not control layers.
+        // Defense-in-depth: useControlLayerModels (isControlLayerModelConfig) already excludes these.
+        return true;
+      }
       const isCompatible = currentBaseModel === model.base;
       const hasMainModel = Boolean(currentBaseModel);
       return !hasMainModel || !isCompatible;

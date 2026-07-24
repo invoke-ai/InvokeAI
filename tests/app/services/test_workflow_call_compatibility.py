@@ -140,6 +140,32 @@ def test_get_workflow_call_compatibility_returns_ok_for_simple_callable_workflow
     assert compatibility.message is None
 
 
+def test_get_workflow_call_compatibility_allows_legacy_none_board_values() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "image",
+                "blank_image",
+                {"board": {"value": "none"}, "width": {"value": 64}, "height": {"value": 64}},
+            ),
+            *_return_nodes(),
+        ],
+        edges=_return_edges("image", "image"),
+    )
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is True
+    assert compatibility.reason is WorkflowCallCompatibilityReason.Ok
+    assert compatibility.message is None
+
+
 def test_get_workflow_call_compatibility_allows_single_return_value_connected_directly() -> None:
     workflow = _workflow_dump(
         nodes=[

@@ -38,6 +38,7 @@ def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker,
     }
 
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr(mock_invoker.services.external_generation, "get_provider_statuses", lambda: statuses)
 
     response = client.get("/api/v1/app/external_providers/status")

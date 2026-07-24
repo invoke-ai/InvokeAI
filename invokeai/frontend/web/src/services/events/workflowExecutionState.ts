@@ -35,7 +35,8 @@ type WorkflowExecutionTransition = {
 const TERMINAL_QUEUE_STATUSES = new Set<QueueStatus>(['completed', 'failed', 'canceled']);
 const TERMINAL_INVOCATION_STATUSES = new Set<InvocationStatus>(['completed', 'failed']);
 
-const isTerminalQueueStatus = (status: QueueStatus | null) => status !== null && TERMINAL_QUEUE_STATUSES.has(status);
+export const isTerminalQueueStatus = (status: QueueStatus | null) =>
+  status !== null && TERMINAL_QUEUE_STATUSES.has(status);
 
 export const createWorkflowExecutionState = (): WorkflowExecutionState => ({
   itemId: null,
