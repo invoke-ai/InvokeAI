@@ -86,8 +86,13 @@ class LayerPatcher:
         # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
         # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
         # without searching, but some legacy code still uses flattened keys.
-        first_key = next(iter(patch.layers.keys()))
-        layer_keys_are_flattened = "." not in first_key
+        #
+        # We inspect *all* keys rather than just the first one: a flattened key never contains a dot, so the patch is
+        # only flattened if no key contains a dot. Checking only the first key misclassifies non-flattened patches whose
+        # first layer happens to target a top-level module with a single-token name (e.g. a Flux2 diffusers LoRA whose
+        # first converted layer is `lora_transformer-context_embedder`), causing a spurious assertion failure on
+        # subsequent dotted keys.
+        layer_keys_are_flattened = not any("." in key for key in patch.layers.keys())
 
         prefix_len = len(prefix)
 

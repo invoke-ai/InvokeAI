@@ -144,8 +144,8 @@ class AnimaRegionalPromptingExtension:
 
         Args:
             mask: Input mask tensor. If None, returns a mask of all ones.
-            target_height: Height of the image token grid (H // patch_size).
-            target_width: Width of the image token grid (W // patch_size).
+            target_height: Height of the image token grid (ceil(latent_H / patch_size)).
+            target_width: Width of the image token grid (ceil(latent_W / patch_size)).
             dtype: Target dtype for the mask.
             device: Target device for the mask.
 
