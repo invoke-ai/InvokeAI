@@ -39,3 +39,17 @@ def test_bundled_tokenizer_ids_within_vocab() -> None:
 
 def test_bundled_tokenizer_is_cached() -> None:
     assert load_bundled_qwen3_tokenizer() is load_bundled_qwen3_tokenizer()
+
+
+def test_bundled_tokenizer_has_chat_template() -> None:
+    # The Z-Image encoder formats prompts via apply_chat_template(), which raises if the
+    # tokenizer_config.json ships without a chat_template. Guard against dropping it again.
+    tokenizer = load_bundled_qwen3_tokenizer()
+    assert tokenizer.chat_template
+    formatted = tokenizer.apply_chat_template(
+        [{"role": "user", "content": "A cinematic photo of a cat"}],
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=True,
+    )
+    assert "<|im_start|>" in formatted
