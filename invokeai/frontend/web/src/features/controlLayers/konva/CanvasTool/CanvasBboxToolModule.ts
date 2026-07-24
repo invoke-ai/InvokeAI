@@ -279,6 +279,23 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
   };
 
   /**
+   * Force-completes any in-flight bbox interaction when focus is lost.
+   *
+   * Temporary bbox selection can be cleared on window blur, unlike the old Space/Alt quick-switches. If blur happens
+   * mid drag/transform, Konva can otherwise keep the bbox interaction alive after the tool switches away.
+   */
+  stopInteraction = () => {
+    if (this.konva.proxyRect.isDragging()) {
+      this.konva.proxyRect.stopDrag();
+    }
+
+    if (this.konva.transformer.isTransforming()) {
+      this.$aspectRatioBuffer.set(this.konva.proxyRect.width() / this.konva.proxyRect.height());
+      this.konva.transformer.stopTransform();
+    }
+  };
+
+  /**
    * Handles the dragmove event on the bbox rect:
    * - Snaps the bbox position to the grid (determined by ctrl/meta key)
    * - Pushes the new bbox rect into app state

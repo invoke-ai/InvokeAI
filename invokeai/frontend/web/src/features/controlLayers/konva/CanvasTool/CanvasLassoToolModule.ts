@@ -116,7 +116,7 @@ export class CanvasLassoToolModule extends CanvasModuleBase {
 
   render = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch = tool === 'view' && this.parent.$toolBuffer.get() === 'lasso';
+    const isTemporaryViewSwitch = tool === 'view' && this.parent.$baseTool.get() === 'lasso';
     if (tool !== 'lasso' && !isTemporaryViewSwitch) {
       this.hidePreview();
       return;
@@ -130,7 +130,7 @@ export class CanvasLassoToolModule extends CanvasModuleBase {
 
   onToolChanged = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch = tool === 'view' && this.parent.$toolBuffer.get() === 'lasso';
+    const isTemporaryViewSwitch = tool === 'view' && this.parent.$baseTool.get() === 'lasso';
     if (tool !== 'lasso' && !isTemporaryViewSwitch) {
       this.reset();
     }

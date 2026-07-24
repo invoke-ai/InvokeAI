@@ -13,7 +13,7 @@ export const useToolIsSelected = (tool: Tool) => {
 export const useSelectTool = (tool: Tool) => {
   const canvasManager = useCanvasManager();
   const setTool = useCallback(() => {
-    canvasManager.tool.$tool.set(tool);
-  }, [canvasManager.tool.$tool, tool]);
+    canvasManager.tool.setBaseTool(tool);
+  }, [canvasManager.tool, tool]);
   return setTool;
 };

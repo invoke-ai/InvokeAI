@@ -15,7 +15,6 @@ import { getCanvasToolModifierHints } from './canvasToolModifierHints';
 import { WORKSPACE_PANEL_ID } from './shared';
 
 const $fallbackTool = atom<Tool>('move');
-const $fallbackToolBuffer = atom<Tool | null>(null);
 const $fallbackPrimaryPointerDown = atom(false);
 const $fallbackTextSession = atom<null>(null);
 
@@ -50,16 +49,13 @@ export const DockviewCanvasHeaderActions = memo((props: IDockviewHeaderActionsPr
   const bboxAspectRatioLocked = useAppSelector((state) => selectBbox(state).aspectRatio.isLocked);
 
   const tool = useStore(canvasManager?.tool.$tool ?? $fallbackTool);
-  const toolBuffer = useStore(canvasManager?.tool.$toolBuffer ?? $fallbackToolBuffer);
+  const baseTool = useStore(canvasManager?.tool.$baseTool ?? $fallbackTool);
   const isPrimaryPointerDown = useStore(canvasManager?.tool.$isPrimaryPointerDown ?? $fallbackPrimaryPointerDown);
   const textSession = useStore(canvasManager?.tool.tools.text.$session ?? $fallbackTextSession);
 
   const effectiveTool = useMemo<Tool>(() => {
-    if (toolBuffer && (tool === 'view' || tool === 'colorPicker')) {
-      return toolBuffer;
-    }
-    return tool;
-  }, [tool, toolBuffer]);
+    return tool === 'view' || tool === 'colorPicker' ? baseTool : tool;
+  }, [baseTool, tool]);
 
   const hints = useMemo(() => {
     if (!canvasManager || props.activePanel?.id !== WORKSPACE_PANEL_ID) {
