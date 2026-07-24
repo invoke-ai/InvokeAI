@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
   deleteMasonryBackgroundInFlightImageNames,
@@ -13,7 +13,26 @@ import {
   setMasonryBackgroundInFlightImageNames,
 } from './masonryImageFetching';
 import { getMasonryRenderState } from './masonryRenderState';
-import { getMasonryScrollDirection, getMasonrySelectedImageScrollDecision } from './masonryScrollIntoView';
+import {
+  createMasonrySelectionAnchorScheduler,
+  getMasonryKeyboardNavigationTarget,
+  getMasonryScrollDirection,
+  getMasonrySelectedImageScrollDecision,
+  getMasonrySelectionAnchorDecision,
+  getMasonrySelectionScrollTarget,
+  getShouldHandleMasonryKeyboardRepeat,
+  isMasonryItemRectVisible,
+  scrollMasonryImageIntoView,
+} from './masonryScrollIntoView';
+
+const getRect = (left: number, top: number, width: number, height: number) => ({
+  bottom: top + height,
+  height,
+  left,
+  right: left + width,
+  top,
+  width,
+});
 
 describe('masonry image fetching', () => {
   test('returns uncached image names in first-seen order', () => {
@@ -413,6 +432,103 @@ describe('masonry scroll direction', () => {
   });
 });
 
+describe('masonry keyboard navigation', () => {
+  test('uses the visually adjacent right item instead of the next source index', () => {
+    expect(
+      getMasonryKeyboardNavigationTarget({
+        columnCount: 2,
+        currentImageName: 'current',
+        currentIndex: 0,
+        direction: 'right',
+        imageNames: ['current', 'source-next', 'visual-right'],
+        mountedItems: [
+          { imageName: 'current', index: 0, rect: getRect(100, 100, 100, 100) },
+          { imageName: 'source-next', index: 1, rect: getRect(100, 260, 100, 100) },
+          { imageName: 'visual-right', index: 2, rect: getRect(220, 110, 100, 80) },
+        ],
+      })
+    ).toEqual({ imageName: 'visual-right', index: 2 });
+  });
+
+  test('uses the visually aligned lower item instead of index plus column count', () => {
+    expect(
+      getMasonryKeyboardNavigationTarget({
+        columnCount: 2,
+        currentImageName: 'current',
+        currentIndex: 0,
+        direction: 'down',
+        imageNames: ['current', 'right', 'source-down', 'visual-down'],
+        mountedItems: [
+          { imageName: 'current', index: 0, rect: getRect(100, 100, 100, 100) },
+          { imageName: 'right', index: 1, rect: getRect(220, 110, 100, 90) },
+          { imageName: 'source-down', index: 2, rect: getRect(220, 230, 100, 100) },
+          { imageName: 'visual-down', index: 3, rect: getRect(105, 240, 100, 100) },
+        ],
+      })
+    ).toEqual({ imageName: 'visual-down', index: 3 });
+  });
+
+  test('falls back to source-index navigation when the current tile is not mounted', () => {
+    expect(
+      getMasonryKeyboardNavigationTarget({
+        columnCount: 2,
+        currentImageName: 'current',
+        currentIndex: 0,
+        direction: 'down',
+        imageNames: ['current', 'right', 'source-down'],
+        mountedItems: [],
+      })
+    ).toEqual({ imageName: 'source-down', index: 2 });
+  });
+
+  test('falls back to source-index navigation when no visual candidate is mounted', () => {
+    expect(
+      getMasonryKeyboardNavigationTarget({
+        columnCount: 2,
+        currentImageName: 'current',
+        currentIndex: 0,
+        direction: 'left',
+        imageNames: ['current', 'right', 'source-down'],
+        mountedItems: [{ imageName: 'current', index: 0, rect: getRect(100, 100, 100, 100) }],
+      })
+    ).toEqual({ imageName: 'current', index: 0 });
+  });
+
+  test('waits for the current selection to become visible during held-key navigation', () => {
+    expect(
+      getShouldHandleMasonryKeyboardRepeat({
+        currentImageName: 'current',
+        isCurrentImageVisible: false,
+        isRepeat: true,
+      })
+    ).toBe(false);
+    expect(
+      getShouldHandleMasonryKeyboardRepeat({
+        currentImageName: 'current',
+        isCurrentImageVisible: true,
+        isRepeat: true,
+      })
+    ).toBe(true);
+  });
+
+  test('keeps individual key presses and initial selection navigation immediate', () => {
+    expect(
+      getShouldHandleMasonryKeyboardRepeat({
+        currentImageName: 'current',
+        isCurrentImageVisible: false,
+        isRepeat: false,
+      })
+    ).toBe(true);
+    expect(
+      getShouldHandleMasonryKeyboardRepeat({
+        currentImageName: null,
+        isCurrentImageVisible: false,
+        isRepeat: true,
+      })
+    ).toBe(true);
+  });
+});
+
 describe('masonry selected image scroll decision', () => {
   test('does not scroll the initial selected image', () => {
     const decision = getMasonrySelectedImageScrollDecision({
@@ -500,6 +616,132 @@ describe('masonry selected image scroll decision', () => {
       },
       shouldScroll: false,
     });
+  });
+});
+
+describe('masonry selection scroll target', () => {
+  test('preserves keyboard direction when the pending target matches the selection', () => {
+    expect(
+      getMasonrySelectionScrollTarget({
+        currentImageName: 'target',
+        pendingTarget: { imageName: 'target', previousIndex: 10, targetIndex: 14 },
+        targetIndex: 14,
+      })
+    ).toEqual({ imageName: 'target', previousIndex: 10, targetIndex: 14 });
+  });
+
+  test('does not apply stale keyboard direction to another selection', () => {
+    expect(
+      getMasonrySelectionScrollTarget({
+        currentImageName: 'other',
+        pendingTarget: { imageName: 'target', previousIndex: 10, targetIndex: 14 },
+        targetIndex: 20,
+      })
+    ).toEqual({ imageName: 'other', previousIndex: undefined, targetIndex: 20 });
+  });
+});
+
+describe('masonry selected image anchoring', () => {
+  test('anchors only when a previously visible selection becomes hidden', () => {
+    expect(
+      getMasonrySelectionAnchorDecision({
+        isCurrentlyVisible: false,
+        wasPreviouslyVisible: true,
+      })
+    ).toEqual({ nextWasVisible: false, shouldAnchor: true });
+
+    expect(
+      getMasonrySelectionAnchorDecision({
+        isCurrentlyVisible: true,
+        wasPreviouslyVisible: true,
+      })
+    ).toEqual({ nextWasVisible: true, shouldAnchor: false });
+  });
+
+  test('does not anchor an offscreen selection and records one that enters the viewport', () => {
+    expect(
+      getMasonrySelectionAnchorDecision({
+        isCurrentlyVisible: false,
+        wasPreviouslyVisible: false,
+      })
+    ).toEqual({ nextWasVisible: false, shouldAnchor: false });
+
+    expect(
+      getMasonrySelectionAnchorDecision({
+        isCurrentlyVisible: true,
+        wasPreviouslyVisible: false,
+      })
+    ).toEqual({ nextWasVisible: true, shouldAnchor: false });
+  });
+
+  test('treats partial rectangle intersection as visible', () => {
+    const scrollerRect = getRect(0, 0, 200, 200);
+
+    expect(isMasonryItemRectVisible({ itemRect: getRect(20, 180, 100, 100), scrollerRect })).toBe(true);
+    expect(isMasonryItemRectVisible({ itemRect: getRect(20, 200, 100, 100), scrollerRect })).toBe(false);
+    expect(isMasonryItemRectVisible({ itemRect: getRect(20, -100, 100, 100), scrollerRect })).toBe(false);
+  });
+
+  test('coalesces repeated layout notifications into one settled anchor check', () => {
+    const callbacks: ((time: number) => void)[] = [];
+    let settledCount = 0;
+    const scheduler = createMasonrySelectionAnchorScheduler({
+      cancelFrame: () => undefined,
+      onSettled: () => settledCount++,
+      requestFrame: (callback) => {
+        callbacks.push(callback);
+        return callbacks.length;
+      },
+    });
+
+    scheduler.schedule();
+    scheduler.schedule();
+    expect(callbacks).toHaveLength(1);
+
+    callbacks.shift()?.(0);
+    expect(callbacks).toHaveLength(1);
+    expect(settledCount).toBe(0);
+
+    callbacks.shift()?.(16);
+    expect(settledCount).toBe(1);
+  });
+});
+
+describe('masonry scroll cancellation', () => {
+  test('prevents an older offscreen target from continuing after cancellation', () => {
+    const callbacks: ((time: number) => void)[] = [];
+    let scrollCount = 0;
+    vi.stubGlobal('requestAnimationFrame', (callback: (time: number) => void) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+
+    const scroller = {
+      clientHeight: 100,
+      scrollBy: () => scrollCount++,
+    };
+    const rootEl = {
+      querySelector: () => scroller,
+      querySelectorAll: () => [],
+    } as unknown as HTMLDivElement;
+
+    try {
+      const cancel = scrollMasonryImageIntoView({
+        imageName: 'target',
+        previousIndex: 0,
+        rootEl,
+        targetIndex: 20,
+      });
+      expect(scrollCount).toBe(1);
+      expect(callbacks).toHaveLength(1);
+
+      cancel();
+      callbacks[0]?.(16);
+      expect(scrollCount).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

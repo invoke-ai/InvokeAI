@@ -40,19 +40,33 @@ import {
   setMasonryBackgroundInFlightImageNames,
 } from './masonryImageFetching';
 import { getMasonryRenderState } from './masonryRenderState';
-import { getMasonrySelectedImageScrollDecision, scrollMasonryImageIntoView } from './masonryScrollIntoView';
+import type { MasonryKeyboardNavigationDirection, MasonryScrollTarget } from './masonryScrollIntoView';
+import {
+  createMasonrySelectionAnchorScheduler,
+  getMasonryKeyboardNavigationTarget,
+  getMasonryScroller,
+  getMasonrySelectedImageScrollDecision,
+  getMasonrySelectionAnchorDecision,
+  getMasonrySelectionScrollTarget,
+  getMountedMasonryKeyboardNavigationItems,
+  getShouldHandleMasonryKeyboardRepeat,
+  isMasonryImageVisible,
+  scrollMasonryImageIntoView,
+} from './masonryScrollIntoView';
 
 type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
 
 type MasonryRootRef = RefObject<HTMLDivElement | null>;
 
 type MasonryContext = {
+  notifyItemLayoutChanged: () => void;
   queryArgs: ListImageNamesQueryArgs;
   registerMissingImageName: (imageName: string) => void;
 };
 
 type MasonryMountedRange = { endIndex: number; startIndex: number };
 type MasonryScrollDirection = 'down' | 'up' | null;
+type ScrollToMasonryImage = (target: MasonryScrollTarget) => void;
 type StaticMasonryImageDimensions = { height: number; width: number };
 
 const MASONRY_ITEM_PADDING_PX = 2;
@@ -250,10 +264,6 @@ const getMountedMasonryRange = (rootEl: HTMLDivElement): MasonryMountedRange | n
   }
 
   return { endIndex, startIndex };
-};
-
-const getMasonryScroller = (rootEl: HTMLDivElement): HTMLElement | null => {
-  return rootEl.querySelector<HTMLElement>('[data-testid="virtuoso-scroller"]');
 };
 
 const useMasonryImagePrefetching = (
@@ -576,6 +586,12 @@ const MasonryImageAtPosition = memo(({ data: imageName, context }: MasonryImageA
   const { currentData: imageDTO, isUninitialized } = imagesApi.endpoints.getImageDTO.useQueryState(imageName);
   imagesApi.endpoints.getImageDTO.useQuerySubscription(imageName, { skip: isUninitialized });
 
+  useLayoutEffect(() => {
+    if (imageDTO) {
+      context.notifyItemLayoutChanged();
+    }
+  }, [context, imageDTO]);
+
   useEffect(() => {
     if (!imageDTO) {
       context.registerMissingImageName(imageName);
@@ -626,7 +642,7 @@ const StaticMasonryImageGrid = memo(({ columnCount, context, imageNames }: Stati
   );
 
   return (
-    <Flex h="full" w="full" overflowY="auto" alignItems="flex-start">
+    <Flex data-masonry-scroller="" h="full" w="full" overflowY="auto" alignItems="flex-start">
       {columns.map((column, columnIndex) => (
         <Box key={columnIndex} flexGrow={1} flexBasis={0} minW={0}>
           {column.map(({ imageName, index }, indexInColumn) => (
@@ -648,7 +664,46 @@ const StaticMasonryImageGrid = memo(({ columnCount, context, imageNames }: Stati
 
 StaticMasonryImageGrid.displayName = 'StaticMasonryImageGrid';
 
-const useMasonryKeyboardNavigation = (imageNames: string[], columnCount: number, rootRef: MasonryRootRef) => {
+const useMasonryScrollCoordinator = (rootRef: MasonryRootRef): ScrollToMasonryImage => {
+  const frameRef = useRef<number | null>(null);
+  const cancelActiveScrollRef = useRef<(() => void) | null>(null);
+
+  const cancelActiveScroll = useCallback(() => {
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    cancelActiveScrollRef.current?.();
+    cancelActiveScrollRef.current = null;
+  }, []);
+
+  const scrollToImage = useCallback(
+    (target: MasonryScrollTarget) => {
+      cancelActiveScroll();
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        const rootEl = rootRef.current;
+        if (!rootEl) {
+          return;
+        }
+        cancelActiveScrollRef.current = scrollMasonryImageIntoView({ ...target, rootEl });
+      });
+    },
+    [cancelActiveScroll, rootRef]
+  );
+
+  useEffect(() => cancelActiveScroll, [cancelActiveScroll]);
+
+  return scrollToImage;
+};
+
+const useMasonryKeyboardNavigation = (
+  imageNames: string[],
+  columnCount: number,
+  rootRef: MasonryRootRef,
+  pendingSelectionScrollTargetRef: MutableRefObject<MasonryScrollTarget | null>,
+  scrollToImage: ScrollToMasonryImage
+) => {
   const { dispatch, getState } = useAppStore();
   const activeTab = useAppSelector(selectActiveTab);
 
@@ -659,7 +714,24 @@ const useMasonryKeyboardNavigation = (imageNames: string[], columnCount: number,
         return;
       }
 
-      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      let direction: MasonryKeyboardNavigationDirection | null = null;
+
+      switch (event.key) {
+        case 'ArrowLeft':
+          direction = 'left';
+          break;
+        case 'ArrowRight':
+          direction = 'right';
+          break;
+        case 'ArrowUp':
+          direction = 'up';
+          break;
+        case 'ArrowDown':
+          direction = 'down';
+          break;
+      }
+
+      if (!direction) {
         return;
       }
 
@@ -678,52 +750,47 @@ const useMasonryKeyboardNavigation = (imageNames: string[], columnCount: number,
         ? (selectImageToCompare(state) ?? selectLastSelectedItem(state))
         : selectLastSelectedItem(state);
       const currentIndex = getItemIndex(imageName ?? null, imageNames);
-
-      let newIndex = currentIndex;
-      switch (event.key) {
-        case 'ArrowLeft':
-          newIndex = Math.max(0, currentIndex - 1);
-          break;
-        case 'ArrowRight':
-          newIndex = Math.min(imageNames.length - 1, currentIndex + 1);
-          break;
-        case 'ArrowUp':
-          newIndex = Math.max(0, currentIndex - columnCount);
-          break;
-        case 'ArrowDown':
-          newIndex = Math.min(imageNames.length - 1, currentIndex + columnCount);
-          break;
-      }
-
-      if (newIndex === currentIndex) {
+      const rootEl = rootRef.current;
+      if (
+        !getShouldHandleMasonryKeyboardRepeat({
+          currentImageName: imageName ?? null,
+          isCurrentImageVisible: Boolean(rootEl && imageName && isMasonryImageVisible(rootEl, imageName)),
+          isRepeat: event.repeat,
+        })
+      ) {
         return;
       }
 
-      const newImageName = imageNames[newIndex];
-      if (!newImageName) {
+      const target = getMasonryKeyboardNavigationTarget({
+        columnCount,
+        currentImageName: imageName ?? null,
+        currentIndex,
+        direction,
+        imageNames,
+        mountedItems: rootEl ? getMountedMasonryKeyboardNavigationItems(rootEl) : [],
+      });
+
+      if (!target || target.index === currentIndex) {
         return;
       }
 
       if (event.altKey) {
-        dispatch(imageToCompareChanged(newImageName));
-      } else {
-        dispatch(selectionChanged([newImageName]));
-      }
-
-      requestAnimationFrame(() => {
-        const rootEl = rootRef.current;
-        if (!rootEl) {
-          return;
-        }
-        scrollMasonryImageIntoView({
-          imageName: newImageName,
+        dispatch(imageToCompareChanged(target.imageName));
+        scrollToImage({
+          imageName: target.imageName,
           previousIndex: currentIndex,
-          rootEl,
-          targetIndex: newIndex,
+          targetIndex: target.index,
         });
-      });
+      } else {
+        pendingSelectionScrollTargetRef.current = {
+          imageName: target.imageName,
+          previousIndex: currentIndex,
+          targetIndex: target.index,
+        };
+        dispatch(selectionChanged([target.imageName]));
+      }
     },
-    [activeTab, columnCount, dispatch, getState, imageNames, rootRef]
+    [activeTab, columnCount, dispatch, getState, imageNames, pendingSelectionScrollTargetRef, rootRef, scrollToImage]
   );
 
   useRegisteredHotkeys({
@@ -791,7 +858,11 @@ const useMasonryKeyboardNavigation = (imageNames: string[], columnCount: number,
   });
 };
 
-const useKeepMasonrySelectedImageInView = (imageNames: string[], rootRef: MasonryRootRef) => {
+const useKeepMasonrySelectedImageInView = (
+  imageNames: string[],
+  pendingSelectionScrollTargetRef: MutableRefObject<MasonryScrollTarget | null>,
+  scrollToImage: ScrollToMasonryImage
+) => {
   const selection = useAppSelector(selectSelection);
   const selectedImageScrollStateRef = useRef({
     hasSelectionChangedSinceMount: false,
@@ -805,6 +876,8 @@ const useKeepMasonrySelectedImageInView = (imageNames: string[], rootRef: Masonr
       state: selectedImageScrollStateRef.current,
     });
     selectedImageScrollStateRef.current = nextState;
+    const pendingTarget = pendingSelectionScrollTargetRef.current;
+    pendingSelectionScrollTargetRef.current = null;
 
     if (!shouldScroll || !targetImageName) {
       return;
@@ -815,18 +888,119 @@ const useKeepMasonrySelectedImageInView = (imageNames: string[], rootRef: Masonr
       return;
     }
 
-    requestAnimationFrame(() => {
-      const rootEl = rootRef.current;
-      if (!rootEl) {
-        return;
-      }
-      scrollMasonryImageIntoView({
-        imageName: targetImageName,
-        rootEl,
+    scrollToImage(
+      getMasonrySelectionScrollTarget({
+        currentImageName: targetImageName,
+        pendingTarget,
         targetIndex,
-      });
+      })
+    );
+  }, [imageNames, pendingSelectionScrollTargetRef, scrollToImage, selection]);
+};
+
+const useKeepVisibleMasonrySelectedImageAnchored = ({
+  columnCount,
+  enabled,
+  imageNames,
+  rootRef,
+  scrollerKey,
+  scrollToImage,
+}: {
+  columnCount: number;
+  enabled: boolean;
+  imageNames: string[];
+  rootRef: MasonryRootRef;
+  scrollerKey: 'static' | 'virtual';
+  scrollToImage: ScrollToMasonryImage;
+}) => {
+  const selection = useAppSelector(selectSelection);
+  const selectedImageName = selection.at(-1) ?? null;
+  const wasVisibleRef = useRef(false);
+  const runAnchorCheckRef = useRef<() => void>(() => undefined);
+  const schedulerRef = useRef<ReturnType<typeof createMasonrySelectionAnchorScheduler> | null>(null);
+
+  const updateVisibility = useCallback(() => {
+    const rootEl = rootRef.current;
+    wasVisibleRef.current = Boolean(
+      enabled && rootEl && selectedImageName && isMasonryImageVisible(rootEl, selectedImageName)
+    );
+  }, [enabled, rootRef, selectedImageName]);
+
+  const runAnchorCheck = useCallback(() => {
+    const rootEl = rootRef.current;
+    if (!enabled || !rootEl || !selectedImageName) {
+      wasVisibleRef.current = false;
+      return;
+    }
+
+    const targetIndex = imageNames.indexOf(selectedImageName);
+    if (targetIndex === -1) {
+      wasVisibleRef.current = false;
+      return;
+    }
+
+    const decision = getMasonrySelectionAnchorDecision({
+      isCurrentlyVisible: isMasonryImageVisible(rootEl, selectedImageName),
+      wasPreviouslyVisible: wasVisibleRef.current,
     });
-  }, [imageNames, rootRef, selection]);
+    wasVisibleRef.current = decision.nextWasVisible;
+
+    if (!decision.shouldAnchor) {
+      return;
+    }
+
+    scrollToImage({ imageName: selectedImageName, targetIndex });
+    requestAnimationFrame(updateVisibility);
+  }, [enabled, imageNames, rootRef, scrollToImage, selectedImageName, updateVisibility]);
+
+  useLayoutEffect(() => {
+    runAnchorCheckRef.current = runAnchorCheck;
+  }, [runAnchorCheck]);
+
+  useEffect(() => {
+    schedulerRef.current = createMasonrySelectionAnchorScheduler({
+      onSettled: () => runAnchorCheckRef.current(),
+    });
+    return () => {
+      schedulerRef.current?.cancel();
+      schedulerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) {
+      wasVisibleRef.current = false;
+      return;
+    }
+
+    const rootEl = rootRef.current;
+    const scroller = rootEl ? getMasonryScroller(rootEl) : null;
+    if (!scroller) {
+      wasVisibleRef.current = false;
+      return;
+    }
+
+    updateVisibility();
+    scroller.addEventListener('scroll', updateVisibility, { passive: true });
+    return () => scroller.removeEventListener('scroll', updateVisibility);
+  }, [enabled, rootRef, scrollerKey, updateVisibility]);
+
+  useEffect(() => {
+    wasVisibleRef.current = false;
+    if (!enabled || !selectedImageName) {
+      return;
+    }
+    const frame = requestAnimationFrame(updateVisibility);
+    return () => cancelAnimationFrame(frame);
+  }, [enabled, selectedImageName, updateVisibility]);
+
+  useEffect(() => {
+    if (enabled) {
+      schedulerRef.current?.schedule();
+    }
+  }, [columnCount, enabled, imageNames]);
+
+  return useCallback(() => schedulerRef.current?.schedule(), []);
 };
 
 type GalleryImageGridMasonryContentProps = {
@@ -842,8 +1016,23 @@ const GalleryImageGridMasonryContent = memo(
     const visibleInFlightImageNamesRef = useRef<Set<string>>(new Set());
     const backgroundInFlightImageNamesRef = useRef<Map<string, number>>(new Map());
     const backgroundRequestIdRef = useRef(0);
+    const pendingSelectionScrollTargetRef = useRef<MasonryScrollTarget | null>(null);
     const { columnCount, hasMeasuredColumnCount } = useMasonryColumnCount(rootRef);
     const shouldRenderStaticMasonry = imageNames.length <= MASONRY_STATIC_RENDER_LIMIT;
+    const renderState = getMasonryRenderState({
+      hasMeasuredColumnCount,
+      imageCount: imageNames.length,
+      isLoading,
+    });
+    const scrollToImage = useMasonryScrollCoordinator(rootRef);
+    const notifyItemLayoutChanged = useKeepVisibleMasonrySelectedImageAnchored({
+      columnCount,
+      enabled: renderState === 'ready',
+      imageNames,
+      rootRef,
+      scrollerKey: shouldRenderStaticMasonry ? 'static' : 'virtual',
+      scrollToImage,
+    });
     const initialItemCount = getMasonryInitialItemCount({
       columnCount,
       imageCount: imageNames.length,
@@ -876,18 +1065,13 @@ const GalleryImageGridMasonryContent = memo(
       backgroundRequestIdRef
     );
     useGalleryStarImageHotkey();
-    useMasonryKeyboardNavigation(imageNames, columnCount, rootRef);
-    useKeepMasonrySelectedImageInView(imageNames, rootRef);
+    useMasonryKeyboardNavigation(imageNames, columnCount, rootRef, pendingSelectionScrollTargetRef, scrollToImage);
+    useKeepMasonrySelectedImageInView(imageNames, pendingSelectionScrollTargetRef, scrollToImage);
 
     const context = useMemo<MasonryContext>(
-      () => ({ queryArgs, registerMissingImageName }),
-      [queryArgs, registerMissingImageName]
+      () => ({ notifyItemLayoutChanged, queryArgs, registerMissingImageName }),
+      [notifyItemLayoutChanged, queryArgs, registerMissingImageName]
     );
-    const renderState = getMasonryRenderState({
-      hasMeasuredColumnCount,
-      imageCount: imageNames.length,
-      isLoading,
-    });
 
     let content: ReactNode = null;
 
@@ -909,6 +1093,7 @@ const GalleryImageGridMasonryContent = memo(
         <StaticMasonryImageGrid columnCount={columnCount} context={context} imageNames={imageNames} />
       ) : (
         <VirtuosoMasonry<string, MasonryContext>
+          data-masonry-scroller=""
           columnCount={columnCount}
           context={context}
           data={imageNames}
