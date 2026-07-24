@@ -19,7 +19,6 @@ from invokeai.app.invocations.model import CLIPField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -104,7 +103,7 @@ class CompelInvocation(BaseInvocation):
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=TorchDevice.choose_torch_dtype,
                 truncate_long_prompts=False,
-                device=get_effective_device(text_encoder),
+                device=text_encoder_info.compute_device,
                 split_long_text_mode=SplitLongTextMode.SENTENCES,
             )
 
@@ -213,7 +212,7 @@ class SDXLPromptInvocationBase:
                 truncate_long_prompts=False,  # TODO:
                 returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
                 requires_pooled=get_pooled,
-                device=get_effective_device(text_encoder),
+                device=text_encoder_info.compute_device,
                 split_long_text_mode=SplitLongTextMode.SENTENCES,
             )
 
