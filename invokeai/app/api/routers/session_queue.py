@@ -375,20 +375,16 @@ async def clear(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> ClearResult:
-    """Clears the queue entirely. Admin users clear all items; non-admin users only clear their own items. If there's a currently-executing item, users can only cancel it if they own it or are an admin."""
+    """Clears the queue. Admin users clear (and cancel) all items; non-admin users clear only their
+    own items — other users' queued and running items are untouched."""
     try:
-        queue_item = ApiDependencies.invoker.services.session_queue.get_current(queue_id)
-        if queue_item is not None:
-            # Check authorization for canceling the current item
-            if queue_item.user_id != current_user.user_id and not current_user.is_admin:
-                raise HTTPException(
-                    status_code=403, detail="You do not have permission to cancel the currently executing queue item"
-                )
-            ApiDependencies.invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
-        # Admin users can clear all items, non-admin users can only clear their own
+        # The service cancels every in-progress item in scope itself (there can be several
+        # with multiple workers), so there is no per-item authorization to do here: a
+        # non-admin's scope is exactly their own items. The previous single get_current()
+        # check both 403'd users whose arbitrary selected row belonged to someone else and
+        # let a scoped clear interrupt another user's running generation.
         user_id = None if current_user.is_admin else current_user.user_id
-        clear_result = ApiDependencies.invoker.services.session_queue.clear(queue_id, user_id=user_id)
-        return clear_result
+        return ApiDependencies.invoker.services.session_queue.clear(queue_id, user_id=user_id)
     except HTTPException:
         raise
     except Exception as e:

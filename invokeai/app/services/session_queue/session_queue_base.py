@@ -32,8 +32,13 @@ class SessionQueueBase(ABC):
     """Base class for session queue"""
 
     @abstractmethod
-    def dequeue(self) -> Optional[SessionQueueItem]:
-        """Dequeues the next session queue item."""
+    def dequeue(self, device: Optional[str] = None) -> Optional[SessionQueueItem]:
+        """Dequeues the next session queue item, recording the processing device (e.g. 'cuda:1') if given.
+
+        When a device is given, implementations may prefer — among the fairness-chosen user's
+        equal-priority pending items — one whose models are already cached on that device, to
+        avoid expensive model reloads (device affinity).
+        """
         pass
 
     @abstractmethod

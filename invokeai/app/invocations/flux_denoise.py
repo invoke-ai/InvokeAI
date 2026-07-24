@@ -599,7 +599,9 @@ class FluxDenoiseInvocation(BaseInvocation):
         for redux_cond_field in redux_cond_list:
             # Load the Redux conditioning tensor.
             redux_cond_data = context.tensors.load(redux_cond_field.conditioning.tensor_name)
-            redux_cond_data.to(device=device, dtype=dtype)
+            # `.to()` is out-of-place — assign the result, or the embeddings stay on whatever
+            # device they were saved from (e.g. an idle-GPU-offloaded Redux node's borrowed GPU).
+            redux_cond_data = redux_cond_data.to(device=device, dtype=dtype)
 
             # Load the mask, if provided.
             mask: Optional[torch.Tensor] = None

@@ -1,6 +1,8 @@
 # Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Default implementation of model loading in InvokeAI."""
 
+import copy
+import itertools
 import re
 from logging import Logger
 from pathlib import Path
@@ -12,8 +14,13 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
+from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, get_model_cache_key
+from invokeai.backend.model_manager.load.model_cache.model_cache import (
+    MODEL_LOAD_LOCK,
+    ModelCache,
+    get_model_cache_key,
+)
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import (
@@ -52,7 +59,9 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
 )
 
 
-# TO DO: The loader is not thread safe!
+# The construction path is not thread-safe on its own; it monkey-patches process-global torch state
+# (see MODEL_LOAD_LOCK). Concurrent callers must hold the MODEL_LOAD_LOCK write lock (see
+# _load_and_cache).
 class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
 
@@ -85,8 +94,7 @@ class ModelLoader(ModelLoaderBase):
         if not model_path.exists():
             raise FileNotFoundError(f"Files for model '{model_config.name}' not found at {model_path}")
 
-        with skip_torch_weight_init():
-            cache_record = self._load_and_cache(model_config, submodel_type)
+        cache_record = self._load_and_cache(model_config, submodel_type)
         return LoadedModel(config=model_config, cache_record=cache_record, cache=self._ram_cache)
 
     @property
@@ -124,25 +132,87 @@ class ModelLoader(ModelLoaderBase):
 
     def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> CacheRecord:
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
+        cache_key = get_model_cache_key(config.key, submodel_type)
         try:
-            return self._ram_cache.get(key=get_model_cache_key(config.key, submodel_type), stats_name=stats_name)
+            return self._ram_cache.get(key=cache_key, stats_name=stats_name)
         except IndexError:
             pass
 
-        config.path = str(self._get_model_path(config))
-        self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
-        loaded_model = self._load_model(config, submodel_type)
+        # Cache miss: construct the model from disk. This path holds the MODEL_LOAD_LOCK *write*
+        # lock because it relies on process-global, non-thread-safe monkey-patches
+        # (skip_torch_weight_init and, inside the loaders, accelerate.init_empty_weights / diffusers
+        # low_cpu_mem_usage). The write lock excludes both other constructions AND concurrent VRAM
+        # load/unload on other workers (which take the read lock); without that, a concurrent move's
+        # load_state_dict(assign=True) -> register_parameter gets hijacked onto the `meta` device.
+        # See MODEL_LOAD_LOCK for the full explanation.
+        #
+        # Lock-ordering: the write lock is acquired before any ModelCache._lock taken below
+        # (get/make_room/put), matching the readers' order, so there is no AB-BA deadlock.
+        with MODEL_LOAD_LOCK.write_lock():
+            # Double-checked locking: another worker sharing this cache may have loaded the same
+            # entry while we waited for the mutex. (Workers on other devices use a different cache,
+            # so they will still miss here and construct their own copy — which is intended.)
+            try:
+                return self._ram_cache.get(key=cache_key, stats_name=stats_name)
+            except IndexError:
+                pass
 
-        # Determine execution device from model config, considering submodel type
-        execution_device = self._get_execution_device(config, submodel_type)
+            config.path = str(self._get_model_path(config))
 
-        self._ram_cache.put(
-            get_model_cache_key(config.key, submodel_type),
-            model=loaded_model,
-            execution_device=execution_device,
-        )
+            # Fast path (multi-GPU): if another device already loaded this exact model, its canonical
+            # CPU weights are still resident in the shared store along with an empty (meta-weight)
+            # clone of the built module. Adopt those weights instead of re-reading the model from
+            # disk — this avoids both the redundant disk read and the large transient second copy
+            # that would otherwise spike RAM (and, on a RAM-constrained box, drive the system into
+            # swap). Any failure falls back to a normal load, so it can never change the result.
+            loaded_model = self._try_adopt_shared_weights(cache_key)
 
-        return self._ram_cache.get(key=get_model_cache_key(config.key, submodel_type), stats_name=stats_name)
+            shell_to_register: Optional[torch.nn.Module] = None
+            if loaded_model is None:
+                # Optional RAM instrumentation for the cold disk-load path (the only place that runs
+                # `from_pretrained`, whose construction transient can briefly spike RAM past the
+                # cache's retained budget). Gated on `log_memory_usage`; captures process RAM before
+                # make_room, after make_room (retained baseline), and after construction (transient
+                # peak) so the surge can be attributed without guessing.
+                log_mem = self._app_config.log_memory_usage
+                ram_before = MemorySnapshot.capture().process_ram if log_mem else 0
+                self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+                ram_after_room = MemorySnapshot.capture().process_ram if log_mem else 0
+                with skip_torch_weight_init():
+                    loaded_model = self._load_model(config, submodel_type)
+                if log_mem:
+                    ram_peak = MemorySnapshot.capture().process_ram
+                    self._logger.info(
+                        f"Cold load RAM for '{cache_key}': "
+                        f"make_room {ram_before / GB:.2f}->{ram_after_room / GB:.2f}GB "
+                        f"({(ram_after_room - ram_before) / GB:+.2f}), "
+                        f"construct {ram_after_room / GB:.2f}->{ram_peak / GB:.2f}GB "
+                        f"({(ram_peak - ram_after_room) / GB:+.2f}) [transient peak]"
+                    )
+                # Snapshot a meta-weight clone now — before put() applies custom layers or any VRAM
+                # move — so the next device to load this model can adopt these weights (see above).
+                # Skipped in single-device setups, where no other cache will ever adopt it.
+                shared_store = self._ram_cache.shared_cpu_weights
+                if shared_store is not None and shared_store.enable_shell_capture:
+                    shell_to_register = self._build_meta_shell(loaded_model)
+
+            # Determine execution device from model config, considering submodel type
+            execution_device = self._get_execution_device(config, submodel_type)
+
+            self._ram_cache.put(
+                cache_key,
+                model=loaded_model,
+                execution_device=execution_device,
+            )
+
+            # Register the shell only after put() has created the shared entry (via the wrapper's
+            # acquire); it is dropped automatically when that entry's last reference is released.
+            if shell_to_register is not None:
+                shared_store = self._ram_cache.shared_cpu_weights
+                if shared_store is not None:
+                    shared_store.set_shell(cache_key, shell_to_register)
+
+            return self._ram_cache.get(key=cache_key, stats_name=stats_name)
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
@@ -302,6 +372,107 @@ class ModelLoader(ModelLoaderBase):
 
         module.register_forward_pre_hook(pre_hook)
         module.register_forward_hook(post_hook, always_call=True)
+
+    def _try_adopt_shared_weights(self, cache_key: str) -> Optional[AnyModel]:
+        """Build this model by adopting another device's already-resident CPU weights, skipping the
+        disk read entirely.
+
+        Returns the constructed model, or None if adoption is unavailable or fails for any reason (in
+        which case the caller loads the model from disk normally). Loader-agnostic: it deep-copies the
+        meta-weight shell that the first device registered (`_build_meta_shell`) and assigns the
+        shared canonical weights into the copy — no per-loader architecture knowledge required, and
+        fp8 cast hooks carried by the shell are preserved automatically.
+
+        Must be called while holding the MODEL_LOAD_LOCK write lock (as `_load_and_cache` does), so
+        the peeked canonical weights and shell cannot be evicted between the peek and the adopt.
+        """
+        shared_store = self._ram_cache.shared_cpu_weights
+        if shared_store is None:
+            return None
+        canonical = shared_store.peek(cache_key)
+        shell = shared_store.get_shell(cache_key)
+        if canonical is None or shell is None:
+            return None
+
+        try:
+            # Independent module per device (its params will be moved to its own GPU); deep-copying an
+            # all-meta shell is cheap (no weight data). assign=True then re-points the copy's
+            # parameters at the shared canonical tensors with no allocation.
+            model = copy.deepcopy(shell)
+            model.load_state_dict(canonical, assign=True)
+            # Safety net: if anything is left on the meta device (e.g. a persistent buffer somehow
+            # missing from the canonical state dict) the model would silently produce wrong results.
+            for tensor in itertools.chain(model.parameters(), model.buffers()):
+                if tensor.is_meta:
+                    raise RuntimeError("adopted model has tensors left on the meta device")
+        except Exception as e:
+            # Adoption is best-effort; never let it break a load. Fall back to a normal disk load.
+            self._logger.warning(
+                f"Could not adopt shared CPU weights for '{cache_key}' ({e!r}); loading from disk instead."
+            )
+            return None
+
+        self._logger.info(
+            f"Adopted shared CPU weights for '{cache_key}' from another device's cache (skipped disk load)."
+        )
+        return model
+
+    @staticmethod
+    def _build_meta_shell(model: AnyModel) -> Optional[torch.nn.Module]:
+        """Return an empty, meta-weight structural clone of `model`, or None if it can't be cloned.
+
+        The clone has the identical module structure, registered hooks (e.g. the fp8 layerwise-cast
+        hooks), and non-persistent buffers as `model`, but every parameter and persistent buffer is
+        replaced by a 0-byte tensor on the `meta` device. A second device adopts it by deep-copying
+        and assigning the shared canonical weights — so this works for every model family (diffusers,
+        single-file checkpoint, GGUF, transformers) without any per-loader code.
+
+        Best-effort: returns None on any failure (the model then simply isn't adoptable, and the next
+        device loads it from disk as before).
+        """
+        if not isinstance(model, torch.nn.Module):
+            return None
+
+        def _meta_like(t: torch.Tensor) -> torch.Tensor:
+            # A 0-byte stand-in with the same logical shape/dtype as `t`; replaced by the canonical
+            # tensor on adoption (load_state_dict(assign=True)), so only its shape needs to match.
+            # `torch.empty_like` is preferred (preserves layout etc.) but is NOT implemented by some
+            # tensor subclasses — notably the GGUF `GGMLTensor`, whose `__torch_dispatch__` returns
+            # NotImplemented for `aten.empty_like`. That made `_build_meta_shell` throw on the first
+            # parameter of every GGUF model (e.g. a Q8_0 quantized transformer), silently disabling
+            # cross-device adoption for exactly the largest models. For those, fall back to a plain
+            # meta tensor built from the subclass's reported (dequantized) shape and dtype.
+            try:
+                return torch.empty_like(t, device="meta")
+            except TypeError:
+                return torch.empty(t.shape, dtype=t.dtype, device="meta")
+
+        try:
+            # Persistent buffers come from the canonical state dict on adoption, so they (like params)
+            # are replaced by meta placeholders. Non-persistent buffers are NOT in the state dict, so
+            # they must be carried over with real data (deepcopy copies them); they are typically
+            # small (e.g. rotary-embedding tables, attention masks).
+            persistent_names = set(model.state_dict().keys())
+            persistent_buffer_ids = {id(b) for n, b in model.named_buffers() if n in persistent_names}
+
+            memo: dict[int, object] = {}
+            for param in model.parameters(recurse=True):
+                memo[id(param)] = torch.nn.Parameter(_meta_like(param), requires_grad=param.requires_grad)
+            for buffer in model.buffers(recurse=True):
+                if id(buffer) in persistent_buffer_ids:
+                    memo[id(buffer)] = _meta_like(buffer)
+
+            return copy.deepcopy(model, memo)
+        except Exception as e:
+            # Best-effort: an un-clonable model simply isn't adoptable (the next device loads it from
+            # disk). Log at debug so a newly-unadoptable model family can be diagnosed rather than
+            # silently double-loading on every device.
+            from invokeai.backend.util.logging import InvokeAILogger
+
+            InvokeAILogger.get_logger().debug(
+                f"Could not build meta-weight shell for {type(model).__name__} ({e!r}); model won't be adopted."
+            )
+            return None
 
     # This needs to be implemented in the subclass
     def _load_model(

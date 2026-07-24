@@ -208,16 +208,32 @@ class Flux2RefImageExtension:
                 vae_dtype = next(iter(vae.parameters())).dtype
                 image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
 
-                # FLUX.2 VAE uses diffusers API
-                latent_dist = vae.encode(image_tensor, return_dict=False)[0]
+                # The FLUX.2 VAE encoder's mid-block self-attention scales quadratically with the
+                # input's spatial size (and on ROCm, SDPA falls back to a *materialized* attention
+                # matrix), so encoding a reference image at full size OOMs VRAM — ~15GB at 1024px,
+                # hundreds of GB at the 2024px reference cap. Tile the encode to bound peak memory
+                # regardless of reference resolution. The VAE's default tile size equals its
+                # sample_size (1024), which still OOMs per tile, so force a smaller 512px tile.
+                # Save/restore the tiling config because this VAE is a shared, cached instance (e.g.
+                # the final image decode must not inherit these settings).
+                downsample = 2 ** (len(vae.config.block_out_channels) - 1)
+                prev_tiling = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
+                vae.use_tiling = True
+                vae.tile_sample_min_size = 512
+                vae.tile_latent_min_size = 512 // downsample
+                try:
+                    # FLUX.2 VAE uses diffusers API
+                    latent_dist = vae.encode(image_tensor, return_dict=False)[0]
 
-                # Use mode() for deterministic encoding (no sampling)
-                if hasattr(latent_dist, "mode"):
-                    ref_image_latents_unpacked = latent_dist.mode()
-                elif hasattr(latent_dist, "sample"):
-                    ref_image_latents_unpacked = latent_dist.sample()
-                else:
-                    ref_image_latents_unpacked = latent_dist
+                    # Use mode() for deterministic encoding (no sampling)
+                    if hasattr(latent_dist, "mode"):
+                        ref_image_latents_unpacked = latent_dist.mode()
+                    elif hasattr(latent_dist, "sample"):
+                        ref_image_latents_unpacked = latent_dist.sample()
+                    else:
+                        ref_image_latents_unpacked = latent_dist
+                finally:
+                    vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size = prev_tiling
 
                 TorchDevice.empty_cache()
 

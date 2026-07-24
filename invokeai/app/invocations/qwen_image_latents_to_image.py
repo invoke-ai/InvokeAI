@@ -58,7 +58,15 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
             # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
             latents = latents.to(device=vae_info.compute_device, dtype=vae.dtype)
 
-            vae.disable_tiling()
+            # Honor the global force_tiled_decode setting, like the SD/SDXL l2i node. Tiling bounds the
+            # VAE's per-tile memory, which is the scalable way to decode very large outputs that would
+            # exceed VRAM even after offloading the transformer/text encoder. For normal sizes, leave
+            # it off (faster, no tile blending) — the reserved working memory offloads other models so
+            # the full-frame decode fits.
+            if context.config.get().force_tiled_decode:
+                vae.enable_tiling()
+            else:
+                vae.disable_tiling()
 
             tiling_context = nullcontext()
 

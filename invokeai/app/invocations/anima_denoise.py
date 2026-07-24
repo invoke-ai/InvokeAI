@@ -789,7 +789,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
                 if driver is not None:
                     user_step = 0
-                    pbar = tqdm(total=total_steps, desc="Denoising (Anima)")
+                    pbar = tqdm(total=total_steps, desc=f"Denoising (Anima){TorchDevice.get_session_device_label()}")
                     for it in driver.iterations():
                         # Gate on the user-facing step index so both halves of a
                         # multi-pass step (e.g. Heun pairs) share one gate value.
@@ -843,7 +843,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     pbar.close()
                 else:
                     # Built-in Euler implementation (default for Anima)
-                    for step_idx in tqdm(range(total_steps), desc="Denoising (Anima)"):
+                    for step_idx in tqdm(
+                        range(total_steps), desc=f"Denoising (Anima){TorchDevice.get_session_device_label()}"
+                    ):
                         for lllite_field, lllite_model, _ in lllite_adapters:
                             lllite_model.set_multiplier(
                                 self._get_lllite_multiplier(lllite_field, step_idx, total_steps)

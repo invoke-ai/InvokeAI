@@ -1,6 +1,7 @@
 import asyncio
 import json
 import sqlite3
+import threading
 from collections.abc import Sequence
 from typing import Any, Optional, Union, cast
 
@@ -86,6 +87,17 @@ ROUND_ROBIN_DEQUEUE_QUERY = """--sql
     LIMIT 1
     """
 
+# Upper bound on how many resident model keys the device-affinity scoring query binds. Real
+# per-device caches hold at most a handful of models; this only guards the SQL parameter count.
+MAX_AFFINITY_MODEL_KEYS = 50
+
+# How far past the fairness-chosen candidate (in item_id distance) the device-affinity swap may
+# look for a warm-model item. This bounds two things at once: the scoring query's cost (at most
+# this many session blobs are scanned per dequeue) and how long a cold item can be deferred — the
+# starved candidate's item_id never changes, so newly enqueued warm items eventually fall outside
+# the window and the cold item runs after at most ~this many swaps.
+AFFINITY_MAX_LOOKAHEAD = 32
+
 # FIFO dequeue (single-user mode, or round_robin explicitly disabled): strict priority then
 # insertion order.
 FIFO_DEQUEUE_QUERY = """--sql
@@ -105,6 +117,12 @@ FIFO_DEQUEUE_QUERY = """--sql
 
 class SqliteSessionQueue(SessionQueueBase):
     __invoker: Invoker
+
+    # Serializes the select-candidate-then-claim sequence in `dequeue()`. The DB connection's
+    # RLock serializes individual statements, but the gap between selecting the next pending item
+    # and marking it 'in_progress' is a race: with multiple session-processor workers (multi-GPU),
+    # two workers could select the same item. Holding this lock across the whole claim prevents it.
+    _dequeue_lock = threading.Lock()
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
@@ -296,20 +314,102 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_batch_enqueued(enqueue_result, user_id=user_id)
         return enqueue_result
 
-    def dequeue(self) -> Optional[SessionQueueItem]:
+    def dequeue(self, device: Optional[str] = None) -> Optional[SessionQueueItem]:
         config = self.__invoker.services.configuration
         use_round_robin = config.multiuser and config.session_queue_mode == "round_robin"
 
         query = ROUND_ROBIN_DEQUEUE_QUERY if use_round_robin else FIFO_DEQUEUE_QUERY
 
-        with self._db.transaction() as cursor:
-            cursor.execute(query)
-            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-        if result is None:
-            return None
-        queue_item = SessionQueueItem.queue_item_from_dict(dict(result))
-        queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress")
+        # Snapshot the claiming device's warm models BEFORE taking the dequeue lock: the lookup
+        # touches the ModelCache lock, which other threads may hold across long operations (VRAM
+        # transfers, cache clears). A slightly stale snapshot is fine for a heuristic; stalling
+        # every worker's dequeue is not. An explicitly configured session_queue_mode=FIFO is a
+        # request for strict insertion order, so it opts out of affinity reordering entirely
+        # (the setting defaults to round_robin, which keeps affinity active for single-user
+        # installs even though they use the FIFO query).
+        if config.session_queue_mode == "round_robin":
+            resident_model_keys = self._get_device_resident_model_keys(device)
+        else:
+            resident_model_keys = set()
+
+        # Hold the dequeue lock across the select-then-claim so concurrent workers (multi-GPU)
+        # cannot select and claim the same pending item. `_set_queue_item_status` already no-ops
+        # if the item was concurrently moved to a terminal state (e.g. canceled), so we only need
+        # to guard against two dequeues racing for the same pending row.
+        with self._dequeue_lock:
+            with self._db.transaction() as cursor:
+                cursor.execute(query)
+                result = cast(Union[sqlite3.Row, None], cursor.fetchone())
+            if result is None:
+                return None
+            queue_item = SessionQueueItem.queue_item_from_dict(dict(result))
+            queue_item = self._apply_device_affinity(queue_item, resident_model_keys)
+            # Record the claiming worker's device so the UI can label the item by GPU.
+            queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress", device=device)
         return queue_item
+
+    def _apply_device_affinity(self, candidate: SessionQueueItem, resident_keys: set[str]) -> SessionQueueItem:
+        """Swap the fairness-chosen candidate for a nearby same-user, same-priority pending item
+        whose models are already cached on the claiming device, if one exists.
+
+        Cross-device model reloads are expensive (tens of seconds for large models), so when a user
+        has queued a mix of models, preferring an item whose models are warm on the freeing GPU cuts
+        thrash. Fairness is preserved by construction: round-robin decides *which user* is served and
+        priority ordering decides *which tier* of their items is eligible; this heuristic only
+        reorders within that user's equal-priority pending items, and only within
+        AFFINITY_MAX_LOOKAHEAD of the candidate's item_id, so a cold item's deferral is bounded.
+        The caller passes an empty key set to disable affinity (legacy single-device mode, explicit
+        FIFO mode, or cache introspection unavailable).
+        """
+        if not resident_keys:
+            return candidate
+        # Model keys are UUID strings that appear verbatim in the session JSON, so residency can be
+        # scored with substring matches — no need to parse each candidate's session. Sort for
+        # deterministic parameter binding; cap to bound the query if a cache is unexpectedly large.
+        keys = sorted(resident_keys)[:MAX_AFFINITY_MODEL_KEYS]
+        score = " + ".join(["(instr(sq.session, ?) > 0)"] * len(keys))
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                SELECT
+                    sq.*,
+                    u.display_name AS user_display_name,
+                    u.email AS user_email,
+                    ({score}) AS affinity
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
+                WHERE sq.status = 'pending'
+                    AND sq.user_id IS ?
+                    AND sq.priority = ?
+                    AND sq.item_id <= ?
+                ORDER BY affinity DESC, sq.item_id ASC
+                LIMIT 1
+                """,
+                (*keys, candidate.user_id, candidate.priority, candidate.item_id + AFFINITY_MAX_LOOKAHEAD),
+            )
+            row = cast(Union[sqlite3.Row, None], cursor.fetchone())
+        if row is None:
+            return candidate
+        row_dict = dict(row)
+        if not row_dict.pop("affinity", 0) or row_dict["item_id"] == candidate.item_id:
+            # No warm-model item for this user (or the candidate already is one) — keep the
+            # fairness-chosen candidate.
+            return candidate
+        return SessionQueueItem.queue_item_from_dict(row_dict)
+
+    def _get_device_resident_model_keys(self, device: Optional[str]) -> set[str]:
+        """Best-effort lookup of the model keys currently cached for the given generation device."""
+        if device is None:
+            return set()
+        try:
+            cache = self.__invoker.services.model_manager.load.ram_caches.get(device)
+            if cache is None:
+                return set()
+            return set(cache.cached_model_keys())
+        except Exception:
+            # Affinity is purely an optimization — dequeue must never fail because cache
+            # introspection did (e.g. model manager not fully started, or mocked in tests).
+            return set()
 
     def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:
         with self._db.transaction() as cursor:
@@ -365,6 +465,7 @@ class SqliteSessionQueue(SessionQueueBase):
         error_type: Optional[str] = None,
         error_message: Optional[str] = None,
         error_traceback: Optional[str] = None,
+        device: Optional[str] = None,
     ) -> SessionQueueItem:
         with self._db.transaction() as cursor:
             cursor.execute(
@@ -386,10 +487,10 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(
                 """--sql
                 UPDATE session_queue
-                SET status = ?, status_sequence = COALESCE(status_sequence, 0) + 1, error_type = ?, error_message = ?, error_traceback = ?
+                SET status = ?, status_sequence = COALESCE(status_sequence, 0) + 1, error_type = ?, error_message = ?, error_traceback = ?, device = COALESCE(?, device)
                 WHERE item_id = ?
                 """,
-                (status, error_type, error_message, error_traceback, item_id),
+                (status, error_type, error_message, error_traceback, device, item_id),
             )
 
         queue_item = self.get_queue_item(item_id)
@@ -452,10 +553,35 @@ class SqliteSessionQueue(SessionQueueBase):
         return deduped_chain_item_ids
 
     def _get_current_workflow_call_chain_item_ids(self, queue_id: str) -> set[int]:
-        current_queue_item = self.get_current(queue_id)
-        if current_queue_item is not None:
-            return set(self._get_workflow_call_chain_item_ids(current_queue_item.item_id))
+        """Item ids in the workflow-call chains of every currently executing item.
 
+        With multiple GPU workers, several items can be in_progress at once. Every one of them is
+        "current": the "except current" operations must leave each active worker's complete
+        ancestor/descendant chain intact, not just the chain of one arbitrarily selected item.
+        Waiting chains with no in-progress item remain cancellable backlog, exactly as in
+        single-worker mode.
+        """
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE queue_id = ? AND status = 'in_progress'
+                ORDER BY item_id ASC
+                """,
+                (queue_id,),
+            )
+            in_progress_ids = [cast(int, row[0]) for row in cursor.fetchall()]
+
+        if in_progress_ids:
+            chain_item_ids: set[int] = set()
+            for item_id in in_progress_ids:
+                chain_item_ids.update(self._get_workflow_call_chain_item_ids(item_id))
+            return chain_item_ids
+
+        # Nothing is in progress. A chain can still be mid-execution in the gap between one child
+        # finishing and the next being dequeued (parent 'waiting', next child 'pending'); protect
+        # the chain of the next item that would be dequeued, as before.
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
@@ -504,8 +630,20 @@ class SqliteSessionQueue(SessionQueueBase):
         return IsFullResult(is_full=is_full)
 
     def clear(self, queue_id: str, user_id: Optional[str] = None) -> ClearResult:
+        user_filter = "AND user_id = ?" if user_id is not None else ""
+        # Cancel every in-progress item in scope BEFORE deleting rows, so each running
+        # worker is signaled to stop via its item's own status-changed event. With
+        # multiple workers (multi-GPU) more than one item can be in_progress at once, and
+        # a user-scoped clear must cancel all of that user's running items — and ONLY
+        # that user's: other users' rows are out of scope and their workers must keep
+        # running. See delete_by_destination for the same pattern.
+        match_filter = f"queue_id == ? {user_filter}"
+        cancel_params: list[Any] = [queue_id]
+        if user_id is not None:
+            cancel_params.append(user_id)
+        self._cancel_in_progress_matching(match_filter, cancel_params)
+
         with self._db.transaction() as cursor:
-            user_filter = "AND user_id = ?" if user_id is not None else ""
             where = f"""--sql
                 WHERE queue_id = ?
                 {user_filter}
@@ -628,6 +766,45 @@ class SqliteSessionQueue(SessionQueueBase):
         )
         return queue_item
 
+    def _cancel_in_progress_matching(self, match_filter: str, params: list[Any]) -> list[int]:
+        """Cancel every in-progress item matching `match_filter`, emitting a cancel event for each.
+
+        The bulk-cancel methods exclude in-progress items from their single UPDATE statement, because
+        a running item must be canceled via `_set_queue_item_status()` so that its
+        `QueueItemStatusChangedEvent` is emitted — the session processor responds to that event by
+        setting the cancel event of the worker running that exact item_id. With multiple workers
+        (multi-GPU) more than one item can be in_progress at once, so each matching item is canceled
+        individually here rather than relying on a single `get_current()` (which returns only one).
+
+        `match_filter` is a WHERE fragment without the leading WHERE (e.g.
+        "queue_id == ? AND batch_id IN (?, ?)"); `params` are its bound values.
+
+        Returns the item ids of the in-progress items actually canceled.
+        """
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE status == 'in_progress' AND {match_filter};
+                """,
+                tuple(params),
+            )
+            item_ids = [row[0] for row in cursor.fetchall()]
+
+        canceled: list[int] = []
+        for item_id in item_ids:
+            # _set_queue_item_status no-ops (and returns the existing item) if the item finished
+            # between the SELECT and now, so count only the ones we actually moved to 'canceled'.
+            # It raises if the row vanished entirely (a concurrent clear/delete); such an item
+            # needs no cancellation, so skip it rather than failing the whole bulk operation.
+            try:
+                if self._set_queue_item_status(item_id, "canceled").status == "canceled":
+                    canceled.append(item_id)
+            except SessionQueueItemNotFoundError:
+                continue
+        return canceled
+
     def _collect_item_ids_by_user(
         self, cursor: sqlite3.Cursor, where: str, params: Sequence[Any]
     ) -> dict[str, list[int]]:
@@ -660,27 +837,24 @@ class SqliteSessionQueue(SessionQueueBase):
     def cancel_by_batch_ids(
         self, queue_id: str, batch_ids: list[str], user_id: Optional[str] = None
     ) -> CancelByBatchIDsResult:
-        with self._db.transaction() as cursor:
-            current_queue_item = self.get_current(queue_id)
-            placeholders = ", ".join(["?" for _ in batch_ids])
+        placeholders = ", ".join(["?" for _ in batch_ids])
+        # Build the match filter (with optional user_id filter) shared by the bulk update and the
+        # in-progress cancellation below.
+        user_filter = "AND user_id = ?" if user_id is not None else ""
+        match_filter = f"queue_id == ? AND batch_id IN ({placeholders}) {user_filter}"
+        params: list[Any] = [queue_id] + batch_ids
+        if user_id is not None:
+            params.append(user_id)
 
-            # Build WHERE clause with optional user_id filter
-            user_filter = "AND user_id = ?" if user_id is not None else ""
+        with self._db.transaction() as cursor:
             where = f"""--sql
-                WHERE
-                  queue_id == ?
-                  AND batch_id IN ({placeholders})
+                WHERE {match_filter}
                   AND status != 'canceled'
                   AND status != 'completed'
                   AND status != 'failed'
-                  -- We will cancel the current item separately below - skip it here
+                  -- In-progress items are canceled individually below so each worker is signaled.
                   AND status != 'in_progress'
-                  {user_filter}
                 """
-            params = [queue_id] + batch_ids
-            if user_id is not None:
-                params.append(user_id)
-
             canceled_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
             count = sum(len(item_ids) for item_ids in canceled_item_ids_by_user.values())
             cursor.execute(
@@ -693,11 +867,10 @@ class SqliteSessionQueue(SessionQueueBase):
                 tuple(params),
             )
 
-        # Handle current item separately - check ownership if user_id is provided. This emits a
-        # per-item queue_item_status_changed, so the bulk event below need not include it.
-        if current_queue_item is not None and current_queue_item.batch_id in batch_ids:
-            if user_id is None or current_queue_item.user_id == user_id:
-                self._set_queue_item_status(current_queue_item.item_id, "canceled")
+        # Cancel every in-progress item matching the same filter (multi-GPU: possibly several at
+        # once). Each cancel emits its own per-item queue_item_status_changed, so the bulk event
+        # below need not include them (the WHERE above already excludes in-progress rows).
+        count += len(self._cancel_in_progress_matching(match_filter, params))
 
         self._emit_queue_items_canceled(queue_id, canceled_item_ids_by_user)
         return CancelByBatchIDsResult(canceled=count)
@@ -705,26 +878,21 @@ class SqliteSessionQueue(SessionQueueBase):
     def cancel_by_destination(
         self, queue_id: str, destination: str, user_id: Optional[str] = None
     ) -> CancelByDestinationResult:
-        with self._db.transaction() as cursor:
-            current_queue_item = self.get_current(queue_id)
+        user_filter = "AND user_id = ?" if user_id is not None else ""
+        match_filter = f"queue_id == ? AND destination == ? {user_filter}"
+        params: list[Any] = [queue_id, destination]
+        if user_id is not None:
+            params.append(user_id)
 
-            # Build WHERE clause with optional user_id filter
-            user_filter = "AND user_id = ?" if user_id is not None else ""
+        with self._db.transaction() as cursor:
             where = f"""--sql
-                WHERE
-                  queue_id == ?
-                  AND destination == ?
+                WHERE {match_filter}
                   AND status != 'canceled'
                   AND status != 'completed'
                   AND status != 'failed'
-                  -- We will cancel the current item separately below - skip it here
+                  -- In-progress items are canceled individually below so each worker is signaled.
                   AND status != 'in_progress'
-                  {user_filter}
                 """
-            params = [queue_id, destination]
-            if user_id is not None:
-                params.append(user_id)
-
             canceled_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
             count = sum(len(item_ids) for item_ids in canceled_item_ids_by_user.values())
             cursor.execute(
@@ -737,11 +905,10 @@ class SqliteSessionQueue(SessionQueueBase):
                 tuple(params),
             )
 
-        # Handle current item separately - check ownership if user_id is provided. This emits a
-        # per-item queue_item_status_changed, so the bulk event below need not include it.
-        if current_queue_item is not None and current_queue_item.destination == destination:
-            if user_id is None or current_queue_item.user_id == user_id:
-                self._set_queue_item_status(current_queue_item.item_id, "canceled")
+        # Cancel every in-progress item matching the same filter (multi-GPU: possibly several at
+        # once). Each cancel emits its own per-item queue_item_status_changed, so the bulk event
+        # below need not include them (the WHERE above already excludes in-progress rows).
+        count += len(self._cancel_in_progress_matching(match_filter, params))
 
         self._emit_queue_items_canceled(queue_id, canceled_item_ids_by_user)
         return CancelByDestinationResult(canceled=count)
@@ -749,40 +916,41 @@ class SqliteSessionQueue(SessionQueueBase):
     def delete_by_destination(
         self, queue_id: str, destination: str, user_id: Optional[str] = None
     ) -> DeleteByDestinationResult:
+        user_filter = "AND user_id = ?" if user_id is not None else ""
+        match_filter = f"queue_id == ? AND destination == ? {user_filter}"
+        params: list[Any] = [queue_id, destination]
+        if user_id is not None:
+            params.append(user_id)
+
+        # Cancel every in-progress item first so each running worker is signaled to stop before we
+        # delete its row. With multiple workers (multi-GPU) more than one item can be in_progress;
+        # canceling only get_current() would leave the others running (and then failing to update a
+        # deleted row). See _cancel_in_progress_matching.
+        canceled_in_progress_ids = set(self._cancel_in_progress_matching(match_filter, params))
+
         with self._db.transaction() as cursor:
-            current_queue_item = self.get_current(queue_id)
-
-            # Handle current item separately - check ownership if user_id is provided. Its cancel
-            # emits a per-item queue_item_status_changed, so the bulk event below must not signal
-            # it a second time. Its row still matches the destination WHERE (the cancel only flips
-            # its status), so it is excluded from the collected ids — but not from the DELETE or
-            # the returned count.
-            canceled_current_item_id: Optional[int] = None
-            if current_queue_item is not None and current_queue_item.destination == destination:
-                if user_id is None or current_queue_item.user_id == user_id:
-                    self.cancel_queue_item(current_queue_item.item_id)
-                    canceled_current_item_id = current_queue_item.item_id
-
-            # Build WHERE clause with optional user_id filter
-            user_filter = "AND user_id = ?" if user_id is not None else ""
             where = f"""--sql
                 WHERE
                   queue_id == ?
                   AND destination == ?
                   {user_filter}
                 """
-            params = [queue_id, destination]
-            if user_id is not None:
-                params.append(user_id)
-
             deleted_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
             count = sum(len(item_ids) for item_ids in deleted_item_ids_by_user.values())
-            if canceled_current_item_id is not None and current_queue_item is not None:
-                owner_item_ids = deleted_item_ids_by_user.get(current_queue_item.user_id)
-                if owner_item_ids is not None and canceled_current_item_id in owner_item_ids:
-                    owner_item_ids.remove(canceled_current_item_id)
-                    if not owner_item_ids:
-                        del deleted_item_ids_by_user[current_queue_item.user_id]
+            # The in-progress items canceled above each emitted their own per-item
+            # queue_item_status_changed, so the bulk event below must not signal them a second
+            # time. Their rows still match the destination WHERE (the cancel only flipped their
+            # status), so they are excluded from the collected ids — but not from the DELETE or
+            # the returned count.
+            if canceled_in_progress_ids:
+                for owner_user_id in list(deleted_item_ids_by_user):
+                    remaining = [
+                        i for i in deleted_item_ids_by_user[owner_user_id] if i not in canceled_in_progress_ids
+                    ]
+                    if remaining:
+                        deleted_item_ids_by_user[owner_user_id] = remaining
+                    else:
+                        del deleted_item_ids_by_user[owner_user_id]
             cursor.execute(
                 f"""--sql
                 DELETE FROM session_queue
@@ -828,18 +996,18 @@ class SqliteSessionQueue(SessionQueueBase):
         return DeleteAllExceptCurrentResult(deleted=count)
 
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
+        match_filter = "queue_id == ?"
+        params: list[Any] = [queue_id]
+
         with self._db.transaction() as cursor:
-            current_queue_item = self.get_current(queue_id)
-            where = """--sql
-                WHERE
-                  queue_id is ?
+            where = f"""--sql
+                WHERE {match_filter}
                   AND status != 'canceled'
                   AND status != 'completed'
                   AND status != 'failed'
-                  -- We will cancel the current item separately below - skip it here
+                  -- In-progress items are canceled individually below so each worker is signaled.
                   AND status != 'in_progress'
                 """
-            params = [queue_id]
             canceled_item_ids_by_user = self._collect_item_ids_by_user(cursor, where, params)
             count = sum(len(item_ids) for item_ids in canceled_item_ids_by_user.values())
             cursor.execute(
@@ -852,10 +1020,10 @@ class SqliteSessionQueue(SessionQueueBase):
                 tuple(params),
             )
 
-        # The current item's cancel emits its own queue_item_status_changed; the bulk event
-        # below covers the silently-updated rows.
-        if current_queue_item is not None and current_queue_item.queue_id == queue_id:
-            self._set_queue_item_status(current_queue_item.item_id, "canceled")
+        # Cancel every in-progress item in the queue (multi-GPU: possibly several at once). Each
+        # cancel emits its own per-item queue_item_status_changed; the bulk event below covers the
+        # silently-updated rows.
+        count += len(self._cancel_in_progress_matching(match_filter, params))
         self._emit_queue_items_canceled(queue_id, canceled_item_ids_by_user)
         return CancelByQueueIDResult(canceled=count)
 

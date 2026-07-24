@@ -47,6 +47,7 @@ KLEIN_MAX_SEQ_LEN = 512
     category="prompt",
     version="1.1.1",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class Flux2KleinTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for Flux2 Klein image generation.
@@ -77,6 +78,13 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
         with ExitStack() as exit_stack:
             # Pass the locked stack down to the helper function
             qwen3_embeds, pooled_embeds = self._encode_prompt(context, exit_stack)
+
+            # Save the conditioning CPU-backed: this node is idle_gpu_offloadable, so the
+            # encode may have run on a BORROWED GPU whose pool lock is released the moment
+            # this node returns — tensors left on it would pin VRAM on a device another
+            # session may immediately start using. Mirrors flux_text_encoder / flux_redux.
+            qwen3_embeds = qwen3_embeds.detach().to("cpu")
+            pooled_embeds = pooled_embeds.detach().to("cpu")
 
             conditioning_data = ConditioningFieldData(
                 conditionings=[FLUXConditioningInfo(clip_embeds=pooled_embeds, t5_embeds=qwen3_embeds)]

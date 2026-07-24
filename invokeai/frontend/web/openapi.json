@@ -3818,7 +3818,7 @@
       "get": {
         "tags": ["model_manager"],
         "summary": "Get model manager RAM cache performance statistics.",
-        "description": "Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded.",
+        "description": "Return performance statistics on the model manager's RAM cache. In multi-GPU mode there is\none cache per generation device; their statistics are aggregated. Will return null if no models\nhave been loaded.",
         "operationId": "get_stats",
         "responses": {
           "200": {
@@ -6622,6 +6622,35 @@
         ]
       }
     },
+    "/api/v1/app/generation_device_options": {
+      "get": {
+        "tags": ["app"],
+        "summary": "Get Generation Device Options",
+        "description": "List the devices available for generation, for use with the `generation_devices` setting.",
+        "operationId": "get_generation_device_options",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GenerationDeviceOption"
+                  },
+                  "type": "array",
+                  "title": "Response Get Generation Device Options"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/app/runtime_config": {
       "get": {
         "tags": ["app"],
@@ -7646,7 +7675,7 @@
       "put": {
         "tags": ["queue"],
         "summary": "Clear",
-        "description": "Clears the queue entirely. Admin users clear all items; non-admin users only clear their own items. If there's a currently-executing item, users can only cancel it if they own it or are an admin.",
+        "description": "Clears the queue. Admin users clear (and cancel) all items; non-admin users clear only their\nown items \u2014 other users' queued and running items are untouched.",
         "operationId": "clear",
         "security": [
           {
@@ -29206,6 +29235,24 @@
         "title": "GeneratePasswordResponse",
         "description": "Response containing a generated password."
       },
+      "GenerationDeviceOption": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "title": "Device",
+            "description": "The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable device name"
+          }
+        },
+        "type": "object",
+        "required": ["device", "name"],
+        "title": "GenerationDeviceOption",
+        "description": "A device that may be selected for generation."
+      },
       "GetMaskBoundingBoxInvocation": {
         "category": "mask",
         "class": "invocation",
@@ -40960,6 +41007,19 @@
             ],
             "default": null,
             "description": "An image representing the current state of the progress"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+            "title": "Device"
           }
         },
         "required": [
@@ -40975,7 +41035,8 @@
           "invocation_source_id",
           "message",
           "percentage",
-          "image"
+          "image",
+          "device"
         ],
         "title": "InvocationProgressEvent",
         "type": "object"
@@ -42220,6 +42281,29 @@
             "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)",
             "default": "auto"
           },
+          "generation_devices": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Generation Devices",
+            "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)",
+            "default": "auto"
+          },
+          "offload_text_encoders_to_idle_gpus": {
+            "type": "boolean",
+            "title": "Offload Text Encoders To Idle Gpus",
+            "description": "When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.",
+            "default": true
+          },
           "precision": {
             "type": "string",
             "enum": ["auto", "float16", "bfloat16", "float32"],
@@ -42269,7 +42353,7 @@
             "type": "string",
             "enum": ["FIFO", "round_robin"],
             "title": "Session Queue Mode",
-            "description": "Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.",
+            "description": "Session queue mode. Use 'FIFO' for strict first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In round-robin mode, priority orders each user's own jobs, but the user rotation takes precedence: one user's high-priority job does not preempt another user's turn. In single-user mode, jobs are served in submission order either way \u2014 except that on multi-GPU systems the default 'round_robin' allows same-priority jobs to be reordered slightly so a freed GPU prefers jobs whose models it already has loaded. Set 'FIFO' to disable that reordering and enforce strict submission order.",
             "default": "round_robin"
           },
           "clear_queue_on_startup": {
@@ -66609,6 +66693,18 @@
             "title": "Retried From Item Id",
             "description": "The item_id of the queue item that this item was retried from"
           },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device",
+            "description": "The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)"
+          },
           "workflow_call_id": {
             "anyOf": [
               {
@@ -71826,6 +71922,10 @@
             ],
             "title": "Max Queue History",
             "description": "Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items."
+          },
+          "generation_devices": {
+            "title": "Generation Devices",
+            "description": "Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI."
           }
         },
         "type": "object",

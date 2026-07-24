@@ -2,6 +2,7 @@ export const COLUMN_WIDTHS = {
   number: '2rem',
   statusBadge: '5.7rem',
   statusDot: 2,
+  gpu: '3.5rem',
   time: '4rem',
   credits: '4rem',
   origin_destination: '7rem',

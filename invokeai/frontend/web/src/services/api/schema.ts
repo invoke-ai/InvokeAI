@@ -829,7 +829,9 @@ export type paths = {
         };
         /**
          * Get model manager RAM cache performance statistics.
-         * @description Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded.
+         * @description Return performance statistics on the model manager's RAM cache. In multi-GPU mode there is
+         *     one cache per generation device; their statistics are aggregated. Will return null if no models
+         *     have been loaded.
          */
         get: operations["get_stats"];
         put?: never;
@@ -1709,6 +1711,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/generation_device_options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Generation Device Options
+         * @description List the devices available for generation, for use with the `generation_devices` setting.
+         */
+        get: operations["get_generation_device_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/runtime_config": {
         parameters: {
             query?: never;
@@ -2121,7 +2143,8 @@ export type paths = {
         get?: never;
         /**
          * Clear
-         * @description Clears the queue entirely. Admin users clear all items; non-admin users only clear their own items. If there's a currently-executing item, users can only cancel it if they own it or are an admin.
+         * @description Clears the queue. Admin users clear (and cancel) all items; non-admin users clear only their
+         *     own items — other users' queued and running items are untouched.
          */
         put: operations["clear"];
         post?: never;
@@ -12519,6 +12542,22 @@ export type components = {
             password: string;
         };
         /**
+         * GenerationDeviceOption
+         * @description A device that may be selected for generation.
+         */
+        GenerationDeviceOption: {
+            /**
+             * Device
+             * @description The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'
+             */
+            device: string;
+            /**
+             * Name
+             * @description Human-readable device name
+             */
+            name: string;
+        };
+        /**
          * Get Image Mask Bounding Box
          * @description Gets the bounding box of the given mask image.
          */
@@ -16505,6 +16544,12 @@ export type components = {
              * @default null
              */
             image: components["schemas"]["ProgressImage"] | null;
+            /**
+             * Device
+             * @description The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             * @default null
+             */
+            device: string | null;
         };
         /**
          * InvocationStartedEvent
@@ -16933,6 +16978,18 @@ export type components = {
              */
             device?: string;
             /**
+             * Generation Devices
+             * @description Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)
+             * @default auto
+             */
+            generation_devices?: "auto" | string[];
+            /**
+             * Offload Text Encoders To Idle Gpus
+             * @description When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.
+             * @default true
+             */
+            offload_text_encoders_to_idle_gpus?: boolean;
+            /**
              * Precision
              * @description Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
              * @default auto
@@ -16979,7 +17036,7 @@ export type components = {
             max_queue_size?: number;
             /**
              * Session Queue Mode
-             * @description Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.
+             * @description Session queue mode. Use 'FIFO' for strict first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In round-robin mode, priority orders each user's own jobs, but the user rotation takes precedence: one user's high-priority job does not preempt another user's turn. In single-user mode, jobs are served in submission order either way — except that on multi-GPU systems the default 'round_robin' allows same-priority jobs to be reordered slightly so a freed GPU prefers jobs whose models it already has loaded. Set 'FIFO' to disable that reordering and enforce strict submission order.
              * @default round_robin
              * @enum {string}
              */
@@ -28782,6 +28839,11 @@ export type components = {
              */
             retried_from_item_id?: number | null;
             /**
+             * Device
+             * @description The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             */
+            device?: string | null;
+            /**
              * Workflow Call Id
              * @description The active workflow-call relationship id when this queue item is a child execution.
              */
@@ -31624,6 +31686,11 @@ export type components = {
              * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
              */
             max_queue_history?: number | null;
+            /**
+             * Generation Devices
+             * @description Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI.
+             */
+            generation_devices?: unknown;
         };
         /**
          * UserDTO
@@ -37661,6 +37728,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": boolean;
+                };
+            };
+        };
+    };
+    get_generation_device_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationDeviceOption"][];
                 };
             };
         };

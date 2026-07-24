@@ -4,6 +4,7 @@ from typing import Dict, Iterable, Optional, Tuple
 
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -36,19 +37,37 @@ class LayerPatcher:
         # original_modules are stored for unpatching layers that are wrapped.
         original_modules: dict[str, torch.nn.Module] = {}
         try:
-            for patch, patch_weight in patches:
-                LayerPatcher.apply_smart_model_patch(
-                    model=model,
-                    prefix=prefix,
-                    patch=patch,
-                    patch_weight=patch_weight,
-                    original_weights=original_weights,
-                    original_modules=original_modules,
-                    dtype=dtype,
-                    force_direct_patching=force_direct_patching,
-                    force_sidecar_patching=force_sidecar_patching,
-                    suppress_warning_layers=suppress_warning_layers,
-                )
+            # Materialize the patch iterable BEFORE acquiring the read lock. Callers pass a lazy
+            # generator (e.g. flux_text_encoder._t5_lora_iterator) that constructs each LoRA via
+            # context.models.load() on demand, and a cold-cache construction takes
+            # MODEL_LOAD_LOCK.write_lock(). Because this lock is non-reentrant and write-preferring,
+            # constructing a LoRA while we already held the read lock below would deadlock: the
+            # write acquire waits for readers==0, but this very thread is that reader. Consuming the
+            # iterator here lets every LoRA load take (and release) the write lock first, then we
+            # take the read lock once for patch application only. This is also compatible with
+            # callers that hand us a fresh iterator per call (see wan_denoise.LoRAIteratorFactory).
+            patches = list(patches)
+            # Patching can register new parameters (FLUX Control LoRA shape expansion routes
+            # through nn.Module.register_parameter via setattr). Model construction on another
+            # worker thread monkey-patches register_parameter process-wide (accelerate's
+            # init_empty_weights), which would strand our new parameter on the meta device — so
+            # patch application must exclude construction, like any VRAM load. Read semantics:
+            # patching on different devices may overlap; only construction is exclusive. The lock
+            # is released before the yield — patched inference must not block model loads.
+            with MODEL_LOAD_LOCK.read_lock():
+                for patch, patch_weight in patches:
+                    LayerPatcher.apply_smart_model_patch(
+                        model=model,
+                        prefix=prefix,
+                        patch=patch,
+                        patch_weight=patch_weight,
+                        original_weights=original_weights,
+                        original_modules=original_modules,
+                        dtype=dtype,
+                        force_direct_patching=force_direct_patching,
+                        force_sidecar_patching=force_sidecar_patching,
+                        suppress_warning_layers=suppress_warning_layers,
+                    )
 
             yield
         finally:
@@ -221,7 +240,10 @@ class LayerPatcher:
                         param_name,
                         torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
                     )
-                    module_param = expanded_weight
+                    # Point at the module's live (expanded) parameter so the out-of-place weight
+                    # update below lands on the module. `expanded_weight` is a detached raw tensor;
+                    # reassigning its `.data` would not propagate to the newly-set Parameter.
+                    module_param = module_to_patch.get_parameter(param_name)
                 else:
                     # For other LoRAs, shape mismatch indicates architecture incompatibility - skip the layer
                     logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
@@ -232,9 +254,17 @@ class LayerPatcher:
                     )
                     continue
 
-            # Convert param_weight to the correct device and dtype, then apply to model weights
+            # Convert param_weight to the correct device and dtype, then apply to model weights.
             param_weight_converted = param_weight.to(device=device, dtype=dtype)
-            module_param.data.copy_(module_param.data + param_weight_converted)
+            # Apply out-of-place (assign a new tensor) rather than an in-place `copy_`. The weight we
+            # are patching may be the model's canonical CPU copy, which is shared across the
+            # per-device model caches in multi-GPU mode (see SharedCpuWeightsStore) and is also the
+            # cache's keep_ram_copy used to restore the model after unpatching. An in-place mutation
+            # here would corrupt that shared/cached tensor — and every other device's view of it.
+            # Reassigning `.data` leaves the original tensor untouched while giving this module the
+            # patched weights, and is memory-equivalent (the in-place form already allocated the
+            # `module_param.data + param_weight_converted` temporary).
+            module_param.data = module_param.data + param_weight_converted
 
         patch.to(device=TorchDevice.CPU_DEVICE)
 
