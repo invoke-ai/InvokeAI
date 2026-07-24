@@ -6,7 +6,10 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasGradientState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { NodeConfig } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
+
+type GlobalCompositeOperation = NonNullable<NodeConfig['globalCompositeOperation']>;
 
 export class CanvasObjectGradient extends CanvasModuleBase {
   readonly type = 'object_gradient';
@@ -35,7 +38,12 @@ export class CanvasObjectGradient extends CanvasModuleBase {
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
-      rect: new Konva.Rect({ name: `${this.type}:rect`, listening: false, perfectDrawEnabled: false }),
+      rect: new Konva.Rect({
+        name: `${this.type}:rect`,
+        listening: false,
+        globalCompositeOperation: (state.globalCompositeOperation ?? 'source-over') as GlobalCompositeOperation,
+        perfectDrawEnabled: false,
+      }),
     };
     this.konva.group.add(this.konva.rect);
     this.state = state;
@@ -55,6 +63,7 @@ export class CanvasObjectGradient extends CanvasModuleBase {
         y: rect.y,
         width: rect.width,
         height: rect.height,
+        globalCompositeOperation: (state.globalCompositeOperation ?? 'source-over') as GlobalCompositeOperation,
       });
 
       this.konva.group.clipFunc((ctx) => {
