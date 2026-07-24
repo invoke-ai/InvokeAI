@@ -108,9 +108,15 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
         self._install_jobs: List[ModelInstallJob] = []
         self._install_queue: Queue[ModelInstallJob] = Queue()
-        # Reentrant so that import_model can hold it across helpers such as
-        # _next_id() while making its duplicate check atomic with registration.
-        self._lock = threading.RLock()
+        # Lock-order discipline: download-queue callbacks run on download queue
+        # threads that already hold the download queue's lock, and they acquire
+        # this lock. Never call into the download queue while holding this
+        # lock, or the opposite acquisition order will deadlock.
+        self._lock = threading.Lock()
+        # Sources reserved by an in-flight import_model call that has not yet
+        # registered its job. Guarded by _lock; waiters use _install_cond.
+        self._pending_sources: set[str] = set()
+        self._install_cond = threading.Condition(self._lock)
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
         self._install_completed_event = threading.Event()
@@ -205,6 +211,18 @@ class ModelInstallService(ModelInstallServiceBase):
     def _restore_incomplete_installs(self) -> None:
         path = self._app_config.models_path
         seen_sources: set[str] = set()
+        # Snapshot the sources that have an owner at the moment restoration
+        # begins. A job's terminal transition, marker deletion and tmpdir
+        # cleanup are not synchronized with the per-marker check below, so an
+        # owner that completes mid-scan could otherwise look inactive while its
+        # marker is still on disk, and we would enqueue a duplicate job for a
+        # directory the owner is about to clean up. A source owned when the
+        # scan starts stays owned for the whole scan; its leftover markers, if
+        # any, are cleaned up on a later startup when the source is idle.
+        with self._lock:
+            owned_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
+            owned_sources |= {str(j.source) for j in self._download_cache.values() if not j.in_terminal_state}
+            owned_sources |= set(self._pending_sources)
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
             marker = self._read_install_marker(tmpdir)
             if not marker:
@@ -251,9 +269,14 @@ class ModelInstallService(ModelInstallServiceBase):
             # idle.
             duplicate_tmpdir = False
             with self._lock:
-                already_active = any(
-                    str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state
-                ) or any(str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state)
+                already_active = (
+                    source_str in owned_sources
+                    or source_str in self._pending_sources
+                    or any(str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state)
+                    or any(
+                        str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state
+                    )
+                )
                 if already_active:
                     self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                     continue
@@ -486,16 +509,26 @@ class ModelInstallService(ModelInstallServiceBase):
     def import_model(self, source: ModelSource, config: Optional[ModelRecordChanges] = None) -> ModelInstallJob:  # noqa D102
         self._wait_for_restore_complete()
 
-        # Hold the lock across the duplicate check and job registration so that
-        # check-and-register is atomic with respect to _restore_incomplete_installs,
-        # which does its own locked check-and-append for each restored marker.
-        # _lock is reentrant, so the _next_id() calls in the import helpers are safe.
-        with self._lock:
+        # Reserve the source under the lock, then run the import helpers with
+        # the lock RELEASED: the helpers call into the download queue, whose
+        # callback threads hold the download queue's lock while acquiring ours,
+        # so holding our lock across a download-queue call inverts the lock
+        # order and deadlocks. The reservation in _pending_sources keeps
+        # check-and-register atomic with respect to _restore_incomplete_installs
+        # and concurrent import_model calls for the same source.
+        source_str = str(source)
+        with self._install_cond:
+            while source_str in self._pending_sources:
+                # Another thread is importing this source. Wait for it to
+                # register its job (or fail), then re-run the duplicate check.
+                self._install_cond.wait()
             similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
             if similar_jobs:
                 self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
                 return similar_jobs[0]
+            self._pending_sources.add(source_str)
 
+        try:
             if isinstance(source, LocalModelSource):
                 install_job = self._import_local_model(source, config)
                 self._put_in_queue(install_job)  # synchronously install
@@ -508,9 +541,17 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._put_in_queue(install_job)
             else:
                 raise ValueError(f"Unsupported model source: '{type(source)}'")
+        except Exception:
+            with self._install_cond:
+                self._pending_sources.discard(source_str)
+                self._install_cond.notify_all()
+            raise
 
+        with self._install_cond:
             self._install_jobs.append(install_job)
-            return install_job
+            self._pending_sources.discard(source_str)
+            self._install_cond.notify_all()
+        return install_job
 
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
         return self._install_jobs
