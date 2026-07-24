@@ -1,5 +1,5 @@
 ---
-title: "Canvas Text Tool"
+title: 'Canvas Text Tool'
 ---
 
 ## Overview
@@ -28,6 +28,13 @@ Layer placement preserves the original click location:
 ## Font stacks
 
 Font definitions live in `invokeai/frontend/web/src/features/controlLayers/text/textConstants.ts` as ten deterministic stacks (sans, serif, mono, rounded, script, humanist, slab serif, display, narrow, UI serif). Each stack lists system-safe fallbacks so the editor can choose the first available font per platform.
+
+The Text tool also supports server-managed custom fonts from the InvokeAI root `fonts` directory:
+
+- `invokeai/app/services/config/config_default.py` ensures the `fonts` directory and `README.txt` exist.
+- `invokeai/app/api/routers/utilities.py` lists supported font files (`.ttf`, `.otf`, `.woff`, `.woff2`) and serves them to the frontend.
+- `invokeai/frontend/web/src/features/controlLayers/components/Text/TextToolOptions.tsx` groups custom fonts separately from built-in stacks and keeps them disabled until their `FontFace` entries are ready.
+- `invokeai/frontend/web/src/features/controlLayers/konva/CanvasTool/CanvasTextToolModule.ts` waits for custom font readiness before rasterizing text, avoiding fallback renders when a font has been listed but not fully loaded yet.
 
 To add or adjust fonts:
 

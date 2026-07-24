@@ -10,6 +10,17 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 The Text tool uses a set of predefined font stacks. When you choose a font, the app resolves the first available font on your system from that stack and uses it for both the editor overlay and the rasterized result. This provides consistent styling across platforms while still falling back to safe system fonts if a preferred font is missing.
 
+## Custom fonts
+
+InvokeAI can also load custom fonts from the host-managed `fonts` directory in the InvokeAI root folder.
+
+- On startup, InvokeAI creates `fonts/README.txt` if the directory does not already exist.
+- Place `.ttf`, `.otf`, `.woff`, or `.woff2` files in `fonts` or any subfolder under it.
+- Refresh the app after adding or removing fonts so the Text tool can reload the available font list.
+- If the `fonts` directory is empty, the Text tool continues to use the built-in font list.
+
+In multiuser deployments, this directory is shared by the entire InvokeAI instance. Fonts added there are available to all authenticated users of that server.
+
 ## Size and spacing
 
 - **Size** controls the font size in pixels.

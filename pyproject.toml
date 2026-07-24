@@ -62,6 +62,7 @@ dependencies = [
   # the last known-good version.
   "fastapi== 0.118.3",
   "huggingface-hub",
+  "networkx",
   "pydantic-settings",
   "pydantic",
   "python-socketio",
@@ -75,6 +76,7 @@ dependencies = [
   "dynamicprompts",
   "einops",
   "email-validator>=2.0.0",
+  "fonttools",
   "passlib[bcrypt]>=1.7.4",
   "picklescan",
   "pillow",
