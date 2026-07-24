@@ -35,6 +35,7 @@ export const IMAGE_METADATA_ACTION_HANDLERS: ImageMetadataActionHandler[] = [
   ImageMetadataHandlers.NegativePrompt,
   ImageMetadataHandlers.MainModel,
   ImageMetadataHandlers.VAEModel,
+  ImageMetadataHandlers.T5EncoderModel,
   ImageMetadataHandlers.Width,
   ImageMetadataHandlers.Height,
   ImageMetadataHandlers.Seed,
