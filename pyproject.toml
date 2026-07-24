@@ -94,13 +94,38 @@ dependencies = [
   # torch 2.4+cu carries its own triton dependency
 ]
 
-"cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
-"cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
+# The +cpu/+cu128/+rocm7.1 pins live on PyTorch's WHL indexes. torchvision has no
+# linux_aarch64 wheels there (torch does for +cpu/+cu128), so on linux_aarch64 these
+# pins are unsatisfiable and are gated behind a marker that excludes only that
+# platform; every other platform (Windows, macOS, Linux x86_64) is unaffected. On
+# linux_aarch64 the base `torch` / `torchvision` declarations resolve from PyPI
+# instead (CPU-only wheels — an aarch64 install requesting `cuda` gets CPU torch).
+# Since torch+cu128 aarch64 wheels DO exist on the index, real CUDA-on-aarch64
+# (e.g. Grace/GH200) is feasible later with a torchvision-specific workaround.
+"cpu" = [
+  "torch==2.7.1+cpu; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  "torchvision==0.22.1+cpu; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  # linux_aarch64 fallback: same versions, resolved from PyPI. Without these
+  # explicit entries the extra's conflict-universe would contain no torch at all
+  # on aarch64 (uv partitions the base declarations into the no-extra universe).
+  "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+  "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+"cuda" = [
+  "torch==2.7.1+cu128; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  "torchvision==0.22.1+cu128; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  # linux_aarch64 fallback, see note under "cpu"
+  "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+  "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
 "rocm" = [
-  # ROCm wheels are x86_64-linux-only; gate by platform so macOS/win resolution is unaffected.
-  "torch==2.10.0+rocm7.1; sys_platform == 'linux'",
-  "torchvision==0.25.0+rocm7.1; sys_platform == 'linux'",
-  "triton-rocm==3.6.0; sys_platform == 'linux'",
+  # ROCm wheels are x86_64-linux-only; gate by platform so macOS/win/linux-aarch64 resolution is unaffected.
+  "torch==2.10.0+rocm7.1; sys_platform == 'linux' and platform_machine != 'aarch64'",
+  "torchvision==0.25.0+rocm7.1; sys_platform == 'linux' and platform_machine != 'aarch64'",
+  "triton-rocm==3.6.0; sys_platform == 'linux' and platform_machine != 'aarch64'",
+  # linux_aarch64 fallback, see note under "cpu"
+  "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+  "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
 
 "onnx" = ["onnxruntime"]
@@ -129,24 +154,35 @@ dependencies = [
 override-dependencies = ["opencv-python; sys_platform=='never'"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
-# We do not publish or support ARM Linux builds; restrict resolution to
-# x86_64 Linux, Windows, and macOS. (ROCm in particular is x86_64-only.)
-environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'x86_64')"]
+# Restrict resolution to the platforms we support: x86_64/aarch64 Linux, Windows,
+# and macOS. (ROCm and the PyTorch WHL-index pins are x86_64-only; on aarch64
+# Linux torch/torchvision fall back to PyPI via the markers below.)
+environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64'))"]
 
 [tool.uv.sources]
+# Exclude linux_aarch64 from the PyTorch WHL indexes so that uv resolves torch /
+# torchvision from PyPI on that platform. The indexes DO carry aarch64 torch wheels
+# (+cpu/+cu128), but no aarch64 torchvision wheels, so the pinned pairs cannot
+# resolve there. All other platforms (Windows, macOS, Linux x86_64) are unaffected.
 torch = [
-  { index = "torch-cpu", extra = "cpu" },
-  { index = "torch-cuda", extra = "cuda" },
-  { index = "torch-rocm", extra = "rocm" },
+  { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 torchvision = [
-  { index = "torch-cpu", extra = "cpu" },
-  { index = "torch-cuda", extra = "cuda" },
-  { index = "torch-rocm", extra = "rocm" },
+  { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 triton-rocm = [
-  { index = "torch-rocm", marker = "sys_platform == 'linux'" },
+  { index = "torch-rocm", marker = "sys_platform == 'linux' and platform_machine != 'aarch64'" },
 ]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
 
 [[tool.uv.index]]
 name = "torch-cpu"

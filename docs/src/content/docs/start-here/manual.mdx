@@ -1,6 +1,6 @@
 ---
 title: Manual Installation
-lastUpdated: 2026-02-18
+lastUpdated: 2026-07-14
 ---
 
 import { LinkCard, Tabs, TabItem, Steps, LinkButton } from '@astrojs/starlight/components'
@@ -120,10 +120,11 @@ The following commands vary depending on the version of Invoke being installed a
               ```
             </TabItem>
             <TabItem label="Linux + no GPU">
-              Use:
+              On `x86_64`, use:
               ```sh
               --torch-backend=cpu
               ```
+              On ARM64 (`aarch64`, e.g. Raspberry Pi 5), do **not** use a torch backend — PyTorch's `cpu` index has no ARM64 torchvision wheels. The default PyPI wheels are CPU-only on ARM64 and work out of the box.
             </TabItem>
             <TabItem label="Linux + AMD GPU">
               Use:

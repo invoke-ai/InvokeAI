@@ -48,6 +48,17 @@ The Gradient tool uses the current **FG/BG color pair**:
   </Card>
 </CardGrid>
 
+## Transparency Lock
+
+When **Transparency Lock** is enabled on the active raster layer, the Gradient tool respects it:
+
+- The gradient only affects pixels that already have opacity on the layer.
+- Fully transparent areas stay transparent.
+- This applies to both **Linear** and **Radial** gradients.
+
+Use this when you want to recolor or shade existing painted content without spilling into empty transparent regions of
+the layer.
+
 ## Clip Gradient
 
 The toolbar includes a **Clip Gradient** toggle:
@@ -65,11 +76,12 @@ In practice:
 
 - Use **Linear** for sky fades, shadow ramps, and broad directional lighting.
 - Use **Radial** for vignettes, glows, spotlights, and soft falloff around a focal point.
+- Enable **Transparency Lock** when you want the gradient to stay inside existing painted pixels.
 - Disable **Clip Gradient** when you want a full-bbox color transition.
 - Keep **Clip Gradient** enabled when you only want to affect a localized area.
 
 ## Summary
 
 The Gradient tool is a raster-only canvas tool for painting linear and radial color transitions. Use it when you want
-soft blends between your FG and BG colors, and use **Clip Gradient** to decide whether the effect stays local or fills
-the full bbox.
+soft blends between your FG and BG colors, use **Transparency Lock** to keep the effect inside existing opaque pixels,
+and use **Clip Gradient** to decide whether the effect stays local or fills the full bbox.

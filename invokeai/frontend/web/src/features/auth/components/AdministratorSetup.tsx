@@ -15,6 +15,7 @@ import {
   Text,
   VStack,
 } from '@invoke-ai/ui-library';
+import { getBasePath } from 'common/util/baseUrl';
 import { validatePasswordField } from 'features/auth/util/passwordUtils';
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -59,8 +60,9 @@ export const AdministratorSetup = memo(() => {
         const result = await setup({ email, display_name: displayName, password }).unwrap();
         if (result.success) {
           // Auto-login after setup - need to call login API
-          // For now, just redirect to login page
-          window.location.href = '/login';
+          // For now, just redirect to login page.
+          // Prefix with the deployment base path so this keeps working behind a reverse-proxy sub-path.
+          window.location.href = `${getBasePath()}/login`;
         }
       } catch {
         // Error is handled by RTK Query and displayed via error state

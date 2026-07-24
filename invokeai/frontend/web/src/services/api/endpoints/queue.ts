@@ -1,3 +1,4 @@
+import { getUserScopedQueueCounts } from 'features/queue/store/userScopedQueueCounts';
 import queryString from 'query-string';
 import type { components, paths } from 'services/api/schema';
 import type {
@@ -433,5 +434,8 @@ export const enqueueMutationFixedCacheKeyOptions = {
 
 export const useIsGenerationInProgress = () => {
   const { data } = useGetQueueStatusQuery();
-  return data && data.queue.in_progress > 0;
+  // In multiuser mode the global in_progress count includes other users' generations; this hook
+  // drives personal UI (the progress workspace tabs), so it must react only to the current
+  // user's own activity.
+  return data !== undefined && getUserScopedQueueCounts(data.queue).inProgress > 0;
 };
