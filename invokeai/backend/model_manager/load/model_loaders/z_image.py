@@ -546,15 +546,14 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             case SubModelType.TextEncoder:
                 return self._load_from_singlefile(config)
             case SubModelType.Tokenizer:
-                # For single-file Qwen3, load tokenizer from HuggingFace
-                # Try local cache first to support offline usage after initial download
-                return self._load_tokenizer_with_offline_fallback()
+                # Single-file checkpoints ship no tokenizer files; use the vendored copy.
+                return self._load_bundled_tokenizer()
 
         raise ValueError(
             f"Only TextEncoder and Tokenizer submodels are supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
 
-    def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
+    def _load_bundled_tokenizer(self) -> AnyModel:
         """Load the Qwen3 tokenizer from the vendored, bundled copy.
 
         Single-file / GGUF checkpoints do not ship tokenizer files. The Qwen3 BPE
@@ -795,15 +794,14 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
             case SubModelType.TextEncoder:
                 return self._load_from_gguf(config)
             case SubModelType.Tokenizer:
-                # For GGUF Qwen3, load tokenizer from HuggingFace
-                # Try local cache first to support offline usage after initial download
-                return self._load_tokenizer_with_offline_fallback()
+                # GGUF checkpoints ship no tokenizer files; use the vendored copy.
+                return self._load_bundled_tokenizer()
 
         raise ValueError(
             f"Only TextEncoder and Tokenizer submodels are supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
 
-    def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
+    def _load_bundled_tokenizer(self) -> AnyModel:
         """Load the Qwen3 tokenizer from the vendored, bundled copy.
 
         Single-file / GGUF checkpoints do not ship tokenizer files. The Qwen3 BPE
