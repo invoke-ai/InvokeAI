@@ -88,11 +88,27 @@ The runtime directory (holding models and outputs) will be created in the locati
 
 - Linux is *recommended* for GPU support in Docker.
 - WSL2 is *required* for Windows.
-- only `x86_64` architecture is supported.
+- only `x86_64` architecture is supported for GPU acceleration; `arm64` (`aarch64`) builds are CPU-only (see below).
 
 The Docker daemon on the system must be already set up to use the GPU. In case of Linux, this involves installing `nvidia-docker-runtime` and configuring the `nvidia` runtime as default. Steps will be different for AMD. Please see Docker/NVIDIA/AMD documentation for the most up-to-date instructions for using your GPU with Docker.
 
 To use an AMD GPU, set `GPU_DRIVER=rocm` in your `.env` file before running `./run.sh`.
+
+### ARM64 / aarch64 (CPU-only)
+
+Linux ARM64 devices (Raspberry Pi 5, other SBCs, ARM servers) can build and run the image in CPU-only mode. From the repository root:
+
+```bash
+docker build -f docker/Dockerfile --build-arg GPU_DRIVER=cpu -t invokeai:cpu .
+```
+
+To cross-compile the arm64 image from an x86_64 machine, use `buildx`:
+
+```bash
+docker buildx build --platform linux/arm64 -f docker/Dockerfile --build-arg GPU_DRIVER=cpu -t invokeai:arm64-cpu .
+```
+
+On arm64, torch/torchvision are installed from PyPI (CPU wheels) regardless of `GPU_DRIVER` — CUDA and ROCm acceleration are not available. API-backed models (e.g. GPT Image, Gemini) work without a GPU.
 
 ## Customize
 

@@ -1,22 +1,15 @@
-import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex, IconButton, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
+import { InvokeButtonIcon } from 'features/queue/components/InvokeButtonIcon';
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiCircleNotchBold,
-  PiLightningFill,
-  PiSlidersHorizontalBold,
-  PiSparkleFill,
-  PiXBold,
-  PiXCircle,
-} from 'react-icons/pi';
-import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { PiSlidersHorizontalBold, PiXBold, PiXCircle } from 'react-icons/pi';
 import { useAutoAddBoard } from 'services/api/hooks/useAutoAddBoard';
 import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 
@@ -83,7 +76,7 @@ const InvokeIconButton = memo(() => {
         onClick={shift ? queue.enqueueFront : queue.enqueueBack}
         isLoading={queue.isLoading}
         isDisabled={queue.isDisabled || !canWriteImages}
-        icon={<InvokeIconButtonIcon />}
+        icon={<InvokeButtonIcon isDisabled={queue.isDisabled || !canWriteImages} boxSize={6} />}
         colorScheme="invokeYellow"
         flexGrow={1}
       />
@@ -91,30 +84,6 @@ const InvokeIconButton = memo(() => {
   );
 });
 InvokeIconButton.displayName = 'InvokeIconButton';
-
-const InvokeIconButtonIcon = memo(() => {
-  const shift = useShiftModifier();
-  const queue = useInvoke();
-  const { isProcessing } = useGetQueueStatusQuery(undefined, {
-    selectFromResult: ({ data }) => {
-      if (!data) {
-        return { isProcessing: false };
-      }
-      return { isProcessing: data.queue.in_progress > 0 };
-    },
-  });
-
-  if (!queue.isDisabled && isProcessing) {
-    return <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />;
-  }
-
-  if (shift) {
-    return <PiLightningFill />;
-  }
-
-  return <PiSparkleFill />;
-});
-InvokeIconButtonIcon.displayName = 'InvokeIconButtonIcon';
 
 const DeleteCurrentIconButton = memo(() => {
   const { t } = useTranslation();
