@@ -24,7 +24,7 @@ import { CanvasSettingsIsolatedStagingPreviewSwitch } from 'features/controlLaye
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
 import { CanvasSettingsOutputOnlyMaskedRegionsCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsOutputOnlyMaskedRegionsCheckbox';
 import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPreserveMaskCheckbox';
-import { CanvasSettingsPressureSensitivityCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPressureSensitivity';
+import { CanvasSettingsPressureOptions } from 'features/controlLayers/components/Settings/CanvasSettingsPressureSensitivity';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsRuleOfThirdsSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsRuleOfThirdsGuideSwitch';
 import { CanvasSettingsSaveAllImagesToGalleryCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsSaveAllImagesToGalleryCheckbox';
@@ -60,7 +60,7 @@ export const CanvasSettingsPopover = memo(() => {
                   </Text>
                 </Flex>
                 <CanvasSettingsInvertScrollCheckbox />
-                <CanvasSettingsPressureSensitivityCheckbox />
+                <CanvasSettingsPressureOptions />
                 <CanvasSettingsPreserveMaskCheckbox />
                 <CanvasSettingsClipToBboxCheckbox />
                 <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />

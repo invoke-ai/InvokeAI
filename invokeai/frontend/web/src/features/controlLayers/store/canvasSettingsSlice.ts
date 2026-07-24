@@ -85,9 +85,13 @@ const zCanvasSettingsState = z.object({
    */
   isolatedLayerPreview: z.boolean(),
   /**
-   * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
+   * Whether pen pressure affects brush and eraser width.
    */
-  pressureSensitivity: z.boolean(),
+  pressureAffectsWidth: z.boolean(),
+  /**
+   * Whether pen pressure affects brush opacity.
+   */
+  pressureAffectsOpacity: z.boolean(),
   /**
    * Whether to show the rule of thirds composition guide overlay on the canvas.
    */
@@ -149,7 +153,8 @@ const getInitialState = (): CanvasSettingsState => ({
   preserveMask: false,
   isolatedStagingPreview: true,
   isolatedLayerPreview: true,
-  pressureSensitivity: true,
+  pressureAffectsWidth: true,
+  pressureAffectsOpacity: false,
   ruleOfThirds: false,
   saveAllImagesToGallery: false,
   stagingAreaAutoSwitch: 'switch_on_start',
@@ -224,8 +229,11 @@ const slice = createSlice({
     settingsIsolatedLayerPreviewToggled: (state) => {
       state.isolatedLayerPreview = !state.isolatedLayerPreview;
     },
-    settingsPressureSensitivityToggled: (state) => {
-      state.pressureSensitivity = !state.pressureSensitivity;
+    settingsPressureAffectsWidthToggled: (state) => {
+      state.pressureAffectsWidth = !state.pressureAffectsWidth;
+    },
+    settingsPressureAffectsOpacityToggled: (state) => {
+      state.pressureAffectsOpacity = !state.pressureAffectsOpacity;
     },
     settingsRuleOfThirdsToggled: (state) => {
       state.ruleOfThirds = !state.ruleOfThirds;
@@ -285,7 +293,8 @@ export const {
   settingsPreserveMaskToggled,
   settingsIsolatedStagingPreviewToggled,
   settingsIsolatedLayerPreviewToggled,
-  settingsPressureSensitivityToggled,
+  settingsPressureAffectsWidthToggled,
+  settingsPressureAffectsOpacityToggled,
   settingsRuleOfThirdsToggled,
   settingsSaveAllImagesToGalleryToggled,
   settingsTransformSmoothingEnabledToggled,
@@ -298,12 +307,38 @@ export const {
   settingsLassoModeChanged,
 } = slice.actions;
 
+const isRecord = (state: unknown): state is Record<string, unknown> =>
+  typeof state === 'object' && state !== null && !Array.isArray(state);
+
+const migrateCanvasSettingsState = (state: unknown): CanvasSettingsState => {
+  if (!isRecord(state)) {
+    return zCanvasSettingsState.parse(state);
+  }
+
+  const migratedState: Record<string, unknown> = { ...state };
+
+  if (migratedState.pressureAffectsWidth === undefined) {
+    migratedState.pressureAffectsWidth =
+      typeof state.pressureSensitivity === 'boolean'
+        ? state.pressureSensitivity
+        : getInitialState().pressureAffectsWidth;
+  }
+
+  if (migratedState.pressureAffectsOpacity === undefined) {
+    migratedState.pressureAffectsOpacity = getInitialState().pressureAffectsOpacity;
+  }
+
+  delete migratedState.pressureSensitivity;
+
+  return zCanvasSettingsState.parse(migratedState);
+};
+
 export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
   slice,
   schema: zCanvasSettingsState,
   getInitialState,
   persistConfig: {
-    migrate: (state) => zCanvasSettingsState.parse(state),
+    migrate: migrateCanvasSettingsState,
   },
 };
 
@@ -327,7 +362,8 @@ export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
 );
 export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
 export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
-export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
+export const selectPressureAffectsWidth = createCanvasSettingsSelector((settings) => settings.pressureAffectsWidth);
+export const selectPressureAffectsOpacity = createCanvasSettingsSelector((settings) => settings.pressureAffectsOpacity);
 export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
 export const selectSaveAllImagesToGallery = createCanvasSettingsSelector((settings) => settings.saveAllImagesToGallery);
 export const selectStagingAreaAutoSwitch = createCanvasSettingsSelector((settings) => settings.stagingAreaAutoSwitch);

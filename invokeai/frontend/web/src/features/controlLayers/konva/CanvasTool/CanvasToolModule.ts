@@ -51,10 +51,12 @@ const CODE_SPACE = 'Space';
 
 type CanvasToolModuleConfig = {
   BRUSH_SPACING_TARGET_SCALE: number;
+  PRESSURE_OPACITY_BRUSH_SPACING_TARGET_SCALE: number;
 };
 
 const DEFAULT_CONFIG: CanvasToolModuleConfig = {
   BRUSH_SPACING_TARGET_SCALE: 0.1,
+  PRESSURE_OPACITY_BRUSH_SPACING_TARGET_SCALE: 0.05,
 };
 
 export class CanvasToolModule extends CanvasModuleBase {

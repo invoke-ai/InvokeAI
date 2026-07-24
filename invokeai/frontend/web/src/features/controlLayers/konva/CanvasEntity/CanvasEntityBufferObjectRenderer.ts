@@ -287,6 +287,9 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
     }
 
     // Move the buffer to the persistent objects group/renderers
+    if (this.renderer instanceof CanvasObjectBrushLineWithPressure) {
+      this.renderer.finalizePressureImage();
+    }
     this.parent.renderer.adoptObjectRenderer(this.renderer);
 
     if (pushToState) {
