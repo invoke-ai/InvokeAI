@@ -47,7 +47,7 @@ class BaseModelType(str, Enum):
     Flux = "flux"
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     Flux2 = "flux2"
-    """Indicates the model is associated with FLUX.2 model architecture, including FLUX2 Klein."""
+    """Indicates the model is associated with FLUX.2 model architecture, including FLUX.2 Klein and FLUX.2 [dev]."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
@@ -79,6 +79,7 @@ class ModelType(str, Enum):
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
+    MistralEncoder = "mistral_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
@@ -144,6 +145,9 @@ class Flux2VariantType(str, Enum):
     Klein9BBase = "klein_9b_base"
     """Flux2 Klein 9B Base variant - undistilled foundation model using Qwen3 8B text encoder."""
 
+    Dev = "dev"
+    """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.1 text encoder (guidance-distilled)."""
+
 
 class ZImageVariantType(str, Enum):
     """Z-Image model variants."""
@@ -178,6 +182,26 @@ class Qwen3VariantType(str, Enum):
     """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
 
 
+class MistralVariantType(str, Enum):
+    """Mistral text encoder variants used by FLUX.2 [dev]."""
+
+    Cow = "cow_mistral3_small"
+    """The 30-layer BFL "cow-mistral3-small" distillation (hidden_size=5120).
+    Hidden states are sampled at indices (10, 20, 30) which on a 30-layer model
+    hit 1/3, 2/3, and the final layer. ComfyUI's reference implementation
+    drops the final RMSNorm for this variant (``final_norm=False``), so the
+    loader strips ``model.norm`` after loading the weights."""
+
+    Mistral24B = "mistral3_24b"
+    """The 40-layer Mistral Small 3 (24B, hidden_size=5120) text encoder BFL
+    ships in the canonical ``black-forest-labs/FLUX.2-dev/text_encoder``. Same
+    extraction indices (10, 20, 30), final RMSNorm kept enabled. Architecturally
+    identical to upstream ``mistralai/Mistral-Small-3.1/3.2`` — installing one
+    of those instead of BFL's release will load fine but produces visibly
+    weaker prompt adherence than the cow distillation, so the cow variants
+    remain the recommended default."""
+
+
 class ModelFormat(str, Enum):
     """Storage format of model."""
 
@@ -193,6 +217,7 @@ class ModelFormat(str, Enum):
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
+    MistralEncoder = "mistral_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
@@ -249,6 +274,7 @@ AnyVariant: TypeAlias = Union[
     ZImageVariantType,
     QwenImageVariantType,
     Qwen3VariantType,
+    MistralVariantType,
 ]
 variant_type_adapter = TypeAdapter[
     ModelVariantType
@@ -258,6 +284,7 @@ variant_type_adapter = TypeAdapter[
     | ZImageVariantType
     | QwenImageVariantType
     | Qwen3VariantType
+    | MistralVariantType
 ](
     ModelVariantType
     | ClipVariantType
@@ -266,4 +293,5 @@ variant_type_adapter = TypeAdapter[
     | ZImageVariantType
     | QwenImageVariantType
     | Qwen3VariantType
+    | MistralVariantType
 )

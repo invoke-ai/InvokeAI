@@ -12,6 +12,12 @@ from invokeai.backend.model_manager.configs.base import (
     Config_Base,
 )
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
+from invokeai.backend.model_manager.configs.flux2_variant import (
+    FLUX2_CONTEXT_IN_DIMS,
+    flux2_variant_from_context_dim,
+    flux2_variant_from_hidden_size,
+    flux2_variant_from_vec_dim,
+)
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     raise_for_override_fields,
@@ -90,15 +96,15 @@ def _get_flux_lora_format(mod: ModelOnDisk) -> FluxLoRAFormat | None:
     return value
 
 
-# FLUX.2 Klein context_in_dim values: 3 * Qwen3 hidden_size
-# Klein 4B: 3 * 2560 = 7680, Klein 9B: 3 * 4096 = 12288
-_FLUX2_CONTEXT_IN_DIMS = {7680, 12288}
+# FLUX.2 context_in_dim values (Klein 4B 7680 / Klein 9B 12288 / Dev 15360) come from the
+# shared dimension table so this "is it FLUX.2?" check can't drift from variant detection.
+_FLUX2_CONTEXT_IN_DIMS = FLUX2_CONTEXT_IN_DIMS
 
-# FLUX.2 Klein vec_in_dim values: Qwen3 hidden_size
-# Klein 4B: 2560 (Qwen3-4B), Klein 9B: 4096 (Qwen3-8B)
-_FLUX2_VEC_IN_DIMS = {2560, 4096}
+# FLUX.2 vec_in_dim values: text encoder hidden_size
+# Klein 4B: 2560 (Qwen3-4B), Klein 9B: 4096 (Qwen3-8B), Dev: 5120 (Mistral Small 3.1)
+_FLUX2_VEC_IN_DIMS = {2560, 4096, 5120}
 
-# FLUX.1 hidden_size is 3072. Klein 9B uses hidden_size=4096.
+# FLUX.1 hidden_size is 3072. Klein 9B uses 4096, FLUX.2 [dev] uses 6144 (48 heads × 128 head_dim).
 # Klein 4B also uses 3072, so hidden_size alone can't distinguish Klein 4B from FLUX.1.
 _FLUX1_HIDDEN_SIZE = 3072
 
@@ -317,74 +323,49 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
 
 
 def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
-    """Determine FLUX.2 Klein variant (4B vs 9B) from a LoRA state dict.
+    """Determine FLUX.2 variant (Klein 4B/9B or Dev) from a LoRA state dict.
 
-    Detection is based on tensor dimensions that differ between Klein 4B and Klein 9B:
-    - hidden_size from attention projection: 3072 = Klein 4B, 4096 = Klein 9B
-    - context_in_dim from context embedder: 7680 = Klein 4B, 12288 = Klein 9B
-    - vec_in_dim from vector embedder: 2560 = Klein 4B, 4096 = Klein 9B
+    Detection is based on tensor dimensions that differ between variants:
+    - hidden_size from attention projection: 3072 = Klein 4B, 4096 = Klein 9B, 6144 = Dev
+    - context_in_dim from context embedder: 7680 = Klein 4B, 12288 = Klein 9B, 15360 = Dev
+    - vec_in_dim from vector embedder: 2560 = Klein 4B, 4096 = Klein 9B, 5120 = Dev
 
     Returns None if the variant cannot be determined (e.g. LoRA only targets layers
     with identical dimensions across variants).
     """
-    KLEIN_4B_CONTEXT_DIM = 7680  # 3 * 2560
-    KLEIN_9B_CONTEXT_DIM = 12288  # 3 * 4096
-    KLEIN_4B_VEC_DIM = 2560
-    KLEIN_9B_VEC_DIM = 4096
-    KLEIN_4B_HIDDEN_SIZE = 3072
-    KLEIN_9B_HIDDEN_SIZE = 4096
+    # Reverse-lookup helpers come from the shared FLUX.2 dimension table (single source of
+    # truth shared with main.py's identification code). Aliased to the original local names
+    # to keep the detection code below unchanged.
+    _variant_from_context_dim = flux2_variant_from_context_dim
+    _variant_from_vec_dim = flux2_variant_from_vec_dim
+    _variant_from_hidden_size = flux2_variant_from_hidden_size
 
     # Check diffusers/PEFT format keys
     for prefix in ["transformer.", "base_model.model.", ""]:
         # Context embedder (txt_in) dimensions
         ctx_key_a = f"{prefix}context_embedder.lora_A.weight"
         if ctx_key_a in state_dict:
-            dim = state_dict[ctx_key_a].shape[1]
-            if dim == KLEIN_4B_CONTEXT_DIM:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_CONTEXT_DIM:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_context_dim(state_dict[ctx_key_a].shape[1])
 
         # Vector embedder dimensions
         vec_key_a = f"{prefix}time_text_embed.text_embedder.linear_1.lora_A.weight"
         if vec_key_a in state_dict:
-            dim = state_dict[vec_key_a].shape[1]
-            if dim == KLEIN_4B_VEC_DIM:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_VEC_DIM:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_vec_dim(state_dict[vec_key_a].shape[1])
 
         # Attention projection hidden_size (Flux.1 diffusers naming)
         attn_key_a = f"{prefix}transformer_blocks.0.attn.to_out.0.lora_A.weight"
         if attn_key_a in state_dict:
-            dim = state_dict[attn_key_a].shape[1]
-            if dim == KLEIN_4B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_hidden_size(state_dict[attn_key_a].shape[1])
 
-        # Attention projection hidden_size (Flux2 Klein diffusers naming)
+        # Attention projection hidden_size (Flux2 diffusers naming)
         attn_key_a2 = f"{prefix}transformer_blocks.0.attn.to_add_out.lora_A.weight"
         if attn_key_a2 in state_dict:
-            dim = state_dict[attn_key_a2].shape[1]
-            if dim == KLEIN_4B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_hidden_size(state_dict[attn_key_a2].shape[1])
 
-        # Fused QKV+MLP hidden_size (Flux2 Klein diffusers naming)
+        # Fused QKV+MLP hidden_size (Flux2 diffusers naming)
         fused_key_a = f"{prefix}single_transformer_blocks.0.attn.to_qkv_mlp_proj.lora_A.weight"
         if fused_key_a in state_dict:
-            dim = state_dict[fused_key_a].shape[1]
-            if dim == KLEIN_4B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_hidden_size(state_dict[fused_key_a].shape[1])
 
     # Check BFL PEFT/LyCORIS format (diffusion_model.* or base_model.model.* prefix with BFL names)
     _bfl_prefixes = ("diffusion_model.", "base_model.model.")
@@ -396,63 +377,33 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
 
         # BFL PEFT: context embedder (txt_in)
         if "txt_in" in key and key.endswith("lora_A.weight"):
-            dim = state_dict[key].shape[1]
-            if dim == KLEIN_4B_CONTEXT_DIM:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_CONTEXT_DIM:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_context_dim(state_dict[key].shape[1])
 
         # BFL PEFT: vector embedder (vector_in)
         if "vector_in" in key and key.endswith("lora_A.weight"):
-            dim = state_dict[key].shape[1]
-            if dim == KLEIN_4B_VEC_DIM:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_VEC_DIM:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_vec_dim(state_dict[key].shape[1])
 
         # BFL PEFT: attention projection
         if key.endswith(".img_attn.proj.lora_A.weight"):
-            dim = state_dict[key].shape[1]
-            if dim == KLEIN_4B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_hidden_size(state_dict[key].shape[1])
 
         # BFL LyCORIS (LoKR): context embedder (txt_in)
         if "txt_in" in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
-            layer_prefix = key.rsplit(".", 1)[0]
-            in_dim = _lokr_in_dim(state_dict, layer_prefix)
+            in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
-                if in_dim == KLEIN_4B_CONTEXT_DIM:
-                    return Flux2VariantType.Klein4B
-                if in_dim == KLEIN_9B_CONTEXT_DIM:
-                    return Flux2VariantType.Klein9B
-                return None
+                return _variant_from_context_dim(in_dim)
 
         # BFL LyCORIS (LoKR): vector embedder (vector_in)
         if "vector_in" in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
-            layer_prefix = key.rsplit(".", 1)[0]
-            in_dim = _lokr_in_dim(state_dict, layer_prefix)
+            in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
-                if in_dim == KLEIN_4B_VEC_DIM:
-                    return Flux2VariantType.Klein4B
-                if in_dim == KLEIN_9B_VEC_DIM:
-                    return Flux2VariantType.Klein9B
-                return None
+                return _variant_from_vec_dim(in_dim)
 
         # BFL LyCORIS (LoKR): attention projection
         if key.endswith((".img_attn.proj.lokr_w1", ".img_attn.proj.lokr_w1_b")):
-            layer_prefix = key.rsplit(".", 1)[0]
-            in_dim = _lokr_in_dim(state_dict, layer_prefix)
+            in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
-                if in_dim == KLEIN_4B_HIDDEN_SIZE:
-                    return Flux2VariantType.Klein4B
-                if in_dim == KLEIN_9B_HIDDEN_SIZE:
-                    return Flux2VariantType.Klein9B
-                return None
+                return _variant_from_hidden_size(in_dim)
 
     # Check kohya format
     for key in state_dict:
@@ -460,40 +411,20 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
             continue
         if key.startswith("lora_unet_txt_in.") or key.startswith("lora_unet_context_embedder."):
             if key.endswith("lora_down.weight"):
-                dim = state_dict[key].shape[1]
-                if dim == KLEIN_4B_CONTEXT_DIM:
-                    return Flux2VariantType.Klein4B
-                if dim == KLEIN_9B_CONTEXT_DIM:
-                    return Flux2VariantType.Klein9B
-                return None
+                return _variant_from_context_dim(state_dict[key].shape[1])
             # Kohya LyCORIS (LoKR)
             elif key.endswith((".lokr_w1", ".lokr_w1_b")):
-                layer_prefix = key.rsplit(".", 1)[0]
-                in_dim = _lokr_in_dim(state_dict, layer_prefix)
+                in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
                 if in_dim is not None:
-                    if in_dim == KLEIN_4B_CONTEXT_DIM:
-                        return Flux2VariantType.Klein4B
-                    if in_dim == KLEIN_9B_CONTEXT_DIM:
-                        return Flux2VariantType.Klein9B
-                    return None
+                    return _variant_from_context_dim(in_dim)
         if key.startswith("lora_unet_vector_in.") or key.startswith("lora_unet_time_text_embed_text_embedder_"):
             if key.endswith("lora_down.weight"):
-                dim = state_dict[key].shape[1]
-                if dim == KLEIN_4B_VEC_DIM:
-                    return Flux2VariantType.Klein4B
-                if dim == KLEIN_9B_VEC_DIM:
-                    return Flux2VariantType.Klein9B
-                return None
+                return _variant_from_vec_dim(state_dict[key].shape[1])
             # Kohya LyCORIS (LoKR)
             elif key.endswith((".lokr_w1", ".lokr_w1_b")):
-                layer_prefix = key.rsplit(".", 1)[0]
-                in_dim = _lokr_in_dim(state_dict, layer_prefix)
+                in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
                 if in_dim is not None:
-                    if in_dim == KLEIN_4B_VEC_DIM:
-                        return Flux2VariantType.Klein4B
-                    if in_dim == KLEIN_9B_VEC_DIM:
-                        return Flux2VariantType.Klein9B
-                    return None
+                    return _variant_from_vec_dim(in_dim)
 
     # Kohya format: check transformer block dimensions (hidden_size from img_attn_proj).
     # This handles LoRAs that only target transformer blocks (no txt_in/vector_in/context_embedder).
@@ -505,22 +436,12 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
 
         # Check img_attn_proj hidden_size
         if "_img_attn_proj." in key and key.endswith("lora_down.weight"):
-            dim = state_dict[key].shape[1]
-            if dim == KLEIN_4B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein4B
-            if dim == KLEIN_9B_HIDDEN_SIZE:
-                return Flux2VariantType.Klein9B
-            return None
+            return _variant_from_hidden_size(state_dict[key].shape[1])
         # LoKR variant
         elif "_img_attn_proj." in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
-            layer_prefix = key.rsplit(".", 1)[0]
-            in_dim = _lokr_in_dim(state_dict, layer_prefix)
+            in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
-                if in_dim == KLEIN_4B_HIDDEN_SIZE:
-                    return Flux2VariantType.Klein4B
-                if in_dim == KLEIN_9B_HIDDEN_SIZE:
-                    return Flux2VariantType.Klein9B
-                return None
+                return _variant_from_hidden_size(in_dim)
 
     return None
 

@@ -68,6 +68,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 - Flux.1 Krea
 - Flux Redux
 - Flux Fill
+- Flux.2 Dev
 - Flux.2 Klein 4B
 - Flux.2 Klein 9B
 - Z-Image Turbo

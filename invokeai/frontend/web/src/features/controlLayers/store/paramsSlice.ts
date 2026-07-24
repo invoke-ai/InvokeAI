@@ -257,12 +257,12 @@ const slice = createSlice({
     ) => {
       state.animaScheduler = action.payload;
     },
-    kleinVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
-      const result = zParamsState.shape.kleinVaeModel.safeParse(action.payload);
+    flux2VaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.flux2VaeModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
-      state.kleinVaeModel = result.data;
+      state.flux2VaeModel = result.data;
     },
     kleinQwen3EncoderModelSelected: (
       state,
@@ -273,6 +273,16 @@ const slice = createSlice({
         return;
       }
       state.kleinQwen3EncoderModel = result.data;
+    },
+    flux2DevMistralEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.flux2DevMistralEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.flux2DevMistralEncoderModel = result.data;
     },
     qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
       const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
@@ -629,8 +639,9 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.animaLLLiteModel = oldState.animaLLLiteModel;
-  newState.kleinVaeModel = oldState.kleinVaeModel;
+  newState.flux2VaeModel = oldState.flux2VaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.flux2DevMistralEncoderModel = oldState.flux2DevMistralEncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
   newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
   newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
@@ -681,8 +692,9 @@ export const {
   zImageVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
-  kleinVaeModelSelected,
+  flux2VaeModelSelected,
   kleinQwen3EncoderModelSelected,
+  flux2DevMistralEncoderModelSelected,
   qwenImageComponentSourceSelected,
   qwenImageVaeModelSelected,
   qwenImageQwenVLEncoderModelSelected,
@@ -761,6 +773,15 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.qwenImageQwenVLEncoderModel = null;
       }
 
+      if (state._version === 3) {
+        // v3 -> v4, merge the separate Klein / [dev] FLUX.2 VAE slots into one shared
+        // flux2VaeModel (both drew from the same FLUX.2 VAE pool). Keep whichever was set.
+        state._version = 4;
+        state.flux2VaeModel = state.kleinVaeModel ?? state.flux2DevVaeModel ?? null;
+        delete state.kleinVaeModel;
+        delete state.flux2DevVaeModel;
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -804,8 +825,9 @@ export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => par
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectAnimaLLLiteModel = createParamsSelector((params) => params.animaLLLiteModel);
 export const selectAnimaLLLiteWeight = createParamsSelector((params) => params.animaLLLiteWeight);
-export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
+export const selectFlux2VaeModel = createParamsSelector((params) => params.flux2VaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectFlux2DevMistralEncoderModel = createParamsSelector((params) => params.flux2DevMistralEncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
 export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
 export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
@@ -1011,4 +1033,11 @@ export const selectMainModelConfig = createSelector(selectModelConfig, (modelCon
     return null;
   }
   return modelConfig;
+});
+
+export const selectIsFlux2Dev = createSelector(selectMainModelConfig, (modelConfig) => {
+  if (!modelConfig || modelConfig.base !== 'flux2') {
+    return false;
+  }
+  return 'variant' in modelConfig && modelConfig.variant === 'dev';
 });

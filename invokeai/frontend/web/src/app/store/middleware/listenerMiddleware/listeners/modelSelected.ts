@@ -7,8 +7,8 @@ import {
   animaQwen3EncoderModelSelected,
   animaVaeModelSelected,
   aspectRatioIdChanged,
+  flux2VaeModelSelected,
   kleinQwen3EncoderModelSelected,
-  kleinVaeModelSelected,
   modelChanged,
   qwenImageComponentSourceSelected,
   qwenImageQwenVLEncoderModelSelected,
@@ -235,11 +235,11 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         }
 
-        // handle incompatible FLUX.2 Klein models - clear if switching away from flux2
-        const { kleinVaeModel, kleinQwen3EncoderModel } = state.params;
+        // handle incompatible FLUX.2 models - clear if switching away from flux2
+        const { flux2VaeModel, kleinQwen3EncoderModel } = state.params;
         if (newBase !== 'flux2') {
-          if (kleinVaeModel) {
-            dispatch(kleinVaeModelSelected(null));
+          if (flux2VaeModel) {
+            dispatch(flux2VaeModelSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
           }
           if (kleinQwen3EncoderModel) {

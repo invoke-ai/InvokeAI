@@ -213,6 +213,7 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
   return (
     modelLoader.type === 'flux_model_loader' ||
     modelLoader.type === 'flux2_klein_model_loader' ||
+    modelLoader.type === 'flux2_dev_model_loader' ||
     modelLoader.type === 'sd3_model_loader' ||
     modelLoader.type === 'cogview4_model_loader' ||
     modelLoader.type === 'qwen_image_model_loader' ||

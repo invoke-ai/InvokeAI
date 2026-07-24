@@ -1,8 +1,9 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
+  selectFlux2DevMistralEncoderModel,
+  selectFlux2VaeModel,
   selectKleinQwen3EncoderModel,
-  selectKleinVaeModel,
   selectMainModelConfig,
   selectParamsSlice,
 } from 'features/controlLayers/store/paramsSlice';
@@ -12,6 +13,7 @@ import { isFlux2ReferenceImageConfig, isFluxKontextReferenceImageConfig } from '
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { zImageField, zModelIdentifierField } from 'features/nodes/types/common';
+import { addFlux2DevLoRAs } from 'features/nodes/util/graph/generation/addFlux2DevLoRAs';
 import { addFlux2KleinLoRAs } from 'features/nodes/util/graph/generation/addFlux2KleinLoRAs';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
@@ -30,7 +32,7 @@ import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types'
 import { isFlux2KleinQwen3Compatible } from 'features/parameters/util/flux2Klein';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
-import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
+import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -64,11 +66,14 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     clipEmbedModel,
   } = params;
 
-  // Flux2 (Klein) uses Qwen3 instead of CLIP+T5
-  // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately
+  // FLUX.2 Klein uses Qwen3 instead of CLIP+T5; FLUX.2 [dev] uses Mistral Small 3.1.
+  // VAE and text encoders can be extracted from the main Diffusers model or selected separately.
   const isFlux2 = model.base === 'flux2';
-  const kleinVaeModel = selectKleinVaeModel(state);
+  const isFlux2Dev = isFlux2 && 'variant' in model && model.variant === 'dev';
+  const isFlux2Klein = isFlux2 && !isFlux2Dev;
+  const flux2VaeModel = selectFlux2VaeModel(state);
   const kleinQwen3EncoderModel = selectKleinQwen3EncoderModel(state);
+  const flux2DevMistralEncoderModel = selectFlux2DevMistralEncoderModel(state);
 
   if (!isFlux2) {
     assert(t5EncoderModel, 'No T5 Encoder model found in state');
@@ -110,10 +115,18 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   const g = new Graph(getPrefixedId('flux_graph'));
 
-  // Create model loader and text encoder nodes based on variant
-  // Klein uses Qwen3 instead of CLIP+T5
-  let modelLoader: Invocation<'flux_model_loader'> | Invocation<'flux2_klein_model_loader'>;
-  let posCond: Invocation<'flux_text_encoder'> | Invocation<'flux2_klein_text_encoder'>;
+  // Create model loader and text encoder nodes based on variant:
+  // - Standard FLUX uses CLIP + T5
+  // - FLUX.2 Klein uses Qwen3
+  // - FLUX.2 [dev] uses Mistral Small 3.1
+  let modelLoader:
+    | Invocation<'flux_model_loader'>
+    | Invocation<'flux2_klein_model_loader'>
+    | Invocation<'flux2_dev_model_loader'>;
+  let posCond:
+    | Invocation<'flux_text_encoder'>
+    | Invocation<'flux2_klein_text_encoder'>
+    | Invocation<'flux2_dev_text_encoder'>;
   let denoise: Invocation<'flux_denoise'> | Invocation<'flux2_denoise'>;
   let posCondCollect: Invocation<'collect'> | null = null;
 
@@ -142,12 +155,61 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     });
   }
 
-  if (isFlux2) {
+  if (isFlux2Dev) {
+    // FLUX.2 [dev]: Mistral-based model loader, text encoder, and the shared FLUX.2 denoise node.
+    // VAE and Mistral encoder can be extracted from a Diffusers source or selected as standalones.
+    let mistralSourceModel: ModelIdentifierField | undefined;
+    if (model.format !== 'diffusers' && (!flux2VaeModel || !flux2DevMistralEncoderModel)) {
+      const diffusersModels = selectFlux2DevDiffusersModels(state);
+      if (diffusersModels[0]) {
+        mistralSourceModel = zModelIdentifierField.parse(diffusersModels[0]);
+      }
+    }
+
+    modelLoader = g.addNode({
+      type: 'flux2_dev_model_loader',
+      id: getPrefixedId('flux2_dev_model_loader'),
+      model,
+      vae_model: flux2VaeModel ?? undefined,
+      mistral_encoder_model: flux2DevMistralEncoderModel ?? undefined,
+      mistral_source_model: mistralSourceModel ?? undefined,
+    });
+
+    posCond = g.addNode({
+      type: 'flux2_dev_text_encoder',
+      id: getPrefixedId('flux2_dev_text_encoder'),
+    });
+
+    denoise = g.addNode({
+      type: 'flux2_denoise',
+      id: getPrefixedId('flux2_denoise'),
+      guidance,
+      num_steps: steps,
+      scheduler: fluxScheduler,
+    });
+
+    posCondCollect = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('pos_cond_collect'),
+    });
+
+    const devLoader = modelLoader as Invocation<'flux2_dev_model_loader'>;
+    const devCond = posCond as Invocation<'flux2_dev_text_encoder'>;
+    g.addEdge(devLoader, 'mistral_encoder', devCond, 'mistral_encoder');
+    g.addEdge(devLoader, 'max_seq_len', devCond, 'max_seq_len');
+    g.addEdge(devLoader, 'transformer', denoise, 'transformer');
+    g.addEdge(devLoader, 'vae', denoise, 'vae'); // required for BN statistics + inpaint paths
+    g.addEdge(devLoader, 'vae', l2i, 'vae');
+    g.addEdge(positivePrompt, 'value', devCond, 'prompt');
+    // Route through a collector (like Klein) so regional guidance can add more items.
+    g.addEdge(devCond, 'conditioning', posCondCollect, 'item');
+    g.addEdge(posCondCollect, 'collection', denoise, 'positive_text_conditioning');
+  } else if (isFlux2Klein) {
     // Flux2 Klein: Use Qwen3-based model loader, text encoder, and dedicated denoise node
     // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately.
     // For non-diffusers main models, find a diffusers flux2 model to use as the source for VAE/encoder.
     let qwen3SourceModel: ModelIdentifierField | undefined;
-    if (model.format !== 'diffusers' && (!kleinVaeModel || !kleinQwen3EncoderModel)) {
+    if (model.format !== 'diffusers' && (!flux2VaeModel || !kleinQwen3EncoderModel)) {
       const diffusersModels = selectFlux2DiffusersModels(state);
       // Prefer a diffusers model that shares the same Qwen3 encoder (e.g. klein_9b and klein_9b_base both use qwen3_8b).
       // Fall back to any diffusers model if only the VAE is needed.
@@ -166,7 +228,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       id: getPrefixedId('flux2_klein_model_loader'),
       model,
       // Optional: Use separately selected VAE and Qwen3 encoder models
-      vae_model: kleinVaeModel ?? undefined,
+      vae_model: flux2VaeModel ?? undefined,
       qwen3_encoder_model: kleinQwen3EncoderModel ?? undefined,
       qwen3_source_model: qwen3SourceModel ?? undefined,
     });
@@ -250,15 +312,29 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   // Metadata
-  if (isFlux2) {
+  if (isFlux2Dev) {
+    const flux2DevMetadata: Record<string, unknown> = {
+      model: Graph.getModelMetadataField(model),
+      steps,
+      scheduler: fluxScheduler,
+      guidance,
+    };
+    if (flux2VaeModel) {
+      flux2DevMetadata.vae = flux2VaeModel;
+    }
+    if (flux2DevMistralEncoderModel) {
+      flux2DevMetadata.mistral_encoder = flux2DevMistralEncoderModel;
+    }
+    g.upsertMetadata(flux2DevMetadata);
+  } else if (isFlux2) {
     // VAE and Qwen3 encoder can come from the main model or be selected separately
     const flux2Metadata: Record<string, unknown> = {
       model: Graph.getModelMetadataField(model),
       steps,
       scheduler: fluxScheduler,
     };
-    if (kleinVaeModel) {
-      flux2Metadata.vae = kleinVaeModel;
+    if (flux2VaeModel) {
+      flux2Metadata.vae = flux2VaeModel;
     }
     if (kleinQwen3EncoderModel) {
       flux2Metadata.qwen3_encoder = kleinQwen3EncoderModel;
@@ -283,25 +359,29 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
-  // Flux2 Klein path
-  if (isFlux2) {
-    const flux2Denoise = denoise as Invocation<'flux2_denoise'>;
-    const flux2ModelLoader = modelLoader as Invocation<'flux2_klein_model_loader'>;
-    const flux2L2i = l2i as Invocation<'flux2_vae_decode'>;
-    const flux2Cond = posCond as Invocation<'flux2_klein_text_encoder'>;
+  // Shared FLUX.2 feature wiring (multi-reference images + generation-mode dispatch + regional
+  // guidance). Klein and [dev] are identical here — only the model loader and text encoder
+  // identities differ, so they're passed in. Keeping this in one place stops the two variants
+  // from drifting (e.g. regional guidance being wired for one but not the other).
+  const addFlux2Features = async (
+    flux2Denoise: Invocation<'flux2_denoise'>,
+    flux2L2i: Invocation<'flux2_vae_decode'>,
+    flux2Loader: Invocation<'flux2_dev_model_loader'> | Invocation<'flux2_klein_model_loader'>,
+    regionPosCond: Invocation<'flux2_dev_text_encoder'> | Invocation<'flux2_klein_text_encoder'>
+  ): Promise<Invocation<ImageOutputNodes>> => {
+    let out: Invocation<ImageOutputNodes> = flux2L2i;
 
-    addFlux2KleinLoRAs(state, g, flux2Denoise, flux2ModelLoader, flux2Cond);
-
-    // FLUX.2 Klein has built-in multi-reference image editing - no separate model needed
-    const validFlux2RefImageConfigs = selectRefImagesSlice(state)
+    // Multi-reference image editing. The 32-channel VAE encode + 4D RoPE position IDs are
+    // model-agnostic; the backend Flux2RefImageExtension handles both Klein and [dev].
+    const validRefImageConfigs = selectRefImagesSlice(state)
       .entities.filter((entity) => entity.isEnabled)
       .filter((entity) => isFlux2ReferenceImageConfig(entity.config))
       .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
-    if (validFlux2RefImageConfigs.length > 0) {
+    if (validRefImageConfigs.length > 0) {
       let prevCollect: Invocation<'collect'> | null = null;
-      for (const { config } of validFlux2RefImageConfigs) {
-        // FLUX.2 uses the same flux_kontext node - it just packages the image
+      for (const { config } of validRefImageConfigs) {
+        // FLUX.2 uses the same flux_kontext node - it just packages the image.
         const kontextConditioning = g.addNode({
           type: 'flux_kontext',
           id: getPrefixedId('flux_kontext'),
@@ -320,11 +400,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       assert(prevCollect !== null);
       g.addEdge(prevCollect, 'collection', flux2Denoise, 'kontext_conditioning');
 
-      g.upsertMetadata({ ref_images: validFlux2RefImageConfigs }, 'merge');
+      g.upsertMetadata({ ref_images: validRefImageConfigs }, 'merge');
     }
 
     if (generationMode === 'txt2img') {
-      canvasOutput = addTextToImage({
+      out = addTextToImage({
         g,
         state,
         denoise: flux2Denoise,
@@ -337,14 +417,14 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         type: 'flux2_vae_encode',
         id: getPrefixedId('flux2_vae_encode'),
       });
-      canvasOutput = await addImageToImage({
+      out = await addImageToImage({
         g,
         state,
         manager,
         l2i: flux2L2i,
         i2l,
         denoise: flux2Denoise,
-        vaeSource: flux2ModelLoader,
+        vaeSource: flux2Loader,
       });
       g.upsertMetadata({ generation_mode: 'flux2_img2img' });
     } else if (generationMode === 'inpaint') {
@@ -353,15 +433,15 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         type: 'flux2_vae_encode',
         id: getPrefixedId('flux2_vae_encode'),
       });
-      canvasOutput = await addInpaint({
+      out = await addInpaint({
         g,
         state,
         manager,
         l2i: flux2L2i,
         i2l,
         denoise: flux2Denoise,
-        vaeSource: flux2ModelLoader,
-        modelLoader: flux2ModelLoader,
+        vaeSource: flux2Loader,
+        modelLoader: flux2Loader,
         seed,
       });
       g.upsertMetadata({ generation_mode: 'flux2_inpaint' });
@@ -371,15 +451,15 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         type: 'flux2_vae_encode',
         id: getPrefixedId('flux2_vae_encode'),
       });
-      canvasOutput = await addOutpaint({
+      out = await addOutpaint({
         g,
         state,
         manager,
         l2i: flux2L2i,
         i2l,
         denoise: flux2Denoise,
-        vaeSource: flux2ModelLoader,
-        modelLoader: flux2ModelLoader,
+        vaeSource: flux2Loader,
+        modelLoader: flux2Loader,
         seed,
       });
       g.upsertMetadata({ generation_mode: 'flux2_outpaint' });
@@ -387,8 +467,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       assert<Equals<typeof generationMode, never>>(false);
     }
 
-    // Regional guidance for FLUX.2 Klein. Backend applies a single attention mask via
-    // joint_attention_kwargs to all transformer blocks — no IP adapter / redux integration.
+    // Regional guidance. Positive prompts only (negatives / auto-negative are blocked by the
+    // validators); the backend applies a single attention mask via joint_attention_kwargs to
+    // all transformer blocks — no IP adapter / redux integration.
     if (manager !== null && posCondCollect !== null) {
       const ipAdapterCollect = g.addNode({
         type: 'collect',
@@ -400,17 +481,39 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         g,
         bbox: canvas.bbox.rect,
         model,
-        posCond: flux2Cond,
+        posCond: regionPosCond,
         negCond: null,
         posCondCollect,
         negCondCollect: null,
         ipAdapterCollect,
         fluxReduxCollect: null,
       });
-      // The collector exists only for type compatibility with addRegions; FLUX.2 Klein
-      // does not consume IP adapters, so drop the node if nothing connected to it.
+      // The collector exists only for type compatibility with addRegions; FLUX.2 does not
+      // consume IP adapters here, so drop the node if nothing connected to it.
       g.deleteNode(ipAdapterCollect.id);
     }
+
+    return out;
+  };
+
+  // FLUX.2 [dev] path — Mistral model loader / text encoder + the shared feature wiring.
+  if (isFlux2Dev) {
+    const flux2Denoise = denoise as Invocation<'flux2_denoise'>;
+    const flux2DevLoader = modelLoader as Invocation<'flux2_dev_model_loader'>;
+    const flux2L2i = l2i as Invocation<'flux2_vae_decode'>;
+    const flux2DevCond = posCond as Invocation<'flux2_dev_text_encoder'>;
+
+    addFlux2DevLoRAs(state, g, flux2Denoise, flux2DevLoader, flux2DevCond);
+    canvasOutput = await addFlux2Features(flux2Denoise, flux2L2i, flux2DevLoader, flux2DevCond);
+  } else if (isFlux2) {
+    // Flux2 Klein path — Qwen3 model loader / text encoder + the shared feature wiring.
+    const flux2Denoise = denoise as Invocation<'flux2_denoise'>;
+    const flux2ModelLoader = modelLoader as Invocation<'flux2_klein_model_loader'>;
+    const flux2L2i = l2i as Invocation<'flux2_vae_decode'>;
+    const flux2Cond = posCond as Invocation<'flux2_klein_text_encoder'>;
+
+    addFlux2KleinLoRAs(state, g, flux2Denoise, flux2ModelLoader, flux2Cond);
+    canvasOutput = await addFlux2Features(flux2Denoise, flux2L2i, flux2ModelLoader, flux2Cond);
   } else {
     // Standard FLUX path with all features
     const fluxDenoise = denoise as Invocation<'flux_denoise'>;

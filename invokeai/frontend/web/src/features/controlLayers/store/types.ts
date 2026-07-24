@@ -796,7 +796,7 @@ export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
 export const zParamsState = z.object({
-  _version: z.literal(3),
+  _version: z.literal(4),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -858,9 +858,13 @@ export const zParamsState = z.object({
   animaScheduler: zParameterAnimaScheduler,
   animaLLLiteModel: zModelIdentifierField.nullable().default(null), // Optional: ControlNet-LLLite inpaint adapter for Anima
   animaLLLiteWeight: z.number().min(-10).max(10).default(1),
-  // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
-  kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
+  // FLUX.2 VAE shared by Klein and [dev] — both use the same 32-channel AutoencoderKLFlux2 pool,
+  // so a single slot avoids losing the selection when switching a GGUF between the two.
+  flux2VaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE (Klein + [dev])
+  // Flux2 Klein text encoder - uses Qwen3 instead of CLIP+T5
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Flux2 [dev] text encoder - uses Mistral Small 3.1 (24B)
+  flux2DevMistralEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Mistral encoder for [dev]
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
@@ -886,7 +890,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 3,
+  _version: 4,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -946,8 +950,9 @@ export const getInitialParamsState = (): ParamsState => ({
   animaScheduler: 'euler',
   animaLLLiteModel: null,
   animaLLLiteWeight: 1,
-  kleinVaeModel: null,
+  flux2VaeModel: null,
   kleinQwen3EncoderModel: null,
+  flux2DevMistralEncoderModel: null,
   qwenImageComponentSource: null,
   qwenImageVaeModel: null,
   qwenImageQwenVLEncoderModel: null,
