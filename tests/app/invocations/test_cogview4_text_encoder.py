@@ -37,9 +37,14 @@ class FakeTokenizer:
 
 
 class FakeLoadedModel:
-    def __init__(self, model):
+    def __init__(self, model, compute_device=torch.device("cpu")):
         self._model = model
         self.repair_calls = 0
+        self._compute_device = compute_device
+
+    @property
+    def compute_device(self) -> torch.device:
+        return self._compute_device
 
     @contextmanager
     def model_on_device(self):

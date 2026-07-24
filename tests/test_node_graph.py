@@ -279,6 +279,15 @@ def test_graph_connects_collector():
     g.add_edge(e3)
 
 
+def test_graph_rejects_collector_output_edge_before_input_edge():
+    graph = Graph()
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(ListPassThroughInvocation(id="consumer"))
+
+    with pytest.raises(InvalidEdgeError, match="Collector must have at least one item or collection input edge"):
+        graph.add_edge(create_edge("collect", "collection", "consumer", "collection"))
+
+
 # TODO: test that derived types mixed with base types are compatible
 
 
@@ -1172,10 +1181,10 @@ def test_iterator_collector_iterator_chain_with_empty_collection():
     session = GraphExecutionState(graph=g)
     run_session_with_mock_context(session)
 
-    # With empty collection, iterators don't create execution nodes, so collectors don't execute
-    # Verify that the final collector was never prepared (which is correct behavior)
-    assert n7.id not in session.source_prepared_mapping
-
-    # Verify only the source collection node executed
-    assert n1.id in session.source_prepared_mapping
-    assert len(session.source_prepared_mapping[n1.id]) == 1
+    first_output = get_single_output_from_session(session, n4.id)
+    final_output = get_single_output_from_session(session, n7.id)
+    assert isinstance(first_output, CollectInvocationOutput)
+    assert isinstance(final_output, CollectInvocationOutput)
+    assert first_output.collection == []
+    assert final_output.collection == []
+    assert session.is_complete()

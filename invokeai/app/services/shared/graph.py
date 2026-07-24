@@ -505,12 +505,32 @@ class _ExecutionMaterializer:
             key=lambda exec_node_id: (self._state._get_iteration_path(exec_node_id), exec_node_id),
         )
 
+    def _get_collect_candidate_group_keys(self, edge: Edge) -> set[tuple[int, ...]]:
+        source_node_id = edge.source.node_id
+        iterator_node_ids = self.get_node_iterators(source_node_id)
+        if isinstance(self._state.graph.get_node(source_node_id), IterateInvocation):
+            iterator_node_ids.append(source_node_id)
+
+        group_depth = len(iterator_node_ids)
+        if edge.destination.field == ITEM_FIELD:
+            group_depth = max(group_depth - 1, 0)
+        if group_depth == 0:
+            return {()}
+
+        return {
+            iteration_path[:group_depth]
+            for iterator_node_id in iterator_node_ids
+            for prepared_id in self._get_ordered_prepared_nodes_for_source(iterator_node_id)
+            if len(iteration_path := self._state._get_iteration_path(prepared_id)) >= group_depth
+        }
+
     def _get_collect_iteration_mapping_groups(
         self, input_edges: list[Edge]
     ) -> list[tuple[tuple[int, ...], list[tuple[str, str]]]]:
         prepared_inputs: list[tuple[Edge, str, str, tuple[int, ...]]] = []
         group_keys: set[tuple[int, ...]] = set()
         for edge in input_edges:
+            group_keys.update(self._get_collect_candidate_group_keys(edge))
             prepared_nodes = self._get_ordered_prepared_nodes_for_source(edge.source.node_id)
             for prepared_id in prepared_nodes:
                 prepared_edge = Edge(
@@ -522,6 +542,9 @@ class _ExecutionMaterializer:
                 prepared_inputs.append(
                     (prepared_edge, edge.source.node_id, prepared_id, self._state._get_iteration_path(prepared_id))
                 )
+
+        if not group_keys:
+            group_keys.add(())
 
         final_group_keys = sorted(
             group_key
@@ -604,6 +627,11 @@ class _ExecutionMaterializer:
             if len(mapping) == len(parent_node_ids):
                 mappings.append(mapping)
         return mappings
+
+    def _mark_source_node_empty(self, source_node_id: str) -> None:
+        self._state.source_prepared_mapping[source_node_id] = set()
+        self._state.executed.add(source_node_id)
+        self._state.executed_history.append(source_node_id)
 
     def _index_prepared_nodes_by_iteration_path(self, prepared_nodes: set[str]) -> dict[tuple[int, ...], list[str]]:
         prepared_nodes_by_iteration_path: dict[tuple[int, ...], list[str]] = {}
@@ -712,6 +740,8 @@ class _ExecutionMaterializer:
             new_node_iteration_path = iteration_path
             if new_node_iteration_path is None:
                 new_node_iteration_path = self._get_known_iteration_path(iteration_index, iteration_node_map)
+            elif isinstance(node, IterateInvocation):
+                new_node_iteration_path += (iteration_index,)
             if new_node_iteration_path is not None:
                 self._state._prepared_registry().set_iteration_path(new_node.id, new_node_iteration_path)
             attached_edges = self._attach_execution_edges(new_node.id, new_edges)
@@ -843,19 +873,30 @@ class _ExecutionMaterializer:
         new_node_ids: list[str] = []
 
         if isinstance(next_node, CollectInvocation):
-            for iteration_path, iteration_mappings in self._get_collect_iteration_mapping_groups(
+            iteration_mapping_groups = self._get_collect_iteration_mapping_groups(
                 self._state.graph._get_input_edges(next_node_id)
-            ):
+            )
+            for iteration_path, iteration_mappings in iteration_mapping_groups:
                 create_results = self.create_execution_node(next_node_id, iteration_mappings, iteration_path)
-                if create_results is not None:
-                    new_node_ids.extend(create_results)
+                new_node_ids.extend(create_results)
         else:
+            parent_iterator_nodes = self.get_node_iterators(next_node_id)
             for iteration_mappings in self._get_parent_iteration_mappings(next_node_id, g):
-                create_results = self.create_execution_node(next_node_id, iteration_mappings)
-                if create_results is not None:
-                    new_node_ids.extend(create_results)
+                iteration_path = None
+                if not parent_iterator_nodes:
+                    iteration_path = max(
+                        (self._state._get_iteration_path(prepared_id) for _, prepared_id in iteration_mappings),
+                        key=lambda path: (len(path), path),
+                        default=(),
+                    )
+                create_results = self.create_execution_node(next_node_id, iteration_mappings, iteration_path)
+                new_node_ids.extend(create_results)
 
-        return next(iter(new_node_ids), None)
+        if not new_node_ids:
+            self._mark_source_node_empty(next_node_id)
+            return next_node_id
+
+        return new_node_ids[0]
 
 
 class _ExecutionScheduler:
@@ -1669,7 +1710,13 @@ class Graph(BaseModel):
         :raises InvalidEdgeError: the provided edge is invalid.
         """
 
-        self._validate_edge(edge)
+        self._add_edge(edge, allow_inputless_source_collector=False)
+
+    def _add_execution_edge(self, edge: Edge) -> None:
+        self._add_edge(edge, allow_inputless_source_collector=True)
+
+    def _add_edge(self, edge: Edge, allow_inputless_source_collector: bool) -> None:
+        self._validate_edge(edge, allow_inputless_source_collector)
         if edge not in self.edges:
             list.append(self.edges, edge)
             self._add_edge_to_indexes(edge)
@@ -1859,7 +1906,11 @@ class Graph(BaseModel):
                 raise InvalidEdgeError(f"Iterator output type does not match iterator input type ({edge}): {err}")
 
     def _validate_collector_edge_rules(
-        self, edge: Edge, source_node: BaseInvocation, destination_node: BaseInvocation
+        self,
+        edge: Edge,
+        source_node: BaseInvocation,
+        destination_node: BaseInvocation,
+        allow_inputless_source_collector: bool,
     ) -> None:
         if isinstance(destination_node, CollectInvocation) and edge.destination.field in (ITEM_FIELD, COLLECTION_FIELD):
             err = self._is_collector_connection_valid(
@@ -1874,18 +1925,22 @@ class Graph(BaseModel):
             and not self._is_destination_field_list_of_Any(edge)
             and not self._is_destination_field_Any(edge)
         ):
+            if allow_inputless_source_collector and not any(
+                edge.destination.node_id == source_node.id for edge in self.edges
+            ):
+                return
             err = self._is_collector_connection_valid(edge.source.node_id, new_output=edge.destination)
             if err is not None:
                 raise InvalidEdgeError(f"Collector input type does not match collector output type ({edge}): {err}")
 
-    def _validate_edge(self, edge: Edge):
+    def _validate_edge(self, edge: Edge, allow_inputless_source_collector: bool = False):
         """Validates that a new edge doesn't create a cycle in the graph"""
         source_node, destination_node = self._get_edge_nodes(edge)
         self._validate_edge_destination_uniqueness(edge, destination_node)
         self._validate_edge_would_not_create_cycle(edge)
         self._validate_edge_field_compatibility(edge, source_node, destination_node)
         self._validate_iterator_edge_rules(edge, source_node, destination_node)
-        self._validate_collector_edge_rules(edge, source_node, destination_node)
+        self._validate_collector_edge_rules(edge, source_node, destination_node, allow_inputless_source_collector)
 
     def has_node(self, node_id: str) -> bool:
         """Determines whether or not a node exists in the graph."""
