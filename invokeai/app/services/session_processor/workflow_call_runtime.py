@@ -96,7 +96,7 @@ class WorkflowCallCoordinator:
         child_queue_item = None
         enqueued_child_item_ids: list[int] = []
         try:
-            self._session_runner._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
+            self._session_runner._services.session_queue.save_queue_item_session(queue_item.item_id, queue_item.session)
             for child_result in child_session_results:
                 child_queue_item = self._session_runner._services.session_queue.enqueue_workflow_call_child(
                     parent_queue_item=queue_item,
@@ -105,8 +105,8 @@ class WorkflowCallCoordinator:
                 )
                 enqueued_child_item_ids.append(child_queue_item.item_id)
             queue_item.session.set_waiting_workflow_call_child_item_ids(enqueued_child_item_ids)
-            self._session_runner._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
-            self._session_runner._services.session_queue.suspend_queue_item(queue_item.item_id)
+            self._session_runner._services.session_queue.save_queue_item_session(queue_item.item_id, queue_item.session)
+            self._session_runner._services.session_queue.suspend_queue_item(queue_item.item_id, queue_item=queue_item)
         except Exception as e:
             if enqueued_child_item_ids:
                 self._session_runner._services.session_queue.delete_queue_items_by_id(enqueued_child_item_ids)
@@ -218,7 +218,7 @@ class WorkflowCallQueueLifecycle:
                 self._fail_parent_from_failed_child(parent_queue_item)
             return
         if not should_resume_parent:
-            self._session_runner._services.session_queue.set_queue_item_session(
+            self._session_runner._services.session_queue.save_queue_item_session(
                 parent_queue_item.item_id, parent_queue_item.session
             )
             return
@@ -228,17 +228,19 @@ class WorkflowCallQueueLifecycle:
         parent_output = WorkflowReturnOutput(values=aggregated_values)
         parent_queue_item.session.complete(waiting_invocation.id, parent_output)
         self._session_runner._on_after_run_node(waiting_invocation, parent_queue_item, parent_output)
-        parent_queue_item = self._session_runner._services.session_queue.set_queue_item_session(
+        self._session_runner._services.session_queue.save_queue_item_session(
             parent_queue_item.item_id, parent_queue_item.session
         )
         if parent_queue_item.session.is_complete():
             parent_queue_item = self._session_runner._services.session_queue.complete_queue_item(
-                parent_queue_item.item_id
+                parent_queue_item.item_id, queue_item=parent_queue_item
             )
             if getattr(parent_queue_item, "parent_item_id", None) is not None:
                 self._resume_parent_from_completed_child(parent_queue_item)
             return
-        self._session_runner._services.session_queue.resume_queue_item(parent_queue_item.item_id)
+        self._session_runner._services.session_queue.resume_queue_item(
+            parent_queue_item.item_id, queue_item=parent_queue_item
+        )
 
     def _fail_parent_from_failed_child(self, child_queue_item: SessionQueueItem) -> None:
         parent_queue_item = self._get_parent_queue_item(child_queue_item)
