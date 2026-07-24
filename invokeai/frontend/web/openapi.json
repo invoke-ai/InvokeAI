@@ -979,6 +979,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -1308,6 +1311,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -1635,6 +1641,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -2009,6 +2018,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -2407,6 +2419,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -3635,6 +3650,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -12008,6 +12026,9 @@
           },
           {
             "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+          },
+          {
+            "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -56109,6 +56130,9 @@
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
               },
               {
@@ -56684,6 +56708,9 @@
                     "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                   },
                   {
@@ -57144,6 +57171,9 @@
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
               },
               {
@@ -57458,6 +57488,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+              },
+              {
+                "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -58223,6 +58256,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -69420,6 +69456,155 @@
         ],
         "title": "T5Encoder_BnBLLMint8_Config",
         "description": "Configuration for T5 Encoder models quantized by bitsandbytes' LLM.int8."
+      },
+      "T5Encoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "t5_encoder",
+            "title": "Type",
+            "default": "t5_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "T5Encoder_GGUF_Config",
+        "description": "Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.\n\nThese are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder\ntensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``)."
       },
       "T5Encoder_T5Encoder_Config": {
         "properties": {
