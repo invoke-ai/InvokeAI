@@ -174,6 +174,22 @@ def test_obj_serializer_fwd_cache_respects_cache_size(fwd_cache: ObjectSerialize
     assert fwd_cache._cache_ids.qsize() == 2
 
 
+def test_obj_serializer_fwd_cache_save_after_deleting_cached_object(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass],
+):
+    first_name = fwd_cache.save(MockDataclass(foo="first"))
+    second_name = fwd_cache.save(MockDataclass(foo="second"))
+
+    fwd_cache.delete(first_name)
+    third_name = fwd_cache.save(MockDataclass(foo="third"))
+
+    assert first_name not in fwd_cache._cache
+    assert second_name in fwd_cache._cache
+    assert third_name in fwd_cache._cache
+    assert fwd_cache._cache_ids.qsize() == 2
+    assert fwd_cache.load(third_name).foo == "third"
+
+
 def test_obj_serializer_fwd_cache_calls_delete_callback(fwd_cache: ObjectSerializerForwardCache[MockDataclass]):
     called_name = None
     obj_1 = MockDataclass(foo="bar")
