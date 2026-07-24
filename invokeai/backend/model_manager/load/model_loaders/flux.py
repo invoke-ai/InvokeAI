@@ -464,12 +464,25 @@ class T5EncoderGGUFModel(ModelLoader):
             hidden_states = self.wo(hidden_states)
             return hidden_states
 
+        patched = 0
         for module in model.modules():
             cls_name = module.__class__.__name__
             if cls_name == "T5DenseGatedActDense":
                 module.forward = types.MethodType(gated_forward, module)
+                patched += 1
             elif cls_name == "T5DenseActDense":
                 module.forward = types.MethodType(act_forward, module)
+                patched += 1
+
+        # Guard against a silent no-op: if transformers ever renames these feed-forward classes, the
+        # match above would patch nothing and the uint8-cast bug would silently corrupt encoder output.
+        # Fail loudly instead so the mismatch is caught at load time rather than in the generated images.
+        if patched == 0:
+            raise RuntimeError(
+                "Failed to patch any T5 feed-forward modules (expected T5DenseGatedActDense / T5DenseActDense). "
+                "The installed transformers version may have renamed these classes; the GGUF T5 encoder "
+                "cannot be loaded safely without the wo-dtype workaround."
+            )
 
     @staticmethod
     def _shape_of(tensor: torch.Tensor) -> torch.Size:
