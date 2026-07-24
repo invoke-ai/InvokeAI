@@ -24,9 +24,14 @@ class FakeTokenizer:
 
 
 class FakeLoadedModel:
-    def __init__(self, model, config=None):
+    def __init__(self, model, config=None, compute_device=torch.device("cpu")):
         self._model = model
         self.config = config
+        self._compute_device = compute_device
+
+    @property
+    def compute_device(self) -> torch.device:
+        return self._compute_device
 
     @contextmanager
     def model_on_device(self):
@@ -64,12 +69,17 @@ def fake_apply_ti(tokenizer, text_encoder, ti_list):
     yield tokenizer, object()
 
 
-def test_sdxl_run_clip_compel_uses_effective_device_for_partially_loaded_model(monkeypatch):
+def test_sdxl_run_clip_compel_uses_compute_device_for_partially_loaded_model(monkeypatch):
+    # Regression test for #9373: the encoder's weights are all offloaded to CPU (effective device == CPU), but its
+    # intended compute device is the accelerator. compel must build on the intended compute device, not the current
+    # residency, or the whole encode silently runs on the CPU.
     module_path = "invokeai.app.invocations.compel"
-    effective_device = torch.device("meta")
-    text_encoder = FakeClipTextEncoder(effective_device=effective_device)
+    compute_device = torch.device("meta")
+    text_encoder = FakeClipTextEncoder(effective_device=torch.device("cpu"))
     tokenizer = FakeTokenizer()
-    text_encoder_info = FakeLoadedModel(text_encoder, config=SimpleNamespace(base="sdxl"))
+    text_encoder_info = FakeLoadedModel(
+        text_encoder, config=SimpleNamespace(base="sdxl"), compute_device=compute_device
+    )
     tokenizer_info = FakeLoadedModel(tokenizer)
 
     mock_context = MagicMock()
@@ -98,16 +108,19 @@ def test_sdxl_run_clip_compel_uses_effective_device_for_partially_loaded_model(m
         zero_on_empty=False,
     )
 
-    assert FakeCompel.last_init_device == effective_device
+    assert FakeCompel.last_init_device == compute_device
     assert cond.shape == (1, 4, 4)
     assert pooled is None
 
 
-def test_sdxl_run_clip_compel_uses_cpu_for_fully_cpu_model(monkeypatch):
+def test_sdxl_run_clip_compel_uses_cpu_for_cpu_only_model(monkeypatch):
+    # A cpu_only text encoder has compute_device == CPU; compel must build on the CPU.
     module_path = "invokeai.app.invocations.compel"
     text_encoder = FakeClipTextEncoder(effective_device=torch.device("cpu"))
     tokenizer = FakeTokenizer()
-    text_encoder_info = FakeLoadedModel(text_encoder, config=SimpleNamespace(base="sdxl"))
+    text_encoder_info = FakeLoadedModel(
+        text_encoder, config=SimpleNamespace(base="sdxl"), compute_device=torch.device("cpu")
+    )
     tokenizer_info = FakeLoadedModel(tokenizer)
 
     mock_context = MagicMock()
