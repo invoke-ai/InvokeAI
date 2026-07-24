@@ -200,6 +200,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (!this.parent.getCanDraw()) {
+      this.konva.startPointIndicator.visible(false);
+      return;
+    }
+
     if (tool === 'rect') {
       this.syncCursorStyle();
     }
@@ -230,7 +235,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
     const cursorPos = this.parent.$cursorPos.get();
-    if (!selectedEntity || !cursorPos) {
+    if (!selectedEntity || selectedEntity.state.type === 'vector_layer' || !cursorPos) {
       return;
     }
 
@@ -572,7 +577,13 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   private updateDragBuffer = async () => {
     const activeEntity = this.getActiveEntityAdapter();
-    if (!activeEntity || !this.dragStartPoint || !this.dragCurrentPoint || !this.shapeId) {
+    if (
+      !activeEntity ||
+      activeEntity.state.type === 'vector_layer' ||
+      !this.dragStartPoint ||
+      !this.dragCurrentPoint ||
+      !this.shapeId
+    ) {
       return;
     }
 

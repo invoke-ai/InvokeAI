@@ -114,6 +114,7 @@ export const buildHotkeysData = (
   addHotkey('canvas', 'selectEraserTool', ['e']);
   addHotkey('canvas', 'selectMoveTool', ['v']);
   addHotkey('canvas', 'selectRectTool', ['u']);
+  addHotkey('canvas', 'selectPathTool', ['p']);
   addHotkey('canvas', 'selectLassoTool', ['l']);
   addHotkey('canvas', 'selectViewTool', ['h']);
   addHotkey('canvas', 'selectColorPickerTool', ['i']);

@@ -5,6 +5,7 @@ import { InpaintMaskMenuItems } from 'features/controlLayers/components/InpaintM
 import { RasterLayerMenuItems } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItems';
 import { IPAdapterMenuItems } from 'features/controlLayers/components/RefImage/IPAdapterMenuItems';
 import { RegionalGuidanceMenuItems } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItems';
+import { VectorLayerMenuItems } from 'features/controlLayers/components/VectorLayer/VectorLayerMenuItems';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { memo, useCallback } from 'react';
 import { assert } from 'tsafe';
@@ -40,6 +41,14 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
       return (
         <MenuList>
           <ControlLayerMenuItems />
+        </MenuList>
+      );
+    }
+
+    if (entityIdentifier.type === 'vector_layer') {
+      return (
+        <MenuList>
+          <VectorLayerMenuItems />
         </MenuList>
       );
     }

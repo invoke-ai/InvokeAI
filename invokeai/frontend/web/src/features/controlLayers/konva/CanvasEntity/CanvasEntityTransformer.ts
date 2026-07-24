@@ -791,6 +791,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     if (transformingAdapter) {
       assert(false, `Already transforming an entity: ${transformingAdapter.id}`);
     }
+    const pathEditSession = this.manager.tool.tools.path.$editSession.get();
+    if (
+      this.parent.state.type === 'vector_layer' &&
+      pathEditSession?.entityIdentifier.id === this.parent.entityIdentifier.id
+    ) {
+      this.manager.tool.tools.path.acceptEditSession();
+    }
     // This will be released when the transformation is stopped
     await this.transformMutex.acquire();
     this.log.debug('Starting transform');
@@ -814,6 +821,22 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.log.debug('Applying transform');
     this.$isProcessing.set(true);
     this._setInteractionMode('off');
+
+    if (this.parent.state.type === 'vector_layer') {
+      const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = this.parent.renderer.konva.objectGroup
+        .getTransform()
+        .getMatrix();
+
+      this.resetScale();
+      this.updatePosition();
+      this.manager.stateApi.transformVectorLayer({
+        entityIdentifier: { id: this.parent.entityIdentifier.id, type: 'vector_layer' },
+        matrix: [a, b, c, d, e, f],
+      });
+      this.stopTransform();
+      return;
+    }
+
     const rect = roundRect(this.getRelativeRect());
     const { transformSmoothingEnabled, transformSmoothingMode } = this.manager.stateApi.getSettings();
     if (!transformSmoothingEnabled) {

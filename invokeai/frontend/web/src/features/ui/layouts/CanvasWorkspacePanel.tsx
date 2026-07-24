@@ -19,6 +19,7 @@ import { CanvasTextOverlay } from 'features/controlLayers/components/Text/Canvas
 import { PinnedFillColorPickerOverlay } from 'features/controlLayers/components/Tool/PinnedFillColorPickerOverlay';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
+import { VectorLayerEditFooter } from 'features/controlLayers/components/VectorLayer/VectorLayerEditFooter';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -120,6 +121,7 @@ export const CanvasWorkspacePanel = memo(() => {
             <Filter />
             <Transform />
             <SelectObject />
+            <VectorLayerEditFooter />
           </CanvasManagerProviderGate>
         </Flex>
         <CanvasManagerProviderGate>

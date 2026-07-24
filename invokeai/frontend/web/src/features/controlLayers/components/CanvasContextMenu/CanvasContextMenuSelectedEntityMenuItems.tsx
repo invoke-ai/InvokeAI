@@ -5,6 +5,7 @@ import { InpaintMaskMenuItems } from 'features/controlLayers/components/InpaintM
 import { RasterLayerMenuItems } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItems';
 import { IPAdapterMenuItems } from 'features/controlLayers/components/RefImage/IPAdapterMenuItems';
 import { RegionalGuidanceMenuItems } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItems';
+import { VectorLayerMenuItems } from 'features/controlLayers/components/VectorLayer/VectorLayerMenuItems';
 import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import {
   EntityIdentifierContext,
@@ -28,6 +29,9 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
   }
   if (entityIdentifier.type === 'inpaint_mask') {
     return <InpaintMaskMenuItems />;
+  }
+  if (entityIdentifier.type === 'vector_layer') {
+    return <VectorLayerMenuItems />;
   }
   if (entityIdentifier.type === 'regional_guidance') {
     return <RegionalGuidanceMenuItems />;

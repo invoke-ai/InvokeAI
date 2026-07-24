@@ -14,6 +14,7 @@ import {
   rgNegativePromptChanged,
   rgPositivePromptChanged,
   rgRefImageAdded,
+  vectorLayerAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import {
@@ -178,6 +179,18 @@ export const useAddInpaintMask = () => {
   const func = useCallback(() => {
     dispatch(inpaintMaskAdded({ isSelected: true, addAfter: selectedInpaintMask }));
   }, [dispatch, selectedInpaintMask]);
+
+  return func;
+};
+
+export const useAddVectorLayer = () => {
+  const dispatch = useAppDispatch();
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedVectorLayer =
+    selectedEntityIdentifier?.type === 'vector_layer' ? selectedEntityIdentifier.id : undefined;
+  const func = useCallback(() => {
+    dispatch(vectorLayerAdded({ isSelected: true, addAfter: selectedVectorLayer }));
+  }, [dispatch, selectedVectorLayer]);
 
   return func;
 };

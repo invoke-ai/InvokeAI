@@ -11,6 +11,8 @@ export const useEntityTypeString = (type: CanvasEntityIdentifier['type'], plural
         return plural ? t('controlLayers.controlLayer_withCount_other') : t('controlLayers.controlLayer');
       case 'raster_layer':
         return plural ? t('controlLayers.rasterLayer_withCount_other') : t('controlLayers.rasterLayer');
+      case 'vector_layer':
+        return plural ? t('controlLayers.vectorLayer_withCount_other') : t('controlLayers.vectorLayer');
       case 'inpaint_mask':
         return plural ? t('controlLayers.inpaintMask_withCount_other') : t('controlLayers.inpaintMask');
       case 'regional_guidance':

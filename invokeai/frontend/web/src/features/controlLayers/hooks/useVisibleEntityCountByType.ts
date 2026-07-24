@@ -5,6 +5,7 @@ import {
   selectActiveInpaintMaskEntities,
   selectActiveRasterLayerEntities,
   selectActiveRegionalGuidanceEntities,
+  selectActiveVectorLayerEntities,
 } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
@@ -17,6 +18,8 @@ export const useVisibleEntityCountByType = (type: CanvasEntityIdentifier['type']
         return createSelector(selectActiveControlLayerEntities, (entities) => entities.length);
       case 'raster_layer':
         return createSelector(selectActiveRasterLayerEntities, (entities) => entities.length);
+      case 'vector_layer':
+        return createSelector(selectActiveVectorLayerEntities, (entities) => entities.length);
       case 'inpaint_mask':
         return createSelector(selectActiveInpaintMaskEntities, (entities) => entities.length);
       case 'regional_guidance':

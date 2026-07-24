@@ -29,6 +29,11 @@ const getIndexAndCount = (
       index: canvas.controlLayers.entities.findIndex((entity) => entity.id === id),
       count: canvas.controlLayers.entities.length,
     };
+  } else if (type === 'vector_layer') {
+    return {
+      index: canvas.vectorLayers.entities.findIndex((entity) => entity.id === id),
+      count: canvas.vectorLayers.entities.length,
+    };
   } else if (type === 'regional_guidance') {
     return {
       index: canvas.regionalGuidance.entities.findIndex((entity) => entity.id === id),
