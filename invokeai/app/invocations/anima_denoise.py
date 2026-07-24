@@ -452,8 +452,8 @@ class AnimaDenoiseInvocation(BaseInvocation):
         Args:
             context: The invocation context.
             cond_field: Single conditioning field or list of fields.
-            img_token_height: Height of the image token grid (H // patch_size).
-            img_token_width: Width of the image token grid (W // patch_size).
+            img_token_height: Height of the image token grid (ceil(latent_H / patch_size)).
+            img_token_width: Width of the image token grid (ceil(latent_W / patch_size)).
             dtype: Target dtype.
             device: Target device.
 
