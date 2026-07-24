@@ -484,12 +484,18 @@ class T5EncoderGGUFModel(ModelLoader):
                 "cannot be loaded safely without the wo-dtype workaround."
             )
 
-    @staticmethod
-    def _shape_of(tensor: torch.Tensor) -> torch.Size:
-        """Return the dequantized shape, handling GGMLTensor wrappers."""
-        return tensor.shape if hasattr(tensor, "shape") else tensor.tensor_shape
-
     def _infer_t5_config_from_state_dict(self, sd: dict[str, torch.Tensor]) -> "object":
+        """Reconstruct a ``T5Config`` from the (transformers-named) GGUF tensors.
+
+        This only supports the T5 v1.1 XXL encoder family (e.g. city96/t5-v1_1-xxl-encoder-gguf), which
+        is what the starter models and FLUX pipelines use. Dimensions that vary (vocab, d_model, layer
+        count, head/ff sizes) are read from tensor shapes; the fixed architectural constants below
+        (``relative_attention_max_distance``, ``layer_norm_epsilon``, gated-gelu activation) are the T5
+        v1.1 defaults and would need revisiting for other T5 variants.
+
+        Note: ``.shape`` on a ``GGMLTensor`` already returns the dequantized (logical) shape, so quantized
+        and unquantized tensors can be read the same way here.
+        """
         from transformers import T5Config
 
         # Number of encoder blocks.
@@ -504,28 +510,27 @@ class T5EncoderGGUFModel(ModelLoader):
         shared = sd.get("shared.weight")
         if shared is None:
             raise ValueError("Could not find shared.weight (token embeddings) in T5 GGUF state dict")
-        vocab_size, d_model = (int(x) for x in self._shape_of(shared))
+        vocab_size, d_model = (int(x) for x in shared.shape)
 
         # Inner attention dim from q projection: nn.Linear(d_model, inner_dim) -> weight (inner_dim, d_model).
         q_weight = sd.get("encoder.block.0.layer.0.SelfAttention.q.weight")
         if q_weight is None:
             raise ValueError("Could not find SelfAttention.q.weight in T5 GGUF state dict")
-        inner_dim = int(self._shape_of(q_weight)[0])
+        inner_dim = int(q_weight.shape[0])
 
         # Number of heads and buckets from the relative attention bias: nn.Embedding(num_buckets, num_heads).
         rel_bias = sd.get("encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight")
         if rel_bias is None:
             raise ValueError("Could not find relative_attention_bias.weight in T5 GGUF state dict")
-        rel_shape = self._shape_of(rel_bias)
-        num_buckets = int(rel_shape[0])
-        num_heads = int(rel_shape[1])
+        num_buckets = int(rel_bias.shape[0])
+        num_heads = int(rel_bias.shape[1])
         d_kv = inner_dim // num_heads
 
         # Feed-forward dim from the gated FFN: nn.Linear(d_model, d_ff) -> weight (d_ff, d_model).
         wi_0 = sd.get("encoder.block.0.layer.1.DenseReluDense.wi_0.weight")
         if wi_0 is None:
             raise ValueError("Could not find DenseReluDense.wi_0.weight in T5 GGUF state dict")
-        d_ff = int(self._shape_of(wi_0)[0])
+        d_ff = int(wi_0.shape[0])
 
         return T5Config(
             vocab_size=vocab_size,
@@ -535,8 +540,8 @@ class T5EncoderGGUFModel(ModelLoader):
             num_layers=num_layers,
             num_heads=num_heads,
             relative_attention_num_buckets=num_buckets,
-            relative_attention_max_distance=128,
-            layer_norm_epsilon=1e-6,
+            relative_attention_max_distance=128,  # T5 v1.1 default
+            layer_norm_epsilon=1e-6,  # T5 v1.1 default
             feed_forward_proj="gated-gelu",
             is_gated_act=True,
             dense_act_fn="gelu_new",
