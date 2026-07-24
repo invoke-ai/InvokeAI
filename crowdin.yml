@@ -1,0 +1,23 @@
+preserve_hierarchy: true
+
+files:
+  - source: /docs/src/content/docs/index.mdx
+    translation: /docs/src/content/docs/%two_letters_code%/%original_file_name%
+
+  - source: /docs/src/content/docs/start-here/**/*.{md,mdx}
+    translation: /docs/src/content/docs/%two_letters_code%/start-here/**/%original_file_name%
+
+  - source: /docs/src/content/docs/configuration/**/*.{md,mdx}
+    translation: /docs/src/content/docs/%two_letters_code%/configuration/**/%original_file_name%
+
+  - source: /docs/src/content/docs/concepts/**/*.{md,mdx}
+    translation: /docs/src/content/docs/%two_letters_code%/concepts/**/%original_file_name%
+
+  - source: /docs/src/content/docs/features/**/*.{md,mdx}
+    translation: /docs/src/content/docs/%two_letters_code%/features/**/%original_file_name%
+
+  - source: /docs/src/content/docs/troubleshooting/**/*.{md,mdx}
+    translation: /docs/src/content/docs/%two_letters_code%/troubleshooting/**/%original_file_name%
+
+  - source: /docs/src/content/i18n/en.json
+    translation: /docs/src/content/i18n/%two_letters_code%.json

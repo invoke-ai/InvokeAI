@@ -1,0 +1,37 @@
+---
+import '@astrojs/starlight/style/markdown.css';
+
+const locale = Astro.locals.starlightRoute.locale;
+const base = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<div class="sl-markdown-content"><slot /></div>
+
+{
+  locale && (
+    <script define:vars={{ base, locale }}>
+      const localizedPrefix = `${base}/${locale}`;
+
+      for (const anchor of document.querySelectorAll('.sl-markdown-content a[href]')) {
+        const href = anchor.getAttribute('href');
+
+        if (!href || !href.startsWith('/') || href.startsWith('//')) {
+          continue;
+        }
+
+        const pathWithoutBase = base && href.startsWith(`${base}/`) ? href.slice(base.length) : href;
+
+        if (
+          pathWithoutBase === `/${locale}` ||
+          pathWithoutBase.startsWith(`/${locale}/`) ||
+          pathWithoutBase === '/download' ||
+          pathWithoutBase.startsWith('/download/')
+        ) {
+          continue;
+        }
+
+        anchor.setAttribute('href', `${localizedPrefix}${pathWithoutBase}`);
+      }
+    </script>
+  )
+}
