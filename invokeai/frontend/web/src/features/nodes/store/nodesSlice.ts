@@ -34,6 +34,7 @@ import type {
   ColorFieldValue,
   EnumFieldValue,
   FieldValue,
+  FileFieldValue,
   FloatFieldValue,
   FloatGeneratorFieldValue,
   ImageFieldCollectionValue,
@@ -56,6 +57,7 @@ import {
   zBooleanFieldValue,
   zColorFieldValue,
   zEnumFieldValue,
+  zFileFieldValue,
   zFloatFieldCollectionValue,
   zFloatFieldValue,
   zFloatGeneratorFieldValue,
@@ -583,6 +585,9 @@ const slice = createSlice({
     fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
       fieldValueReducer(state, action, zImageFieldValue);
     },
+    fieldFileValueChanged: (state, action: FieldValueAction<FileFieldValue>) => {
+      fieldValueReducer(state, action, zFileFieldValue);
+    },
     fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
       fieldValueReducer(state, action, zImageFieldCollectionValue);
     },
@@ -802,6 +807,7 @@ export const {
   fieldStylePresetValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
+  fieldFileValueChanged,
   fieldImageCollectionValueChanged,
   fieldLabelChanged,
   fieldLoRACollectionValueChanged,
