@@ -103,7 +103,7 @@ def _resolve_model_path(model_config_path: str) -> Path:
     return (base_models_path / model_path).resolve()
 
 
-def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prompt: str | None) -> str:
+def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prompt: str | None, user_id: str) -> str:
     """Run text LLM inference synchronously (called from thread)."""
     model_manager = ApiDependencies.invoker.services.model_manager
     model_config = model_manager.store.get_model(model_key)
@@ -112,7 +112,7 @@ def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prom
         raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
 
     with _model_load_lock:
-        loaded_model = model_manager.load.load_model(model_config)
+        loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
     with torch.no_grad(), loaded_model.model_on_device() as (_, model):
         model_abs_path = _resolve_model_path(model_config.path)
@@ -147,6 +147,7 @@ async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRe
             body.model_key,
             body.max_tokens,
             body.system_prompt,
+            current_user.user_id,
         )
         return ExpandPromptResponse(expanded_prompt=expanded)
     except UnknownModelException:
@@ -172,7 +173,7 @@ class ImageToPromptResponse(BaseModel):
     error: str | None = None
 
 
-def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> str:
+def _run_image_to_prompt(image_name: str, model_key: str, instruction: str, user_id: str) -> str:
     """Run LLaVA OneVision inference synchronously (called from thread)."""
     model_manager = ApiDependencies.invoker.services.model_manager
     model_config = model_manager.store.get_model(model_key)
@@ -181,7 +182,7 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
         raise ValueError(f"Model '{model_key}' is not a LLaVA OneVision model (got {model_config.type})")
 
     with _model_load_lock:
-        loaded_model = model_manager.load.load_model(model_config)
+        loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
     # Load the image from InvokeAI's image store
     image = ApiDependencies.invoker.services.images.get_pil_image(image_name)
@@ -229,6 +230,7 @@ async def image_to_prompt(current_user: CurrentUserOrDefault, body: ImageToPromp
             body.image_name,
             body.model_key,
             body.instruction,
+            current_user.user_id,
         )
         return ImageToPromptResponse(prompt=prompt)
     except UnknownModelException:

@@ -215,6 +215,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 AND board_images.board_id = ?
                 """
                 query_params.append(board_id)
+            elif user_id is not None and not is_admin:
+                # No board_id supplied — still enforce per-user isolation so
+                # non-admins cannot enumerate other users' images
+                query_conditions += """--sql
+                AND images.user_id = ?
+                """
+                query_params.append(user_id)
 
             # Search term condition
             if search_term:
@@ -465,6 +472,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 AND board_images.board_id = ?
                 """
                 query_params.append(board_id)
+            elif user_id is not None and not is_admin:
+                # No board_id supplied — still enforce per-user isolation so
+                # non-admins cannot enumerate other users' images
+                query_conditions += """--sql
+                AND images.user_id = ?
+                """
+                query_params.append(user_id)
 
             if search_term:
                 query_conditions += """--sql

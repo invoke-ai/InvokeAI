@@ -107,6 +107,32 @@ def test_status_current_item_redacted_for_non_owner_but_counts_global(session_qu
     assert status.user_pending == 1  # A's single pending item
 
 
+def test_status_admin_caller_gets_user_subcounts_and_current_item_identifiers(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    """An admin caller (user_id set, is_admin=True) gets their own subcounts - so personal UI
+    like the progress bar can distinguish the admin's own activity from other users' - while
+    still seeing the identifiers of another user's current item."""
+    admin_id = "admin-1"
+    user_b = "user-b"
+    b_item_id = _insert_queue_item(session_queue, user_id=user_b)
+    _insert_queue_item(session_queue, user_id=admin_id)
+
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == b_item_id
+
+    status = session_queue.get_queue_status(queue_id="default", user_id=admin_id, is_admin=True)
+
+    # Admins are not subject to current-item redaction.
+    assert status.item_id == b_item_id
+    assert status.session_id is not None
+    assert status.batch_id is not None
+    # Global counts plus the admin's own subcounts.
+    assert status.in_progress == 1  # B's item, counted globally
+    assert status.user_in_progress == 0  # the admin owns none in progress
+    assert status.user_pending == 1  # the admin's single pending item
+
+
 def test_get_queue_item_ids_returns_all_users_ids(session_queue: SqliteSessionQueue) -> None:
     """get_queue_item_ids returns ids for every user so the virtualized list can show the
     (redacted) entries belonging to other users. Redaction happens at hydration time."""

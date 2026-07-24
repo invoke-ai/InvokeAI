@@ -14,6 +14,7 @@ import { CanvasObjectLasso } from 'features/controlLayers/konva/CanvasObject/Can
 import { CanvasObjectOval } from 'features/controlLayers/konva/CanvasObject/CanvasObjectOval';
 import { CanvasObjectPolygon } from 'features/controlLayers/konva/CanvasObject/CanvasObjectPolygon';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
+import { objectStateNeedsPixelBbox } from 'features/controlLayers/konva/CanvasObject/needsPixelBbox';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
@@ -473,28 +474,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   needsPixelBbox = (): boolean => {
     let needsPixelBbox = false;
     for (const renderer of this.renderers.values()) {
-      const isEraserLine =
-        renderer instanceof CanvasObjectEraserLine || renderer instanceof CanvasObjectEraserLineWithPressure;
-      const isSubtractingLasso =
-        renderer instanceof CanvasObjectLasso && renderer.state.compositeOperation === 'destination-out';
-      const isSubtractRect =
-        renderer instanceof CanvasObjectRect && renderer.state.compositeOperation === 'destination-out';
-      const isSubtractOval =
-        renderer instanceof CanvasObjectOval && renderer.state.compositeOperation === 'destination-out';
-      const isSubtractPolygon =
-        renderer instanceof CanvasObjectPolygon && renderer.state.compositeOperation === 'destination-out';
-      const isImage = renderer instanceof CanvasObjectImage;
-      const imageIgnoresTransparency = isImage && renderer.state.usePixelBbox === false;
-      const hasClip = renderer instanceof CanvasObjectBrushLine && renderer.state.clip;
-      if (
-        isEraserLine ||
-        isSubtractingLasso ||
-        isSubtractRect ||
-        isSubtractOval ||
-        isSubtractPolygon ||
-        hasClip ||
-        (isImage && !imageIgnoresTransparency)
-      ) {
+      if (objectStateNeedsPixelBbox(renderer.state)) {
         needsPixelBbox = true;
         break;
       }

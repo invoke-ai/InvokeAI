@@ -14,6 +14,7 @@ import {
   VStack,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { getBasePath } from 'common/util/baseUrl';
 import { selectSessionExpired, setCredentials } from 'features/auth/store/authSlice';
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -61,8 +62,9 @@ export const LoginPage = memo(() => {
         };
         dispatch(setCredentials({ token: result.token, user }));
         // Force a page reload to ensure all user-specific state is loaded from server
-        // This is important for multiuser isolation to prevent state leakage
-        window.location.href = '/app';
+        // This is important for multiuser isolation to prevent state leakage.
+        // Prefix with the deployment base path so this keeps working behind a reverse-proxy sub-path.
+        window.location.href = `${getBasePath()}/app`;
       } catch {
         // Error is handled by RTK Query and displayed via error state
       }
