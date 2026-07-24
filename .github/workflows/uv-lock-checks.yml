@@ -63,9 +63,7 @@ jobs:
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
         uses: astral-sh/setup-uv@v8.1.0
         with:
-          # Keep this at or above the uv version used to generate uv.lock (revision 3 lock
-          # format requires a modern uv; 0.6.x cannot parse it).
-          version: '0.11.28'
+          version: '0.6.10'
           enable-cache: true
 
       - name: check lockfile
