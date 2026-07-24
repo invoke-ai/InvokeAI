@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1.4
+
+# For InvokeAI devcontainer.
+#
+# Design choices:
+# - Build on standard devcontainer base.
+# - Only do root-level installs, as base container does not include the non-root ubuntu user and
+#   sets it up using the common-utils feature after.
+
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    export DEBIAN_FRONTEND=noninteractive ;\
+    apt-get --quiet install --update --assume-yes --no-install-recommends --autoremove \
+        git git-lfs \
+        imagemagick- \
+        libopencv-dev \
+        libstdc++-10-dev \
+        openssh-client &&\
+    # Link amdgpu.ids for ROCm builds
+    # contributed by https://github.com/Rubonnek
+    mkdir -p "/opt/amdgpu/share/libdrm" &&\
+    ln -s "/usr/share/libdrm/amdgpu.ids" "/opt/amdgpu/share/libdrm/amdgpu.ids" &&\
+    # for patchmatch build
+    ln -sf --relative /usr/lib/$(uname -p)-linux-gnu/pkgconfig/{opencv4,opencv}.pc
+
+# Install `uv` for Python package management
+COPY --from=ghcr.io/astral-sh/uv:0.11.14 /uv /uvx /usr/local/bin/
+
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
+
+# PNPM_HOME needs to be writable by the user using it, but that user doesn't exist yet.
+# Set up a pnpm group that users may be added to later.
+RUN addgroup --system pnpm &&\
+    umask 0002 &&\
+    mkdir "${PNPM_HOME}" &&\
+    chown :pnpm "${PNPM_HOME}" &&\
+    chmod g+s "${PNPM_HOME}" &&\
+    # Use the pnpm install script, but inhibit it from changing any rc-files
+    # because we set those values in the ENV above.
+    curl -fsSL https://get.pnpm.io/install.sh | PNPM_VERSION=10.33.4 SHELL=/bin/sh ENV=/dev/null newgrp pnpm &&\
+    pnpm env use --global 22
