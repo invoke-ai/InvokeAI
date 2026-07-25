@@ -22,28 +22,40 @@ def dequantize_and_run(func, args, kwargs):
 
     Dequantizes the inputs and runs the function.
     Also casts other floating point tensors to match the compute_dtype of SDNQTensors.
+
+    Some ops (e.g. ``torch.cat`` / ``torch.stack``) pass their tensors inside a list or tuple rather
+    than as top-level args, so both discovery and processing recurse into sequences. Without this a
+    sequence arg is left untouched — its SDNQTensors are never dequantized and ``func`` redispatches
+    onto them, recursing until ``RecursionError``.
     """
     compute_dtype = None
     target_device = None
 
+    def scan(value) -> None:
+        nonlocal compute_dtype, target_device
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                scan(item)
+            return
+        if compute_dtype is None and hasattr(value, "compute_dtype"):
+            compute_dtype = value.compute_dtype
+        if target_device is None and isinstance(value, torch.Tensor):
+            target_device = value.device
+
     for a in args:
-        if hasattr(a, "compute_dtype"):
-            compute_dtype = a.compute_dtype
-        if isinstance(a, torch.Tensor) and target_device is None:
-            target_device = a.device
+        scan(a)
         if compute_dtype is not None and target_device is not None:
             break
 
     if compute_dtype is None or target_device is None:
         for v in kwargs.values():
-            if hasattr(v, "compute_dtype") and compute_dtype is None:
-                compute_dtype = v.compute_dtype
-            if isinstance(v, torch.Tensor) and target_device is None:
-                target_device = v.device
+            scan(v)
             if compute_dtype is not None and target_device is not None:
                 break
 
     def process_tensor(t):
+        if isinstance(t, (list, tuple)):
+            return type(t)(process_tensor(item) for item in t)
         if hasattr(t, "get_dequantized_tensor"):
             result = t.get_dequantized_tensor()
             if target_device is not None and result.device != target_device:

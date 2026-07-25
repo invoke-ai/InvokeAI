@@ -1,5 +1,6 @@
 import json
-from typing import Any, Literal, Self
+from pathlib import Path
+from typing import Any, Literal, Optional, Self
 
 from pydantic import Field
 from safetensors import safe_open
@@ -130,17 +131,51 @@ class T5Encoder_SDNQ_Config(Config_Base):
 
         cls._raise_if_not_sdnq_quantized(te_dir)
 
+        # Every FLUX workflow requests a Tokenizer2 alongside the encoder, and the loader can only load
+        # it from a `tokenizer_2/` folder. Reject an install that has no resolvable tokenizer (e.g. a
+        # bare inline `text_encoder_2` folder with no sibling `tokenizer_2/`) at identification time so
+        # it never registers as a selectable T5 that then fails mid-workflow on the missing tokenizer.
+        if cls.resolve_tokenizer_dir(mod.path) is None:
+            raise NotAMatchError("no tokenizer_2 folder resolvable for this SDNQ T5 encoder layout")
+
         return cls(**override_fields)
+
+    @staticmethod
+    def resolve_text_encoder_dir(path: Path) -> Optional[Path]:
+        """Return the directory holding T5's config.json + safetensors, or None.
+
+        Two layouts: a standalone bundle (``path`` is the pipeline root, T5 under ``text_encoder_2/``)
+        or an inline submodel (``path`` *is* the ``text_encoder_2`` folder).
+        """
+        nested = path / "text_encoder_2"
+        if (nested / "config.json").exists():
+            return nested
+        if (path / "config.json").exists():
+            return path
+        return None
+
+    @staticmethod
+    def resolve_tokenizer_dir(path: Path) -> Optional[Path]:
+        """Return the ``tokenizer_2/`` directory for either layout, or None if it doesn't exist.
+
+        In the standalone-bundle layout ``tokenizer_2/`` is a child of the pipeline root; in the
+        inline layout (``path`` is the ``text_encoder_2`` folder) it's a *sibling* of that folder.
+        The encoder loader picks the encoder dir by the same layout test, so the tokenizer must too —
+        using ``path / "tokenizer_2"`` unconditionally is wrong for the inline case.
+        """
+        if (path / "text_encoder_2" / "config.json").exists():
+            candidate = path / "tokenizer_2"
+        else:
+            candidate = path.parent / "tokenizer_2"
+        return candidate if candidate.exists() else None
 
     @classmethod
     def _locate_text_encoder_dir(cls, mod: ModelOnDisk):
         """Return the directory that actually holds T5's config.json + safetensors."""
-        nested = mod.path / "text_encoder_2"
-        if (nested / "config.json").exists():
-            return nested
-        if (mod.path / "config.json").exists():
-            return mod.path
-        raise NotAMatchError("no text_encoder_2/config.json or config.json at model root")
+        te_dir = cls.resolve_text_encoder_dir(mod.path)
+        if te_dir is None:
+            raise NotAMatchError("no text_encoder_2/config.json or config.json at model root")
+        return te_dir
 
     @classmethod
     def _raise_if_not_sdnq_quantized(cls, te_dir) -> None:

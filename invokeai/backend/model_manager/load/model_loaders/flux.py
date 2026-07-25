@@ -370,9 +370,13 @@ class T5EncoderSDNQLoader(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5Tokenizer.from_pretrained(
-                    Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
-                )
+                # tokenizer_2/ is a child of the pipeline root in the standalone layout but a sibling
+                # of the text_encoder_2 folder in the inline layout — resolve it the same way the
+                # encoder dir is resolved (identification already rejects installs where it's absent).
+                tokenizer_dir = T5Encoder_SDNQ_Config.resolve_tokenizer_dir(Path(config.path))
+                if tokenizer_dir is None:
+                    raise ValueError(f"No tokenizer_2 folder found for SDNQ T5 encoder at {config.path}")
+                return T5Tokenizer.from_pretrained(tokenizer_dir, max_length=512, local_files_only=True)
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
                 return self._load_text_encoder(config)
 
@@ -383,9 +387,9 @@ class T5EncoderSDNQLoader(ModelLoader):
     def _load_text_encoder(self, config: T5Encoder_SDNQ_Config) -> AnyModel:
         # Two layouts: either config.path is the pipeline root (T5 lives under text_encoder_2/),
         # or config.path is the text_encoder_2 folder itself (FluxPipeline submodel case).
-        base = Path(config.path)
-        nested = base / "text_encoder_2"
-        te_dir = nested if (nested / "config.json").exists() else base
+        te_dir = T5Encoder_SDNQ_Config.resolve_text_encoder_dir(Path(config.path))
+        if te_dir is None:
+            raise ValueError(f"No T5 encoder config.json found for SDNQ T5 encoder at {config.path}")
 
         model_config = AutoConfig.from_pretrained(te_dir, local_files_only=True)
         with accelerate.init_empty_weights():

@@ -195,3 +195,38 @@ class TestSDNQTensor:
         # Should return self without error
         result = tensor.requires_grad_(True)
         assert result is tensor
+
+    @staticmethod
+    def _make_tensor(values: list[list[int]], scale_value: float) -> SDNQTensor:
+        weight = torch.tensor(values, dtype=torch.int8)
+        return SDNQTensor(
+            data=weight,
+            quantization_type=SDNQQuantizationType.INT8_SYM,
+            tensor_shape=torch.Size(weight.shape),
+            compute_dtype=torch.float32,
+            scale=torch.tensor([scale_value], dtype=torch.float32),
+        )
+
+    def test_torch_cat_dequantizes_sequence_args(self):
+        """torch.cat passes its tensors inside a list; the op must dequantize them instead of
+        redispatching onto the SDNQTensors (which would recurse until RecursionError)."""
+        a = self._make_tensor([[1, 2], [3, 4]], 0.1)
+        b = self._make_tensor([[5, 6], [7, 8]], 0.2)
+
+        result = torch.cat([a, b], dim=0)
+        expected = torch.cat([a.get_dequantized_tensor(), b.get_dequantized_tensor()], dim=0)
+
+        assert not isinstance(result, SDNQTensor)
+        assert torch.allclose(result, expected, atol=1e-6)
+
+    def test_torch_stack_dequantizes_sequence_args(self):
+        """Same as cat, for torch.stack (also receives a list of tensors)."""
+        a = self._make_tensor([[1, 2], [3, 4]], 0.1)
+        b = self._make_tensor([[5, 6], [7, 8]], 0.2)
+
+        result = torch.stack([a, b], dim=0)
+        expected = torch.stack([a.get_dequantized_tensor(), b.get_dequantized_tensor()], dim=0)
+
+        assert not isinstance(result, SDNQTensor)
+        assert result.shape == torch.Size([2, 2, 2])
+        assert torch.allclose(result, expected, atol=1e-6)

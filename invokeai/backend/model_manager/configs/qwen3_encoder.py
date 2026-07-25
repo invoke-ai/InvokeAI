@@ -79,6 +79,25 @@ def _has_qwen_vl_visual_tower(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
+def _has_qwen3_specific_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check for Qwen3-only QK-normalization weights (``q_norm``/``k_norm`` per attention block).
+
+    Qwen3 adds an RMSNorm on the query and key projections that Qwen2 does not have. A Qwen2
+    causal LM otherwise satisfies the generic ``_has_qwen3_keys`` heuristic (same ``model.layers.*``
+    / ``model.embed_tokens.weight`` layout), so this is the discriminator that keeps a Qwen2 file
+    from being accepted as a Qwen3 encoder the loader would fail to build. Covers both the
+    PyTorch/diffusers naming and the llama.cpp/GGUF naming.
+    """
+    for key in state_dict.keys():
+        if not isinstance(key, str):
+            continue
+        if ".self_attn.q_norm." in key or ".self_attn.k_norm." in key:
+            return True
+        if ".attn_q_norm." in key or ".attn_k_norm." in key:  # llama.cpp / GGUF layout
+            return True
+    return False
+
+
 def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Optional[Qwen3VariantType]:
     """Determine Qwen3 variant (0.6B, 4B, or 8B) from state dict based on hidden_size.
 
@@ -396,9 +415,23 @@ class Qwen3Encoder_SDNQ_Config(Checkpoint_Config_Base, Config_Base):
 
     @classmethod
     def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:
-        has_qwen3 = _has_qwen3_keys(mod.load_state_dict())
-        if not has_qwen3:
+        state_dict = mod.load_state_dict()
+        if not _has_qwen3_keys(state_dict):
             raise NotAMatchError("state dict does not look like a Qwen3 model")
+        # The SDNQ Qwen3 encoder loader always builds a text-only Qwen3ForCausalLM, so identification
+        # must reject anything it cannot load. _has_qwen3_keys is generic across Qwen2/Qwen3/Qwen-VL:
+        #  - a Qwen-VL file bundles a visual tower (unexpected weights), and
+        #  - a Qwen2 causal LM lacks the Qwen3 QK-norm params (missing weights).
+        # Mirror the folder config's architecture guard using the single file's state-dict keys.
+        if _has_qwen_vl_visual_tower(state_dict):
+            raise NotAMatchError(
+                "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
+            )
+        if not _has_qwen3_specific_keys(state_dict):
+            raise NotAMatchError(
+                "state dict lacks Qwen3 QK-normalization (q_norm/k_norm) weights; looks like a Qwen2 model, "
+                "which the SDNQ Qwen3 encoder loader cannot build"
+            )
 
     @classmethod
     def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:

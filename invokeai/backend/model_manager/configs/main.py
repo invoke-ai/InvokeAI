@@ -1797,6 +1797,14 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             if class_name is None:
                 continue
 
+            # model_index.json only advertises which components a pipeline *should* have; a partial
+            # download can retain the original index while missing component folders. Record a
+            # submodel only when its subfolder actually exists on disk, otherwise a partial pipeline
+            # is treated as self-contained (is_self_contained_sdnq_pipeline) and the loaders later
+            # request fixed vae/ text_encoder/ tokenizer/ subfolders that aren't there.
+            if not (mod.path / key).is_dir():
+                continue
+
             match class_name:
                 case "Flux2Transformer2DModel":
                     submodels[SubModelType.Transformer] = SubmodelDefinition(
@@ -1919,6 +1927,12 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             _library_name, class_name = value
 
             if class_name is None:
+                continue
+
+            # See the FLUX.2 _get_submodels note: only record a component the pipeline actually
+            # ships on disk, so a partial download with a complete model_index.json isn't
+            # mis-classified as a self-contained SDNQ pipeline.
+            if not (mod.path / key).is_dir():
                 continue
 
             match class_name:

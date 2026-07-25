@@ -51,12 +51,24 @@ def _write_sdnq_transformer(root: Path, transformer_config: dict) -> None:
     (transformer_dir / "quantization_config.json").write_text(json.dumps({"quant_method": "sdnq"}), encoding="utf-8")
 
 
+# The component folders discovery must find on disk before recording a submodel. model_index.json
+# advertising them is not enough — a partial download can keep the index while missing folders.
+_PIPELINE_COMPONENT_DIRS = ("vae", "text_encoder", "tokenizer")
+
+
+def _write_component_dirs(root: Path, components: tuple[str, ...] = _PIPELINE_COMPONENT_DIRS) -> None:
+    """Create the given component subfolders. Discovery only checks that they exist (the class name
+    comes from model_index.json), so an empty dir is enough to make the component 'present'."""
+    for name in components:
+        (root / name).mkdir(exist_ok=True)
+
+
 def _write_qwen_vl_text_encoder(root: Path) -> None:
     """Write a text_encoder/ folder that actually contains a Qwen-VL model: a config declaring the
     Qwen-VL architecture and SDNQ weights that include both language (model.*) and visual-tower
     (visual.*) keys. The pipeline loader's text-only Qwen3ForCausalLM cannot consume these."""
     te_dir = root / "text_encoder"
-    te_dir.mkdir()
+    te_dir.mkdir(exist_ok=True)
     (te_dir / "config.json").write_text(
         json.dumps({"architectures": ["Qwen2VLForConditionalGeneration"], "hidden_size": 2560}), encoding="utf-8"
     )
@@ -72,7 +84,9 @@ def _write_qwen_vl_text_encoder(root: Path) -> None:
     )
 
 
-def _make_flux2_pipeline(root: Path, encoder_class: str) -> Path:
+def _make_flux2_pipeline(
+    root: Path, encoder_class: str, components: tuple[str, ...] = _PIPELINE_COMPONENT_DIRS
+) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     (root / "model_index.json").write_text(
         json.dumps(
@@ -87,10 +101,13 @@ def _make_flux2_pipeline(root: Path, encoder_class: str) -> Path:
         encoding="utf-8",
     )
     _write_sdnq_transformer(root, {"attention_head_dim": 128, "num_attention_heads": 24, "joint_attention_dim": 7680})
+    _write_component_dirs(root, components)
     return root
 
 
-def _make_zimage_pipeline(root: Path, encoder_class: str) -> Path:
+def _make_zimage_pipeline(
+    root: Path, encoder_class: str, components: tuple[str, ...] = _PIPELINE_COMPONENT_DIRS
+) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     (root / "model_index.json").write_text(
         json.dumps(
@@ -108,6 +125,7 @@ def _make_zimage_pipeline(root: Path, encoder_class: str) -> Path:
     scheduler_dir = root / "scheduler"
     scheduler_dir.mkdir()
     (scheduler_dir / "scheduler_config.json").write_text(json.dumps({"shift": 3.0}), encoding="utf-8")
+    _write_component_dirs(root, components)
     return root
 
 
@@ -172,3 +190,43 @@ def test_zimage_sdnq_pipeline_with_unloadable_encoder_is_not_self_contained(tmp_
         _mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()}
     )
     _assert_pipeline_not_self_contained(config)
+
+
+# --- Partial download: complete model_index.json but component folders missing on disk ---
+# is_self_contained_sdnq_pipeline must key on what actually ships, not on what the index advertises,
+# otherwise the loaders later request fixed vae/ text_encoder/ tokenizer/ subfolders that aren't there.
+
+
+@pytest.mark.parametrize("missing", ["vae", "text_encoder", "tokenizer"])
+def test_flux2_sdnq_pipeline_with_missing_component_dir_is_not_self_contained(tmp_path: Path, missing: str):
+    present = tuple(c for c in _PIPELINE_COMPONENT_DIRS if c != missing)
+    root = _make_flux2_pipeline(tmp_path / f"flux2-missing-{missing}", "Qwen3ForCausalLM", components=present)
+    config = Main_SDNQ_Diffusers_Flux2_Config.from_model_on_disk(
+        _mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()}
+    )
+    assert config.submodels is not None
+    assert not is_self_contained_sdnq_pipeline(config)
+    # The absent component is not recorded, even though model_index.json still advertises it.
+    submodel_for = {
+        "vae": SubModelType.VAE,
+        "text_encoder": SubModelType.TextEncoder,
+        "tokenizer": SubModelType.Tokenizer,
+    }
+    assert submodel_for[missing] not in config.submodels
+
+
+@pytest.mark.parametrize("missing", ["vae", "text_encoder", "tokenizer"])
+def test_zimage_sdnq_pipeline_with_missing_component_dir_is_not_self_contained(tmp_path: Path, missing: str):
+    present = tuple(c for c in _PIPELINE_COMPONENT_DIRS if c != missing)
+    root = _make_zimage_pipeline(tmp_path / f"zimage-missing-{missing}", "Qwen3ForCausalLM", components=present)
+    config = Main_SDNQ_Diffusers_ZImage_Config.from_model_on_disk(
+        _mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()}
+    )
+    assert config.submodels is not None
+    assert not is_self_contained_sdnq_pipeline(config)
+    submodel_for = {
+        "vae": SubModelType.VAE,
+        "text_encoder": SubModelType.TextEncoder,
+        "tokenizer": SubModelType.Tokenizer,
+    }
+    assert submodel_for[missing] not in config.submodels
