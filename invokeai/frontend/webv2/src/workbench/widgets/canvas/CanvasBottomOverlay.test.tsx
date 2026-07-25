@@ -7,6 +7,7 @@ import {
   BOTTOM_CONTROLS_SLOT_LAYOUT,
   BOTTOM_OVERLAY_LAYOUT,
   BOTTOM_OVERLAY_STACK_LAYOUT,
+  BOTTOM_STAGING_SLOT_LAYOUT,
   CanvasBottomOverlay,
 } from './CanvasBottomOverlay';
 
@@ -15,6 +16,10 @@ describe('CanvasBottomOverlay', () => {
     expect(BOTTOM_OVERLAY_LAYOUT).toMatchObject({ bottom: '2', minH: '0', overflow: 'hidden', top: '2' });
     expect(BOTTOM_OVERLAY_STACK_LAYOUT).toMatchObject({ h: 'full', minH: '0', overflow: 'hidden' });
     expect(BOTTOM_CONTROLS_SLOT_LAYOUT).toMatchObject({ flex: '0 1 auto', minH: '0', overflow: 'hidden' });
+  });
+
+  it('spans the staging slot across the canvas so its thumbnail strip can scroll', () => {
+    expect(BOTTOM_STAGING_SLOT_LAYOUT).toMatchObject({ flexShrink: '0', minW: '0', w: 'full' });
   });
 
   it('server-renders staging above controls inside the bounded layout', () => {

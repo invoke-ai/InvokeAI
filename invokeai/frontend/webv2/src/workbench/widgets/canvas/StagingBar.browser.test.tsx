@@ -99,8 +99,9 @@ const renderStagingBar = async (slotCount: number, selectedImageIndex = 0) => {
   });
 
   const viewport = host.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
+  const overlay = host.firstElementChild!.firstElementChild as HTMLElement;
 
-  return { thumbnails: Array.from(viewport.querySelectorAll<HTMLElement>('button')), viewport };
+  return { overlay, thumbnails: Array.from(viewport.querySelectorAll<HTMLElement>('button')), viewport };
 };
 
 beforeAll(async () => {
@@ -124,12 +125,14 @@ afterEach(async () => {
 
 describe('StagingBar thumbnail strip', () => {
   it('keeps every thumbnail reachable by scrolling when many images are staged', async () => {
-    const { thumbnails, viewport } = await renderStagingBar(24);
+    const { overlay, thumbnails, viewport } = await renderStagingBar(24);
     const bounds = viewport.getBoundingClientRect();
 
     expect(thumbnails).toHaveLength(24);
-    // The strip scrolls inside the floating bar group instead of stretching it
-    // past the canvas, where the overlay would silently clip it.
+    // The strip gets the full canvas widget to scroll within — not the width of
+    // the options bar beneath it, and never wider than the canvas itself (the
+    // overlay would silently clip the centered overflow at both edges).
+    expect(bounds.width).toBe(overlay.getBoundingClientRect().width);
     expect(bounds.width).toBeLessThanOrEqual(CANVAS_WIDTH);
     expect(viewport.scrollWidth).toBeGreaterThan(viewport.clientWidth);
 

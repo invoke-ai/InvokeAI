@@ -43,7 +43,6 @@ import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
 type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
-const STRIP_CONTAIN_CSS = { contain: 'inline-size' } as const;
 const AUTO_SWITCH_MODES: AutoSwitchMode[] = ['off', 'progress', 'latest'];
 const MENU_POSITIONING = { placement: 'top-end' } as const;
 
@@ -128,15 +127,13 @@ export const StagingBar = ({
   return (
     <Stack align="center" gap="2" w="full">
       {hasSlots ? (
-        // `contain: inline-size` zeroes the strip's intrinsic width, so a long
-        // run of staged candidates can never push the floating bar group wider
-        // than the canvas (the bottom overlay would just clip the overflow, and
-        // centering hides half of it). The strip instead tracks the width of the
-        // options bar below it and scrolls within it.
+        // The strip spans the whole canvas widget and scrolls within it: the
+        // overlay's staging slot stretches, so this width is definite and a long
+        // run of staged candidates can only ever scroll — never widen the
+        // floating bar group past the canvas, where the overlay would silently
+        // clip the centered overflow at both edges.
         <ScrollArea.Root
-          css={STRIP_CONTAIN_CSS}
           h={areThumbnailsVisible ? THUMBNAIL_STRIP_HEIGHT : '0'}
-          minW="0"
           opacity={areThumbnailsVisible ? 1 : 0}
           pointerEvents={areThumbnailsVisible ? 'auto' : 'none'}
           size="xs"
