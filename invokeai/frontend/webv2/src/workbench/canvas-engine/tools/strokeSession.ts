@@ -69,6 +69,18 @@ export interface StrokeSessionConfig {
    * only grows within the selection. Absent ⇒ the no-selection hot path.
    */
   clipMask?: PlacedSurface | null;
+  /**
+   * A document-space rectangle the stroke may not paint outside — the legacy
+   * "clip strokes to bbox" setting, resolved ONCE per gesture like `clipMask`.
+   *
+   * Unlike the selection mask this needs no compositing pass: the scratch is
+   * region-local and the region is clamped to this rect, so path geometry beyond
+   * it falls outside the scratch surface and is never drawn. A mask needs the
+   * extra `destination-in` only because it is an arbitrary SHAPE within its rect.
+   *
+   * Absent/`null` ⇒ unclipped (the default, and the hot path).
+   */
+  clipRect?: Rect | null;
 }
 
 /** The imperative handle a tool drives across a gesture. */
@@ -108,7 +120,7 @@ const padToChunk = (r: Rect): Rect => {
 
 /** Creates a paint session that grows the target layer's content-sized cache. */
 export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession => {
-  const { clipMask, color, composite, createdLayer, ctx, layerId, opacity, size, thinning, tool } = config;
+  const { clipMask, clipRect, color, composite, createdLayer, ctx, layerId, opacity, size, thinning, tool } = config;
 
   const layers: LayerCacheStore = ctx.layers;
   // A per-frame scratch surface for the filled stroke, sized to the paint region.
@@ -142,6 +154,9 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     if (clipMask) {
       dirty = intersect(dirty, clipMask.rect);
     }
+    if (dirty && clipRect) {
+      dirty = intersect(dirty, clipRect);
+    }
     if (!dirty || isEmpty(dirty)) {
       return;
     }
@@ -157,6 +172,15 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     let region = padToChunk(accumRect ? roundOut(union(accumRect, dirty)) : dirty);
     if (clipMask) {
       const clamped = intersect(region, clipMask.rect);
+      if (clamped) {
+        region = clamped;
+      }
+    }
+    if (clipRect) {
+      // Clamping the region IS the bbox clip: the scratch is sized to the region
+      // and the path is drawn translated into it, so anything beyond the rect
+      // lands outside the surface and never reaches the cache.
+      const clamped = intersect(region, clipRect);
       if (clamped) {
         region = clamped;
       }

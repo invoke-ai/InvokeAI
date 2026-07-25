@@ -487,6 +487,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     canUndo: stores.canUndo,
     checkerboard: stores.checkerboard,
     checkerColors: stores.checkerColors,
+    clipToBbox: stores.clipToBbox,
     documentEditingLocked: stores.documentEditingLocked,
     eraserOptions: stores.eraserOptions,
     gradientOptions: stores.gradientOptions,
@@ -1066,6 +1067,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     emitStrokeCommitted: (event) => commitOrdinaryStroke(event),
     getDocument: () => mirror.getDocument(),
     getSelectionMask: () => selection.mask(),
+    getStrokeClipRect: () => {
+      // Legacy "clip strokes to bbox". Read at gesture start, so moving the frame
+      // mid-stroke cannot change where the stroke already landed.
+      const doc = mirror.getDocument();
+      return stores.clipToBbox.get() && doc ? { ...doc.bbox } : null;
+    },
     invalidate: (payload) => scheduler.invalidate(payload),
     layers: layerCache,
     notifyLayerPainted,

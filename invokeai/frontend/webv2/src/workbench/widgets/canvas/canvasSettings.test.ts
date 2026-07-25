@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CANVAS_BBOX_OVERLAY_KEY,
   CANVAS_CHECKERBOARD_KEY,
+  CANVAS_CLIP_TO_BBOX_KEY,
   CANVAS_INVERT_BRUSH_SCROLL_KEY,
   CANVAS_RULE_OF_THIRDS_KEY,
   CANVAS_SETTING_SECTIONS,
@@ -27,6 +28,8 @@ const settingByKey = (key: string) => {
 const DEFAULTS = {
   [CANVAS_BBOX_OVERLAY_KEY]: false,
   [CANVAS_CHECKERBOARD_KEY]: true,
+  // Off by default, matching legacy — strokes are unclipped until asked.
+  [CANVAS_CLIP_TO_BBOX_KEY]: false,
   [CANVAS_INVERT_BRUSH_SCROLL_KEY]: false,
   [CANVAS_RULE_OF_THIRDS_KEY]: false,
   [CANVAS_SHOW_BBOX_KEY]: true,
@@ -45,6 +48,7 @@ describe('canvasSettings persistence mapping', () => {
     const resolved = resolveCanvasSettings({
       [CANVAS_BBOX_OVERLAY_KEY]: true,
       [CANVAS_CHECKERBOARD_KEY]: false,
+      [CANVAS_CLIP_TO_BBOX_KEY]: true,
       [CANVAS_INVERT_BRUSH_SCROLL_KEY]: true,
       [CANVAS_RULE_OF_THIRDS_KEY]: true,
       [CANVAS_SHOW_BBOX_KEY]: false,
@@ -55,6 +59,7 @@ describe('canvasSettings persistence mapping', () => {
     expect(resolved).toEqual({
       [CANVAS_BBOX_OVERLAY_KEY]: true,
       [CANVAS_CHECKERBOARD_KEY]: false,
+      [CANVAS_CLIP_TO_BBOX_KEY]: true,
       [CANVAS_INVERT_BRUSH_SCROLL_KEY]: true,
       [CANVAS_RULE_OF_THIRDS_KEY]: true,
       [CANVAS_SHOW_BBOX_KEY]: false,

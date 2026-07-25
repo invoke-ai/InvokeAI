@@ -79,6 +79,7 @@ export interface CanvasInteractionState {
   canUndo: boolean;
   checkerboard: boolean;
   checkerColors: CheckerColors;
+  clipToBbox: boolean;
   documentEditingLocked: boolean;
   eraserOptions: EraserOptions;
   gradientOptions: GradientToolOptions;

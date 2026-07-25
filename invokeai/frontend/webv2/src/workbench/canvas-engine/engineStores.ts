@@ -466,6 +466,11 @@ export interface EngineStores {
    * is untouched until the drag commits.
    */
   marqueePreview: ScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>;
+  /**
+   * Whether brush/eraser strokes are clipped to the generation frame (legacy
+   * "clip strokes to bbox"). Resolved once per gesture by the paint tool.
+   */
+  clipToBbox: ScalarStore<boolean>;
   /** Model-dependent grid size (document px) the bbox snaps to. React feeds this from generate settings. */
   bboxGrid: ScalarStore<number>;
   /**
@@ -653,6 +658,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   canRedo: createScalarStore<boolean>(false),
   canUndo: createScalarStore<boolean>(false),
   checkerboard: createScalarStore<boolean>(true),
+  clipToBbox: createScalarStore<boolean>(false),
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),

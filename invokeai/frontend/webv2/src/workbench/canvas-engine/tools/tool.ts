@@ -175,6 +175,12 @@ export interface ToolContext {
    * hot path. Absent in minimal test harnesses.
    */
   getSelectionMask?(): PlacedSurface | null;
+  /**
+   * The document-space rectangle strokes may not paint outside, or `null` when
+   * unclipped. Painting tools read it ONCE on pointer-down, alongside the
+   * selection mask. Absent in minimal test harnesses.
+   */
+  getStrokeClipRect?(): Rect | null;
   /** Updates visual SAM input for the active engine-owned Select Object session. */
   updateSamInput?(input: SamVisualInput): void;
   /**

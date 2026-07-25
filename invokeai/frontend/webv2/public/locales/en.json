@@ -1290,6 +1290,7 @@
       "settings": {
         "bboxOverlay": "Show bbox overlay",
         "checkerboard": "Checkerboard background",
+        "clipToBbox": "Clip strokes to bbox",
         "clearCaches": "Clear caches",
         "clearHistory": "Clear history",
         "grid": "Show grid",
