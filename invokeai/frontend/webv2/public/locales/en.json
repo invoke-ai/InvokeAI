@@ -724,6 +724,17 @@
   },
   "launchpad": {
     "backToProject": "Back to project",
+    "browserIssues": {
+      "canvasReadbackIntegrity": {
+        "description": "Your browser is modifying or blocking canvas pixel data. This can make later strokes noisy or pixelated.",
+        "genericWorkaround": "If you use another privacy browser or canvas-protection extension, allow unmodified canvas access for this site, then reload Invoke.",
+        "heliumWorkaround": "Open the setting below, disable “[Helium Noise] Canvas pixel noising”, then relaunch Helium.",
+        "title": "Canvas protection may corrupt painted strokes"
+      },
+      "copyFailed": "Could not copy browser setting",
+      "copySetting": "Copy browser setting",
+      "settingCopied": "Browser setting copied"
+    },
     "projectsGreeting": "Welcome to Invoke",
     "projectsGreetingWithName": "Welcome back, {{name}}",
     "projectsSubtitle": "Pick up where you left off, or start something new.",
