@@ -190,14 +190,14 @@ import {
 } from '@workbench/canvas-engine/transform/transformMath';
 import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
 
-import type { HistoryEntry } from './history/history';
+import type { ImagePatchApply } from './history/imagePatch';
 import type { CanvasProjectMutation } from './mutationContracts';
 import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
-import { createImagePatchEntry, type ImagePatchApply } from './history/imagePatch';
+import { createStrokeCommit } from './strokeCommit';
 import { createViewTool } from './tools/viewTool';
 
 /**
@@ -745,62 +745,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * pixel restore is needed); redo re-adds the layer, recreates a blank cache,
    * and re-applies the stroke's `after` pixels.
    */
-  const createComposedPaintEntry = (
-    created: { layer: CanvasLayerContract; index: number },
-    event: StrokeCommittedEvent,
-    label: string
-  ): HistoryEntry => {
-    const { afterImageData, dirtyRect, layerId } = event;
-    const rect: Rect = { height: dirtyRect.height, width: dirtyRect.width, x: dirtyRect.x, y: dirtyRect.y };
-    const bytes = event.beforeImageData.data.byteLength + afterImageData.data.byteLength + 256;
-    return {
-      bytes,
-      label,
-      redo: () => {
-        dispatchCanvasMutation({ index: created.index, layer: created.layer, type: 'addCanvasLayer' });
-        // Re-create an EMPTY cache marked fresh so the async rasterize pass can't
-        // clobber the restored stroke; `applyImagePatch` grows it to the stroke's
-        // content bounds and writes the `after` pixels.
-        const entry = layerCache.getOrCreateRect(layerId, { height: 0, width: 0, x: 0, y: 0 });
-        entry.stale = false;
-        applyImagePatch(layerId, rect, afterImageData);
-      },
-      undo: () => {
-        dispatchCanvasMutation({ ids: [layerId], type: 'removeCanvasLayers' });
-      },
-    };
-  };
-
-  const commitOrdinaryStroke = (event: StrokeCommittedEvent): void => {
-    // A fresh stroke ends any open nudge-coalescing burst.
-    endNudgeBurst();
-    notifyLayerPainted(event.layerId);
-    // Persistence first: mark the layer dirty so a debounced upload fires even
-    // when no external subscriber is attached.
-    bitmapStore.markLayerDirty(event.layerId);
-    // Record the edit on the engine-owned history. Guarded against re-entrancy:
-    // an undo/redo replay routes pixels through `applyImagePatch`, not a fresh
-    // stroke, so this never fires during apply — the guard is belt-and-braces.
-    if (!history.isApplying()) {
-      mutationPort.commitEdit({ kind: 'paint' });
-      const label = event.tool === 'eraser' ? 'Eraser stroke' : 'Brush stroke';
-      history.push(
-        event.createdLayer
-          ? createComposedPaintEntry(event.createdLayer, event, label)
-          : createImagePatchEntry({
-              after: event.afterImageData,
-              apply: applyImagePatch,
-              before: event.beforeImageData,
-              label,
-              layerId: event.layerId,
-              rect: event.dirtyRect,
-            })
-      );
-    }
-    for (const listener of strokeListeners) {
-      listener(event);
-    }
-  };
+  const { commitOrdinaryStroke } = createStrokeCommit({
+    applyImagePatch,
+    commitPaintEdit: () => mutationPort.commitEdit({ kind: 'paint' }),
+    dispatchCanvasMutation,
+    endNudgeBurst,
+    history,
+    layerCache,
+    markLayerDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
+    notifyLayerPainted,
+    strokeListeners,
+  });
 
   // ---- Selection (transient interaction state) + marching ants ------------
   //
