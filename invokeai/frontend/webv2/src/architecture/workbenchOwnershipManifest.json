@@ -82,6 +82,7 @@
     "WorkbenchWidgetRegistryContext.tsx": "workbench",
     "autoRoutePolicy.ts": "workbench",
     "canvasDimsSync.ts": "workbench",
+    "canvasLayerContent.ts": "workbench",
     "canvasLayerOps.ts": "workbench",
     "canvasMigration.ts": "workbench",
     "canvasProjectMutationPort.ts": "workbench",

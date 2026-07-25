@@ -6,6 +6,7 @@ import {
   getControlValidationReason,
   type ControlValidationReason,
 } from '@features/generation/graph';
+import { isCompositableControlLayer } from '@workbench/canvasLayerContent';
 
 export interface ControlLayerIssue {
   code: ControlValidationReason;
@@ -15,17 +16,7 @@ export interface ControlLayerIssue {
   message: string;
 }
 
-/**
- * Pure parity with the composite plan's content gate: a control layer only
- * reaches the generation pipeline when it has an image source or committed
- * paint pixels, so readiness checks must skip anything else.
- */
-export const hasControlLayerContent = (layer: CanvasControlLayerContract): boolean => {
-  if (layer.source.type === 'image') {
-    return true;
-  }
-  return layer.source.type === 'paint' && layer.source.bitmap !== null;
-};
+export { hasControlLayerContent } from '@workbench/canvasLayerContent';
 
 const resolveAdapterModel = (
   adapterModel: string | null,
@@ -52,7 +43,7 @@ export const getBlockingControlLayerIssues = (params: {
   let zImageControlCount = 0;
 
   for (const layer of layers) {
-    if (layer.type !== 'control' || !layer.isEnabled || !hasControlLayerContent(layer)) {
+    if (!isCompositableControlLayer(layer)) {
       continue;
     }
     const { adapter } = layer;
