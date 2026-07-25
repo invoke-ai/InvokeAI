@@ -177,12 +177,16 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
     adapter: zControlAdapter,
     filter: zFilter.optional(),
+    // Display-only visibility; absent ⇒ not hidden, so older documents load
+    // unchanged. Only the three overlay types carry it — see `contracts.ts`.
+    isHidden: z.boolean().optional(),
     source: zLayerSource,
     type: z.literal('control'),
     withTransparencyEffect: z.boolean(),
   }),
   zLayerBase.extend({
     autoNegative: z.boolean(),
+    isHidden: z.boolean().optional(),
     mask: zMask,
     negativePrompt: z.string().nullable(),
     positivePrompt: z.string().nullable(),
@@ -191,6 +195,7 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   }),
   zLayerBase.extend({
     denoiseLimit: zFiniteNumber.optional(),
+    isHidden: z.boolean().optional(),
     mask: zMask,
     noiseLevel: zFiniteNumber.optional(),
     type: z.literal('inpaint_mask'),

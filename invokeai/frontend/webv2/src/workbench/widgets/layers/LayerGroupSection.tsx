@@ -21,7 +21,14 @@ import type { LayerGroupKey } from './layerGroups';
 
 import { groupAddItemId } from './addLayerMenu';
 import { LAYER_KEYBOARD_SENSOR_OPTIONS } from './layerDndConfig';
-import { canExportRasterPsd, getGroupActions, isGroupAllVisible, planGroupVisibilityToggle } from './layerGroupActions';
+import {
+  canExportRasterPsd,
+  getGroupActions,
+  groupVisibilityAxis,
+  isGroupAllVisible,
+  planGroupHiddenToggle,
+  planGroupVisibilityToggle,
+} from './layerGroupActions';
 import { reorderWithinGroup } from './layerGroups';
 import { LayerListItem, type LayerListItemEngine } from './LayerListItem';
 import { applyStructural } from './layerOps';
@@ -201,7 +208,7 @@ const GroupActions = ({
   const { t } = useTranslation();
   const addLayer = useAddLayer();
   const projectName = useActiveProjectName();
-  const allVisible = isGroupAllVisible(groupLayers);
+  const allVisible = isGroupAllVisible(groupLayers, groupVisibilityAxis(groupKey));
   // Enablement and execution share the same contributor selector and the
   // engine's live-content predicate, so empty paint layers do not enable an op.
   const canMerge =
@@ -214,6 +221,23 @@ const GroupActions = ({
   const handleNew = useCallback(() => addLayer(groupAddItemId(groupKey)), [addLayer, groupKey]);
 
   const handleToggleVisibility = useCallback(() => {
+    // Overlay groups toggle the DISPLAY axis — "get these out of my way" must
+    // not change the generated image. The raster group has no display axis, so
+    // it keeps toggling enablement.
+    if (groupVisibilityAxis(groupKey) === 'hidden') {
+      const { forward, inverse } = planGroupHiddenToggle(groupLayers);
+      if (forward.length === 0) {
+        return;
+      }
+      applyStructural(
+        engine,
+        dispatch,
+        t('widgets.layers.groupActions.toggleHidden'),
+        { type: 'setCanvasLayersHidden', updates: forward },
+        { type: 'setCanvasLayersHidden', updates: inverse }
+      );
+      return;
+    }
     const { forward, inverse } = planGroupVisibilityToggle(groupLayers);
     applyStructural(
       engine,
@@ -222,7 +246,7 @@ const GroupActions = ({
       { type: 'setCanvasLayersEnabled', updates: forward },
       { type: 'setCanvasLayersEnabled', updates: inverse }
     );
-  }, [dispatch, engine, groupLayers, t]);
+  }, [dispatch, engine, groupKey, groupLayers, t]);
 
   const handleMergeVisible = useCallback(() => {
     if (!engine) {

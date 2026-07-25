@@ -1225,6 +1225,7 @@
         "selectTextTool": "Select text tool",
         "selectTransformTool": "Select transform tool",
         "selectViewTool": "Select view tool",
+        "toggleNonRasterLayers": "Hide control, guidance and mask layers",
         "undo": "Undo canvas edit"
       },
       "contextMenu": {
@@ -1512,6 +1513,7 @@
         "selectObject": "Select object",
         "show": "Show layer",
         "toggleAutoNegative": "Toggle auto-negative",
+        "toggleHidden": "Show/hide on canvas",
         "toggleLock": "Toggle lock",
         "toggleTransparencyEffect": "Toggle transparency effect",
         "toggleVisibility": "Toggle visibility",
@@ -1799,7 +1801,8 @@
         "mergeVisible": "Merge visible",
         "new": "New layer",
         "showAll": "Show all",
-        "toggleVisibility": "Toggle group visibility"
+        "toggleVisibility": "Toggle group visibility",
+        "toggleHidden": "Show/hide all on canvas"
       },
       "groups": {
         "control": "Control Layers",

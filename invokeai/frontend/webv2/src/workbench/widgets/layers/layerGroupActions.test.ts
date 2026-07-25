@@ -1,12 +1,20 @@
 import type {
   CanvasInpaintMaskLayerContract,
+  CanvasLayerContract,
   CanvasLayerSourceContract,
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 
 import { describe, expect, it } from 'vitest';
 
-import { canExportRasterPsd, getGroupActions, isGroupAllVisible, planGroupVisibilityToggle } from './layerGroupActions';
+import {
+  canExportRasterPsd,
+  getGroupActions,
+  groupVisibilityAxis,
+  isGroupAllVisible,
+  planGroupHiddenToggle,
+  planGroupVisibilityToggle,
+} from './layerGroupActions';
 
 const raster = (source: CanvasLayerSourceContract, id = 'r'): CanvasRasterLayerContractV2 => ({
   blendMode: 'normal',
@@ -119,3 +127,79 @@ describe('planGroupVisibilityToggle', () => {
 
 // Merge-visible contributor selection is tested where it lives:
 // `canvas-engine/document/mergeVisible.test.ts` (the selector the engine op runs).
+
+describe('planGroupHiddenToggle', () => {
+  const control = (id: string, isHidden?: boolean): CanvasLayerContract => ({
+    adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+    blendMode: 'normal',
+    id,
+    isEnabled: true,
+    isHidden,
+    isLocked: false,
+    name: id,
+    opacity: 1,
+    source: { image: { height: 10, imageName: id, width: 10 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect: false,
+  });
+
+  it('hides every layer when all are currently shown', () => {
+    const plan = planGroupHiddenToggle([control('a'), control('b')]);
+    expect(plan.nextVisible).toBe(false);
+    expect(plan.forward).toEqual([
+      { id: 'a', isHidden: true },
+      { id: 'b', isHidden: true },
+    ]);
+  });
+
+  it('shows every layer when any is currently hidden', () => {
+    const plan = planGroupHiddenToggle([control('a', true), control('b')]);
+    expect(plan.nextVisible).toBe(true);
+    expect(plan.forward).toEqual([
+      { id: 'a', isHidden: false },
+      { id: 'b', isHidden: false },
+    ]);
+  });
+
+  it('restores each layer prior state verbatim, so undo is one entry', () => {
+    const plan = planGroupHiddenToggle([control('a', true), control('b')]);
+    expect(plan.inverse).toEqual([
+      { id: 'a', isHidden: true },
+      { id: 'b', isHidden: false },
+    ]);
+  });
+
+  it('never touches enablement — hiding must not change the generated image', () => {
+    const plan = planGroupHiddenToggle([control('a')]);
+    expect(JSON.stringify(plan)).not.toContain('isEnabled');
+  });
+
+  it('skips layers that cannot be hidden', () => {
+    const raster: CanvasLayerContract = {
+      blendMode: 'normal',
+      id: 'r',
+      isEnabled: true,
+      isLocked: false,
+      name: 'r',
+      opacity: 1,
+      source: { bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    };
+    const plan = planGroupHiddenToggle([raster, control('a')]);
+    expect(plan.forward.map((update) => update.id)).toEqual(['a']);
+  });
+});
+
+describe('groupVisibilityAxis', () => {
+  it('drives display visibility for the overlay groups', () => {
+    expect(groupVisibilityAxis('control')).toBe('hidden');
+    expect(groupVisibilityAxis('regional_guidance')).toBe('hidden');
+    expect(groupVisibilityAxis('inpaint_mask')).toBe('hidden');
+  });
+
+  it('drives enablement for the raster group, which has no display axis', () => {
+    expect(groupVisibilityAxis('raster')).toBe('enabled');
+  });
+});

@@ -1,7 +1,7 @@
 import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
+import { getSourceContentRect, isLayerHidden, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, isEmpty, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 
@@ -26,7 +26,14 @@ export const calculateActiveFrameLayerIds = ({
 }: FrameDemandInput): Set<string> => {
   const active = new Set<string>();
   for (const layer of document.layers) {
-    if (!layer.isEnabled || !renderableSourceOf(layer) || (isolationLayerIds && !isolationLayerIds.has(layer.id))) {
+    // A hidden layer draws nothing this frame, so it needs no cache allocated —
+    // but an isolated operation preview still targets it.
+    if (
+      !layer.isEnabled ||
+      (isLayerHidden(layer) && !isolationLayerIds?.has(layer.id)) ||
+      !renderableSourceOf(layer) ||
+      (isolationLayerIds && !isolationLayerIds.has(layer.id))
+    ) {
       continue;
     }
     const sourceRect = getSourceContentRect(layer, document);

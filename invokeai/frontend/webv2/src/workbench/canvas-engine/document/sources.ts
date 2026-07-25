@@ -37,6 +37,27 @@ const hasSource = (layer: CanvasLayerContract): layer is SourceLayer =>
 export const isMaskLayer = (layer: CanvasLayerContract): layer is MaskLayer =>
   layer.type === 'inpaint_mask' || layer.type === 'regional_guidance';
 
+/**
+ * The layer types that can be hidden without being disabled — everything drawn
+ * on canvas purely to SHOW you where an effect applies.
+ *
+ * Raster layers are excluded on purpose: the raster stack is the generation
+ * input, so hiding one and still generating from it is not a state that can be
+ * explained to a user. Their contracts have no `isHidden` field at all.
+ */
+export type HideableLayer = Extract<CanvasLayerContract, { type: 'control' | 'inpaint_mask' | 'regional_guidance' }>;
+
+/** True when `layer` supports being hidden independently of being enabled. */
+export const isHideableLayer = (layer: CanvasLayerContract): layer is HideableLayer =>
+  layer.type === 'control' || isMaskLayer(layer);
+
+/**
+ * True when `layer`'s on-canvas preview is suppressed. DISPLAY ONLY — callers
+ * that decide what the image contains (generation, export) must NOT consult it;
+ * that is `isEnabled`'s job.
+ */
+export const isLayerHidden = (layer: CanvasLayerContract): boolean => isHideableLayer(layer) && layer.isHidden === true;
+
 /** The number of strict composite groups (see {@link layerGroupRank}). */
 export const LAYER_GROUP_COUNT = 4;
 

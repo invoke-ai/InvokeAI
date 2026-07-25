@@ -21,7 +21,7 @@ import type {
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { LAYER_GROUP_COUNT, layerGroupRank } from '@workbench/canvas-engine/document/sources';
+import { isLayerHidden, LAYER_GROUP_COUNT, layerGroupRank } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, transformBounds } from '@workbench/canvas-engine/math/rect';
 
@@ -452,7 +452,9 @@ export const compositeDocument = (
       const layer = doc.layers[i];
       if (
         !layer ||
-        (!layer.isEnabled && layer.id !== opts.onlyLayerId) ||
+        // Disabled OR hidden: neither draws. `onlyLayerId` (an isolated
+        // operation preview) overrides both — the user is acting on that layer.
+        ((!layer.isEnabled || isLayerHidden(layer)) && layer.id !== opts.onlyLayerId) ||
         layer.id === opts.skipLayerId ||
         (opts.onlyLayerId && layer.id !== opts.onlyLayerId) ||
         layerGroupRank(layer) !== rank

@@ -50,6 +50,7 @@ const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
   'saveCanvasSnapshot',
   'setCanvasBbox',
   'setCanvasLayersEnabled',
+  'setCanvasLayersHidden',
   'setCanvasSelectedLayer',
   'setCanvasStagingAutoSwitch',
   'setStagedImageIndex',
@@ -2345,6 +2346,40 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
 
     expect(getLayerIds(state)).toEqual([]);
     expect(getCanvas(state).document.selectedLayerId).toBeNull();
+  });
+
+  it('hides overlay layers without disabling them, so generation is untouched', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createInpaintMaskLayer('m'), createRasterLayer('r')]);
+
+    state = workbenchReducer(state, {
+      type: 'setCanvasLayersHidden',
+      updates: [
+        { id: 'm', isHidden: true },
+        { id: 'r', isHidden: true },
+      ],
+    });
+
+    const layers = getCanvas(state).document.layers;
+    const mask = layers.find((layer) => layer.id === 'm')!;
+    const raster = layers.find((layer) => layer.id === 'r')!;
+
+    expect(mask).toMatchObject({ isEnabled: true, isHidden: true });
+    // Raster layers have no display axis; the update is skipped rather than
+    // silently giving them a meaningless field.
+    expect(raster).not.toHaveProperty('isHidden');
+    expect(raster.isEnabled).toBe(true);
+  });
+
+  it('leaves the document untouched when a hide update changes nothing', () => {
+    const state = withCanvasLayers(createInitialWorkbenchState(), [createInpaintMaskLayer('m')]);
+    const before = getCanvas(state).document;
+
+    const next = workbenchReducer(state, {
+      type: 'setCanvasLayersHidden',
+      updates: [{ id: 'm', isHidden: false }],
+    });
+
+    expect(getCanvas(next).document).toBe(before);
   });
 
   it('sets many layers visibility in one bulk action, preserving unlisted layers by identity', () => {

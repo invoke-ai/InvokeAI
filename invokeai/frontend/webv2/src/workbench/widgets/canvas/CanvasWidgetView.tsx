@@ -4,6 +4,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useQueueItemProgressImage } from '@features/queue/react';
+import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
 import {
   createLayerId,
@@ -432,6 +433,24 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       copySelection(commandId === 'canvas.cutSelection');
     } else if (commandId === 'canvas.pasteImage') {
       pasteFromClipboard();
+    } else if (commandId === 'canvas.toggleNonRasterLayers') {
+      // Hide, never disable: this is the "get the overlays out of my way"
+      // shortcut, and it must leave the generated image untouched.
+      const hideable = layers.filter(isHideableLayer);
+      if (engine && hideable.length > 0) {
+        const nextHidden = hideable.every((layer) => !isLayerHidden(layer));
+        engine.layers.commitStructural(
+          t('widgets.canvas.commands.toggleNonRasterLayers'),
+          {
+            type: 'setCanvasLayersHidden',
+            updates: hideable.map((layer) => ({ id: layer.id, isHidden: nextHidden })),
+          },
+          {
+            type: 'setCanvasLayersHidden',
+            updates: hideable.map((layer) => ({ id: layer.id, isHidden: isLayerHidden(layer) })),
+          }
+        );
+      }
     } else if (commandId === 'canvas.resetSelected') {
       if (engine && selectedLayer) {
         engine.layers.clearMask(selectedLayer.id);
@@ -544,6 +563,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       ['canvas.tool.eraser', t('widgets.canvas.commands.selectEraserTool'), ['e']],
       ['canvas.tool.lasso', t('widgets.canvas.commands.selectLassoTool'), ['l']],
       ['canvas.tool.marquee', t('widgets.canvas.commands.selectMarqueeTool'), ['u']],
+      ['canvas.toggleNonRasterLayers', t('widgets.canvas.commands.toggleNonRasterLayers'), ['shift+h']],
       ['canvas.copySelection', t('widgets.canvas.commands.copySelection'), ['mod+c']],
       ['canvas.cutSelection', t('widgets.canvas.commands.cutSelection'), ['mod+x']],
       ['canvas.pasteImage', t('widgets.canvas.commands.pasteImage'), ['mod+v']],

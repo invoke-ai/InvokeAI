@@ -4,6 +4,7 @@ import type {
   CanvasImageRef,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
+  CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/contracts';
 import type { Mat2d } from '@workbench/canvas-engine/types';
 
@@ -688,5 +689,54 @@ describe('compositeDocument — floating selection', () => {
 
     const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
     expect(drawn).toEqual([cache.surface.canvas]);
+  });
+});
+
+describe('compositeDocument — hidden layers', () => {
+  // Typed to the guidance member: `isHidden` exists only on the three overlay
+  // contracts, so a bare spread of the union does not accept it — which is the
+  // invariant this design is built on.
+  const hiddenMask = (id: string): CanvasLayerContract => ({
+    ...(maskLayer(id) as CanvasRegionalGuidanceLayerContract),
+    isHidden: true,
+  });
+
+  it('does not draw a hidden overlay layer', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('m', 10, 10);
+    const rasterCache = caches.getOrCreate('r', 10, 10);
+    const target = backend.createSurface(200, 200);
+
+    compositeDocument(target, makeDoc([hiddenMask('m'), rasterLayer('r')]), caches, VIEW, { backend });
+
+    const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    expect(drawn).toEqual([rasterCache.surface.canvas]);
+  });
+
+  it('draws it again once unhidden — hiding never touches its pixels', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const maskCache = caches.getOrCreate('m', 10, 10);
+    const target = backend.createSurface(200, 200);
+
+    compositeDocument(target, makeDoc([maskLayer('m')]), caches, VIEW, { backend });
+
+    const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(maskCache.surface.width).toBe(10);
+  });
+
+  it('still draws a hidden layer while it is the isolated operation target', () => {
+    // An operation preview acts ON that layer; suppressing it would leave the
+    // user editing something they cannot see.
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('m', 10, 10);
+    const target = backend.createSurface(200, 200);
+
+    compositeDocument(target, makeDoc([hiddenMask('m')]), caches, VIEW, { backend, onlyLayerId: 'm' });
+
+    expect(target.callLog.some((e) => e.op === 'drawImage')).toBe(true);
   });
 });

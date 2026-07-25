@@ -7,7 +7,8 @@ import { Badge, Box, HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconButton, Row, ToggleDot } from '@platform/ui';
-import { LockIcon, LockOpenIcon } from 'lucide-react';
+import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
+import { EyeIcon, EyeOffIcon, LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -115,6 +116,27 @@ export const LayerListItem = ({
     [layer.isEnabled, patchBase, t]
   );
 
+  /**
+   * Hide is a DISPLAY-only axis, orthogonal to enabled: a hidden control map or
+   * mask still conditions generation exactly as it would if visible. Only the
+   * three overlay types have it — for a raster layer, visibility and
+   * participation are the same fact.
+   */
+  const handleToggleHidden = useCallback(
+    (event: { stopPropagation: () => void }) => {
+      event.stopPropagation();
+      const isHidden = !isLayerHidden(layer);
+      applyStructural(
+        engine,
+        dispatch,
+        t('widgets.layers.actions.toggleHidden'),
+        { type: 'setCanvasLayersHidden', updates: [{ id: layer.id, isHidden }] },
+        { type: 'setCanvasLayersHidden', updates: [{ id: layer.id, isHidden: !isHidden }] }
+      );
+    },
+    [dispatch, engine, layer, t]
+  );
+
   const handleToggleLock = useCallback(
     (event: { stopPropagation: () => void }) => {
       event.stopPropagation();
@@ -209,6 +231,20 @@ export const LayerListItem = ({
               <ControlLayerWarningIcon layer={layer} />
             </HStack>
           </Stack>
+          {isHideableLayer(layer) ? (
+            <IconButton
+              aria-label={t('widgets.layers.actions.toggleHidden')}
+              aria-pressed={!isLayerHidden(layer)}
+              color={isLayerHidden(layer) ? 'fg.subtle' : 'fg'}
+              disabled={!interaction.canToggleVisibility}
+              size="2xs"
+              variant="ghost"
+              onClick={handleToggleHidden}
+              onPointerDown={stopPropagation}
+            >
+              {isLayerHidden(layer) ? <EyeOffIcon /> : <EyeIcon />}
+            </IconButton>
+          ) : null}
           <Box flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
             <ToggleDot
               checked={layer.isEnabled}
