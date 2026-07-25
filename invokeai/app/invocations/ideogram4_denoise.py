@@ -32,13 +32,19 @@ def _effective_guidance_schedule(
     (index 0 = the final/polish step). A ``guidance_scale`` override replaces the main weight while
     the preset's polish tail is preserved; a changed step count rescales the polish tail
     proportionally (always keeping at least one polish and one main step).
+
+    ``num_steps`` must be >= 2 (enforced by the invocation's ``steps`` field) so both a polish and a
+    main step always exist — otherwise a single step would be all-polish and silently drop the
+    ``guidance_scale`` override.
     """
     polish_gw = base_schedule[0]
     main_gw = float(guidance_scale) if guidance_scale is not None else float(base_schedule[-1])
     if num_steps == preset_num_steps and guidance_scale is None:
         return base_schedule
     n_polish_base = sum(1 for gw in base_schedule if gw == base_schedule[0])
-    polish_count = min(num_steps, max(1, round(n_polish_base * num_steps / preset_num_steps)))
+    # Cap the polish tail at num_steps - 1 so at least one main step always remains and the
+    # guidance_scale override is never silently dropped.
+    polish_count = max(1, min(round(n_polish_base * num_steps / preset_num_steps), num_steps - 1))
     main_count = num_steps - polish_count
     return (polish_gw,) * polish_count + (main_gw,) * main_count
 
@@ -71,9 +77,10 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
     # Optional advanced overrides of the sampler preset. None = use the preset's value.
     steps: Optional[int] = InputField(
         default=None,
-        ge=1,
+        ge=2,
         le=100,
-        description="Override the preset's step count. Leave empty to use the preset.",
+        description="Override the preset's step count (minimum 2, so a polish and a main step both "
+        "exist). Leave empty to use the preset.",
     )
     guidance_scale: Optional[float] = InputField(
         default=None,

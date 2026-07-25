@@ -7,11 +7,12 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 // Each preset bundles a step count, the per-step guidance schedule (with a polish tail), and the
-// logit-normal schedule mean/std. The primary quality/speed control for Ideogram 4.
-const IDEOGRAM4_SAMPLER_PRESET_OPTIONS: ComboboxOption[] = [
-  { value: 'V4_QUALITY_48', label: 'Quality (48 steps)' },
-  { value: 'V4_DEFAULT_20', label: 'Default (20 steps)' },
-  { value: 'V4_TURBO_12', label: 'Turbo (12 steps)' },
+// logit-normal schedule mean/std. The primary quality/speed control for Ideogram 4. The visible
+// labels are localized (the step count is interpolated so translators can reposition it).
+const IDEOGRAM4_SAMPLER_PRESET_I18N: { value: string; i18nKey: string; steps: number }[] = [
+  { value: 'V4_QUALITY_48', i18nKey: 'parameters.ideogram4SamplerPresets.quality', steps: 48 },
+  { value: 'V4_DEFAULT_20', i18nKey: 'parameters.ideogram4SamplerPresets.default', steps: 20 },
+  { value: 'V4_TURBO_12', i18nKey: 'parameters.ideogram4SamplerPresets.turbo', steps: 12 },
 ];
 
 // Per-preset step count and schedule mean (mu), mirroring the backend PRESETS. Used by the advanced
@@ -41,12 +42,16 @@ const ParamIdeogram4SamplerPreset = () => {
     [dispatch]
   );
 
-  const value = useMemo(() => IDEOGRAM4_SAMPLER_PRESET_OPTIONS.find((o) => o.value === samplerPreset), [samplerPreset]);
+  const options = useMemo<ComboboxOption[]>(
+    () => IDEOGRAM4_SAMPLER_PRESET_I18N.map((o) => ({ value: o.value, label: t(o.i18nKey, { steps: o.steps }) })),
+    [t]
+  );
+  const value = useMemo(() => options.find((o) => o.value === samplerPreset), [options, samplerPreset]);
 
   return (
     <FormControl>
       <FormLabel>{t('parameters.samplerPreset')}</FormLabel>
-      <Combobox value={value} options={IDEOGRAM4_SAMPLER_PRESET_OPTIONS} onChange={onChange} sx={comboboxSx} />
+      <Combobox value={value} options={options} onChange={onChange} sx={comboboxSx} />
     </FormControl>
   );
 };

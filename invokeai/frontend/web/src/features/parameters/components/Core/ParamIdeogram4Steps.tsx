@@ -11,7 +11,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-const MARKS = [1, 12, 20, 48, 100];
+const MARKS = [2, 12, 20, 48, 100];
 
 // Optional override of the sampler preset's step count. null = use the preset.
 const ParamIdeogram4Steps = () => {
@@ -50,7 +50,7 @@ const ParamIdeogram4Steps = () => {
       <CompositeSlider
         value={displayValue}
         defaultValue={presetSteps}
-        min={1}
+        min={2}
         max={100}
         step={1}
         onChange={onChange}
@@ -59,7 +59,7 @@ const ParamIdeogram4Steps = () => {
       <CompositeNumberInput
         value={displayValue}
         defaultValue={presetSteps}
-        min={1}
+        min={2}
         max={100}
         step={1}
         onChange={onChange}

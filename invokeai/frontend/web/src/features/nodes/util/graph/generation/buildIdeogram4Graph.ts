@@ -2,7 +2,6 @@ import { objectEquals } from '@observ33r/object-equals';
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  selectIdeogram4ColorPalette,
   selectIdeogram4GuidanceScale,
   selectIdeogram4Mu,
   selectIdeogram4SamplerPreset,
@@ -13,7 +12,7 @@ import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
-import { buildIdeogram4Prompt } from 'features/nodes/util/graph/generation/buildIdeogram4Prompt';
+import { collectIdeogram4PromptInputs } from 'features/nodes/util/graph/generation/buildIdeogram4Prompt';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getOriginalAndScaledSizesForTextToImage,
@@ -45,16 +44,18 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
   assert(model.base === 'ideogram-4', 'Selected model is not an Ideogram 4 model');
 
   const samplerPreset = selectIdeogram4SamplerPreset(state);
-  // Optional advanced overrides (null = use the preset). The color palette is consumed by
-  // buildIdeogram4Prompt; it is read here only for metadata.
+  // Optional advanced overrides (null = use the preset).
   const ideogram4Steps = selectIdeogram4Steps(state);
   const ideogram4GuidanceScale = selectIdeogram4GuidanceScale(state);
   const ideogram4Mu = selectIdeogram4Mu(state);
-  const colorPalette = selectIdeogram4ColorPalette(state);
 
-  // Assemble the prompt: raw-JSON passthrough, a structured caption built from Regional Guidance
-  // layers (+ optional color palette), or plain text when there is nothing structured to encode.
-  const { prompt, isStructured } = buildIdeogram4Prompt(state, manager);
+  // Collect the raw prompt inputs. The JSON caption is assembled at generation time in the
+  // ideogram4_caption_builder node so dynamic prompts / prompt batching (which vary the global
+  // prompt) are folded into the encoded caption. The regions and palette are fixed per generation.
+  const { globalPrompt, regions, colorPalette } = collectIdeogram4PromptInputs(state, manager);
+  // Whether anything beyond the global prompt shapes the caption. When true we record the assembled
+  // caption in metadata (via an edge off the runtime builder) so it captures each batch item's caption.
+  const hasStructuredInputs = regions.length > 0 || colorPalette.length > 0;
 
   const g = new Graph(getPrefixedId('ideogram4_graph'));
 
@@ -64,10 +65,20 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
     model,
   });
 
+  // The global prompt lives in its own node so the linear batch (dynamic prompts / prompt batching)
+  // can inject expansions into it — those then flow through the caption builder into the encoder.
   const promptNode = g.addNode({
     id: getPrefixedId('ideogram4_prompt'),
     type: 'string',
-    value: prompt,
+    value: globalPrompt,
+  });
+
+  // Assembles the structured JSON caption from the (possibly batch-injected) prompt + fixed regions.
+  const captionBuilder = g.addNode({
+    id: getPrefixedId('ideogram4_caption_builder'),
+    type: 'ideogram4_caption_builder',
+    regions,
+    color_palette: colorPalette,
   });
 
   const textEncoder = g.addNode({
@@ -97,7 +108,8 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'qwen3_encoder', textEncoder, 'qwen3_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
-  g.addEdge(promptNode, 'value', textEncoder, 'prompt');
+  g.addEdge(promptNode, 'value', captionBuilder, 'prompt');
+  g.addEdge(captionBuilder, 'value', textEncoder, 'prompt');
   g.addEdge(textEncoder, 'conditioning', denoise, 'positive_conditioning');
   g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(denoise, 'latents', l2i, 'latents');
@@ -107,13 +119,9 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
   denoise.width = scaledSize.width;
   denoise.height = scaledSize.height;
 
-  // The linear batch injects the raw positive prompt (and dynamic-prompt expansions) into the node we
-  // return as `positivePrompt`. For a structured caption we must NOT let it clobber the assembled JSON,
-  // so we return a decoy string node; for plain text we return the real prompt node so dynamic prompts
-  // and prompt batching work normally.
-  const positivePrompt: Invocation<'string'> = isStructured
-    ? g.addNode({ id: getPrefixedId('positive_prompt_decoy'), type: 'string' })
-    : promptNode;
+  // Return the real prompt node so the linear batch injects dynamic-prompt expansions into it; they
+  // flow through the caption builder into the encoder. `positive_prompt` metadata is the global prompt.
+  const positivePrompt: Invocation<'string'> = promptNode;
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'ideogram-4');
@@ -131,9 +139,11 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
     height: originalSize.height,
     generation_mode: 'ideogram4_txt2img',
   });
-  // The assembled caption is static; store it for reproducibility when it differs from the raw prompt.
-  if (isStructured) {
-    g.upsertMetadata({ ideogram4_caption: prompt });
+  // Record the actually-encoded caption for reproducibility. It's assembled at runtime, so take it via
+  // an edge off the builder — this captures each batch item's caption, not a stale build-time value.
+  // Only when something beyond the plain global prompt shapes it (otherwise it equals positive_prompt).
+  if (hasStructuredInputs) {
+    g.addEdgeToMetadata(captionBuilder, 'value', 'ideogram4_caption');
   }
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');

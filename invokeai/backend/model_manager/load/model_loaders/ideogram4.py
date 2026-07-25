@@ -12,6 +12,7 @@ FLUX nf4. Both transformer branches are returned as a single ``Ideogram4Transfor
 """
 
 import json
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -175,7 +176,15 @@ class Ideogram4DiffusersModel(ModelLoader):
             if is_bnb_nf4:
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=compute_dtype)
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        # Mirror the fp8 helper's policy (load_fp8_state_dict): unexpected keys signal a wrong or
+        # contaminated checkpoint and must hard-fail; missing keys are expected only for tied weights
+        # that transformers re-ties itself, so downgrade those to a warning rather than silently
+        # accepting a partial load that would fail later during encoding.
+        if unexpected:
+            raise RuntimeError(f"unexpected keys loading Ideogram 4 text encoder: {unexpected[:10]}")
+        if missing:
+            warnings.warn(f"missing keys loading Ideogram 4 text encoder: {missing[:10]}", stacklevel=2)
         if not is_bnb_nf4:
             model = model.to(compute_dtype)
         model.eval()

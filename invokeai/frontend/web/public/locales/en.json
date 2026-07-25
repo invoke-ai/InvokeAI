@@ -1635,6 +1635,11 @@
         "samplerPreset": "Sampler Preset",
         "colorPalette": "Color Palette",
         "ideogram4Caption": "Structured Caption",
+        "ideogram4SamplerPresets": {
+            "quality": "Quality ({{steps}} steps)",
+            "default": "Default ({{steps}} steps)",
+            "turbo": "Turbo ({{steps}} steps)"
+        },
         "duration": "Duration",
         "lockAspectRatio": "Lock Aspect Ratio",
         "swapDimensions": "Swap Dimensions",

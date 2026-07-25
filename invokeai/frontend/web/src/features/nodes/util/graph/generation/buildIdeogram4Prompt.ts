@@ -6,16 +6,14 @@ import type { Rect } from 'features/controlLayers/store/types';
 
 /**
  * Ideogram 4 is prompted with a structured JSON caption describing the scene as a list of regions,
- * each with a bounding box and a description. This module assembles that caption from InvokeAI's
- * Canvas Regional Guidance layers — the bbox numbers live inside the prompt string (Ideogram 4 does
- * not use spatial attention masks), so this is pure string assembly with no backend mask handling.
+ * each with a bounding box and a description. The bbox numbers live inside the prompt string (Ideogram 4
+ * does not use spatial attention masks).
  *
- * See the reference prompting guide for the schema; the key points used here:
- *   - bbox is `[y_min, x_min, y_max, x_max]`, normalized to 0–1000, origin at top-left.
- *   - Key order matters (the model was trained on a consistent order). `obj` elements use
- *     `type`, `bbox`, `desc`. We rely on JS object insertion order being preserved by JSON.stringify.
- *   - The reference serializes with compact separators and `ensure_ascii=False`; JSON.stringify
- *     already produces compact `,`/`:` separators and preserves non-ASCII characters.
+ * This module reads the raw inputs (global prompt, per-region description + bbox, color palette) from
+ * canvas state. The actual JSON assembly happens at generation time in the backend
+ * `ideogram4_caption_builder` node (see backend `build_ideogram4_caption`) so that dynamic-prompt
+ * expansions and prompt batching — which vary the global prompt — are folded into the encoded caption.
+ * Only the bbox normalization stays here, since it needs the canvas manager / generation bbox.
  */
 
 /** Ideogram 4 normalizes spatial coordinates to a 0–1000 grid with the origin at the top-left. */
@@ -47,80 +45,31 @@ export type Ideogram4RegionInput = {
   bbox: Ideogram4Bbox | null;
 };
 
-/** An `obj`-type element. Key order matches the training schema: `type`, `bbox`, `desc`. */
-type Ideogram4Element = { type: 'obj'; bbox: Ideogram4Bbox; desc: string } | { type: 'obj'; desc: string };
-
-type Ideogram4PromptResult = {
-  /** The final prompt string to feed to the text encoder. */
-  prompt: string;
-  /**
-   * Whether the prompt is a structured caption (assembled JSON or raw-JSON passthrough). When true,
-   * the graph builder must NOT let the linear batch inject the raw positive prompt over it, otherwise
-   * the assembled caption would be clobbered by the plain prompt text.
-   */
-  isStructured: boolean;
+export type Ideogram4PromptInputs = {
+  /** The global positive prompt (batch-injectable; becomes `high_level_description` / raw text). */
+  globalPrompt: string;
+  /** Enabled Regional Guidance layers with a non-empty prompt (description + normalized bbox). */
+  regions: Ideogram4RegionInput[];
+  /** The raw color palette (normalized/validated by the backend caption builder). */
+  colorPalette: string[];
 };
 
 /**
- * Assembles an Ideogram 4 prompt from a global prompt, a set of regions, and an optional color palette.
- *
- * - Raw-JSON passthrough: if the global prompt is already a JSON object (trimmed, starts with `{`), it
- *   is used verbatim and treated as structured (the palette is ignored — the user controls the JSON).
- * - With regions and/or a color palette: a structured JSON caption is built — the global prompt becomes
- *   `high_level_description`, each region becomes an `obj` element, and the palette (if any) becomes
- *   `style_description.color_palette`.
- * - Otherwise: the plain global prompt is returned (the model accepts plain text). This keeps dynamic
- *   prompts and prompt batching working, since the caller can let the batch inject it directly.
+ * Reads the raw Ideogram 4 prompt inputs from state: the global prompt, each enabled Regional Guidance
+ * layer (prompt + normalized bbox), and the color palette. The JSON caption is assembled later, at
+ * generation time, by the backend `ideogram4_caption_builder` node — so the batch-injectable global
+ * prompt is reflected in the encoded caption. Regions with no drawn content contribute a null bbox.
  */
-export const buildIdeogram4Caption = (
-  globalPrompt: string,
-  regions: Ideogram4RegionInput[],
-  colorPalette: string[] = []
-): Ideogram4PromptResult => {
-  const trimmed = globalPrompt.trim();
-
-  // The user pasted a structured caption (or any JSON object) — use it verbatim.
-  if (trimmed.startsWith('{')) {
-    return { prompt: globalPrompt, isStructured: true };
-  }
-
-  const elements: Ideogram4Element[] = regions
-    .filter((region) => region.prompt.trim().length > 0)
-    .map((region) =>
-      region.bbox ? { type: 'obj', bbox: region.bbox, desc: region.prompt } : { type: 'obj', desc: region.prompt }
-    );
-
-  // Normalize the palette to uppercase #RRGGBB (the schema's required hex form); drop invalid entries.
-  const palette = colorPalette.map((c) => c.toUpperCase()).filter((c) => /^#[0-9A-F]{6}$/.test(c));
-
-  // Nothing structured to encode — fall back to the plain prompt (documented to work).
-  if (elements.length === 0 && palette.length === 0) {
-    return { prompt: trimmed, isStructured: false };
-  }
-
-  // Strict key order: high_level_description, (style_description), compositional_deconstruction.
-  // style_description here carries only color_palette; the other style fields are left to raw-JSON use.
-  const compositional_deconstruction = { background: '', elements };
-  const caption =
-    palette.length > 0
-      ? { high_level_description: trimmed, style_description: { color_palette: palette }, compositional_deconstruction }
-      : { high_level_description: trimmed, compositional_deconstruction };
-
-  return { prompt: JSON.stringify(caption), isStructured: true };
-};
-
-/**
- * Reads the global prompt and each enabled Regional Guidance layer (prompt + normalized bbox) from
- * canvas state, then assembles the Ideogram 4 prompt. Regions with no drawn content contribute their
- * description without a bbox.
- */
-export const buildIdeogram4Prompt = (state: RootState, manager: CanvasManager | null): Ideogram4PromptResult => {
+export const collectIdeogram4PromptInputs = (
+  state: RootState,
+  manager: CanvasManager | null
+): Ideogram4PromptInputs => {
   const globalPrompt = selectPositivePrompt(state);
   const colorPalette = selectIdeogram4ColorPalette(state);
 
   // No canvas manager (e.g. the Generate tab) → no regions to read.
   if (manager === null) {
-    return buildIdeogram4Caption(globalPrompt, [], colorPalette);
+    return { globalPrompt, regions: [], colorPalette };
   }
 
   const canvas = selectCanvasSlice(state);
@@ -143,5 +92,5 @@ export const buildIdeogram4Prompt = (state: RootState, manager: CanvasManager | 
     regions.push({ prompt, bbox });
   }
 
-  return buildIdeogram4Caption(globalPrompt, regions, colorPalette);
+  return { globalPrompt, regions, colorPalette };
 };

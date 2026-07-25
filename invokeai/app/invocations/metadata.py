@@ -238,6 +238,13 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The Qwen3 text encoder model used for Z-Image inference",
     )
+    # Ideogram 4 assembles its structured JSON caption at generation time (ideogram4_caption_builder),
+    # so this is a declared field rather than a static extra: the graph wires the builder's output to it
+    # via an edge, capturing the exact caption encoded for each (possibly batched) image.
+    ideogram4_caption: Optional[str] = InputField(
+        default=None,
+        description="The structured JSON caption encoded for Ideogram 4 inference",
+    )
 
     # High resolution fix metadata.
     hrf_enabled: Optional[bool] = InputField(
