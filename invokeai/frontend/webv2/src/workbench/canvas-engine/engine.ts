@@ -2694,13 +2694,199 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const mergeLayerDown = (upperLayerId: string): boolean => layerController.merge.mergeDown(upperLayerId);
   const mergeVisibleRasterLayers = (): Promise<MergeVisibleResult> => layerController.merge.mergeVisible();
 
-  let captureDocumentSnapshot!: () => CanvasDocumentSnapshot | null;
-  let isDocumentSnapshotCurrent!: (snapshot: CanvasDocumentSnapshot) => boolean;
-  let captureRasterSnapshot!: (
+  const documentSnapshotSources = new WeakMap<
+    CanvasDocumentSnapshot,
+    {
+      canvas: NonNullable<ReturnType<typeof mutationPort.getCanvasState>>;
+      contentEpoch: number;
+      lifecycleGeneration: number;
+    }
+  >();
+  const isDocumentSnapshotCurrent = (snapshot: CanvasDocumentSnapshot): boolean => {
+    const source = documentSnapshotSources.get(snapshot);
+    return (
+      !disposed &&
+      source !== undefined &&
+      source.canvas === mutationPort.getCanvasState() &&
+      source.contentEpoch === rasterContentEpoch &&
+      source.lifecycleGeneration === lifecycleGeneration &&
+      snapshot.documentGeneration === rasterController.getDocumentGeneration()
+    );
+  };
+  const captureRasterSnapshot = async (
     documentSnapshot: CanvasDocumentSnapshot,
     layerIds: readonly string[],
     options?: { signal?: AbortSignal; includeDisabled?: boolean }
-  ) => Promise<CaptureRasterSnapshotResult>;
+  ): Promise<CaptureRasterSnapshotResult> => {
+    if (options?.signal?.aborted) {
+      return { status: 'aborted' };
+    }
+    if (!documentSnapshotSources.has(documentSnapshot)) {
+      return { status: 'not-ready' };
+    }
+    if (!isDocumentSnapshotCurrent(documentSnapshot)) {
+      return { status: 'stale' };
+    }
+    const snapshotSource = documentSnapshotSources.get(documentSnapshot)!;
+    const captureLifecycleGeneration = snapshotSource.lifecycleGeneration;
+
+    const uniqueLayerIds = [...new Set(layerIds)];
+    const layerById = new Map(documentSnapshot.canvas.document.layers.map((layer) => [layer.id, layer]));
+    let requestedBytes = 0;
+    for (const layerId of uniqueLayerIds) {
+      const layer = layerById.get(layerId);
+      const source = layer ? renderableSourceOf(layer) : null;
+      if (!layer || !source || !isSupportedExportSource(source)) {
+        return { status: 'not-ready' };
+      }
+      if (source.type === 'image') {
+        requestedBytes += source.image.width * source.image.height * 4;
+      } else if (source.type === 'paint' && source.bitmap) {
+        requestedBytes += source.bitmap.width * source.bitmap.height * 4;
+      } else {
+        const contentRect = getSourceContentRect(layer, documentSnapshot.canvas.document);
+        requestedBytes += contentRect.width * contentRect.height * 4;
+      }
+    }
+
+    rasterController.memory.setBaseBytes(layerCache.byteSize());
+    rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+    const reservation = rasterController.memory.reserve(requestedBytes, {
+      generation: captureLifecycleGeneration,
+      purpose: 'background-snapshot',
+    });
+    if (reservation.status === 'over-budget') {
+      return { status: 'over-budget' };
+    }
+    const reservationLeases: { release(): void }[] = [reservation.lease];
+    const pinLeases = uniqueLayerIds.map((layerId) => rasterController.memory.pin(layerId, captureLifecycleGeneration));
+    const layerSurfaces = new Map<string, { rect: Rect; surface: RasterSurface }>();
+    const emptyLayerIds = new Set<string>();
+    const capturedGuards: LayerExportGuard[] = [];
+    let actualDetachedBytes = 0;
+    try {
+      for (const layerId of uniqueLayerIds) {
+        if (options?.signal?.aborted) {
+          return { status: 'aborted' };
+        }
+        if (!isDocumentSnapshotCurrent(documentSnapshot)) {
+          return { status: 'stale' };
+        }
+        const liveResult = await rasterizeLayerPixels(layerId, {
+          includeDisabled: options?.includeDisabled,
+          signal: options?.signal,
+        });
+        if (options?.signal?.aborted) {
+          return { status: 'aborted' };
+        }
+        if (!isDocumentSnapshotCurrent(documentSnapshot)) {
+          return { status: 'stale' };
+        }
+        if (liveResult.status === 'empty') {
+          emptyLayerIds.add(layerId);
+          continue;
+        }
+        if (liveResult.status !== 'ok') {
+          return {
+            status:
+              liveResult.status === 'aborted' || liveResult.status === 'over-budget' ? liveResult.status : 'not-ready',
+          };
+        }
+        const live = liveResult;
+        if (!isLayerExportGuardCurrent(live.guard)) {
+          live.release();
+          return { status: 'stale' };
+        }
+        capturedGuards.push(live.guard);
+        try {
+          const actualBytes = live.surface.width * live.surface.height * 4;
+          const source = renderableSourceOf(layerById.get(layerId)!);
+          const estimatedBytes =
+            source?.type === 'image'
+              ? source.image.width * source.image.height * 4
+              : source?.type === 'paint' && source.bitmap
+                ? source.bitmap.width * source.bitmap.height * 4
+                : getSourceContentRect(layerById.get(layerId)!, documentSnapshot.canvas.document).width *
+                  getSourceContentRect(layerById.get(layerId)!, documentSnapshot.canvas.document).height *
+                  4;
+          const additionalBytes = Math.max(0, actualBytes - estimatedBytes);
+          if (additionalBytes > 0) {
+            rasterController.memory.setBaseBytes(layerCache.byteSize());
+            rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+            const additional = rasterController.memory.reserve(additionalBytes, {
+              generation: captureLifecycleGeneration,
+              purpose: 'background-snapshot',
+            });
+            if (additional.status === 'over-budget') {
+              return { status: 'over-budget' };
+            }
+            reservationLeases.push(additional.lease);
+          }
+          const detached = backend.createSurface(live.surface.width, live.surface.height);
+          detached.ctx.setTransform(1, 0, 0, 1, 0, 0);
+          detached.ctx.clearRect(0, 0, detached.width, detached.height);
+          detached.ctx.drawImage(live.surface.canvas, 0, 0);
+          layerSurfaces.set(layerId, { rect: { ...live.rect }, surface: detached });
+          actualDetachedBytes += actualBytes;
+        } finally {
+          live.release();
+        }
+      }
+      if (
+        !isDocumentSnapshotCurrent(documentSnapshot) ||
+        capturedGuards.some((guard) => !isLayerExportGuardCurrent(guard))
+      ) {
+        return { status: 'stale' };
+      }
+
+      for (const lease of reservationLeases) {
+        lease.release();
+      }
+      const detachedLease = rasterController.memory.trackDetached(actualDetachedBytes, captureLifecycleGeneration);
+      let released = false;
+      const snapshot: CanvasRasterSnapshot = {
+        ...documentSnapshot,
+        emptyLayerIds,
+        layerSurfaces,
+        release: () => {
+          if (released) {
+            return;
+          }
+          released = true;
+          emptyLayerIds.clear();
+          layerSurfaces.clear();
+          detachedLease.release();
+          activeRasterSnapshots.delete(snapshot);
+        },
+      };
+      activeRasterSnapshots.add(snapshot);
+      return { snapshot, status: 'ok' };
+    } finally {
+      for (const lease of reservationLeases) {
+        lease.release();
+      }
+      for (const lease of pinLeases) {
+        lease.release();
+      }
+    }
+  };
+  const captureDocumentSnapshot = (): CanvasDocumentSnapshot | null => {
+    const canvas = mutationPort.getCanvasState();
+    if (disposed || !canvas) {
+      return null;
+    }
+    const snapshot: CanvasDocumentSnapshot = {
+      canvas: structuredClone(canvas),
+      documentGeneration: rasterController.getDocumentGeneration(),
+    };
+    documentSnapshotSources.set(snapshot, {
+      canvas,
+      contentEpoch: rasterContentEpoch,
+      lifecycleGeneration,
+    });
+    return snapshot;
+  };
+
   const psdExportController = new PsdExportController({
     backend,
     captureDocumentSnapshot: () => captureDocumentSnapshot(),
@@ -3196,182 +3382,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       },
     },
   });
-  const documentSnapshotSources = new WeakMap<
-    CanvasDocumentSnapshot,
-    {
-      canvas: NonNullable<ReturnType<typeof mutationPort.getCanvasState>>;
-      contentEpoch: number;
-      lifecycleGeneration: number;
-    }
-  >();
-  isDocumentSnapshotCurrent = (snapshot: CanvasDocumentSnapshot): boolean => {
-    const source = documentSnapshotSources.get(snapshot);
-    return (
-      !disposed &&
-      source !== undefined &&
-      source.canvas === mutationPort.getCanvasState() &&
-      source.contentEpoch === rasterContentEpoch &&
-      source.lifecycleGeneration === lifecycleGeneration &&
-      snapshot.documentGeneration === rasterController.getDocumentGeneration()
-    );
-  };
-  captureRasterSnapshot = async (
-    documentSnapshot: CanvasDocumentSnapshot,
-    layerIds: readonly string[],
-    options?: { signal?: AbortSignal; includeDisabled?: boolean }
-  ): Promise<CaptureRasterSnapshotResult> => {
-    if (options?.signal?.aborted) {
-      return { status: 'aborted' };
-    }
-    if (!documentSnapshotSources.has(documentSnapshot)) {
-      return { status: 'not-ready' };
-    }
-    if (!isDocumentSnapshotCurrent(documentSnapshot)) {
-      return { status: 'stale' };
-    }
-    const snapshotSource = documentSnapshotSources.get(documentSnapshot)!;
-    const captureLifecycleGeneration = snapshotSource.lifecycleGeneration;
-
-    const uniqueLayerIds = [...new Set(layerIds)];
-    const layerById = new Map(documentSnapshot.canvas.document.layers.map((layer) => [layer.id, layer]));
-    let requestedBytes = 0;
-    for (const layerId of uniqueLayerIds) {
-      const layer = layerById.get(layerId);
-      const source = layer ? renderableSourceOf(layer) : null;
-      if (!layer || !source || !isSupportedExportSource(source)) {
-        return { status: 'not-ready' };
-      }
-      if (source.type === 'image') {
-        requestedBytes += source.image.width * source.image.height * 4;
-      } else if (source.type === 'paint' && source.bitmap) {
-        requestedBytes += source.bitmap.width * source.bitmap.height * 4;
-      } else {
-        const contentRect = getSourceContentRect(layer, documentSnapshot.canvas.document);
-        requestedBytes += contentRect.width * contentRect.height * 4;
-      }
-    }
-
-    rasterController.memory.setBaseBytes(layerCache.byteSize());
-    rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
-    const reservation = rasterController.memory.reserve(requestedBytes, {
-      generation: captureLifecycleGeneration,
-      purpose: 'background-snapshot',
-    });
-    if (reservation.status === 'over-budget') {
-      return { status: 'over-budget' };
-    }
-    const reservationLeases: { release(): void }[] = [reservation.lease];
-    const pinLeases = uniqueLayerIds.map((layerId) => rasterController.memory.pin(layerId, captureLifecycleGeneration));
-    const layerSurfaces = new Map<string, { rect: Rect; surface: RasterSurface }>();
-    const emptyLayerIds = new Set<string>();
-    const capturedGuards: LayerExportGuard[] = [];
-    let actualDetachedBytes = 0;
-    try {
-      for (const layerId of uniqueLayerIds) {
-        if (options?.signal?.aborted) {
-          return { status: 'aborted' };
-        }
-        if (!isDocumentSnapshotCurrent(documentSnapshot)) {
-          return { status: 'stale' };
-        }
-        const liveResult = await rasterizeLayerPixels(layerId, {
-          includeDisabled: options?.includeDisabled,
-          signal: options?.signal,
-        });
-        if (options?.signal?.aborted) {
-          return { status: 'aborted' };
-        }
-        if (!isDocumentSnapshotCurrent(documentSnapshot)) {
-          return { status: 'stale' };
-        }
-        if (liveResult.status === 'empty') {
-          emptyLayerIds.add(layerId);
-          continue;
-        }
-        if (liveResult.status !== 'ok') {
-          return {
-            status:
-              liveResult.status === 'aborted' || liveResult.status === 'over-budget' ? liveResult.status : 'not-ready',
-          };
-        }
-        const live = liveResult;
-        if (!isLayerExportGuardCurrent(live.guard)) {
-          live.release();
-          return { status: 'stale' };
-        }
-        capturedGuards.push(live.guard);
-        try {
-          const actualBytes = live.surface.width * live.surface.height * 4;
-          const source = renderableSourceOf(layerById.get(layerId)!);
-          const estimatedBytes =
-            source?.type === 'image'
-              ? source.image.width * source.image.height * 4
-              : source?.type === 'paint' && source.bitmap
-                ? source.bitmap.width * source.bitmap.height * 4
-                : getSourceContentRect(layerById.get(layerId)!, documentSnapshot.canvas.document).width *
-                  getSourceContentRect(layerById.get(layerId)!, documentSnapshot.canvas.document).height *
-                  4;
-          const additionalBytes = Math.max(0, actualBytes - estimatedBytes);
-          if (additionalBytes > 0) {
-            rasterController.memory.setBaseBytes(layerCache.byteSize());
-            rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
-            const additional = rasterController.memory.reserve(additionalBytes, {
-              generation: captureLifecycleGeneration,
-              purpose: 'background-snapshot',
-            });
-            if (additional.status === 'over-budget') {
-              return { status: 'over-budget' };
-            }
-            reservationLeases.push(additional.lease);
-          }
-          const detached = backend.createSurface(live.surface.width, live.surface.height);
-          detached.ctx.setTransform(1, 0, 0, 1, 0, 0);
-          detached.ctx.clearRect(0, 0, detached.width, detached.height);
-          detached.ctx.drawImage(live.surface.canvas, 0, 0);
-          layerSurfaces.set(layerId, { rect: { ...live.rect }, surface: detached });
-          actualDetachedBytes += actualBytes;
-        } finally {
-          live.release();
-        }
-      }
-      if (
-        !isDocumentSnapshotCurrent(documentSnapshot) ||
-        capturedGuards.some((guard) => !isLayerExportGuardCurrent(guard))
-      ) {
-        return { status: 'stale' };
-      }
-
-      for (const lease of reservationLeases) {
-        lease.release();
-      }
-      const detachedLease = rasterController.memory.trackDetached(actualDetachedBytes, captureLifecycleGeneration);
-      let released = false;
-      const snapshot: CanvasRasterSnapshot = {
-        ...documentSnapshot,
-        emptyLayerIds,
-        layerSurfaces,
-        release: () => {
-          if (released) {
-            return;
-          }
-          released = true;
-          emptyLayerIds.clear();
-          layerSurfaces.clear();
-          detachedLease.release();
-          activeRasterSnapshots.delete(snapshot);
-        },
-      };
-      activeRasterSnapshots.add(snapshot);
-      return { snapshot, status: 'ok' };
-    } finally {
-      for (const lease of reservationLeases) {
-        lease.release();
-      }
-      for (const lease of pinLeases) {
-        lease.release();
-      }
-    }
-  };
   const exportCapability: CanvasEngineInternalExportCapability = {
     captureLayerExportGuard: captureCurrentLayerExportGuard,
     captureRasterSnapshot,
@@ -3384,22 +3394,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getCompositeExecutorDeps,
     hasExportableLayerContent,
     isLayerExportGuardCurrent,
-  };
-  captureDocumentSnapshot = (): CanvasDocumentSnapshot | null => {
-    const canvas = mutationPort.getCanvasState();
-    if (disposed || !canvas) {
-      return null;
-    }
-    const snapshot: CanvasDocumentSnapshot = {
-      canvas: structuredClone(canvas),
-      documentGeneration: rasterController.getDocumentGeneration(),
-    };
-    documentSnapshotSources.set(snapshot, {
-      canvas,
-      contentEpoch: rasterContentEpoch,
-      lifecycleGeneration,
-    });
-    return snapshot;
   };
   const documentCapability: CanvasDocumentCapability = {
     captureSnapshot: captureDocumentSnapshot,
