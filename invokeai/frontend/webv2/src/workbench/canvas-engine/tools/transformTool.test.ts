@@ -5,7 +5,12 @@ import type { LayerTransform } from '@workbench/canvas-engine/transform/transfor
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
-import { TRANSFORM_ROTATE_NUB_PX, transformOverlayGeometry } from '@workbench/canvas-engine/transform/transformMath';
+import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
+import {
+  layerTransformMatrix,
+  TRANSFORM_ROTATE_NUB_PX,
+  transformOverlayGeometry,
+} from '@workbench/canvas-engine/transform/transformMath';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createTransformTool } from './transformTool';
@@ -100,9 +105,13 @@ interface Harness {
  * A ToolContext whose transform-session seams mutate a real `transformSession`
  * store (mirroring the engine), so the tool's reads reflect its own writes across
  * a down→move→up drag. The viewport projects document→screen 1:1.
+ *
+ * Grid snapping starts OFF so the gesture-math tests assert raw pointer deltas;
+ * the snapping tests re-enable it on `h.ctx.stores`. (The product default is on.)
  */
 const createHarness = (doc: CanvasDocumentContractV2, zoom = 1, float?: FloatingSelection | null): Harness => {
   const stores = createEngineStores();
+  stores.snapToGrid.set(false);
   const overrides: { layerId: string; override: unknown }[] = [];
   const state = { applyCount: 0, commitFloatCount: 0, cancelFloatCount: 0 };
   const floatRef: { current: FloatingSelection | null } = { current: float ?? null };
@@ -320,6 +329,85 @@ describe('transform tool: gestures', () => {
     // No update beyond the initial begin override.
     expect(h.overrides.length).toBe(startOverrides);
     expect(h.session()?.transform.scaleX).toBe(1);
+  });
+});
+
+describe('transform tool: grid snapping', () => {
+  /** A harness with snapping on at `grid`. */
+  const snapHarness = (grid: number, float?: FloatingSelection) => {
+    const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], 'a');
+    const h = createHarness(doc, 1, float);
+    h.ctx.stores.snapToGrid.set(true);
+    h.ctx.stores.bboxGrid.set(grid);
+    return h;
+  };
+
+  it('snaps an interior move to the grid', () => {
+    const h = snapHarness(8);
+    const tool = createTransformTool();
+    activate(tool, h.ctx);
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(71, 65)); // raw (21, 15) → (24, 16)
+    up(tool, h.ctx, pointer(71, 65));
+
+    expect(h.session()?.transform.x).toBeCloseTo(24, 5);
+    expect(h.session()?.transform.y).toBeCloseTo(16, 5);
+  });
+
+  it('bypasses the move snap while alt is held', () => {
+    const h = snapHarness(8);
+    const tool = createTransformTool();
+    activate(tool, h.ctx);
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(71, 65, { alt: true }));
+
+    expect(h.session()?.transform.x).toBeCloseTo(21, 5);
+    expect(h.session()?.transform.y).toBeCloseTo(15, 5);
+  });
+
+  it('lands a dragged scale handle on the grid', () => {
+    const h = snapHarness(8);
+    const tool = createTransformTool();
+    activate(tool, h.ctx);
+
+    // se corner at doc (100,100) dragged to (153,153) → snaps to (152,152).
+    down(tool, h.ctx, pointer(100, 100));
+    move(tool, h.ctx, pointer(153, 153));
+
+    expect(h.session()?.transform.scaleX).toBeCloseTo(1.52, 5);
+    expect(h.session()?.transform.scaleY).toBeCloseTo(1.52, 5);
+  });
+
+  it('still scales about center under alt (alt is not a bypass on a handle)', () => {
+    const h = snapHarness(8);
+    const tool = createTransformTool();
+    activate(tool, h.ctx);
+
+    down(tool, h.ctx, pointer(100, 100));
+    move(tool, h.ctx, pointer(153, 153, { alt: true }));
+
+    // The layer center (50,50) stays put — the alt anchor, not a snap bypass.
+    const next = h.session()!.transform;
+    const center = applyToPoint(layerTransformMatrix(next), { x: 50, y: 50 });
+    expect(center.x).toBeCloseTo(50, 5);
+    expect(center.y).toBeCloseTo(50, 5);
+  });
+
+  it('does not snap a float gesture (its transform is layer-local)', () => {
+    const float = {
+      layerId: 'a',
+      pixels: { rect: { height: 100, width: 100, x: 0, y: 0 } },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    } as FloatingSelection;
+    const h = snapHarness(8, float);
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(71, 65));
+
+    expect(h.floatTransforms.at(-1)).toMatchObject({ x: 21, y: 15 });
   });
 });
 

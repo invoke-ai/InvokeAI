@@ -15,6 +15,11 @@
  *   corners); a corner rotate zone rotates about the center (shift = 15° snap);
  *   the interior moves (shift = axis constrain). Pointer-move only updates the
  *   session preview — it never dispatches.
+ * - **Snap**: with the snap-to-grid setting on, a LAYER gesture lands its origin
+ *   (move) or the dragged handle (scale) on the model grid. Alt bypasses the snap
+ *   on a move; on a scale handle it does not, because alt already means
+ *   scale-about-center there. Float gestures never snap — their transform is
+ *   layer-local, so a document-space grid would skew rotated/scaled layers.
  * - **Apply** (`enter` / options button): the engine commits — a param edit for
  *   image layers, a pixel bake for paint layers — as ONE undoable entry.
  * - **Cancel** (`esc` / options button / a REAL tool switch): drops the
@@ -45,6 +50,7 @@ import {
 
 import type { Tool, ToolContext } from './tool';
 
+import { positionGrid } from './gridSnap';
 import { hittableLayerRect, layerMatrix } from './moveHitTest';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
@@ -186,7 +192,7 @@ export const createTransformTool = (): Tool => {
       transform: subject.transform,
     });
 
-  const nextTransform = (state: GestureState, input: PointerInput): LayerTransform => {
+  const nextTransform = (ctx: ToolContext, state: GestureState, input: PointerInput): LayerTransform => {
     // The pointer arrives in document space; the gesture math runs in the
     // subject's space, so convert before doing anything with it.
     const pointer = state.fromDocument(input.documentPoint);
@@ -194,12 +200,17 @@ export const createTransformTool = (): Tool => {
       x: pointer.x - state.startPointerDoc.x,
       y: pointer.y - state.startPointerDoc.y,
     };
+    // A float works in its layer's LOCAL space, so a document-space grid would
+    // skew it on a rotated/scaled layer — only layer gestures snap.
+    const gridFor = (bypass: boolean): number => (state.kind === 'layer' ? positionGrid(ctx, bypass) : 0);
     switch (state.target.kind) {
       case 'move':
-        return applyMove(state.startTransform, delta, input.modifiers.shift);
+        return applyMove(state.startTransform, delta, input.modifiers.shift, gridFor(input.modifiers.alt));
       case 'scale':
         return applyScale({
           alt: input.modifiers.alt,
+          // No alt bypass on a scale handle — alt already means scale-about-center.
+          grid: gridFor(false),
           handle: state.target.handle,
           pointerDoc: pointer,
           shift: input.modifiers.shift,
@@ -378,7 +389,7 @@ export const createTransformTool = (): Tool => {
           }
           gesture.moved = true;
         }
-        publish(ctx, gesture.kind, nextTransform(gesture, input));
+        publish(ctx, gesture.kind, nextTransform(ctx, gesture, input));
         return;
       }
       // Idle hover over a framed subject: reflect the target under the pointer.

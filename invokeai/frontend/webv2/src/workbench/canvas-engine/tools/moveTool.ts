@@ -22,6 +22,10 @@
  *   irrelevant). Pointer-move only sets a transient transform override (live
  *   preview) — it never dispatches.
  * - **`shift`** constrains motion to the dominant axis, for both modes.
+ * - **Snap**: with the snap-to-grid setting on, a LAYER drag lands its origin on
+ *   the model grid (the one the overlay draws); hold **alt** to bypass. Moving
+ *   PIXELS never snaps — a float's transform is layer-local, so document-space
+ *   grid math would skew it on a rotated or scaled layer.
  * - **Commit** (pointer-up after a real layer move): one `commitStructural` with
  *   the new/old transform x/y. A zero-delta drag commits nothing. Moving a float
  *   commits nothing here — the float's own commit does that later.
@@ -35,7 +39,11 @@ import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
+import { snapMovedPoint } from '@workbench/canvas-engine/math/snapping';
+
 import type { Tool, ToolContext } from './tool';
+
+import { positionGrid } from './gridSnap';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
@@ -121,13 +129,22 @@ export const createMoveTool = (): Tool => {
       input.modifiers.shift
     );
 
+  /**
+   * Where a layer drag puts the layer's origin, snapped to the grid unless the
+   * setting is off or alt bypasses it. Shared by the live preview and the commit
+   * so the layer lands exactly where the drag showed it.
+   */
+  const nextLayerPosition = (
+    ctx: ToolContext,
+    origin: { x: number; y: number },
+    input: PointerInput,
+    delta: Vec2
+  ): Vec2 => snapMovedPoint(origin, delta, positionGrid(ctx, input.modifiers.alt));
+
   const applyDelta = (ctx: ToolContext, current: GestureState, input: PointerInput): void => {
     const delta = deltaFor(current, input);
     if (current.mode.kind === 'layer') {
-      ctx.setLayerTransformOverride(current.mode.targetId, {
-        x: current.mode.origin.x + delta.x,
-        y: current.mode.origin.y + delta.y,
-      });
+      ctx.setLayerTransformOverride(current.mode.targetId, nextLayerPosition(ctx, current.mode.origin, input, delta));
       return;
     }
     if (current.mode.kind === 'float') {
@@ -209,17 +226,17 @@ export const createMoveTool = (): Tool => {
       }
       if (current.mode.kind === 'float') {
         // The float keeps the drag; it bakes later, as one entry for the whole
-        // move however many drags it took.
+        // move however many drags it took. Floats never snap — see the header.
         applyDelta(ctx, current, input);
         return;
       }
 
-      const delta = deltaFor(current, input);
       const origin = current.mode.origin;
-      const next = { x: origin.x + delta.x, y: origin.y + delta.y };
+      const next = nextLayerPosition(ctx, origin, input, deltaFor(current, input));
 
       if (next.x === origin.x && next.y === origin.y) {
-        // Zero-delta drag: drop the preview, commit nothing.
+        // Nothing moved — either a zero-delta drag, or a drag whose snapped
+        // result landed back on the origin. Drop the preview, commit nothing.
         ctx.setLayerTransformOverride(current.mode.targetId, null);
         return;
       }

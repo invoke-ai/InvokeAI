@@ -21,6 +21,7 @@ import type { CanvasLayerBaseContract } from '@workbench/canvas-engine/contracts
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint, fromTRS } from '@workbench/canvas-engine/math/mat2d';
+import { snapMovedPoint } from '@workbench/canvas-engine/math/snapping';
 
 /** The editable layer transform (translate + per-axis scale + rotation in radians). */
 export type LayerTransform = CanvasLayerBaseContract['transform'];
@@ -297,11 +298,18 @@ export const constrainMoveDelta = (delta: Vec2, shift: boolean): Vec2 => {
   return Math.abs(delta.x) >= Math.abs(delta.y) ? { x: delta.x, y: 0 } : { x: 0, y: delta.y };
 };
 
-/** Translates `start` by a document-space pointer delta (shift = axis constrain). */
-export const applyMove = (start: LayerTransform, deltaDoc: Vec2, shift: boolean): LayerTransform => {
-  const d = constrainMoveDelta(deltaDoc, shift);
-  return { ...start, x: start.x + d.x, y: start.y + d.y };
-};
+/**
+ * Translates `start` by a document-space pointer delta (shift = axis constrain).
+ *
+ * A positive `grid` snaps the RESULTING origin to that grid, per axis and only
+ * for axes the drag moved — an axis that shift has locked carries a zero delta,
+ * so it passes through exactly rather than being pulled onto a grid line.
+ * `grid = 0` (the default) leaves the position untouched.
+ */
+export const applyMove = (start: LayerTransform, deltaDoc: Vec2, shift: boolean, grid = 0): LayerTransform => ({
+  ...start,
+  ...snapMovedPoint(start, constrainMoveDelta(deltaDoc, shift), grid),
+});
 
 /** Parameters for {@link applyScale}. */
 export interface ScaleParams {
@@ -316,6 +324,8 @@ export interface ScaleParams {
   shift: boolean;
   /** Scale about the layer center instead of the opposite handle. */
   alt: boolean;
+  /** Grid the dragged handle lands on (document space); `0`/absent = no snap. */
+  grid?: number;
 }
 
 /**
@@ -324,6 +334,10 @@ export interface ScaleParams {
  * one axis, corners scale both (`shift` forces a uniform, aspect-preserving
  * factor). Dragging past the anchor flips the axis (negative scale), which is
  * kept correct; each axis is clamped to {@link MIN_ABS_SCALE}.
+ *
+ * `grid` snaps where the HANDLE lands in document space (the equivalent of the
+ * legacy Konva `anchorDragBoundFunc`); the scale factors stay derived from that
+ * snapped target rather than being rounded themselves, so the anchor never drifts.
  */
 export const applyScale = (p: ScaleParams): LayerTransform => {
   const { alt, handle, rect, shift, start } = p;
@@ -332,10 +346,14 @@ export const applyScale = (p: ScaleParams): LayerTransform => {
   const anchorLocal = alt ? localCenter(rect) : localHandlePoint(rect, OPPOSITE[handle]);
   const anchorDoc = applyToPoint(m, anchorLocal);
   const handleDoc = applyToPoint(m, handleLocal);
-  const targetDoc: Vec2 = {
-    x: handleDoc.x + (p.pointerDoc.x - p.startPointerDoc.x),
-    y: handleDoc.y + (p.pointerDoc.y - p.startPointerDoc.y),
-  };
+  // `snapMovedPoint`'s per-axis rule matters here too: an axis the pointer never
+  // moved along must keep its scale, or a purely horizontal corner drag would
+  // resize the layer vertically just because the handle did not start on a line.
+  const targetDoc = snapMovedPoint(
+    handleDoc,
+    { x: p.pointerDoc.x - p.startPointerDoc.x, y: p.pointerDoc.y - p.startPointerDoc.y },
+    p.grid ?? 0
+  );
 
   // Un-rotate the anchor→target vector into the layer's scaled-local frame.
   const cos = Math.cos(start.rotation);

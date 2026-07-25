@@ -411,6 +411,71 @@ describe('applyMove', () => {
   });
 });
 
+describe('applyMove: grid snapping', () => {
+  const offGrid: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 3, y: 5 };
+
+  it('is a no-op at grid 0, reproducing the unsnapped result exactly', () => {
+    expect(applyMove(offGrid, { x: 5, y: -3 }, false, 0)).toEqual(applyMove(offGrid, { x: 5, y: -3 }, false));
+  });
+  it('snaps the resulting position, not the delta', () => {
+    // 3+21=24 (already a multiple), 5+15=20 → 24 (nearest, ties round up).
+    expect(applyMove(offGrid, { x: 21, y: 15 }, false, 8)).toMatchObject({ x: 24, y: 24 });
+  });
+  it('passes a shift-locked axis through untouched', () => {
+    // Shift zeroes dy, so y keeps its off-grid 5 rather than being pulled to 8.
+    expect(applyMove(offGrid, { x: 21, y: 2 }, true, 8)).toMatchObject({ x: 24, y: 5 });
+  });
+  it('leaves rotation and scale alone', () => {
+    const start: LayerTransform = { rotation: 0.5, scaleX: 2, scaleY: 3, x: 0, y: 0 };
+    expect(applyMove(start, { x: 5, y: 5 }, false, 8)).toMatchObject({ rotation: 0.5, scaleX: 2, scaleY: 3 });
+  });
+});
+
+describe('applyScale: grid snapping', () => {
+  const scaleAt = (grid: number, pointerDoc: { x: number; y: number }): LayerTransform =>
+    applyScale({
+      alt: false,
+      grid,
+      handle: 'se',
+      pointerDoc,
+      shift: false,
+      rect,
+      start: identity,
+      startPointerDoc: { x: 100, y: 100 },
+    });
+
+  it('is a no-op at grid 0', () => {
+    const withZero = scaleAt(0, { x: 153, y: 100 });
+    const withNone = applyScale({
+      alt: false,
+      handle: 'se',
+      pointerDoc: { x: 153, y: 100 },
+      shift: false,
+      rect,
+      start: identity,
+      startPointerDoc: { x: 100, y: 100 },
+    });
+    expect(withZero).toEqual(withNone);
+  });
+
+  it('lands the dragged handle on a grid multiple', () => {
+    // se handle starts at doc (100,100); a 53px x-drag targets 153 → snaps to 152.
+    const next = scaleAt(8, { x: 153, y: 100 });
+    const handleDoc = applyToPoint(layerTransformMatrix(next), localHandlePoint(rect, 'se'));
+    expect(close(handleDoc.x, 152)).toBe(true);
+    expect(close(handleDoc.y, 100)).toBe(true);
+    // The scale is derived from the snapped target, not rounded itself.
+    expect(close(next.scaleX, 1.52)).toBe(true);
+  });
+
+  it('keeps the opposite anchor fixed while snapping', () => {
+    const next = scaleAt(8, { x: 153, y: 141 });
+    const anchorDoc = applyToPoint(layerTransformMatrix(next), localHandlePoint(rect, 'nw'));
+    expect(close(anchorDoc.x, 0)).toBe(true);
+    expect(close(anchorDoc.y, 0)).toBe(true);
+  });
+});
+
 describe('bakeMatrix', () => {
   it('equals the layer matrix so bake-then-draw ≡ transform-then-draw', () => {
     const transform: LayerTransform = { rotation: Math.PI / 6, scaleX: 1.5, scaleY: 0.8, x: 12, y: 34 };

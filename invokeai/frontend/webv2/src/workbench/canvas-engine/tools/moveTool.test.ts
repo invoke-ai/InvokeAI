@@ -60,10 +60,14 @@ const makeDoc = (layers: CanvasLayerContract[], selectedLayerId: string | null):
   width: 100,
 });
 
-const pointer = (x: number, y: number, opts: { shift?: boolean; buttons?: number } = {}): PointerInput => ({
+const pointer = (
+  x: number,
+  y: number,
+  opts: { shift?: boolean; alt?: boolean; buttons?: number } = {}
+): PointerInput => ({
   buttons: opts.buttons ?? 1,
   documentPoint: { x, y },
-  modifiers: { alt: false, ctrl: false, meta: false, shift: opts.shift ?? false },
+  modifiers: { alt: opts.alt ?? false, ctrl: false, meta: false, shift: opts.shift ?? false },
   pointerType: 'mouse',
   pressure: 0.5,
   screenPoint: { x, y },
@@ -95,6 +99,14 @@ interface HarnessOptions {
   canLift?: boolean;
   /** A float that is already in flight before the gesture starts. */
   existingFloat?: boolean;
+  /**
+   * Grid-snapping state. Defaults to OFF so the drag/commit-contract tests below
+   * assert raw pointer deltas; the snapping tests opt in explicitly. (The product
+   * default is on — see `createEngineStores`.)
+   */
+  snapToGrid?: boolean;
+  /** The grid snapping uses when enabled; defaults to the engine's own default. */
+  bboxGrid?: number;
 }
 
 const IDENTITY: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
@@ -113,6 +125,11 @@ const createHarness = (doc: CanvasDocumentContractV2, options: HarnessOptions = 
     current: options.existingFloat ? fakeFloat(doc.selectedLayerId ?? 'a') : null,
   };
   const commitFloat = vi.fn();
+  const stores = createEngineStores();
+  stores.snapToGrid.set(options.snapToGrid ?? false);
+  if (options.bboxGrid !== undefined) {
+    stores.bboxGrid.set(options.bboxGrid);
+  }
   const ctx: ToolContext = {
     backend: null as never,
     commitFloatingSelection: commitFloat,
@@ -145,7 +162,7 @@ const createHarness = (doc: CanvasDocumentContractV2, options: HarnessOptions = 
     },
     setLayerTransformOverride: (layerId, override) => overrides.push({ layerId, override }),
     setOverlayCursor: vi.fn(),
-    stores: createEngineStores(),
+    stores,
     updateCursor: vi.fn(),
     viewport: null as never,
   };
@@ -352,6 +369,107 @@ describe('move tool: drag', () => {
     expect(h.commits).toHaveLength(0);
     expect(h.dispatched).toHaveLength(0);
     expect(h.overrides.at(-1)).toEqual({ layerId: 'a', override: null });
+  });
+});
+
+describe('move tool: grid snapping', () => {
+  const snapDoc = () => makeDoc([imageLayer('a', { x: 0, y: 0, width: 50, height: 50 })], 'a');
+
+  it('snaps the committed position to the grid, and previews the same value', () => {
+    const h = createHarness(snapDoc(), { bboxGrid: 8, snapToGrid: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(31, 25)); // raw delta (21, 15) → snapped (24, 16)
+    up(tool, h.ctx, pointer(31, 25));
+
+    // The preview shows exactly what the commit lands on — no jump on release.
+    expect(h.overrides).toEqual([
+      { layerId: 'a', override: { x: 24, y: 16 } },
+      { layerId: 'a', override: null },
+    ]);
+    expect(h.commits[0]!.forward).toEqual({
+      id: 'a',
+      patch: { transform: { x: 24, y: 16 } },
+      type: 'updateCanvasLayer',
+    });
+  });
+
+  it('seats an off-grid layer onto the grid rather than carrying its offset', () => {
+    const doc = makeDoc([imageLayer('a', { x: 3, y: 5, width: 50, height: 50 })], 'a');
+    const h = createHarness(doc, { bboxGrid: 8, snapToGrid: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 30)); // 3+20=23 → 24, 5+20=25 → 24
+    up(tool, h.ctx, pointer(30, 30));
+
+    expect(h.commits[0]!.forward).toMatchObject({ patch: { transform: { x: 24, y: 24 } } });
+  });
+
+  it('leaves the position raw when the setting is off', () => {
+    const h = createHarness(snapDoc(), { snapToGrid: false });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(31, 25));
+    up(tool, h.ctx, pointer(31, 25));
+
+    expect(h.commits[0]!.forward).toMatchObject({ patch: { transform: { x: 21, y: 15 } } });
+  });
+
+  it('bypasses the snap while alt is held', () => {
+    const h = createHarness(snapDoc(), { bboxGrid: 8, snapToGrid: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(31, 25, { alt: true }));
+    up(tool, h.ctx, pointer(31, 25, { alt: true }));
+
+    expect(h.commits[0]!.forward).toMatchObject({ patch: { transform: { x: 21, y: 15 } } });
+  });
+
+  it('keeps a shift-locked axis exactly on its origin instead of snapping it', () => {
+    // y starts off-grid at 5 and shift zeroes its delta — snapping it to 8 would
+    // move the layer along an axis the user locked.
+    const doc = makeDoc([imageLayer('a', { x: 0, y: 5, width: 50, height: 50 })], 'a');
+    const h = createHarness(doc, { bboxGrid: 8, snapToGrid: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(41, 15, { shift: true }));
+    up(tool, h.ctx, pointer(41, 15, { shift: true }));
+
+    expect(h.commits[0]!.forward).toMatchObject({ patch: { transform: { x: 32, y: 5 } } });
+  });
+
+  it('commits nothing when the snap lands the layer back on its origin', () => {
+    const h = createHarness(snapDoc(), { bboxGrid: 64, snapToGrid: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 30)); // past the threshold, but (20,20) snaps back to (0,0)
+    up(tool, h.ctx, pointer(30, 30));
+
+    expect(h.commits).toHaveLength(0);
+    expect(h.overrides.at(-1)).toEqual({ layerId: 'a', override: null });
+  });
+
+  it('does not snap a floating selection (its transform is layer-local)', () => {
+    const h = createHarness(snapDoc(), {
+      bboxGrid: 8,
+      canLift: true,
+      selectionContainsPoint: true,
+      snapToGrid: true,
+    });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(31, 25));
+    up(tool, h.ctx, pointer(31, 25));
+
+    expect(h.transforms.at(-1)).toMatchObject({ x: 21, y: 15 });
+    expect(h.commits).toHaveLength(0);
   });
 });
 
