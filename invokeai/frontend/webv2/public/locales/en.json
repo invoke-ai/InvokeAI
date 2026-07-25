@@ -1220,8 +1220,18 @@
         "undo": "Undo canvas edit"
       },
       "contextMenu": {
+        "createError": "Couldn't create from BBox",
+        "createFromBbox": "Create From BBox",
+        "createdFromBbox": "Added {{destination}} from BBox",
         "empty": "This region has no visible raster content.",
+        "newControlLayer": "New Control Layer",
+        "newGlobalReferenceImage": "New Global Reference Image",
+        "newRasterLayer": "New Raster Layer",
+        "newRegionalReferenceImage": "New Regional Reference Image",
         "notReady": "The canvas is still preparing image data.",
+        "referenceImageAdded": "Added reference image",
+        "referenceImageFull": "The selected model can't accept more reference images.",
+        "referenceImageUnsupported": "The selected model doesn't support reference images.",
         "saveBboxToGallery": "Save BBox to Gallery",
         "saveCanvasToGallery": "Save Canvas to Gallery",
         "saveError": "Couldn't save to gallery",

@@ -32,6 +32,7 @@ import {
   resolveCanvasContextMenuBranch,
   type CanvasContextMenuTarget,
 } from './canvasContextMenu';
+import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
@@ -54,6 +55,7 @@ import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolStrip } from './ToolStrip';
 import { useCanvasEngine } from './useCanvasEngine';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
+import { useCreateFromBbox } from './useCreateFromBbox';
 
 /** Command id → document-space nudge delta (shift variants are ×10). */
 const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
@@ -94,6 +96,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const { document, stagingArea } = canvas;
   const operation = useCanvasOperation(engine);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
+  const { createFromBbox, isCreating } = useCreateFromBbox(engine);
 
   // Right-click on the canvas surface: hit-test the layer under the cursor and
   // open either the shared per-layer menu or the global empty-space menu at the
@@ -500,10 +503,24 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     [contextMenuTarget]
   );
   const contextMenuBranch = resolveCanvasContextMenuBranch(contextMenuTarget, engine !== null);
-  const isSaveToGalleryDisabled = !engine || isSaving || isInteractionLocked;
+  // The two composite operations share one busy flag so they can't overlap.
+  const isCompositeMenuDisabled = !engine || isSaving || isCreating || isInteractionLocked;
   const saveToGallerySubmenu = useMemo(
-    () => <CanvasSaveToGallerySubmenu disabled={isSaveToGalleryDisabled} onSave={saveToGallery} />,
-    [isSaveToGalleryDisabled, saveToGallery]
+    () => <CanvasSaveToGallerySubmenu disabled={isCompositeMenuDisabled} onSave={saveToGallery} />,
+    [isCompositeMenuDisabled, saveToGallery]
+  );
+  const createFromBboxSubmenu = useMemo(
+    () => <CanvasCreateFromBboxSubmenu disabled={isCompositeMenuDisabled} onCreate={createFromBbox} />,
+    [createFromBbox, isCompositeMenuDisabled]
+  );
+  const compositeSubmenus = useMemo(
+    () => (
+      <>
+        {saveToGallerySubmenu}
+        {createFromBboxSubmenu}
+      </>
+    ),
+    [createFromBboxSubmenu, saveToGallerySubmenu]
   );
   const canvasSurface = useMemo(() => (engine ? <CanvasSurface engine={engine} /> : null), [engine]);
 
@@ -518,7 +535,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
           <>
             <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
             <CanvasLayerContextMenu
-              beforeDangerItems={saveToGallerySubmenu}
+              beforeDangerItems={compositeSubmenus}
               dispatch={canvasDispatch}
               engine={engine}
               layers={document.layers}
@@ -530,7 +547,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
         ) : null}
         {contextMenuBranch === 'global' && contextMenuTarget ? (
           <CanvasGlobalContextMenu target={contextMenuTarget} onClose={closeContextMenu}>
-            {saveToGallerySubmenu}
+            {compositeSubmenus}
           </CanvasGlobalContextMenu>
         ) : null}
 

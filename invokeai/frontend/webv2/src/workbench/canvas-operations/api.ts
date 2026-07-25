@@ -16,6 +16,13 @@ export {
   type ImportGalleryImagesResult,
 } from './importGalleryImages';
 export { getCanvasImportNotice } from './canvasImportNotice';
+export {
+  createFromBbox,
+  type CreateFromBboxDestination,
+  type CreateFromBboxLayerDestination,
+  type CreateFromBboxResult,
+} from './createFromBbox';
+export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
 export type {
   FilterOperationSessionState,
   SamInput,

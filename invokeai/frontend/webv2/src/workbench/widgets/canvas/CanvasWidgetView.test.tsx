@@ -36,7 +36,11 @@ vi.mock('./useCanvasEngine', () => ({ useCanvasEngine: () => harness.engine }));
 vi.mock('./useCanvasGallerySave', () => ({
   useCanvasGallerySave: () => ({ isSaving: false, save: () => undefined }),
 }));
+vi.mock('./useCreateFromBbox', () => ({
+  useCreateFromBbox: () => ({ createFromBbox: () => undefined, isCreating: false }),
+}));
 vi.mock('./CanvasBottomControls', () => ({ CanvasBottomControls: () => null }));
+vi.mock('./CanvasCreateFromBboxSubmenu', () => ({ CanvasCreateFromBboxSubmenu: () => null }));
 vi.mock('./CanvasGlobalContextMenu', () => ({ CanvasGlobalContextMenu: () => null }));
 vi.mock('./CanvasImageDropOverlay', () => ({ CanvasImageDropOverlay: () => null }));
 vi.mock('./CanvasSaveToGallerySubmenu', () => ({ CanvasSaveToGallerySubmenu: () => null }));

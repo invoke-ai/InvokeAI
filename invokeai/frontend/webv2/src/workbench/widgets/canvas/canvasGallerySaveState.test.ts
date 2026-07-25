@@ -33,4 +33,15 @@ describe('getCanvasGallerySaveErrorAction', () => {
       projectId: 'project-1',
     });
   });
+
+  it('records under the caller-provided area', () => {
+    expect(
+      getCanvasGallerySaveErrorAction(
+        new Error('backend exploded'),
+        'project-1',
+        "Couldn't create from BBox",
+        'canvas-create-from-bbox'
+      )
+    ).toMatchObject({ area: 'canvas-create-from-bbox', message: "Couldn't create from BBox" });
+  });
 });
