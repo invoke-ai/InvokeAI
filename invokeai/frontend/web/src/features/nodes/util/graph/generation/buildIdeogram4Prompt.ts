@@ -38,14 +38,14 @@ export const rectToIdeogram4Bbox = (regionRect: Rect, genBbox: Rect): Ideogram4B
   return [yMin, xMin, yMax, xMax];
 };
 
-export type Ideogram4RegionInput = {
+type Ideogram4RegionInput = {
   /** The region's positive prompt — becomes the element's `desc`. */
   prompt: string;
   /** The region's normalized bbox, or null when the region has no drawn content. */
   bbox: Ideogram4Bbox | null;
 };
 
-export type Ideogram4PromptInputs = {
+type Ideogram4PromptInputs = {
   /** The global positive prompt (batch-injectable; becomes `high_level_description` / raw text). */
   globalPrompt: string;
   /** Enabled Regional Guidance layers with a non-empty prompt (description + normalized bbox). */
