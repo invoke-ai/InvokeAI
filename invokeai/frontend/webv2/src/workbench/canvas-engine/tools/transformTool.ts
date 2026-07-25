@@ -34,6 +34,7 @@ import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerTransform, TransformRect, TransformTarget } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
+import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 import {
   applyMove,
   applyRotate,
@@ -44,7 +45,7 @@ import {
 
 import type { Tool, ToolContext } from './tool';
 
-import { hittableLayerRect } from './moveHitTest';
+import { hittableLayerRect, layerMatrix } from './moveHitTest';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
@@ -54,24 +55,52 @@ export const TRANSFORM_DRAG_THRESHOLD_PX = 3;
 
 interface GestureState {
   target: TransformTarget;
-  /** The session transform captured at gesture start (revert target for cancel). */
+  /** Whether this drag moves the layer session or a floating selection. */
+  kind: 'layer' | 'float';
+  /** The subject transform captured at gesture start (revert target for cancel). */
   startTransform: LayerTransform;
+  /** The press point, in the SUBJECT's space (not necessarily document space). */
   startPointerDoc: Vec2;
   startScreen: Vec2;
-  /** The session layer's local content rect (off-origin aware). */
+  /** The subject's content rect, in its own space (off-origin aware). */
   rect: TransformRect;
+  /** Converts a document-space pointer into the subject's space. */
+  fromDocument: (point: Vec2) => Vec2;
   /** The cursor held for the duration of this gesture. */
   cursor: string;
   moved: boolean;
 }
 
-/** The cursor for a hovered/grabbed target, given the layer's current transform. */
+/** The cursor for a hovered/grabbed target, given the subject's current transform. */
 const cursorForTarget = (transform: LayerTransform, target: TransformTarget): string => {
   if (target.kind === 'scale') {
     return resizeCursorForHandle(transform, target.handle);
   }
   return target.kind === 'rotate' ? 'grab' : 'move';
 };
+
+/**
+ * What a transform gesture acts on. A layer works in DOCUMENT space; a floating
+ * selection works in its layer's LOCAL space (that is where its pixels and its
+ * transform live). The gesture math is space-agnostic as long as `rect`,
+ * `transform`, and the pointer are all expressed in the same space — `toDocument`
+ * / `fromDocument` bridge that space to the viewport, so both cases run through
+ * exactly the same handle hit-testing and scale/rotate/move code.
+ */
+interface TransformSubject {
+  readonly kind: 'layer' | 'float';
+  readonly rect: TransformRect;
+  readonly transform: LayerTransform;
+  toDocument(point: Vec2): Vec2;
+  fromDocument(point: Vec2): Vec2;
+  /**
+   * Rotation the subject's own space adds on top of `transform.rotation`, so a
+   * resize cursor points the right way for a float on a rotated layer.
+   */
+  readonly spaceRotation: number;
+}
+
+const identityPoint = (point: Vec2): Vec2 => point;
 
 /** Creates a fresh transform tool with its own session/gesture state. */
 export const createTransformTool = (): Tool => {
@@ -89,30 +118,81 @@ export const createTransformTool = (): Tool => {
     layer.type !== 'regional_guidance' &&
     hittableLayerRect(layer, doc) !== null;
 
-  /** Hit-tests the active session's frame at a screen point (or `null`). */
-  const targetAt = (ctx: ToolContext, screenPoint: Vec2): TransformTarget | null => {
-    const session = ctx.stores.transformSession.get();
+  /**
+   * What the tool currently acts on: a live floating selection takes precedence
+   * over the layer session — the pixels are already detached, so the frame must
+   * wrap them, not the layer they came from.
+   */
+  const subjectOf = (ctx: ToolContext): TransformSubject | null => {
     const doc = ctx.getDocument();
-    if (!session || !doc) {
+    if (!doc) {
       return null;
     }
-    const layer = doc.layers.find((candidate) => candidate.id === session.layerId);
-    const rect = layer ? hittableLayerRect(layer, doc) : null;
-    if (!rect) {
+    const float = ctx.getFloatingSelection?.() ?? null;
+    if (float) {
+      const layer = doc.layers.find((candidate) => candidate.id === float.layerId);
+      if (!layer) {
+        return null;
+      }
+      const matrix = layerMatrix(layer.transform);
+      const inverse = invert(matrix);
+      if (!inverse) {
+        return null;
+      }
+      return {
+        fromDocument: (point) => applyToPoint(inverse, point),
+        kind: 'float',
+        rect: float.pixels.rect,
+        spaceRotation: layer.transform.rotation,
+        toDocument: (point) => applyToPoint(matrix, point),
+        transform: float.transform,
+      };
+    }
+    const session = ctx.stores.transformSession.get();
+    const layer = session ? doc.layers.find((candidate) => candidate.id === session.layerId) : undefined;
+    const rect = session && layer ? hittableLayerRect(layer, doc) : null;
+    if (!session || !rect) {
       return null;
     }
-    return transformTargetAt({
-      point: screenPoint,
+    return {
+      fromDocument: identityPoint,
+      kind: 'layer',
       rect,
-      toScreen: (p) => ctx.viewport.documentToScreen(p),
+      spaceRotation: 0,
+      toDocument: identityPoint,
       transform: session.transform,
-    });
+    };
   };
 
+  /** Publishes a live transform to whichever subject the gesture is driving. */
+  const publish = (ctx: ToolContext, kind: TransformSubject['kind'], transform: LayerTransform): void => {
+    if (kind === 'float') {
+      ctx.setFloatingTransform?.(transform);
+    } else {
+      ctx.updateTransformSession?.(transform);
+    }
+  };
+
+  /** The cursor for a target, accounting for any rotation the subject's space adds. */
+  const cursorFor = (subject: TransformSubject, transform: LayerTransform, target: TransformTarget): string =>
+    cursorForTarget({ ...transform, rotation: transform.rotation + subject.spaceRotation }, target);
+
+  /** Hit-tests the current subject's frame at a screen point (or `null`). */
+  const targetAt = (ctx: ToolContext, subject: TransformSubject, screenPoint: Vec2): TransformTarget | null =>
+    transformTargetAt({
+      point: screenPoint,
+      rect: subject.rect,
+      toScreen: (p) => ctx.viewport.documentToScreen(subject.toDocument(p)),
+      transform: subject.transform,
+    });
+
   const nextTransform = (state: GestureState, input: PointerInput): LayerTransform => {
+    // The pointer arrives in document space; the gesture math runs in the
+    // subject's space, so convert before doing anything with it.
+    const pointer = state.fromDocument(input.documentPoint);
     const delta: Vec2 = {
-      x: input.documentPoint.x - state.startPointerDoc.x,
-      y: input.documentPoint.y - state.startPointerDoc.y,
+      x: pointer.x - state.startPointerDoc.x,
+      y: pointer.y - state.startPointerDoc.y,
     };
     switch (state.target.kind) {
       case 'move':
@@ -121,7 +201,7 @@ export const createTransformTool = (): Tool => {
         return applyScale({
           alt: input.modifiers.alt,
           handle: state.target.handle,
-          pointerDoc: input.documentPoint,
+          pointerDoc: pointer,
           shift: input.modifiers.shift,
           rect: state.rect,
           start: state.startTransform,
@@ -129,7 +209,7 @@ export const createTransformTool = (): Tool => {
         });
       case 'rotate':
         return applyRotate({
-          pointerDoc: input.documentPoint,
+          pointerDoc: pointer,
           shift: input.modifiers.shift,
           rect: state.rect,
           start: state.startTransform,
@@ -161,6 +241,11 @@ export const createTransformTool = (): Tool => {
         // layer-change teardown already cancelled it — leave that alone too.
         return;
       }
+      // A live float IS the session — entering the tool frames the pixels in
+      // flight, so no layer session is opened over the top of them.
+      if (ctx.getFloatingSelection?.()) {
+        return;
+      }
       // Entering the tool on an eligible selected layer opens a session on it.
       const doc = ctx.getDocument();
       const selectedId = doc?.selectedLayerId;
@@ -182,6 +267,8 @@ export const createTransformTool = (): Tool => {
         return;
       }
       // A real tool switch mid-session cancels it (drops the preview, no dispatch).
+      // A float is NOT cancelled here — the engine banks it on a real switch, so
+      // the pixels land rather than snapping back.
       endGesture();
       ctx.cancelTransform?.();
     },
@@ -194,6 +281,16 @@ export const createTransformTool = (): Tool => {
         // guard (`pipeline.isGestureActive()`) for the same reason.
         return;
       }
+      // A float owns Apply/Cancel while it is in flight: baking it is what
+      // "apply" means, and abandoning it is what "cancel" means.
+      if (ctx.getFloatingSelection?.()) {
+        if (command === 'apply') {
+          ctx.commitFloatingSelection?.();
+        } else {
+          ctx.cancelFloatingSelection?.();
+        }
+        return;
+      }
       if (command === 'apply') {
         ctx.applyTransform?.();
       } else {
@@ -201,10 +298,14 @@ export const createTransformTool = (): Tool => {
       }
     },
     onPointerCancel: (ctx) => {
-      // Revert just this drag (keep the session); Escape's session cancel is separate.
+      // Revert just this drag (keep the session / the float); Escape's own
+      // session-level cancel is separate.
       if (gesture) {
-        const session = ctx.stores.transformSession.get();
-        if (session) {
+        if (gesture.kind === 'float') {
+          if (ctx.getFloatingSelection?.()) {
+            ctx.setFloatingTransform?.(gesture.startTransform);
+          }
+        } else if (ctx.stores.transformSession.get()) {
           ctx.updateTransformSession?.(gesture.startTransform);
         }
         endGesture();
@@ -219,34 +320,32 @@ export const createTransformTool = (): Tool => {
       if (!doc) {
         return;
       }
-      const session = ctx.stores.transformSession.get();
-
-      // 1) An open session: a press on its frame starts a scale/rotate/move gesture.
-      if (session) {
-        const layer = doc.layers.find((candidate) => candidate.id === session.layerId);
-        const rect = layer ? hittableLayerRect(layer, doc) : null;
-        const target = rect ? targetAt(ctx, input.screenPoint) : null;
-        if (rect && target) {
+      // 1) A framed subject (a float, or an open layer session): a press on its
+      //    frame starts a scale/rotate/move gesture.
+      const subject = subjectOf(ctx);
+      if (subject) {
+        const target = targetAt(ctx, subject, input.screenPoint);
+        if (target) {
           gesture = {
-            cursor: target.kind === 'rotate' ? 'grabbing' : cursorForTarget(session.transform, target),
+            cursor: target.kind === 'rotate' ? 'grabbing' : cursorFor(subject, subject.transform, target),
+            fromDocument: subject.fromDocument,
+            kind: subject.kind,
             moved: false,
-            rect,
-            startPointerDoc: input.documentPoint,
+            rect: subject.rect,
+            startPointerDoc: subject.fromDocument(input.documentPoint),
             startScreen: input.screenPoint,
-            startTransform: session.transform,
+            startTransform: subject.transform,
             target,
           };
           return;
         }
-      }
-
-      // 2) No session yet: open one on the SELECTED layer (the layers panel is the
-      //    sole authority on which layer is active — a press never re-targets it)
-      //    and start a move gesture. A press off an existing session's frame is a
-      //    no-op; the session persists.
-      if (session) {
+        // A press off the frame is a no-op; the subject persists.
         return;
       }
+
+      // 2) Nothing framed yet: open a session on the SELECTED layer (the layers
+      //    panel is the sole authority on which layer is active — a press never
+      //    re-targets it) and start a move gesture.
       const selectedId = doc.selectedLayerId;
       const selected = selectedId ? doc.layers.find((layer) => layer.id === selectedId) : undefined;
       if (!selected || !isEligible(selected, doc)) {
@@ -259,6 +358,8 @@ export const createTransformTool = (): Tool => {
       ctx.beginTransformSession?.(selected.id);
       gesture = {
         cursor: 'move',
+        fromDocument: identityPoint,
+        kind: 'layer',
         moved: false,
         rect,
         startPointerDoc: input.documentPoint,
@@ -277,27 +378,27 @@ export const createTransformTool = (): Tool => {
           }
           gesture.moved = true;
         }
-        ctx.updateTransformSession?.(nextTransform(gesture, input));
+        publish(ctx, gesture.kind, nextTransform(gesture, input));
         return;
       }
-      // Idle hover over a session frame: reflect the target under the pointer.
-      const session = ctx.stores.transformSession.get();
-      if (!session) {
+      // Idle hover over a framed subject: reflect the target under the pointer.
+      const subject = subjectOf(ctx);
+      if (!subject) {
         if (hoverCursor !== null) {
           hoverCursor = null;
           ctx.updateCursor();
         }
         return;
       }
-      const target = targetAt(ctx, input.screenPoint);
-      const cursor = target ? cursorForTarget(session.transform, target) : 'default';
+      const target = targetAt(ctx, subject, input.screenPoint);
+      const cursor = target ? cursorFor(subject, subject.transform, target) : 'default';
       if (cursor !== hoverCursor) {
         hoverCursor = cursor;
         ctx.updateCursor();
       }
     },
     onPointerUp: () => {
-      // The session's live transform already reflects the drag; keep the session.
+      // The subject's live transform already reflects the drag; keep it framed.
       endGesture();
     },
   };

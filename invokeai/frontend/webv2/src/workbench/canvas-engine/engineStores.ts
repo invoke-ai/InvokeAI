@@ -445,6 +445,12 @@ export interface EngineStores {
    * mask gains/loses content.
    */
   hasSelection: ScalarStore<boolean>;
+  /**
+   * Whether pixels are currently in flight as a floating selection. React reads
+   * it to enable the transform bar's Apply/Cancel while a float is framed (there
+   * is no `transformSession` in that case — the float is the session).
+   */
+  hasFloatingSelection: ScalarStore<boolean>;
   /** Core-only visual SAM interaction state; application session status remains outside the engine. */
   samInteraction: ScalarStore<SamInteractionState | null>;
   /**
@@ -651,6 +657,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
   documentEditingLocked: createScalarStore<boolean>(false),
+  hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),
   gradientOptions: createScalarStore<GradientToolOptions>(

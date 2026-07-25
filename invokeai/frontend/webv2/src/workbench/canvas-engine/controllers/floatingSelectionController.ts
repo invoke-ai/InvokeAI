@@ -32,6 +32,8 @@ export interface FloatingSelectionControllerOptions {
   readonly notifyPainted: (layerId: string) => void;
   readonly markDirty: (layerId: string) => void;
   readonly invalidateLayer: (layerId: string) => void;
+  /** Called whenever a float appears or disappears (the engine mirrors it to a store). */
+  readonly onChange: () => void;
 }
 
 const isIdentity = (transform: LayerTransform): boolean =>
@@ -138,6 +140,7 @@ export class FloatingSelectionController {
     // Bump the cache version so the hole composites, WITHOUT marking dirty.
     this.deps.notifyPainted(layerId);
     this.deps.invalidateLayer(layerId);
+    this.deps.onChange();
     return true;
   }
 
@@ -165,6 +168,7 @@ export class FloatingSelectionController {
     if (!layer) {
       // The layer went away under the float; the pixels have nowhere to land.
       this.float = null;
+      this.deps.onChange();
       return;
     }
     if (isIdentity(float.transform)) {
@@ -211,6 +215,7 @@ export class FloatingSelectionController {
     );
 
     this.float = null;
+    this.deps.onChange();
     this.deps.notifyPainted(float.layerId);
     this.deps.markDirty(float.layerId);
     this.deps.invalidateLayer(float.layerId);
@@ -257,6 +262,7 @@ export class FloatingSelectionController {
       return;
     }
     this.float = null;
+    this.deps.onChange();
     if (!this.layerOf(float)) {
       return;
     }

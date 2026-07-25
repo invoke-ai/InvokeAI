@@ -138,7 +138,7 @@ import {
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
-import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
+import { applyToPoint, fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import {
   type CompositeOptions,
@@ -485,6 +485,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     documentEditingLocked: stores.documentEditingLocked,
     eraserOptions: stores.eraserOptions,
     gradientOptions: stores.gradientOptions,
+    hasFloatingSelection: stores.hasFloatingSelection,
     hasSelection: stores.hasSelection,
     invertBrushSizeScroll: stores.invertBrushSizeScroll,
     lassoOptions: stores.lassoOptions,
@@ -901,6 +902,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
+      onChange: () => stores.hasFloatingSelection.set(floatingSelection.has()),
     },
     getDocument: () => mirror.getDocument(),
     selection: {
@@ -1706,6 +1708,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   } | null => {
     if (interactionController.getActiveToolId() !== 'transform') {
       return null;
+    }
+    const float = floatingSelection.get();
+    if (float) {
+      // The float frames its own pixels. Its rect and transform are LAYER-LOCAL,
+      // so the resulting geometry is projected out through the layer's matrix to
+      // reach the document space the overlay draws in.
+      const floatLayer = doc.layers.find((candidate) => candidate.id === float.layerId);
+      if (!floatLayer) {
+        return null;
+      }
+      const toDocument = layerMatrix(floatLayer.transform);
+      const geometry = transformOverlayGeometry(float.transform, float.pixels.rect);
+      return {
+        center: applyToPoint(toDocument, geometry.center),
+        corners: geometry.corners.map((point) => applyToPoint(toDocument, point)),
+        handles: geometry.handles.map((point) => applyToPoint(toDocument, point)),
+        rotationAnchor: applyToPoint(toDocument, geometry.rotationAnchor),
+      };
     }
     const session = stores.transformSession.get();
     if (!session) {
@@ -2761,8 +2781,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const beginTransformSession = (layerId: string): void => editingController.transform.begin(layerId);
   const updateTransformSession = (transform: LayerTransform): void => editingController.transform.update(transform);
-  const cancelTransform = (): void => editingController.transform.cancel();
-  const applyTransform = (): void => editingController.transform.apply();
+  // A framed float is the session — Apply banks it, Cancel abandons it. Only
+  // with no float in flight do these reach the layer transform session.
+  const cancelTransform = (): void => {
+    if (floatingSelection.has()) {
+      floatingSelection.cancel();
+      return;
+    }
+    editingController.transform.cancel();
+  };
+  const applyTransform = (): void => {
+    if (floatingSelection.has()) {
+      floatingSelection.commit();
+      return;
+    }
+    editingController.transform.apply();
+  };
 
   // ---- Text editing session -----------------------------------------------
   //

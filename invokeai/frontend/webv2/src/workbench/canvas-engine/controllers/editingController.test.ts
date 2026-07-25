@@ -73,6 +73,7 @@ const createFloatingSelectionOptions = () => ({
   layers: {} as never,
   markDirty: vi.fn(),
   notifyPainted: vi.fn(),
+  onChange: vi.fn(),
 });
 
 const createSelectionImageOptions = () => ({

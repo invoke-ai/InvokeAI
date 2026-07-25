@@ -81,6 +81,7 @@ export interface CanvasInteractionState {
   documentEditingLocked: boolean;
   eraserOptions: EraserOptions;
   gradientOptions: GradientToolOptions;
+  hasFloatingSelection: boolean;
   hasSelection: boolean;
   invertBrushSizeScroll: boolean;
   lassoOptions: LassoToolOptions;

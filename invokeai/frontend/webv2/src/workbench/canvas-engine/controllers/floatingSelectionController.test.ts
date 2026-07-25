@@ -67,6 +67,7 @@ const createHarness = (options: { layer?: CanvasLayerContract; maskRect?: Rect; 
     invalidateLayer: vi.fn(),
     markDirty: vi.fn(),
     notifyPainted: vi.fn(),
+    onChange: vi.fn(),
   };
 
   const controller = new FloatingSelectionController({
@@ -80,6 +81,7 @@ const createHarness = (options: { layer?: CanvasLayerContract; maskRect?: Rect; 
     layers,
     markDirty: calls.markDirty,
     notifyPainted: calls.notifyPainted,
+    onChange: calls.onChange,
     selection,
   });
 

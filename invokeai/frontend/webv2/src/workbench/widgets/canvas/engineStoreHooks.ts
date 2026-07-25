@@ -169,6 +169,10 @@ export const useTransformSession = (engine: CanvasCoreStoreCapability): Transfor
 export const useCanvasHasSelection = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'hasSelection');
 
+/** Whether pixels are in flight as a floating selection (enables the transform bar while framed). */
+export const useCanvasHasFloatingSelection = (engine: CanvasCoreStoreCapability): boolean =>
+  useCanvasInteractionState(engine, 'hasFloatingSelection');
+
 /** The lasso tool's current options (the committed boolean op mode). Write through `engine.interaction.set`. */
 export const useLassoOptions = (engine: CanvasCoreStoreCapability): LassoToolOptions =>
   useCanvasInteractionState(engine, 'lassoOptions');
