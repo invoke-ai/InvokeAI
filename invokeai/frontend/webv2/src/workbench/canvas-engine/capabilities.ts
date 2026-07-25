@@ -38,9 +38,21 @@ export interface LayerExportGuard {
   readonly documentGeneration: number;
 }
 
+/**
+ * Why a guarded layer mutation declined to touch the document. Every commit
+ * that captures a permit, does async work, then re-checks before publishing
+ * reports refusal with exactly these reasons — one shared vocabulary so callers
+ * can handle them uniformly and new commits can't invent near-miss variants.
+ *
+ * `busy` — another edit owns the document, or a gesture started mid-flight.
+ * `stale` — the guarded pixels no longer match the live layer.
+ * `aborted` — the caller's signal fired.
+ */
+export type GuardedMutationRefusal = 'aborted' | 'busy' | 'locked' | 'missing' | 'stale' | 'unsupported';
+
 export type CommitRasterFilterResult =
   | { status: 'committed'; layerId: string }
-  | { status: 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' | 'aborted' }
+  | { status: GuardedMutationRefusal }
   | { status: 'failed'; message: string };
 export interface RasterFilterSettings {
   type: string;
@@ -65,9 +77,7 @@ export interface CommitMaskImageResultOptions {
   target: MaskImageResultTarget;
   signal?: AbortSignal;
 }
-export type CommitMaskImageResult =
-  | { status: 'committed'; layerId: string }
-  | { status: 'aborted' | 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' };
+export type CommitMaskImageResult = { status: 'committed'; layerId: string } | { status: GuardedMutationRefusal };
 
 export interface CanvasInteractionState {
   activeTool: ToolId;
@@ -216,7 +226,7 @@ export type { NewRasterLayerResult };
 
 export type ReplaceSelectionFromImageResult =
   | { status: 'selected' }
-  | { status: 'aborted' | 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' }
+  | { status: GuardedMutationRefusal }
   | { status: 'failed'; message: string };
 
 export interface CanvasLayerCapability {
@@ -251,7 +261,7 @@ export interface CommitGeneratedImageOptions {
 
 export type CommitGeneratedImageResult =
   | { status: 'committed'; layerId: string }
-  | { status: 'missing' | 'locked' | 'stale' | 'unsupported' | 'busy' | 'aborted' }
+  | { status: GuardedMutationRefusal }
   | { status: 'failed'; message: string };
 
 export type CanvasLifecycleState = 'active' | 'cooling' | 'cool' | 'disposed';
@@ -266,12 +276,23 @@ export interface CanvasLifecycleCapability {
 
 export type CanvasEditCapability = CanvasEditGate;
 
+/**
+ * The input to {@link CanvasEnginePreviewCapability.setGuardedFilterPreview}: a
+ * persisted filter result (decoded via the engine's `imageResolver`) and the
+ * document-space rect it occupies, tagged with the filter that produced it.
+ */
 export interface FilterPreviewInput {
   imageName: string;
   rect: Rect;
   filterType?: string;
 }
 
+/**
+ * Result of {@link CanvasEngineLayerCapability.mergeVisibleRasterLayers}: `'merged'` when a new
+ * composite layer was inserted, `'not-ready'` when a contributor could not be
+ * rasterized consistently, `'busy'` when another edit owns the document, and
+ * `'nothing'` when fewer than two visible rasters have content.
+ */
 export type MergeVisibleResult = 'merged' | 'not-ready' | 'busy' | 'nothing';
 export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty';
 export type ExtractMaskedAreaResult =

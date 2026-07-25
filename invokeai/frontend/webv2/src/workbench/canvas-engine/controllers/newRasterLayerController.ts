@@ -12,15 +12,15 @@ import { layerMatrix } from '@workbench/canvas-engine/tools/moveHitTest';
 
 export type NewRasterLayerResult = { status: 'created'; layerId: string } | { status: 'busy' | 'empty' | 'missing' };
 
-export interface NewRasterLayerControllerOptions {
+export interface NewRasterLayerControllerOptions<Permit> {
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
   readonly selection: SelectionState;
   readonly history: History;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly getReducerDocument: () => CanvasDocumentContractV2 | null;
-  readonly capturePermit: () => object | null;
-  readonly isPermitCurrent: (permit: object) => boolean;
+  readonly capturePermit: () => Permit | null;
+  readonly isPermitCurrent: (permit: Permit) => boolean;
   readonly isGestureActive: () => boolean;
   readonly endBurst: () => void;
   readonly createLayerId: () => string;
@@ -47,10 +47,10 @@ export interface NewRasterLayerControllerOptions {
  * The new layer is inserted directly above the active one, which is where the
  * user is looking, and becomes the selection.
  */
-export class NewRasterLayerController {
+export class NewRasterLayerController<Permit> {
   private disposed = false;
 
-  constructor(private readonly deps: NewRasterLayerControllerOptions) {}
+  constructor(private readonly deps: NewRasterLayerControllerOptions<Permit>) {}
 
   /**
    * Inserts `pixels` as a new paint layer covering `rect` (document space).

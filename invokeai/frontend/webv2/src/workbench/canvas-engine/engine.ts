@@ -27,23 +27,29 @@
 
 import type {
   CanvasHistoryCapability,
+  CanvasDiagnosticsCapability,
   CanvasEngine,
+  CanvasEngineExportCapability,
+  CanvasEngineLayerCapability,
+  CanvasEnginePreviewCapability,
+  CanvasEngineToolCapability,
   CanvasInteractionState,
   CanvasInteractionStateCapability,
   CanvasDocumentCapability,
   CanvasDocumentSnapshot,
-  CanvasExportCapability,
   CanvasLifecycleCapability,
-  CanvasLayerCapability,
-  CanvasPreviewCapability,
   CanvasSelectionCapability,
   CanvasSurfaceCapability,
-  CanvasToolCapability,
   CanvasViewportCapability,
   BooleanRasterOperation,
+  BooleanRasterResult,
+  CropLayerResult,
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
+  ExtractMaskedAreaResult,
+  FilterPreviewInput,
   LayerExportGuard,
+  MergeVisibleResult,
   NewRasterLayerResult,
   PsdExportResult,
   StagedPreviewInput,
@@ -55,17 +61,27 @@ import type {
   CaptureRasterSnapshotResult,
 } from '@workbench/canvas-engine/rasterTransactions';
 export type {
+  BooleanRasterResult,
+  CanvasDiagnosticsCapability,
   CanvasEngine,
+  CanvasEngineExportCapability,
+  CanvasEngineLayerCapability,
+  CanvasEnginePreviewCapability,
+  CanvasEngineToolCapability,
   CommitGeneratedImageOptions,
   CommitGeneratedImageResult,
   CommitStagedImageOptions,
   CommitStagedImageResult,
+  CropLayerResult,
   ExportBakedLayerBlobResult,
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
+  ExtractMaskedAreaResult,
+  FilterPreviewInput,
   GeneratedImageTarget,
   LayerExportGuard,
   LayerThumbnailRequestResult,
+  MergeVisibleResult,
   PsdExportResult,
   ReplaceSelectionFromImageResult,
 } from '@workbench/canvas-engine/capabilities';
@@ -97,21 +113,13 @@ import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 import { ControlPixelController } from '@workbench/canvas-engine/controllers/controlPixelController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
-import {
-  FilterResultController,
-  type CommitRasterFilterOptions,
-  type CommitRasterFilterResult,
-} from '@workbench/canvas-engine/controllers/filterResultController';
+import { FilterResultController } from '@workbench/canvas-engine/controllers/filterResultController';
 import { GeneratedResultController } from '@workbench/canvas-engine/controllers/generatedResultController';
 import { HistoryController } from '@workbench/canvas-engine/controllers/historyController';
 import { InteractionController } from '@workbench/canvas-engine/controllers/interactionController';
 import { LayerController } from '@workbench/canvas-engine/controllers/layerController';
 import { LayerMutationController } from '@workbench/canvas-engine/controllers/layerMutationController';
-import {
-  MaskResultController,
-  type CommitMaskImageResult,
-  type CommitMaskImageResultOptions,
-} from '@workbench/canvas-engine/controllers/maskResultController';
+import { MaskResultController } from '@workbench/canvas-engine/controllers/maskResultController';
 import {
   createCanvasMutationContext,
   type DocumentEditPermit,
@@ -123,7 +131,7 @@ import { RasterExportController } from '@workbench/canvas-engine/controllers/ras
 import { RenderController } from '@workbench/canvas-engine/controllers/renderController';
 import { StagedResultController } from '@workbench/canvas-engine/controllers/stagedResultController';
 import { StructuralLayerController } from '@workbench/canvas-engine/controllers/structuralLayerController';
-import { createCanvasDiagnostics, type CanvasDiagnosticsSnapshot } from '@workbench/canvas-engine/diagnostics';
+import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import {
   createEngineStores,
   type EngineStores,
@@ -191,38 +199,6 @@ import { createDocumentMirror, type DocumentMirror } from './document/documentMi
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
 import { createImagePatchEntry, type ImagePatchApply } from './history/imagePatch';
 import { createViewTool } from './tools/viewTool';
-
-/**
- * The input to {@link CanvasEnginePreviewCapability.setStagedPreview}: either a persisted image
- * (decoded via the engine's `imageResolver`, sized to the decoded pixels — the
- * final staged candidate, optionally with candidate-specific placement) or an
- * inline data-URL with explicit document-space dimensions (a live
- * denoise-progress frame, scaled to fill those dims at the current bbox).
- */
-export interface FilterPreviewInput {
-  imageName: string;
-  rect: Rect;
-  filterType?: string;
-}
-
-/**
- * Result of {@link CanvasEngineLayerCapability.mergeVisibleRasterLayers}: `'merged'` when a new
- * composite layer was inserted, `'not-ready'` when a contributor could not be
- * rasterized consistently, `'busy'` when another edit owns the document, and
- * `'nothing'` when fewer than two visible rasters have content.
- */
-export type MergeVisibleResult = 'merged' | 'not-ready' | 'busy' | 'nothing';
-
-export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty';
-
-export type ExtractMaskedAreaResult =
-  | { status: 'extracted'; layerId: string }
-  | { status: 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty' };
-
-export type CropLayerResult =
-  | { status: 'cropped' }
-  | { status: 'missing' | 'locked' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' | 'busy' }
-  | { status: 'failed'; message: string };
 
 /**
  * Result of {@link CanvasEngineExportCapability.exportRasterLayersToPsd}: `'exported'` on
@@ -329,39 +305,19 @@ export interface CanvasEngineOptions {
   enableDiagnostics?: boolean;
 }
 
-export interface CanvasEngineToolCapability extends CanvasToolCapability {
-  canTargetLayerFromContextMenu(): boolean;
-  handleEscapePriority(options: { gestureWasActive: boolean }): void;
-  onStrokeCommitted(listener: (event: StrokeCommittedEvent) => void): () => void;
-  setInteractionLocked(locked: boolean): void;
-}
+export interface CanvasEngineSelectionCapability extends CanvasSelectionCapability {}
 
-export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
-  applyTransform(): void;
-  booleanMergeRasterLayers(upperLayerId: string, operation: BooleanRasterOperation): Promise<BooleanRasterResult>;
-  cancelTextEdit(): void;
-  cancelTransform(): void;
-  clearMask(layerId: string): boolean;
-  commitLayerConversion(label: string, expectedLiveLayer: CanvasLayerContract, after: CanvasLayerContract): boolean;
-  commitLayerCopy(label: string, sourceLayerId: string, layer: CanvasLayerContract, index: number): boolean;
-  commitMaskImageResult(options: CommitMaskImageResultOptions): Promise<CommitMaskImageResult>;
-  commitOpenTextSession(): boolean;
-  commitRasterFilterResult(options: CommitRasterFilterOptions): Promise<CommitRasterFilterResult>;
-  commitTextEdit(content: string, styleChanges?: Partial<TextToolOptions>): void;
-  copyLayerToRaster(layerId: string): Promise<string | null>;
-  cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
-  mergeLayerDown(upperLayerId: string): boolean;
-  mergeVisibleRasterLayers(): Promise<MergeVisibleResult>;
-  nudgeSelectedLayer(dx: number, dy: number): void;
-  openTextCreate(docPoint: Vec2): void;
-  openTextEdit(layerId: string): void;
-  rasterizeLayer(layerId: string): boolean;
-  setTextEditContentReader(reader: (() => string) | null): void;
-  updateTextEditStyle(patch: Partial<TextToolOptions>): void;
-  updateTransformSession(transform: LayerTransform): void;
-}
-
-export interface CanvasEngineExportCapability extends CanvasExportCapability {
+/**
+ * The export surface the engine actually builds. It widens the public
+ * {@link CanvasEngineExportCapability} with members that stay inside the Canvas
+ * module — raster snapshots, layer-pixel exports, and the composite executor
+ * deps are consumed by `canvas-operations`, never by `api.ts` callers.
+ *
+ * Declared as an `extends` rather than a parallel copy so the two can never
+ * silently diverge: anything added to the public capability must be implemented
+ * here, and anything added here is visibly internal.
+ */
+export interface CanvasEngineInternalExportCapability extends CanvasEngineExportCapability {
   captureRasterSnapshot(
     documentSnapshot: CanvasDocumentSnapshot,
     layerIds: readonly string[],
@@ -372,31 +328,12 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
     options?: ExportBakedLayerPixelsOptions
   ): Promise<ExportBakedLayerPixelsResult>;
   exportLayerPixels(layerId: string, options?: ExportLayerPixelsOptions): Promise<ExportLayerPixelsResult>;
-  exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
-  extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
   getCompositeExecutorDeps(): CanvasCompositeExecutorDeps;
-}
-
-export interface CanvasEngineSelectionCapability extends CanvasSelectionCapability {}
-
-export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
-  setGuardedFilterPreview(
-    layerId: string,
-    input: FilterPreviewInput,
-    guard: LayerExportGuard
-  ): Promise<'shown' | 'missing' | 'stale'>;
-  setStagedPreview(input: StagedPreviewInput | null): void;
-}
-
-export interface CanvasDiagnosticsCapability {
-  clearCaches(): Promise<void>;
-  getDiagnostics(): Readonly<CanvasDiagnosticsSnapshot>;
-  logDebugInfo(): void;
 }
 
 /** Private engine composition shape used only inside the Canvas implementation and its tests. */
 export interface CanvasEngineImplementation extends CanvasEngine {
-  readonly exports: CanvasEngineExportCapability;
+  readonly exports: CanvasEngineInternalExportCapability;
   readonly stores: EngineStores;
 }
 
@@ -942,7 +879,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getDocument: () => mirror.getDocument(),
       isGestureActive: () => pipeline.isGestureActive(),
       isGuardCurrent: (guard) => isLayerExportGuardCurrent(guard),
-      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
+      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit),
     },
     text: {
       canEdit: () => canEditDocument(),
@@ -2741,7 +2678,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getDocument: () => mirror.getDocument(),
     history,
     isGestureActive: () => pipeline.isGestureActive(),
-    isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
+    isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit),
     now: () => new Date().toISOString(),
   });
   const commitStagedImage = stagedResultController.commit.bind(stagedResultController);
@@ -3108,7 +3045,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       isCacheReady: isLayerCacheReadyForOp,
       isGestureActive: () => pipeline.isGestureActive(),
       isGuardCurrent: isLayerExportGuardCurrent,
-      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
+      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit),
       preparePixels: prepareGeneratedPaintCache,
     },
     crop: {
@@ -3125,7 +3062,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       installPrepared: (prepared) => installGeneratedPaintCache(prepared),
       isGestureActive: () => pipeline.isGestureActive(),
       isGuardCurrent: isLayerExportGuardCurrent,
-      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
+      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit),
       isSupportedSource: isSupportedExportSource,
       preparePixels: prepareGeneratedPaintCache,
     },
@@ -3141,7 +3078,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       installPrepared: (prepared) => installGeneratedPaintCache(prepared),
       isGestureActive: () => pipeline.isGestureActive(),
       isGuardCurrent: isLayerExportGuardCurrent,
-      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
+      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit),
       preparePixels: prepareGeneratedPaintCache,
     },
     extractMaskedArea: {
@@ -3163,7 +3100,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       isCacheReady: isLayerCacheReadyForOp,
       isGestureActive: () => pipeline.isGestureActive(),
       isGuardCurrent: isLayerExportGuardCurrent,
-      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
+      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit),
       layers: layerCache,
       preparePixels: prepareGeneratedPaintCache,
       rasterize: (layerId) => rasterizeLayerPixelsForStructural(layerId),
@@ -3180,7 +3117,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       history,
       installPrepared: (prepared) => installGeneratedPaintCache(prepared),
       isGestureActive: () => pipeline.isGestureActive(),
-      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
+      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit),
       layers: layerCache,
       preparePixels: prepareGeneratedPaintCache,
       selection: editingController.selection,
@@ -3435,7 +3372,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       }
     }
   };
-  const exportCapability: CanvasEngineExportCapability = {
+  const exportCapability: CanvasEngineInternalExportCapability = {
     captureLayerExportGuard: captureCurrentLayerExportGuard,
     captureRasterSnapshot,
     exportBakedLayerBlob,

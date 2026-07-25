@@ -27,13 +27,13 @@ interface PixelSnapshot {
   rect: Rect;
 }
 
-export interface CropLayerControllerOptions {
+export interface CropLayerControllerOptions<Permit> {
   readonly backend: RasterBackend;
   readonly history: History;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly getReducerDocument: () => CanvasDocumentContractV2 | null;
-  readonly capturePermit: () => object | null;
-  readonly isPermitCurrent: (permit: object) => boolean;
+  readonly capturePermit: () => Permit | null;
+  readonly isPermitCurrent: (permit: Permit) => boolean;
   readonly isGestureActive: () => boolean;
   readonly endBurst: () => void;
   readonly isSupportedSource: (source: CanvasLayerSourceContract) => boolean;
@@ -54,9 +54,9 @@ export interface CropLayerControllerOptions {
 }
 
 /** Owns guarded crop-to-bbox conversion and replayable pixel snapshots. */
-export class CropLayerController {
+export class CropLayerController<Permit> {
   private disposed = false;
-  constructor(private readonly deps: CropLayerControllerOptions) {}
+  constructor(private readonly deps: CropLayerControllerOptions<Permit>) {}
 
   async crop(layerId: string): Promise<CropLayerResult> {
     const permit = this.deps.capturePermit();
