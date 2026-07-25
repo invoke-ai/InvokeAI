@@ -456,9 +456,17 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(is_intermediate)
 
+            # Board membership is checked with (NOT) EXISTS rather than a LEFT JOIN so the
+            # planner can serve the ordered scan from idx_images_gallery_names without a
+            # temp B-tree sort. board_images.image_name is that table's primary key, so an
+            # image has at most one board row and the two forms are equivalent.
             if board_id == "none":
                 query_conditions += """--sql
-                AND board_images.board_id IS NULL
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM board_images
+                    WHERE board_images.image_name = images.image_name
+                )
                 """
                 # For uncategorized images, filter by user_id to ensure per-user isolation
                 # Admin users can see all uncategorized images from all users
@@ -469,7 +477,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     query_params.append(user_id)
             elif board_id is not None:
                 query_conditions += """--sql
-                AND board_images.board_id = ?
+                AND EXISTS (
+                    SELECT 1
+                    FROM board_images
+                    WHERE board_images.image_name = images.image_name
+                    AND board_images.board_id = ?
+                )
                 """
                 query_params.append(board_id)
             elif user_id is not None and not is_admin:
@@ -496,7 +509,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 starred_count_query = f"""--sql
                 SELECT COUNT(*)
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE images.starred = TRUE AND (1=1{query_conditions})
                 """
                 cursor.execute(starred_count_query, query_params)
@@ -507,7 +519,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 names_query = f"""--sql
                 SELECT images.image_name
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE 1=1{query_conditions}
                 ORDER BY images.starred DESC, images.created_at {order_dir.value}
                 """
@@ -515,7 +526,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 names_query = f"""--sql
                 SELECT images.image_name
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE 1=1{query_conditions}
                 ORDER BY images.created_at {order_dir.value}
                 """

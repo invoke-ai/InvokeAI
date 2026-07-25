@@ -10,7 +10,11 @@ import pytest
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory,
+    ImageRecordChanges,
+    ResourceOrigin,
+)
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.backend.util.logging import InvokeAILogger
@@ -260,3 +264,101 @@ class TestOwnershipFilteringOmittedBoard:
         result = image_store.get_image_names(board_id="none", user_id="user1", is_admin=False)
 
         assert result.image_names == ["u1-uncat.png"]
+
+
+class TestGetImageNamesBoardFilterAndOrdering:
+    """get_image_names() board filtering (via (NOT) EXISTS) and starred-first ordering.
+
+    Seeds six images with distinct, known created_at values: img-1/img-4 live on a
+    board, img-2 (uncategorized) and img-1 (boarded) are starred.
+    """
+
+    def _seed_gallery(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> str:
+        image_store, board_store, board_image_store = stores
+        names = [f"img-{i}.png" for i in range(6)]
+        for name in names:
+            _save(image_store, name)
+        with image_store._db.transaction() as cursor:
+            for i, name in enumerate(names):
+                cursor.execute(
+                    "UPDATE images SET created_at = ? WHERE image_name = ?;",
+                    (f"2026-07-{10 + i:02d} 00:00:00.000", name),
+                )
+        board = board_store.save(board_name="Board", user_id="user1")
+        board_image_store.add_image_to_board(board_id=board.board_id, image_name="img-1.png")
+        board_image_store.add_image_to_board(board_id=board.board_id, image_name="img-4.png")
+        image_store.update("img-1.png", ImageRecordChanges(starred=True))
+        image_store.update("img-2.png", ImageRecordChanges(starred=True))
+        return board.board_id
+
+    def test_none_board_excludes_boarded_images_and_orders_starred_first(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> None:
+        self._seed_gallery(stores)
+        image_store = stores[0]
+
+        result = image_store.get_image_names(board_id="none")
+
+        assert result.image_names == ["img-2.png", "img-5.png", "img-3.png", "img-0.png"]
+        assert result.starred_count == 1
+        assert result.total_count == 4
+
+    def test_explicit_board_returns_only_board_contents_ordered(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> None:
+        board_id = self._seed_gallery(stores)
+        image_store = stores[0]
+
+        result = image_store.get_image_names(board_id=board_id)
+
+        assert result.image_names == ["img-1.png", "img-4.png"]
+        assert result.starred_count == 1
+        assert result.total_count == 2
+
+    def test_no_board_filter_returns_all_images(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> None:
+        self._seed_gallery(stores)
+        image_store = stores[0]
+
+        result = image_store.get_image_names()
+
+        assert result.image_names == [
+            "img-2.png",
+            "img-1.png",
+            "img-5.png",
+            "img-4.png",
+            "img-3.png",
+            "img-0.png",
+        ]
+        assert result.starred_count == 2
+        assert result.total_count == 6
+
+    def test_none_board_ascending_order_keeps_starred_first(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> None:
+        self._seed_gallery(stores)
+        image_store = stores[0]
+
+        result = image_store.get_image_names(board_id="none", order_dir=SQLiteDirection.Ascending)
+
+        assert result.image_names == ["img-2.png", "img-0.png", "img-3.png", "img-5.png"]
+
+    def test_none_board_without_starred_first_orders_by_created_at_only(
+        self,
+        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+    ) -> None:
+        self._seed_gallery(stores)
+        image_store = stores[0]
+
+        result = image_store.get_image_names(board_id="none", starred_first=False)
+
+        assert result.image_names == ["img-5.png", "img-3.png", "img-2.png", "img-0.png"]
+        assert result.starred_count == 0
