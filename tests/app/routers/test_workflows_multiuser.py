@@ -419,6 +419,82 @@ def test_list_workflows_includes_call_saved_workflow_compatibility(client: TestC
     }
 
 
+def _create_callable_workflow(client: TestClient, token: str, name: str) -> str:
+    return create_workflow(
+        client,
+        token,
+        {
+            **WORKFLOW_BODY,
+            "name": name,
+            "nodes": [
+                {
+                    "id": "return",
+                    "type": "invocation",
+                    "position": {"x": 0, "y": 0},
+                    "data": {
+                        "id": "return",
+                        "type": "workflow_return",
+                        "version": "1.0.0",
+                        "nodePack": "invokeai",
+                        "label": "",
+                        "notes": "",
+                        "isOpen": True,
+                        "isIntermediate": False,
+                        "useCache": True,
+                        "dynamicInputTemplates": {},
+                        "inputs": {"values": {"value": []}},
+                    },
+                }
+            ],
+        },
+    )
+
+
+def test_list_workflows_callable_filter_counts_only_callable_workflows(client: TestClient, user1_token: str):
+    callable_a = _create_callable_workflow(client, user1_token, "Callable A")
+    create_workflow(client, user1_token, {**WORKFLOW_BODY, "name": "Not Callable A"})
+    callable_b = _create_callable_workflow(client, user1_token, "Callable B")
+    create_workflow(client, user1_token, {**WORKFLOW_BODY, "name": "Not Callable B"})
+    callable_c = _create_callable_workflow(client, user1_token, "Callable C")
+
+    response = client.get(
+        "/api/v1/workflows/?categories=user&callable=true&per_page=2&page=0&order_by=name&direction=ASC",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["total"] == 3
+    assert payload["pages"] == 2
+    assert payload["per_page"] == 2
+    assert [item["workflow_id"] for item in payload["items"]] == [callable_a, callable_b]
+    assert {item["workflow_id"] for item in payload["items"]}.isdisjoint({callable_c})
+    assert all(item["call_saved_workflow_compatibility"]["is_callable"] for item in payload["items"])
+
+
+def test_list_workflows_callable_filter_paginates_callable_workflows_after_filtering(
+    client: TestClient, user1_token: str
+):
+    _create_callable_workflow(client, user1_token, "Callable A")
+    create_workflow(client, user1_token, {**WORKFLOW_BODY, "name": "Not Callable A"})
+    _create_callable_workflow(client, user1_token, "Callable B")
+    create_workflow(client, user1_token, {**WORKFLOW_BODY, "name": "Not Callable B"})
+    callable_c = _create_callable_workflow(client, user1_token, "Callable C")
+
+    response = client.get(
+        "/api/v1/workflows/?categories=user&callable=true&per_page=2&page=1&order_by=name&direction=ASC",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["total"] == 3
+    assert payload["pages"] == 2
+    assert payload["per_page"] == 2
+    assert [item["workflow_id"] for item in payload["items"]] == [callable_c]
+    assert all(item["call_saved_workflow_compatibility"]["is_callable"] for item in payload["items"])
+
+
 def test_get_workflow_includes_call_saved_workflow_compatibility(client: TestClient, user1_token: str):
     workflow_id = create_workflow(client, user1_token)
 

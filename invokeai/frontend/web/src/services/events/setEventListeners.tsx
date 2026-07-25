@@ -4,6 +4,7 @@ import { socketConnected } from 'app/store/middleware/listenerMiddleware/listene
 import type { AppStore } from 'app/store/store';
 import { parseify } from 'common/util/serialize';
 import { isNil, round } from 'es-toolkit/compat';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
@@ -29,18 +30,22 @@ import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { modelSelected } from 'features/parameters/store/actions';
-import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast, toastApi } from 'features/toast/toast';
 import { t } from 'i18next';
 import { Trans } from 'react-i18next';
 import type { ApiTagDescription } from 'services/api';
-import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
+import { api, LIST_TAG } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
-import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
+import { getEventScope } from 'services/events/eventScope';
+import { buildOnForeignInvocationComplete, buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
-import { getUpdatedQueueStatusOnQueueItemStatusChanged } from 'services/events/queueStatusEvents';
+import {
+  buildOnNonOwnerQueueItemStatusChanged,
+  buildOnQueueItemStatusChanged,
+} from 'services/events/onQueueItemStatusChanged';
+import { QUEUE_CHANGED_TAGS } from 'services/events/queueCacheTags';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import { createWorkflowExecutionCoordinator } from 'services/events/workflowExecutionCoordinator';
 import type { Socket } from 'socket.io-client';
@@ -71,6 +76,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     clearCanvasWorkflowIntegrationProcessing: () => dispatch(canvasWorkflowIntegrationProcessingCompleted()),
     completedInvocationKeysByItemId,
     getAllNodeExecutionStates: () => $nodeExecutionStates.get(),
+    getCurrentUserId: () => selectCurrentUser(getState())?.user_id ?? null,
     getNodeExecutionState: (nodeId) => $nodeExecutionStates.get()[nodeId],
     logReconciliationError: (error, itemId) => {
       log.debug({ error: parseify(error) }, `Unable to reconcile workflow queue item ${itemId}`);
@@ -81,6 +87,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     setNodeExecutionState: (nodeId, state) => $nodeExecutionStates.setKey(nodeId, state),
     upsertNodeExecutionState: upsertExecutionState,
   });
+
+  const onForeignInvocationComplete = buildOnForeignInvocationComplete(dispatch);
+  const onQueueItemStatusChanged = buildOnQueueItemStatusChanged(dispatch, workflowExecutionCoordinator);
+  const onNonOwnerQueueItemStatusChanged = buildOnNonOwnerQueueItemStatusChanged(dispatch);
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -170,20 +180,43 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('workflow_access_revoked', (data) => {
     log.debug({ data }, 'Workflow access revoked');
     invalidateWorkflowLibrary();
-    const currentUser = getState().auth.user;
+    const currentUser = selectCurrentUser(getState());
     if (currentUser?.is_admin || currentUser?.user_id === data.user_id) {
       return;
     }
     clearSavedWorkflowSelection(data.workflow_id);
   });
 
+  // In multiuser mode, admins are subscribed to the "admin" socket room and receive invocation
+  // and queue item events for *every* user, carrying that user's real user_id. Another user's
+  // events must not drive this client's personal state: the workflow execution coordinator, node
+  // execution states, canvas workflow integration processing, completed-invocation bookkeeping,
+  // or $lastProgressEvent. Ownership is decided here at the listener — before the coordinator
+  // records anything — so each handler only ever sees the events it owns:
+  //
+  // - Foreign invocation_started/progress/error are dropped. (The backend already routes progress
+  //   to the owner's room only; the client-side check is defense in depth.)
+  // - A foreign invocation_complete downgrades to a cache-invalidation-only gallery refresh so an
+  //   admin viewing another user's board stays fresh without optimistic cache work or DTO fetches.
+  // - A non-owner queue_item_status_changed (sanitized companion or admin-room copy) only
+  //   invalidates queue tags.
+  //
+  // In single-user mode there is no authenticated user and every event is 'own'.
   socket.on('invocation_started', (data) => {
+    if (getEventScope(getState, data) !== 'own') {
+      log.trace({ data } as JsonObject, `Ignoring invocation_started for another user (${data.user_id})`);
+      return;
+    }
     const { invocation_source_id, invocation } = data;
     log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
     workflowExecutionCoordinator.onInvocationStarted(data);
   });
 
   socket.on('invocation_progress', (data) => {
+    if (getEventScope(getState, data) !== 'own') {
+      log.trace({ data } as JsonObject, `Ignoring invocation_progress for another user (${data.user_id})`);
+      return;
+    }
     if (!workflowExecutionCoordinator.onInvocationProgress(data)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
@@ -205,13 +238,21 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_error', (data) => {
+    if (getEventScope(getState, data) !== 'own') {
+      log.trace({ data } as JsonObject, `Ignoring invocation_error for another user (${data.user_id})`);
+      return;
+    }
     const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
     workflowExecutionCoordinator.onInvocationError(data);
   });
 
   socket.on('invocation_complete', (data) => {
-    workflowExecutionCoordinator.onInvocationComplete(data);
+    if (getEventScope(getState, data) === 'own') {
+      workflowExecutionCoordinator.onInvocationComplete(data);
+    } else {
+      onForeignInvocationComplete(data);
+    }
   });
 
   socket.on('model_load_started', (data) => {
@@ -424,169 +465,63 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
-    // Sanitized companion event sent to non-owner queue subscribers in multiuser mode. The
-    // backend sets user_id="redacted" and clears identifiers/error fields. We must not run
-    // payload-driven cache mutations or per-session side effects (node state reset, progress
-    // clear, completion bookkeeping) — those belong to the owner. Just invalidate queue tags
-    // so the non-owner's queue list and badge counts refetch with sanitized data.
-    if (data.user_id === 'redacted') {
-      log.trace({ data }, `Sanitized queue_item_status_changed for item ${data.item_id}`);
-      const tags: ApiTagDescription[] = [
-        'SessionQueueStatus',
-        'SessionQueueItemIdList',
-        { type: 'SessionQueueItem', id: data.item_id },
-        { type: 'SessionQueueItem', id: LIST_TAG },
-        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
-      ];
-      dispatch(queueApi.util.invalidateTags(tags));
-      return;
-    }
-
-    if (!workflowExecutionCoordinator.onQueueItemStatusChanged(data)) {
-      return;
-    }
-
-    // we've got new status for the queue item, batch and queue
-    const {
-      item_id,
-      status,
-      status_sequence,
-      batch_status,
-      error_type,
-      error_message,
-      destination,
-      started_at,
-      updated_at,
-      completed_at,
-      error_traceback,
-    } = data;
-
-    log.debug({ data }, `Queue item ${item_id} status updated: ${status}`);
-
-    // // Update this specific queue item in the list of queue items
-    dispatch(
-      queueApi.util.updateQueryData('getQueueItem', item_id, (draft) => {
-        draft.status = status;
-        draft.status_sequence = status_sequence;
-        draft.started_at = started_at;
-        draft.updated_at = updated_at;
-        draft.completed_at = completed_at;
-        draft.error_type = error_type;
-        draft.error_message = error_message;
-        draft.error_traceback = error_traceback;
-      })
-    );
-
-    // Optimistically update the listAllQueueItems cache for this destination so the canvas
-    // staging area immediately reflects status changes without waiting for a tag-based refetch
-    if (destination) {
-      dispatch(
-        queueApi.util.updateQueryData('listAllQueueItems', { destination }, (draft) => {
-          const item = draft.find((i) => i.item_id === item_id);
-          if (item) {
-            item.status = status;
-            item.status_sequence = status_sequence;
-            item.started_at = started_at;
-            item.updated_at = updated_at;
-            item.completed_at = completed_at;
-            item.error_type = error_type;
-            item.error_message = error_message;
-            item.error_traceback = error_traceback;
-          }
-        })
-      );
-    }
-    dispatch(
-      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) =>
-        getUpdatedQueueStatusOnQueueItemStatusChanged(draft, data)
-      )
-    );
-
-    // Invalidate caches for things we cannot easily update
-    // Invalidate SessionQueueStatus to refetch with user-specific counts
-    const tagsToInvalidate: ApiTagDescription[] = [
-      'CurrentSessionQueueItem',
-      'NextSessionQueueItem',
-      'InvocationCacheStatus',
-      'SessionQueueStatus',
-      'SessionQueueItemIdList',
-      { type: 'SessionQueueItem', id: item_id },
-      { type: 'SessionQueueItem', id: LIST_TAG },
-      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
-      { type: 'BatchStatus', id: batch_status.batch_id },
-    ];
-    if (destination) {
-      tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });
-    }
-    dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
-
-    if (status === 'completed' || status === 'failed' || status === 'canceled') {
-      if (status === 'failed' && error_type) {
-        toast({
-          id: `INVOCATION_ERROR_${error_type}`,
-          title: getTitle(error_type),
-          status: 'error',
-          duration: null,
-          updateDescription: true,
-          description: <ErrorToastDescription errorType={error_type} errorMessage={error_message} />,
-        });
-      }
-      // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
-      $lastProgressEvent.set(null);
+    if (getEventScope(getState, data) === 'own') {
+      onQueueItemStatusChanged(data);
+    } else {
+      onNonOwnerQueueItemStatusChanged(data);
     }
   });
 
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
+    // Clearing the queue deletes the in-progress item without emitting a per-item terminal status
+    // event, so the progress bar must be reset here — and the coordinator must mark the deleted
+    // tracked items terminal so a trailing invocation_progress event cannot repopulate the bar.
+    // The coordinator scopes a user-scoped clear (multiuser mode) to that user's items — on an
+    // admin client that may be a subset of the tracked items; on another user's client it is
+    // none of them — and reports whether the clear applied to any tracked item, so the progress
+    // bar is only reset when the clear could have deleted the item behind it. The queue tags
+    // below always need refreshing.
+    if (workflowExecutionCoordinator.onQueueCleared(data)) {
+      $lastProgressEvent.set(null);
+    }
     dispatch(
       queueApi.util.invalidateTags([
-        'SessionQueueStatus',
+        ...QUEUE_CHANGED_TAGS,
         'SessionProcessorStatus',
         'BatchStatus',
-        'CurrentSessionQueueItem',
-        'NextSessionQueueItem',
         'QueueCountsByDestination',
-        'SessionQueueItemIdList',
-        { type: 'SessionQueueItem', id: LIST_TAG },
-        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       ])
     );
   });
 
   socket.on('batch_enqueued', (data) => {
     log.debug({ data }, 'Batch enqueued');
-    dispatch(
-      queueApi.util.invalidateTags([
-        'SessionQueueStatus',
-        'CurrentSessionQueueItem',
-        'NextSessionQueueItem',
-        'QueueCountsByDestination',
-        'SessionQueueItemIdList',
-        { type: 'SessionQueueItem', id: LIST_TAG },
-        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
-      ])
-    );
+    dispatch(queueApi.util.invalidateTags([...QUEUE_CHANGED_TAGS, 'QueueCountsByDestination']));
   });
+
+  // Bulk queue item events (retried/canceled) are the only signal other clients get for a bulk
+  // operation, which changes many rows in one SQL statement and emits no per-item
+  // queue_item_status_changed. Owners receive their own item ids, admins receive all of them,
+  // and other users receive a sanitized companion with no ids — in every case, refetch the
+  // queue caches so lists and badge counts update.
+  const invalidateQueueTagsForBulkItemEvent = (itemIds: number[]) => {
+    const tagsToInvalidate: ApiTagDescription[] = [...QUEUE_CHANGED_TAGS, 'BatchStatus', 'QueueCountsByDestination'];
+    // Invalidate each affected item specifically
+    for (const itemId of itemIds) {
+      tagsToInvalidate.push({ type: 'SessionQueueItem', id: itemId });
+    }
+    dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
+  };
 
   socket.on('queue_items_retried', (data) => {
     log.debug({ data }, 'Queue items retried');
-    const tagsToInvalidate: ApiTagDescription[] = [
-      'SessionQueueStatus',
-      'BatchStatus',
-      'CurrentSessionQueueItem',
-      'NextSessionQueueItem',
-      'QueueCountsByDestination',
-      'SessionQueueItemIdList',
-      { type: 'SessionQueueItem', id: LIST_TAG },
-      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
-    ];
-    // Invalidate each retried item specifically
-    if (data.retried_item_ids) {
-      for (const itemId of data.retried_item_ids) {
-        tagsToInvalidate.push({ type: 'SessionQueueItem', id: itemId });
-      }
-    }
-    dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
+    invalidateQueueTagsForBulkItemEvent(data.retried_item_ids ?? []);
+  });
+
+  socket.on('queue_items_canceled', (data) => {
+    log.debug({ data }, 'Queue items canceled');
+    invalidateQueueTagsForBulkItemEvent(data.canceled_item_ids);
   });
 
   socket.on('recall_parameters_updated', (data) => {

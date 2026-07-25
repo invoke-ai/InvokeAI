@@ -53,7 +53,10 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         ):
             context.util.signal_progress("Running VAE")
             assert isinstance(vae, AutoencoderKLQwenImage)
-            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            latents = latents.to(device=vae_info.compute_device, dtype=vae.dtype)
 
             vae.disable_tiling()
 
