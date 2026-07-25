@@ -161,6 +161,7 @@ import { createColorPickerTool } from '@workbench/canvas-engine/tools/colorPicke
 import { createEraserTool } from '@workbench/canvas-engine/tools/eraserTool';
 import { createGradientTool } from '@workbench/canvas-engine/tools/gradientTool';
 import { createLassoTool } from '@workbench/canvas-engine/tools/lassoTool';
+import { createMarqueeTool } from '@workbench/canvas-engine/tools/marqueeTool';
 import { hittableLayerRect, layerOutlineCorners } from '@workbench/canvas-engine/tools/moveHitTest';
 import { createMoveTool } from '@workbench/canvas-engine/tools/moveTool';
 import { stepBrushSize } from '@workbench/canvas-engine/tools/paintConstants';
@@ -481,6 +482,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     hasSelection: stores.hasSelection,
     invertBrushSizeScroll: stores.invertBrushSizeScroll,
     lassoOptions: stores.lassoOptions,
+    marqueeOptions: stores.marqueeOptions,
     ruleOfThirds: stores.ruleOfThirds,
     shapeOptions: stores.shapeOptions,
     showBbox: stores.showBbox,
@@ -515,6 +517,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ['bbox', createBboxTool()],
     ['colorPicker', createColorPickerTool()],
     ['lasso', createLassoTool()],
+    ['marquee', createMarqueeTool()],
     ['shape', createShapeTool()],
     ['gradient', createGradientTool()],
     ['text', createTextTool()],
@@ -1811,6 +1814,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       gradientPreview: stores.gradientPreview.get(),
       lassoPreview: stores.lassoPreview.get(),
       marchingAnts: selection.hasSelection() ? { paths: selection.antsPaths(), phase: antsPhase } : null,
+      marqueePreview: stores.marqueePreview.get(),
       samInput: samSession?.input.type === 'visual' ? samSession.input : null,
       samPreview: samPreview ? { opacity: 0.45, rect: samPreview.rect, surface: samPreview.data } : null,
       bboxOverlay: stores.bboxOverlay.get(),
@@ -1892,6 +1896,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // any in-progress lasso preview), stopping the ants loop via onChange.
       cleanup.run(() => selection.clear());
       cleanup.run(() => stores.lassoPreview.set(null));
+      cleanup.run(() => stores.marqueePreview.set(null));
       const doc = mirror.getDocument();
       const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
       rasterController.clearMirroredImages();

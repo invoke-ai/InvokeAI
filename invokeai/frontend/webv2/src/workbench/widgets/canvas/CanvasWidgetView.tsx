@@ -403,6 +403,20 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       engine?.tools.setTool('eraser');
     } else if (commandId === 'canvas.tool.lasso') {
       engine?.tools.setTool('lasso');
+    } else if (commandId === 'canvas.tool.marquee') {
+      if (engine) {
+        // Pressing the shortcut while already on the marquee cycles its shape
+        // (Photoshop-style) rather than re-selecting the tool it is already on.
+        if (engine.interaction.get('activeTool') === 'marquee') {
+          const marquee = engine.interaction.get('marqueeOptions');
+          engine.interaction.set('marqueeOptions', {
+            ...marquee,
+            kind: marquee.kind === 'rect' ? 'ellipse' : 'rect',
+          });
+        } else {
+          engine.tools.setTool('marquee');
+        }
+      }
     } else if (commandId === 'canvas.tool.shape') {
       engine?.tools.setTool('shape');
     } else if (commandId === 'canvas.tool.text') {
@@ -457,6 +471,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       ['canvas.tool.brush', t('widgets.canvas.commands.selectBrushTool'), ['b']],
       ['canvas.tool.eraser', t('widgets.canvas.commands.selectEraserTool'), ['e']],
       ['canvas.tool.lasso', t('widgets.canvas.commands.selectLassoTool'), ['l']],
+      ['canvas.tool.marquee', t('widgets.canvas.commands.selectMarqueeTool'), ['u']],
       ['canvas.tool.shape', t('widgets.canvas.commands.selectShapeTool'), ['r']],
       ['canvas.tool.text', t('widgets.canvas.commands.selectTextTool'), ['t']],
       ['canvas.tool.gradient', t('widgets.canvas.commands.selectGradientTool'), ['g']],

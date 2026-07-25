@@ -54,6 +54,23 @@ export const DEFAULT_LASSO_OPTIONS: LassoToolOptions = {
   mode: 'replace',
 };
 
+/**
+ * Marquee (selection) tool options: the shape the next drag traces, and the
+ * boolean op it applies when no modifier overrides it. One tool covers both
+ * shapes — see `tools/marqueeTool.ts`.
+ */
+export interface MarqueeToolOptions {
+  kind: 'rect' | 'ellipse';
+  /** The op a committed marquee applies to the selection, when no modifier overrides it. */
+  mode: SelectionOp;
+}
+
+/** Default marquee options: a rectangle that replaces the selection. */
+export const DEFAULT_MARQUEE_OPTIONS: MarqueeToolOptions = {
+  kind: 'rect',
+  mode: 'replace',
+};
+
 /** A single gradient stop (offset in [0,1], any CSS color). */
 export interface GradientStop {
   offset: number;
@@ -390,6 +407,8 @@ export interface EngineStores {
   bboxOptions: ScalarStore<BboxToolOptions>;
   /** Lasso tool options (the committed boolean op mode). */
   lassoOptions: ScalarStore<LassoToolOptions>;
+  /** Marquee tool options (shape kind / the committed boolean op mode). */
+  marqueeOptions: ScalarStore<MarqueeToolOptions>;
   /** Shape tool options (kind / fill / stroke / stroke width). */
   shapeOptions: ScalarStore<ShapeToolOptions>;
   /** Gradient tool options (kind / angle / stops). */
@@ -432,6 +451,12 @@ export interface EngineStores {
    * it is a transient channel — no dispatch, no React subscriber.
    */
   lassoPreview: ScalarStore<readonly Vec2[] | null>;
+  /**
+   * The live marquee-tool drag outline (document-space rect + shape), or `null`
+   * when idle. Like `lassoPreview`, a transient overlay-only channel: the mask
+   * is untouched until the drag commits.
+   */
+  marqueePreview: ScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>;
   /** Model-dependent grid size (document px) the bbox snaps to. React feeds this from generate settings. */
   bboxGrid: ScalarStore<number>;
   /**
@@ -520,6 +545,9 @@ const bboxOptionsEqual = (a: BboxToolOptions, b: BboxToolOptions): boolean =>
 
 const lassoOptionsEqual = (a: LassoToolOptions, b: LassoToolOptions): boolean => a.mode === b.mode;
 
+const marqueeOptionsEqual = (a: MarqueeToolOptions, b: MarqueeToolOptions): boolean =>
+  a.kind === b.kind && a.mode === b.mode;
+
 const shapeOptionsEqual = (a: ShapeToolOptions, b: ShapeToolOptions): boolean =>
   a.kind === b.kind && a.fill === b.fill && a.stroke === b.stroke && a.strokeWidth === b.strokeWidth;
 
@@ -529,7 +557,8 @@ const stopsEqual = (a: readonly GradientStop[], b: readonly GradientStop[]): boo
 const gradientOptionsEqual = (a: GradientToolOptions, b: GradientToolOptions): boolean =>
   a.kind === b.kind && a.angle === b.angle && stopsEqual(a.stops, b.stops);
 
-const shapePreviewEqual = (
+/** Shared by the shape and marquee previews — both are a rect plus a shape kind. */
+const rectShapePreviewEqual = (
   a: { rect: Rect; kind: 'rect' | 'ellipse' } | null,
   b: { rect: Rect; kind: 'rect' | 'ellipse' } | null
 ): boolean => {
@@ -627,10 +656,12 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   gradientPreview: createScalarStore<{ start: Vec2; end: Vec2 } | null>(null, gradientPreviewEqual),
   lassoOptions: createScalarStore<LassoToolOptions>({ ...DEFAULT_LASSO_OPTIONS }, lassoOptionsEqual),
   lassoPreview: createScalarStore<readonly Vec2[] | null>(null),
+  marqueeOptions: createScalarStore<MarqueeToolOptions>({ ...DEFAULT_MARQUEE_OPTIONS }, marqueeOptionsEqual),
+  marqueePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, rectShapePreviewEqual),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
-  shapePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, shapePreviewEqual),
+  shapePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, rectShapePreviewEqual),
   showBbox: createScalarStore<boolean>(true),
   showGrid: createScalarStore<boolean>(false),
   snapToGrid: createScalarStore<boolean>(true),

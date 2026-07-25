@@ -4,7 +4,7 @@ import type { PointerInput } from '@workbench/canvas-engine/types';
 import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
-import { createLassoTool, lassoOpFor } from '@workbench/canvas-engine/tools/lassoTool';
+import { createLassoTool } from '@workbench/canvas-engine/tools/lassoTool';
 import { describe, expect, it, vi } from 'vitest';
 
 const pointer = (
@@ -38,17 +38,6 @@ const createHarness = () => {
 const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDown?.(ctx, i);
 const move = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerMove?.(ctx, i, [i]);
 const up = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerUp?.(ctx, i);
-
-describe('lassoOpFor', () => {
-  it('maps modifiers to ops, falling back to the persistent mode', () => {
-    const none = { alt: false, ctrl: false, meta: false, shift: false };
-    expect(lassoOpFor(none, 'replace')).toBe('replace');
-    expect(lassoOpFor(none, 'add')).toBe('add');
-    expect(lassoOpFor({ ...none, shift: true }, 'replace')).toBe('add');
-    expect(lassoOpFor({ ...none, alt: true }, 'replace')).toBe('subtract');
-    expect(lassoOpFor({ ...none, alt: true, shift: true }, 'replace')).toBe('intersect');
-  });
-});
 
 describe('lassoTool: drag → commit', () => {
   const drag = (tool: Tool, ctx: ToolContext, upOpts: { shift?: boolean; alt?: boolean } = {}): void => {

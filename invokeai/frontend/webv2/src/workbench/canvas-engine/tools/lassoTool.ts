@@ -16,9 +16,10 @@
  * changes aren't undoable). Zero React, zero import-time side effects.
  */
 
-import type { PointerInput, SelectionOp, Vec2 } from '@workbench/canvas-engine/types';
+import type { Vec2 } from '@workbench/canvas-engine/types';
 
 import { polygonBounds, polygonToSvgPath } from '@workbench/canvas-engine/freehand';
+import { selectionOpFor } from '@workbench/canvas-engine/selection/selectionOpMode';
 
 import type { Tool, ToolContext } from './tool';
 
@@ -30,20 +31,6 @@ export const LASSO_MIN_POINT_DISTANCE = 2;
 
 /** Fewest distinct points that make a fillable selection polygon. */
 const MIN_POLYGON_POINTS = 3;
-
-/** Resolves the boolean op for a commit: modifiers win, else the persistent mode. */
-export const lassoOpFor = (modifiers: PointerInput['modifiers'], mode: SelectionOp): SelectionOp => {
-  if (modifiers.shift && modifiers.alt) {
-    return 'intersect';
-  }
-  if (modifiers.shift) {
-    return 'add';
-  }
-  if (modifiers.alt) {
-    return 'subtract';
-  }
-  return mode;
-};
 
 const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -116,7 +103,7 @@ export const createLassoTool = (): Tool => {
       }
       const path = ctx.createPath2D(polygonToSvgPath(polygon));
       const bounds = polygonBounds(polygon);
-      const op = lassoOpFor(input.modifiers, ctx.stores.lassoOptions.get().mode);
+      const op = selectionOpFor(input.modifiers, ctx.stores.lassoOptions.get().mode);
       ctx.commitSelection({ bounds, op, path });
     },
   };

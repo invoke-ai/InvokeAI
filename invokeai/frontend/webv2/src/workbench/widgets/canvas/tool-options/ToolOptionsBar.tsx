@@ -16,6 +16,7 @@ import { CanvasOptionsBar } from './CanvasOptionsBar';
 import { EraserOptions } from './EraserOptions';
 import { GradientOptions } from './GradientOptions';
 import { LassoOptions } from './LassoOptions';
+import { MarqueeOptions } from './MarqueeOptions';
 import { MoveOptions } from './MoveOptions';
 import { ShapeOptions } from './ShapeOptions';
 import { TextOptions } from './TextOptions';
@@ -42,6 +43,7 @@ export const TOOL_OPTIONS_COMPONENTS: Partial<Record<ToolId, ComponentType<ToolO
   eraser: EraserOptions,
   gradient: GradientOptions,
   lasso: LassoOptions,
+  marquee: MarqueeOptions,
   move: MoveOptions,
   shape: ShapeOptions,
   text: TextOptions,

@@ -18,6 +18,7 @@ import type {
   GradientToolOptions,
   LassoToolOptions,
   LayerThumbnailStatus,
+  MarqueeToolOptions,
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
@@ -83,6 +84,7 @@ export interface CanvasInteractionState {
   hasSelection: boolean;
   invertBrushSizeScroll: boolean;
   lassoOptions: LassoToolOptions;
+  marqueeOptions: MarqueeToolOptions;
   ruleOfThirds: boolean;
   shapeOptions: ShapeToolOptions;
   showBbox: boolean;
@@ -375,6 +377,7 @@ export type {
   GradientToolOptions,
   LassoToolOptions,
   LayerThumbnailStatus,
+  MarqueeToolOptions,
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,

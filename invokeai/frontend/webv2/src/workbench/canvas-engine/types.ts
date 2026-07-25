@@ -61,6 +61,7 @@ export type ToolId =
   | 'shape'
   | 'gradient'
   | 'lasso'
+  | 'marquee'
   | 'move'
   | 'transform'
   | 'bbox'
