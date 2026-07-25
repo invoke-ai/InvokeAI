@@ -193,6 +193,7 @@ import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
+import { createLayerExportGuards, isDeeplyEqual, isSupportedExportSource } from './layerExportGuards';
 import { createPreviewPublisher } from './previewPublisher';
 import { createSelectObjectBridge } from './selectObjectBridge';
 import { createStrokeCommit } from './strokeCommit';
@@ -232,35 +233,6 @@ const createCleanupAccumulator = (): { run: (step: () => void) => void; throwIfF
       }
     },
   };
-};
-
-/** Structural equality for JSON-safe canvas contracts (including synthetic mask paint sources). */
-const isDeeplyEqual = (left: unknown, right: unknown): boolean => {
-  if (Object.is(left, right)) {
-    return true;
-  }
-  if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) {
-    return false;
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return (
-      Array.isArray(left) &&
-      Array.isArray(right) &&
-      left.length === right.length &&
-      left.every((value, index) => isDeeplyEqual(value, right[index]))
-    );
-  }
-  const leftRecord = left as Record<string, unknown>;
-  const rightRecord = right as Record<string, unknown>;
-  const leftKeys = Object.keys(leftRecord);
-  const rightKeys = Object.keys(rightRecord);
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every(
-      (key) =>
-        Object.prototype.hasOwnProperty.call(rightRecord, key) && isDeeplyEqual(leftRecord[key], rightRecord[key])
-    )
-  );
 };
 
 export interface CanvasEngineErrorReport {
@@ -1017,24 +989,21 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     store: layerCache,
   });
 
-  const isSupportedExportSource = (source: CanvasLayerSourceContract): boolean => {
-    if (source.type === 'shape') {
-      return source.kind !== 'polygon';
-    }
-    return true;
-  };
-
-  const isCurrentRasterizationJob = (layer: CanvasLayerContract): boolean => {
-    const job = rasterController.getRasterizationJob(layer.id);
-    const source = renderableSourceOf(layer);
-    return (
-      !!job &&
-      !!source &&
-      job.version === layerCache.version(layer.id) &&
-      job.documentGeneration === rasterController.getDocumentGeneration() &&
-      isDeeplyEqual(job.source, source)
-    );
-  };
+  const {
+    captureCurrentLayerExportGuard,
+    captureLayerExportGuard,
+    hasExportableLayerContent,
+    isCurrentRasterizationJob,
+    isLayerExportGuardCurrent,
+  } = createLayerExportGuards({
+    getDocument: () => mirror.getDocument(),
+    getDocumentGeneration: () => rasterController.getDocumentGeneration(),
+    getRasterizationJob: (layerId) => rasterController.getRasterizationJob(layerId),
+    hasCanvasState: () => mutationPort.getCanvasState() !== null,
+    isDisposed: () => disposed,
+    layerCache,
+    projectId,
+  });
 
   /**
    * Starts (or joins) an isolated rasterization. Pixels land in a scratch
@@ -1195,49 +1164,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     return promise;
   };
 
-  const captureLayerExportGuard = (layer: CanvasLayerContract, entry: LayerCacheEntry): LayerExportGuard => ({
-    cacheVersion: entry.version,
-    documentGeneration: rasterController.getDocumentGeneration(),
-    layer,
-    layerId: layer.id,
-    projectId,
-  });
-
-  const isLayerExportGuardCurrent = (guard: LayerExportGuard): boolean => {
-    if (
-      disposed ||
-      guard.projectId !== projectId ||
-      mutationPort.getCanvasState() === null ||
-      guard.documentGeneration !== rasterController.getDocumentGeneration()
-    ) {
-      return false;
-    }
-    const document = mirror.getDocument();
-    const liveLayer = document?.layers.find((candidate) => candidate.id === guard.layerId);
-    const entry = layerCache.get(guard.layerId);
-    return !!entry && liveLayer === guard.layer && entry.version === guard.cacheVersion;
-  };
-
-  const captureCurrentLayerExportGuard = (layerId: string): LayerExportGuard | null => {
-    const document = mirror.getDocument();
-    const layer = document?.layers.find((candidate) => candidate.id === layerId);
-    const source = layer ? renderableSourceOf(layer) : null;
-    const entry = layerCache.get(layerId);
-    if (
-      !layer ||
-      !source ||
-      !isSupportedExportSource(source) ||
-      !entry ||
-      entry.stale ||
-      isCurrentRasterizationJob(layer) ||
-      isEmpty(entry.rect)
-    ) {
-      return null;
-    }
-    const guard = captureLayerExportGuard(layer, entry);
-    return isLayerExportGuardCurrent(guard) ? guard : null;
-  };
-
   const documentEditOwner = Symbol('canvas-operation-document-edit-owner');
   // Later-defined engine values (mirror, pipeline, prepared-cache helpers) are
   // passed as thunks: the context never invokes them during construction.
@@ -1285,29 +1211,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
       void getOrStartLayerRasterization(layer, doc);
     }
-  };
-
-  const hasExportableLayerContent = (layerId: string): boolean => {
-    const doc = mirror.getDocument();
-    const layer = doc?.layers.find((candidate) => candidate.id === layerId);
-    if (!doc || !layer) {
-      return false;
-    }
-    const source = renderableSourceOf(layer);
-    if (!source || !isSupportedExportSource(source)) {
-      return false;
-    }
-    if (!isEmpty(getSourceContentRect(layer, doc))) {
-      return true;
-    }
-    // Only paint-backed layers (including masks through renderableSourceOf) can
-    // have real pixels beyond their persisted source rect. The live cache must
-    // describe the current source revision and must not be mid-rasterization.
-    if (source.type !== 'paint') {
-      return false;
-    }
-    const entry = layerCache.get(layerId);
-    return !!entry && !entry.stale && !isCurrentRasterizationJob(layer) && !isEmpty(entry.rect);
   };
 
   const rasterExportController = new RasterExportController({
