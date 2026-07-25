@@ -120,7 +120,7 @@ import {
 } from '@workbench/canvas-engine/controllers/mutationContext';
 import { PersistenceController } from '@workbench/canvas-engine/controllers/persistenceController';
 import { PsdExportController } from '@workbench/canvas-engine/controllers/psdExportController';
-import { RasterController, type RasterizationJob } from '@workbench/canvas-engine/controllers/rasterController';
+import { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
 import {
   RasterExportController,
   type ExportLayerPixelsResult,
@@ -157,7 +157,6 @@ import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill'
 import { renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
 import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
 import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
-import { textFontString } from '@workbench/canvas-engine/render/rasterizers/textRasterizer';
 import { enforceSurfaceBudget } from '@workbench/canvas-engine/render/surfaceBudget';
 import { getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
 import {
@@ -195,6 +194,7 @@ import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
 import { createLayerExportGuards, isDeeplyEqual, isSupportedExportSource } from './layerExportGuards';
+import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
 import { createSelectObjectBridge } from './selectObjectBridge';
@@ -1019,164 +1019,31 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     projectId,
   });
 
-  /**
-   * Starts (or joins) an isolated rasterization. Pixels land in a scratch
-   * surface and are copied into the live cache only while this exact job still
-   * describes the current layer source, cache version, and document.
-   */
-  const getOrStartLayerRasterization = (
-    layer: CanvasLayerContract,
-    document: CanvasDocumentContractV2,
-    signal?: AbortSignal
-  ): Promise<'published' | 'stale' | 'error' | 'aborted'> => {
-    if (signal?.aborted) {
-      return Promise.resolve('aborted');
-    }
-    if (disposed || mutationPort.getCanvasState() === null) {
-      return Promise.resolve('stale');
-    }
-    const liveSource = renderableSourceOf(layer);
-    if (!liveSource || !isSupportedExportSource(liveSource)) {
-      return Promise.resolve('stale');
-    }
-
-    const contentRect = getSourceContentRect(layer, document);
-    const entry = layerCache.getOrCreateRect(layer.id, contentRect);
-    const version = entry.version;
-    const documentGeneration = rasterController.getDocumentGeneration();
-    const source = structuredClone(liveSource);
-    const existing = rasterController.getRasterizationJob(layer.id);
-    if (
-      existing &&
-      existing.version === version &&
-      existing.documentGeneration === documentGeneration &&
-      isDeeplyEqual(existing.source, source)
-    ) {
-      if (!signal) {
-        return existing.promise;
-      }
-      const abort = (): void => {
-        existing.abortedByCaller = true;
-        existing.controller.abort(signal.reason);
-      };
-      signal.addEventListener('abort', abort, { once: true });
-      return existing.promise.finally(() => signal.removeEventListener('abort', abort));
-    }
-    cancelLayerRasterization(layer.id);
-
-    if (source.type === 'text') {
-      fontLoader.ensure(textFontString(source), () => {
-        const currentDocument = mirror.getDocument();
-        const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
-        if (
-          disposed ||
-          mutationPort.getCanvasState() === null ||
-          !currentLayer ||
-          rasterController.getDocumentGeneration() !== documentGeneration ||
-          layerCache.version(layer.id) !== version ||
-          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
-        ) {
-          return;
-        }
-        invalidateLayerCache(layer.id);
-        scheduler.invalidate({ layers: [layer.id] });
-      });
-    }
-
-    const scratch = backend.createSurface(contentRect.width, contentRect.height);
-    const controller = new AbortController();
-    let settleJob!: (result: 'published' | 'stale' | 'error' | 'aborted') => void;
-    const promise = new Promise<'published' | 'stale' | 'error' | 'aborted'>((resolve) => {
-      settleJob = resolve;
-    });
-    const job: RasterizationJob = {
-      controller,
-      documentGeneration,
-      promise,
-      source,
-      version,
-    };
-    const abort = (): void => {
-      job.abortedByCaller = true;
-      controller.abort(signal?.reason);
-    };
-    signal?.addEventListener('abort', abort, { once: true });
-    rasterController.installRasterizationJob(layer.id, job);
-    let published = false;
-    void (async () => {
-      try {
-        const result = await rasterizeSource(source, rasterizeDeps(document, controller.signal), scratch);
-        const currentDocument = mirror.getDocument();
-        const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
-        const currentEntry = layerCache.get(layer.id);
-        if (
-          disposed ||
-          mutationPort.getCanvasState() === null ||
-          rasterController.getRasterizationJob(layer.id) !== job ||
-          rasterController.getDocumentGeneration() !== documentGeneration ||
-          !currentLayer ||
-          !currentEntry ||
-          currentEntry.version !== version ||
-          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
-        ) {
-          return 'stale';
-        }
-
-        if (currentEntry.surface.width !== result.rect.width || currentEntry.surface.height !== result.rect.height) {
-          currentEntry.surface.resize(result.rect.width, result.rect.height);
-        }
-        const ctx = currentEntry.surface.ctx;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, result.rect.width, result.rect.height);
-        if (!isEmpty(result.rect)) {
-          ctx.drawImage(result.surface.canvas, 0, 0);
-        }
-        currentEntry.rect = { ...result.rect };
-        const publishedEntry = layerCache.publishPixels(layer.id);
-        if (!publishedEntry) {
-          return 'stale';
-        }
-        trackPublishedLayerImage(currentLayer);
-        published = true;
-        stores.thumbnailVersion.set(layer.id, publishedEntry.version);
-        stores.thumbnailStatus.set(layer.id, 'ready');
-        scheduler.invalidate({ layers: [layer.id] });
-        return 'published';
-      } catch (error) {
-        if (job.abortedByCaller) {
-          return 'aborted';
-        }
-        const currentDocument = mirror.getDocument();
-        const currentLayer = currentDocument?.layers.find((candidate) => candidate.id === layer.id);
-        if (
-          disposed ||
-          mutationPort.getCanvasState() === null ||
-          rasterController.getRasterizationJob(layer.id) !== job ||
-          rasterController.getDocumentGeneration() !== documentGeneration ||
-          !currentLayer ||
-          layerCache.version(layer.id) !== version ||
-          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
-        ) {
-          return 'stale';
-        }
-        stores.thumbnailStatus.set(layer.id, 'error');
-        try {
-          reportError('Layer thumbnail rasterization failed', layer.id, error);
-        } catch {
-          // Diagnostics must not turn a handled thumbnail failure into a rejection.
-        }
-        return 'error';
-      } finally {
-        signal?.removeEventListener('abort', abort);
-        rasterController.finishRasterizationJob(layer.id, job);
-        const imageName = sourceImageName(source);
-        if (!published && imageName) {
-          releaseBitmapIfUnreferenced(imageName);
-        }
-      }
-    })().then(settleJob, () => settleJob('stale'));
-    return promise;
-  };
+  const { getOrStartLayerRasterization } = createLayerRasterizer({
+    createSurface: (width, height) => backend.createSurface(width, height),
+    fontLoader,
+    getDocument: () => mirror.getDocument(),
+    hasCanvasState: () => mutationPort.getCanvasState() !== null,
+    invalidateLayerCache,
+    invalidateLayerRender: (layerId) => scheduler.invalidate({ layers: [layerId] }),
+    isDisposed: () => disposed,
+    jobs: {
+      cancel: cancelLayerRasterization,
+      finish: (layerId, job) => rasterController.finishRasterizationJob(layerId, job),
+      get: (layerId) => rasterController.getRasterizationJob(layerId),
+      getDocumentGeneration: () => rasterController.getDocumentGeneration(),
+      install: (layerId, job) => rasterController.installRasterizationJob(layerId, job),
+    },
+    layerCache,
+    rasterize: (source, document, scratch, signal) => rasterizeSource(source, rasterizeDeps(document, signal), scratch),
+    releaseBitmapIfUnreferenced: (imageName) => rasterController.releaseBitmapIfUnreferenced(imageName),
+    reportError,
+    thumbnails: {
+      setStatus: (layerId, status) => stores.thumbnailStatus.set(layerId, status),
+      setVersion: (layerId, version) => stores.thumbnailVersion.set(layerId, version),
+    },
+    trackPublishedLayerImage: (layer) => rasterController.trackPublishedLayerImage(layer),
+  });
 
   const documentEditOwner = Symbol('canvas-operation-document-edit-owner');
   // Later-defined engine values (mirror, pipeline, prepared-cache helpers) are
@@ -1318,8 +1185,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const releaseBitmapIfUnreferenced = (imageName: string): void =>
     rasterController.releaseBitmapIfUnreferenced(imageName);
-  const trackPublishedLayerImage = (layer: CanvasLayerContract): void =>
-    rasterController.trackPublishedLayerImage(layer);
 
   const dropLayer = (layerId: string): void => {
     // Generation-cancel persistence before the id can be restored by undo/redo.
