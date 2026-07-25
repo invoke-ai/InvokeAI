@@ -102,7 +102,7 @@ import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RenderScheduler } from '@workbench/canvas-engine/render/scheduler';
 import type { SamVisualInput } from '@workbench/canvas-engine/samInteraction';
-import type { Mat2d, Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
 import { ControlPixelController } from '@workbench/canvas-engine/controllers/controlPixelController';
@@ -146,7 +146,6 @@ import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 import {
-  type CompositeOptions,
   compositeDocument,
   createCheckerboardTile,
   shouldSmoothAtZoom,
@@ -159,11 +158,7 @@ import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '
 import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
 import { enforceSurfaceBudget } from '@workbench/canvas-engine/render/surfaceBudget';
 import { getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
-import {
-  documentDeltaToLocal,
-  floatDocumentMatrix,
-  liftSelectedPixels,
-} from '@workbench/canvas-engine/selection/floatingSelection';
+import { documentDeltaToLocal, liftSelectedPixels } from '@workbench/canvas-engine/selection/floatingSelection';
 import { ANTS_STEP_PX, createAntsAnimator, type AntsAnimator } from '@workbench/canvas-engine/selection/marchingAnts';
 import { createBboxTool } from '@workbench/canvas-engine/tools/bboxTool';
 import { createBrushTool } from '@workbench/canvas-engine/tools/brushTool';
@@ -179,11 +174,7 @@ import { createSamTool } from '@workbench/canvas-engine/tools/samTool';
 import { createShapeTool } from '@workbench/canvas-engine/tools/shapeTool';
 import { createTextTool } from '@workbench/canvas-engine/tools/textTool';
 import { createTransformTool } from '@workbench/canvas-engine/tools/transformTool';
-import {
-  bakeMatrix,
-  type LayerTransform,
-  transformOverlayGeometry,
-} from '@workbench/canvas-engine/transform/transformMath';
+import { type LayerTransform, transformOverlayGeometry } from '@workbench/canvas-engine/transform/transformMath';
 import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
 
 import type { ImagePatchApply } from './history/imagePatch';
@@ -197,6 +188,7 @@ import { createLayerExportGuards, isDeeplyEqual, isSupportedExportSource } from 
 import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
+import { floatingSelectionFrame } from './render/floatingSelectionFrame';
 import { createSelectObjectBridge } from './selectObjectBridge';
 import { createStrokeCommit } from './strokeCommit';
 import { createViewTool } from './tools/viewTool';
@@ -845,30 +837,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * layer-local placement, and the document-space matrix the ants ride through
    * so the outline tracks the pixels in flight.
    */
-  const floatingSelectionRender = (
-    doc: CanvasDocumentContractV2 | null
-  ): { composite: NonNullable<CompositeOptions['floatingSelection']>; ants: Mat2d } | null => {
-    const float = floatingSelection.get();
-    const layer = float && doc ? doc.layers.find((candidate) => candidate.id === float.layerId) : undefined;
-    if (!float || !layer) {
-      return null;
-    }
-    const matrix = bakeMatrix(float.transform);
-    const ants = floatDocumentMatrix(layerMatrix(layer.transform), matrix);
-    return ants
-      ? {
-          ants,
-          composite: {
-            layerId: float.layerId,
-            matrix,
-            rect: float.pixels.rect,
-            // The display copy when the layer has an effect; the raw pixels
-            // otherwise. Only the bake ever touches `pixels`.
-            surface: float.display ?? float.pixels.surface,
-          },
-        }
-      : null;
-  };
 
   const antsAnimator: AntsAnimator = createAntsAnimator({
     cancelFrame: (handle) => globalThis.cancelAnimationFrame(handle),
@@ -1292,7 +1260,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const filterPreviews = renderController.previews.filterSnapshot();
     // Resolved once: the composite draws the float's pixels, the overlay rides
     // the ants through the matching document-space transform.
-    const floatRender = floatingSelectionRender(doc);
+    const floatRender = floatingSelectionFrame(floatingSelection.get(), doc);
     if (needsComposite) {
       const stagedPlacement = stagedPreview?.placement;
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
