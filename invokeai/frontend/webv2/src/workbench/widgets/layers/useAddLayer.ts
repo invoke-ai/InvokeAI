@@ -1,3 +1,4 @@
+import { useModelsSelector } from '@features/models';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -8,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import type { AddLayerItemId } from './addLayerMenu';
 
 import { isAddLayerItemAvailable } from './addLayerMenu';
+import { resolveDefaultControlModelForBase } from './controlModelOptions';
 import {
   applyStructural,
   createControlLayer,
@@ -32,6 +34,7 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
   const engine = useCanvasEngine();
   const dispatch = useCanvasProjectMutationDispatch();
   const base = useSelectedModelBase();
+  const models = useModelsSelector((snapshot) => snapshot.models);
   const layerNames = useActiveProjectSelector(
     (project) => project.canvas.document.layers.map((layer) => layer.name),
     (left, right) => left.length === right.length && left.every((name, index) => name === right[index])
@@ -58,7 +61,12 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           return;
         }
         case 'control': {
-          const layer = createControlLayer(nextControlLayerName(layerNames), undefined, base);
+          const layer = createControlLayer(
+            nextControlLayerName(layerNames),
+            undefined,
+            base,
+            resolveDefaultControlModelForBase(models, base)
+          );
           applyStructural(
             engine,
             dispatch,
@@ -107,6 +115,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         }
       }
     },
-    [base, dispatch, engine, layerNames, regionalGuidanceCount, t]
+    [base, dispatch, engine, layerNames, models, regionalGuidanceCount, t]
   );
 };

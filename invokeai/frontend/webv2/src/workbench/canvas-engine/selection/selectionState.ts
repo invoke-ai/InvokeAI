@@ -42,6 +42,7 @@ import type { PlacedSurface, Rect, SelectionOp, Vec2 } from '@workbench/canvas-e
 
 import { intersect, isEmpty, roundOut, union } from '@workbench/canvas-engine/math/rect';
 import { traceMaskOutlinePath } from '@workbench/canvas-engine/selection/maskOutline';
+import { rectPathData } from '@workbench/canvas-engine/selection/selectionPaths';
 
 /** A committed selection contribution: the closed path and the op it applied. */
 export interface SelectionCommit {
@@ -98,12 +99,8 @@ export interface SelectionStateDeps {
 
 const MASK_FILL = '#ffffff';
 
-/** SVG path data for a closed rectangle in document space. */
-const rectToPathData = (r: Rect): string =>
-  `M ${r.x} ${r.y} L ${r.x + r.width} ${r.y} L ${r.x + r.width} ${r.y + r.height} L ${r.x} ${r.y + r.height} Z`;
-
 /** Builds a closed rectangle `Path2D` (document space) via the injected factory. */
-const rectPath = (createPath2D: CreatePath2D, r: Rect): Path2D => createPath2D(rectToPathData(r));
+const rectPath = (createPath2D: CreatePath2D, r: Rect): Path2D => createPath2D(rectPathData(r));
 
 /** The canvas composite op that realizes each boolean selection op on the mask. */
 const compositeForOp = (op: SelectionOp): GlobalCompositeOperation => {
@@ -259,7 +256,7 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
     // back to tracing any non-zero coverage rather than showing no outline.
     const alphaSource = { data: copiedData, height: source.height, width: source.width };
     const outline =
-      traceMaskOutlinePath(alphaSource, rect) || traceMaskOutlinePath(alphaSource, rect, 1) || rectToPathData(rect);
+      traceMaskOutlinePath(alphaSource, rect) || traceMaskOutlinePath(alphaSource, rect, 1) || rectPathData(rect);
     const nextPath = createPath2D(outline);
 
     mask = nextMask;

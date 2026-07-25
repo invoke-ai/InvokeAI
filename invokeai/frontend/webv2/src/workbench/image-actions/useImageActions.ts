@@ -7,15 +7,7 @@ import {
   type GalleryBoard,
   type GalleryImage,
 } from '@features/gallery';
-import {
-  createReferenceImageId,
-  generatedImageToReferenceImage,
-  getDefaultReferenceImageConfig,
-  getMaxReferenceImages,
-  isVaeModelConfig,
-  isReferenceImageSupported,
-  isSupportedGenerateModel,
-} from '@features/generation/settings';
+import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -30,6 +22,7 @@ import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchC
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 import {
@@ -309,24 +302,13 @@ export const useImageActions = ({
         currentGenerateValues.referenceImages.length < getMaxReferenceImages(currentGenerateValues.model)
       ),
       useAsReferenceImage: (image) => {
-        const latestGenerateValues = getLatestGenerateValues();
-        const currentValues = getCurrentGenerateValues({ generateValues: latestGenerateValues, supportedModels });
+        const result = appendReferenceImage({ generateValues: getLatestGenerateValues(), image, models });
 
-        if (
-          !currentValues ||
-          !isReferenceImageSupported(currentValues.model) ||
-          currentValues.referenceImages.length >= getMaxReferenceImages(currentValues.model)
-        ) {
+        if (result.status !== 'appended') {
           return;
         }
 
-        const referenceImage = {
-          config: getDefaultReferenceImageConfig(currentValues.model, models, generatedImageToReferenceImage(image)),
-          id: createReferenceImageId(),
-          isEnabled: true,
-        };
-
-        generation.patchSettings({ referenceImages: [...currentValues.referenceImages, referenceImage] }, projectId);
+        generation.patchSettings({ referenceImages: result.referenceImages }, projectId);
         openWorkbenchWidget('generate', { preferredRegions: ['left'] });
       },
     };

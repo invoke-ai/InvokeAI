@@ -3,7 +3,7 @@ import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/c
 import { estimateTextExtent } from '@workbench/canvas-engine/render/rasterizers/textRasterizer';
 import { describe, expect, it } from 'vitest';
 
-import { hitTestLayer, hittableLayerSize, layerOutlineCorners, topLayerAt } from './moveHitTest';
+import { hitTestLayer, hittableLayerSize, layerOutlineCorners } from './moveHitTest';
 
 const shapeLayer = (id: string, width: number, height: number): CanvasLayerContract => ({
   blendMode: 'normal',
@@ -79,27 +79,6 @@ const imageLayer = (
     y: opts.y ?? 0,
   },
   type: 'raster',
-});
-
-/** A control layer (composite group rank 1) backed by an image source. */
-const controlLayer = (id: string, opts: { width?: number; height?: number } = {}): CanvasLayerContract => ({
-  adapter: {
-    beginEndStepPct: [0, 1],
-    controlMode: 'balanced',
-    kind: 'controlnet',
-    model: null,
-    weight: 1,
-  },
-  blendMode: 'normal',
-  id,
-  isEnabled: true,
-  isLocked: false,
-  name: id,
-  opacity: 1,
-  source: { image: { height: opts.height ?? 20, imageName: id, width: opts.width ?? 20 }, type: 'image' },
-  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-  type: 'control',
-  withTransparencyEffect: false,
 });
 
 const paintLayer = (
@@ -228,65 +207,6 @@ describe('hitTestLayer', () => {
   });
 });
 
-describe('topLayerAt', () => {
-  it('returns the top-most (index 0) layer that passes the predicate and contains the point', () => {
-    const top = imageLayer('top', { width: 50, height: 50 });
-    const bottom = imageLayer('bottom', { width: 50, height: 50 });
-    const d = doc([top, bottom]);
-    expect(topLayerAt(d, { x: 10, y: 10 }, () => true)?.id).toBe('top');
-  });
-
-  it('skips layers the predicate rejects (e.g. locked/hidden)', () => {
-    const top = imageLayer('top', { width: 50, height: 50, isLocked: true });
-    const bottom = imageLayer('bottom', { width: 50, height: 50 });
-    const d = doc([top, bottom]);
-    // Drag predicate rejects locked → falls through to the bottom layer.
-    expect(topLayerAt(d, { x: 10, y: 10 }, (l) => !l.isLocked)?.id).toBe('bottom');
-  });
-
-  it('returns null on empty space', () => {
-    const layer = imageLayer('a', { x: 0, y: 0, width: 10, height: 10 });
-    expect(topLayerAt(doc([layer]), { x: 80, y: 80 }, () => true)).toBeNull();
-  });
-});
-
-describe('topLayerAt: composite-group ordering (batch finding N1)', () => {
-  // The compositor draws by group rank (raster < control < regional < inpaint
-  // mask), NOT by raw array index, so the hit-test must agree: a layer in a higher
-  // group wins the hit over a lower-group layer that sits EARLIER in the array.
-  it('a control layer wins the hit over an overlapping raster placed earlier in the array', () => {
-    const raster = imageLayer('raster'); // global index 0 — would win under naive array order
-    const control = controlLayer('control'); // index 1, but composites above the raster
-    const d = doc([raster, control]);
-    expect(topLayerAt(d, { x: 10, y: 10 }, () => true)?.id).toBe('control');
-  });
-
-  it('an inpaint mask (top group) wins over control and raster below it', () => {
-    const raster = imageLayer('raster');
-    const control = controlLayer('control');
-    const mask = maskLayer('mask', { width: 20, height: 20 });
-    // Array order deliberately does NOT match composite order.
-    const d = doc([raster, mask, control]);
-    expect(topLayerAt(d, { x: 10, y: 10 }, () => true)?.id).toBe('mask');
-  });
-
-  it('within a group, array order still decides (index 0 is top-most within the group)', () => {
-    const top = controlLayer('top');
-    const bottom = controlLayer('bottom');
-    const raster = imageLayer('raster');
-    const d = doc([top, bottom, raster]);
-    expect(topLayerAt(d, { x: 10, y: 10 }, () => true)?.id).toBe('top');
-  });
-
-  it('falls through to a lower group when the predicate rejects the higher one', () => {
-    const raster = imageLayer('raster');
-    const control = controlLayer('control');
-    const d = doc([raster, control]);
-    // e.g. move-tool auto-select excluding controls → the raster below is grabbed.
-    expect(topLayerAt(d, { x: 10, y: 10 }, (l) => l.type === 'raster')?.id).toBe('raster');
-  });
-});
-
 describe('layerOutlineCorners', () => {
   it('returns the four document-space corners of the rendered rect', () => {
     const layer = imageLayer('a', { x: 5, y: 5, width: 10, height: 10 });
@@ -326,15 +246,6 @@ describe('live cache rect (freshly-painted, not-yet-flushed content)', () => {
     expect(hitTestLayer(layer, doc([layer]), { x: 30, y: 30 }, liveRect)).toBe(true);
     // Outside the live rect: still a miss.
     expect(hitTestLayer(layer, doc([layer]), { x: 5, y: 5 }, liveRect)).toBe(false);
-  });
-
-  it('topLayerAt uses the liveRectOf resolver to grab unflushed content', () => {
-    const layer = paintLayer('p');
-    const d = doc([layer]);
-    const liveRectOf = (id: string) => (id === 'p' ? { height: 40, width: 40, x: 20, y: 20 } : undefined);
-    expect(topLayerAt(d, { x: 30, y: 30 }, () => true, liveRectOf)?.id).toBe('p');
-    // Without the resolver the empty layer is ungrabbable.
-    expect(topLayerAt(d, { x: 30, y: 30 }, () => true)).toBeNull();
   });
 
   it('unions the live rect with persisted content (both contribute to the hit area)', () => {

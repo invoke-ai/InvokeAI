@@ -41,6 +41,7 @@ const createHarness = (overrides: Partial<CanvasMutationContextDeps> = {}) => {
   const lock = createLockStore();
   const editOwner = Symbol('test-edit-owner');
   const deps: CanvasMutationContextDeps = {
+    commitEdit: vi.fn(),
     createLayerId: () => 'layer-new',
     dispatch: vi.fn(() => true),
     editOwner,
@@ -107,8 +108,48 @@ describe('createCanvasMutationContext', () => {
   });
 
   describe('dispatchPrepared', () => {
+    it('defers a user edit route until reducer and mirror postconditions succeed', () => {
+      const { context, deps } = createHarness();
+
+      context.dispatchPrepared(
+        action,
+        () => true,
+        () => true
+      );
+
+      expect(deps.dispatch).toHaveBeenCalledWith(action, 'system');
+      expect(deps.commitEdit).toHaveBeenCalledWith({ kind: 'mutation', mutation: action });
+    });
+
+    it('does not commit system-originated or history-replayed edit intent', () => {
+      const history = createHistory();
+      const { context, deps } = createHarness({ history });
+
+      context.dispatchPrepared(
+        action,
+        () => true,
+        () => true,
+        'system'
+      );
+      history.push({
+        bytes: 1,
+        label: 'Replay',
+        redo: () => undefined,
+        undo: () =>
+          context.dispatchPrepared(
+            action,
+            () => true,
+            () => true
+          ),
+      });
+      history.undo();
+
+      expect(deps.commitEdit).not.toHaveBeenCalled();
+    });
+
     it('throws when dispatch rejects the mutation and the reducer shows no postcondition', () => {
-      const { context } = createHarness({ dispatch: () => false });
+      const commitEdit = vi.fn();
+      const { context } = createHarness({ commitEdit, dispatch: () => false });
       expect(() =>
         context.dispatchPrepared(
           action,
@@ -116,6 +157,7 @@ describe('createCanvasMutationContext', () => {
           () => false
         )
       ).toThrow('Canvas document mutation was rejected');
+      expect(commitEdit).not.toHaveBeenCalled();
     });
 
     it('rethrows a dispatch error when the reducer did not apply the mutation', () => {

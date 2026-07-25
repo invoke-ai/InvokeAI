@@ -1,10 +1,16 @@
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
-import { TRANSFORM_ROTATE_NUB_PX, transformOverlayGeometry } from '@workbench/canvas-engine/transform/transformMath';
+import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
+import {
+  layerTransformMatrix,
+  TRANSFORM_ROTATE_NUB_PX,
+  transformOverlayGeometry,
+} from '@workbench/canvas-engine/transform/transformMath';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createTransformTool } from './transformTool';
@@ -87,19 +93,29 @@ const rotateAbout = (p: Vec2, pivot: Vec2, rad: number): Vec2 => {
 interface Harness {
   ctx: ToolContext;
   applyCount: () => number;
+  commitFloatCount: () => number;
+  cancelFloatCount: () => number;
   session: () => ReturnType<ReturnType<typeof createEngineStores>['transformSession']['get']>;
   overrides: { layerId: string; override: unknown }[];
+  float: { current: FloatingSelection | null };
+  floatTransforms: LayerTransform[];
 }
 
 /**
  * A ToolContext whose transform-session seams mutate a real `transformSession`
  * store (mirroring the engine), so the tool's reads reflect its own writes across
  * a down→move→up drag. The viewport projects document→screen 1:1.
+ *
+ * Grid snapping starts OFF so the gesture-math tests assert raw pointer deltas;
+ * the snapping tests re-enable it on `h.ctx.stores`. (The product default is on.)
  */
-const createHarness = (doc: CanvasDocumentContractV2, zoom = 1): Harness => {
+const createHarness = (doc: CanvasDocumentContractV2, zoom = 1, float?: FloatingSelection | null): Harness => {
   const stores = createEngineStores();
+  stores.snapToGrid.set(false);
   const overrides: { layerId: string; override: unknown }[] = [];
-  const state = { applyCount: 0 };
+  const state = { applyCount: 0, commitFloatCount: 0, cancelFloatCount: 0 };
+  const floatRef: { current: FloatingSelection | null } = { current: float ?? null };
+  const floatTransforms: LayerTransform[] = [];
 
   const beginTransformSession = (layerId: string): void => {
     const layer = doc.layers.find((entry) => entry.id === layerId);
@@ -132,16 +148,31 @@ const createHarness = (doc: CanvasDocumentContractV2, zoom = 1): Harness => {
     },
     backend: null as never,
     beginTransformSession,
+    cancelFloatingSelection: () => {
+      state.cancelFloatCount += 1;
+      floatRef.current = null;
+    },
     cancelTransform,
+    commitFloatingSelection: () => {
+      state.commitFloatCount += 1;
+      floatRef.current = null;
+    },
     commitStructural: vi.fn(),
     createLayerId: () => 'x',
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: vi.fn(),
     emitStrokeCommitted: vi.fn(),
     getDocument: () => doc,
+    getFloatingSelection: () => floatRef.current,
     invalidate: vi.fn(),
     layers: null as never,
     notifyLayerPainted: vi.fn(),
+    setFloatingTransform: (transform) => {
+      floatTransforms.push(transform);
+      if (floatRef.current) {
+        floatRef.current.transform = transform;
+      }
+    },
     setLayerTransformOverride: vi.fn(),
     setOverlayCursor: vi.fn(),
     stores,
@@ -155,7 +186,11 @@ const createHarness = (doc: CanvasDocumentContractV2, zoom = 1): Harness => {
 
   return {
     applyCount: () => state.applyCount,
+    cancelFloatCount: () => state.cancelFloatCount,
+    commitFloatCount: () => state.commitFloatCount,
     ctx,
+    float: floatRef,
+    floatTransforms,
     overrides,
     session: () => stores.transformSession.get(),
   };
@@ -199,13 +234,35 @@ describe('transform tool: session lifecycle', () => {
     expect(h.session()).toBeNull();
   });
 
-  it('clicking a layer with no session starts a session (move gesture)', () => {
-    const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], null);
+  it('pressing with no session opens one on the SELECTED layer (move gesture)', () => {
+    const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], 'a');
     const h = createHarness(doc);
     const tool = createTransformTool();
 
     down(tool, h.ctx, pointer(50, 50));
     expect(h.session()?.layerId).toBe('a');
+  });
+
+  it('opens no session when nothing is selected, however the press lands', () => {
+    const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], null);
+    const h = createHarness(doc);
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    expect(h.session()).toBeNull();
+  });
+
+  it('does not adopt the layer under the pointer over the selected one', () => {
+    // 'top' covers the press point; 'bottom' is what the panel selected.
+    const doc = makeDoc(
+      [imageLayer('top', { width: 100, height: 100 }), imageLayer('bottom', { width: 100, height: 100 })],
+      'bottom'
+    );
+    const h = createHarness(doc);
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    expect(h.session()?.layerId).toBe('bottom');
   });
 });
 
@@ -272,6 +329,85 @@ describe('transform tool: gestures', () => {
     // No update beyond the initial begin override.
     expect(h.overrides.length).toBe(startOverrides);
     expect(h.session()?.transform.scaleX).toBe(1);
+  });
+});
+
+describe('transform tool: grid snapping', () => {
+  /** A harness with snapping on at `grid`. */
+  const snapHarness = (grid: number, float?: FloatingSelection) => {
+    const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], 'a');
+    const h = createHarness(doc, 1, float);
+    h.ctx.stores.snapToGrid.set(true);
+    h.ctx.stores.bboxGrid.set(grid);
+    return h;
+  };
+
+  it('snaps an interior move to the grid', () => {
+    const h = snapHarness(8);
+    const tool = createTransformTool();
+    activate(tool, h.ctx);
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(71, 65)); // raw (21, 15) → (24, 16)
+    up(tool, h.ctx, pointer(71, 65));
+
+    expect(h.session()?.transform.x).toBeCloseTo(24, 5);
+    expect(h.session()?.transform.y).toBeCloseTo(16, 5);
+  });
+
+  it('bypasses the move snap while alt is held', () => {
+    const h = snapHarness(8);
+    const tool = createTransformTool();
+    activate(tool, h.ctx);
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(71, 65, { alt: true }));
+
+    expect(h.session()?.transform.x).toBeCloseTo(21, 5);
+    expect(h.session()?.transform.y).toBeCloseTo(15, 5);
+  });
+
+  it('lands a dragged scale handle on the grid', () => {
+    const h = snapHarness(8);
+    const tool = createTransformTool();
+    activate(tool, h.ctx);
+
+    // se corner at doc (100,100) dragged to (153,153) → snaps to (152,152).
+    down(tool, h.ctx, pointer(100, 100));
+    move(tool, h.ctx, pointer(153, 153));
+
+    expect(h.session()?.transform.scaleX).toBeCloseTo(1.52, 5);
+    expect(h.session()?.transform.scaleY).toBeCloseTo(1.52, 5);
+  });
+
+  it('still scales about center under alt (alt is not a bypass on a handle)', () => {
+    const h = snapHarness(8);
+    const tool = createTransformTool();
+    activate(tool, h.ctx);
+
+    down(tool, h.ctx, pointer(100, 100));
+    move(tool, h.ctx, pointer(153, 153, { alt: true }));
+
+    // The layer center (50,50) stays put — the alt anchor, not a snap bypass.
+    const next = h.session()!.transform;
+    const center = applyToPoint(layerTransformMatrix(next), { x: 50, y: 50 });
+    expect(center.x).toBeCloseTo(50, 5);
+    expect(center.y).toBeCloseTo(50, 5);
+  });
+
+  it('does not snap a float gesture (its transform is layer-local)', () => {
+    const float = {
+      layerId: 'a',
+      pixels: { rect: { height: 100, width: 100, x: 0, y: 0 } },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    } as FloatingSelection;
+    const h = snapHarness(8, float);
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(71, 65));
+
+    expect(h.floatTransforms.at(-1)).toMatchObject({ x: 21, y: 15 });
   });
 });
 
@@ -436,5 +572,116 @@ describe('transform tool: temp-tool switch (space/alt hold)', () => {
 
     tool.onActivate?.(h.ctx, { temporary: true });
     expect(h.session()).toBeNull();
+  });
+});
+
+describe('transform tool: floating selections', () => {
+  const IDENTITY: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
+
+  /** A stand-in float over `layerId`, holding pixels at a known layer-local rect. */
+  const makeFloat = (layerId: string, rect = { height: 100, width: 100, x: 0, y: 0 }): FloatingSelection =>
+    ({ layerId, pixels: { rect }, transform: { ...IDENTITY } }) as FloatingSelection;
+
+  const doc = (layerOpts: Parameters<typeof imageLayer>[1] = { height: 100, width: 100 }) =>
+    makeDoc([imageLayer('a', layerOpts)], 'a');
+
+  it('frames the float instead of opening a layer session on activate', () => {
+    const h = createHarness(doc(), 1, makeFloat('a'));
+    const tool = createTransformTool();
+
+    activate(tool, h.ctx);
+
+    expect(h.session()).toBeNull();
+  });
+
+  it('moves the float when the frame interior is dragged', () => {
+    const h = createHarness(doc(), 1, makeFloat('a'));
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(70, 60));
+
+    expect(h.floatTransforms.at(-1)).toMatchObject({ x: 20, y: 10 });
+    // The layer session is untouched.
+    expect(h.session()).toBeNull();
+  });
+
+  it('scales the float from a corner handle', () => {
+    const h = createHarness(doc(), 1, makeFloat('a'));
+    const tool = createTransformTool();
+
+    // The float's own se corner, at the pixels' layer-local bounds (100,100).
+    down(tool, h.ctx, pointer(100, 100));
+    move(tool, h.ctx, pointer(150, 150));
+
+    const scaled = h.floatTransforms.at(-1)!;
+    expect(scaled.scaleX).toBeCloseTo(1.5, 5);
+    expect(scaled.scaleY).toBeCloseTo(1.5, 5);
+  });
+
+  it('maps the pointer through the layer matrix, so a scaled layer drags true', () => {
+    // On a 2× layer, dragging 40 document px must move the float 20 layer-local px.
+    const h = createHarness(doc({ height: 100, width: 100 }), 1, makeFloat('a'));
+    (h.ctx.getDocument() as CanvasDocumentContractV2).layers[0]!.transform.scaleX = 2;
+    (h.ctx.getDocument() as CanvasDocumentContractV2).layers[0]!.transform.scaleY = 2;
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(90, 50));
+
+    expect(h.floatTransforms.at(-1)).toMatchObject({ x: 20, y: 0 });
+  });
+
+  it('banks the float on Enter rather than applying a layer transform', () => {
+    const h = createHarness(doc(), 1, makeFloat('a'));
+    const tool = createTransformTool();
+
+    tool.onKeyCommand?.(h.ctx, 'apply');
+
+    expect(h.commitFloatCount()).toBe(1);
+    expect(h.applyCount()).toBe(0);
+  });
+
+  it('abandons the float on Escape', () => {
+    const h = createHarness(doc(), 1, makeFloat('a'));
+    const tool = createTransformTool();
+
+    tool.onKeyCommand?.(h.ctx, 'cancel');
+
+    expect(h.cancelFloatCount()).toBe(1);
+  });
+
+  it('reverts only the current drag on pointercancel, keeping the float', () => {
+    const h = createHarness(doc(), 1, makeFloat('a'));
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    move(tool, h.ctx, pointer(70, 60));
+    tool.onPointerCancel?.(h.ctx);
+
+    expect(h.floatTransforms.at(-1)).toEqual(IDENTITY);
+    expect(h.float.current).not.toBeNull();
+    expect(h.cancelFloatCount()).toBe(0);
+  });
+
+  it('does not cancel the float on a real tool switch — the engine banks it', () => {
+    const h = createHarness(doc(), 1, makeFloat('a'));
+    const tool = createTransformTool();
+
+    tool.onDeactivate?.(h.ctx);
+
+    expect(h.cancelFloatCount()).toBe(0);
+    expect(h.float.current).not.toBeNull();
+  });
+
+  it('presses off the frame are a no-op — the float stays framed', () => {
+    const h = createHarness(doc(), 1, makeFloat('a', { height: 20, width: 20, x: 0, y: 0 }));
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(400, 400));
+    move(tool, h.ctx, pointer(420, 420));
+
+    expect(h.floatTransforms).toHaveLength(0);
+    expect(h.float.current).not.toBeNull();
   });
 });

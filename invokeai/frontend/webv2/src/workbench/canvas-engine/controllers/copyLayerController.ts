@@ -10,12 +10,12 @@ type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
 
-export interface CopyLayerControllerOptions {
+export interface CopyLayerControllerOptions<Permit> {
   readonly history: History;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly getReducerDocument: () => CanvasDocumentContractV2 | null;
-  readonly capturePermit: () => object | null;
-  readonly isPermitCurrent: (permit: object) => boolean;
+  readonly capturePermit: () => Permit | null;
+  readonly isPermitCurrent: (permit: Permit) => boolean;
   readonly isGestureActive: () => boolean;
   readonly endBurst: () => void;
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
@@ -31,9 +31,9 @@ export interface CopyLayerControllerOptions {
 }
 
 /** Owns guarded baked copies into new raster paint layers. */
-export class CopyLayerController {
+export class CopyLayerController<Permit> {
   private disposed = false;
-  constructor(private readonly deps: CopyLayerControllerOptions) {}
+  constructor(private readonly deps: CopyLayerControllerOptions<Permit>) {}
 
   async copyToRaster(layerId: string): Promise<string | null> {
     const permit = this.deps.capturePermit();

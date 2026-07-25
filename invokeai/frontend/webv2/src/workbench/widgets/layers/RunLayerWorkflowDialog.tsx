@@ -363,7 +363,7 @@ export const RunLayerWorkflowDialog = ({
           exportLayer: (targetLayerId) => engine.exports.exportBakedLayerBlob(targetLayerId, { includeDisabled: true }),
           getImage: galleryImages.resolve,
           isGuardCurrent: (guard) => engine.exports.isLayerExportGuardCurrent(guard),
-          makeDurable: galleryDurability.makeDurable,
+          makeDurable: galleryDurability.makeCanvasAsset,
           runGraph: (options) => runUtilityGraph({ ...options, hub: socketHub }),
           saveToGallery: galleryDurability.save,
           touchGallery: (targetProjectId) => gallery.touchImages(targetProjectId),

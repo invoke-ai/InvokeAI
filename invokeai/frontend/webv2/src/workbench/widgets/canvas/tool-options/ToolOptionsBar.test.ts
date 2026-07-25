@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { resolveCanvasOptionsContent, TOOL_OPTIONS_COMPONENTS } from './ToolOptionsBar';
 
 describe('TOOL_OPTIONS_COMPONENTS', () => {
-  it('has an entry for exactly the tools with dedicated options today (bbox, brush, eraser, gradient, lasso, move, shape, text, transform)', () => {
+  it('has an entry for exactly the tools with dedicated options today (bbox, brush, eraser, gradient, lasso, marquee, move, shape, text, transform)', () => {
     expect(Object.keys(TOOL_OPTIONS_COMPONENTS).sort()).toEqual([
       'bbox',
       'brush',
       'eraser',
       'gradient',
       'lasso',
+      'marquee',
       'move',
       'shape',
       'text',

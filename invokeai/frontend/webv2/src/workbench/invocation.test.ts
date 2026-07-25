@@ -6,6 +6,7 @@ import type {
   VaeModelConfig,
 } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
+import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { InvocationRoute } from '@workbench/invocationContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
@@ -13,7 +14,12 @@ import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { describe, expect, it, vi } from 'vitest';
 
-import { getInvocationRouteInput, resolveInvocationRoute, resolveInvocationRouteInput } from './invocation';
+import {
+  areInvocationRouteInputsEqual,
+  getInvocationRouteInput,
+  resolveInvocationRoute,
+  resolveInvocationRouteInput,
+} from './invocation';
 import { submitResolvedInvocation } from './invocationSubmit';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
 import { createWorkbenchStore } from './workbenchStore';
@@ -222,6 +228,7 @@ describe('resolveInvocationRoute — canvas source', () => {
       generateValues?: typeof validGenerateValues;
       mountedWidgetIds?: WidgetId[];
       bbox?: { width: number; height: number };
+      layers?: CanvasLayerContract[];
     } = {}
   ) => {
     const project = getActiveProject(overrides.generateValues ?? validGenerateValues);
@@ -229,9 +236,26 @@ describe('resolveInvocationRoute — canvas source', () => {
     return {
       ...getInvocationRouteInput(project),
       canvasBbox: overrides.bbox ?? { height: 512, width: 512 },
+      canvasLayers: overrides.layers ?? [],
       mountedWidgetIds: overrides.mountedWidgetIds ?? (['canvas', 'generate'] as WidgetId[]),
     };
   };
+
+  const loadedModels = [animaModel, qwen3Encoder, animaVae] as unknown as ModelConfig[];
+
+  const modellessControlLayer = (source?: CanvasControlLayerContract['source']): CanvasControlLayerContract => ({
+    adapter: { beginEndStepPct: [0, 1], controlMode: null, kind: 'controlnet', model: null, weight: 1 },
+    blendMode: 'normal',
+    id: 'control-1',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Control Layer 1',
+    opacity: 1,
+    source: source ?? { image: { height: 64, imageName: 'control.png', width: 64 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect: true,
+  });
 
   it('is a valid source when the widget is mounted, the model is valid, and the frame has area', () => {
     const route = resolveInvocationRouteInput(canvasInputFor(), 'global', canvasRoute);
@@ -271,6 +295,42 @@ describe('resolveInvocationRoute — canvas source', () => {
 
     expect(route.sourceValid).toBe(false);
     expect(route.validationReasons).toContain('The Canvas widget is not mounted in this project.');
+  });
+
+  it('blocks a content-bearing control layer with no model once models are loaded', () => {
+    const route = resolveInvocationRouteInput(
+      canvasInputFor({ layers: [modellessControlLayer()] }),
+      'global',
+      canvasRoute,
+      loadedModels
+    );
+
+    expect(route.sourceValid).toBe(false);
+    expect(route.validationReasons).toContain('Control layer "Control Layer 1" has no control model selected.');
+  });
+
+  it('does not block content-less control layers or check layers before models load', () => {
+    const emptyLayerRoute = resolveInvocationRouteInput(
+      canvasInputFor({ layers: [modellessControlLayer({ bitmap: null, type: 'paint' })] }),
+      'global',
+      canvasRoute,
+      loadedModels
+    );
+    expect(emptyLayerRoute.validationReasons).toEqual([]);
+
+    const modelsLoadingRoute = resolveInvocationRouteInput(
+      canvasInputFor({ layers: [modellessControlLayer()] }),
+      'global',
+      canvasRoute
+    );
+    expect(modelsLoadingRoute.validationReasons).toEqual([]);
+  });
+
+  it('treats the layer stack identity as part of the route input', () => {
+    const input = canvasInputFor();
+
+    expect(areInvocationRouteInputsEqual(input, { ...input })).toBe(true);
+    expect(areInvocationRouteInputsEqual(input, { ...input, canvasLayers: [...input.canvasLayers] })).toBe(false);
   });
 });
 

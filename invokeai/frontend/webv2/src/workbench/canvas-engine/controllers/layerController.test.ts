@@ -141,6 +141,22 @@ describe('LayerController', () => {
     isPermitCurrent: () => true,
     preparePixels: vi.fn(),
   };
+  const newRasterLayer = {
+    backend: {} as never,
+    capturePermit: () => null,
+    createLayerId: () => 'new',
+    dispatchPrepared: vi.fn(),
+    endBurst: vi.fn(),
+    getDocument: () => null,
+    getReducerDocument: () => null,
+    history: {} as never,
+    installPrepared: vi.fn(),
+    isGestureActive: () => false,
+    isPermitCurrent: () => true,
+    layers: {} as never,
+    preparePixels: vi.fn(),
+    selection: {} as never,
+  };
   it('exposes only declared layer and preview ports', async () => {
     const forward: CanvasProjectMutation = { id: 'layer', type: 'setCanvasSelectedLayer' };
     const inverse: CanvasProjectMutation = { id: null, type: 'setCanvasSelectedLayer' };
@@ -149,6 +165,7 @@ describe('LayerController', () => {
       mask,
       booleanMerge,
       extractMaskedArea,
+      newRasterLayer,
       crop,
       copy,
       merge,
@@ -170,6 +187,7 @@ describe('LayerController', () => {
       mask,
       booleanMerge,
       extractMaskedArea,
+      newRasterLayer,
       crop,
       copy,
       merge,

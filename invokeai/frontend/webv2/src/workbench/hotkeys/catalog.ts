@@ -145,7 +145,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'incrementToolWidth', [']']),
   hotkey('canvas', 'selectEraserTool', ['e']),
   hotkey('canvas', 'selectMoveTool', ['v']),
-  hotkey('canvas', 'selectRectTool', ['u']),
+  hotkey('canvas', 'selectMarqueeTool', ['u']),
   hotkey('canvas', 'selectLassoTool', ['l']),
   hotkey('canvas', 'selectViewTool', ['h']),
   hotkey('canvas', 'selectColorPickerTool', ['i']),

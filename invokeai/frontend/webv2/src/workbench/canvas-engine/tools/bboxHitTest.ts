@@ -6,9 +6,9 @@
  * (four corners + four edge midpoints) are hit-tested in SCREEN space so their
  * grab areas stay a constant pixel size regardless of zoom — callers project the
  * bbox to screen coordinates first. Resize math runs in DOCUMENT space: the edge
- * opposite the grabbed handle stays fixed, the moved edge(s) follow a pointer
- * delta, then snapping, min-size clamping, and (optionally) an aspect constraint
- * are applied.
+ * opposite the grabbed handle stays fixed (or the center, under `symmetric`),
+ * the moved edge(s) follow a pointer delta, then snapping, min-size clamping,
+ * and (optionally) an aspect constraint are applied.
  *
  * Zero React, zero import-time side effects.
  */
@@ -124,6 +124,12 @@ export interface ResizeBboxParams {
   constrain: boolean;
   /** Target width / height ratio, used when `constrain`. */
   ratio: number;
+  /**
+   * Mirror the drag across the frame's center (ctrl/⌘): the opposite edge moves
+   * by the same amount in the opposite direction and the center stays put,
+   * instead of the opposite edge staying fixed.
+   */
+  symmetric: boolean;
 }
 
 /** Builds a rect from a fixed anchor corner extending by `width`/`height` in the handle's directions. */
@@ -237,17 +243,40 @@ const resizeEdgeConstrained = (p: ResizeBboxParams): Rect => {
   return { height, width, x: centerX - width / 2, y };
 };
 
+/** Resizes with the edge opposite the handle held fixed. */
+const resizeAnchored = (p: ResizeBboxParams): Rect => {
+  if (p.constrain && p.ratio > 0) {
+    return isCornerHandle(p.handle) ? resizeCornerConstrained(p) : resizeEdgeConstrained(p);
+  }
+  return resizeFree(p);
+};
+
+/** Re-places `rect` around a fixed center, keeping its size. */
+const centerRectOn = (rect: Rect, centerX: number, centerY: number): Rect => ({
+  height: rect.height,
+  width: rect.width,
+  x: centerX - rect.width / 2,
+  y: centerY - rect.height / 2,
+});
+
 /**
  * Resizes `start` for a handle drag. Applies (in order) the delta to the moved
  * edge(s), grid snapping (unless bypassed), min-size clamping, and — when
  * `constrain` — an aspect-ratio constraint anchored at the opposite corner
  * (corners) or the center (edges).
+ *
+ * Under `symmetric` the frame mirrors across its center instead: both sides move
+ * by the drag, so the frame grows/shrinks twice as fast and the center stays
+ * put. That is exactly the anchored resize of a doubled delta re-centered on the
+ * start center — the grabbed edge still lands under the pointer, and snapping,
+ * min-size clamping and the aspect constraint all keep applying unchanged.
  */
 export const resizeBbox = (p: ResizeBboxParams): Rect => {
-  if (p.constrain && p.ratio > 0) {
-    return isCornerHandle(p.handle) ? resizeCornerConstrained(p) : resizeEdgeConstrained(p);
+  if (!p.symmetric) {
+    return resizeAnchored(p);
   }
-  return resizeFree(p);
+  const doubled = resizeAnchored({ ...p, dx: p.dx * 2, dy: p.dy * 2 });
+  return centerRectOn(doubled, p.start.x + p.start.width / 2, p.start.y + p.start.height / 2);
 };
 
 /** Re-fits `rect` to `ratio`, keeping its center fixed, then snaps to `grid` and clamps min size. */

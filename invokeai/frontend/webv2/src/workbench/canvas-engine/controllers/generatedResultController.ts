@@ -20,6 +20,7 @@ export interface GeneratedResultControllerOptions {
     options: { signal?: AbortSignal; isCurrent?: () => boolean }
   ) => Promise<DecodeImageResult>;
   readonly discardPersisted: (layerId: string) => void;
+  readonly getDefaultControlModel: (base: string | null) => string | null;
   readonly getMainModelBase: () => string | null;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
 }
@@ -159,17 +160,22 @@ export class GeneratedResultController {
       }
       const layerId = o.ctx.createLayerId();
       const selectedLayerId = document.selectedLayerId;
+      const buildControlCopy = (): CanvasLayerContract => {
+        const mainBase = o.getMainModelBase();
+        return {
+          ...createControlLayer(
+            options.copyLayerName ?? nextControlLayerName(document.layers.map((layer) => layer.name)),
+            layerId,
+            mainBase,
+            o.getDefaultControlModel(mainBase)
+          ),
+          source,
+          transform: identityTransform,
+        };
+      };
       const copy: CanvasLayerContract =
         options.target === 'copy-control'
-          ? {
-              ...createControlLayer(
-                options.copyLayerName ?? nextControlLayerName(document.layers.map((layer) => layer.name)),
-                layerId,
-                o.getMainModelBase()
-              ),
-              source,
-              transform: identityTransform,
-            }
+          ? buildControlCopy()
           : {
               blendMode: 'normal',
               id: layerId,

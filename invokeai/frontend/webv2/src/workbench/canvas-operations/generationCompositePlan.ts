@@ -13,6 +13,7 @@ import {
   getCompositeLayerBounds,
   planBaseRasterComposite,
 } from '@workbench/canvas-engine/api';
+import { isCompositableControlLayer, isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
 import type {
   CompositeEntry,
@@ -152,17 +153,6 @@ export const planComposites = (document: CanvasDocumentContractV2, bbox: Rect): 
   return { bbox, entries };
 };
 
-/** True when a control layer is enabled and holds rasterizable (non-empty) content. */
-const hasControlContent = (layer: CanvasLayerContract): layer is CanvasControlLayerContract => {
-  if (!layer.isEnabled || layer.type !== 'control') {
-    return false;
-  }
-  if (layer.source.type === 'image') {
-    return true;
-  }
-  return layer.source.type === 'paint' && layer.source.bitmap !== null;
-};
-
 /** The native (unscaled) content rect of a control layer's source (layer-local). */
 const controlContentRect = (
   layer: CanvasControlLayerContract,
@@ -220,7 +210,7 @@ export interface ControlCompositeEntry {
  * paint into the img2img/inpaint source.
  */
 export const planControlComposites = (document: CanvasDocumentContractV2, bbox: Rect): ControlCompositeEntry[] =>
-  document.layers.filter(hasControlContent).map((layer) => {
+  document.layers.filter(isCompositableControlLayer).map((layer) => {
     const ref = toControlLayerRef(layer, document);
     return {
       entry: {
@@ -233,10 +223,6 @@ export const planControlComposites = (document: CanvasDocumentContractV2, bbox: 
       layerId: layer.id,
     };
   });
-
-/** True when a regional-guidance layer is enabled and holds a persisted (non-empty) mask. */
-const hasRegionalMaskContent = (layer: CanvasLayerContract): layer is CanvasRegionalGuidanceLayerContract =>
-  layer.isEnabled && layer.type === 'regional_guidance' && layer.mask.bitmap !== null;
 
 /** The native content rect of a regional mask's persisted bitmap (layer-local, at its offset). */
 const regionalMaskContentRect = (
@@ -293,7 +279,7 @@ export const planRegionalMaskComposites = (
   document: CanvasDocumentContractV2,
   bbox: Rect
 ): RegionalMaskCompositeEntry[] =>
-  document.layers.filter(hasRegionalMaskContent).map((layer) => {
+  document.layers.filter(isCompositableRegionalGuidanceLayer).map((layer) => {
     const ref = toRegionalMaskRef(layer);
     return {
       entry: {

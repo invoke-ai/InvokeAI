@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clampZoom,
   constrainAspect,
+  snapMovedPoint,
   snapRectToGrid,
   snapToGrid,
   snapZoom,
@@ -77,6 +78,23 @@ describe('snapToGrid', () => {
   it('returns the value unchanged for a non-positive grid', () => {
     expect(snapToGrid(13.3, 0)).toBe(13.3);
     expect(snapToGrid(13.3, -4)).toBe(13.3);
+  });
+});
+
+describe('snapMovedPoint', () => {
+  it('snaps the resulting position rather than the delta', () => {
+    // An off-grid origin seats ONTO the grid: 3+21=24, 5+15=20 -> 24.
+    expect(snapMovedPoint({ x: 3, y: 5 }, { x: 21, y: 15 }, 8)).toEqual({ x: 24, y: 24 });
+  });
+
+  it('passes an axis with a zero delta through untouched', () => {
+    // Shift-locked (or simply unmoved) axes must not drift onto a grid line.
+    expect(snapMovedPoint({ x: 3, y: 5 }, { x: 21, y: 0 }, 8)).toEqual({ x: 24, y: 5 });
+    expect(snapMovedPoint({ x: 3, y: 5 }, { x: 0, y: 15 }, 8)).toEqual({ x: 3, y: 24 });
+  });
+
+  it('is a plain translation for a non-positive grid', () => {
+    expect(snapMovedPoint({ x: 3, y: 5 }, { x: 21, y: 15 }, 0)).toEqual({ x: 24, y: 20 });
   });
 });
 

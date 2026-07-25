@@ -62,6 +62,20 @@ const createSelectionPixelOptions = () => ({
   notifyPainted: vi.fn(),
 });
 
+const createFloatingSelectionOptions = () => ({
+  applyImagePatch: vi.fn(),
+  backend: {} as never,
+  canEdit: () => true,
+  endBurst: vi.fn(),
+  getDocument: () => null,
+  history: {} as never,
+  invalidateLayer: vi.fn(),
+  layers: {} as never,
+  markDirty: vi.fn(),
+  notifyPainted: vi.fn(),
+  onChange: vi.fn(),
+});
+
 const createSelectionImageOptions = () => ({
   capturePermit: () => null,
   decodeImage: vi.fn(),
@@ -76,6 +90,7 @@ describe('EditingController', () => {
     const selection = createSelection();
     const createSelectionState = vi.fn((_deps: SelectionStateDeps) => selection);
     const controller = new EditingController({
+      floatingSelection: createFloatingSelectionOptions(),
       getDocument: () => null,
       selection: {} as SelectionStateDeps,
       selectionPixels: createSelectionPixelOptions(),
@@ -98,6 +113,7 @@ describe('EditingController', () => {
   it('disposes selection and leases idempotently and cannot reactivate afterward', () => {
     const selection = createSelection();
     const controller = new EditingController({
+      floatingSelection: createFloatingSelectionOptions(),
       getDocument: () => null,
       selection: {} as SelectionStateDeps,
       selectionPixels: createSelectionPixelOptions(),

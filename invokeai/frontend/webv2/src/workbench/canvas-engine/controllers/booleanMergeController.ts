@@ -16,13 +16,13 @@ type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
 
-export interface BooleanMergeControllerOptions {
+export interface BooleanMergeControllerOptions<Permit> {
   readonly backend: RasterBackend;
   readonly history: History;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly getReducerDocument: () => CanvasDocumentContractV2 | null;
-  readonly capturePermit: () => object | null;
-  readonly isPermitCurrent: (permit: object) => boolean;
+  readonly capturePermit: () => Permit | null;
+  readonly isPermitCurrent: (permit: Permit) => boolean;
   readonly isGestureActive: () => boolean;
   readonly endBurst: () => void;
   readonly isCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV2) => boolean;
@@ -46,10 +46,10 @@ const modes: Record<BooleanRasterOperation, GlobalCompositeOperation> = {
 };
 
 /** Owns guarded two-layer boolean compositing and atomic stack history. */
-export class BooleanMergeController {
+export class BooleanMergeController<Permit> {
   private disposed = false;
 
-  constructor(private readonly deps: BooleanMergeControllerOptions) {}
+  constructor(private readonly deps: BooleanMergeControllerOptions<Permit>) {}
 
   async merge(upperLayerId: string, operation: BooleanRasterOperation): Promise<BooleanRasterResult> {
     const permit = this.deps.capturePermit();

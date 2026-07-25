@@ -221,6 +221,7 @@ const inpaintMask = (
     noiseLevel: number;
     denoiseLimit: number;
     isEnabled: boolean;
+    isHidden: boolean;
     offset: { x: number; y: number };
   }> = {}
 ): CanvasLayerContract => ({
@@ -228,6 +229,7 @@ const inpaintMask = (
   denoiseLimit: overrides.denoiseLimit,
   id,
   isEnabled: overrides.isEnabled ?? true,
+  isHidden: overrides.isHidden,
   isLocked: false,
   mask: {
     bitmap: 'bitmap' in overrides ? overrides.bitmap! : imageRef(`${id}-bmp`, 100, 80),
@@ -266,6 +268,12 @@ describe('planComposites — inpaint-mask entries', () => {
     ]);
     const entry = entryOfKind(doc, 'inpaint-mask');
     expect(entry!.maskLayers!.map((l) => l.id)).toEqual(['on']);
+  });
+
+  it('INCLUDES hidden masks — hiding is display-only and must not change the image', () => {
+    const doc = makeDoc([inpaintMask('shown'), inpaintMask('hidden', { isHidden: true })]);
+    const entry = entryOfKind(doc, 'inpaint-mask');
+    expect(entry!.maskLayers!.map((l) => l.id)).toEqual(['shown', 'hidden']);
   });
 
   it('resolves an undefined denoiseLimit to the legacy default (1.0)', () => {
@@ -333,6 +341,7 @@ const controlLayer = (
   overrides: Partial<{
     source: CanvasControlLayerContract['source'];
     isEnabled: boolean;
+    isHidden: boolean;
     withTransparencyEffect: boolean;
     opacity: number;
     blendMode: CanvasLayerContract['blendMode'];
@@ -342,6 +351,7 @@ const controlLayer = (
   blendMode: overrides.blendMode ?? 'normal',
   id,
   isEnabled: overrides.isEnabled ?? true,
+  isHidden: overrides.isHidden,
   isLocked: false,
   name: id,
   opacity: overrides.opacity ?? 1,
@@ -349,6 +359,15 @@ const controlLayer = (
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'control',
   withTransparencyEffect: overrides.withTransparencyEffect ?? false,
+});
+
+describe('planComposites — hidden layers still generate', () => {
+  it('keeps a hidden control layer in the plan', () => {
+    const shown = planControlComposites(makeDoc([controlLayer('c')]), BBOX);
+    const hidden = planControlComposites(makeDoc([controlLayer('c', { isHidden: true })]), BBOX);
+    expect(hidden.length).toBe(shown.length);
+    expect(hidden.length).toBeGreaterThan(0);
+  });
 });
 
 describe('planComposites — control-layer exclusion', () => {

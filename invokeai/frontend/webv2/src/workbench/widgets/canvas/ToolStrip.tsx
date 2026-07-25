@@ -11,6 +11,7 @@ import {
   MoveIcon,
   PaintBucketIcon,
   Rotate3dIcon,
+  SquareDashedIcon,
   SquareIcon,
   TypeIcon,
 } from 'lucide-react';
@@ -120,6 +121,13 @@ const ToolStripRoot = ({
           isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.text')}
           toolId="text"
+        />
+        <ToolStripButton
+          engine={engine}
+          icon={SquareDashedIcon}
+          isInteractionLocked={isInteractionLocked}
+          label={t('widgets.canvas.tools.marquee')}
+          toolId="marquee"
         />
         <ToolStripButton
           engine={engine}

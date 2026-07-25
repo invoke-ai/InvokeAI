@@ -4,6 +4,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useQueueItemProgressImage } from '@features/queue/react';
+import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
 import {
   createLayerId,
@@ -27,11 +28,13 @@ import { useTranslation } from 'react-i18next';
 import { gridSizeForModelBase } from './bboxGrid';
 import { CanvasBottomControls } from './CanvasBottomControls';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
+import { copyBlobToClipboard, decodeImageBlob, readClipboardImage } from './canvasClipboard';
 import {
   resolveCanvasContextMenu,
   resolveCanvasContextMenuBranch,
   type CanvasContextMenuTarget,
 } from './canvasContextMenu';
+import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
@@ -54,6 +57,7 @@ import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolStrip } from './ToolStrip';
 import { useCanvasEngine } from './useCanvasEngine';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
+import { useCreateFromBbox } from './useCreateFromBbox';
 
 /** Command id → document-space nudge delta (shift variants are ×10). */
 const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
@@ -94,6 +98,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const { document, stagingArea } = canvas;
   const operation = useCanvasOperation(engine);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
+  const { createFromBbox, isCreating } = useCreateFromBbox(engine);
 
   // Right-click on the canvas surface: hit-test the layer under the cursor and
   // open either the shared per-layer menu or the global empty-space menu at the
@@ -170,26 +175,24 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     (event: ReactMouseEvent<HTMLDivElement>) => {
       // Keep the native menu inside inline editors (the text tool's contenteditable
       // overlay), consistent with the surface-focus INLINE_EDIT_SELECTOR.
-      const rect = event.currentTarget.getBoundingClientRect();
+      //
+      // The menu targets the SELECTED layer, not the layer under the pointer, and
+      // never dispatches a selection — the layers panel is the sole authority on
+      // which layer is active.
       const resolution = resolveCanvasContextMenu({
         clientX: event.clientX,
         clientY: event.clientY,
-        hitTest: engine ? (point) => engine.tools.contextMenuLayerIdAt(point) : undefined,
         isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
         isInteractionLocked,
-        surfaceLeft: rect.left,
-        surfaceTop: rect.top,
+        selectedLayerId: engine?.tools.canTargetLayerFromContextMenu() ? canvas.document.selectedLayerId : null,
       });
       if (!resolution.preventDefault) {
         return;
       }
       event.preventDefault();
-      if (resolution.target?.layerId) {
-        canvasDispatch({ id: resolution.target.layerId, type: 'setCanvasSelectedLayer' });
-      }
       setContextMenuTarget(resolution.target);
     },
-    [canvasDispatch, engine, isInteractionLocked]
+    [canvas.document.selectedLayerId, engine, isInteractionLocked]
   );
 
   const handleCanvasImageDrop = useCallback(
@@ -230,6 +233,56 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     },
     [canvasCommands, engine, notifications, queries, t]
   );
+
+  /**
+   * Copies the selection's pixels to the system clipboard, optionally cutting
+   * them. The engine produces the blob; the clipboard write is a widget concern
+   * (`canvas-engine` may not reach `workbench/widgets`).
+   */
+  const copySelection = useEffectEvent((cut: boolean) => {
+    const mountedEngine = engine;
+    if (!mountedEngine) {
+      return;
+    }
+    void (async () => {
+      try {
+        const blob = await mountedEngine.selection.exportSelectionBlob();
+        if (!blob) {
+          return;
+        }
+        await copyBlobToClipboard(blob);
+        if (cut) {
+          // Only after the write succeeds — a failed copy must not destroy pixels.
+          mountedEngine.selection.eraseSelection();
+        }
+      } catch {
+        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.copyFailed') });
+      }
+    })();
+  });
+
+  /** Pastes an image off the system clipboard as a new layer over the bbox. */
+  const pasteFromClipboard = useEffectEvent(() => {
+    const mountedEngine = engine;
+    if (!mountedEngine) {
+      return;
+    }
+    void (async () => {
+      const blob = await readClipboardImage();
+      if (!blob) {
+        return;
+      }
+      const pixels = await decodeImageBlob(blob);
+      if (!pixels) {
+        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.pasteFailed') });
+        return;
+      }
+      const result = mountedEngine.selection.pasteImage(pixels);
+      if (result.status !== 'created') {
+        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.pasteFailed') });
+      }
+    })();
+  });
 
   useDndMonitor({ onDragEnd: handleCanvasImageDrop });
 
@@ -368,10 +421,35 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     }
 
     if (commandId === 'canvas.deleteSelected') {
-      // Staged images take priority; otherwise delete the selected layer (undoable).
-      if (engine && selectedLayer && selectedIndex >= 0) {
+      // With a live pixel selection, Delete clears the selected PIXELS — the
+      // Photoshop meaning. Only with no selection does it delete the layer.
+      if (engine?.interaction.get('hasSelection')) {
+        engine.selection.eraseSelection();
+      } else if (engine && selectedLayer && selectedIndex >= 0) {
         const { forward, inverse } = deleteLayerActions(selectedLayer, selectedIndex);
         engine.layers.commitStructural(t('widgets.canvas.commands.deleteLayer'), forward, inverse);
+      }
+    } else if (commandId === 'canvas.copySelection' || commandId === 'canvas.cutSelection') {
+      copySelection(commandId === 'canvas.cutSelection');
+    } else if (commandId === 'canvas.pasteImage') {
+      pasteFromClipboard();
+    } else if (commandId === 'canvas.toggleNonRasterLayers') {
+      // Hide, never disable: this is the "get the overlays out of my way"
+      // shortcut, and it must leave the generated image untouched.
+      const hideable = layers.filter(isHideableLayer);
+      if (engine && hideable.length > 0) {
+        const nextHidden = hideable.every((layer) => !isLayerHidden(layer));
+        engine.layers.commitStructural(
+          t('widgets.canvas.commands.toggleNonRasterLayers'),
+          {
+            type: 'setCanvasLayersHidden',
+            updates: hideable.map((layer) => ({ id: layer.id, isHidden: nextHidden })),
+          },
+          {
+            type: 'setCanvasLayersHidden',
+            updates: hideable.map((layer) => ({ id: layer.id, isHidden: isLayerHidden(layer) })),
+          }
+        );
       }
     } else if (commandId === 'canvas.resetSelected') {
       if (engine && selectedLayer) {
@@ -401,7 +479,31 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     } else if (commandId === 'canvas.tool.eraser') {
       engine?.tools.setTool('eraser');
     } else if (commandId === 'canvas.tool.lasso') {
-      engine?.tools.setTool('lasso');
+      if (engine) {
+        // Pressing the shortcut while already on the tool cycles its shape
+        // (Photoshop-style) rather than re-selecting the tool it is already on.
+        if (engine.interaction.get('activeTool') === 'lasso') {
+          const lasso = engine.interaction.get('lassoOptions');
+          engine.interaction.set('lassoOptions', {
+            ...lasso,
+            shape: lasso.shape === 'freehand' ? 'polygon' : 'freehand',
+          });
+        } else {
+          engine.tools.setTool('lasso');
+        }
+      }
+    } else if (commandId === 'canvas.tool.marquee') {
+      if (engine) {
+        if (engine.interaction.get('activeTool') === 'marquee') {
+          const marquee = engine.interaction.get('marqueeOptions');
+          engine.interaction.set('marqueeOptions', {
+            ...marquee,
+            kind: marquee.kind === 'rect' ? 'ellipse' : 'rect',
+          });
+        } else {
+          engine.tools.setTool('marquee');
+        }
+      }
     } else if (commandId === 'canvas.tool.shape') {
       engine?.tools.setTool('shape');
     } else if (commandId === 'canvas.tool.text') {
@@ -419,7 +521,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     } else if (commandId === 'canvas.brushSizeUp') {
       engine?.tools.stepBrushSize(1);
     } else if (commandId === 'canvas.duplicateLayer') {
-      if (engine && selectedLayer) {
+      // With a live pixel selection, mod+J is "layer via copy" — it lifts just
+      // the selected pixels. With none, it duplicates the whole layer.
+      if (engine?.interaction.get('hasSelection')) {
+        engine.selection.liftSelectionToLayer();
+      } else if (engine && selectedLayer) {
         const { forward, inverse } = duplicateLayerActions(selectedLayer.id, createLayerId());
         engine.layers.commitStructural(t('widgets.canvas.commands.duplicateLayer'), forward, inverse);
       }
@@ -456,6 +562,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       ['canvas.tool.brush', t('widgets.canvas.commands.selectBrushTool'), ['b']],
       ['canvas.tool.eraser', t('widgets.canvas.commands.selectEraserTool'), ['e']],
       ['canvas.tool.lasso', t('widgets.canvas.commands.selectLassoTool'), ['l']],
+      ['canvas.tool.marquee', t('widgets.canvas.commands.selectMarqueeTool'), ['u']],
+      ['canvas.toggleNonRasterLayers', t('widgets.canvas.commands.toggleNonRasterLayers'), ['shift+h']],
+      ['canvas.copySelection', t('widgets.canvas.commands.copySelection'), ['mod+c']],
+      ['canvas.cutSelection', t('widgets.canvas.commands.cutSelection'), ['mod+x']],
+      ['canvas.pasteImage', t('widgets.canvas.commands.pasteImage'), ['mod+v']],
       ['canvas.tool.shape', t('widgets.canvas.commands.selectShapeTool'), ['r']],
       ['canvas.tool.text', t('widgets.canvas.commands.selectTextTool'), ['t']],
       ['canvas.tool.gradient', t('widgets.canvas.commands.selectGradientTool'), ['g']],
@@ -500,10 +611,24 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     [contextMenuTarget]
   );
   const contextMenuBranch = resolveCanvasContextMenuBranch(contextMenuTarget, engine !== null);
-  const isSaveToGalleryDisabled = !engine || isSaving || isInteractionLocked;
+  // The two composite operations share one busy flag so they can't overlap.
+  const isCompositeMenuDisabled = !engine || isSaving || isCreating || isInteractionLocked;
   const saveToGallerySubmenu = useMemo(
-    () => <CanvasSaveToGallerySubmenu disabled={isSaveToGalleryDisabled} onSave={saveToGallery} />,
-    [isSaveToGalleryDisabled, saveToGallery]
+    () => <CanvasSaveToGallerySubmenu disabled={isCompositeMenuDisabled} onSave={saveToGallery} />,
+    [isCompositeMenuDisabled, saveToGallery]
+  );
+  const createFromBboxSubmenu = useMemo(
+    () => <CanvasCreateFromBboxSubmenu disabled={isCompositeMenuDisabled} onCreate={createFromBbox} />,
+    [createFromBbox, isCompositeMenuDisabled]
+  );
+  const compositeSubmenus = useMemo(
+    () => (
+      <>
+        {saveToGallerySubmenu}
+        {createFromBboxSubmenu}
+      </>
+    ),
+    [createFromBboxSubmenu, saveToGallerySubmenu]
   );
   const canvasSurface = useMemo(() => (engine ? <CanvasSurface engine={engine} /> : null), [engine]);
 
@@ -518,7 +643,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
           <>
             <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
             <CanvasLayerContextMenu
-              beforeDangerItems={saveToGallerySubmenu}
+              beforeDangerItems={compositeSubmenus}
               dispatch={canvasDispatch}
               engine={engine}
               layers={document.layers}
@@ -530,7 +655,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
         ) : null}
         {contextMenuBranch === 'global' && contextMenuTarget ? (
           <CanvasGlobalContextMenu target={contextMenuTarget} onClose={closeContextMenu}>
-            {saveToGallerySubmenu}
+            {compositeSubmenus}
           </CanvasGlobalContextMenu>
         ) : null}
 

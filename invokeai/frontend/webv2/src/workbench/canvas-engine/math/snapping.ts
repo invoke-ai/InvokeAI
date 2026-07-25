@@ -4,7 +4,7 @@
  * No classes, no mutation — every function returns a new value.
  */
 
-import type { Rect } from '@workbench/canvas-engine/types';
+import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 /** Zoom levels the viewport snaps to when close enough. Single source of truth for the HUD. */
 export const ZOOM_SNAP_CANDIDATES: readonly number[] = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5];
@@ -49,6 +49,21 @@ export const snapToGrid = (value: number, grid: number): number => {
   }
   return Math.round(value / grid) * grid;
 };
+
+/**
+ * The snapped absolute position for a drag of `delta` away from `origin`.
+ *
+ * Snaps the RESULT, not the delta, so something that starts off-grid seats onto
+ * the grid instead of carrying its misalignment along forever.
+ *
+ * Per axis, and only for axes the drag actually moved: an axis with a zero delta
+ * (shift locked it, or the pointer simply never moved along it) is passed through
+ * untouched rather than being pulled onto a grid line the user never crossed.
+ */
+export const snapMovedPoint = (origin: Vec2, delta: Vec2, grid: number): Vec2 => ({
+  x: delta.x === 0 ? origin.x : snapToGrid(origin.x + delta.x, grid),
+  y: delta.y === 0 ? origin.y : snapToGrid(origin.y + delta.y, grid),
+});
 
 /** Snaps a rect's position and size to the nearest multiple of `grid`. */
 export const snapRectToGrid = (rect: Rect, grid: number): Rect => {

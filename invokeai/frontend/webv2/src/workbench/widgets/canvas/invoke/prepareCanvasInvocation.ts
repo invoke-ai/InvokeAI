@@ -46,10 +46,12 @@ import {
   compileCanvasGraph,
   detectCanvasMode,
   getControlValidationReason,
+  getControlValidationReasonMessage,
   getRegionalGuidanceRejectionReason,
   isRegionalGuidanceSupportedForBase,
   type CanvasCompileMode,
   type ControlLayerGraphInput,
+  type ControlValidationReason,
   type RegionalGuidanceInput,
   type RegionalReferenceImageInput,
   resolveGenerateSeed,
@@ -63,6 +65,17 @@ import {
 
 /** Title on every canvas-invoke failure notice. */
 export const CANVAS_INVOKE_ERROR_TITLE = 'Canvas generation failed';
+
+/** Structured control-layer rejection: callers map `code` to localized text. */
+export class ControlLayerValidationError extends Error {
+  constructor(
+    readonly code: ControlValidationReason,
+    readonly layerName: string
+  ) {
+    super(getControlValidationReasonMessage(code, layerName));
+    this.name = 'ControlLayerValidationError';
+  }
+}
 
 /** Injected dependencies for the React-free orchestrator. */
 export interface RunCanvasInvocationDeps {
@@ -96,6 +109,8 @@ export interface RunCanvasInvocationDeps {
   /** Persisted compositing settings (infill / coherence / mask blur), defaulted + clamped. */
   compositing: CanvasCompositingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
+  /** Localizes a control-layer rejection; defaults to the English validation sentence. */
+  formatControlLayerError?: (code: ControlValidationReason, layerName: string) => string;
 }
 
 const recordNotice = (
@@ -141,7 +156,7 @@ const createControlLayerCollector = (
         zImageControlIndex: adapter.kind === 'z_image_control' ? zImageControlCount : 0,
       });
       if (rejection || !resolved) {
-        throw new Error(`[${rejection ?? 'missing_model'}] Control layer "${layer.name}" is invalid.`);
+        throw new ControlLayerValidationError(rejection ?? 'missing_model', layer.name);
       }
       if (adapter.kind === 'control_lora') {
         controlLoraCount += 1;
@@ -380,7 +395,13 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     });
     composed.dedupeCommit.commit();
   } catch (error) {
-    recordNotice(commands.notifications, 'error', error instanceof Error ? error.message : String(error));
+    const message =
+      error instanceof ControlLayerValidationError && deps.formatControlLayerError
+        ? deps.formatControlLayerError(error.code, error.layerName)
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    recordNotice(commands.notifications, 'error', message);
   } finally {
     inFlight.delete(projectId);
   }
@@ -405,6 +426,8 @@ export interface PrepareCanvasInvocationArgs {
    */
   compositing?: CanvasCompositingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
+  /** Localizes a control-layer rejection; defaults to the English validation sentence. */
+  formatControlLayerError?: (code: ControlValidationReason, layerName: string) => string;
 }
 
 /**
@@ -425,6 +448,7 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     commands: args.commands,
     composeForGeneration: (composeOptions) => operations.composeForGeneration(composeOptions),
     flushPendingUploads: () => engine.lifecycle.flushPendingUploads(),
+    formatControlLayerError: args.formatControlLayerError,
     generateValues: args.generateValues,
     inFlight: inFlightProjects,
     models: args.models,

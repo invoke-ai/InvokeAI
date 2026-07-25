@@ -71,6 +71,8 @@ export const createWorkbenchPersistenceRuntime = ({
   let failedRevision: number | null = null;
   let lastSavedRevision = aggregate.getPersistedRevision();
   let previousConnectionStatus = aggregate.getState().backendConnection.status;
+  let isSaveInFlight = false;
+  let queuedSaveRequireCurrentRevision: boolean | null = null;
   let unsubscribeAggregate: (() => void) | null = null;
 
   const publish = (next: PersistenceRuntimeSnapshot): void => {
@@ -139,17 +141,36 @@ export const createWorkbenchPersistenceRuntime = ({
       return;
     }
     timeoutId = null;
+
+    if (isSaveInFlight) {
+      queuedSaveRequireCurrentRevision =
+        queuedSaveRequireCurrentRevision === null
+          ? requireCurrentRevision
+          : queuedSaveRequireCurrentRevision || requireCurrentRevision;
+      return;
+    }
+
     const state = aggregate.getState();
     const revision = aggregate.getPersistedRevision();
     generation += 1;
     const saveGeneration = generation;
 
+    isSaveInFlight = true;
     aggregate.saveStarted();
     publish({ error: null, phase: 'saving' });
     void persistence
       .saveWorkbench(state)
       .then((result) => completeSave(result, revision, saveGeneration, requireCurrentRevision))
-      .catch((error: unknown) => failSave(error, revision, saveGeneration, requireCurrentRevision));
+      .catch((error: unknown) => failSave(error, revision, saveGeneration, requireCurrentRevision))
+      .finally(() => {
+        isSaveInFlight = false;
+        const queuedRequireCurrentRevision = queuedSaveRequireCurrentRevision;
+        queuedSaveRequireCurrentRevision = null;
+
+        if (queuedRequireCurrentRevision !== null) {
+          save(queuedRequireCurrentRevision);
+        }
+      });
   };
 
   const scheduleSave = (): void => {
@@ -233,6 +254,7 @@ export const createWorkbenchPersistenceRuntime = ({
       }
       disposed = true;
       generation += 1;
+      queuedSaveRequireCurrentRevision = null;
       clearScheduledSave();
       unsubscribeAggregate?.();
       unsubscribeAggregate = null;

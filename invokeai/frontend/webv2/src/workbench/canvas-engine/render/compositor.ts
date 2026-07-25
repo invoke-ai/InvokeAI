@@ -21,7 +21,7 @@ import type {
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { LAYER_GROUP_COUNT, layerGroupRank } from '@workbench/canvas-engine/document/sources';
+import { isLayerHidden, LAYER_GROUP_COUNT, layerGroupRank } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, transformBounds } from '@workbench/canvas-engine/math/rect';
 
@@ -159,6 +159,15 @@ export interface CompositeOptions {
   adjustedSurface?: ((layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null) | null;
   /** Shared memoized surfaces for mask and control display effects. */
   derivedSurfaces?: DerivedSurfaceCache | null;
+  /**
+   * A live floating selection: pixels cut out of `layerId` and held in flight.
+   * They are drawn immediately ABOVE their own layer (the hole they left is
+   * already in that layer's cache), inheriting its opacity and blend mode, so
+   * the z-order is right by construction. `surface`/`rect` are LAYER-LOCAL, and
+   * `matrix` is the float's layer-local transform — both are composed with the
+   * layer's own matrix at draw time. `null`/absent ⇒ nothing in flight.
+   */
+  floatingSelection?: { layerId: string; surface: RasterSurface; rect: Rect; matrix: Mat2d } | null;
   /** Optional deterministic render counters; omitted in the normal zero-overhead path. */
   diagnostics?: CanvasDiagnostics | null;
 }
@@ -375,6 +384,26 @@ const drawCachedLayer = (
 };
 
 /**
+ * Draws the floating selection over the layer it was cut from. Its pixels are
+ * layer-local, so they go through the layer's (possibly overridden) matrix and
+ * then the float's own — never resampled into document space and back.
+ */
+const drawFloatingSelection = (
+  ctx: Ctx,
+  layer: CanvasLayerContract,
+  view: Mat2d,
+  opts: CompositeOptions,
+  float: NonNullable<CompositeOptions['floatingSelection']>
+): void => {
+  ctx.save();
+  ctx.globalAlpha = layer.opacity;
+  ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
+  setTransformFromMat(ctx, multiply(multiply(view, getEffectiveLayerMatrix(layer, opts)), float.matrix));
+  ctx.drawImage(float.surface.canvas, float.rect.x, float.rect.y);
+  ctx.restore();
+};
+
+/**
  * Composites `doc` onto `target`, using `caches` for each layer's pixels and
  * `view` as the document→screen transform.
  */
@@ -423,7 +452,9 @@ export const compositeDocument = (
       const layer = doc.layers[i];
       if (
         !layer ||
-        (!layer.isEnabled && layer.id !== opts.onlyLayerId) ||
+        // Disabled OR hidden: neither draws. `onlyLayerId` (an isolated
+        // operation preview) overrides both — the user is acting on that layer.
+        ((!layer.isEnabled || isLayerHidden(layer)) && layer.id !== opts.onlyLayerId) ||
         layer.id === opts.skipLayerId ||
         (opts.onlyLayerId && layer.id !== opts.onlyLayerId) ||
         layerGroupRank(layer) !== rank
@@ -431,17 +462,25 @@ export const compositeDocument = (
         continue;
       }
       opts.diagnostics?.increment('layersConsidered');
+      const float = opts.floatingSelection?.layerId === layer.id ? opts.floatingSelection : null;
       const entry = caches.get(layer.id);
       // Skip layers with no cache or an empty content rect (a brand-new / cleared
-      // paint / mask layer holds no pixels — nothing to draw).
+      // paint / mask layer holds no pixels — nothing to draw). A float still draws:
+      // its pixels are detached, so an emptied source layer must not hide them.
       if (!entry || entry.rect.width <= 0 || entry.rect.height <= 0) {
+        if (float) {
+          drawFloatingSelection(ctx, layer, view, opts, float);
+        }
         continue;
       }
-      if (isDefinitelyOffscreen(layer, entry, view, target, opts)) {
+      if (isDefinitelyOffscreen(layer, entry, view, target, opts) && !float) {
         opts.diagnostics?.increment('layersCulled');
         continue;
       }
       drawCachedLayer(ctx, layer, entry, view, opts);
+      if (float) {
+        drawFloatingSelection(ctx, layer, view, opts, float);
+      }
       opts.diagnostics?.increment('layersDrawn');
     }
   };

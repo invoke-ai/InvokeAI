@@ -10,6 +10,8 @@ import {
   getSourceBounds,
   getSourceContentRect,
   getSourcePixelSize,
+  isHideableLayer,
+  isLayerHidden,
   isMaskLayer,
   isRenderableLayer,
   maskAsPaintSource,
@@ -129,5 +131,74 @@ describe('getSourceBounds — parametric sources', () => {
 
   it('returns the whole document for a gradient', () => {
     expect(getSourceBounds(rasterLayer(gradient), doc)).toEqual({ height: 200, width: 300, x: 0, y: 0 });
+  });
+});
+
+describe('hide vs disable', () => {
+  const control = (isHidden?: boolean): CanvasLayerContract => ({
+    adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+    blendMode: 'normal',
+    id: 'c',
+    isEnabled: true,
+    isHidden,
+    isLocked: false,
+    name: 'c',
+    opacity: 1,
+    source: { image: { height: 10, imageName: 'c', width: 10 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect: false,
+  });
+
+  const inpaintMask = (isHidden?: boolean): CanvasLayerContract => ({
+    blendMode: 'normal',
+    id: 'm',
+    isEnabled: true,
+    isHidden,
+    isLocked: false,
+    mask: { bitmap: null, fill: { color: '#f00', style: 'solid' } },
+    name: 'm',
+    opacity: 1,
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'inpaint_mask',
+  });
+
+  const raster = (): CanvasLayerContract => ({
+    blendMode: 'normal',
+    id: 'r',
+    isEnabled: true,
+    isLocked: false,
+    name: 'r',
+    opacity: 1,
+    source: { bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'raster',
+  });
+
+  it('marks the three overlay types as hideable', () => {
+    expect(isHideableLayer(control())).toBe(true);
+    expect(isHideableLayer(inpaintMask())).toBe(true);
+  });
+
+  it('does not mark raster layers hideable — visibility IS participation for them', () => {
+    expect(isHideableLayer(raster())).toBe(false);
+    expect(isLayerHidden(raster())).toBe(false);
+  });
+
+  it('treats an absent flag as not hidden, so older documents load unchanged', () => {
+    expect(isLayerHidden(control(undefined))).toBe(false);
+    expect(isLayerHidden(inpaintMask(undefined))).toBe(false);
+  });
+
+  it('reports hidden only when the flag is explicitly set', () => {
+    expect(isLayerHidden(control(true))).toBe(true);
+    expect(isLayerHidden(control(false))).toBe(false);
+  });
+
+  it('leaves a hidden layer renderable — hiding is display-only, not disabling', () => {
+    // `isRenderableLayer` gates rasterization and generation eligibility; only
+    // `isEnabled` may switch it off.
+    expect(isRenderableLayer(control(true))).toBe(true);
+    expect(isRenderableLayer({ ...control(true), isEnabled: false })).toBe(false);
   });
 });

@@ -9,9 +9,11 @@ export { compileCanvasGraph } from './core/canvas/compileCanvasGraph';
 export { detectCanvasMode } from './core/canvas/canvasMode';
 export {
   type ControlAdapterKind,
+  type ControlValidationReason,
   getControlValidationReason,
   isControlKindSupportedForBase,
 } from './core/canvas/controlValidation';
+export { getControlLayerRejectionReason, getControlValidationReasonMessage } from './core/canvas/addControlLayers';
 export {
   getRegionalGuidanceRejectionReason,
   isRegionalGuidanceSupportedForBase,

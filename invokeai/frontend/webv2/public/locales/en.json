@@ -724,6 +724,17 @@
   },
   "launchpad": {
     "backToProject": "Back to project",
+    "browserIssues": {
+      "canvasReadbackIntegrity": {
+        "description": "Your browser is modifying or blocking canvas pixel data. This can make later strokes noisy or pixelated.",
+        "genericWorkaround": "If you use another privacy browser or canvas-protection extension, allow unmodified canvas access for this site, then reload Invoke.",
+        "heliumWorkaround": "Open the setting below, disable “[Helium Noise] Canvas pixel noising”, then relaunch Helium.",
+        "title": "Canvas protection may corrupt painted strokes"
+      },
+      "copyFailed": "Could not copy browser setting",
+      "copySetting": "Copy browser setting",
+      "settingCopied": "Browser setting copied"
+    },
     "projectsGreeting": "Welcome to Invoke",
     "projectsGreetingWithName": "Welcome back, {{name}}",
     "projectsSubtitle": "Pick up where you left off, or start something new.",
@@ -1168,7 +1179,13 @@
     "canvas": {
       "acceptToLayer": "Accept to Layer",
       "candidateCount": "{{current}} of {{total}}",
+      "clipboard": {
+        "copyFailed": "Could not copy the selection to the clipboard",
+        "pasteFailed": "Could not paste an image from the clipboard"
+      },
       "commands": {
+        "copySelection": "Copy selection",
+        "cutSelection": "Cut selection",
         "decreaseBrushSize": "Decrease brush/eraser size",
         "deleteLayer": "Delete layer",
         "deleteSelected": "Delete selected canvas item",
@@ -1191,6 +1208,7 @@
         "nudgeRightLarge": "Nudge layer right 10px",
         "nudgeUp": "Nudge layer up",
         "nudgeUpLarge": "Nudge layer up 10px",
+        "pasteImage": "Paste image",
         "previousEntity": "Previous canvas entity",
         "redo": "Redo canvas edit",
         "reorderLayer": "Reorder layer",
@@ -1201,16 +1219,28 @@
         "selectEraserTool": "Select eraser tool",
         "selectGradientTool": "Select gradient tool",
         "selectLassoTool": "Select lasso tool",
+        "selectMarqueeTool": "Select marquee tool",
         "selectMoveTool": "Select move tool",
         "selectShapeTool": "Select shape tool",
         "selectTextTool": "Select text tool",
         "selectTransformTool": "Select transform tool",
         "selectViewTool": "Select view tool",
+        "toggleNonRasterLayers": "Hide control, guidance and mask layers",
         "undo": "Undo canvas edit"
       },
       "contextMenu": {
+        "createError": "Couldn't create from BBox",
+        "createFromBbox": "Create From BBox",
+        "createdFromBbox": "Added {{destination}} from BBox",
         "empty": "This region has no visible raster content.",
+        "newControlLayer": "New Control Layer",
+        "newGlobalReferenceImage": "New Global Reference Image",
+        "newRasterLayer": "New Raster Layer",
+        "newRegionalReferenceImage": "New Regional Reference Image",
         "notReady": "The canvas is still preparing image data.",
+        "referenceImageAdded": "Added reference image",
+        "referenceImageFull": "The selected model can't accept more reference images.",
+        "referenceImageUnsupported": "The selected model doesn't support reference images.",
         "saveBboxToGallery": "Save BBox to Gallery",
         "saveCanvasToGallery": "Save Canvas to Gallery",
         "saveError": "Couldn't save to gallery",
@@ -1260,6 +1290,7 @@
       "settings": {
         "bboxOverlay": "Show bbox overlay",
         "checkerboard": "Checkerboard background",
+        "clipToBbox": "Clip strokes to bbox",
         "clearCaches": "Clear caches",
         "clearHistory": "Clear history",
         "grid": "Show grid",
@@ -1313,8 +1344,15 @@
         "gradientStart": "Start",
         "gradientStartOpacity": "Start opacity",
         "invertSelection": "Invert",
+        "lassoFreehand": "Freehand",
         "lassoHint": "Draw a shape to select. Shift adds, Alt subtracts.",
+        "lassoPolygon": "Polygon",
+        "lassoPolygonHint": "Click to place points. Double-click, Enter, or click the first point to close.",
+        "lassoShape": "Lasso mode",
+        "liftSelectionToLayer": "New layer",
         "lockAspect": "Lock aspect ratio",
+        "marqueeHint": "Drag to select a region. Shift constrains, Alt draws from centre.",
+        "marqueeKind": "Marquee shape",
         "movePosition": "Move layer",
         "opacity": "Opacity",
         "positionX": "X",
@@ -1354,6 +1392,7 @@
         "gradient": "Gradient",
         "label": "Tools",
         "lasso": "Lasso select",
+        "marquee": "Marquee select",
         "move": "Move",
         "shape": "Shape",
         "text": "Text",
@@ -1475,6 +1514,7 @@
         "selectObject": "Select object",
         "show": "Show layer",
         "toggleAutoNegative": "Toggle auto-negative",
+        "toggleHidden": "Show/hide on canvas",
         "toggleLock": "Toggle lock",
         "toggleTransparencyEffect": "Toggle transparency effect",
         "toggleVisibility": "Toggle visibility",
@@ -1571,6 +1611,7 @@
           "pidi_edge_detection": "PiDiNet",
           "spandrel_filter": "Spandrel"
         },
+        "invalidLayer": "Control layer \"{{name}}\": {{reason}}",
         "kind": "Adapter type",
         "kinds": {
           "control_lora": "Control LoRA",
@@ -1586,6 +1627,7 @@
           "more_prompt": "More prompt",
           "unbalanced": "Unbalanced"
         },
+        "needsAttention": "Control layer needs attention",
         "preview": "Preview filter",
         "selectModel": "Select a model",
         "stepRange": "Step range",
@@ -1760,7 +1802,8 @@
         "mergeVisible": "Merge visible",
         "new": "New layer",
         "showAll": "Show all",
-        "toggleVisibility": "Toggle group visibility"
+        "toggleVisibility": "Toggle group visibility",
+        "toggleHidden": "Show/hide all on canvas"
       },
       "groups": {
         "control": "Control Layers",

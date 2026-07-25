@@ -26,6 +26,7 @@ import {
 } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const CONTROL_WIDTH = '10rem';
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
@@ -102,6 +103,7 @@ const InvokeTooltipContent = ({
 };
 
 export const InvokeControl = () => {
+  const { t } = useTranslation();
   const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
   const commands = useWorkbenchCommands();
   const { generation } = commands;
@@ -147,12 +149,17 @@ export const InvokeControl = () => {
 
     submitResolvedInvocation({
       commands,
+      formatControlLayerError: (code, layerName) =>
+        t('widgets.layers.control.invalidLayer', {
+          name: layerName,
+          reason: t(`widgets.layers.control.validation.${code}`),
+        }),
       models: availabilityModels,
       prepareCanvasInvocation,
       project: snapshot.activeProject,
       route: postFlushRoute,
     });
-  }, [availabilityModels, commands, queries]);
+  }, [availabilityModels, commands, queries, t]);
   const tooltipContent = useMemo(
     () => (
       <InvokeTooltipContent

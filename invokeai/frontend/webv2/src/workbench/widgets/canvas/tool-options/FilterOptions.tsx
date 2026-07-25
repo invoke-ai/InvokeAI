@@ -171,7 +171,7 @@ export const FilterOptionsBar = ({
                 roundedEnd="none"
                 size="xs"
                 onClick={() =>
-                  void getCanvasOperations(engine).commitFilterOperation('apply', galleryDurability.makeDurable)
+                  void getCanvasOperations(engine).commitFilterOperation('apply', galleryDurability.makeCanvasAsset)
                 }
               >
                 {t('common.apply')}
@@ -197,7 +197,10 @@ export const FilterOptionsBar = ({
                     disabled={!saveTargetEligibility.raster}
                     value="raster"
                     onClick={() =>
-                      void getCanvasOperations(engine).commitFilterOperation('raster', galleryDurability.makeDurable)
+                      void getCanvasOperations(engine).commitFilterOperation(
+                        'raster',
+                        galleryDurability.makeCanvasAsset
+                      )
                     }
                   >
                     <Menu.ItemText>{t('widgets.layers.selectObject.saveAs_raster')}</Menu.ItemText>
@@ -206,7 +209,10 @@ export const FilterOptionsBar = ({
                     disabled={!saveTargetEligibility.control}
                     value="control"
                     onClick={() =>
-                      void getCanvasOperations(engine).commitFilterOperation('control', galleryDurability.makeDurable)
+                      void getCanvasOperations(engine).commitFilterOperation(
+                        'control',
+                        galleryDurability.makeCanvasAsset
+                      )
                     }
                   >
                     <Menu.ItemText>{t('widgets.layers.selectObject.saveAs_control')}</Menu.ItemText>

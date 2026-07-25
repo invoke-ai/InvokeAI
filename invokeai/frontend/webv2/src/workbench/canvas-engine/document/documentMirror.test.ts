@@ -90,7 +90,84 @@ const spyCallbacks = () => ({
   onDocumentReplaced: vi.fn<DocumentMirrorCallbacks['onDocumentReplaced']>(),
   onLayerOrderChanged: vi.fn<DocumentMirrorCallbacks['onLayerOrderChanged']>(),
   onLayersChanged: vi.fn<DocumentMirrorCallbacks['onLayersChanged']>(),
+  onSelectionChanged: vi.fn<NonNullable<DocumentMirrorCallbacks['onSelectionChanged']>>(),
   onStagingChanged: vi.fn<DocumentMirrorCallbacks['onStagingChanged']>(),
+});
+
+describe('createDocumentMirror: selection changes', () => {
+  const withSelection = (doc: CanvasDocumentContractV2, selectedLayerId: string | null): CanvasDocumentContractV2 => ({
+    ...doc,
+    selectedLayerId,
+  });
+
+  it('reports a selection-only change without reporting a layer change', () => {
+    // A selection-only edit produces a new `document` object that reuses the
+    // `layers` array reference — none of the other callbacks can see it.
+    const a = rasterLayer('a');
+    const b = rasterLayer('b');
+    const doc = makeDoc([a, b], { selectedLayerId: 'a' });
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const callbacks = spyCallbacks();
+    createDocumentMirror(store, 'p1', callbacks);
+
+    const nextDoc = withSelection(doc, 'b');
+    expect(nextDoc.layers).toBe(doc.layers);
+    store.setState({ projects: [{ canvas: { ...canvas, document: nextDoc }, id: 'p1' }] });
+
+    expect(callbacks.onSelectionChanged).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSelectionChanged).toHaveBeenCalledWith('b');
+    expect(callbacks.onLayersChanged).not.toHaveBeenCalled();
+    expect(callbacks.onLayerOrderChanged).not.toHaveBeenCalled();
+    expect(callbacks.onDocumentReplaced).not.toHaveBeenCalled();
+    expect(callbacks.onBboxChanged).not.toHaveBeenCalled();
+  });
+
+  it('stays silent when a layer edit leaves the selection alone', () => {
+    const a = rasterLayer('a');
+    const doc = makeDoc([a], { selectedLayerId: 'a' });
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const callbacks = spyCallbacks();
+    createDocumentMirror(store, 'p1', callbacks);
+
+    const nextDoc: CanvasDocumentContractV2 = { ...doc, layers: [{ ...a, opacity: 0.5 }] };
+    store.setState({ projects: [{ canvas: { ...canvas, document: nextDoc }, id: 'p1' }] });
+
+    expect(callbacks.onLayersChanged).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSelectionChanged).not.toHaveBeenCalled();
+  });
+
+  it('reports the cleared selection when the selected layer is removed', () => {
+    const a = rasterLayer('a');
+    const b = rasterLayer('b');
+    const doc = makeDoc([a, b], { selectedLayerId: 'a' });
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const callbacks = spyCallbacks();
+    createDocumentMirror(store, 'p1', callbacks);
+
+    const nextDoc: CanvasDocumentContractV2 = { ...doc, layers: [b], selectedLayerId: 'b' };
+    store.setState({ projects: [{ canvas: { ...canvas, document: nextDoc }, id: 'p1' }] });
+
+    expect(callbacks.onLayersChanged).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSelectionChanged).toHaveBeenCalledWith('b');
+  });
+
+  it('reports a selection change carried by a wholesale document replacement', () => {
+    const a = rasterLayer('a');
+    const doc = makeDoc([a], { selectedLayerId: 'a' });
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const callbacks = spyCallbacks();
+    createDocumentMirror(store, 'p1', callbacks);
+
+    const nextDoc = makeDoc([rasterLayer('z')], { selectedLayerId: 'z' });
+    store.setState({ projects: [{ canvas: makeCanvas(nextDoc, 1), id: 'p1' }] });
+
+    expect(callbacks.onDocumentReplaced).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSelectionChanged).toHaveBeenCalledWith('z');
+  });
 });
 
 describe('createDocumentMirror', () => {

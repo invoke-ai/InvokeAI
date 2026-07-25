@@ -29,7 +29,8 @@ export type CanvasSettingStore =
   | 'showBbox'
   | 'bboxOverlay'
   | 'ruleOfThirds'
-  | 'snapToGrid';
+  | 'snapToGrid'
+  | 'clipToBbox';
 
 /** The popover section a setting is grouped under. */
 export type CanvasSettingSection = 'behavior' | 'display' | 'grid';
@@ -42,6 +43,7 @@ export const CANVAS_SHOW_BBOX_KEY = 'showBbox';
 export const CANVAS_BBOX_OVERLAY_KEY = 'bboxOverlay';
 export const CANVAS_RULE_OF_THIRDS_KEY = 'ruleOfThirds';
 export const CANVAS_SNAP_TO_GRID_KEY = 'snapToGrid';
+export const CANVAS_CLIP_TO_BBOX_KEY = 'clipToBbox';
 export const CANVAS_SHOW_PROGRESS_KEY = 'showProgressOnCanvas';
 
 /** A single boolean canvas setting: its persisted key, default, label, section, and (optional) engine store. */
@@ -71,6 +73,16 @@ export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
     labelKey: 'widgets.canvas.settings.invertBrushScroll',
     section: 'behavior',
     store: 'invertBrushSizeScroll',
+  },
+  {
+    // Legacy parity: brush/eraser strokes cannot paint outside the generation
+    // frame. Resolved once per gesture, so moving the frame mid-stroke cannot
+    // change where the stroke already landed.
+    defaultValue: false,
+    key: CANVAS_CLIP_TO_BBOX_KEY,
+    labelKey: 'widgets.canvas.settings.clipToBbox',
+    section: 'behavior',
+    store: 'clipToBbox',
   },
   // ── Display ───────────────────────────────────────────────────────────────
   {

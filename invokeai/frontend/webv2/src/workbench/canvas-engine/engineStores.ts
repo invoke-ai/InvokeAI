@@ -43,14 +43,34 @@ export interface EraserOptions {
   opacity: number;
 }
 
-/** Lasso (selection) tool options: the boolean op applied when a path commits. */
+/** Lasso (selection) tool options: how the path is drawn, and the op it applies. */
 export interface LassoToolOptions {
   /** The op a committed lasso path applies to the selection, when no modifier overrides it. */
   mode: SelectionOp;
+  /** `freehand` traces a drag; `polygon` places straight-edged vertices by click. */
+  shape: 'freehand' | 'polygon';
 }
 
-/** Default lasso options: a fresh path replaces the selection. */
+/** Default lasso options: a freehand path that replaces the selection. */
 export const DEFAULT_LASSO_OPTIONS: LassoToolOptions = {
+  mode: 'replace',
+  shape: 'freehand',
+};
+
+/**
+ * Marquee (selection) tool options: the shape the next drag traces, and the
+ * boolean op it applies when no modifier overrides it. One tool covers both
+ * shapes — see `tools/marqueeTool.ts`.
+ */
+export interface MarqueeToolOptions {
+  kind: 'rect' | 'ellipse';
+  /** The op a committed marquee applies to the selection, when no modifier overrides it. */
+  mode: SelectionOp;
+}
+
+/** Default marquee options: a rectangle that replaces the selection. */
+export const DEFAULT_MARQUEE_OPTIONS: MarqueeToolOptions = {
+  kind: 'rect',
   mode: 'replace',
 };
 
@@ -390,6 +410,8 @@ export interface EngineStores {
   bboxOptions: ScalarStore<BboxToolOptions>;
   /** Lasso tool options (the committed boolean op mode). */
   lassoOptions: ScalarStore<LassoToolOptions>;
+  /** Marquee tool options (shape kind / the committed boolean op mode). */
+  marqueeOptions: ScalarStore<MarqueeToolOptions>;
   /** Shape tool options (kind / fill / stroke / stroke width). */
   shapeOptions: ScalarStore<ShapeToolOptions>;
   /** Gradient tool options (kind / angle / stops). */
@@ -423,6 +445,12 @@ export interface EngineStores {
    * mask gains/loses content.
    */
   hasSelection: ScalarStore<boolean>;
+  /**
+   * Whether pixels are currently in flight as a floating selection. React reads
+   * it to enable the transform bar's Apply/Cancel while a float is framed (there
+   * is no `transformSession` in that case — the float is the session).
+   */
+  hasFloatingSelection: ScalarStore<boolean>;
   /** Core-only visual SAM interaction state; application session status remains outside the engine. */
   samInteraction: ScalarStore<SamInteractionState | null>;
   /**
@@ -432,6 +460,17 @@ export interface EngineStores {
    * it is a transient channel — no dispatch, no React subscriber.
    */
   lassoPreview: ScalarStore<readonly Vec2[] | null>;
+  /**
+   * The live marquee-tool drag outline (document-space rect + shape), or `null`
+   * when idle. Like `lassoPreview`, a transient overlay-only channel: the mask
+   * is untouched until the drag commits.
+   */
+  marqueePreview: ScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>;
+  /**
+   * Whether brush/eraser strokes are clipped to the generation frame (legacy
+   * "clip strokes to bbox"). Resolved once per gesture by the paint tool.
+   */
+  clipToBbox: ScalarStore<boolean>;
   /** Model-dependent grid size (document px) the bbox snaps to. React feeds this from generate settings. */
   bboxGrid: ScalarStore<number>;
   /**
@@ -518,7 +557,11 @@ const checkerColorsEqual = (a: CheckerColors, b: CheckerColors): boolean => a.a 
 const bboxOptionsEqual = (a: BboxToolOptions, b: BboxToolOptions): boolean =>
   a.aspectLocked === b.aspectLocked && a.aspectRatio === b.aspectRatio;
 
-const lassoOptionsEqual = (a: LassoToolOptions, b: LassoToolOptions): boolean => a.mode === b.mode;
+const lassoOptionsEqual = (a: LassoToolOptions, b: LassoToolOptions): boolean =>
+  a.mode === b.mode && a.shape === b.shape;
+
+const marqueeOptionsEqual = (a: MarqueeToolOptions, b: MarqueeToolOptions): boolean =>
+  a.kind === b.kind && a.mode === b.mode;
 
 const shapeOptionsEqual = (a: ShapeToolOptions, b: ShapeToolOptions): boolean =>
   a.kind === b.kind && a.fill === b.fill && a.stroke === b.stroke && a.strokeWidth === b.strokeWidth;
@@ -529,7 +572,8 @@ const stopsEqual = (a: readonly GradientStop[], b: readonly GradientStop[]): boo
 const gradientOptionsEqual = (a: GradientToolOptions, b: GradientToolOptions): boolean =>
   a.kind === b.kind && a.angle === b.angle && stopsEqual(a.stops, b.stops);
 
-const shapePreviewEqual = (
+/** Shared by the shape and marquee previews — both are a rect plus a shape kind. */
+const rectShapePreviewEqual = (
   a: { rect: Rect; kind: 'rect' | 'ellipse' } | null,
   b: { rect: Rect; kind: 'rect' | 'ellipse' } | null
 ): boolean => {
@@ -614,10 +658,12 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   canRedo: createScalarStore<boolean>(false),
   canUndo: createScalarStore<boolean>(false),
   checkerboard: createScalarStore<boolean>(true),
+  clipToBbox: createScalarStore<boolean>(false),
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
   documentEditingLocked: createScalarStore<boolean>(false),
+  hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),
   gradientOptions: createScalarStore<GradientToolOptions>(
@@ -627,10 +673,12 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   gradientPreview: createScalarStore<{ start: Vec2; end: Vec2 } | null>(null, gradientPreviewEqual),
   lassoOptions: createScalarStore<LassoToolOptions>({ ...DEFAULT_LASSO_OPTIONS }, lassoOptionsEqual),
   lassoPreview: createScalarStore<readonly Vec2[] | null>(null),
+  marqueeOptions: createScalarStore<MarqueeToolOptions>({ ...DEFAULT_MARQUEE_OPTIONS }, marqueeOptionsEqual),
+  marqueePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, rectShapePreviewEqual),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
-  shapePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, shapePreviewEqual),
+  shapePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, rectShapePreviewEqual),
   showBbox: createScalarStore<boolean>(true),
   showGrid: createScalarStore<boolean>(false),
   snapToGrid: createScalarStore<boolean>(true),

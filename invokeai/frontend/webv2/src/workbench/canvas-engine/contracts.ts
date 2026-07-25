@@ -233,6 +233,18 @@ export interface CanvasControlLayerContract extends CanvasLayerBaseContract {
   adapter: CanvasControlAdapterContract;
   withTransparencyEffect: boolean;
   filter?: { type: string; settings: Record<string, unknown> };
+  /**
+   * Whether this layer's on-canvas preview is suppressed. DISPLAY ONLY — a
+   * hidden layer still affects generation exactly as it would if visible, which
+   * is the whole point: you can get a control map or mask overlay out of the way
+   * without changing the image it produces. Absent ⇒ not hidden.
+   *
+   * Only these three types carry it. For a raster layer, visibility and
+   * participation are the SAME fact — the raster stack IS the generation
+   * input — so `isEnabled` alone says everything, and a hidden-but-contributing
+   * raster layer is deliberately not representable.
+   */
+  isHidden?: boolean;
 }
 
 export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseContract {
@@ -242,6 +254,18 @@ export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseCont
   negativePrompt: string | null;
   autoNegative: boolean;
   referenceImages: RegionalGuidanceReferenceImage[];
+  /**
+   * Whether this layer's on-canvas preview is suppressed. DISPLAY ONLY — a
+   * hidden layer still affects generation exactly as it would if visible, which
+   * is the whole point: you can get a control map or mask overlay out of the way
+   * without changing the image it produces. Absent ⇒ not hidden.
+   *
+   * Only these three types carry it. For a raster layer, visibility and
+   * participation are the SAME fact — the raster stack IS the generation
+   * input — so `isEnabled` alone says everything, and a hidden-but-contributing
+   * raster layer is deliberately not representable.
+   */
+  isHidden?: boolean;
 }
 
 export interface CanvasInpaintMaskLayerContract extends CanvasLayerBaseContract {
@@ -249,6 +273,18 @@ export interface CanvasInpaintMaskLayerContract extends CanvasLayerBaseContract 
   mask: CanvasMaskContract;
   noiseLevel?: number;
   denoiseLimit?: number;
+  /**
+   * Whether this layer's on-canvas preview is suppressed. DISPLAY ONLY — a
+   * hidden layer still affects generation exactly as it would if visible, which
+   * is the whole point: you can get a control map or mask overlay out of the way
+   * without changing the image it produces. Absent ⇒ not hidden.
+   *
+   * Only these three types carry it. For a raster layer, visibility and
+   * participation are the SAME fact — the raster stack IS the generation
+   * input — so `isEnabled` alone says everything, and a hidden-but-contributing
+   * raster layer is deliberately not representable.
+   */
+  isHidden?: boolean;
 }
 
 export type CanvasLayerContract =

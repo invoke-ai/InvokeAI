@@ -4,6 +4,7 @@ import type {
   CanvasImageRef,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
+  CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/contracts';
 import type { Mat2d } from '@workbench/canvas-engine/types';
 
@@ -620,5 +621,122 @@ describe('shouldSmoothAtZoom', () => {
     expect(shouldSmoothAtZoom(1)).toBe(false);
     expect(shouldSmoothAtZoom(4)).toBe(false);
     expect(shouldSmoothAtZoom(20)).toBe(false);
+  });
+});
+
+describe('compositeDocument — floating selection', () => {
+  const floatOf = (backend: ReturnType<typeof createTestStubRasterBackend>, layerId: string) => ({
+    layerId,
+    matrix: identity(),
+    rect: { height: 8, width: 8, x: 0, y: 0 },
+    surface: backend.createSurface(8, 8),
+  });
+
+  it('draws the float immediately above its own layer and below the next one up', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const top = rasterLayer('top');
+    const bottom = rasterLayer('bottom');
+    const topCache = caches.getOrCreate('top', 10, 10);
+    const bottomCache = caches.getOrCreate('bottom', 10, 10);
+    const float = floatOf(backend, 'bottom');
+
+    const target = backend.createSurface(200, 200);
+    compositeDocument(target, makeDoc([top, bottom]), caches, VIEW, { floatingSelection: float });
+
+    const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    expect(drawn).toEqual([bottomCache.surface.canvas, float.surface.canvas, topCache.surface.canvas]);
+  });
+
+  it('inherits its layer opacity and blend mode', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('a', 10, 10);
+    const float = floatOf(backend, 'a');
+
+    const target = backend.createSurface(200, 200);
+    const doc = makeDoc([rasterLayer('a', { blendMode: 'multiply' as CanvasBlendMode, opacity: 0.5 })]);
+    compositeDocument(target, doc, caches, VIEW, { floatingSelection: float });
+
+    // Twice: once for the layer's own cache, once for the float over it.
+    expect(findSet(target.callLog, 'globalAlpha').filter((value) => value === 0.5)).toHaveLength(2);
+    expect(findSet(target.callLog, 'globalCompositeOperation').filter((value) => value === 'multiply')).toHaveLength(2);
+  });
+
+  it('still draws a float whose source layer has been emptied by the cut', () => {
+    // The lift can take everything a layer held; the detached pixels must not
+    // vanish with it.
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreateRect('a', { height: 0, width: 0, x: 0, y: 0 });
+    const float = floatOf(backend, 'a');
+
+    const target = backend.createSurface(200, 200);
+    compositeDocument(target, makeDoc([rasterLayer('a')]), caches, VIEW, { floatingSelection: float });
+
+    const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    expect(drawn).toEqual([float.surface.canvas]);
+  });
+
+  it('ignores a float whose layer id matches nothing in the document', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const cache = caches.getOrCreate('a', 10, 10);
+    const float = floatOf(backend, 'gone');
+
+    const target = backend.createSurface(200, 200);
+    compositeDocument(target, makeDoc([rasterLayer('a')]), caches, VIEW, { floatingSelection: float });
+
+    const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    expect(drawn).toEqual([cache.surface.canvas]);
+  });
+});
+
+describe('compositeDocument — hidden layers', () => {
+  // Typed to the guidance member: `isHidden` exists only on the three overlay
+  // contracts, so a bare spread of the union does not accept it — which is the
+  // invariant this design is built on.
+  const hiddenMask = (id: string): CanvasLayerContract => ({
+    ...(maskLayer(id) as CanvasRegionalGuidanceLayerContract),
+    isHidden: true,
+  });
+
+  it('does not draw a hidden overlay layer', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('m', 10, 10);
+    const rasterCache = caches.getOrCreate('r', 10, 10);
+    const target = backend.createSurface(200, 200);
+
+    compositeDocument(target, makeDoc([hiddenMask('m'), rasterLayer('r')]), caches, VIEW, { backend });
+
+    const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    expect(drawn).toEqual([rasterCache.surface.canvas]);
+  });
+
+  it('draws it again once unhidden — hiding never touches its pixels', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const maskCache = caches.getOrCreate('m', 10, 10);
+    const target = backend.createSurface(200, 200);
+
+    compositeDocument(target, makeDoc([maskLayer('m')]), caches, VIEW, { backend });
+
+    const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(maskCache.surface.width).toBe(10);
+  });
+
+  it('still draws a hidden layer while it is the isolated operation target', () => {
+    // An operation preview acts ON that layer; suppressing it would leave the
+    // user editing something they cannot see.
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreate('m', 10, 10);
+    const target = backend.createSurface(200, 200);
+
+    compositeDocument(target, makeDoc([hiddenMask('m')]), caches, VIEW, { backend, onlyLayerId: 'm' });
+
+    expect(target.callLog.some((e) => e.op === 'drawImage')).toBe(true);
   });
 });

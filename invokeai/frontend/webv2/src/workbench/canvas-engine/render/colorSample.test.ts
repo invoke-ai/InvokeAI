@@ -35,11 +35,22 @@ const createFixedPixelBackend = (pixel: readonly [number, number, number, number
     createSurface: (width: number, height: number): FakeSurface => {
       const drawnCanvases: unknown[] = [];
       const transforms: number[][] = [];
+      let hasDrawnPixels = false;
       const canvas = { height, width } as unknown as OffscreenCanvas;
       const ctx = {
-        clearRect: () => {},
-        drawImage: (image: unknown) => drawnCanvases.push(image),
-        getImageData: () => ({ data: Uint8ClampedArray.from(pixel), height: 1, width: 1 }) as unknown as ImageData,
+        clearRect: () => {
+          hasDrawnPixels = false;
+        },
+        drawImage: (image: unknown) => {
+          drawnCanvases.push(image);
+          hasDrawnPixels = true;
+        },
+        getImageData: () =>
+          ({
+            data: Uint8ClampedArray.from(hasDrawnPixels ? pixel : [0, 0, 0, 0]),
+            height: 1,
+            width: 1,
+          }) as unknown as ImageData,
         restore: () => {},
         save: () => {},
         setTransform: (...args: number[]) => transforms.push(args),
@@ -85,7 +96,17 @@ const makeDoc = (layers: CanvasLayerContract[]): CanvasDocumentContractV2 => ({
 });
 
 describe('sampleDocumentColor', () => {
-  it('returns null for a point outside the document bounds (never allocates a scratch surface)', () => {
+  it('returns null for non-finite points without allocating a scratch surface', () => {
+    const backend = createFixedPixelBackend([10, 20, 30, 255]);
+    const layers = createLayerCacheStore(backend);
+    const doc = makeDoc([]);
+
+    expect(sampleDocumentColor(doc, layers, backend, { x: Number.NaN, y: 5 })).toBeNull();
+    expect(sampleDocumentColor(doc, layers, backend, { x: 5, y: Number.POSITIVE_INFINITY })).toBeNull();
+    expect(backend.__surfaces).toHaveLength(0);
+  });
+
+  it('returns null when no layer covers a point beyond the document bounds', () => {
     const backend = createFixedPixelBackend([10, 20, 30, 255]);
     const layers = createLayerCacheStore(backend);
     const doc = makeDoc([]);
@@ -94,7 +115,7 @@ describe('sampleDocumentColor', () => {
     expect(sampleDocumentColor(doc, layers, backend, { x: 100, y: 5 })).toBeNull();
     expect(sampleDocumentColor(doc, layers, backend, { x: 5, y: -1 })).toBeNull();
     expect(sampleDocumentColor(doc, layers, backend, { x: 5, y: 100 })).toBeNull();
-    expect(backend.__surfaces).toHaveLength(0);
+    expect(backend.__surfaces).toHaveLength(4);
   });
 
   it('returns null when the composited pixel is fully transparent', () => {

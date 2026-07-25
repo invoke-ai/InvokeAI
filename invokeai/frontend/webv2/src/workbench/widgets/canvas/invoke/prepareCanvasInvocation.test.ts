@@ -673,12 +673,23 @@ describe('runCanvasInvocation', () => {
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks invocation with the shared reason code when a nonempty control layer has no model', async () => {
+  it('blocks invocation with a human-readable notice when a nonempty control layer has no model', async () => {
     const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
     expect(harness.notices()).toHaveLength(1);
-    expect(harness.notices()[0]?.message).toContain('missing_model');
+    expect(harness.notices()[0]?.message).toBe('Control layer "control" has no control model selected.');
+    expect(harness.notices()[0]?.message).not.toContain('[missing_model]');
+  });
+
+  it('prefers the injected control-layer error formatter', async () => {
+    const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
+    const formatControlLayerError = vi.fn((code: string, layerName: string) => `localized ${code} for ${layerName}`);
+
+    await runCanvasInvocation({ ...harness.deps, formatControlLayerError });
+
+    expect(formatControlLayerError).toHaveBeenCalledWith('missing_model', 'control');
+    expect(harness.notices()[0]?.message).toBe('localized missing_model for control');
   });
 
   it('blocks invocation when a nonempty control layer has malformed numeric settings', async () => {
@@ -702,7 +713,7 @@ describe('runCanvasInvocation', () => {
     await runCanvasInvocation(harness.deps);
 
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()[0]?.message).toContain('invalid_adapter_values');
+    expect(harness.notices()[0]?.message).toBe('Control layer "control" has invalid control adapter settings.');
   });
 
   it('ignores an empty control layer with no model', async () => {
@@ -745,7 +756,7 @@ describe('runCanvasInvocation', () => {
     });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()[0]?.message).toContain('control_lora_limit');
+    expect(harness.notices()[0]?.message).toBe('Only one Control LoRA can be used at a time.');
   });
 
   it('prepares a Z-Image control with exact adapter and model configuration', async () => {
@@ -834,7 +845,7 @@ describe('runCanvasInvocation', () => {
     await runCanvasInvocation(harness.deps);
 
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()[0]?.message).toContain('z_image_control_limit');
+    expect(harness.notices()[0]?.message).toBe('Only one Z-Image control layer can be used at a time.');
   });
 
   it('ignores a concurrent invoke while a prior prepare for the same project is in flight', async () => {

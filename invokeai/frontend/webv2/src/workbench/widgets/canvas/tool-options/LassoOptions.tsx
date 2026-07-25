@@ -1,93 +1,81 @@
-import type { CanvasCoreStoreCapability, CanvasSelectionCapability, SelectionOp } from '@workbench/canvas-engine/api';
+import type { SelectValueChangeDetails } from '@chakra-ui/react';
+import type { LassoToolOptions, SelectionOp } from '@workbench/canvas-engine/api';
 
-import { HStack, Text } from '@chakra-ui/react';
-import { Button } from '@platform/ui';
-import { isLayerPixelEditEligible } from '@workbench/canvas-engine/api';
-import { useCanvasHasSelection, useLassoOptions } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useCallback } from 'react';
+import { createListCollection, HStack, Text } from '@chakra-ui/react';
+import { Select } from '@platform/ui';
+import { useLassoOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ToolOptionsComponentProps } from './ToolOptionsBar';
 
-const OP_MODES: readonly SelectionOp[] = ['replace', 'add', 'subtract', 'intersect'];
+import { SelectionOptionsRow } from './SelectionOptionsRow';
 
-const OP_MODE_LABEL_KEYS: Record<SelectionOp, string> = {
-  add: 'widgets.canvas.toolOptions.selectionAdd',
-  intersect: 'widgets.canvas.toolOptions.selectionIntersect',
-  replace: 'widgets.canvas.toolOptions.selectionReplace',
-  subtract: 'widgets.canvas.toolOptions.selectionSubtract',
-};
+type LassoShape = LassoToolOptions['shape'];
 
-type LassoEngine = CanvasCoreStoreCapability & { readonly selection: CanvasSelectionCapability };
-
-/** One op-mode button with a stable click handler (avoids a per-render closure in the map). */
-const OpModeButton = ({ engine, mode, active }: { engine: LassoEngine; mode: SelectionOp; active: boolean }) => {
-  const { t } = useTranslation();
-  const onClick = useCallback(() => engine.interaction.set('lassoOptions', { mode }), [engine, mode]);
-  return (
-    <Button aria-pressed={active} size="xs" variant={active ? 'solid' : 'ghost'} onClick={onClick}>
-      {t(OP_MODE_LABEL_KEYS[mode])}
-    </Button>
-  );
-};
+const SELECT_POSITIONING = { placement: 'top-start', sameWidth: false } as const;
+const SELECT_TRIGGER_PROPS = { minW: '6rem' } as const;
 
 /**
- * Lasso tool options: the boolean op-mode selector (replace / add / subtract /
- * intersect — also settable transiently by holding shift / alt / shift+alt while
- * committing a path) plus fill / erase / invert / deselect actions. Fill and
- * erase require an eligible (unlocked, visible) paint layer selected; invert and
- * deselect only require a live selection. Reads/writes the engine's transient
- * selection state directly — no reducer mirror.
+ * Lasso tool options: how the path is drawn (freehand drag / polygon clicks),
+ * plus the shared selection controls bound to the lasso's own op mode.
  */
 export const LassoOptions = ({ engine }: ToolOptionsComponentProps) => {
   const { t } = useTranslation();
   const options = useLassoOptions(engine);
-  const hasSelection = useCanvasHasSelection(engine);
 
-  // Whether the selected layer can receive a masked fill/erase (paint, unlocked,
-  // visible). Same eligibility the engine enforces; used to disable the buttons.
-  const canPaintTarget = useActiveProjectSelector((project) => {
-    const { document } = project.canvas;
-    const layer = document.selectedLayerId
-      ? document.layers.find((entry) => entry.id === document.selectedLayerId)
-      : undefined;
-    return isLayerPixelEditEligible(layer);
-  });
+  const shapeCollection = useMemo(
+    () =>
+      createListCollection<{ label: string; value: LassoShape }>({
+        items: [
+          { label: t('widgets.canvas.toolOptions.lassoFreehand'), value: 'freehand' },
+          { label: t('widgets.canvas.toolOptions.lassoPolygon'), value: 'polygon' },
+        ],
+      }),
+    [t]
+  );
+  const shapeValue = useMemo(() => [options.shape], [options.shape]);
 
-  const onFill = useCallback(() => engine.selection.fillSelection(), [engine]);
-  const onErase = useCallback(() => engine.selection.eraseSelection(), [engine]);
-  const onInvert = useCallback(() => engine.selection.invertSelection(), [engine]);
-  const onDeselect = useCallback(() => engine.selection.deselect(), [engine]);
+  const onShapeChange = useCallback(
+    ({ value }: SelectValueChangeDetails<{ label: string; value: LassoShape }>) => {
+      const next = value[0] as LassoShape | undefined;
+      if (next && next !== options.shape) {
+        engine.interaction.set('lassoOptions', { ...options, shape: next });
+      }
+    },
+    [engine, options]
+  );
 
-  const canEdit = hasSelection && canPaintTarget;
+  const onModeChange = useCallback(
+    (mode: SelectionOp) => engine.interaction.set('lassoOptions', { ...options, mode }),
+    [engine, options]
+  );
 
   return (
     <HStack align="center" gap="3">
-      <HStack align="center" gap="1" role="group" aria-label={t('widgets.canvas.toolOptions.selectionMode')}>
-        {OP_MODES.map((mode) => (
-          <OpModeButton key={mode} active={options.mode === mode} engine={engine} mode={mode} />
-        ))}
-      </HStack>
-      <HStack align="center" gap="1">
-        <Button disabled={!canEdit} size="xs" variant="ghost" onClick={onFill}>
-          {t('widgets.canvas.toolOptions.fillSelection')}
-        </Button>
-        <Button disabled={!canEdit} size="xs" variant="ghost" onClick={onErase}>
-          {t('widgets.canvas.toolOptions.eraseSelection')}
-        </Button>
-        <Button disabled={!hasSelection} size="xs" variant="ghost" onClick={onInvert}>
-          {t('widgets.canvas.toolOptions.invertSelection')}
-        </Button>
-        <Button disabled={!hasSelection} size="xs" variant="ghost" onClick={onDeselect}>
-          {t('widgets.canvas.toolOptions.deselect')}
-        </Button>
-      </HStack>
-      {!hasSelection ? (
+      <HStack align="center" gap="1.5">
         <Text color="fg.muted" fontSize="2xs">
-          {t('widgets.canvas.toolOptions.lassoHint')}
+          {t('widgets.canvas.toolOptions.lassoShape')}
         </Text>
-      ) : null}
+        <Select
+          collection={shapeCollection}
+          positioning={SELECT_POSITIONING}
+          size="xs"
+          triggerProps={SELECT_TRIGGER_PROPS}
+          value={shapeValue}
+          onValueChange={onShapeChange}
+        />
+      </HStack>
+      <SelectionOptionsRow
+        engine={engine}
+        hintKey={
+          options.shape === 'polygon'
+            ? 'widgets.canvas.toolOptions.lassoPolygonHint'
+            : 'widgets.canvas.toolOptions.lassoHint'
+        }
+        mode={options.mode}
+        onModeChange={onModeChange}
+      />
     </HStack>
   );
 };

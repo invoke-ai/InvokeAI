@@ -1,5 +1,6 @@
 import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
+import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type {
   InvocationMode,
   InvocationRoute,
@@ -21,6 +22,7 @@ import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
 
+import { getBlockingControlLayerIssues } from './controlLayerChecks';
 import { getProjectWidgetValues } from './widgetState';
 
 /**
@@ -93,6 +95,8 @@ export interface InvocationRouteInput {
   projectId: string;
   /** The canvas generation frame (document space) — its area gates a canvas invoke. */
   canvasBbox: { width: number; height: number };
+  /** The canvas layer stack (identity-stable) — control layers gate a canvas invoke. */
+  canvasLayers: readonly CanvasLayerContract[];
 }
 
 const getMountedWidgetIds = (project: Project): WidgetId[] => {
@@ -116,6 +120,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
     height: project.canvas.document.bbox.height,
     width: project.canvas.document.bbox.width,
   },
+  canvasLayers: project.canvas.document.layers,
   generateValues: getProjectWidgetValues(project, 'generate'),
   upscaleValues: getProjectWidgetValues(project, 'upscale'),
   invocation: project.invocation,
@@ -132,6 +137,7 @@ export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right:
   left.upscaleValues === right.upscaleValues &&
   left.canvasBbox.width === right.canvasBbox.width &&
   left.canvasBbox.height === right.canvasBbox.height &&
+  left.canvasLayers === right.canvasLayers &&
   areArraysEqual(left.mountedWidgetIds, right.mountedWidgetIds);
 
 export const createInvocationRouteInputSelector = () =>
@@ -208,6 +214,22 @@ export const resolveInvocationRouteInput = (
 
     if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
       validationReasons.push('Canvas generation frame must have a positive area.');
+    }
+
+    // Control layers that would make the invoke pipeline reject the document.
+    // Gated on a loaded models list so a not-yet-loaded snapshot can't produce
+    // false "missing model" blocks.
+    if (models) {
+      const values = normalizeGenerateWidgetValues(input.generateValues);
+      if (values && isSupportedGenerateModel(values.model)) {
+        validationReasons.push(
+          ...getBlockingControlLayerIssues({
+            layers: input.canvasLayers,
+            mainModel: values.model,
+            models,
+          }).map((issue) => issue.message)
+        );
+      }
     }
   }
 

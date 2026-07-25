@@ -34,6 +34,15 @@ export interface DocumentMirrorCallbacks {
   onBboxChanged(): void;
   /** The staging area changed. */
   onStagingChanged(): void;
+  /**
+   * The document's `selectedLayerId` changed. A selection-only edit produces a
+   * new `document` object with the SAME `layers` reference and an equal `bbox`,
+   * so none of the other callbacks fire for it — this is the only signal. The
+   * engine uses it to repaint selection-derived chrome (the move-tool outline,
+   * the transform frame) and to close out per-layer transient sessions, since
+   * the layer panel is the sole authority on which layer is active.
+   */
+  onSelectionChanged?(selectedLayerId: string | null): void;
 }
 
 /** The imperative mirror handle. */
@@ -160,6 +169,7 @@ export const createDocumentMirror = (
     if (doc !== lastDoc) {
       const prevDoc = lastDoc;
       const prevRevision = lastRevision;
+      const prevSelectedLayerId = prevDoc?.selectedLayerId ?? null;
       lastDoc = doc;
       lastRevision = revision;
 
@@ -187,6 +197,13 @@ export const createDocumentMirror = (
         if (!bboxEqual(prevDoc.bbox, doc.bbox)) {
           callbacks.onBboxChanged();
         }
+      }
+
+      // Fired last, so an observer that tears down per-layer transient state
+      // (transform session, floating selection) sees the reconciled layer set.
+      const selectedLayerId = doc?.selectedLayerId ?? null;
+      if (selectedLayerId !== prevSelectedLayerId) {
+        callbacks.onSelectionChanged?.(selectedLayerId);
       }
     }
 

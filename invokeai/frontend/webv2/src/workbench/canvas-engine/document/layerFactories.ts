@@ -88,10 +88,15 @@ export const createRegionalGuidanceFromImage = (
   type: 'regional_guidance',
 });
 
-export const createControlLayer = (name: string, id: string, base?: string | null): CanvasControlLayerContract => {
+export const createControlLayer = (
+  name: string,
+  id: string,
+  base?: string | null,
+  model?: string | null
+): CanvasControlLayerContract => {
   const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : CONTROL_ADAPTER_DEFAULTS.controlnet;
   return {
-    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct] },
+    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct], model: model ?? null },
     blendMode: 'normal',
     id,
     isEnabled: true,

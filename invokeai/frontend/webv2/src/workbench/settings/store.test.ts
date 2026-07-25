@@ -242,6 +242,25 @@ describe('normalizeWorkbenchPreferences diagnostics', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences auto-switch invoke route', () => {
+  it('defaults to enabled for older preferences', () => {
+    expect(store.DEFAULT_PREFERENCES.autoSwitchInvocationRoute).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({}).autoSwitchInvocationRoute).toBe(true);
+  });
+
+  it('round-trips explicit values and heals non-boolean shapes', () => {
+    expect(store.normalizeWorkbenchPreferences({ autoSwitchInvocationRoute: false }).autoSwitchInvocationRoute).toBe(
+      false
+    );
+    expect(store.normalizeWorkbenchPreferences({ autoSwitchInvocationRoute: true }).autoSwitchInvocationRoute).toBe(
+      true
+    );
+    expect(
+      store.normalizeWorkbenchPreferences({ autoSwitchInvocationRoute: 'off' as never }).autoSwitchInvocationRoute
+    ).toBe(true);
+  });
+});
+
 describe('normalizeWorkbenchPreferences queue scope', () => {
   it('defaults queue jobs to all jobs for older preferences', () => {
     expect(store.normalizeWorkbenchPreferences({}).queueJobsScope).toBe('all');

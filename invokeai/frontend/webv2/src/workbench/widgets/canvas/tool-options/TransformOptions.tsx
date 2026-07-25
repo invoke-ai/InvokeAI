@@ -3,7 +3,7 @@ import type { LayerTransform } from '@workbench/canvas-engine/api';
 
 import { HStack, NumberInput, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui';
-import { useTransformSession } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasHasFloatingSelection, useTransformSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -24,12 +24,18 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
  * dimensions), so a percent is the resolution-independent, self-contained
  * representation. Edits update the session preview through the engine (no
  * dispatch until Apply); the whole session is one undo entry. Disabled with no
- * session.
+ * session — except Apply / Cancel, which stay live for a floating selection.
  */
 export const TransformOptions = ({ engine }: ToolOptionsComponentProps) => {
   const { t } = useTranslation();
   const session = useTransformSession(engine);
   const transform = session?.transform ?? null;
+  // A floating selection frames its own pixels instead of opening a layer
+  // session, so Apply / Cancel must still act — they bank or abandon the float.
+  // The numerics stay disabled: the float's transform is LAYER-LOCAL, and
+  // showing those numbers in a bar that otherwise reads document space would
+  // misreport where the pixels are.
+  const hasFloat = useCanvasHasFloatingSelection(engine);
 
   const patch = useCallback(
     (next: Partial<LayerTransform>) => {
@@ -86,6 +92,7 @@ export const TransformOptions = ({ engine }: ToolOptionsComponentProps) => {
   const onCancel = useCallback(() => engine.layers.cancelTransform(), [engine]);
 
   const disabled = !transform;
+  const commitDisabled = disabled && !hasFloat;
 
   return (
     <HStack align="center" gap="3">
@@ -164,10 +171,10 @@ export const TransformOptions = ({ engine }: ToolOptionsComponentProps) => {
           <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.rotation')} fontSize="xs" />
         </NumberInput.Root>
       </HStack>
-      <Button disabled={disabled} size="xs" variant="solid" onClick={onApply}>
+      <Button disabled={commitDisabled} size="xs" variant="solid" onClick={onApply}>
         {t('widgets.canvas.toolOptions.applyTransform')}
       </Button>
-      <Button disabled={disabled} size="xs" variant="ghost" onClick={onCancel}>
+      <Button disabled={commitDisabled} size="xs" variant="ghost" onClick={onCancel}>
         {t('widgets.canvas.toolOptions.cancelTransform')}
       </Button>
     </HStack>

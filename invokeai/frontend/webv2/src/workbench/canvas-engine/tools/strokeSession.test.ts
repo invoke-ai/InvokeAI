@@ -111,6 +111,85 @@ describe('strokeSession: selection-constrained painting', () => {
   });
 });
 
+describe('strokeSession: bbox-clipped painting', () => {
+  /** A stroke sweeping from (10,10) to (40,40), optionally clipped to a rect. */
+  const runClipped = (clipRect: { x: number; y: number; width: number; height: number } | null) => {
+    const { backend, created } = createCapturingBackend();
+    const layers = createLayerCacheStore(backend);
+    const entry: LayerCacheEntry = layers.getOrCreate('L', 100, 100);
+    const ctx = {
+      backend,
+      createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
+      emitStrokeCommitted: vi.fn(),
+      invalidate: vi.fn(),
+      layers,
+      notifyLayerPainted: vi.fn(),
+    } as unknown as ToolContext;
+    created.length = 0;
+
+    const session = createStrokeSession({
+      clipRect,
+      color: '#ff0000',
+      composite: 'source-over',
+      ctx,
+      layerId: 'L',
+      opacity: 1,
+      size: 20,
+      thinning: 0,
+      tool: 'brush',
+    });
+    session.addPoints([pointer(10, 10)]);
+    session.addPoints([pointer(40, 10), pointer(40, 40)]);
+    const event = session.commit();
+    return { cache: entry.surface as StubRasterSurface, event, scratch: created[0] as StubRasterSurface | undefined };
+  };
+
+  it('keeps the dirty rect inside the clip rect', () => {
+    const clip = { height: 20, width: 20, x: 0, y: 0 };
+    const { event } = runClipped(clip);
+
+    expect(event).not.toBeNull();
+    expect(event!.dirtyRect.x).toBeGreaterThanOrEqual(clip.x);
+    expect(event!.dirtyRect.y).toBeGreaterThanOrEqual(clip.y);
+    expect(event!.dirtyRect.x + event!.dirtyRect.width).toBeLessThanOrEqual(clip.x + clip.width);
+    expect(event!.dirtyRect.y + event!.dirtyRect.height).toBeLessThanOrEqual(clip.y + clip.height);
+  });
+
+  it('reports a larger dirty rect unclipped — the clip is what bounds it', () => {
+    const clipped = runClipped({ height: 20, width: 20, x: 0, y: 0 })!;
+    const unclipped = runClipped(null)!;
+    const area = (rect: { width: number; height: number }) => rect.width * rect.height;
+
+    expect(area(unclipped.event!.dirtyRect)).toBeGreaterThan(area(clipped.event!.dirtyRect));
+  });
+
+  it('needs no compositing pass — clamping the region IS the clip', () => {
+    // Unlike a selection mask (an arbitrary shape within its rect), a rect clip
+    // is fully expressed by the scratch's extent, so no `destination-in`.
+    const { scratch } = runClipped({ height: 20, width: 20, x: 0, y: 0 });
+    expect(compositeOps(scratch!)).not.toContain('destination-in');
+  });
+
+  it('commits nothing when the stroke falls entirely outside the clip rect', () => {
+    const { event } = runClipped({ height: 5, width: 5, x: 500, y: 500 });
+    expect(event).toBeNull();
+  });
+
+  it('still covers the whole stroke when the clip rect contains it', () => {
+    // The stroke spans (10,10)→(40,40) with a 20px brush, so its true content
+    // reaches [0,50] on both axes. A generous clip may trim the region's chunk
+    // PADDING back to the clip boundary — an internal cache extent — but must
+    // never trim painted content.
+    const { event } = runClipped({ height: 200, width: 200, x: -50, y: -50 });
+    const dirty = event!.dirtyRect;
+
+    expect(dirty.x).toBeLessThanOrEqual(0);
+    expect(dirty.y).toBeLessThanOrEqual(0);
+    expect(dirty.x + dirty.width).toBeGreaterThanOrEqual(50);
+    expect(dirty.y + dirty.height).toBeGreaterThanOrEqual(50);
+  });
+});
+
 describe('strokeSession: content-sized cache growth', () => {
   const makeSession = (initialRect: { x: number; y: number; width: number; height: number }) => {
     const { backend } = createCapturingBackend();

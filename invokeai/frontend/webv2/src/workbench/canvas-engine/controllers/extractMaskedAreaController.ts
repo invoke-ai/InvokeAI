@@ -24,7 +24,7 @@ type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
 
-export interface ExtractMaskedAreaControllerOptions {
+export interface ExtractMaskedAreaControllerOptions<Permit> {
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
   readonly derived: DerivedSurfaceCache;
@@ -32,8 +32,8 @@ export interface ExtractMaskedAreaControllerOptions {
   readonly history: History;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly getReducerDocument: () => CanvasDocumentContractV2 | null;
-  readonly capturePermit: () => object | null;
-  readonly isPermitCurrent: (permit: object) => boolean;
+  readonly capturePermit: () => Permit | null;
+  readonly isPermitCurrent: (permit: Permit) => boolean;
   readonly isGestureActive: () => boolean;
   readonly endBurst: () => void;
   readonly isCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV2) => boolean;
@@ -54,9 +54,9 @@ export interface ExtractMaskedAreaControllerOptions {
 }
 
 /** Owns guarded extraction of raster content through an inpaint mask. */
-export class ExtractMaskedAreaController {
+export class ExtractMaskedAreaController<Permit> {
   private disposed = false;
-  constructor(private readonly deps: ExtractMaskedAreaControllerOptions) {}
+  constructor(private readonly deps: ExtractMaskedAreaControllerOptions<Permit>) {}
 
   async extract(maskLayerId: string): Promise<ExtractMaskedAreaResult> {
     const permit = this.deps.capturePermit();

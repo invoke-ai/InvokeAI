@@ -17,12 +17,21 @@ type MutablePixel = { current: readonly [number, number, number, number] };
 const createFixedPixelBackend = (pixel: MutablePixel): RasterBackend => ({
   createImageBitmap: () => Promise.resolve({} as ImageBitmap),
   createSurface: (width: number, height: number): RasterSurface => {
+    let hasDrawnPixels = false;
     const canvas = { height, width } as unknown as OffscreenCanvas;
     const ctx = {
-      clearRect: () => {},
-      drawImage: () => {},
+      clearRect: () => {
+        hasDrawnPixels = false;
+      },
+      drawImage: () => {
+        hasDrawnPixels = true;
+      },
       getImageData: () =>
-        ({ data: Uint8ClampedArray.from(pixel.current), height: 1, width: 1 }) as unknown as ImageData,
+        ({
+          data: Uint8ClampedArray.from(hasDrawnPixels ? pixel.current : [0, 0, 0, 0]),
+          height: 1,
+          width: 1,
+        }) as unknown as ImageData,
       restore: () => {},
       save: () => {},
       setTransform: () => {},
@@ -32,7 +41,7 @@ const createFixedPixelBackend = (pixel: MutablePixel): RasterBackend => ({
   encodeSurface: () => Promise.resolve(new Blob()),
 });
 
-const paintLayer = (id: string): CanvasLayerContract => ({
+const paintLayer = (id: string, x = 0): CanvasLayerContract => ({
   blendMode: 'normal',
   id,
   isEnabled: true,
@@ -40,15 +49,15 @@ const paintLayer = (id: string): CanvasLayerContract => ({
   name: id,
   opacity: 1,
   source: { bitmap: null, type: 'paint' },
-  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
   type: 'raster',
 });
 
-const makeDoc = (): CanvasDocumentContractV2 => ({
+const makeDoc = (layerX = 0): CanvasDocumentContractV2 => ({
   background: 'transparent',
   bbox: { height: 100, width: 100, x: 0, y: 0 },
   height: 100,
-  layers: [paintLayer('paint1')],
+  layers: [paintLayer('paint1', layerX)],
   selectedLayerId: 'paint1',
   version: 2,
   width: 100,
@@ -120,6 +129,15 @@ describe('color picker tool', () => {
     expect(h.ctx.stores.brushOptions.get().color).toBe('#0a141e');
   });
 
+  it('samples a translated layer beyond the document rectangle', () => {
+    const h = createHarness(makeDoc(200));
+    const tool = createColorPickerTool();
+
+    down(tool, h.ctx, pointer(200, 10));
+
+    expect(h.ctx.stores.brushOptions.get().color).toBe('#0a141e');
+  });
+
   it('re-samples on drag (primary button held) as the sample changes', () => {
     const h = createHarness(makeDoc());
     const tool = createColorPickerTool();
@@ -142,7 +160,7 @@ describe('color picker tool', () => {
     expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
   });
 
-  it('leaves brushOptions untouched when the point falls outside the document', () => {
+  it('leaves brushOptions untouched when no layer covers a point outside the document', () => {
     const h = createHarness(makeDoc());
     const tool = createColorPickerTool();
     const defaultColor = h.ctx.stores.brushOptions.get().color;

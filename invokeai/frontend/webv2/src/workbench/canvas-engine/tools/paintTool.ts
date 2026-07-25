@@ -227,6 +227,7 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           // stroke is masked to it; with none the field is null and the hot path is
           // untouched (no per-point mask lookup).
           clipMask: ctx.getSelectionMask?.() ?? null,
+          clipRect: ctx.getStrokeClipRect?.() ?? null,
           color: target.color ?? spec.color(ctx),
           composite,
           createdLayer: target.createdLayer ?? null,

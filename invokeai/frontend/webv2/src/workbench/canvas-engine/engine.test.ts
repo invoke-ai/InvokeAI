@@ -72,6 +72,7 @@ const createTestMutationPort = (store: EngineStore, projectId: string): CanvasPr
     }
   });
   return {
+    commitEdit: () => undefined,
     dispatch: (mutation) => {
       const before = canvas;
       if (!before) {
@@ -3423,11 +3424,15 @@ describe('engine-owned history: stroke → undo → redo', () => {
       },
     };
     const bitmapStore = createSpyBitmapStore();
+    const mutationPort = createTestMutationPort(store, 'p1');
+    const commitEdit = vi.fn(mutationPort.commitEdit);
+    mutationPort.commitEdit = commitEdit;
 
     const engine = createCanvasEngine({
       backend,
       bitmapStore,
       imageResolver: () => Promise.resolve(new Blob()),
+      mutationPort,
       projectId: 'p1',
       store,
     });
@@ -3444,11 +3449,11 @@ describe('engine-owned history: stroke → undo → redo', () => {
     overlay.fire('pointermove', pointerAt(40, 40));
     overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
 
-    return { bitmapStore, engine, strokes, surfaces };
+    return { bitmapStore, commitEdit, engine, strokes, surfaces };
   };
 
   it('records a stroke and restores before/after pixels on undo/redo', () => {
-    const { bitmapStore, engine, strokes, surfaces } = drawStroke();
+    const { bitmapStore, commitEdit, engine, strokes, surfaces } = drawStroke();
 
     // One stroke committed and one history entry recorded.
     expect(strokes).toHaveLength(1);
@@ -3456,6 +3461,8 @@ describe('engine-owned history: stroke → undo → redo', () => {
     expect(event.layerId).toBe('paint1');
     expect(engine.stores.canUndo.get()).toBe(true);
     expect(engine.stores.canRedo.get()).toBe(false);
+    expect(commitEdit).toHaveBeenCalledOnce();
+    expect(commitEdit).toHaveBeenCalledWith({ kind: 'paint' });
     // The commit marked the layer dirty for persistence.
     const dirtyAfterStroke = bitmapStore.markLayerDirty.mock.calls.length;
     expect(dirtyAfterStroke).toBeGreaterThanOrEqual(1);
@@ -3479,6 +3486,7 @@ describe('engine-owned history: stroke → undo → redo', () => {
     expect(redoPut).toBeDefined();
     expect(engine.stores.canUndo.get()).toBe(true);
     expect(engine.stores.canRedo.get()).toBe(false);
+    expect(commitEdit).toHaveBeenCalledOnce();
 
     engine.lifecycle.dispose();
   });
@@ -5742,6 +5750,7 @@ describe('staged result acceptance', () => {
       pendingImages: [stagedCandidate()],
     };
     const mutationPort: CanvasProjectMutationPort = {
+      commitEdit: () => undefined,
       dispatch: () => false,
       getCanvasState: () => canvas,
       subscribe: () => () => undefined,
@@ -5774,6 +5783,7 @@ describe('staged result acceptance', () => {
     let committed = false;
     let postCommitReads = 0;
     const mutationPort: CanvasProjectMutationPort = {
+      commitEdit: () => undefined,
       dispatch: (mutation) => {
         if (mutation.type !== 'commitStagedImage') {
           return false;
@@ -5834,6 +5844,7 @@ describe('staged result acceptance', () => {
       backend: createTestStubRasterBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
       mutationPort: {
+        commitEdit: () => undefined,
         dispatch: () => false,
         getCanvasState: () => null,
         subscribe: () => () => undefined,
@@ -7236,7 +7247,7 @@ describe('move tool: drag through the pipeline', () => {
     engine.lifecycle.dispose();
   });
 
-  it('a click (no drag) dispatches a selection change and no transform update', () => {
+  it('a click (no drag) dispatches nothing — the layers panel owns selection', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -7260,7 +7271,7 @@ describe('move tool: drag through the pipeline', () => {
 
     const actions = dispatch.mock.calls.map((call) => call[0] as EngineTestAction);
     expect(actions.some((action) => action.type === 'updateCanvasLayer')).toBe(false);
-    expect(actions.some((action) => action.type === 'setCanvasSelectedLayer')).toBe(true);
+    expect(actions.some((action) => action.type === 'setCanvasSelectedLayer')).toBe(false);
     expect(engine.stores.canUndo.get()).toBe(false);
 
     engine.lifecycle.dispose();
@@ -9307,9 +9318,45 @@ describe('commitGeneratedImageResult', () => {
       }
       const created = engine.document.getDocument()!.layers.find((layer) => layer.id === result.layerId);
       expect(created?.type === 'control' ? created.adapter.kind : null).toBe(expectedKind);
+      // Without a getDefaultControlModel option the layer starts model-less.
+      expect(created?.type === 'control' ? created.adapter.model : 'wrong-type').toBeNull();
       engine.lifecycle.dispose();
     }
   );
+
+  it('seeds workflow Copy To Control layers with the injected default control model', async () => {
+    const source = workflowRaster();
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]), 'sd-1');
+    const getDefaultControlModel = vi.fn((base: string | null) => (base === 'sd-1' ? 'sd1-union' : null));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      getDefaultControlModel,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exports.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+
+    const result = await engine.layers.commitGeneratedImageResult({
+      guard: exported.guard,
+      image: generatedImage,
+      origin: generatedOrigin,
+      target: 'copy-control',
+    });
+
+    expect(result.status).toBe('committed');
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed control copy');
+    }
+    expect(getDefaultControlModel).toHaveBeenCalledWith('sd-1');
+    const created = engine.document.getDocument()!.layers.find((layer) => layer.id === result.layerId);
+    expect(created?.type === 'control' ? created.adapter.model : null).toBe('sd1-union');
+    engine.lifecycle.dispose();
+  });
 
   it('replaces a raster at the generated origin and native size, clears baked adjustments, and replays exactly', async () => {
     const source = workflowRaster();
@@ -14958,63 +15005,49 @@ describe('text edit session', () => {
   });
 });
 
-describe('contextMenuLayerIdAt (canvas right-click target)', () => {
-  const controlLayer = (id: string): CanvasLayerContract => ({
-    adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
-    blendMode: 'normal',
-    id,
-    isEnabled: true,
-    isLocked: false,
-    name: id,
-    opacity: 1,
-    source: { image: { height: 10, imageName: id, width: 10 }, type: 'image' },
-    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-    type: 'control',
-    withTransparencyEffect: false,
-  });
-
-  // A raster at index 0 with a control layer above it, both covering [0,10]². At
-  // the default viewport (zoom 1, no pan) a screen point maps 1:1 to document space.
-  const stackedDoc = (): CanvasDocumentContractV2 => ({
+describe('canTargetLayerFromContextMenu (canvas right-click target)', () => {
+  // The menu acts on the document's SELECTED layer — the canvas never hit-tests
+  // to pick one, so this only reports whether an in-progress edit suppresses it.
+  const doc = (): CanvasDocumentContractV2 => ({
     background: 'transparent',
     bbox: { height: 100, width: 100, x: 0, y: 0 },
     height: 100,
-    layers: [rasterLayer('raster'), controlLayer('control')],
-    selectedLayerId: null,
+    layers: [rasterLayer('raster')],
+    selectedLayerId: 'raster',
     version: 2,
     width: 100,
   });
 
-  const makeEngine = (doc: CanvasDocumentContractV2) => {
-    const { store } = createFakeStore(doc);
-    const engine = createCanvasEngine({
+  const makeEngine = (document: CanvasDocumentContractV2) => {
+    const { store } = createFakeStore(document);
+    return createCanvasEngine({
       backend: createTestStubRasterBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
     });
-    return engine;
   };
 
-  it('returns the composite-top layer at the point (control over raster, batch finding N1)', () => {
-    const engine = makeEngine(stackedDoc());
-    // The raster is earlier in the array but the control composites above it.
-    expect(engine.tools.contextMenuLayerIdAt({ x: 5, y: 5 })).toBe('control');
+  it('allows a layer target with a document and no in-progress edit', () => {
+    const engine = makeEngine(doc());
+    expect(engine.tools.canTargetLayerFromContextMenu()).toBe(true);
     engine.lifecycle.dispose();
   });
 
-  it('returns null on empty space', () => {
-    const engine = makeEngine(stackedDoc());
-    expect(engine.tools.contextMenuLayerIdAt({ x: 60, y: 60 })).toBeNull();
-    engine.lifecycle.dispose();
-  });
-
-  it('returns null while a text-edit session is open (never opens over an in-progress edit)', () => {
-    const engine = makeEngine(stackedDoc());
+  it('refuses while a text-edit session is open (never opens over an in-progress edit)', () => {
+    const engine = makeEngine(doc());
     engine.tools.setTool('text');
     engine.layers.openTextCreate({ x: 5, y: 5 });
     expect(engine.stores.textEditSession.get()).not.toBeNull();
-    expect(engine.tools.contextMenuLayerIdAt({ x: 5, y: 5 })).toBeNull();
+    expect(engine.tools.canTargetLayerFromContextMenu()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
+  it('refuses while a transform session is open', () => {
+    const engine = makeEngine(doc());
+    engine.tools.setTool('transform');
+    expect(engine.stores.transformSession.get()).not.toBeNull();
+    expect(engine.tools.canTargetLayerFromContextMenu()).toBe(false);
     engine.lifecycle.dispose();
   });
 });

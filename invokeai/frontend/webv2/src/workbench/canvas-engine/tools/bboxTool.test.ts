@@ -31,11 +31,16 @@ const identityViewport = {
 const pointer = (
   x: number,
   y: number,
-  opts: { shift?: boolean; alt?: boolean; buttons?: number } = {}
+  opts: { shift?: boolean; alt?: boolean; ctrl?: boolean; meta?: boolean; buttons?: number } = {}
 ): PointerInput => ({
   buttons: opts.buttons ?? 1,
   documentPoint: { x, y },
-  modifiers: { alt: opts.alt ?? false, ctrl: false, meta: false, shift: opts.shift ?? false },
+  modifiers: {
+    alt: opts.alt ?? false,
+    ctrl: opts.ctrl ?? false,
+    meta: opts.meta ?? false,
+    shift: opts.shift ?? false,
+  },
   pointerType: 'mouse',
   pressure: 0.5,
   screenPoint: { x, y },
@@ -137,6 +142,46 @@ describe('bbox tool: resize gesture', () => {
     up(tool, h.ctx, pointer(150, 112, { shift: true }));
     const out = h.commits[0]?.forward as { bbox: { width: number; height: number } };
     expect(out.bbox.width).toBe(out.bbox.height);
+  });
+
+  it('mirrors the resize across the frame center while ctrl is held', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+
+    down(tool, h.ctx, pointer(112, 112)); // SE corner handle
+    move(tool, h.ctx, pointer(128, 128, { ctrl: true })); // delta (16,16), mirrored
+    up(tool, h.ctx, pointer(128, 128, { ctrl: true }));
+
+    // Both sides move 16: 96 + 32 = 128 per axis, center held at (64,64).
+    expect(h.commits[0]?.forward).toEqual({
+      bbox: { height: 128, width: 128, x: 0, y: 0 },
+      type: 'setCanvasBbox',
+    });
+  });
+
+  it('accepts meta as the mirror modifier (⌘ on macOS)', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+
+    down(tool, h.ctx, pointer(112, 112));
+    move(tool, h.ctx, pointer(128, 128, { meta: true }));
+    up(tool, h.ctx, pointer(128, 128, { meta: true }));
+
+    expect(h.commits[0]?.forward).toEqual({
+      bbox: { height: 128, width: 128, x: 0, y: 0 },
+      type: 'setCanvasBbox',
+    });
+  });
+
+  it('leaves a move gesture unmirrored while ctrl is held', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+
+    down(tool, h.ctx, pointer(60, 60, { ctrl: true })); // inside the frame → move
+    move(tool, h.ctx, pointer(76, 76, { ctrl: true }));
+    up(tool, h.ctx, pointer(76, 76, { ctrl: true }));
+
+    expect(h.commits[0]?.forward).toEqual({ bbox: { height: 96, width: 96, x: 32, y: 32 }, type: 'setCanvasBbox' });
   });
 });
 

@@ -402,7 +402,11 @@ const ThemeCard = ({
 };
 
 const BehaviorSection = () => {
-  const { confirmImageDeletion, enableInformationalPopovers, enableModelDescriptions } = useWorkbenchPreferences();
+  const { autoSwitchInvocationRoute, confirmImageDeletion, enableInformationalPopovers, enableModelDescriptions } =
+    useWorkbenchPreferences();
+  const updateAutoSwitchInvocationRoute = useCallback((checked: boolean) => {
+    updatePreferences({ autoSwitchInvocationRoute: checked });
+  }, []);
   const updateConfirmImageDeletion = useCallback((checked: boolean) => {
     updatePreferences({ confirmImageDeletion: checked });
   }, []);
@@ -415,6 +419,12 @@ const BehaviorSection = () => {
 
   return (
     <SettingsSection description="Safety checks and user-assistance behavior." title="Behavior">
+      <SettingToggle
+        checked={autoSwitchInvocationRoute}
+        description="Switch the Invoke source and destination to match the surface you are editing. Locked sources and destinations are never changed."
+        label="Auto-switch Invoke route"
+        onChange={updateAutoSwitchInvocationRoute}
+      />
       <SettingToggle
         checked={confirmImageDeletion}
         description="Ask for confirmation before permanently deleting images."

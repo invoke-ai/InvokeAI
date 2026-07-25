@@ -11,7 +11,11 @@
  *   and positions snap to the model grid (`stores.bboxGrid`); hold **alt** to
  *   bypass snapping. Corner/edge resize preserves the aspect ratio when the lock
  *   is active (`stores.bboxOptions`); **shift** toggles the constraint on for an
- *   unlocked frame (a locked ratio stays locked).
+ *   unlocked frame (a locked ratio stays locked). **Ctrl** (⌘ on macOS) mirrors
+ *   the resize across the frame's center, so the opposite edge moves too and the
+ *   center holds; it composes with both snapping and the aspect constraint.
+ *   Modifiers are sampled per pointer sample, so a mid-drag press takes effect on
+ *   the next pointer move.
  * - **Commit** (pointer-up after a real change): exactly one `commitStructural`
  *   with the new/old bbox (`setCanvasBbox`, undoable). A zero-delta gesture
  *   commits nothing.
@@ -75,7 +79,7 @@ const nextBboxFor = (
   ctx: ToolContext,
   state: GestureState,
   point: Vec2,
-  modifiers: { alt: boolean; shift: boolean }
+  modifiers: { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
 ): Rect => {
   const grid = ctx.stores.bboxGrid.get();
   // Snap to the model grid unless Alt bypasses it or the snap-to-grid setting is off.
@@ -96,7 +100,20 @@ const nextBboxFor = (
       ? state.startBbox.width / state.startBbox.height
       : 1;
 
-  return resizeBbox({ constrain, dx, dy, grid, handle: state.target, ratio, snap, start: state.startBbox });
+  // Ctrl (⌘ on macOS) mirrors the drag across the frame's center.
+  const symmetric = modifiers.ctrl || modifiers.meta;
+
+  return resizeBbox({
+    constrain,
+    dx,
+    dy,
+    grid,
+    handle: state.target,
+    ratio,
+    snap,
+    start: state.startBbox,
+    symmetric,
+  });
 };
 
 /** Creates a fresh bbox tool with its own gesture state. */

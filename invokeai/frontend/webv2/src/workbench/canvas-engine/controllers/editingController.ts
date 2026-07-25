@@ -8,6 +8,7 @@ import { createCanvasEditGate } from '@workbench/canvas-engine/editGate';
 import { roundOut, union } from '@workbench/canvas-engine/math/rect';
 import { createSelectionState } from '@workbench/canvas-engine/selection/selectionState';
 
+import { FloatingSelectionController, type FloatingSelectionControllerOptions } from './floatingSelectionController';
 import { SelectionImageController, type SelectionImageControllerOptions } from './selectionImageController';
 import { SelectionPixelController, type SelectionPixelControllerOptions } from './selectionPixelController';
 import { TextEditingController, type TextEditingControllerOptions } from './textEditingController';
@@ -22,6 +23,7 @@ export interface EditingControllerOptions<Permit = unknown, Owner = symbol> {
   readonly transform: TransformEditingControllerOptions;
   readonly selectionPixels: Omit<SelectionPixelControllerOptions, 'selection'>;
   readonly selectionImage: Omit<SelectionImageControllerOptions<Permit, Owner>, 'selection'>;
+  readonly floatingSelection: Omit<FloatingSelectionControllerOptions, 'selection'>;
 }
 
 /** Owns transient editing state whose lifetime follows one engine instance. */
@@ -32,6 +34,7 @@ export class EditingController<Permit = unknown, Owner = symbol> {
   readonly transform: TransformEditingController;
   readonly selectionPixels: SelectionPixelController;
   readonly selectionImage: SelectionImageController<Permit, Owner>;
+  readonly floatingSelection: FloatingSelectionController;
   private readonly editGate: CanvasEditGateController;
   private readonly getDocument: () => CanvasDocumentContractV2 | null;
   private disposed = false;
@@ -46,6 +49,10 @@ export class EditingController<Permit = unknown, Owner = symbol> {
     this.selectionPixels = new SelectionPixelController({ ...options.selectionPixels, selection: this.selection });
     this.selectionImage = new SelectionImageController<Permit, Owner>({
       ...options.selectionImage,
+      selection: this.selection,
+    });
+    this.floatingSelection = new FloatingSelectionController({
+      ...options.floatingSelection,
       selection: this.selection,
     });
   }
@@ -122,6 +129,9 @@ export class EditingController<Permit = unknown, Owner = symbol> {
     this.transform.dispose();
     this.selectionPixels.dispose();
     this.selectionImage.dispose();
+    // Before the selection: disposing a live float puts its pixels back, and
+    // that read still needs the selection's mask to be intact.
+    this.floatingSelection.dispose();
     this.selection.dispose();
   }
 }

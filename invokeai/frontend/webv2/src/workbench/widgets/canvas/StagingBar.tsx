@@ -35,7 +35,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
@@ -127,6 +127,11 @@ export const StagingBar = ({
   return (
     <Stack align="center" gap="2" w="full">
       {hasSlots ? (
+        // The strip spans the whole canvas widget and scrolls within it: the
+        // overlay's staging slot stretches, so this width is definite and a long
+        // run of staged candidates can only ever scroll — never widen the
+        // floating bar group past the canvas, where the overlay would silently
+        // clip the centered overflow at both edges.
         <ScrollArea.Root
           h={areThumbnailsVisible ? THUMBNAIL_STRIP_HEIGHT : '0'}
           opacity={areThumbnailsVisible ? 1 : 0}
@@ -136,7 +141,13 @@ export const StagingBar = ({
           variant="hover"
           w="full"
         >
-          <ScrollArea.Viewport h="full" w="full">
+          <ScrollArea.Viewport h="full" scrollPaddingInline="2" w="full">
+            {/*
+             * Leave the content slot's width alone: its inline `min-width:
+             * fit-content` grows it to hold every thumbnail, so `justify` only
+             * centers when the strip fits and no thumbnail ever lands at a
+             * negative offset that scrolling cannot reach.
+             */}
             <ScrollArea.Content asChild>
               <HStack h="full" justify="center">
                 {slots.map((slot, index) => (
@@ -338,9 +349,21 @@ const StagingThumbnail = ({
   onSelect: () => void;
 }) => {
   const { t } = useTranslation();
+  // Ref callbacks re-run when `isSelected` changes, so cycling with the arrows
+  // (or an auto-switch) drags the strip along without an effect.
+  const scrollIntoView = useCallback(
+    (node: HTMLElement | null) => {
+      if (node && isSelected) {
+        node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    },
+    [isSelected]
+  );
 
   return (
     <Stack
+      ref={scrollIntoView}
+      aria-current={isSelected || undefined}
       aria-label={t('widgets.canvas.selectStagedCandidate', { number: index + 1 })}
       as="button"
       bg="bg.emphasized"

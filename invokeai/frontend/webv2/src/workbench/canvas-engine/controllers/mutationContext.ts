@@ -1,3 +1,4 @@
+import type { CanvasEditIntent, WorkbenchActionOrigin } from '@workbench/autoRoutePolicy';
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
@@ -32,8 +33,13 @@ export interface CanvasMutationContext {
   capturePermit(owner?: symbol): DocumentEditPermit | null;
   isPermitCurrent(permit: DocumentEditPermit): boolean;
   isGuardCurrent(guard: LayerExportGuard): boolean;
-  dispatch(action: CanvasProjectMutation): boolean;
-  dispatchPrepared(action: CanvasProjectMutation, reducerAccepted: () => boolean, mirrorAccepted: () => boolean): void;
+  dispatch(action: CanvasProjectMutation, origin?: WorkbenchActionOrigin): boolean;
+  dispatchPrepared(
+    action: CanvasProjectMutation,
+    reducerAccepted: () => boolean,
+    mirrorAccepted: () => boolean,
+    origin?: WorkbenchActionOrigin
+  ): void;
   preparePixels(layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement;
   installPrepared(prepared: PreparedLayerCacheReplacement, persist?: boolean): void;
   endBurst(): void;
@@ -46,7 +52,8 @@ export interface CanvasMutationContextDeps {
   readonly history: History;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly getReducerDocument: () => CanvasDocumentContractV2 | null;
-  readonly dispatch: (action: CanvasProjectMutation) => boolean;
+  readonly dispatch: (action: CanvasProjectMutation, origin?: WorkbenchActionOrigin) => boolean;
+  readonly commitEdit: (intent: CanvasEditIntent) => void;
   readonly refreshMirror: () => void;
   readonly editingLocked: { get(): boolean; subscribe(listener: () => void): () => void };
   readonly editOwner: symbol;
@@ -86,10 +93,13 @@ export const createCanvasMutationContext = (
   const dispatchPrepared = (
     action: CanvasProjectMutation,
     isApplied: () => boolean,
-    isMirrored: () => boolean
+    isMirrored: () => boolean,
+    origin: WorkbenchActionOrigin = deps.history.isApplying() ? 'system' : 'user'
   ): void => {
     try {
-      if (!deps.dispatch(action)) {
+      // Prepared mutations are not route-worthy until both reducer and mirror
+      // postconditions succeed. Commit their edit intent separately below.
+      if (!deps.dispatch(action, 'system')) {
         throw new Error('Canvas document mutation was rejected');
       }
     } catch (error) {
@@ -114,7 +124,6 @@ export const createCanvasMutationContext = (
       if (!isMirrored()) {
         throw error;
       }
-      return;
     }
 
     // A reducer may reject a guarded transaction by returning the unchanged
@@ -136,13 +145,17 @@ export const createCanvasMutationContext = (
         throw new Error('Canvas document mutation was not mirrored');
       }
     }
+
+    if (origin === 'user') {
+      deps.commitEdit({ kind: 'mutation', mutation: action });
+    }
   };
 
   return {
     canEdit,
     capturePermit,
     createLayerId: () => deps.createLayerId(),
-    dispatch: (action) => deps.dispatch(action),
+    dispatch: (action, origin) => deps.dispatch(action, origin),
     dispatchPrepared,
     dispose: () => unsubscribeDocumentEditingLock(),
     endBurst: () => deps.endBurst(),

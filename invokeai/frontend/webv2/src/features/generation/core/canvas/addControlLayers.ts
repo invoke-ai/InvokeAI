@@ -25,7 +25,7 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 
-import type { ControlAdapterKind } from './controlValidation';
+import type { ControlAdapterKind, ControlValidationReason } from './controlValidation';
 
 import { getControlValidationReason } from './controlValidation';
 
@@ -196,11 +196,24 @@ export const getControlLayerRejectionReason = (params: {
   kind: ControlAdapterKind;
   adapterModel: { base: string; type?: string } | null;
   beginEndStepPct: [number, number];
+  controlLoraIndex?: number;
   mainBase: string;
   mainVariant?: string;
   weight: number;
+  zImageControlIndex?: number;
 }): string | null => {
-  const { adapterModel, beginEndStepPct, hasContent, kind, layerName, mainBase, mainVariant, weight } = params;
+  const {
+    adapterModel,
+    beginEndStepPct,
+    controlLoraIndex = 0,
+    hasContent,
+    kind,
+    layerName,
+    mainBase,
+    mainVariant,
+    weight,
+    zImageControlIndex = 0,
+  } = params;
 
   if (!hasContent) {
     return `Control layer "${layerName}" has no control content.`;
@@ -208,15 +221,18 @@ export const getControlLayerRejectionReason = (params: {
   const reason = getControlValidationReason({
     adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type ?? kind } : null,
     beginEndStepPct,
-    controlLoraIndex: 0,
+    controlLoraIndex,
     kind,
     mainBase,
     mainVariant,
     weight,
+    zImageControlIndex,
   });
-  if (!reason) {
-    return null;
-  }
+  return reason ? getControlValidationReasonMessage(reason, layerName) : null;
+};
+
+/** The human-readable sentence for a control validation reason code. */
+export const getControlValidationReasonMessage = (reason: ControlValidationReason, layerName: string): string => {
   if (reason === 'missing_model') {
     return `Control layer "${layerName}" has no control model selected.`;
   }
@@ -225,6 +241,15 @@ export const getControlLayerRejectionReason = (params: {
   }
   if (reason === 'incompatible_base') {
     return `Control layer "${layerName}" uses an incompatible base model.`;
+  }
+  if (reason === 'invalid_adapter_values') {
+    return `Control layer "${layerName}" has invalid control adapter settings.`;
+  }
+  if (reason === 'control_lora_limit') {
+    return 'Only one Control LoRA can be used at a time.';
+  }
+  if (reason === 'z_image_control_limit') {
+    return 'Only one Z-Image control layer can be used at a time.';
   }
   if (reason === 'flux_fill_control_lora') {
     return 'Control LoRA is not compatible with FLUX Fill.';

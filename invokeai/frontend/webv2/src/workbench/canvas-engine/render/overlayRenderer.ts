@@ -50,6 +50,12 @@ export interface OverlayCursor {
   radiusDoc: number;
 }
 
+/** A live rect-or-ellipse drag outline in document space (shape and marquee tools). */
+export interface RectShapePreview {
+  rect: Rect;
+  kind: 'rect' | 'ellipse';
+}
+
 /** Everything the overlay needs to draw a frame. */
 export interface OverlayState {
   /** Document→screen transform. */
@@ -97,7 +103,13 @@ export interface OverlayState {
    * The in-progress shape-tool drag (document-space rect + kind), drawn as a
    * live outline while a shape is being created. Absent/`null` when idle.
    */
-  shapePreview?: { rect: Rect; kind: 'rect' | 'ellipse' } | null;
+  shapePreview?: RectShapePreview | null;
+  /**
+   * The in-progress marquee-tool drag (document-space rect + kind), drawn as a
+   * live outline while a pixel selection is being dragged out. Absent/`null`
+   * when idle; the committed selection shows as marching ants instead.
+   */
+  marqueePreview?: RectShapePreview | null;
   /**
    * The in-progress gradient-tool drag vector (document-space start/end),
    * drawn as a direction indicator. Absent/`null` when idle.
@@ -316,9 +328,12 @@ const drawLassoPreview = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/** Draws the shape-tool drag preview (rect or ellipse outline) in screen space. */
-const drawShapePreview = (ctx: Ctx, state: OverlayState): void => {
-  const preview = state.shapePreview;
+/**
+ * Draws a rect-or-ellipse drag outline in screen space. Shared by the shape tool
+ * (previewing the layer it will create) and the marquee tool (previewing the
+ * region it will select) — the same dashed outline in both cases.
+ */
+const drawRectShapePreview = (ctx: Ctx, state: OverlayState, preview: RectShapePreview | null | undefined): void => {
   if (!preview || preview.rect.width <= 0 || preview.rect.height <= 0) {
     return;
   }
@@ -538,7 +553,8 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
     drawMarchingAnts(ctx, state.view, state.marchingAnts);
   }
   drawLassoPreview(ctx, state);
-  drawShapePreview(ctx, state);
+  drawRectShapePreview(ctx, state, state.marqueePreview);
+  drawRectShapePreview(ctx, state, state.shapePreview);
   drawGradientPreview(ctx, state);
   drawCursor(ctx, state);
 

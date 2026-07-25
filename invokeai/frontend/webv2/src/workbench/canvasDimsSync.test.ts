@@ -341,6 +341,9 @@ describe('createCanvasDimsSync (wiring)', () => {
   it('stays inert when the project is not invoking into the canvas', () => {
     const store = createWorkbenchStore();
     store.commands.generation.setSource('generate');
+    // Lock the source: a bbox drag is itself a canvas intent signal and would
+    // otherwise auto-route the project into canvas mode.
+    store.commands.generation.toggleSourceLock();
     store.commands.generation.patchSettings({ height: 1024, model, modelKey: model.key, width: 1024 });
 
     let syncDispatches = 0;

@@ -344,11 +344,30 @@ export const imageSaveToGalleryChanges = (): { is_intermediate: false; image_cat
 /**
  * The `ImageRecordChanges` body that makes an intermediate image durable without
  * changing its category. Clearing `is_intermediate` stops garbage collection;
- * where the image appears is determined by its existing category. Used when a
- * utility result becomes a canvas source while discarded previews remain
- * intermediate and can be collected.
+ * where the image appears is determined by its existing category.
+ *
+ * NOT for adopting a graph result as canvas pixels — a node's output is
+ * `general`, so this alone publishes it to the gallery's Images view. Use
+ * {@link imageMakeCanvasAssetChanges} there.
  */
 export const imageMakeDurableChanges = (): { is_intermediate: false } => ({
+  is_intermediate: false,
+});
+
+/**
+ * The `ImageRecordChanges` body that adopts a utility result as CANVAS-OWNED
+ * pixels: durable (so it is not garbage-collected out from under the layer that
+ * now points at it) and `image_category: 'other'`, the category the canvas
+ * already uploads its own paint bitmaps under.
+ *
+ * A node's output is `general` by default, which is exactly what the gallery's
+ * Images view lists — so promoting a control-layer filter result with
+ * {@link imageMakeDurableChanges} alone published every ControlNet preprocess
+ * into the user's gallery. These are layer pixels, not gallery images: they
+ * belong with the rest of the canvas's assets.
+ */
+export const imageMakeCanvasAssetChanges = (): { is_intermediate: false; image_category: 'other' } => ({
+  image_category: 'other',
   is_intermediate: false,
 });
 
@@ -361,6 +380,19 @@ export const imageMakeDurableChanges = (): { is_intermediate: false } => ({
 export const makeImageDurable = async (imageName: string): Promise<void> => {
   await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
     body: JSON.stringify(imageMakeDurableChanges()),
+    method: 'PATCH',
+  });
+};
+
+/**
+ * Adopts a utility result as canvas-owned pixels — durable AND out of the
+ * gallery's Images view. Used wherever a graph result becomes a layer's
+ * persisted source; {@link makeImageDurable} remains for callers that must keep
+ * whatever category the image already had.
+ */
+export const makeImageCanvasAsset = async (imageName: string): Promise<void> => {
+  await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
+    body: JSON.stringify(imageMakeCanvasAssetChanges()),
     method: 'PATCH',
   });
 };

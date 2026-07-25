@@ -1,8 +1,3 @@
-import type {
-  CanvasDocumentCapability,
-  CanvasExportCapability,
-  CanvasLifecycleCapability,
-} from '@workbench/canvas-engine/api';
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { Project } from '@workbench/projectContracts';
 
@@ -11,19 +6,16 @@ import { toModelIdentifier } from '@features/generation/graph';
 import { isSupportedGenerateModel, normalizeGenerateWidgetValues } from '@features/generation/settings';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
-import { uploadCanvasImage } from './backend/canvasImages';
+import type { CanvasCompositeExportEngine, CanvasCompositeRegion } from './exportCanvasComposite';
 
-export type CanvasGallerySaveRegion = 'canvas' | 'bbox';
+import { uploadCanvasImage } from './backend/canvasImages';
+import { exportCanvasComposite } from './exportCanvasComposite';
+
+export type CanvasGallerySaveRegion = CanvasCompositeRegion;
 
 export type SaveCanvasToGalleryResult =
   | { status: 'saved'; imageName: string }
   | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
-
-type CanvasGallerySaveEngine = {
-  readonly document: CanvasDocumentCapability;
-  readonly exports: Pick<CanvasExportCapability, 'exportRasterComposite'>;
-  readonly lifecycle: Pick<CanvasLifecycleCapability, 'flushPendingUploads'>;
-};
 
 const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, unknown> => {
   const generateValues = normalizeGenerateWidgetValues(getProjectWidgetValues(project, 'generate'));
@@ -51,7 +43,7 @@ const getCanvasSaveBoardId = (project: Project): string | undefined => {
 };
 
 export const saveCanvasToGallery = async (options: {
-  engine: CanvasGallerySaveEngine;
+  engine: CanvasCompositeExportEngine;
   region: CanvasGallerySaveRegion;
   project: Project;
   uploadImage?: typeof uploadCanvasImage;
@@ -59,15 +51,7 @@ export const saveCanvasToGallery = async (options: {
   const { engine, project, region, uploadImage = uploadCanvasImage } = options;
   const boardId = getCanvasSaveBoardId(project);
 
-  await engine.lifecycle.flushPendingUploads();
-  const document = engine.document.getDocument();
-  if (!document) {
-    return { status: 'not-ready' };
-  }
-
-  const exported = await engine.exports.exportRasterComposite(
-    region === 'canvas' ? { bounds: 'content' } : { bounds: 'rect', rect: document.bbox }
-  );
+  const exported = await exportCanvasComposite(engine, region);
   if (exported.status !== 'ok') {
     return exported;
   }

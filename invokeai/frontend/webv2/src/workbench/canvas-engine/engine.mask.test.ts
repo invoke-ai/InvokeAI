@@ -38,6 +38,7 @@ interface EngineStore {
 }
 
 const createMutationPort = (store: EngineStore, projectId: string): CanvasProjectMutationPort => ({
+  commitEdit: () => undefined,
   dispatch: (mutation) => {
     const before = store.getState().projects.find((project) => project.id === projectId)?.canvas ?? null;
     if (!before) {

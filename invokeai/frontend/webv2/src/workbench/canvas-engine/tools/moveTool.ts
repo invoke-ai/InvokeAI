@@ -1,50 +1,56 @@
 /**
- * The move tool: click to select the top-most layer under the cursor, drag to
- * move a layer (auto-selecting the pressed unlocked layer, photo-editor style).
+ * The move tool: drag to move the SELECTED layer, or the selected PIXELS.
  *
- * Interaction contract (see CANVAS_PLAN Phase 3):
- * - **Click** (press+release under the drag threshold): selects the top-most
- *   VISIBLE layer whose rendered bounds contain the point (locked layers may be
- *   click-selected); empty space clears the selection. One `setCanvasSelectedLayer`
- *   dispatch, no history entry.
- * - **Drag**: moves a layer. The pressed point's top-most enabled+unlocked layer
- *   becomes the target (auto-select); otherwise the currently-selected
- *   enabled+unlocked layer is moved. Hidden/locked layers are never dragged.
- *   `shift` constrains motion to the dominant axis. Pointer-move only sets a
- *   transient transform override (live preview) — it never dispatches.
- * - **Commit** (pointer-up after a real move): one `commitStructural` with the
- *   new/old transform x/y (plus a selection dispatch when the target wasn't
- *   already selected). A zero-delta drag commits nothing.
- * - **Cancel** (Esc / pointercancel): drops the override, no dispatch.
+ * Interaction contract:
+ * - **The layers panel is the sole authority on which layer is active.** The move
+ *   tool never hit-tests the stack to pick a target and never dispatches
+ *   `setCanvasSelectedLayer`. Clicking canvas pixels that belong to some other
+ *   layer does not steal the selection, and clicking empty space does not clear
+ *   it — an editor where the pointer silently re-targets is the behaviour this
+ *   contract exists to prevent.
+ * - **Click** (press+release under the drag threshold): a no-op.
+ * - **Drag inside a live selection** — or with a float already in flight —
+ *   moves the selected PIXELS: the first such drag cuts them out of the selected
+ *   layer into a floating selection that follows the pointer, leaving a hole.
+ *   The float stays live across further drags until it is committed (Enter,
+ *   deselect, tool switch — one undo entry for the whole move) or cancelled
+ *   (Escape). This is the Photoshop feel: ants present and the press inside them
+ *   moves pixels; otherwise the press moves the layer.
+ * - **Drag anywhere else**: moves the document's `selectedLayerId`, when that
+ *   layer is enabled and unlocked. Hidden/locked layers are never dragged, and a
+ *   press over empty space still drags the selected layer (the grab point is
+ *   irrelevant). Pointer-move only sets a transient transform override (live
+ *   preview) — it never dispatches.
+ * - **`shift`** constrains motion to the dominant axis, for both modes.
+ * - **Snap**: with the snap-to-grid setting on, a LAYER drag lands its origin on
+ *   the model grid (the one the overlay draws); hold **alt** to bypass. Moving
+ *   PIXELS never snaps — a float's transform is layer-local, so document-space
+ *   grid math would skew it on a rotated or scaled layer.
+ * - **Commit** (pointer-up after a real layer move): one `commitStructural` with
+ *   the new/old transform x/y. A zero-delta drag commits nothing. Moving a float
+ *   commits nothing here — the float's own commit does that later.
+ * - **Cancel** (Esc / pointercancel): drops the layer override or reverts the
+ *   float to where this drag started. Neither dispatches.
  *
  * Zero React, zero import-time side effects.
  */
 
 import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
+
+import { snapMovedPoint } from '@workbench/canvas-engine/math/snapping';
 
 import type { Tool, ToolContext } from './tool';
 
-import { type LiveCacheRectOf, topLayerAt } from './moveHitTest';
+import { positionGrid } from './gridSnap';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
 
-/**
- * A live-cache-rect resolver over the tool's layer cache, so hit-testing grabs
- * freshly-painted content the debounced bitmap flush hasn't yet written back to
- * the persisted contract (a new layer + stroke is otherwise ungrabbable until the
- * ~1.5s flush lands).
- */
-const liveRectOf =
-  (ctx: ToolContext): LiveCacheRectOf =>
-  (layerId) =>
-    ctx.layers.get(layerId)?.rect;
-
 /** Screen-space distance (CSS px) the pointer must travel before a press becomes a drag. */
 export const MOVE_DRAG_THRESHOLD_PX = 3;
 
-const isVisible = (layer: CanvasLayerContract): boolean => layer.isEnabled;
 const isDraggable = (layer: CanvasLayerContract): boolean => layer.isEnabled && !layer.isLocked;
 
 /** Applies the shift-to-dominant-axis constraint to a document-space delta. */
@@ -55,17 +61,16 @@ export const constrainDelta = (dx: number, dy: number, shift: boolean): Vec2 => 
   return Math.abs(dx) >= Math.abs(dy) ? { x: dx, y: 0 } : { x: 0, y: dy };
 };
 
+/** Which thing this gesture moves. */
+type DragMode =
+  | { kind: 'layer'; targetId: string; origin: { x: number; y: number } }
+  | { kind: 'float'; layerId: string; origin: LayerTransform }
+  | { kind: 'none' };
+
 interface GestureState {
   startDoc: Vec2;
   startScreen: Vec2;
-  /** The layer being dragged (null when the press had nothing to move). */
-  targetId: string | null;
-  /** The drag target's original transform x/y. */
-  origin: { x: number; y: number } | null;
-  /** The top-most visible layer under the press, for click selection (lock allowed). */
-  clickTargetId: string | null;
-  /** The document's selected layer at press time. */
-  selectedAtStart: string | null;
+  mode: DragMode;
   moved: boolean;
 }
 
@@ -74,8 +79,8 @@ export const createMoveTool = (): Tool => {
   let state: GestureState | null = null;
 
   const clearOverride = (ctx: ToolContext): void => {
-    if (state?.targetId) {
-      ctx.setLayerTransformOverride(state.targetId, null);
+    if (state?.mode.kind === 'layer') {
+      ctx.setLayerTransformOverride(state.mode.targetId, null);
     }
   };
 
@@ -83,31 +88,76 @@ export const createMoveTool = (): Tool => {
     state = null;
   };
 
-  const resolveDragTarget = (ctx: ToolContext, point: Vec2, selectedId: string | null): CanvasLayerContract | null => {
+  /**
+   * The drag target is the document's selected layer, and nothing else — the
+   * press point plays no part in choosing it.
+   */
+  const selectedDraggableLayer = (ctx: ToolContext): CanvasLayerContract | null => {
     const doc = ctx.getDocument();
-    if (!doc) {
-      return null;
-    }
-    // Auto-select: the pressed point's top-most enabled+unlocked layer wins.
-    const hit = topLayerAt(doc, point, isDraggable, liveRectOf(ctx));
-    if (hit) {
-      return hit;
-    }
-    // Otherwise fall back to moving the currently-selected layer (if movable).
-    const selected = selectedId ? doc.layers.find((layer) => layer.id === selectedId) : undefined;
+    const selectedId = doc?.selectedLayerId;
+    const selected = doc && selectedId ? doc.layers.find((layer) => layer.id === selectedId) : undefined;
     return selected && isDraggable(selected) ? selected : null;
   };
 
-  const previewAt = (ctx: ToolContext, input: PointerInput): void => {
-    if (!state || !state.targetId || !state.origin) {
-      return;
+  /**
+   * Resolves what a press at `point` drags. Pixels win over the layer when a
+   * float is already in flight, or when a live selection contains the press.
+   */
+  const resolveMode = (ctx: ToolContext, point: Vec2): DragMode => {
+    const existing = ctx.getFloatingSelection?.() ?? null;
+    if (existing) {
+      return { kind: 'float', layerId: existing.layerId, origin: { ...existing.transform } };
     }
-    const delta = constrainDelta(
-      input.documentPoint.x - state.startDoc.x,
-      input.documentPoint.y - state.startDoc.y,
+    const layer = selectedDraggableLayer(ctx);
+    if (!layer) {
+      return { kind: 'none' };
+    }
+    if (ctx.isPointInSelection?.(point) && ctx.liftFloatingSelection?.(layer.id)) {
+      const lifted = ctx.getFloatingSelection?.();
+      if (lifted) {
+        return { kind: 'float', layerId: lifted.layerId, origin: { ...lifted.transform } };
+      }
+    }
+    return { kind: 'layer', origin: { x: layer.transform.x, y: layer.transform.y }, targetId: layer.id };
+  };
+
+  /** The constrained document-space delta from the gesture start to `input`. */
+  const deltaFor = (current: GestureState, input: PointerInput): Vec2 =>
+    constrainDelta(
+      input.documentPoint.x - current.startDoc.x,
+      input.documentPoint.y - current.startDoc.y,
       input.modifiers.shift
     );
-    ctx.setLayerTransformOverride(state.targetId, { x: state.origin.x + delta.x, y: state.origin.y + delta.y });
+
+  /**
+   * Where a layer drag puts the layer's origin, snapped to the grid unless the
+   * setting is off or alt bypasses it. Shared by the live preview and the commit
+   * so the layer lands exactly where the drag showed it.
+   */
+  const nextLayerPosition = (
+    ctx: ToolContext,
+    origin: { x: number; y: number },
+    input: PointerInput,
+    delta: Vec2
+  ): Vec2 => snapMovedPoint(origin, delta, positionGrid(ctx, input.modifiers.alt));
+
+  const applyDelta = (ctx: ToolContext, current: GestureState, input: PointerInput): void => {
+    const delta = deltaFor(current, input);
+    if (current.mode.kind === 'layer') {
+      ctx.setLayerTransformOverride(current.mode.targetId, nextLayerPosition(ctx, current.mode.origin, input, delta));
+      return;
+    }
+    if (current.mode.kind === 'float') {
+      // The float's transform is LAYER-LOCAL, so a document-space pointer delta
+      // has to be mapped through the layer's inverse matrix first — otherwise a
+      // rotated or scaled layer would drag the pixels off at an angle.
+      const local = ctx.documentDeltaToLayerLocal?.(current.mode.layerId, delta) ?? delta;
+      ctx.setFloatingTransform?.({
+        ...current.mode.origin,
+        x: current.mode.origin.x + local.x,
+        y: current.mode.origin.y + local.y,
+      });
+    }
   };
 
   return {
@@ -117,29 +167,32 @@ export const createMoveTool = (): Tool => {
       clearOverride(ctx);
       endGesture();
     },
+    onKeyCommand: (ctx, command) => {
+      // Enter banks a float in place. Escape's abandon runs on the engine's own
+      // ladder (it must work whichever tool is active), so it is not handled here.
+      if (command === 'apply' && !state) {
+        ctx.commitFloatingSelection?.();
+      }
+    },
     onPointerCancel: (ctx) => {
+      if (state?.mode.kind === 'float') {
+        // Revert just this drag; the float itself survives (Escape's own
+        // float-cancel is a separate, engine-level step).
+        ctx.setFloatingTransform?.(state.mode.origin);
+      }
       clearOverride(ctx);
       ctx.invalidate({ overlay: true });
       endGesture();
     },
     onPointerDown: (ctx, input) => {
-      if (state || (input.buttons & PRIMARY_BUTTON) === 0) {
+      if (state || (input.buttons & PRIMARY_BUTTON) === 0 || !ctx.getDocument()) {
         return;
       }
-      const doc = ctx.getDocument();
-      if (!doc) {
-        return;
-      }
-      const clickTarget = topLayerAt(doc, input.documentPoint, isVisible, liveRectOf(ctx));
-      const dragTarget = resolveDragTarget(ctx, input.documentPoint, doc.selectedLayerId);
       state = {
-        clickTargetId: clickTarget?.id ?? null,
+        mode: resolveMode(ctx, input.documentPoint),
         moved: false,
-        origin: dragTarget ? { x: dragTarget.transform.x, y: dragTarget.transform.y } : null,
-        selectedAtStart: doc.selectedLayerId,
         startDoc: input.documentPoint,
         startScreen: input.screenPoint,
-        targetId: dragTarget?.id ?? null,
       };
     },
     onPointerMove: (ctx, input) => {
@@ -154,7 +207,7 @@ export const createMoveTool = (): Tool => {
         }
         state.moved = true;
       }
-      previewAt(ctx, input);
+      applyDelta(ctx, state, input);
     },
     onPointerUp: (ctx, input) => {
       if (!state) {
@@ -164,45 +217,37 @@ export const createMoveTool = (): Tool => {
       endGesture();
 
       if (!current.moved) {
-        // A click: select the top-most visible layer, or clear on empty space.
-        ctx.dispatch({ id: current.clickTargetId, type: 'setCanvasSelectedLayer' });
+        // A click never re-targets the layer selection — that is the panel's job.
+        return;
+      }
+      if (current.mode.kind === 'none') {
+        // No movable layer is selected — nothing to commit.
+        return;
+      }
+      if (current.mode.kind === 'float') {
+        // The float keeps the drag; it bakes later, as one entry for the whole
+        // move however many drags it took. Floats never snap — see the header.
+        applyDelta(ctx, current, input);
         return;
       }
 
-      if (!current.targetId || !current.origin) {
-        // Dragged over empty space with nothing to move — no-op.
+      const origin = current.mode.origin;
+      const next = nextLayerPosition(ctx, origin, input, deltaFor(current, input));
+
+      if (next.x === origin.x && next.y === origin.y) {
+        // Nothing moved — either a zero-delta drag, or a drag whose snapped
+        // result landed back on the origin. Drop the preview, commit nothing.
+        ctx.setLayerTransformOverride(current.mode.targetId, null);
         return;
       }
 
-      const delta = constrainDelta(
-        input.documentPoint.x - current.startDoc.x,
-        input.documentPoint.y - current.startDoc.y,
-        input.modifiers.shift
-      );
-      const next = { x: current.origin.x + delta.x, y: current.origin.y + delta.y };
-
-      if (next.x === current.origin.x && next.y === current.origin.y) {
-        // Zero-delta drag: behave like a click-select of the target, no commit.
-        ctx.setLayerTransformOverride(current.targetId, null);
-        ctx.dispatch({ id: current.targetId, type: 'setCanvasSelectedLayer' });
-        return;
-      }
-
-      // Auto-select the dragged layer if it wasn't already selected (no history).
-      if (current.targetId !== current.selectedAtStart) {
-        ctx.dispatch({ id: current.targetId, type: 'setCanvasSelectedLayer' });
-      }
       ctx.commitStructural(
         'Move layer',
-        { id: current.targetId, patch: { transform: { x: next.x, y: next.y } }, type: 'updateCanvasLayer' },
-        {
-          id: current.targetId,
-          patch: { transform: { x: current.origin.x, y: current.origin.y } },
-          type: 'updateCanvasLayer',
-        }
+        { id: current.mode.targetId, patch: { transform: { x: next.x, y: next.y } }, type: 'updateCanvasLayer' },
+        { id: current.mode.targetId, patch: { transform: { x: origin.x, y: origin.y } }, type: 'updateCanvasLayer' }
       );
       // The committed transform now flows through the mirror; drop the preview.
-      ctx.setLayerTransformOverride(current.targetId, null);
+      ctx.setLayerTransformOverride(current.mode.targetId, null);
     },
   };
 };

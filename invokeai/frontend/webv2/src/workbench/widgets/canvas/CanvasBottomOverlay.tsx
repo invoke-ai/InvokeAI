@@ -23,6 +23,17 @@ export const BOTTOM_OVERLAY_STACK_LAYOUT = {
   overflow: 'hidden',
 } satisfies StackProps;
 
+/**
+ * The staging slot spans the canvas rather than hugging its content, so the
+ * staged-thumbnail strip gets the whole widget width to scroll within while the
+ * bars it contains stay centered.
+ */
+export const BOTTOM_STAGING_SLOT_LAYOUT = {
+  flexShrink: '0',
+  minW: '0',
+  w: 'full',
+} satisfies BoxProps;
+
 export const BOTTOM_CONTROLS_SLOT_LAYOUT = {
   align: 'center',
   flex: '0 1 auto',
@@ -42,7 +53,7 @@ const Root = forwardRef<HTMLDivElement, BoxProps>(({ children, ...props }, ref) 
 ));
 Root.displayName = 'CanvasBottomOverlay.Root';
 
-const Staging = (props: BoxProps) => <Box flexShrink="0" {...props} />;
+const Staging = (props: BoxProps) => <Box {...BOTTOM_STAGING_SLOT_LAYOUT} {...props} />;
 
 const Controls = (props: FlexProps) => <Flex {...BOTTOM_CONTROLS_SLOT_LAYOUT} {...props} />;
 

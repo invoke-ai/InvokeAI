@@ -9,9 +9,10 @@ const toErrorMessage = (error: unknown): string => (error instanceof Error ? err
 export const getCanvasGallerySaveErrorAction = (
   error: unknown,
   projectId: string,
-  message: string
+  message: string,
+  area: 'canvas-create-from-bbox' | 'canvas-save-to-gallery' = 'canvas-save-to-gallery'
 ): Parameters<WorkbenchNotificationCommands['reportError']>[0] => ({
-  area: 'canvas-save-to-gallery',
+  area,
   context: { error: toErrorMessage(error) },
   message,
   namespace: 'canvas' as const,

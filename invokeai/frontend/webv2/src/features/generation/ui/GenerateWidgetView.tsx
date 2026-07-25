@@ -77,7 +77,7 @@ export const GenerateWidgetView = () => {
       return;
     }
 
-    ui.settings.patchGenerateSettings(getGenerateFormCommitPatch({ ...nextSettings, model }), projectId);
+    ui.settings.patchGenerateSettings(getGenerateFormCommitPatch({ ...nextSettings, model }), projectId, 'system');
   }, [models, projectId, selectedModel, settings, storedValues, supportedModels, ui]);
 
   const commitSettings = useCallback(

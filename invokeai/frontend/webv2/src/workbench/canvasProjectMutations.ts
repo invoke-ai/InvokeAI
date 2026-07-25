@@ -14,6 +14,8 @@ import type {
 } from '@workbench/canvas-engine/api';
 import type { ProjectEvent, Project } from '@workbench/projectContracts';
 
+import { isHideableLayer } from '@workbench/canvas-engine/api';
+
 import { normalizeCanvasDocumentControlAdapters } from './canvasMigration';
 import {
   getCanvasStagingCandidateFingerprint,
@@ -84,6 +86,7 @@ export type CanvasProjectMutation =
   | { type: 'updateCanvasLayer'; id: string; patch: CanvasLayerBasePatch }
   | { type: 'replaceCanvasLayer'; layerId: string; layer: CanvasLayerContract }
   | { type: 'setCanvasLayersEnabled'; updates: readonly { id: string; isEnabled: boolean }[] }
+  | { type: 'setCanvasLayersHidden'; updates: readonly { id: string; isHidden: boolean }[] }
   | { type: 'updateCanvasLayerSource'; id: string; source: CanvasLayerSourceContract }
   | { type: 'updateCanvasLayerConfig'; id: string; config: CanvasLayerConfigPatch }
   | { type: 'convertCanvasLayer'; id: string; targetType: CanvasLayerContract['type']; layer: CanvasLayerContract }
@@ -123,6 +126,7 @@ const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProject
   'saveCanvasSnapshot',
   'setCanvasBbox',
   'setCanvasLayersEnabled',
+  'setCanvasLayersHidden',
   'setCanvasSelectedLayer',
   'setCanvasStagingAutoSwitch',
   'setStagedImageIndex',
@@ -206,6 +210,28 @@ const setCanvasLayersEnabled = (
     }
     changed = true;
     return { ...layer, isEnabled };
+  });
+  return changed ? { ...document, layers } : document;
+};
+
+/**
+ * Bulk display-visibility update. Layers that cannot be hidden (raster) are
+ * skipped rather than silently gaining a meaningless field: for them visibility
+ * and participation are the same fact, which `isEnabled` already carries.
+ */
+const setCanvasLayersHidden = (
+  document: CanvasDocumentContractV2,
+  updates: readonly { id: string; isHidden: boolean }[]
+): CanvasDocumentContractV2 => {
+  const targets = new Map(updates.map((update) => [update.id, update.isHidden]));
+  let changed = false;
+  const layers = document.layers.map((layer) => {
+    const isHidden = targets.get(layer.id);
+    if (isHidden === undefined || !isHideableLayer(layer) || isHidden === (layer.isHidden === true)) {
+      return layer;
+    }
+    changed = true;
+    return { ...layer, isHidden };
   });
   return changed ? { ...document, layers } : document;
 };
@@ -591,6 +617,8 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       );
     case 'setCanvasLayersEnabled':
       return updateCanvasDocument(project, (document) => setCanvasLayersEnabled(document, mutation.updates));
+    case 'setCanvasLayersHidden':
+      return updateCanvasDocument(project, (document) => setCanvasLayersHidden(document, mutation.updates));
     case 'updateCanvasLayerSource':
       return updateCanvasDocument(project, (document) =>
         mapCanvasLayer(document, mutation.id, (layer) =>
