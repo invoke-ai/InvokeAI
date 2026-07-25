@@ -136,45 +136,6 @@ const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProject
 export const isCanvasProjectMutation = (value: { type: string }): value is CanvasProjectMutation =>
   CANVAS_PROJECT_MUTATION_TYPES.has(value.type);
 
-/**
- * Mutations that count as deliberate canvas content edits for auto-switching
- * the Invoke route. Selection, visibility, staging review/navigation
- * (including accepting a staged image — the terminal review act, whose failed
- * mirror acceptance must roll the project back exactly), snapshot management,
- * and document hydration are excluded — they express review or bookkeeping,
- * not editing intent. `applyCanvasLayerStackMutation` is excluded because the
- * engine dispatches the same type for both forward ops (merge/copy/extract)
- * and their exact-compensation rollbacks; a route flip there would break
- * transactional restore invariants, and those flows are accompanied by other
- * high-confidence gestures in practice.
- */
-const HIGH_CONFIDENCE_CANVAS_MUTATION_TYPES: ReadonlySet<CanvasProjectMutation['type']> = new Set<
-  CanvasProjectMutation['type']
->([
-  'addCanvasLayer',
-  'convertCanvasLayer',
-  'duplicateCanvasLayer',
-  'mergeCanvasLayersDown',
-  'removeCanvasLayers',
-  'reorderCanvasLayers',
-  'replaceCanvasLayer',
-  'resizeCanvasDocument',
-  'setCanvasBbox',
-  'updateCanvasLayerConfig',
-  'updateCanvasLayerSource',
-]);
-
-/** Layer patch keys that carry content intent (move/transform/composite), unlike rename or lock toggles. */
-const CONTENT_BEARING_LAYER_PATCH_KEYS = ['transform', 'opacity', 'blendMode'] as const;
-
-export const isHighConfidenceCanvasEdit = (mutation: CanvasProjectMutation): boolean => {
-  if (mutation.type === 'updateCanvasLayer') {
-    return CONTENT_BEARING_LAYER_PATCH_KEYS.some((key) => key in mutation.patch);
-  }
-
-  return HIGH_CONFIDENCE_CANVAS_MUTATION_TYPES.has(mutation.type);
-};
-
 type CanvasLayers = CanvasDocumentContractV2['layers'];
 
 const layerExists = (layers: CanvasLayers, id: string): boolean => layers.some((layer) => layer.id === id);

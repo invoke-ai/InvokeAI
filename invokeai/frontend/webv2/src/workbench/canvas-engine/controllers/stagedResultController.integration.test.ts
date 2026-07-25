@@ -29,7 +29,8 @@ const createMirrorRejectingPort = (
   let readsAfterCommit = 0;
   let armedType: CanvasProjectMutation['type'] | null = null;
   const port: CanvasProjectMutationPort = {
-    dispatch: (mutation) => {
+    commitEdit: real.commitEdit,
+    dispatch: (mutation, origin) => {
       if (mutation.type === armedType) {
         faultActive = true;
         readsAfterCommit = 0;
@@ -37,7 +38,7 @@ const createMirrorRejectingPort = (
       } else {
         faultActive = false;
       }
-      return real.dispatch(mutation);
+      return real.dispatch(mutation, origin);
     },
     getCanvasState: () => {
       if (faultActive) {

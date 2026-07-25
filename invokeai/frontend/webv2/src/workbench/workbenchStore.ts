@@ -3,9 +3,11 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { createExternalStore } from '@platform/state/externalStore';
 
+import type { CanvasEditIntent } from './autoRoutePolicy';
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { recordDiagnosticEntry } from './diagnostics/logger';
+import { getWorkbenchPreferences } from './settings/store';
 import {
   createInitialWorkbenchState,
   __workbenchReducerInternal,
@@ -59,15 +61,21 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       ),
     },
     canvas: {
-      apply: (projectId: string, mutation: CanvasProjectMutation): boolean => {
+      apply: (
+        projectId: string,
+        mutation: CanvasProjectMutation,
+        origin?: ActionPayload<'applyCanvasProjectMutation'>['origin']
+      ): boolean => {
         const before = getState().projects.find((project) => project.id === projectId)?.canvas;
         if (!before) {
           return false;
         }
 
-        dispatch({ mutation, projectId, type: 'applyCanvasProjectMutation' });
+        dispatch({ mutation, origin, projectId, type: 'applyCanvasProjectMutation' });
         return getState().projects.find((project) => project.id === projectId)?.canvas !== before;
       },
+      commitEdit: (projectId: string, intent: CanvasEditIntent): void =>
+        dispatch({ intent, projectId, type: 'commitCanvasEdit' }),
       appendStagingCandidate: command('appendCanvasStagingCandidate'),
     },
     gallery: {
@@ -133,7 +141,12 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       clearPromptHistory: command('clearPromptHistory', (projectId?: string) => ({ projectId })),
       patchPromptDraft: command(
         'patchProjectPromptDraft',
-        (values: ActionPayload<'patchProjectPromptDraft'>['values'], projectId?: string) => ({ projectId, values })
+        (
+          values: ActionPayload<'patchProjectPromptDraft'>['values'],
+          sourceId: ActionPayload<'patchProjectPromptDraft'>['sourceId'],
+          projectId?: string,
+          origin?: ActionPayload<'patchProjectPromptDraft'>['origin']
+        ) => ({ origin, projectId, sourceId, values })
       ),
       patchSettings: command(
         'patchGenerateSettings',
@@ -494,7 +507,9 @@ export const createWorkbenchStore = (initialState = createInitialWorkbenchState(
 
   const dispatch = (action: WorkbenchAction): void => {
     const previousState = state;
-    const nextState = __workbenchReducerInternal(state, action);
+    const nextState = __workbenchReducerInternal(state, action, {
+      autoSwitchInvocationRoute: getWorkbenchPreferences().autoSwitchInvocationRoute,
+    });
 
     setSnapshotState(nextState);
     recordDiagnosticForAction(action, previousState, nextState);

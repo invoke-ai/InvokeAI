@@ -72,6 +72,7 @@ const createTestMutationPort = (store: EngineStore, projectId: string): CanvasPr
     }
   });
   return {
+    commitEdit: () => undefined,
     dispatch: (mutation) => {
       const before = canvas;
       if (!before) {
@@ -3423,11 +3424,15 @@ describe('engine-owned history: stroke → undo → redo', () => {
       },
     };
     const bitmapStore = createSpyBitmapStore();
+    const mutationPort = createTestMutationPort(store, 'p1');
+    const commitEdit = vi.fn(mutationPort.commitEdit);
+    mutationPort.commitEdit = commitEdit;
 
     const engine = createCanvasEngine({
       backend,
       bitmapStore,
       imageResolver: () => Promise.resolve(new Blob()),
+      mutationPort,
       projectId: 'p1',
       store,
     });
@@ -3444,11 +3449,11 @@ describe('engine-owned history: stroke → undo → redo', () => {
     overlay.fire('pointermove', pointerAt(40, 40));
     overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
 
-    return { bitmapStore, engine, strokes, surfaces };
+    return { bitmapStore, commitEdit, engine, strokes, surfaces };
   };
 
   it('records a stroke and restores before/after pixels on undo/redo', () => {
-    const { bitmapStore, engine, strokes, surfaces } = drawStroke();
+    const { bitmapStore, commitEdit, engine, strokes, surfaces } = drawStroke();
 
     // One stroke committed and one history entry recorded.
     expect(strokes).toHaveLength(1);
@@ -3456,6 +3461,8 @@ describe('engine-owned history: stroke → undo → redo', () => {
     expect(event.layerId).toBe('paint1');
     expect(engine.stores.canUndo.get()).toBe(true);
     expect(engine.stores.canRedo.get()).toBe(false);
+    expect(commitEdit).toHaveBeenCalledOnce();
+    expect(commitEdit).toHaveBeenCalledWith({ kind: 'paint' });
     // The commit marked the layer dirty for persistence.
     const dirtyAfterStroke = bitmapStore.markLayerDirty.mock.calls.length;
     expect(dirtyAfterStroke).toBeGreaterThanOrEqual(1);
@@ -3479,6 +3486,7 @@ describe('engine-owned history: stroke → undo → redo', () => {
     expect(redoPut).toBeDefined();
     expect(engine.stores.canUndo.get()).toBe(true);
     expect(engine.stores.canRedo.get()).toBe(false);
+    expect(commitEdit).toHaveBeenCalledOnce();
 
     engine.lifecycle.dispose();
   });
@@ -5742,6 +5750,7 @@ describe('staged result acceptance', () => {
       pendingImages: [stagedCandidate()],
     };
     const mutationPort: CanvasProjectMutationPort = {
+      commitEdit: () => undefined,
       dispatch: () => false,
       getCanvasState: () => canvas,
       subscribe: () => () => undefined,
@@ -5774,6 +5783,7 @@ describe('staged result acceptance', () => {
     let committed = false;
     let postCommitReads = 0;
     const mutationPort: CanvasProjectMutationPort = {
+      commitEdit: () => undefined,
       dispatch: (mutation) => {
         if (mutation.type !== 'commitStagedImage') {
           return false;
@@ -5834,6 +5844,7 @@ describe('staged result acceptance', () => {
       backend: createTestStubRasterBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
       mutationPort: {
+        commitEdit: () => undefined,
         dispatch: () => false,
         getCanvasState: () => null,
         subscribe: () => () => undefined,

@@ -76,6 +76,7 @@ const createTrackedRoot = (host: HTMLDivElement) => {
 const createEngineDeps = (state: CanvasStateContractV2): EngineDeps => {
   const listeners = new Set<() => void>();
   const mutationPort: CanvasProjectMutationPort = {
+    commitEdit: () => undefined,
     dispatch: () => false,
     getCanvasState: () => state,
     subscribe: (listener) => {

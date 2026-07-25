@@ -45,6 +45,7 @@ const createFakeDeps = (): EngineDeps => {
     backend: createTestStubRasterBackend(),
     imageResolver: () => Promise.resolve(new Blob()),
     mutationPort: {
+      commitEdit: () => undefined,
       dispatch: (mutation) => {
         const before = project.canvas;
         project = applyCanvasProjectMutation(project, mutation);
@@ -311,6 +312,7 @@ describe('createEngineRegistry', () => {
     });
     const listeners = new Set<() => void>();
     const mutationPort = {
+      commitEdit: () => undefined,
       dispatch: (mutation: Parameters<typeof applyCanvasProjectMutation>[1]) => {
         const before = project.canvas;
         project = applyCanvasProjectMutation(project, mutation);

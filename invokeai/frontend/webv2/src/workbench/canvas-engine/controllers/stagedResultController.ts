@@ -18,7 +18,8 @@ export interface StagedResultControllerOptions<Permit, Owner = symbol> {
   readonly dispatchPrepared: (
     mutation: CanvasProjectMutation,
     reducerAccepted: () => boolean,
-    mirrorAccepted: () => boolean
+    mirrorAccepted: () => boolean,
+    origin?: 'system' | 'user'
   ) => void;
   readonly endBurst: () => void;
   readonly getCanvasState: () => CanvasStateContractV2 | null;
@@ -144,7 +145,8 @@ export class StagedResultController<Permit, Owner = symbol> {
           () =>
             hasPreviousLayerStack(o.getCanvasState()?.document ?? null) &&
             o.getCanvasState()?.stagingArea === previousStagingArea,
-          () => hasPreviousLayerStack(o.getDocument())
+          () => hasPreviousLayerStack(o.getDocument()),
+          'system'
         );
       }
       return { status: 'stale' };
@@ -162,7 +164,7 @@ export class StagedResultController<Permit, Owner = symbol> {
         o.dispatchPrepared(mutation, reducerAccepted, mirrorAccepted);
       } catch (error) {
         if (reducerAccepted()) {
-          o.dispatchPrepared(rollback, reducerRolledBack, mirrorRolledBack);
+          o.dispatchPrepared(rollback, reducerRolledBack, mirrorRolledBack, 'system');
         }
         throw error;
       }

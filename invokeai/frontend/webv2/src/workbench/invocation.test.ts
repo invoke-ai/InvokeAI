@@ -14,9 +14,8 @@ import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  autoSwitchDestinations,
+  areInvocationRouteInputsEqual,
   getInvocationRouteInput,
-  getRouteAfterHighConfidenceEdit,
   resolveInvocationRoute,
   resolveInvocationRouteInput,
 } from './invocation';
@@ -320,49 +319,5 @@ describe('submitResolvedInvocation', () => {
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
       route: expect.objectContaining({ destination: 'gallery', sourceId: 'generate' }),
     });
-  });
-});
-
-describe('getRouteAfterHighConfidenceEdit', () => {
-  const route = (overrides: Partial<InvocationRoute> = {}): InvocationRoute => ({
-    destination: 'canvas',
-    destinationLocked: false,
-    sourceId: 'generate',
-    sourceLocked: false,
-    ...overrides,
-  });
-
-  it('switches the source and remaps the destination per the auto-switch mapping', () => {
-    expect(getRouteAfterHighConfidenceEdit(route(), 'workflow')).toEqual(
-      route({ destination: 'gallery', sourceId: 'workflow' })
-    );
-    expect(getRouteAfterHighConfidenceEdit(route(), 'upscale')).toEqual(
-      route({ destination: 'gallery', sourceId: 'upscale' })
-    );
-    expect(getRouteAfterHighConfidenceEdit(route({ destination: 'gallery' }), 'canvas')).toEqual(
-      route({ destination: 'canvas', sourceId: 'canvas' })
-    );
-  });
-
-  it('covers every source in the destination mapping', () => {
-    expect(Object.keys(autoSwitchDestinations).sort()).toEqual(['canvas', 'generate', 'upscale', 'workflow']);
-  });
-
-  it('is an identity no-op when the source is unchanged, preserving a manual destination', () => {
-    const gallerySameSource = route({ destination: 'gallery' });
-
-    expect(getRouteAfterHighConfidenceEdit(gallerySameSource, 'generate')).toBe(gallerySameSource);
-  });
-
-  it('does nothing when the source is locked', () => {
-    const locked = route({ sourceLocked: true });
-
-    expect(getRouteAfterHighConfidenceEdit(locked, 'canvas')).toBe(locked);
-  });
-
-  it('switches only the source when the destination is locked', () => {
-    expect(getRouteAfterHighConfidenceEdit(route({ destinationLocked: true }), 'workflow')).toEqual(
-      route({ destinationLocked: true, sourceId: 'workflow' })
-    );
   });
 });

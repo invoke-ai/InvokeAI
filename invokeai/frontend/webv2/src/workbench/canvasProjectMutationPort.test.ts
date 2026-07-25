@@ -243,3 +243,35 @@ describe('project-bound bitmap persistence', () => {
     upload.bitmapStore.dispose();
   });
 });
+
+describe('Canvas edit intent', () => {
+  it('keeps system mutations from routing and routes a confirmed user edit', () => {
+    const store = createWorkbenchStore();
+    const projectId = store.getState().activeProjectId;
+    const port = createCanvasProjectMutationPort(store, projectId);
+
+    store.commands.generation.setSource('workflow');
+    port.dispatch({ bbox: { height: 768, width: 768, x: 0, y: 0 }, type: 'setCanvasBbox' }, 'system');
+
+    expect(store.queries.getProject(projectId)?.invocation.sourceId).toBe('workflow');
+
+    port.commitEdit({ kind: 'paint' });
+
+    expect(store.queries.getProject(projectId)?.invocation).toMatchObject({
+      destination: 'canvas',
+      sourceId: 'canvas',
+    });
+  });
+
+  it('keeps confirmed edits bound to the originating project', () => {
+    const store = createWorkbenchStore();
+    const originProjectId = store.getState().activeProjectId;
+    const port = createCanvasProjectMutationPort(store, originProjectId);
+    const otherProjectId = store.commands.projects.create().id;
+
+    port.commitEdit({ kind: 'paint' });
+
+    expect(store.queries.getProject(originProjectId)?.invocation.sourceId).toBe('canvas');
+    expect(store.queries.getProject(otherProjectId)?.invocation.sourceId).toBe('generate');
+  });
+});

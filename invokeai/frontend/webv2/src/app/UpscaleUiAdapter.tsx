@@ -33,7 +33,7 @@ export const UpscaleUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const adapter = useMemo<UpscaleUiAdapter>(
     () => ({
       ...project,
-      patchPromptDraft: (values) => commands.generation.patchPromptDraft(values, project.projectId),
+      patchPromptDraft: (values) => commands.generation.patchPromptDraft(values, 'upscale', project.projectId),
       patchValues: (values, origin) => commands.widgets.patchValues('upscale', values, project.projectId, origin),
       reportError: (message) =>
         commands.notifications.reportError({ area: 'upscale', message, namespace: 'generation' }),

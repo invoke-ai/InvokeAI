@@ -1477,6 +1477,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, { type: 'undoProjectChange' });
 
     expect(getActiveProject(state).projectGraph.nodes).toHaveLength(0);
+    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
   });
 
   it('replaceProjectGraph snapshots the previous document into graph history', () => {
@@ -1492,6 +1493,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const project = getActiveProject(state);
 
     expect(project.projectGraph.id).toBe('replacement-graph');
+    expect(project.invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
     expect(project.graphHistory[0]?.document?.id).toBe(originalGraphId);
     expect(project.graphHistory[0]?.retainedBytes).toBeGreaterThan(0);
     expect(project.graphHistory[0]?.document).toBe(project.undoRedo.past.at(-1)?.project.projectGraph);
@@ -1502,6 +1504,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     expect(getActiveProject(state).projectGraph.id).toBe(originalGraphId);
+    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
   });
 
   it('keeps the newest graph-history entries within the count limit and recomputes retained bytes', () => {
@@ -1659,6 +1662,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const state = createInitialWorkbenchState();
     const beforeUpscale = getProjectWidgetValues(getActiveProject(state), 'upscale');
     const nextState = workbenchReducer(state, {
+      sourceId: 'upscale',
       type: 'patchProjectPromptDraft',
       values: { negativePrompt: 'blur', negativePromptEnabled: false, positivePrompt: 'fine detail' },
     });
@@ -3445,6 +3449,7 @@ describe('auto invocation route switching', () => {
     let promptState = createInitialWorkbenchState();
 
     promptState = workbenchReducer(promptState, {
+      sourceId: 'upscale',
       type: 'patchProjectPromptDraft',
       values: { positivePrompt: 'crisp detail' },
     });
@@ -3483,6 +3488,73 @@ describe('auto invocation route switching', () => {
     const edited = workbenchReducer(state, { layer: createRasterLayer('b'), type: 'addCanvasLayer' });
 
     expect(getRoute(edited)).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+  });
+
+  it('switches to Canvas for structural and visibility edits', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
+
+    state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
+    state = workbenchReducer(state, {
+      add: { index: 1, layers: [createRasterLayer('b')] },
+      enabledUpdates: [],
+      selectedLayerId: 'b',
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getRoute(state)).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+
+    state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
+    state = workbenchReducer(state, {
+      type: 'setCanvasLayersEnabled',
+      updates: [{ id: 'a', isEnabled: false }],
+    });
+
+    expect(getRoute(state)).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+  });
+
+  it('routes confirmed paint intents but ignores system Canvas mutations', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
+    state = reduceWorkbench(state, {
+      intent: { kind: 'paint' },
+      projectId: state.activeProjectId,
+      type: 'commitCanvasEdit',
+    });
+
+    expect(getRoute(state)).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+
+    state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
+    state = reduceWorkbench(state, {
+      mutation: { bbox: { height: 768, width: 768, x: 0, y: 0 }, type: 'setCanvasBbox' },
+      origin: 'system',
+      projectId: state.activeProjectId,
+      type: 'applyCanvasProjectMutation',
+    });
+
+    expect(getRoute(state).sourceId).toBe('workflow');
+  });
+
+  it('uses the explicit source on shared prompt edits', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
+    state = workbenchReducer(state, {
+      sourceId: 'generate',
+      type: 'patchProjectPromptDraft',
+      values: { positivePrompt: 'generate prompt' },
+    });
+
+    expect(getRoute(state)).toMatchObject({ destination: 'gallery', sourceId: 'generate' });
+
+    state = workbenchReducer(state, { sourceId: 'canvas', type: 'setInvocationSource' });
+    state = workbenchReducer(state, {
+      sourceId: 'generate',
+      type: 'patchProjectPromptDraft',
+      values: { positivePrompt: 'canvas parameter prompt' },
+    });
+
+    expect(getRoute(state)).toMatchObject({ destination: 'gallery', sourceId: 'canvas' });
   });
 
   it('never lets generate edits steal the route from an active canvas source', () => {

@@ -11,14 +11,17 @@ Canvas mutations are explicitly project-addressed. `CanvasProjectMutation` is th
   type: 'applyCanvasProjectMutation';
   projectId: string;
   mutation: CanvasProjectMutation;
+  origin?: 'user' | 'system';
 }
 ```
 
 The workbench reducer handles this envelope only through `updateProjectById`. There are no canvas actions whose target is inferred from the active project.
 
-Each engine receives a `CanvasProjectMutationPort` bound to its immutable `projectId`. The port exposes only `getCanvasState()`, `subscribe()`, and `dispatch(mutation)`. It neither exposes the global workbench dispatcher nor follows active-project changes. Widgets use `useCanvasProjectMutationDispatch`, which captures the current project ID and emits the same envelope. Consequently, project switches and colliding layer IDs cannot redirect a delayed engine mutation to another project.
+Each engine receives a `CanvasProjectMutationPort` bound to its immutable `projectId`. The port exposes `getCanvasState()`, `subscribe()`, `dispatch(mutation, origin?)`, and `commitEdit(intent)`. It neither exposes the global workbench dispatcher nor follows active-project changes. Widgets use `useCanvasProjectMutationDispatch`, which captures the current project ID and emits the same envelope. Consequently, project switches and colliding layer IDs cannot redirect a delayed engine mutation to another project.
 
-The port's `dispatch()` returns whether the named project's canvas identity changed. Paint persistence clears a dirty result only after the intended layer accepts the bitmap reference. A rejected update retains dirty pixels for retry; deletion of the layer or project is terminal and discards obsolete persistence work. This applies equally to raster/control paint sources and paint-backed masks.
+The port's `dispatch()` returns whether the named project's canvas identity changed. User-origin mutations may auto-route the invocation controller; history replay, synchronization, rollback, and bitmap persistence dispatch as `system`. Prepared transactions dispatch their document mutation as `system`, verify reducer and mirror postconditions, then call `commitEdit()` exactly once for a successful user edit. Paint calls `commitEdit({ kind: 'paint' })` synchronously at stroke commit, so a delayed persistence upload can never steal a later manual route.
+
+Paint persistence clears a dirty result only after the intended layer accepts the bitmap reference. A rejected update retains dirty pixels for retry; deletion of the layer or project is terminal and discards obsolete persistence work. This applies equally to raster/control paint sources and paint-backed masks.
 
 ## Package and capability boundaries
 

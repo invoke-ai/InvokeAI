@@ -616,17 +616,23 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return false;
     }
     if (layer.type === 'raster' || layer.type === 'control') {
-      return mutationPort.dispatch({
-        id: layerId,
-        source: { bitmap, offset, type: 'paint' },
-        type: 'updateCanvasLayerSource',
-      });
+      return mutationPort.dispatch(
+        {
+          id: layerId,
+          source: { bitmap, offset, type: 'paint' },
+          type: 'updateCanvasLayerSource',
+        },
+        'system'
+      );
     } else if (layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') {
-      return mutationPort.dispatch({
-        config: { layerType: layer.type, mask: { bitmap, offset } },
-        id: layerId,
-        type: 'updateCanvasLayerConfig',
-      });
+      return mutationPort.dispatch(
+        {
+          config: { layerType: layer.type, mask: { bitmap, offset } },
+          id: layerId,
+          type: 'updateCanvasLayerConfig',
+        },
+        'system'
+      );
     }
     return false;
   };
@@ -637,7 +643,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const bitmapStore: BitmapStore =
     opts.bitmapStore ??
     createBitmapStore({
-      dispatch: (action) => mutationPort.dispatch(action),
+      dispatch: (action) => mutationPort.dispatch(action, 'system'),
       dispatchBitmap: (layerId, bitmap, offset) => dispatchLayerBitmap(layerId, bitmap, offset),
       encodeSurface: (surface) => backend.encodeSurface(surface),
       getAuthoritativeLayerSource: getAuthoritativeLayerSourceById,
@@ -666,6 +672,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isGestureActive: () => pipeline.isGestureActive(),
   });
   const history = historyController.history;
+  const dispatchCanvasMutation = (
+    action: CanvasProjectMutation,
+    origin: 'system' | 'user' = history.isApplying() ? 'system' : 'user'
+  ): boolean => mutationPort.dispatch(action, origin);
   // Direct pixel writes do not replace the reducer canvas object. Snapshot
   // freshness therefore also binds to this engine-local content epoch.
   let rasterContentEpoch = 0;
@@ -676,7 +686,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const structuralController = new StructuralLayerController({
     canEdit: () => canEditDocument(),
-    dispatch: (action) => mutationPort.dispatch(action),
+    dispatch: (action) => dispatchCanvasMutation(action),
     getDocument: () => mirror.getDocument(),
     history,
     isGestureActive: () => pipeline.isGestureActive(),
@@ -792,7 +802,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       bytes,
       label,
       redo: () => {
-        mutationPort.dispatch({ index: created.index, layer: created.layer, type: 'addCanvasLayer' });
+        dispatchCanvasMutation({ index: created.index, layer: created.layer, type: 'addCanvasLayer' });
         // Re-create an EMPTY cache marked fresh so the async rasterize pass can't
         // clobber the restored stroke; `applyImagePatch` grows it to the stroke's
         // content bounds and writes the `after` pixels.
@@ -801,7 +811,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         applyImagePatch(layerId, rect, afterImageData);
       },
       undo: () => {
-        mutationPort.dispatch({ ids: [layerId], type: 'removeCanvasLayers' });
+        dispatchCanvasMutation({ ids: [layerId], type: 'removeCanvasLayers' });
       },
     };
   };
@@ -817,6 +827,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // an undo/redo replay routes pixels through `applyImagePatch`, not a fresh
     // stroke, so this never fires during apply — the guard is belt-and-braces.
     if (!history.isApplying()) {
+      mutationPort.commitEdit({ kind: 'paint' });
       const label = event.tool === 'eraser' ? 'Eraser stroke' : 'Brush stroke';
       history.push(
         event.createdLayer
@@ -915,7 +926,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     transform: {
       backend,
       canEdit: () => canEditDocument(),
-      dispatch: (action) => mutationPort.dispatch(action),
+      dispatch: (action) => dispatchCanvasMutation(action),
       endBurst: () => endNudgeBurst(),
       getCache: (layerId) => layerCache.get(layerId) ?? null,
       getDocument: () => mirror.getDocument(),
@@ -975,7 +986,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     commitStructural: (label, forward, inverse) => commitStructural(label, forward, inverse),
     createLayerId,
     createPath2D: createPath2DImpl,
-    dispatch: (action) => mutationPort.dispatch(action),
+    dispatch: (action) => dispatchCanvasMutation(action),
     emitStrokeCommitted: (event) => commitOrdinaryStroke(event),
     getDocument: () => mirror.getDocument(),
     getSelectionMask: () => selection.mask(),
@@ -1280,8 +1291,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // Later-defined engine values (mirror, pipeline, prepared-cache helpers) are
   // passed as thunks: the context never invokes them during construction.
   const mutationContext = createCanvasMutationContext({
+    commitEdit: (intent) => mutationPort.commitEdit(intent),
     createLayerId,
-    dispatch: (action) => mutationPort.dispatch(action),
+    dispatch: (action, origin) => dispatchCanvasMutation(action, origin),
     editOwner: documentEditOwner,
     editingLocked: stores.documentEditingLocked,
     endBurst: () => endNudgeBurst(),
@@ -2928,7 +2940,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       canEdit: () => canEditDocument(),
       deleteDerived: deleteDerivedSurfaces,
       discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-      dispatch: (action) => mutationPort.dispatch(action),
+      dispatch: (action) => dispatchCanvasMutation(action),
       endBurst: () => endNudgeBurst(),
       getDocument: () => mirror.getDocument(),
       history,
@@ -2953,7 +2965,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     rasterize: {
       backend,
       canEdit: () => canEditDocument(),
-      dispatch: (action) => mutationPort.dispatch(action),
+      dispatch: (action) => dispatchCanvasMutation(action),
       endBurst: () => endNudgeBurst(),
       getDocument: () => mirror.getDocument(),
       history,
@@ -3327,7 +3339,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     replaceTemporaryRestoreTool: () => pipeline.replaceTemporaryRestoreTool('sam', 'view'),
     selectLayer: (layerId) => {
       if (mirror.getDocument()?.selectedLayerId !== layerId) {
-        mutationPort.dispatch({ id: layerId, type: 'setCanvasSelectedLayer' });
+        dispatchCanvasMutation({ id: layerId, type: 'setCanvasSelectedLayer' });
       }
     },
     setSamInputHandler: (handler) => {

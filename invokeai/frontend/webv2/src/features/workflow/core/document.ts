@@ -334,16 +334,6 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
 /** Returns the project-undo label for an action, or null when the edit should not create an undo entry. */
 export const getProjectGraphUndoLabel = (action: ProjectGraphAction): string | null => undoLabels[action.type] ?? null;
 
-/** Edits meaningful enough to auto-select the project graph as the invocation source. */
-export const isHighConfidenceGraphEdit = (action: ProjectGraphAction): boolean =>
-  action.type === 'addNode' ||
-  action.type === 'addNodeAndEdge' ||
-  action.type === 'addGraphElements' ||
-  action.type === 'removeNodes' ||
-  action.type === 'addEdge' ||
-  action.type === 'removeEdges' ||
-  action.type === 'setFieldValue';
-
 const updateNode = (
   document: ProjectGraphState,
   nodeId: string,

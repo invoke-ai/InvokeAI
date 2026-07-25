@@ -45,6 +45,7 @@ describe('Upscale snapshot submission', () => {
     });
     state = workbenchReducer(state, {
       projectId,
+      sourceId: 'upscale',
       type: 'patchProjectPromptDraft',
       values: { negativePrompt: 'blur', positivePrompt: 'fine detail' },
     });
@@ -57,6 +58,7 @@ describe('Upscale snapshot submission', () => {
     });
     state = workbenchReducer(state, {
       projectId,
+      sourceId: 'upscale',
       type: 'patchProjectPromptDraft',
       values: { negativePrompt: 'changed later', positivePrompt: 'changed later' },
     });

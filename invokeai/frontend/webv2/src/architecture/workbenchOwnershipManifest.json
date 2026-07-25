@@ -80,6 +80,7 @@
     "WorkbenchRuntime.tsx": "workbench",
     "WorkbenchSessionController.tsx": "workbench",
     "WorkbenchWidgetRegistryContext.tsx": "workbench",
+    "autoRoutePolicy.ts": "workbench",
     "canvasDimsSync.ts": "workbench",
     "canvasLayerOps.ts": "workbench",
     "canvasMigration.ts": "workbench",

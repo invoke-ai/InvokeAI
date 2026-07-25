@@ -5,7 +5,6 @@ export {
   createDefaultUpscaleWidgetValues,
   getUpscaleOutputDimensions,
   getUpscaleValidationReasons,
-  isHighConfidenceUpscaleEdit,
   normalizeUpscaleWidgetValues,
   resolveUpscaleSeed,
   syncUpscaleWidgetValuesWithModels,

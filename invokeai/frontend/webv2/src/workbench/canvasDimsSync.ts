@@ -131,7 +131,10 @@ export const reconcileCanvasDims = ({
 
 /** The minimal workbench store surface the sync depends on. */
 export interface CanvasDimsSyncStore {
-  commands: Pick<WorkbenchCommands, 'canvas' | 'generation'>;
+  commands: {
+    canvas: Pick<WorkbenchCommands['canvas'], 'apply'>;
+    generation: Pick<WorkbenchCommands['generation'], 'patchSettings'>;
+  };
   getState(): WorkbenchState;
   subscribe(listener: () => void): () => void;
 }
@@ -242,7 +245,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
         };
         isSyncing = true;
         try {
-          store.commands.canvas.apply(project.id, { bbox: result.bbox, type: 'setCanvasBbox' });
+          store.commands.canvas.apply(project.id, { bbox: result.bbox, type: 'setCanvasBbox' }, 'system');
         } finally {
           isSyncing = false;
         }
