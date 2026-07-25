@@ -47,13 +47,10 @@ import type {
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
   ExtractMaskedAreaResult,
-  FilterPreviewInput,
   LayerExportGuard,
   MergeVisibleResult,
   NewRasterLayerResult,
   PsdExportResult,
-  StagedPreviewInput,
-  StagedPreviewPlacement,
 } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasCompositeExecutorDeps,
@@ -143,7 +140,6 @@ import {
   type RasterCompositeExportRequest,
   type RasterCompositeExportSnapshot,
 } from '@workbench/canvas-engine/exportRasterComposite';
-import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
@@ -197,6 +193,7 @@ import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
+import { createPreviewPublisher } from './previewPublisher';
 import { createSelectObjectBridge } from './selectObjectBridge';
 import { createStrokeCommit } from './strokeCommit';
 import { createViewTool } from './tools/viewTool';
@@ -342,28 +339,6 @@ export interface CanvasEngineCoreComposition {
   readonly engine: CanvasEngineImplementation;
   readonly applicationHost: CanvasApplicationHost;
 }
-
-/**
- * Decodes a `data:` URL to a `Blob` without a DOM (`atob`/`Blob`/`Uint8Array`
- * are all node-safe), so the staged-progress decode path runs in vitest through
- * the injected raster backend just like the imageName path runs through the
- * injected resolver.
- */
-const dataUrlToBlob = (dataUrl: string): Blob => {
-  const commaIndex = dataUrl.indexOf(',');
-  const header = commaIndex >= 0 ? dataUrl.slice(0, commaIndex) : '';
-  const data = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
-  const mime = /^data:([^;,]+)/i.exec(header)?.[1] ?? 'application/octet-stream';
-  if (/;base64/i.test(header)) {
-    const binary = atob(data);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return new Blob([bytes], { type: mime });
-  }
-  return new Blob([decodeURIComponent(data)], { type: mime });
-};
 
 const sourceImageName = (source: CanvasLayerSourceContract): string | null => {
   if (source.type === 'image') {
@@ -1444,147 +1419,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     stores.thumbnailStatus.delete(layerId);
   };
 
-  // ---- Staged generation preview ------------------------------------------
-
-  /** Drops any staged preview and bumps the token so an in-flight decode is discarded. */
-  const clearStagedPreview = (): void => {
-    if (renderController.previews.clearStaged()) {
-      scheduler.invalidate({ all: true });
-    }
-  };
-
-  /** Decodes a staged-preview input to a surface (imageName via resolver, dataUrl via the backend seam). */
-  const decodeStagedPreview = async (
-    input: StagedPreviewInput
-  ): Promise<{ surface: RasterSurface; width: number; height: number; placement?: StagedPreviewPlacement }> => {
-    if ('imageName' in input) {
-      const blob = await imageResolver(input.imageName);
-      const decoded = await rasterController.decodeBlob(blob);
-      return {
-        height: decoded.decodedHeight,
-        placement: input.placement ? { ...input.placement } : undefined,
-        surface: decoded.surface,
-        width: decoded.decodedWidth,
-      };
-    }
-    const { dataUrl, height, width } = input;
-    const decoded = await rasterController.decodeBlob(dataUrlToBlob(dataUrl), { height, scale: true, width });
-    return { height, surface: decoded.surface, width };
-  };
-
-  const setStagedPreview = (input: StagedPreviewInput | null): void => {
-    if (input === null) {
-      clearStagedPreview();
-      return;
-    }
-    const token = renderController.previews.nextStagedToken();
-    decodeStagedPreview(input)
-      .then((decoded) => {
-        // A newer set/clear superseded this decode while it was in flight.
-        if (renderController.previews.publishStaged(token, decoded)) {
-          scheduler.invalidate({ all: true });
-        }
-      })
-      .catch(() => {
-        // A transient decode failure leaves any prior preview untouched rather
-        // than blanking the canvas; the next selection re-drives a decode.
-      });
-  };
-
-  /**
-   * Drops a layer's filter-preview state and bumps its token so an in-flight
-   * decode for it is discarded — even if the id is later reused (e.g. an undo
-   * that restores a deleted layer must not resurrect a stale decode result
-   * that resolves afterward). The token is bumped, never reset/deleted, so a
-   * later guarded preview for the same id can never collide with a
-   * still-in-flight decode's captured token.
-   */
-  const clearFilterPreview = (layerId: string): void => {
-    if (renderController.previews.clearFilter(layerId)) {
-      scheduler.invalidate({ layers: [layerId] });
-    }
-  };
-
-  /**
-   * Drops every layer's filter-preview state. Used on a wholesale document
-   * replace: none of the outgoing document's previews describe the incoming
-   * document, even if a layer id happens to be reused.
-   */
-  const clearAllFilterPreviews = (): void => {
-    for (const id of renderController.previews.filterLayerIds()) {
-      clearFilterPreview(id);
-    }
-  };
-
-  const publishFilterPreview = async (
-    layerId: string,
-    input: FilterPreviewInput,
-    validate: () => 'shown' | 'missing' | 'stale',
-    guard: LayerExportGuard
-  ): Promise<'shown' | 'missing' | 'stale'> => {
-    const nextToken = renderController.previews.beginGuardedFilter(layerId);
-    const dropGuardedRequest = (): void => {
-      renderController.previews.finishGuardedFilter(layerId, nextToken);
-    };
-    const beforeDecode = validate();
-    if (beforeDecode !== 'shown') {
-      dropGuardedRequest();
-      return beforeDecode;
-    }
-    try {
-      const decoded = await decodeStagedPreview({ imageName: input.imageName });
-      if (input.filterType && (decoded.width !== input.rect.width || decoded.height !== input.rect.height)) {
-        throw new LayerFilterOutputDimensionError(
-          input.filterType,
-          { height: decoded.height, width: decoded.width },
-          input.rect
-        );
-      }
-      const beforePublish = validate();
-      if (beforePublish !== 'shown') {
-        dropGuardedRequest();
-        return beforePublish;
-      }
-      // A newer set/clear for THIS layer superseded the decode in flight.
-      if (!renderController.previews.isFilterTokenCurrent(layerId, nextToken)) {
-        dropGuardedRequest();
-        return 'stale';
-      }
-      renderController.previews.publishFilter(layerId, nextToken, {
-        guard,
-        rect: { ...input.rect },
-        surface: decoded.surface,
-      });
-      scheduler.invalidate({ layers: [layerId] });
-      return 'shown';
-    } catch (error) {
-      // Transient decode failure leaves any prior preview untouched.
-      dropGuardedRequest();
-      if (error instanceof LayerFilterOutputDimensionError) {
-        throw error;
-      }
-      return 'stale';
-    }
-  };
-
-  const setGuardedFilterPreview = (
-    layerId: string,
-    input: FilterPreviewInput,
-    guard: LayerExportGuard
-  ): Promise<'shown' | 'missing' | 'stale'> => {
-    const validate = (): 'shown' | 'missing' | 'stale' => {
-      const liveLayer = mirror.getDocument()?.layers.find((candidate) => candidate.id === layerId);
-      if (!liveLayer) {
-        return 'missing';
-      }
-      if (layerId !== guard.layerId || !isLayerExportGuardCurrent(guard)) {
-        return 'stale';
-      }
-      return 'shown';
-    };
-    return publishFilterPreview(layerId, input, validate, guard);
-  };
-
   // ---- Render loop --------------------------------------------------------
 
   /**
@@ -1842,6 +1676,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // Stay paused until attached: invalidations accumulate but never request a
   // (DOM) frame, keeping the engine node-safe before it has render targets.
   scheduler.pause();
+
+  // ---- Staged generation and filter previews ------------------------------
+
+  const { clearAllFilterPreviews, clearFilterPreview, clearStagedPreview, setGuardedFilterPreview, setStagedPreview } =
+    createPreviewPublisher({
+      decodeBlob: (blob, dimensions) => rasterController.decodeBlob(blob, dimensions),
+      getDocument: () => mirror.getDocument(),
+      invalidateAll: () => scheduler.invalidate({ all: true }),
+      invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
+      isGuardCurrent: (guard) => isLayerExportGuardCurrent(guard),
+      previews: renderController.previews,
+      resolveImage: imageResolver,
+    });
 
   // ---- Document mirror ----------------------------------------------------
 
