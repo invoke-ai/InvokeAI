@@ -173,26 +173,24 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     (event: ReactMouseEvent<HTMLDivElement>) => {
       // Keep the native menu inside inline editors (the text tool's contenteditable
       // overlay), consistent with the surface-focus INLINE_EDIT_SELECTOR.
-      const rect = event.currentTarget.getBoundingClientRect();
+      //
+      // The menu targets the SELECTED layer, not the layer under the pointer, and
+      // never dispatches a selection — the layers panel is the sole authority on
+      // which layer is active.
       const resolution = resolveCanvasContextMenu({
         clientX: event.clientX,
         clientY: event.clientY,
-        hitTest: engine ? (point) => engine.tools.contextMenuLayerIdAt(point) : undefined,
         isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
         isInteractionLocked,
-        surfaceLeft: rect.left,
-        surfaceTop: rect.top,
+        selectedLayerId: engine?.tools.canTargetLayerFromContextMenu() ? canvas.document.selectedLayerId : null,
       });
       if (!resolution.preventDefault) {
         return;
       }
       event.preventDefault();
-      if (resolution.target?.layerId) {
-        canvasDispatch({ id: resolution.target.layerId, type: 'setCanvasSelectedLayer' });
-      }
       setContextMenuTarget(resolution.target);
     },
-    [canvasDispatch, engine, isInteractionLocked]
+    [canvas.document.selectedLayerId, engine, isInteractionLocked]
   );
 
   const handleCanvasImageDrop = useCallback(

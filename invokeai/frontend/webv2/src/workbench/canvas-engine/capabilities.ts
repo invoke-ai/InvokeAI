@@ -288,7 +288,12 @@ export interface CanvasDiagnosticsSnapshot {
 }
 
 export interface CanvasEngineToolCapability extends CanvasToolCapability {
-  contextMenuLayerIdAt(screenPoint: Vec2): string | null;
+  /**
+   * Whether the canvas context menu may act on a layer. The menu targets the
+   * document's SELECTED layer (never the layer under the pointer); this reports
+   * only whether an in-progress gesture/session should suppress it.
+   */
+  canTargetLayerFromContextMenu(): boolean;
   handleEscapePriority(options: { gestureWasActive: boolean }): void;
   onStrokeCommitted(listener: (event: StrokeCommittedEvent) => void): () => void;
   setInteractionLocked(locked: boolean): void;

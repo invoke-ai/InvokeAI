@@ -13,8 +13,13 @@
  * (CANVAS_PLAN Phase 5: "param for parametric"), and MASK layers (inpaint /
  * regional) by their alpha bitmap's content rect (legacy allows moving masks).
  * An EMPTY layer (a brand-new / cleared paint or mask layer with no pixels)
- * returns `null`/`false` rather than throwing, so the move/transform tools can
- * scan a mixed stack safely.
+ * returns `null`/`false` rather than throwing, so callers can probe a mixed
+ * stack safely.
+ *
+ * There is deliberately no "top-most layer under the point" query here: the
+ * layers panel is the sole authority on which layer is active, so no tool picks
+ * a target by hit-testing the stack. These helpers answer "where is THIS layer",
+ * which is what the move outline and the transform frame need.
  *
  * Zero React, zero import-time side effects.
  */
@@ -26,24 +31,11 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import {
-  getSourceContentRect,
-  LAYER_GROUP_COUNT,
-  layerGroupRank,
-  renderableSourceOf,
-} from '@workbench/canvas-engine/document/sources';
+import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { applyToPoint, fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
-
-/**
- * Resolves a layer's LIVE cache rect (layer-local), or `undefined`. Threaded from
- * the engine so hit-testing covers freshly-painted content the debounced bitmap
- * flush hasn't yet written back to the persisted contract — mirrors how
- * `invertMask` unions the live cache rect. A pure caller (no engine) omits it.
- */
-export type LiveCacheRectOf = (layerId: string) => Rect | undefined;
 
 /**
  * A hit-testable layer's content rectangle in its LOCAL (untransformed) space —
@@ -109,38 +101,6 @@ export const hitTestLayer = (
   }
   const local = applyToPoint(inverse, point);
   return local.x >= rect.x && local.x <= rect.x + rect.width && local.y >= rect.y && local.y <= rect.y + rect.height;
-};
-
-/**
- * The top-most layer that both satisfies `predicate` and contains `point`, or
- * `null`. "Top-most" follows the COMPOSITE order, not the raw array order: layers
- * are visited by group rank high→low (inpaint mask > regional guidance > control >
- * raster — see {@link layerGroupRank}), and WITHIN a group by array order (index 0
- * is top-most within its group). This matches what the compositor draws, so a
- * control layer painted visually over a raster wins the hit even when the raster
- * sits at a lower global index — keeping the move-tool auto-select and the canvas
- * context-menu target consistent with the pixels on screen (batch finding N1). The
- * predicate lets callers require visible/unlocked; `liveRectOf` (optional) supplies
- * each layer's live cache rect so freshly-painted, not-yet-flushed content is
- * hit-testable.
- */
-export const topLayerAt = (
-  doc: CanvasDocumentContractV2,
-  point: Vec2,
-  predicate: (layer: CanvasLayerContract) => boolean,
-  liveRectOf?: LiveCacheRectOf
-): CanvasLayerContract | null => {
-  for (let rank = LAYER_GROUP_COUNT - 1; rank >= 0; rank--) {
-    for (const layer of doc.layers) {
-      if (layerGroupRank(layer) !== rank) {
-        continue;
-      }
-      if (predicate(layer) && hitTestLayer(layer, doc, point, liveRectOf?.(layer.id))) {
-        return layer;
-      }
-    }
-  }
-  return null;
 };
 
 /**

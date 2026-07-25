@@ -161,7 +161,7 @@ import { createColorPickerTool } from '@workbench/canvas-engine/tools/colorPicke
 import { createEraserTool } from '@workbench/canvas-engine/tools/eraserTool';
 import { createGradientTool } from '@workbench/canvas-engine/tools/gradientTool';
 import { createLassoTool } from '@workbench/canvas-engine/tools/lassoTool';
-import { hittableLayerRect, layerOutlineCorners, topLayerAt } from '@workbench/canvas-engine/tools/moveHitTest';
+import { hittableLayerRect, layerOutlineCorners } from '@workbench/canvas-engine/tools/moveHitTest';
 import { createMoveTool } from '@workbench/canvas-engine/tools/moveTool';
 import { stepBrushSize } from '@workbench/canvas-engine/tools/paintConstants';
 import { createSamTool } from '@workbench/canvas-engine/tools/samTool';
@@ -318,7 +318,7 @@ export interface CanvasEngineOptions {
 }
 
 export interface CanvasEngineToolCapability extends CanvasToolCapability {
-  contextMenuLayerIdAt(screenPoint: Vec2): string | null;
+  canTargetLayerFromContextMenu(): boolean;
   handleEscapePriority(options: { gestureWasActive: boolean }): void;
   onStrokeCommitted(listener: (event: StrokeCommittedEvent) => void): () => void;
   setInteractionLocked(locked: boolean): void;
@@ -2044,6 +2044,30 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       cleanup.run(() => scheduler.invalidate({ layers: ids }));
       cleanup.throwIfFailed();
     },
+    /**
+     * The layers panel is the sole authority on which layer is active, so a
+     * panel selection has to retarget the engine's per-layer transient state.
+     * Nothing here dispatches — this only reconciles engine-side state.
+     *
+     * A selection-only document change reuses the `layers` array reference and
+     * leaves the bbox equal, so none of the other callbacks fire for it: without
+     * this the move-tool outline and the transform frame would keep framing the
+     * previously selected layer until some unrelated edit invalidated the overlay.
+     */
+    onSelectionChanged: (selectedLayerId) => {
+      const cleanup = createCleanupAccumulator();
+      const session = stores.transformSession.get();
+      if (session && session.layerId !== selectedLayerId) {
+        // The open session belongs to the layer that was just deselected; drop
+        // its preview rather than leaving a frame on an inactive layer.
+        cleanup.run(() => cancelTransform());
+        if (selectedLayerId !== null && interactionController.getActiveToolId() === 'transform') {
+          cleanup.run(() => beginTransformSession(selectedLayerId));
+        }
+      }
+      cleanup.run(() => scheduler.invalidate({ overlay: true }));
+      cleanup.throwIfFailed();
+    },
     onStagingChanged: () => scheduler.invalidate({ overlay: true }),
   });
 
@@ -2779,30 +2803,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     });
   };
 
-  const contextMenuLayerIdAt = (screenPoint: Vec2): string | null => {
-    // Never open the menu over an in-progress edit: a live paint/drag gesture, or
-    // an open transform / text-edit session. Right-click during those belongs to
-    // the interaction, not to picking a layer. Mirrors the mid-gesture guards on
-    // merge/nudge/undo above.
-    if (pipeline.isGestureActive() || stores.transformSession.get() || stores.textEditSession.get()) {
-      return null;
-    }
-    const doc = mirror.getDocument();
-    if (!doc) {
-      return null;
-    }
-    // Same screen→document conversion and group-rank-consistent, live-cache-aware
-    // hit-test the move tool uses for click-selection, so right-clicking a layer
-    // targets exactly the layer a left-click there would select.
-    const documentPoint = viewport.screenToDocument(screenPoint);
-    const hit = topLayerAt(
-      doc,
-      documentPoint,
-      (layer) => layer.isEnabled,
-      (layerId) => layerCache.get(layerId)?.rect
-    );
-    return hit?.id ?? null;
-  };
+  /**
+   * Whether the canvas context menu may target a layer at all. It never picks a
+   * layer by hit-testing — the menu acts on the document's selected layer, since
+   * the layers panel is the sole authority on which layer is active. This only
+   * suppresses the menu during an in-progress edit: a live paint/drag gesture, or
+   * an open transform / text-edit session. Right-click during those belongs to
+   * the interaction. Mirrors the mid-gesture guards on merge/nudge/undo above.
+   */
+  const canTargetLayerFromContextMenu = (): boolean =>
+    !pipeline.isGestureActive() &&
+    !stores.transformSession.get() &&
+    !stores.textEditSession.get() &&
+    mirror.getDocument() !== null;
 
   const undo = (): void => historyController.undo();
   const redo = (): void => historyController.redo();
@@ -3237,7 +3250,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
   const toolsCapability: CanvasEngineToolCapability = {
     ...interactionController.tools,
-    contextMenuLayerIdAt,
+    canTargetLayerFromContextMenu,
     handleEscapePriority,
     onStrokeCommitted,
     setInteractionLocked,

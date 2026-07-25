@@ -122,8 +122,8 @@ describe('constrainDelta', () => {
   });
 });
 
-describe('move tool: click selection', () => {
-  it('selects the top-most visible layer under the point (one dispatch, no commit)', () => {
+describe('move tool: the layers panel owns selection', () => {
+  it('does not select the layer under the pointer on click', () => {
     const doc = makeDoc(
       [imageLayer('top', { width: 50, height: 50 }), imageLayer('bottom', { width: 50, height: 50 })],
       null
@@ -135,10 +135,10 @@ describe('move tool: click selection', () => {
     up(tool, h.ctx, pointer(10, 10));
 
     expect(h.commits).toHaveLength(0);
-    expect(h.dispatched).toEqual([{ id: 'top', type: 'setCanvasSelectedLayer' }]);
+    expect(h.dispatched).toHaveLength(0);
   });
 
-  it('clears the selection when clicking empty space', () => {
+  it('does not clear the selection when clicking empty space', () => {
     const doc = makeDoc([imageLayer('a', { width: 10, height: 10 })], 'a');
     const h = createHarness(doc);
     const tool = createMoveTool();
@@ -146,30 +146,23 @@ describe('move tool: click selection', () => {
     down(tool, h.ctx, pointer(80, 80));
     up(tool, h.ctx, pointer(80, 80));
 
-    expect(h.dispatched).toEqual([{ id: null, type: 'setCanvasSelectedLayer' }]);
+    expect(h.dispatched).toHaveLength(0);
   });
 
-  it('can click-select a locked layer', () => {
-    const doc = makeDoc([imageLayer('locked', { width: 50, height: 50, isLocked: true })], null);
+  it('does not steal the selection when pressing another layer above the selected one', () => {
+    // The exact complaint this contract exists to fix: 'bottom' is selected in
+    // the panel and 'top' covers the press point.
+    const doc = makeDoc(
+      [imageLayer('top', { width: 50, height: 50 }), imageLayer('bottom', { width: 50, height: 50 })],
+      'bottom'
+    );
     const h = createHarness(doc);
     const tool = createMoveTool();
 
     down(tool, h.ctx, pointer(10, 10));
     up(tool, h.ctx, pointer(10, 10));
 
-    expect(h.dispatched).toEqual([{ id: 'locked', type: 'setCanvasSelectedLayer' }]);
-  });
-
-  it('does not click-select a hidden layer', () => {
-    const doc = makeDoc([imageLayer('hidden', { width: 50, height: 50, isEnabled: false })], null);
-    const h = createHarness(doc);
-    const tool = createMoveTool();
-
-    down(tool, h.ctx, pointer(10, 10));
-    up(tool, h.ctx, pointer(10, 10));
-
-    // Hidden layer is not hit → empty-space clear.
-    expect(h.dispatched).toEqual([{ id: null, type: 'setCanvasSelectedLayer' }]);
+    expect(h.dispatched).toHaveLength(0);
   });
 });
 
@@ -222,7 +215,9 @@ describe('move tool: drag', () => {
     });
   });
 
-  it('auto-selects the pressed unlocked layer before committing the move', () => {
+  it('moves the SELECTED layer even when another layer covers the press point', () => {
+    // 'top' is composited over the press point, but 'bottom' is what the panel
+    // selected — the panel wins, and no selection dispatch is emitted.
     const doc = makeDoc(
       [imageLayer('top', { width: 50, height: 50 }), imageLayer('bottom', { width: 50, height: 50 })],
       'bottom'
@@ -234,10 +229,9 @@ describe('move tool: drag', () => {
     move(tool, h.ctx, pointer(30, 10));
     up(tool, h.ctx, pointer(30, 10));
 
-    // Selection switched to the pressed layer, then the move committed on it.
-    expect(h.dispatched).toEqual([{ id: 'top', type: 'setCanvasSelectedLayer' }]);
+    expect(h.dispatched).toHaveLength(0);
     expect(h.commits).toHaveLength(1);
-    expect(h.commits[0]!.forward).toMatchObject({ id: 'top' });
+    expect(h.commits[0]!.forward).toMatchObject({ id: 'bottom' });
   });
 
   it('moves the selected layer when the press lands on empty space', () => {
@@ -258,8 +252,8 @@ describe('move tool: drag', () => {
     });
   });
 
-  it('does not drag a locked layer (auto-select finds nothing, no selected fallback)', () => {
-    const doc = makeDoc([imageLayer('locked', { width: 50, height: 50, isLocked: true })], null);
+  it('does not drag a locked selected layer', () => {
+    const doc = makeDoc([imageLayer('locked', { width: 50, height: 50, isLocked: true })], 'locked');
     const h = createHarness(doc);
     const tool = createMoveTool();
 
@@ -298,7 +292,21 @@ describe('move tool: drag', () => {
     up(tool, h.ctx, pointer(11, 11));
 
     expect(h.commits).toHaveLength(0);
-    expect(h.dispatched).toEqual([{ id: 'a', type: 'setCanvasSelectedLayer' }]);
+    expect(h.dispatched).toHaveLength(0);
+  });
+
+  it('commits nothing on a zero-delta drag, only clearing the preview', () => {
+    const doc = makeDoc([imageLayer('a', { width: 50, height: 50 })], 'a');
+    const h = createHarness(doc);
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(20, 20)); // past the threshold
+    up(tool, h.ctx, pointer(10, 10)); // ...and back to the origin
+
+    expect(h.commits).toHaveLength(0);
+    expect(h.dispatched).toHaveLength(0);
+    expect(h.overrides.at(-1)).toEqual({ layerId: 'a', override: null });
   });
 });
 

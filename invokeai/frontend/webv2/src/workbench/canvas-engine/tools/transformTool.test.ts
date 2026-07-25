@@ -199,13 +199,35 @@ describe('transform tool: session lifecycle', () => {
     expect(h.session()).toBeNull();
   });
 
-  it('clicking a layer with no session starts a session (move gesture)', () => {
-    const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], null);
+  it('pressing with no session opens one on the SELECTED layer (move gesture)', () => {
+    const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], 'a');
     const h = createHarness(doc);
     const tool = createTransformTool();
 
     down(tool, h.ctx, pointer(50, 50));
     expect(h.session()?.layerId).toBe('a');
+  });
+
+  it('opens no session when nothing is selected, however the press lands', () => {
+    const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], null);
+    const h = createHarness(doc);
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    expect(h.session()).toBeNull();
+  });
+
+  it('does not adopt the layer under the pointer over the selected one', () => {
+    // 'top' covers the press point; 'bottom' is what the panel selected.
+    const doc = makeDoc(
+      [imageLayer('top', { width: 100, height: 100 }), imageLayer('bottom', { width: 100, height: 100 })],
+      'bottom'
+    );
+    const h = createHarness(doc);
+    const tool = createTransformTool();
+
+    down(tool, h.ctx, pointer(50, 50));
+    expect(h.session()?.layerId).toBe('bottom');
   });
 });
 

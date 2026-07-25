@@ -2,8 +2,10 @@
  * The transform tool: an interactive scale/rotate/move SESSION on a single layer.
  *
  * Interaction contract (CANVAS_PLAN Phase 5):
- * - **Session**: selecting the tool with an eligible layer selected (or clicking a
- *   layer) captures its committed transform and opens a session. The live preview
+ * - **Session**: selecting the tool with an eligible layer selected (or pressing
+ *   the canvas with no session open) captures the SELECTED layer's committed
+ *   transform and opens a session on it. A press never re-targets which layer is
+ *   active — that is the layers panel's job. The live preview
  *   flows through the engine's transform-override channel; a `transformSession`
  *   store exposes the layer id + live transform so the numeric options bar can
  *   render and edit it. The session survives multiple gestures — drag handles,
@@ -42,7 +44,7 @@ import {
 
 import type { Tool, ToolContext } from './tool';
 
-import { hittableLayerRect, topLayerAt } from './moveHitTest';
+import { hittableLayerRect } from './moveHitTest';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
@@ -238,25 +240,30 @@ export const createTransformTool = (): Tool => {
         }
       }
 
-      // 2) No session, or a press off the session frame: adopt the top-most eligible
-      //    layer under the pointer and start a move gesture on it. Empty space is a
-      //    no-op (the current session, if any, persists).
-      const hit = topLayerAt(doc, input.documentPoint, (layer) => isEligible(layer, doc));
-      if (!hit) {
+      // 2) No session yet: open one on the SELECTED layer (the layers panel is the
+      //    sole authority on which layer is active — a press never re-targets it)
+      //    and start a move gesture. A press off an existing session's frame is a
+      //    no-op; the session persists.
+      if (session) {
         return;
       }
-      const rect = hittableLayerRect(hit, doc);
+      const selectedId = doc.selectedLayerId;
+      const selected = selectedId ? doc.layers.find((layer) => layer.id === selectedId) : undefined;
+      if (!selected || !isEligible(selected, doc)) {
+        return;
+      }
+      const rect = hittableLayerRect(selected, doc);
       if (!rect) {
         return;
       }
-      ctx.beginTransformSession?.(hit.id);
+      ctx.beginTransformSession?.(selected.id);
       gesture = {
         cursor: 'move',
         moved: false,
         rect,
         startPointerDoc: input.documentPoint,
         startScreen: input.screenPoint,
-        startTransform: hit.transform,
+        startTransform: selected.transform,
         target: { kind: 'move' },
       };
     },
