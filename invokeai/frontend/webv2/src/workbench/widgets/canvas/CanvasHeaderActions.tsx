@@ -7,7 +7,6 @@ import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngi
 import { Box, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { useModifierHeld } from '@platform/react/useModifierHeld';
 import { ConfirmDialog, IconButton, MenuContent, Tooltip } from '@platform/ui';
-import { createNewCanvasStateV2 } from '@workbench/canvasMigration';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -28,9 +27,16 @@ import {
 import { Fragment, useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { CanvasHeaderCommandContext } from './canvasHeaderCommands';
 import type { CanvasBooleanSetting, ResolvedCanvasSettings } from './canvasSettings';
 
 import { gridSizeForModelBase } from './bboxGrid';
+import {
+  applyFitBbox,
+  confirmNewCanvas as confirmNewCanvasDocument,
+  executeCanvasHeaderCommand,
+  zoomAtViewportCentre,
+} from './canvasHeaderCommands';
 import {
   CANVAS_SETTING_SECTIONS,
   CANVAS_SETTINGS,
@@ -98,61 +104,38 @@ const CanvasHeaderActionsInner = ({
     }
   }, [editingLocked]);
 
-  const setZoom = (value: number) => {
-    const viewport = engine.viewport.getViewport();
-    const size = viewport.getViewportSize();
-    viewport.zoomAtPoint(value, { x: size.width / 2, y: size.height / 2 });
-  };
+  const setZoom = (value: number) => zoomAtViewportCentre(engine, value);
 
   // Fit-bbox honors the snap-to-grid setting: snapping off ⇒ grid 1 (a plain round).
   const gridSize = settings[CANVAS_SNAP_TO_GRID_KEY] ? gridSizeForModelBase(modelBase) : 1;
   const fitLayersRect = useMemo(() => computeFitBboxToLayers(document, gridSize), [document, gridSize]);
   const fitMasksRect = useMemo(() => computeFitBboxToMasks(document, gridSize), [document, gridSize]);
 
-  // One undoable `setCanvasBbox` (inverse restores the current bbox) — exactly how a
-  // manual bbox-tool edit commits. `refit` re-centers the view afterward (legacy
-  // re-fits the stage after fit-to-layers, but not after fit-to-masks).
-  const applyFit = (rect: Rect | null, refit: boolean) => {
-    if (editingLocked || !rect) {
-      return;
-    }
-    engine.layers.commitStructural(
-      t('widgets.canvas.commands.fitBbox'),
-      { bbox: rect, type: 'setCanvasBbox' },
-      { bbox: document.bbox, type: 'setCanvasBbox' }
-    );
-    if (refit) {
-      engine.viewport.fitToView();
-    }
-  };
+  const commandContext = (): CanvasHeaderCommandContext => ({
+    dispatch,
+    document,
+    editingLocked,
+    engine,
+    fitLayersRect,
+    fitMasksRect,
+    openNewCanvas,
+    t,
+  });
 
-  const confirmNewCanvas = useCallback(() => {
-    if (editingLocked) {
-      return;
-    }
-    // A wholesale document replace (seeded with one empty inpaint mask, matching
-    // Task 42's new-canvas init) at the current dimensions. The engine's mirror
-    // treats this as a document swap and clears the canvas history by design, so
-    // this is intentionally NOT undoable — the confirm dialog is the safety net.
-    dispatch({
-      document: createNewCanvasStateV2(document.width, document.height).document,
-      type: 'replaceCanvasDocument',
-    });
-  }, [dispatch, document.height, document.width, editingLocked]);
+  const applyFit = (rect: Rect | null, refit: boolean) => applyFitBbox(commandContext(), rect, refit);
+
+  const confirmNewCanvas = useCallback(
+    () => confirmNewCanvasDocument({ dispatch, document, editingLocked }),
+    [dispatch, document, editingLocked]
+  );
 
   // Commands (hotkey-assignable; catalog ids `canvas.fitBboxToLayers` /
   // `canvas.fitBboxToMasks` / `canvas.newSession`). `useEffectEvent` reads the
   // latest fit rects / dialog opener without re-registering per document change.
   // The new-session command routes through the SAME confirm dialog as the button.
-  const executeHeaderCommand = useEffectEvent((commandId: string) => {
-    if (commandId === 'canvas.fitBboxToLayers') {
-      applyFit(fitLayersRect, true);
-    } else if (commandId === 'canvas.fitBboxToMasks') {
-      applyFit(fitMasksRect, false);
-    } else if (commandId === 'canvas.newSession') {
-      openNewCanvas();
-    }
-  });
+  const executeHeaderCommand = useEffectEvent((commandId: string) =>
+    executeCanvasHeaderCommand(commandId, commandContext())
+  );
 
   useEffect(() => {
     const entries = [
