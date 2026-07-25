@@ -53,9 +53,6 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
   // ideogram4_caption_builder node so dynamic prompts / prompt batching (which vary the global
   // prompt) are folded into the encoded caption. The regions and palette are fixed per generation.
   const { globalPrompt, regions, colorPalette } = collectIdeogram4PromptInputs(state, manager);
-  // Whether anything beyond the global prompt shapes the caption. When true we record the assembled
-  // caption in metadata (via an edge off the runtime builder) so it captures each batch item's caption.
-  const hasStructuredInputs = regions.length > 0 || colorPalette.length > 0;
 
   const g = new Graph(getPrefixedId('ideogram4_graph'));
 
@@ -139,12 +136,10 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
     height: originalSize.height,
     generation_mode: 'ideogram4_txt2img',
   });
-  // Record the actually-encoded caption for reproducibility. It's assembled at runtime, so take it via
-  // an edge off the builder — this captures each batch item's caption, not a stale build-time value.
-  // Only when something beyond the plain global prompt shapes it (otherwise it equals positive_prompt).
-  if (hasStructuredInputs) {
-    g.addEdgeToMetadata(captionBuilder, 'value', 'ideogram4_caption');
-  }
+  // Always record the actually-encoded caption for reproducibility and transparency (so the metadata
+  // viewer shows the structured JSON the model really received, not just the raw prompt). It's assembled
+  // at runtime, so take it via an edge off the builder — this captures each batch item's caption.
+  g.addEdgeToMetadata(captionBuilder, 'value', 'ideogram4_caption');
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 

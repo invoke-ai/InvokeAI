@@ -128,30 +128,28 @@ describe('buildIdeogram4Graph', () => {
     expect(captionBuilder.color_palette).toEqual(['#FF0000']);
   });
 
+  // `core_metadata` and the `ideogram4_caption` metadata field are outside Graph's strict typed unions
+  // (the metadata node is excluded from AnyInvocation), so compare their string values via casts.
+  const captionEdge = (g: Awaited<ReturnType<typeof buildIdeogram4Graph>>['g']) => {
+    const captionBuilderId = g.getNodes().find((n) => (n.type as string) === 'ideogram4_caption_builder')?.id;
+    return g
+      .getEdges()
+      .find((e) => e.source.node_id === captionBuilderId && (e.destination.field as string) === 'ideogram4_caption');
+  };
+
   it('records the runtime-assembled caption in metadata via an edge (structured inputs)', async () => {
     const { g } = await buildIdeogram4Graph(buildArg());
-    const captionBuilder = g.getNodes().find((n) => n.type === 'ideogram4_caption_builder');
-    const metadataNode = g.getNodes().find((n) => n.type === 'core_metadata');
-    expect(metadataNode).toBeDefined();
     // The caption is wired from the runtime builder into metadata, so each batch item records its own.
-    expect(
-      g.getEdges().some(
-        (e) =>
-          e.source.node_id === captionBuilder!.id &&
-          e.source.field === 'value' &&
-          e.destination.node_id === metadataNode!.id &&
-          e.destination.field === 'ideogram4_caption'
-      )
-    ).toBe(true);
+    const edge = captionEdge(g);
+    expect(edge).toBeDefined();
+    expect(edge!.source.field).toBe('value');
   });
 
-  it('does not record a caption edge when there are no structured inputs (plain prompt)', async () => {
+  it('always records the caption edge, even for a plain prompt (so the encoded JSON is visible)', async () => {
+    // Plain prompts are now wrapped in the JSON schema at runtime, so the caption differs from the raw
+    // positive_prompt and must be recorded too — otherwise the metadata viewer only shows the raw text.
     promptInputs = { globalPrompt: 'just plain text', regions: [], colorPalette: [] };
     const { g } = await buildIdeogram4Graph(buildArg());
-    const edges = g.getEdges();
-    expect(edges.some((e) => e.destination.field === 'ideogram4_caption')).toBe(false);
-    // The prompt still flows through the caption builder (which passes plain text through at runtime).
-    const captionBuilder = g.getNodes().find((n) => n.type === 'ideogram4_caption_builder');
-    expect(captionBuilder).toBeDefined();
+    expect(captionEdge(g)).toBeDefined();
   });
 });

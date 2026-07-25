@@ -16,8 +16,28 @@ def test_raw_json_passthrough_is_verbatim():
     assert build_ideogram4_caption(raw, [("ignored", [0, 0, 10, 10])], ["#FFFFFF"]) == raw
 
 
-def test_plain_text_without_regions_or_palette_returns_trimmed_prompt():
-    assert build_ideogram4_caption("  a serene lake  ", [], []) == "a serene lake"
+def test_plain_prompt_without_regions_synthesizes_a_default_partial_frame_element():
+    # Never bare plain text, and never an empty/degenerate elements list: a no-region prompt is wrapped
+    # in the JSON schema with one auto-synthesized element (the whole prompt at a partial, non-full-frame
+    # bbox). An empty elements list — or a full-frame element repeating the prompt — trips Ideogram's
+    # safety filter, so the default element uses a partial bbox.
+    result = build_ideogram4_caption("  a serene lake  ", [], [])
+    assert json.loads(result) == {
+        "high_level_description": "a serene lake",
+        "compositional_deconstruction": {
+            "background": "",
+            "elements": [{"type": "obj", "bbox": [100, 100, 900, 900], "desc": "a serene lake"}],
+        },
+    }
+    # The default bbox must never be the degenerate full frame.
+    assert [100, 100, 900, 900] != [0, 0, 1000, 1000]
+
+
+def test_regions_present_do_not_trigger_the_default_element():
+    # When the user drew regions, elements come from them — no synthesized default is added.
+    result = build_ideogram4_caption("a scene", [("a red bird", [10, 20, 300, 400])], [])
+    elements = json.loads(result)["compositional_deconstruction"]["elements"]
+    assert elements == [{"type": "obj", "bbox": [10, 20, 300, 400], "desc": "a red bird"}]
 
 
 def test_region_with_bbox_builds_obj_element_in_key_order():
@@ -58,7 +78,10 @@ def test_palette_only_still_builds_structured_caption():
     parsed = json.loads(result)
     # Strict key order: high_level_description, style_description, compositional_deconstruction.
     assert list(parsed.keys()) == ["high_level_description", "style_description", "compositional_deconstruction"]
-    assert parsed["compositional_deconstruction"]["elements"] == []
+    # No regions -> the default full-scene element is synthesized (elements is never empty).
+    assert parsed["compositional_deconstruction"]["elements"] == [
+        {"type": "obj", "bbox": [100, 100, 900, 900], "desc": "a scene"}
+    ]
 
 
 def test_compact_separators_and_non_ascii_preserved():

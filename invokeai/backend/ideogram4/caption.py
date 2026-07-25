@@ -21,6 +21,13 @@ from typing import Optional
 
 _HEX_COLOR_RE = re.compile(r"#[0-9A-F]{6}")
 
+# Centered, deliberately sub-full-frame bbox ([y_min, x_min, y_max, x_max], 0–1000) for the element we
+# auto-synthesize when the user drew no regions. Empirically, Ideogram 4's built-in safety filter blocks
+# "degenerate" captions — an empty ``elements`` list, or a single *full-frame* [0,0,1000,1000] element
+# whose desc merely repeats ``high_level_description``. A partial bbox (or a distinct desc) avoids the
+# block; since a no-region prompt only gives us one description, we make the default element partial.
+_DEFAULT_SCENE_BBOX = (100, 100, 900, 900)
+
 
 def build_ideogram4_caption(
     global_prompt: str,
@@ -31,8 +38,10 @@ def build_ideogram4_caption(
 
     - Raw-JSON passthrough: if the trimmed global prompt already starts with ``{`` it is returned
       verbatim (the user controls the JSON; regions/palette are ignored).
-    - With regions and/or a palette: a structured JSON caption is built.
-    - Otherwise: the plain (trimmed) global prompt is returned — the model accepts plain text.
+    - Otherwise a structured JSON caption is always built — regions become ``obj`` elements and a
+      palette becomes ``style_description.color_palette``. A prompt with neither still becomes a
+      minimal caption (just ``high_level_description``), never bare plain text: Ideogram is trained on
+      the JSON schema and its safety filter false-positives far more on plain text.
 
     ``regions`` is a list of ``(description, bbox)`` where bbox is ``[y_min, x_min, y_max, x_max]`` or
     None. Regions with a blank description are dropped.
@@ -52,14 +61,21 @@ def build_ideogram4_caption(
         else:
             elements.append({"type": "obj", "desc": description})
 
+    # No usable regions: synthesize one default element describing the whole scene from the prompt, with
+    # a partial (non-full-frame) bbox. An empty `elements` list — or a full-frame element repeating the
+    # prompt — trips Ideogram's safety filter (verified empirically); a partial default box avoids it.
+    if not elements:
+        elements = [{"type": "obj", "bbox": list(_DEFAULT_SCENE_BBOX), "desc": trimmed}]
+
     # Normalize the palette to uppercase #RRGGBB (the schema's required hex form); drop invalid entries.
     # Mirror the JS order: uppercase first, then validate.
     palette = [c.upper() for c in color_palette if _HEX_COLOR_RE.fullmatch(c.upper())]
 
-    # Nothing structured to encode — fall back to the plain prompt (documented to work).
-    if not elements and not palette:
-        return trimmed
-
+    # Always emit a structured caption (never bare plain text): Ideogram 4 is trained on the JSON schema
+    # and its built-in safety filter false-positives far more often on plain-text prompts than on
+    # structured JSON. A prompt with no regions/palette becomes a minimal caption carrying just the
+    # high_level_description (with an empty compositional_deconstruction). Raw-JSON pastes still pass
+    # through verbatim above.
     compositional_deconstruction = {"background": "", "elements": elements}
     if palette:
         caption = {
