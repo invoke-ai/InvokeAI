@@ -16,13 +16,10 @@
 import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
-import { isRenderableLayer } from '@workbench/canvas-engine/document/sources';
-import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-
 import type { LayerCacheStore } from './layerCache';
 import type { RasterBackend } from './raster';
 
-import { blendToComposite } from './compositor';
+import { compositeDocument } from './compositor';
 
 /** An RGBA sample, channels in `[0, 255]`. */
 export interface RgbaSample {
@@ -32,13 +29,12 @@ export interface RgbaSample {
   a: number;
 }
 
-const matToTuple = (m: Mat2d): [number, number, number, number, number, number] => [m.a, m.b, m.c, m.d, m.e, m.f];
-
 /**
  * Samples the composited document color at `docPoint` (document space;
- * fractional coordinates are floored to the covering pixel). Returns `null`
- * when the point falls outside the document, or when no renderable layer
- * covers it with non-zero alpha there.
+ * fractional coordinates are floored to the covering pixel). The canvas plane
+ * is unbounded, so transformed layer content outside the document dimensions
+ * remains pickable. Returns `null` when no renderable layer covers the point
+ * with non-zero alpha.
  */
 export const sampleDocumentColor = (
   doc: CanvasDocumentContractV2,
@@ -48,46 +44,18 @@ export const sampleDocumentColor = (
 ): RgbaSample | null => {
   const px = Math.floor(docPoint.x);
   const py = Math.floor(docPoint.y);
-  if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) {
+  if (!Number.isFinite(px) || !Number.isFinite(py)) {
     return null;
   }
 
   const scratch = backend.createSurface(1, 1);
-  const ctx = scratch.ctx;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, 1, 1);
-  // Translate so the sampled document pixel lands at the scratch surface's
-  // one pixel (0, 0); each layer's own transform composes on top of this.
   const view: Mat2d = { a: 1, b: 0, c: 0, d: 1, e: -px, f: -py };
+  // Reuse the canonical compositor so sampling shares its layer ordering,
+  // cache-origin placement, transforms, blend modes, and display effects.
+  // Omitting a checkerboard tile and staged preview keeps empty space transparent.
+  compositeDocument(scratch, doc, layers, view, { backend });
 
-  // Bottom → top, matching the real compositor's paint order.
-  for (let i = doc.layers.length - 1; i >= 0; i--) {
-    const layer = doc.layers[i];
-    if (!layer || !isRenderableLayer(layer)) {
-      continue;
-    }
-    const entry = layers.get(layer.id);
-    // drawImage throws for zero-sized OffscreenCanvas sources in Chromium.
-    // Empty paint layers legitimately retain a 0x0 cache until their first stroke.
-    if (!entry || entry.surface.canvas.width === 0 || entry.surface.canvas.height === 0) {
-      continue;
-    }
-
-    ctx.save();
-    ctx.globalAlpha = layer.opacity;
-    ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
-    const layerMat = fromTRS(
-      { x: layer.transform.x, y: layer.transform.y },
-      layer.transform.rotation,
-      layer.transform.scaleX,
-      layer.transform.scaleY
-    );
-    ctx.setTransform(...matToTuple(multiply(view, layerMat)));
-    ctx.drawImage(entry.surface.canvas, 0, 0);
-    ctx.restore();
-  }
-
-  const { data } = ctx.getImageData(0, 0, 1, 1);
+  const { data } = scratch.ctx.getImageData(0, 0, 1, 1);
   const alpha = data[3] ?? 0;
   if (alpha === 0) {
     return null;
