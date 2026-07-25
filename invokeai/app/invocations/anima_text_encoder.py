@@ -125,7 +125,10 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             (_, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
-            device = text_encoder.device
+            # Use the encoder's intended compute device, not its current parameter residency: partial loading may
+            # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU (see
+            # #9373). Qwen3 is fully autocast-capable, so nothing pins it to the compute device otherwise.
+            device = text_encoder_info.compute_device
 
             # Apply LoRA models to the text encoder
             lora_dtype = TorchDevice.choose_anima_inference_dtype(device)

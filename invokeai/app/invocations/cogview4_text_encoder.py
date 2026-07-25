@@ -6,7 +6,6 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import GlmEncoderField
 from invokeai.app.invocations.primitives import CogView4ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     CogView4ConditioningInfo,
     ConditioningFieldData,
@@ -52,8 +51,11 @@ class CogView4TextEncoderInvocation(BaseInvocation):
             glm_text_encoder_info.model_on_device() as (_, glm_text_encoder),
             context.models.load(self.glm_encoder.tokenizer).model_on_device() as (_, glm_tokenizer),
         ):
+            # Repair any required tensors left on the CPU by a previous interrupted run, then run on the encoder's
+            # intended compute device. Do NOT infer the device from current parameter residency: partial loading may
+            # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
             repaired_tensors = glm_text_encoder_info.repair_required_tensors_on_device()
-            device = get_effective_device(glm_text_encoder)
+            device = glm_text_encoder_info.compute_device
             if repaired_tensors > 0:
                 context.logger.warning(
                     f"Recovered {repaired_tensors} required GLM tensor(s) onto {device} after a partial device mismatch."
