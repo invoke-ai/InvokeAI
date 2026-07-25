@@ -56,6 +56,7 @@ import {
   setZImageSeedVarianceRandomizePercent,
   setZImageSeedVarianceStrength,
   setZImageShift,
+  t5EncoderModelSelected,
   vaeSelected,
   wanComponentSourceSelected,
   wanGuidanceScaleLowNoiseChanged,
@@ -1230,6 +1231,27 @@ const Qwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion Qwen3EncoderModel
 
+//#region T5EncoderModel
+const T5EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'T5EncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 't5_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 't5_encoder');
+    assert(parsed.type === 't5_encoder');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(t5EncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.t5Encoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion T5EncoderModel
+
 //#region ZImageVAEModel
 const ZImageVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
@@ -1772,6 +1794,7 @@ export const ImageMetadataHandlers = {
   Scheduler,
   VAEModel,
   Qwen3EncoderModel,
+  T5EncoderModel,
   ZImageVAEModel,
   ZImageQwen3SourceModel,
   AnimaVAEModel,
