@@ -310,6 +310,32 @@ def test_multifile_onefile(tmp_path: Path, mm2_session: Session) -> None:
     queue.stop()
 
 
+def test_multifile_download_with_relative_dest(tmp_path: Path, mm2_session: Session, monkeypatch: Any) -> None:
+    started_paths: list[Path | None] = []
+    monkeypatch.chdir(tmp_path)
+    queue = DownloadQueueService(
+        requests_session=mm2_session,
+    )
+    queue.start()
+    job = queue.multifile_download(
+        parts=[
+            RemoteModelFile(
+                url=AnyHttpUrl("http://www.civitai.com/models/12345"),
+                path=Path("nested/mock12345.safetensors"),
+            )
+        ],
+        dest=Path("relative-downloads"),
+        on_start=lambda job: started_paths.append(job.download_path),
+    )
+    queue.join()
+
+    assert job.status == DownloadJobStatus("completed"), "expected job status to be completed"
+    assert job.download_path == tmp_path / "relative-downloads/nested"
+    assert started_paths == [tmp_path / "relative-downloads/nested"]
+    assert Path(tmp_path, "relative-downloads/nested/mock12345.safetensors").exists()
+    queue.stop()
+
+
 def test_multifile_no_rel_paths(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
