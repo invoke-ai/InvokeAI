@@ -1,6 +1,8 @@
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
+import { createWorkbenchPersistenceRuntime, type PersistenceClock } from '@workbench/persistenceRuntime';
 import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as libraryModule from './library';
@@ -146,6 +148,7 @@ const SESSION_KEY = 'webv2:workbench-account';
 let persistence: typeof persistenceModule;
 let library: typeof libraryModule;
 let service: persistenceModule.SyncedWorkbenchPersistence;
+const defaultUpdateProject = api.updateProject.getMockImplementation()!;
 
 const seedSessionBlob = (blob: Record<string, unknown>): void => {
   api.__clientState.set(SESSION_KEY, JSON.stringify(blob));
@@ -174,7 +177,8 @@ beforeEach(async () => {
   api.deleteProject.mockClear();
   api.getProject.mockClear();
   api.listProjects.mockClear();
-  api.updateProject.mockClear();
+  api.updateProject.mockReset();
+  api.updateProject.mockImplementation(defaultUpdateProject);
 
   persistence = await import('./syncedPersistence');
   service = persistence.createSyncedWorkbenchPersistence();
@@ -294,6 +298,147 @@ describe('loadWorkbench session hydration', () => {
 });
 
 describe('saveWorkbench', () => {
+  it('serializes concurrent saves against the latest acknowledged project revision', async () => {
+    const project = seedServerProject('Original');
+    const account = createInitialWorkbenchState().account;
+
+    seedSessionBlob({ account, activeProjectId: project.id, openProjectIds: [project.id] });
+
+    const loaded = await service.loadWorkbench();
+    const original = loaded!.state.projects[0]!;
+    const firstState = stateWithProjects([{ ...original, name: 'First edit' }]);
+    const latestState = stateWithProjects([{ ...original, name: 'Latest edit' }]);
+    const defaultUpdate = api.updateProject.getMockImplementation()!;
+    const writes: {
+      request: { name: string; data: Record<string, unknown>; expected_revision: number };
+      resolve(value: Awaited<ReturnType<typeof defaultUpdate>>): void;
+    }[] = [];
+
+    api.updateProject.mockImplementation((_projectId, request) => {
+      return new Promise((resolve) => {
+        writes.push({ request, resolve });
+      });
+    });
+
+    const firstSave = service.saveWorkbench(firstState);
+    const latestSave = service.saveWorkbench(latestState);
+
+    await vi.waitFor(() => expect(writes).toHaveLength(1));
+    const firstWinner = await defaultUpdate(project.id, writes[0]!.request);
+
+    writes[0]!.resolve(firstWinner);
+    await vi.waitFor(() => expect(writes).toHaveLength(2));
+    const latestWinner = await defaultUpdate(project.id, writes[1]!.request);
+
+    writes[1]!.resolve(latestWinner);
+
+    const results = await Promise.all([firstSave, latestSave]);
+
+    expect(writes.map((write) => write.request.expected_revision)).toEqual([1, 2]);
+    expect(results.flatMap((result) => result.conflicts)).toEqual([]);
+    expect(api.__records.get(project.id)?.name).toBe('Latest edit');
+  });
+
+  it('serializes reconnect replay behind an in-flight save instead of creating and activating a recovery', async () => {
+    const first = seedServerProject('First');
+    const second = seedServerProject('Second');
+    const account = createInitialWorkbenchState().account;
+
+    seedSessionBlob({ account, activeProjectId: second.id, openProjectIds: [first.id, second.id] });
+
+    const loaded = await service.loadWorkbench();
+    const store = createWorkbenchStore(loaded!.state);
+    const callbacks = new Map<number, () => void>();
+    let nextTimerId = 0;
+    const clock: PersistenceClock & { runAll(): void } = {
+      clearTimeout: (id) => callbacks.delete(id as number),
+      runAll: () => {
+        const pending = [...callbacks.values()];
+        callbacks.clear();
+        for (const callback of pending) {
+          callback();
+        }
+      },
+      setTimeout: (callback) => {
+        nextTimerId += 1;
+        callbacks.set(nextTimerId, callback);
+        return nextTimerId;
+      },
+    };
+    const runtime = createWorkbenchPersistenceRuntime({
+      aggregate: {
+        ...store.internal.persistence,
+        getPersistedRevision: store.getPersistedRevision,
+        notifyProjectNotFound: vi.fn(),
+        reportLoadError: vi.fn(),
+        setHasHydrated: store.setHasHydrated,
+        subscribe: store.subscribe,
+      },
+      clock,
+      persistence: service,
+    });
+
+    runtime.start();
+    await vi.waitFor(() => expect(store.getSnapshot().hasHydrated).toBe(true));
+    store.commands.queue.setConnectionStatus({ status: 'connected' });
+    store.commands.projects.rename(first.id, 'First local edit');
+    store.commands.projects.rename(second.id, 'Second local edit A');
+
+    const defaultUpdate = api.updateProject.getMockImplementation()!;
+    let rejectedFirstProject = false;
+    const secondProjectWrites: {
+      reject(error: unknown): void;
+      request: { name: string; data: Record<string, unknown>; expected_revision: number };
+      resolve(value: Awaited<ReturnType<typeof defaultUpdate>>): void;
+    }[] = [];
+
+    api.updateProject.mockImplementation((projectId, request) => {
+      if (projectId === first.id && !rejectedFirstProject) {
+        rejectedFirstProject = true;
+        return Promise.reject(new Error('transient HTTP failure'));
+      }
+      if (projectId === second.id) {
+        return new Promise((resolve, reject) => {
+          secondProjectWrites.push({ reject, request, resolve });
+        });
+      }
+      return defaultUpdate(projectId, request);
+    });
+
+    clock.runAll();
+    await vi.waitFor(() => expect(secondProjectWrites).toHaveLength(1));
+
+    store.commands.projects.rename(second.id, 'Second local edit B');
+    store.commands.queue.setConnectionStatus({ status: 'disconnected' });
+    store.commands.queue.setConnectionStatus({ status: 'connected' });
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    const didOverlap = secondProjectWrites.length > 1;
+    const firstWinner = await defaultUpdate(second.id, secondProjectWrites[0]!.request);
+
+    secondProjectWrites[0]!.resolve(firstWinner);
+
+    if (didOverlap) {
+      secondProjectWrites[1]!.reject(Object.assign(new Error('conflict'), { __status: 409 }));
+    } else {
+      await vi.waitFor(() => expect(secondProjectWrites).toHaveLength(2));
+      const secondWinner = await defaultUpdate(second.id, secondProjectWrites[1]!.request);
+
+      secondProjectWrites[1]!.resolve(secondWinner);
+    }
+
+    await vi.waitFor(() => expect(runtime.getSnapshot().phase).toBe('idle'));
+
+    const recoveryRecords = [...api.__records.values()].filter((record) => record.data.recoveryOf === second.id);
+
+    expect(secondProjectWrites.map((write) => write.request.expected_revision)).toEqual([1, 2]);
+    expect(recoveryRecords).toHaveLength(0);
+    expect(store.getState().activeProjectId).toBe(second.id);
+    runtime.dispose();
+  });
+
   it('never deletes server projects that are absent from state', async () => {
     const first = seedServerProject('First');
     const second = seedServerProject('Second');

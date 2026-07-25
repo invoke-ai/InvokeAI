@@ -248,6 +248,41 @@ describe('Workbench persistence runtime', () => {
     expect(aggregate.events).toContain('save-succeeded:current');
   });
 
+  it('keeps one save in flight and coalesces queued edits into the latest state', async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    const first = deferred<WorkbenchSaveResult>();
+    const second = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+
+    runtime.start();
+    await flushPromises();
+    aggregate.edit('First');
+    clock.runAll();
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(1);
+
+    aggregate.edit('Second');
+    clock.runAll();
+    aggregate.edit('Latest');
+    clock.runAll();
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(1);
+
+    first.resolve(saveResult(aggregate.state, 'first'));
+    await flushPromises();
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+    expect(persistence.saveWorkbench).toHaveBeenLastCalledWith(
+      expect.objectContaining({ projects: [expect.objectContaining({ name: 'Latest' })] })
+    );
+
+    second.resolve(saveResult(aggregate.state, 'latest'));
+    await flushPromises();
+    expect(aggregate.events).toContain('save-succeeded:latest');
+  });
+
   it('holds a failed revision until a new edit and then retries', async () => {
     const aggregate = createAggregate();
     const { persistence } = createPersistence(() => Promise.resolve(null));

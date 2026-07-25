@@ -622,6 +622,23 @@ export const clearAllWorkbenchData = async (): Promise<void> => {
 export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence => {
   const syncState = createSyncedPersistenceState();
   let loadPromise: Promise<HydratedWorkbenchSnapshot | null> | null = null;
+  // Every mutation below shares syncEntries and its optimistic revisions.
+  // Serialize them so this browser cannot race itself and manufacture a 409.
+  let mutationTail: Promise<void> = Promise.resolve();
+
+  const enqueueMutation = <Result>(operation: () => Promise<Result>): Promise<Result> => {
+    const result = mutationTail.then(
+      () => operation(),
+      () => operation()
+    );
+
+    mutationTail = result.then(
+      () => undefined,
+      () => undefined
+    );
+
+    return result;
+  };
 
   const adoptProjectRecord = (record: ProjectRecordDTO): Project | null => {
     const project = deserializeProjectDocument(record.data);
@@ -642,19 +659,23 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
   return {
     adoptProjectRecord,
     /** Clear everywhere: server projects + session blob, local cache, sync map, and this lifetime's sync state. */
-    async clearWorkbench(): Promise<void> {
-      await clearAllWorkbenchData();
+    clearWorkbench(): Promise<void> {
+      return enqueueMutation(async () => {
+        await clearAllWorkbenchData();
 
-      syncState.syncEntries.clear();
-      syncState.deletedProjectIds.clear();
-      syncState.lastPushedAccount = null;
-      syncState.hasPending = false;
+        syncState.syncEntries.clear();
+        syncState.deletedProjectIds.clear();
+        syncState.lastPushedAccount = null;
+        syncState.hasPending = false;
+      });
     },
-    async flushProjectToServer(project): Promise<void> {
-      const conflicts: ProjectConflictResolution[] = [];
+    flushProjectToServer(project): Promise<void> {
+      return enqueueMutation(async () => {
+        const conflicts: ProjectConflictResolution[] = [];
 
-      await pushProject(syncState, project, conflicts);
-      persistSyncMap(syncState);
+        await pushProject(syncState, project, conflicts);
+        persistSyncMap(syncState);
+      });
     },
     hasPendingChanges(): boolean {
       return syncState.hasPending;
@@ -732,57 +753,61 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
       syncState.syncEntries.delete(projectId);
       persistSyncMap(syncState);
     },
-    async persistEmptySession(state): Promise<void> {
-      const emptied: WorkbenchState = { ...state, activeProjectId: '', projects: [] };
+    persistEmptySession(state): Promise<void> {
+      return enqueueMutation(async () => {
+        const emptied: WorkbenchState = { ...state, activeProjectId: '', projects: [] };
 
-      await localStorageWorkbenchPersistence.saveWorkbench(emptied);
+        await localStorageWorkbenchPersistence.saveWorkbench(emptied);
 
-      try {
-        const blob = serializeSessionBlob(emptied);
+        try {
+          const blob = serializeSessionBlob(emptied);
 
-        await setClientStateValue(SESSION_STATE_KEY, blob);
-        syncState.lastPushedAccount = blob;
-      } catch {
-        syncState.hasPending = true;
-      }
+          await setClientStateValue(SESSION_STATE_KEY, blob);
+          syncState.lastPushedAccount = blob;
+        } catch {
+          syncState.hasPending = true;
+        }
+      });
     },
     releaseProjectSync(projectId): void {
       syncState.syncEntries.delete(projectId);
       persistSyncMap(syncState);
     },
-    async saveWorkbench(state: WorkbenchState): Promise<WorkbenchSaveResult> {
-      const snapshot = createSnapshot(state);
+    saveWorkbench(state: WorkbenchState): Promise<WorkbenchSaveResult> {
+      return enqueueMutation(async () => {
+        const snapshot = createSnapshot(state);
 
-      await localStorageWorkbenchPersistence.saveWorkbench(state);
+        await localStorageWorkbenchPersistence.saveWorkbench(state);
 
-      syncState.hasPending = false;
+        syncState.hasPending = false;
 
-      const conflicts: ProjectConflictResolution[] = [];
-      const projectSyncInfos: Record<string, ProjectSyncInfo> = {};
+        const conflicts: ProjectConflictResolution[] = [];
+        const projectSyncInfos: Record<string, ProjectSyncInfo> = {};
 
-      await pushSessionState(syncState, state);
+        await pushSessionState(syncState, state);
 
-      for (const project of state.projects) {
-        const lastAckedDoc = syncState.syncEntries.get(project.id)?.pushedDoc ?? null;
-        const documentJson = await pushProject(syncState, project, conflicts);
-        const entry = syncState.syncEntries.get(project.id);
+        for (const project of state.projects) {
+          const lastAckedDoc = syncState.syncEntries.get(project.id)?.pushedDoc ?? null;
+          const documentJson = await pushProject(syncState, project, conflicts);
+          const entry = syncState.syncEntries.get(project.id);
 
-        projectSyncInfos[project.id] = {
-          isPendingPush: entry?.pushedDoc !== documentJson,
-          revision: entry?.revision ?? null,
-        };
+          projectSyncInfos[project.id] = {
+            isPendingPush: entry?.pushedDoc !== documentJson,
+            revision: entry?.revision ?? null,
+          };
 
-        // The server acknowledged new content for this project — keep the
-        // library summary current without a refetch.
-        if (entry && entry.pushedDoc === documentJson && lastAckedDoc !== documentJson) {
-          upsertProjectSummary({ id: project.id, name: project.name, revision: entry.revision });
+          // The server acknowledged new content for this project — keep the
+          // library summary current without a refetch.
+          if (entry && entry.pushedDoc === documentJson && lastAckedDoc !== documentJson) {
+            upsertProjectSummary({ id: project.id, name: project.name, revision: entry.revision });
+          }
         }
-      }
 
-      persistSyncMap(syncState);
-      reportProjectSync({ hasPendingChanges: syncState.hasPending, projects: projectSyncInfos });
+        persistSyncMap(syncState);
+        reportProjectSync({ hasPendingChanges: syncState.hasPending, projects: projectSyncInfos });
 
-      return { conflicts, hasPendingChanges: syncState.hasPending, snapshot };
+        return { conflicts, hasPendingChanges: syncState.hasPending, snapshot };
+      });
     },
     unmarkProjectDeleted(projectId): void {
       syncState.deletedProjectIds.delete(projectId);
