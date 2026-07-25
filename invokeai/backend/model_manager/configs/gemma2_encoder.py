@@ -21,12 +21,17 @@ from pydantic import Field
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
+    get_config_dict_or_raise,
     raise_for_class_name,
     raise_for_override_fields,
     raise_if_not_dir,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+
+# PiD's caption projection is hard-wired to Gemma-2-2b's 2304-dim hidden state. Larger Gemma 2
+# variants (9B → 3584, 27B → 4608) share the Gemma2ForCausalLM architecture but are incompatible.
+_PID_GEMMA_HIDDEN_SIZE = 2304
 
 
 class Gemma2Encoder_Gemma2Encoder_Config(Config_Base):
@@ -61,6 +66,16 @@ class Gemma2Encoder_Gemma2Encoder_Config(Config_Base):
 
         # Architecture marker is the canonical signal.
         raise_for_class_name(config_path, {"Gemma2ForCausalLM"})
+
+        # Only Gemma-2-2b (2304-dim hidden state) is compatible with PiD's fixed caption projection.
+        # Reject 9B/27B variants here so they are not offered as compatible encoders and then fail with
+        # a matrix-shape error deep inside PiD inference.
+        hidden_size = get_config_dict_or_raise(config_path).get("hidden_size")
+        if hidden_size != _PID_GEMMA_HIDDEN_SIZE:
+            raise NotAMatchError(
+                f"Gemma2 hidden_size {hidden_size} is incompatible with PiD, which requires "
+                f"{_PID_GEMMA_HIDDEN_SIZE} (Gemma-2-2b); 9B/27B variants are not supported."
+            )
 
         # Sanity check that tokenizer files live alongside the model (PiD calls
         # AutoTokenizer.from_pretrained on the same directory).

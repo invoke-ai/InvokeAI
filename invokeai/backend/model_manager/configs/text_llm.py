@@ -41,12 +41,15 @@ class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
         if not class_name.endswith("ForCausalLM"):
             raise NotAMatchError(f"model architecture '{class_name}' is not a causal language model")
 
-        # Defer to specialised text-encoder configs for models that have a
-        # dedicated wrapper. Without this both configs match the same
-        # directory and the user ends up with a `text_llm` entry even though
-        # a more specific type exists.
+        # During *automatic* classification, defer to specialised text-encoder configs for models
+        # that have a dedicated wrapper (e.g. Gemma2 → the PiD encoder config). Without this both
+        # configs match the same directory and the user ends up with a `text_llm` entry even though a
+        # more specific type exists. This deferral must NOT apply when the user *explicitly* asks for
+        # `type=text_llm`: the generic AutoModelForCausalLM loader supports these models, and removing
+        # the explicit escape hatch was a regression for previously-usable Gemma 2 causal LMs.
+        explicitly_requested_text_llm = override_fields.get("type") == ModelType.TextLLM
         _SPECIALISED_CAUSAL_LM_ARCHITECTURES = {"Gemma2ForCausalLM"}
-        if class_name in _SPECIALISED_CAUSAL_LM_ARCHITECTURES:
+        if not explicitly_requested_text_llm and class_name in _SPECIALISED_CAUSAL_LM_ARCHITECTURES:
             raise NotAMatchError(f"architecture '{class_name}' is handled by a dedicated encoder config, not TextLLM")
 
         # Verify tokenizer files exist to avoid runtime failures

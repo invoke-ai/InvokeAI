@@ -10966,7 +10966,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Num Inference Steps
-             * @description Number of PiD distill steps. The released checkpoints are trained for 4.
+             * @description Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.
              * @default 4
              */
             num_inference_steps?: number;
@@ -12185,7 +12185,7 @@ export type components = {
             pid_decoder?: components["schemas"]["PiDDecoderField"] | null;
             /**
              * Num Inference Steps
-             * @description Number of PiD distill steps. The released checkpoints are trained for 4.
+             * @description Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.
              * @default 4
              */
             num_inference_steps?: number;
@@ -26078,7 +26078,7 @@ export type components = {
             prompt?: string;
             /**
              * Num Inference Steps
-             * @description Number of PiD distill steps. The released checkpoints are trained for 4.
+             * @description Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.
              * @default 4
              */
             num_inference_steps?: number;
@@ -27323,7 +27323,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Num Inference Steps
-             * @description Number of PiD distill steps. The released checkpoints are trained for 4.
+             * @description Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.
              * @default 4
              */
             num_inference_steps?: number;
@@ -28562,7 +28562,7 @@ export type components = {
             pid_decoder?: components["schemas"]["PiDDecoderField"] | null;
             /**
              * Num Inference Steps
-             * @description Number of PiD distill steps. The released checkpoints are trained for 4.
+             * @description Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.
              * @default 4
              */
             num_inference_steps?: number;
@@ -28942,7 +28942,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Num Inference Steps
-             * @description Number of PiD distill steps. The released checkpoints are trained for 4.
+             * @description Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.
              * @default 4
              */
             num_inference_steps?: number;
@@ -35245,7 +35245,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Num Inference Steps
-             * @description Number of PiD distill steps. The released checkpoints are trained for 4.
+             * @description Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.
              * @default 4
              */
             num_inference_steps?: number;

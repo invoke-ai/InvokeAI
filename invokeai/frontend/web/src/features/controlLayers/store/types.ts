@@ -871,7 +871,7 @@ export const zParamsState = z.object({
   pidMode: zPidMode,
   pidDecoderModel: zModelIdentifierField.nullable(), // PiD decoder checkpoint (matched to the main model's base)
   gemma2EncoderModel: zModelIdentifierField.nullable(), // Gemma-2 caption encoder required by PiD
-  pidSteps: z.number(), // PiD distill steps (released checkpoints are trained for 4)
+  pidSteps: z.number().int().min(1).max(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint

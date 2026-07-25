@@ -47,6 +47,7 @@ from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
     PiDDecodeConfig,
     PiDDecoder,
+    assert_pid_decoder_matches_base,
     encode_caption_for_pid,
     estimate_pid_decode_working_memory,
 )
@@ -104,13 +105,22 @@ class QwenImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     num_inference_steps: int = InputField(
         default=4,
         ge=1,
-        le=8,
-        description="Number of PiD distill steps. The released checkpoints are trained for 4.",
+        le=4,
+        description="Number of PiD distill steps. The released checkpoints are distilled for 4; the "
+        "student schedule has only 4 transitions, so higher counts cannot add sampling steps.",
     )
     seed: int = InputField(default=0, description="Seed for the PiD decoder's noise.")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        # Fail fast if the connected decoder is for a different backbone (the base-agnostic loader lets
+        # the Nodes editor wire any PiD decoder into this Qwen-Image-specific node).
+        assert_pid_decoder_matches_base(
+            context.models.get_config(self.pid_decoder.decoder).base,
+            BaseModelType.QwenImage,
+            node_title="Qwen-Image PiD Decode",
+        )
+
         latents = context.tensors.load(self.latents.latents_name)
 
         # 1) Reduce the stored 5D (B, C, num_frames, H, W) latent to 2D (B, C, H, W). Qwen's VAE is a video-style
@@ -160,7 +170,10 @@ class QwenImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                     f"Expected PreTrainedTokenizerBase for Gemma tokenizer, got {type(gemma_tokenizer).__name__}."
                 )
 
-            device = TorchDevice.choose_torch_device()
+            # Encode on the Gemma encoder's actual device: model_on_device() honours the encoder's
+            # cpu_only setting, so on a CUDA host with a CPU-only Gemma the global compute device would
+            # push the tokenizer output to CUDA and mismatch the CPU-resident model.
+            device = next(gemma_encoder.parameters()).device
             encode_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
             context.util.signal_progress("Encoding caption with Gemma-2")
             caption_embs, caption_mask = encode_caption_for_pid(

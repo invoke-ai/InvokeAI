@@ -98,12 +98,13 @@ const ParamPidSteps = memo(() => {
   const { t } = useTranslation();
   const pidSteps = useAppSelector(selectPidSteps);
   const onChange = useCallback((v: number) => dispatch(pidStepsChanged(v)), [dispatch]);
-  // The released PiD checkpoints are distilled for 4 steps; keep the range small around that.
+  // The released PiD checkpoints are distilled for 4 steps and the student schedule has only 4
+  // transitions — more steps round onto duplicate timesteps, so the range is capped at 4.
   return (
     <FormControl gap={2}>
       <FormLabel m={0}>{t('modelManager.pidSteps')}</FormLabel>
-      <CompositeSlider value={pidSteps} defaultValue={4} min={1} max={8} step={1} onChange={onChange} marks />
-      <CompositeNumberInput value={pidSteps} defaultValue={4} min={1} max={8} step={1} onChange={onChange} />
+      <CompositeSlider value={pidSteps} defaultValue={4} min={1} max={4} step={1} onChange={onChange} marks />
+      <CompositeNumberInput value={pidSteps} defaultValue={4} min={1} max={4} step={1} onChange={onChange} />
     </FormControl>
   );
 });

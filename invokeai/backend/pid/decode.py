@@ -212,6 +212,13 @@ def _get_t_list(device: torch.device, *, num_steps: Optional[int] = None) -> Ten
         idx = torch.linspace(0, len(full) - 1, num_steps + 1).round().long()
         t = full[idx]
     assert abs(t[-1].item()) < 1e-6, "t_list must end at 0"
+    # The student schedule has only 4 transitions (a 5-point list). Sub-sampling to more
+    # than 4 steps rounds distinct linspace indices onto the same point, yielding duplicate
+    # timesteps that _student_sample_loop would waste a full network forward on (and which
+    # degrade rather than refine the output). Callers cap num_steps at 4; assert the derived
+    # schedule is strictly decreasing as a safety net against an invalid step count slipping through.
+    if t.numel() >= 2:
+        assert bool((t[1:] < t[:-1]).all()), f"t_list must be strictly decreasing, got {t.tolist()}"
     return t
 
 
@@ -477,12 +484,33 @@ def encode_caption_for_pid(
     return caption_embs, caption_mask
 
 
+def assert_pid_decoder_matches_base(decoder_base: BaseModelType, node_base: BaseModelType, *, node_title: str) -> None:
+    """Guard a base-specific PiD decode node against an incompatible decoder.
+
+    The generic ``pid_decoder_loader`` exposes every PiD decoder through one base-agnostic
+    field, so in the Nodes editor a decoder for the wrong backbone can be connected to a
+    decode node. The decoders share tensor names across backbones, so a mismatch would either
+    silently produce garbage (compatible shapes) or fail deep inside inference (incompatible
+    shapes). Validate up front instead.
+
+    ``node_base`` is the backbone the node feeds to ``PidNet`` — e.g. the Z-Image decode node
+    reuses the FLUX decoder and therefore passes ``BaseModelType.Flux`` here, so a FLUX decoder
+    is accepted for Z-Image while every other pairing must match exactly.
+    """
+    if decoder_base != node_base:
+        raise ValueError(
+            f"{node_title} requires a {node_base.value} PiD decoder, but the selected decoder is "
+            f"configured for {decoder_base.value}. Connect a PiD decoder whose base matches this node."
+        )
+
+
 __all__ = [
     "PID_CHI_PROMPT",
     "PID_MODEL_MAX_LENGTH",
     "PID_NEGATIVE_PROMPT",
     "PiDDecodeConfig",
     "PiDDecoder",
+    "assert_pid_decoder_matches_base",
     "build_pid_net",
     "encode_caption_for_pid",
     "load_pid_decoder",
