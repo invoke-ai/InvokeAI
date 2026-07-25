@@ -14,6 +14,7 @@ vi.mock('@platform/transport/http', () => ({
 
 import {
   getGalleryImageByName,
+  imageMakeCanvasAssetChanges,
   imageMakeDurableChanges,
   imageSaveToGalleryChanges,
   listGalleryImages,
@@ -165,5 +166,23 @@ describe('imageMakeDurableChanges', () => {
     const body = imageMakeDurableChanges();
     expect(body).toEqual({ is_intermediate: false });
     expect('image_category' in body).toBe(false);
+  });
+});
+
+describe('imageMakeCanvasAssetChanges', () => {
+  it('makes the image durable AND moves it out of the gallery images view', () => {
+    // A node's output is `general` — precisely what the Images view lists — so
+    // durability alone published every ControlNet preprocess into the gallery.
+    expect(imageMakeCanvasAssetChanges()).toEqual({ image_category: 'other', is_intermediate: false });
+  });
+
+  it('uses the same category the canvas uploads its own paint bitmaps under', () => {
+    // Layer pixels are layer pixels however they were produced; a filtered
+    // control map must not be classified differently from a painted one.
+    expect(imageMakeCanvasAssetChanges().image_category).toBe('other');
+  });
+
+  it('still clears is_intermediate, so the layer source cannot be collected', () => {
+    expect(imageMakeCanvasAssetChanges().is_intermediate).toBe(false);
   });
 });

@@ -18,6 +18,7 @@ import {
   getGalleryImagesByNames,
   isDateBoardId,
   listGalleryBoards,
+  makeImageCanvasAsset,
   makeImageDurable,
   removeImagesFromGalleryBoard,
   saveImageToGallery,
@@ -41,6 +42,8 @@ export const galleryTransfers = {
 
 /** Durability transitions for intermediate results. */
 export const galleryDurability = {
+  /** Durable, and adopted as canvas-owned pixels (out of the gallery's Images view). */
+  makeCanvasAsset: makeImageCanvasAsset,
   makeDurable: makeImageDurable,
   save: saveImageToGallery,
 } as const;
