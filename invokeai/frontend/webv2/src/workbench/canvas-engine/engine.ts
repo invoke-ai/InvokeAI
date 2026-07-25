@@ -47,14 +47,12 @@ import type {
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
   ExtractMaskedAreaResult,
-  LayerExportGuard,
   MergeVisibleResult,
   NewRasterLayerResult,
   PsdExportResult,
 } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasCompositeExecutorDeps,
-  CanvasRasterSnapshot,
   CaptureRasterSnapshotResult,
 } from '@workbench/canvas-engine/rasterTransactions';
 export type {
@@ -123,7 +121,10 @@ import {
 import { PersistenceController } from '@workbench/canvas-engine/controllers/persistenceController';
 import { PsdExportController } from '@workbench/canvas-engine/controllers/psdExportController';
 import { RasterController, type RasterizationJob } from '@workbench/canvas-engine/controllers/rasterController';
-import { RasterExportController } from '@workbench/canvas-engine/controllers/rasterExportController';
+import {
+  RasterExportController,
+  type ExportLayerPixelsResult,
+} from '@workbench/canvas-engine/controllers/rasterExportController';
 import { RenderController } from '@workbench/canvas-engine/controllers/renderController';
 import { StagedResultController } from '@workbench/canvas-engine/controllers/stagedResultController';
 import { StructuralLayerController } from '@workbench/canvas-engine/controllers/structuralLayerController';
@@ -195,6 +196,7 @@ import { createDocumentMirror, type DocumentMirror } from './document/documentMi
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
 import { createLayerExportGuards, isDeeplyEqual, isSupportedExportSource } from './layerExportGuards';
 import { createPreviewPublisher } from './previewPublisher';
+import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
 import { createSelectObjectBridge } from './selectObjectBridge';
 import { createStrokeCommit } from './strokeCommit';
 import { createViewTool } from './tools/viewTool';
@@ -205,10 +207,12 @@ import { createViewTool } from './tools/viewTool';
  * when the union bounds exceed the PSD dimension cap, and `'not-ready'` when a
  * participant's cache is still decoding (nothing exported — surface feedback).
  */
-/** Opaque snapshot identity carried through async layer operations. */
-export type ExportLayerPixelsResult =
-  | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' | 'aborted' };
+/**
+ * Re-exported from the controller that produces it, so the many callers that
+ * name it off `canvas-engine/engine` keep resolving while there is only one
+ * definition to keep in step.
+ */
+export type { ExportLayerPixelsResult };
 
 export type ExportBakedLayerPixelsResult = ExportLayerPixelsResult;
 
@@ -435,7 +439,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const cancelAllLayerRasterizations = (): void => rasterController.cancelAllRasterization();
 
   let disposed = false;
-  const activeRasterSnapshots = new Set<CanvasRasterSnapshot>();
   let lifecycleState: 'active' | 'cooling' | 'cool' | 'disposed' = 'active';
   let lifecycleGeneration = 0;
   let cooldownPromise: Promise<'cooled' | 'dirty'> | null = null;
@@ -475,6 +478,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const deleteDerivedSurfaces = (layerId: string): void => rasterController.deleteDerivedSurfaces(layerId);
   const getAdjustedSurface = (layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null =>
     rasterController.getAdjustedSurface(layer, entry);
+
+  /**
+   * Re-reads the live cache sizes into the memory budget. Both caches change
+   * outside the budget's knowledge (a rasterize grows one, an eviction shrinks
+   * the other), so every allocation decision has to re-sync first or it reserves
+   * against a stale total.
+   */
+  const syncMemoryBaselines = (): void => {
+    rasterController.memory.setBaseBytes(layerCache.byteSize());
+    rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+  };
 
   // Completed-stroke subscribers (persistence P2.2, history P2.3).
   const strokeListeners = new Set<(event: StrokeCommittedEvent) => void>();
@@ -1224,8 +1238,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     layers: layerCache,
     pin: (layerId) => rasterController.memory.pin(layerId, lifecycleGeneration),
     reserve: (bytes) => {
-      rasterController.memory.setBaseBytes(layerCache.byteSize());
-      rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+      syncMemoryBaselines();
       return rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'raster-export' });
     },
   });
@@ -1496,8 +1509,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         transformOverrides: !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null,
       });
 
-      rasterController.memory.setBaseBytes(layerCache.byteSize());
-      rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+      syncMemoryBaselines();
       const protectedIds = new Set([...activeFrameLayerIds, ...rasterController.memory.pinnedLayerIds()]);
       const memory = rasterController.memory.snapshot();
       const surfaceBudgetBytes = Math.max(
@@ -1511,8 +1523,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         surfaceBudgetBytes,
         diagnostics
       );
-      rasterController.memory.setBaseBytes(layerCache.byteSize());
-      rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+      syncMemoryBaselines();
       // Prune version-keyed dependents for every evicted id (mirrors dropLayer):
       // the evicted layer's surface is gone, so its adjusted-surface memo and
       // thumbnail state must not linger keyed to a version the re-rasterized entry
@@ -2365,212 +2376,31 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const mergeLayerDown = (upperLayerId: string): boolean => layerController.merge.mergeDown(upperLayerId);
   const mergeVisibleRasterLayers = (): Promise<MergeVisibleResult> => layerController.merge.mergeVisible();
 
-  const documentSnapshotSources = new WeakMap<
-    CanvasDocumentSnapshot,
-    {
-      canvas: NonNullable<ReturnType<typeof mutationPort.getCanvasState>>;
-      contentEpoch: number;
-      lifecycleGeneration: number;
-    }
-  >();
-  const isDocumentSnapshotCurrent = (snapshot: CanvasDocumentSnapshot): boolean => {
-    const source = documentSnapshotSources.get(snapshot);
-    return (
-      !disposed &&
-      source !== undefined &&
-      source.canvas === mutationPort.getCanvasState() &&
-      source.contentEpoch === rasterContentEpoch &&
-      source.lifecycleGeneration === lifecycleGeneration &&
-      snapshot.documentGeneration === rasterController.getDocumentGeneration()
-    );
-  };
-  const captureRasterSnapshot = async (
-    documentSnapshot: CanvasDocumentSnapshot,
-    layerIds: readonly string[],
-    options?: { signal?: AbortSignal; includeDisabled?: boolean }
-  ): Promise<CaptureRasterSnapshotResult> => {
-    if (options?.signal?.aborted) {
-      return { status: 'aborted' };
-    }
-    if (!documentSnapshotSources.has(documentSnapshot)) {
-      return { status: 'not-ready' };
-    }
-    if (!isDocumentSnapshotCurrent(documentSnapshot)) {
-      return { status: 'stale' };
-    }
-    const snapshotSource = documentSnapshotSources.get(documentSnapshot)!;
-    const captureLifecycleGeneration = snapshotSource.lifecycleGeneration;
-
-    const uniqueLayerIds = [...new Set(layerIds)];
-    const layerById = new Map(documentSnapshot.canvas.document.layers.map((layer) => [layer.id, layer]));
-    let requestedBytes = 0;
-    for (const layerId of uniqueLayerIds) {
-      const layer = layerById.get(layerId);
-      const source = layer ? renderableSourceOf(layer) : null;
-      if (!layer || !source || !isSupportedExportSource(source)) {
-        return { status: 'not-ready' };
-      }
-      if (source.type === 'image') {
-        requestedBytes += source.image.width * source.image.height * 4;
-      } else if (source.type === 'paint' && source.bitmap) {
-        requestedBytes += source.bitmap.width * source.bitmap.height * 4;
-      } else {
-        const contentRect = getSourceContentRect(layer, documentSnapshot.canvas.document);
-        requestedBytes += contentRect.width * contentRect.height * 4;
-      }
-    }
-
-    rasterController.memory.setBaseBytes(layerCache.byteSize());
-    rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
-    const reservation = rasterController.memory.reserve(requestedBytes, {
-      generation: captureLifecycleGeneration,
-      purpose: 'background-snapshot',
+  const { captureDocumentSnapshot, captureRasterSnapshot, isDocumentSnapshotCurrent, releaseActiveSnapshots } =
+    createRasterSnapshotCapture({
+      createSurface: (width, height) => backend.createSurface(width, height),
+      getCanvasState: () => mutationPort.getCanvasState(),
+      getContentEpoch: () => rasterContentEpoch,
+      getDocumentGeneration: () => rasterController.getDocumentGeneration(),
+      getLifecycleGeneration: () => lifecycleGeneration,
+      isDisposed: () => disposed,
+      isGuardCurrent: isLayerExportGuardCurrent,
+      memory: rasterController.memory,
+      rasterizeLayerPixels,
+      syncMemoryBaselines,
     });
-    if (reservation.status === 'over-budget') {
-      return { status: 'over-budget' };
-    }
-    const reservationLeases: { release(): void }[] = [reservation.lease];
-    const pinLeases = uniqueLayerIds.map((layerId) => rasterController.memory.pin(layerId, captureLifecycleGeneration));
-    const layerSurfaces = new Map<string, { rect: Rect; surface: RasterSurface }>();
-    const emptyLayerIds = new Set<string>();
-    const capturedGuards: LayerExportGuard[] = [];
-    let actualDetachedBytes = 0;
-    try {
-      for (const layerId of uniqueLayerIds) {
-        if (options?.signal?.aborted) {
-          return { status: 'aborted' };
-        }
-        if (!isDocumentSnapshotCurrent(documentSnapshot)) {
-          return { status: 'stale' };
-        }
-        const liveResult = await rasterizeLayerPixels(layerId, {
-          includeDisabled: options?.includeDisabled,
-          signal: options?.signal,
-        });
-        if (options?.signal?.aborted) {
-          return { status: 'aborted' };
-        }
-        if (!isDocumentSnapshotCurrent(documentSnapshot)) {
-          return { status: 'stale' };
-        }
-        if (liveResult.status === 'empty') {
-          emptyLayerIds.add(layerId);
-          continue;
-        }
-        if (liveResult.status !== 'ok') {
-          return {
-            status:
-              liveResult.status === 'aborted' || liveResult.status === 'over-budget' ? liveResult.status : 'not-ready',
-          };
-        }
-        const live = liveResult;
-        if (!isLayerExportGuardCurrent(live.guard)) {
-          live.release();
-          return { status: 'stale' };
-        }
-        capturedGuards.push(live.guard);
-        try {
-          const actualBytes = live.surface.width * live.surface.height * 4;
-          const source = renderableSourceOf(layerById.get(layerId)!);
-          const estimatedBytes =
-            source?.type === 'image'
-              ? source.image.width * source.image.height * 4
-              : source?.type === 'paint' && source.bitmap
-                ? source.bitmap.width * source.bitmap.height * 4
-                : getSourceContentRect(layerById.get(layerId)!, documentSnapshot.canvas.document).width *
-                  getSourceContentRect(layerById.get(layerId)!, documentSnapshot.canvas.document).height *
-                  4;
-          const additionalBytes = Math.max(0, actualBytes - estimatedBytes);
-          if (additionalBytes > 0) {
-            rasterController.memory.setBaseBytes(layerCache.byteSize());
-            rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
-            const additional = rasterController.memory.reserve(additionalBytes, {
-              generation: captureLifecycleGeneration,
-              purpose: 'background-snapshot',
-            });
-            if (additional.status === 'over-budget') {
-              return { status: 'over-budget' };
-            }
-            reservationLeases.push(additional.lease);
-          }
-          const detached = backend.createSurface(live.surface.width, live.surface.height);
-          detached.ctx.setTransform(1, 0, 0, 1, 0, 0);
-          detached.ctx.clearRect(0, 0, detached.width, detached.height);
-          detached.ctx.drawImage(live.surface.canvas, 0, 0);
-          layerSurfaces.set(layerId, { rect: { ...live.rect }, surface: detached });
-          actualDetachedBytes += actualBytes;
-        } finally {
-          live.release();
-        }
-      }
-      if (
-        !isDocumentSnapshotCurrent(documentSnapshot) ||
-        capturedGuards.some((guard) => !isLayerExportGuardCurrent(guard))
-      ) {
-        return { status: 'stale' };
-      }
-
-      for (const lease of reservationLeases) {
-        lease.release();
-      }
-      const detachedLease = rasterController.memory.trackDetached(actualDetachedBytes, captureLifecycleGeneration);
-      let released = false;
-      const snapshot: CanvasRasterSnapshot = {
-        ...documentSnapshot,
-        emptyLayerIds,
-        layerSurfaces,
-        release: () => {
-          if (released) {
-            return;
-          }
-          released = true;
-          emptyLayerIds.clear();
-          layerSurfaces.clear();
-          detachedLease.release();
-          activeRasterSnapshots.delete(snapshot);
-        },
-      };
-      activeRasterSnapshots.add(snapshot);
-      return { snapshot, status: 'ok' };
-    } finally {
-      for (const lease of reservationLeases) {
-        lease.release();
-      }
-      for (const lease of pinLeases) {
-        lease.release();
-      }
-    }
-  };
-  const captureDocumentSnapshot = (): CanvasDocumentSnapshot | null => {
-    const canvas = mutationPort.getCanvasState();
-    if (disposed || !canvas) {
-      return null;
-    }
-    const snapshot: CanvasDocumentSnapshot = {
-      canvas: structuredClone(canvas),
-      documentGeneration: rasterController.getDocumentGeneration(),
-    };
-    documentSnapshotSources.set(snapshot, {
-      canvas,
-      contentEpoch: rasterContentEpoch,
-      lifecycleGeneration,
-    });
-    return snapshot;
-  };
 
   const psdExportController = new PsdExportController({
     backend,
-    captureDocumentSnapshot: () => captureDocumentSnapshot(),
-    captureRasterSnapshot: (snapshot, layerIds, options) => captureRasterSnapshot(snapshot, layerIds, options),
+    captureDocumentSnapshot,
+    captureRasterSnapshot,
     getAvailableBytes: () => {
-      rasterController.memory.setBaseBytes(layerCache.byteSize());
-      rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+      syncMemoryBaselines();
       return rasterController.memory.getAvailableBytes();
     },
-    isDocumentSnapshotCurrent: (snapshot) => isDocumentSnapshotCurrent(snapshot),
+    isDocumentSnapshotCurrent,
     reserve: (bytes) => {
-      rasterController.memory.setBaseBytes(layerCache.byteSize());
-      rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+      syncMemoryBaselines();
       return rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'psd-export' });
     },
   });
@@ -2703,9 +2533,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return;
     }
     disposed = true;
-    for (const snapshot of activeRasterSnapshots) {
-      snapshot.release();
-    }
+    releaseActiveSnapshots();
     rasterController.memory.releaseGeneration(lifecycleGeneration);
     lifecycleGeneration += 1;
     lifecycleState = 'disposed';
@@ -2833,8 +2661,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     backend,
     getLayerSurface: requireLayerSurfaceForExport,
     reserve: (bytes) => {
-      rasterController.memory.setBaseBytes(layerCache.byteSize());
-      rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+      syncMemoryBaselines();
       return rasterController.memory.reserveOperation(bytes, { purpose: 'invocation-composite' });
     },
     uploadImage: (blob) => opts.uploadImage(blob),
@@ -2872,8 +2699,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         };
       },
       reserve: (bytes) => {
-        rasterController.memory.setBaseBytes(layerCache.byteSize());
-        rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+        syncMemoryBaselines();
         return rasterController.memory.reserveOperation(bytes, { purpose: 'background-snapshot' });
       },
     });
@@ -3040,8 +2866,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         }
       },
       reserve: (bytes) => {
-        rasterController.memory.setBaseBytes(layerCache.byteSize());
-        rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize());
+        syncMemoryBaselines();
         return rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'thumbnail' });
       },
       setStatus: (layerId, status) => {
