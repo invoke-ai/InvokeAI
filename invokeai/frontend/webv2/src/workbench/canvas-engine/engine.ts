@@ -176,6 +176,7 @@ import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
+import { decideLayerChange } from './document/layerChangeDecision';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
 import { createLayerExportGuards, isDeeplyEqual, isSupportedExportSource } from './layerExportGuards';
 import { createLayerRasterizer } from './layerRasterizer';
@@ -1349,7 +1350,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       for (const id of ids) {
         cleanup.run(() => editingController.invalidateLayer(id));
       }
-      const present = new Set(doc ? doc.layers.map((layer) => layer.id) : []);
       const sourceChanged = new Set(sourceChangedIds);
       const previousImageNames = new Map(ids.map((id) => [id, rasterController.getMirroredImage(id)]));
       for (const id of ids) {
@@ -1371,13 +1371,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       const session = stores.transformSession.get();
       const textSession = stores.textEditSession.get();
       for (const id of ids) {
-        const layer = doc?.layers.find((candidate) => candidate.id === id);
-        if (!present.has(id)) {
+        const decision = decideLayerChange({
+          currentThumbnailKey: rasterController.getThumbnailKey(id),
+          currentThumbnailVersion: stores.thumbnailVersion.get(id),
+          hasTextEditSession: textSession?.layerId === id,
+          hasTransformSession: session?.layerId === id,
+          isSelfEcho: () => bitmapStore.isSelfEcho(id, getLayerSourceById(id)),
+          layer: doc?.layers.find((candidate) => candidate.id === id),
+          previousImageName: previousImageNames.get(id),
+          sourceChanged: sourceChanged.has(id),
+        });
+        if (decision.kind === 'removed') {
+          const { releaseImageName } = decision;
           rasterController.deleteThumbnailKey(id);
           cleanup.run(() => dropLayer(id));
-          const previousImageName = previousImageNames.get(id);
-          if (previousImageName) {
-            cleanup.run(() => releaseBitmapIfUnreferenced(previousImageName));
+          if (releaseImageName) {
+            cleanup.run(() => releaseBitmapIfUnreferenced(releaseImageName));
           }
           // A control-filter preview (session + decoded surface) belongs to a
           // specific layer; a layer removed out from under an in-flight or
@@ -1386,12 +1395,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
           // token bumped, or a late-resolving decode — or a later undo that
           // restores this same id — would repopulate a stale preview.
           cleanup.run(() => clearFilterPreview(id));
-          if (session && session.layerId === id) {
+          if (decision.cancelTransformSession) {
             cleanup.run(cancelTransform);
           }
-          // An edit-mode text session whose layer was deleted out from under it
-          // (layers panel, or undo of the add) is torn down the same way.
-          if (textSession && textSession.layerId === id) {
+          if (decision.cancelTextEditSession) {
             cleanup.run(cancelTextEdit);
           }
           continue;
@@ -1400,49 +1407,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         if (preview && !isLayerExportGuardCurrent(preview.guard)) {
           cleanup.run(() => clearFilterPreview(id));
         }
-        if (!sourceChanged.has(id)) {
-          if (layer) {
-            const displayKey = getLayerThumbnailDisplayKey(layer);
-            if (rasterController.getThumbnailKey(id) !== displayKey) {
-              rasterController.setThumbnailKey(id, displayKey);
-              const currentVersion = stores.thumbnailVersion.get(id);
-              // Cache versions are positive. Negative display tokens cannot
-              // collide with the next cache publication and suppress its redraw.
-              stores.thumbnailVersion.set(
-                id,
-                currentVersion !== undefined && currentVersion < 0 ? currentVersion - 1 : -1
-              );
-            }
+        if (decision.kind === 'appearance-only') {
+          if (decision.thumbnailDisplay) {
+            rasterController.setThumbnailKey(id, decision.thumbnailDisplay.key);
+            stores.thumbnailVersion.set(id, decision.thumbnailDisplay.version);
           }
-          // Prop/transform-only change (opacity, blend, lock, visibility,
-          // rename, nudge): the layer object was replaced but its SOURCE
-          // reference is unchanged, so the rasterized pixels are still valid.
-          // Invalidating here would be wasteful for an image layer and
-          // *destructive* for an unflushed paint layer — a `bitmap: null` paint
-          // source rasterizes to a CLEARED surface, wiping strokes that live
-          // only in the cache until their debounced upload lands. The compositor
-          // applies transform/opacity/blend at draw time, so the scheduled
-          // recomposite below is all a prop change needs.
           continue;
         }
-        // The layer's source genuinely changed (image swap, or a paint-bitmap
-        // swap from undo/import). Self-echo guard: skip when it's the exact
-        // paint-bitmap ref the bitmap store just applied — the cache already
-        // holds those pixels, so re-rasterizing would needlessly re-fetch and
-        // could flicker. Any other swap invalidates → re-rasterizes.
-        if (layer) {
-          rasterController.setThumbnailKey(id, getLayerThumbnailDisplayKey(layer));
-        }
+        const { releaseImageName } = decision;
+        rasterController.setThumbnailKey(id, decision.thumbnailKey);
         cleanup.run(() => rasterController.untrackLayerImage(id));
-        const previousImageName = previousImageNames.get(id);
-        if (previousImageName) {
-          cleanup.run(() => releaseBitmapIfUnreferenced(previousImageName));
+        if (releaseImageName) {
+          cleanup.run(() => releaseBitmapIfUnreferenced(releaseImageName));
         }
-        const source = getLayerSourceById(id);
-        if (bitmapStore.isSelfEcho(id, source)) {
-          continue;
+        if (decision.invalidateCache) {
+          cleanup.run(() => invalidateLayerCache(id));
         }
-        cleanup.run(() => invalidateLayerCache(id));
       }
       cleanup.run(() => scheduler.invalidate({ layers: ids }));
       cleanup.throwIfFailed();
