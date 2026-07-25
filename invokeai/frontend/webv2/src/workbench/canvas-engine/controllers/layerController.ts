@@ -9,6 +9,7 @@ import { CropLayerController, type CropLayerControllerOptions } from './cropLaye
 import { ExtractMaskedAreaController, type ExtractMaskedAreaControllerOptions } from './extractMaskedAreaController';
 import { MaskLayerController } from './maskLayerController';
 import { MergeLayerController, type MergeLayerControllerOptions } from './mergeLayerController';
+import { NewRasterLayerController, type NewRasterLayerControllerOptions } from './newRasterLayerController';
 import { RasterizeLayerController, type RasterizeLayerControllerOptions } from './rasterizeLayerController';
 import { ThumbnailController, type ThumbnailControllerOptions } from './thumbnailController';
 
@@ -26,6 +27,7 @@ export type LayerControllerDeps = Omit<
     extractMaskedArea: ExtractMaskedAreaControllerOptions;
     crop: CropLayerControllerOptions;
     copy: CopyLayerControllerOptions;
+    newRasterLayer: NewRasterLayerControllerOptions;
   };
 
 /** Public layer-operation boundary. Implementations are injected by the composition root. */
@@ -41,6 +43,7 @@ export class LayerController {
   readonly extractMaskedArea: ExtractMaskedAreaController;
   readonly crop: CropLayerController;
   readonly copy: CopyLayerController;
+  readonly newRasterLayer: NewRasterLayerController;
   private disposed = false;
 
   constructor(deps: LayerControllerDeps) {
@@ -53,6 +56,7 @@ export class LayerController {
     this.extractMaskedArea = new ExtractMaskedAreaController(deps.extractMaskedArea);
     this.crop = new CropLayerController(deps.crop);
     this.copy = new CopyLayerController(deps.copy);
+    this.newRasterLayer = new NewRasterLayerController(deps.newRasterLayer);
     this.layers = {
       applyStructuralPreview: (action) => (this.disposed ? false : this.structural.preview(action)),
       canCommitStructural: () => this.structural.canCommit(),
@@ -79,5 +83,6 @@ export class LayerController {
     this.extractMaskedArea.dispose();
     this.crop.dispose();
     this.copy.dispose();
+    this.newRasterLayer.dispose();
   }
 }

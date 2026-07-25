@@ -1179,7 +1179,13 @@
     "canvas": {
       "acceptToLayer": "Accept to Layer",
       "candidateCount": "{{current}} of {{total}}",
+      "clipboard": {
+        "copyFailed": "Could not copy the selection to the clipboard",
+        "pasteFailed": "Could not paste an image from the clipboard"
+      },
       "commands": {
+        "copySelection": "Copy selection",
+        "cutSelection": "Cut selection",
         "decreaseBrushSize": "Decrease brush/eraser size",
         "deleteLayer": "Delete layer",
         "deleteSelected": "Delete selected canvas item",
@@ -1202,6 +1208,7 @@
         "nudgeRightLarge": "Nudge layer right 10px",
         "nudgeUp": "Nudge layer up",
         "nudgeUpLarge": "Nudge layer up 10px",
+        "pasteImage": "Paste image",
         "previousEntity": "Previous canvas entity",
         "redo": "Redo canvas edit",
         "reorderLayer": "Reorder layer",
@@ -1340,6 +1347,7 @@
         "lassoPolygon": "Polygon",
         "lassoPolygonHint": "Click to place points. Double-click, Enter, or click the first point to close.",
         "lassoShape": "Lasso mode",
+        "liftSelectionToLayer": "New layer",
         "lockAspect": "Lock aspect ratio",
         "marqueeHint": "Drag to select a region. Shift constrains, Alt draws from centre.",
         "marqueeKind": "Marquee shape",

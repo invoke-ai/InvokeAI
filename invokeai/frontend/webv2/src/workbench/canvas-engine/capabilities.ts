@@ -9,6 +9,7 @@ import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
+import type { NewRasterLayerResult } from './controllers/newRasterLayerController';
 import type { CanvasEditGate } from './editGate';
 import type {
   BboxToolOptions,
@@ -190,6 +191,17 @@ export interface CanvasSelectionCapability {
   getSelectionBounds(): Rect | null;
   getSelectionMaskRect(): Rect | null;
   invertSelection(): void;
+  /**
+   * Encodes the selection's pixels on the active layer as a PNG, or `null` when
+   * there is nothing to copy. The engine deliberately stops at the blob: writing
+   * to the system clipboard is a widget-layer concern (`canvas-engine` may not
+   * reach `workbench/widgets`).
+   */
+  exportSelectionBlob(): Promise<Blob | null>;
+  /** Inserts decoded pixels as a new raster layer above the active one. */
+  pasteImage(pixels: ImageData, center?: Vec2): NewRasterLayerResult;
+  /** Copies the selection's pixels into a new layer above the active one, leaving the source intact. */
+  liftSelectionToLayer(): NewRasterLayerResult;
   replaceSelectionFromImage(
     guard: LayerExportGuard,
     image: CanvasImageRef,
@@ -198,6 +210,8 @@ export interface CanvasSelectionCapability {
   ): Promise<ReplaceSelectionFromImageResult>;
   selectAll(): void;
 }
+
+export type { NewRasterLayerResult };
 
 export type ReplaceSelectionFromImageResult =
   | { status: 'selected' }

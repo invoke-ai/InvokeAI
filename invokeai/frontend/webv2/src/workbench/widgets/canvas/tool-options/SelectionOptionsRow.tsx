@@ -75,6 +75,7 @@ export const SelectionOptionsRow = ({ engine, hintKey, mode, onModeChange }: Sel
   const onErase = useCallback(() => engine.selection.eraseSelection(), [engine]);
   const onInvert = useCallback(() => engine.selection.invertSelection(), [engine]);
   const onDeselect = useCallback(() => engine.selection.deselect(), [engine]);
+  const onLiftToLayer = useCallback(() => engine.selection.liftSelectionToLayer(), [engine]);
 
   const canEdit = hasSelection && canPaintTarget;
 
@@ -91,6 +92,9 @@ export const SelectionOptionsRow = ({ engine, hintKey, mode, onModeChange }: Sel
         </Button>
         <Button disabled={!canEdit} size="xs" variant="ghost" onClick={onErase}>
           {t('widgets.canvas.toolOptions.eraseSelection')}
+        </Button>
+        <Button disabled={!canEdit} size="xs" variant="ghost" onClick={onLiftToLayer}>
+          {t('widgets.canvas.toolOptions.liftSelectionToLayer')}
         </Button>
         <Button disabled={!hasSelection} size="xs" variant="ghost" onClick={onInvert}>
           {t('widgets.canvas.toolOptions.invertSelection')}

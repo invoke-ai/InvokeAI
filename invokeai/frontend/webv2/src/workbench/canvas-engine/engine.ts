@@ -44,6 +44,7 @@ import type {
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
   LayerExportGuard,
+  NewRasterLayerResult,
   PsdExportResult,
   StagedPreviewInput,
   StagedPreviewPlacement,
@@ -155,7 +156,11 @@ import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbe
 import { textFontString } from '@workbench/canvas-engine/render/rasterizers/textRasterizer';
 import { enforceSurfaceBudget } from '@workbench/canvas-engine/render/surfaceBudget';
 import { getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
-import { documentDeltaToLocal, floatDocumentMatrix } from '@workbench/canvas-engine/selection/floatingSelection';
+import {
+  documentDeltaToLocal,
+  floatDocumentMatrix,
+  liftSelectedPixels,
+} from '@workbench/canvas-engine/selection/floatingSelection';
 import { ANTS_STEP_PX, createAntsAnimator, type AntsAnimator } from '@workbench/canvas-engine/selection/marchingAnts';
 import { createBboxTool } from '@workbench/canvas-engine/tools/bboxTool';
 import { createBrushTool } from '@workbench/canvas-engine/tools/brushTool';
@@ -2851,6 +2856,44 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     editingController.selectionPixels.run('erase');
   };
 
+  /**
+   * The selection's pixels on the active layer, encoded as a PNG. Reuses the
+   * float's own masked-copy step (it never mutates the source — the cut is a
+   * separate call), so Copy and a lift always take exactly the same pixels.
+   */
+  const exportSelectionBlob = (): Promise<Blob | null> => {
+    floatingSelection.commit();
+    const doc = mirror.getDocument();
+    const layer = doc?.layers.find((candidate) => candidate.id === doc.selectedLayerId);
+    const mask = selection.mask();
+    const entry = layer ? layerCache.get(layer.id) : undefined;
+    if (!doc || !layer || !mask || !entry || isEmpty(entry.rect)) {
+      return Promise.resolve(null);
+    }
+    const lifted = liftSelectedPixels({
+      backend,
+      cache: { rect: entry.rect, surface: entry.surface },
+      layerMatrix: layerMatrix(layer.transform),
+      mask,
+    });
+    return lifted ? backend.encodeSurface(lifted.pixels.surface) : Promise.resolve(null);
+  };
+
+  const pasteImage = (pixels: ImageData, center?: Vec2): NewRasterLayerResult => {
+    floatingSelection.commit();
+    const doc = mirror.getDocument();
+    // Centred on the generation frame by default — the part of an unbounded
+    // canvas the user is actually composing in.
+    const target =
+      center ?? (doc ? { x: doc.bbox.x + doc.bbox.width / 2, y: doc.bbox.y + doc.bbox.height / 2 } : undefined);
+    return layerController.newRasterLayer.pasteImage(pixels, 'Pasted', 'Paste', target);
+  };
+
+  const liftSelectionToLayer = (): NewRasterLayerResult => {
+    floatingSelection.commit();
+    return layerController.newRasterLayer.liftSelectionToLayer('Selection', 'Layer via copy');
+  };
+
   const clearMask = (layerId: string): boolean => layerController.mask.clear(layerId);
   const dispose = (): void => {
     if (disposed) {
@@ -3117,6 +3160,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       rasterize: (layerId) => rasterizeLayerPixelsForStructural(layerId),
     },
     commitGeneratedImageResult,
+    newRasterLayer: {
+      backend,
+      capturePermit: () => captureDocumentEditPermit(),
+      createLayerId,
+      dispatchPrepared: dispatchPreparedMutation,
+      endBurst: () => endNudgeBurst(),
+      getDocument: () => mirror.getDocument(),
+      getReducerDocument,
+      history,
+      installPrepared: (prepared) => installGeneratedPaintCache(prepared),
+      isGestureActive: () => pipeline.isGestureActive(),
+      isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit as DocumentEditPermit),
+      layers: layerCache,
+      preparePixels: prepareGeneratedPaintCache,
+      selection: editingController.selection,
+    },
     mask: {
       applyImagePatch,
       canEdit: () => canEditDocument(),
@@ -3405,8 +3464,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     eraseSelection,
     fillSelection,
     getSelectionBounds: () => selection.bounds(),
+    exportSelectionBlob,
     getSelectionMaskRect: () => selection.mask()?.rect ?? null,
     invertSelection,
+    liftSelectionToLayer,
+    pasteImage,
     replaceSelectionFromImage,
     selectAll,
   };

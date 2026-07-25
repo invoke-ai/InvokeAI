@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { gridSizeForModelBase } from './bboxGrid';
 import { CanvasBottomControls } from './CanvasBottomControls';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
+import { copyBlobToClipboard, decodeImageBlob, readClipboardImage } from './canvasClipboard';
 import {
   resolveCanvasContextMenu,
   resolveCanvasContextMenuBranch,
@@ -232,6 +233,56 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     [canvasCommands, engine, notifications, queries, t]
   );
 
+  /**
+   * Copies the selection's pixels to the system clipboard, optionally cutting
+   * them. The engine produces the blob; the clipboard write is a widget concern
+   * (`canvas-engine` may not reach `workbench/widgets`).
+   */
+  const copySelection = useEffectEvent((cut: boolean) => {
+    const mountedEngine = engine;
+    if (!mountedEngine) {
+      return;
+    }
+    void (async () => {
+      try {
+        const blob = await mountedEngine.selection.exportSelectionBlob();
+        if (!blob) {
+          return;
+        }
+        await copyBlobToClipboard(blob);
+        if (cut) {
+          // Only after the write succeeds — a failed copy must not destroy pixels.
+          mountedEngine.selection.eraseSelection();
+        }
+      } catch {
+        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.copyFailed') });
+      }
+    })();
+  });
+
+  /** Pastes an image off the system clipboard as a new layer over the bbox. */
+  const pasteFromClipboard = useEffectEvent(() => {
+    const mountedEngine = engine;
+    if (!mountedEngine) {
+      return;
+    }
+    void (async () => {
+      const blob = await readClipboardImage();
+      if (!blob) {
+        return;
+      }
+      const pixels = await decodeImageBlob(blob);
+      if (!pixels) {
+        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.pasteFailed') });
+        return;
+      }
+      const result = mountedEngine.selection.pasteImage(pixels);
+      if (result.status !== 'created') {
+        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.pasteFailed') });
+      }
+    })();
+  });
+
   useDndMonitor({ onDragEnd: handleCanvasImageDrop });
 
   useLayoutEffect(() => {
@@ -369,11 +420,18 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     }
 
     if (commandId === 'canvas.deleteSelected') {
-      // Staged images take priority; otherwise delete the selected layer (undoable).
-      if (engine && selectedLayer && selectedIndex >= 0) {
+      // With a live pixel selection, Delete clears the selected PIXELS — the
+      // Photoshop meaning. Only with no selection does it delete the layer.
+      if (engine?.interaction.get('hasSelection')) {
+        engine.selection.eraseSelection();
+      } else if (engine && selectedLayer && selectedIndex >= 0) {
         const { forward, inverse } = deleteLayerActions(selectedLayer, selectedIndex);
         engine.layers.commitStructural(t('widgets.canvas.commands.deleteLayer'), forward, inverse);
       }
+    } else if (commandId === 'canvas.copySelection' || commandId === 'canvas.cutSelection') {
+      copySelection(commandId === 'canvas.cutSelection');
+    } else if (commandId === 'canvas.pasteImage') {
+      pasteFromClipboard();
     } else if (commandId === 'canvas.resetSelected') {
       if (engine && selectedLayer) {
         engine.layers.clearMask(selectedLayer.id);
@@ -444,7 +502,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     } else if (commandId === 'canvas.brushSizeUp') {
       engine?.tools.stepBrushSize(1);
     } else if (commandId === 'canvas.duplicateLayer') {
-      if (engine && selectedLayer) {
+      // With a live pixel selection, mod+J is "layer via copy" — it lifts just
+      // the selected pixels. With none, it duplicates the whole layer.
+      if (engine?.interaction.get('hasSelection')) {
+        engine.selection.liftSelectionToLayer();
+      } else if (engine && selectedLayer) {
         const { forward, inverse } = duplicateLayerActions(selectedLayer.id, createLayerId());
         engine.layers.commitStructural(t('widgets.canvas.commands.duplicateLayer'), forward, inverse);
       }
@@ -482,6 +544,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       ['canvas.tool.eraser', t('widgets.canvas.commands.selectEraserTool'), ['e']],
       ['canvas.tool.lasso', t('widgets.canvas.commands.selectLassoTool'), ['l']],
       ['canvas.tool.marquee', t('widgets.canvas.commands.selectMarqueeTool'), ['u']],
+      ['canvas.copySelection', t('widgets.canvas.commands.copySelection'), ['mod+c']],
+      ['canvas.cutSelection', t('widgets.canvas.commands.cutSelection'), ['mod+x']],
+      ['canvas.pasteImage', t('widgets.canvas.commands.pasteImage'), ['mod+v']],
       ['canvas.tool.shape', t('widgets.canvas.commands.selectShapeTool'), ['r']],
       ['canvas.tool.text', t('widgets.canvas.commands.selectTextTool'), ['t']],
       ['canvas.tool.gradient', t('widgets.canvas.commands.selectGradientTool'), ['g']],
