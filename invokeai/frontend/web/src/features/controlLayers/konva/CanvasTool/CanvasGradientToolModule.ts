@@ -1,6 +1,8 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
+import { buildGradientBufferState } from 'features/controlLayers/konva/CanvasTool/gradientBufferState';
+import { getTransparencyLockedCompositeOperation } from 'features/controlLayers/konva/CanvasTool/transparencyLocking';
 import { getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
@@ -156,6 +158,7 @@ export class CanvasGradientToolModule extends CanvasModuleBase {
     const activeColor = settings.activeColor === 'bgColor' ? settings.bgColor : settings.fgColor;
     const inactiveColor = settings.activeColor === 'bgColor' ? settings.fgColor : settings.bgColor;
     const clipEnabled = settings.gradientClipEnabled;
+    const globalCompositeOperation = getTransparencyLockedCompositeOperation(selectedEntity.state);
 
     if (settings.gradientType === 'radial') {
       let radialRect = rect;
@@ -165,40 +168,40 @@ export class CanvasGradientToolModule extends CanvasModuleBase {
         radialRect = bboxInLayer;
         radialCenter = offsetCoord(start, { x: radialRect.x, y: radialRect.y });
       }
-      await selectedEntity.bufferRenderer.setBuffer({
-        id,
-        type: 'gradient',
-        gradientType: 'radial',
-        rect: radialRect,
-        center: radialCenter,
-        radius: radialRadius,
-        clipCenter: start,
-        clipRadius: Math.max(1, radius),
-        clipEnabled,
-        bboxRect: bboxInLayer,
-        fgColor: activeColor,
-        bgColor: inactiveColor,
-      });
+      await selectedEntity.bufferRenderer.setBuffer(
+        buildGradientBufferState({
+          id,
+          gradientType: 'radial',
+          rect: radialRect,
+          center: radialCenter,
+          radius: radialRadius,
+          clipCenter: start,
+          clipRadius: radius,
+          clipEnabled,
+          bboxRect: bboxInLayer,
+          fgColor: activeColor,
+          bgColor: inactiveColor,
+          globalCompositeOperation,
+        })
+      );
     } else {
-      const endPoint = {
-        x: endInRect.x === startInRect.x && endInRect.y === startInRect.y ? endInRect.x + 1 : endInRect.x,
-        y: endInRect.x === startInRect.x && endInRect.y === startInRect.y ? endInRect.y : endInRect.y,
-      };
-      await selectedEntity.bufferRenderer.setBuffer({
-        id,
-        type: 'gradient',
-        gradientType: 'linear',
-        rect,
-        start: startInRect,
-        end: endPoint,
-        clipCenter: start,
-        clipRadius: Math.max(1, radius),
-        clipAngle: angle,
-        clipEnabled,
-        bboxRect: bboxInLayer,
-        fgColor: activeColor,
-        bgColor: inactiveColor,
-      });
+      await selectedEntity.bufferRenderer.setBuffer(
+        buildGradientBufferState({
+          id,
+          gradientType: 'linear',
+          rect,
+          start: startInRect,
+          end: endInRect,
+          clipCenter: start,
+          clipRadius: radius,
+          clipAngle: angle,
+          clipEnabled,
+          bboxRect: bboxInLayer,
+          fgColor: activeColor,
+          bgColor: inactiveColor,
+          globalCompositeOperation,
+        })
+      );
     }
   };
 

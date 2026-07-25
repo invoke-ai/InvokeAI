@@ -1,4 +1,5 @@
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { getUserScopedQueueCounts } from 'features/queue/store/userScopedQueueCounts';
 import { useEffect } from 'react';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
@@ -7,9 +8,14 @@ const invokeLogoSVG = 'assets/images/invoke-favicon.svg';
 const invokeAlertLogoSVG = 'assets/images/invoke-alert-favicon.svg';
 
 const queryOptions = {
-  selectFromResult: (res) => ({
-    queueSize: res.data ? res.data.queue.pending + res.data.queue.in_progress : 0,
-  }),
+  // The busy favicon/title reflect the user's own activity, not other users' generations.
+  selectFromResult: (res) => {
+    if (!res.data) {
+      return { queueSize: 0 };
+    }
+    const { pending, inProgress } = getUserScopedQueueCounts(res.data.queue);
+    return { queueSize: pending + inProgress };
+  },
 } satisfies Parameters<typeof useGetQueueStatusQuery>[1];
 
 const updateFavicon = (queueSize: number) => {

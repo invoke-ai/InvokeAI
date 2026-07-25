@@ -69,8 +69,15 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         ):
             context.util.signal_progress("Running VAE decoder")
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
-            latents = latents.to(TorchDevice.choose_torch_device())
-            if self.fp32:
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            device = vae_info.compute_device
+            latents = latents.to(device)
+            # Force fp32 when running on CPU (e.g. when the VAE is configured cpu_only). fp16 conv does run on CPU with
+            # the pinned torch, but it's much slower than fp32 there, and SD/SDXL VAE has known fp16 overflow issues
+            # that produce black images — fp32 avoids both.
+            if self.fp32 or device.type == "cpu":
                 # FP32 mode: convert everything to float32 for maximum precision
                 vae.to(dtype=torch.float32)
                 latents = latents.float()
