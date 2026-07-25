@@ -775,6 +775,27 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     if (canvas.bbox.scaleMethod !== 'none') {
       reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
     }
+    // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+    // bbox/4 to land on the SD3 grid; without this a 1040px bbox silently becomes a 256px generation.
+    const gridSize = getGridSize('sd-3', getPidScale(params.pidMode));
+    if (canvas.bbox.rect.width % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+          model: 'SD3',
+          width: canvas.bbox.rect.width,
+          multiple: gridSize,
+        }),
+      });
+    }
+    if (canvas.bbox.rect.height % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+          model: 'SD3',
+          height: canvas.bbox.rect.height,
+          multiple: gridSize,
+        }),
+      });
+    }
   }
 
   if (model?.base === 'sdxl' && params.pidMode !== 'off') {
@@ -791,6 +812,27 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
     if (canvas.bbox.scaleMethod !== 'none') {
       reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+    }
+    // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+    // bbox/4 to land on the SDXL grid; without this a 1040px bbox silently becomes a 256px generation.
+    const gridSize = getGridSize('sdxl', getPidScale(params.pidMode));
+    if (canvas.bbox.rect.width % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+          model: 'SDXL',
+          width: canvas.bbox.rect.width,
+          multiple: gridSize,
+        }),
+      });
+    }
+    if (canvas.bbox.rect.height % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+          model: 'SDXL',
+          height: canvas.bbox.rect.height,
+          multiple: gridSize,
+        }),
+      });
     }
   }
 
@@ -929,6 +971,27 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       }
       if (canvas.bbox.scaleMethod !== 'none') {
         reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+      // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+      // bbox/4 to land on the grid; without this a 1040px bbox silently becomes a 256px generation.
+      const gridSize = getGridSize('z-image', getPidScale(params.pidMode));
+      if (canvas.bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'Z-Image',
+            width: canvas.bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (canvas.bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'Z-Image',
+            height: canvas.bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
       }
     }
   }

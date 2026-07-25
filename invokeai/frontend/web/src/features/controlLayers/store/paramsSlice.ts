@@ -56,6 +56,7 @@ import {
   getOptimalDimension,
   getPidScale,
 } from 'features/parameters/util/optimalDimension';
+import { getPidDecoderBaseForMainBase } from 'features/parameters/util/pid';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
@@ -154,6 +155,33 @@ const slice = createSlice({
       }
 
       applyClipSkip(state, model, state.clipSkip);
+
+      // PiD decoders are trained per backbone, so a decoder selected for the old base is invalid for a
+      // different one. Clear it unless the new base maps to the same decoder base (e.g. Z-Image reuses the
+      // FLUX decoder), so enqueue requires a matching decoder instead of failing during PiD execution.
+      const pidDecoderBase = getPidDecoderBaseForMainBase(model.base);
+      if (state.pidDecoderModel && state.pidDecoderModel.base !== pidDecoderBase) {
+        state.pidDecoderModel = null;
+      }
+      // If the new base cannot do PiD at all, turn PiD off. A stuck `native` mode is hidden by the UI
+      // (PidSettings is gated on the base) but keeps warping dimensions via getPidScale (4x grid / 2048
+      // optimum) with no way to disable it. Re-fit dimensions to the plain scale on the new base.
+      if (pidDecoderBase === null && state.pidMode !== 'off') {
+        const prevPidScale = getPidScale(state.pidMode);
+        state.pidMode = 'off';
+        const nextPidScale = getPidScale('off');
+        if (prevPidScale !== nextPidScale) {
+          const optimalDimension = getOptimalDimension(model.base, nextPidScale);
+          const { width, height } = calculateNewSize(
+            state.dimensions.aspectRatio.value,
+            optimalDimension * optimalDimension,
+            model.base,
+            nextPidScale
+          );
+          state.dimensions.width = width;
+          state.dimensions.height = height;
+        }
+      }
     },
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
@@ -312,6 +340,13 @@ const slice = createSlice({
         return;
       }
       state.gemma2EncoderModel = result.data;
+    },
+    pidStepsChanged: (state, action: PayloadAction<number>) => {
+      const result = zParamsState.shape.pidSteps.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.pidSteps = result.data;
     },
     qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
       const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
@@ -736,6 +771,7 @@ export const {
   pidModeChanged,
   pidDecoderModelSelected,
   gemma2EncoderModelSelected,
+  pidStepsChanged,
   qwenImageComponentSourceSelected,
   qwenImageVaeModelSelected,
   qwenImageQwenVLEncoderModelSelected,
@@ -870,6 +906,7 @@ export const selectKleinVaeModel = createParamsSelector((params) => params.klein
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectPidMode = createParamsSelector((params) => params.pidMode);
 export const selectPidDecoderModel = createParamsSelector((params) => params.pidDecoderModel);
+export const selectPidSteps = createParamsSelector((params) => params.pidSteps);
 export const selectGemma2EncoderModel = createParamsSelector((params) => params.gemma2EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
 export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);

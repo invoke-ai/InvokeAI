@@ -1362,6 +1362,7 @@
         "pidModeOff": "Off",
         "pidModeFit": "On (Fit to size)",
         "pidModeNative": "On (Native 4×)",
+        "pidSteps": "PiD Steps",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwenVLEncoder": "Qwen2.5-VL Encoder",
         "animaVae": "VAE",

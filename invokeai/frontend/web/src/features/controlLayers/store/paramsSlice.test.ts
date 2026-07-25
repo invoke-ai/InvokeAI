@@ -8,6 +8,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  modelChanged,
   paramsSliceConfig,
   positivePromptAddedToHistory,
   promptRemovedFromHistory,
@@ -181,6 +182,50 @@ describe('paramsSliceConfig persisted state migration', () => {
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
 
     expect(result.positivePromptHistory).toEqual([{ positivePrompt: 'a fluffy cat', negativePrompt: null }]);
+  });
+});
+
+describe('paramsSlice PiD state on base change (modelChanged)', () => {
+  const fluxModel = { key: 'flux', hash: 'h', name: 'FLUX', base: 'flux', type: 'main' };
+  const modelWithBase = (base: string) => ({ key: base, hash: 'h', name: base, base, type: 'main' });
+
+  const stateOnFluxWithNativePid = () =>
+    ({
+      ...getInitialParamsState(),
+      model: fluxModel,
+      pidMode: 'native',
+      pidDecoderModel: { key: 'd', name: 'flux decoder', base: 'flux' },
+    }) as ReturnType<typeof getInitialParamsState>;
+
+  it('clears an incompatible PiD decoder when switching to a different PiD base (FLUX -> SDXL)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('sdxl') as any, previousModel: fluxModel as any })
+    );
+    // The FLUX decoder is invalid for SDXL, so it is cleared; SDXL supports PiD so the mode is kept.
+    expect(next.pidDecoderModel).toBeNull();
+    expect(next.pidMode).toBe('native');
+  });
+
+  it('keeps the FLUX decoder when switching to Z-Image (which reuses the FLUX decoder)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('z-image') as any, previousModel: fluxModel as any })
+    );
+    expect(next.pidDecoderModel).not.toBeNull();
+    expect(next.pidMode).toBe('native');
+  });
+
+  it('turns PiD off (and clears the decoder) when switching to a non-PiD base (FLUX -> SD1)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('sd-1') as any, previousModel: fluxModel as any })
+    );
+    expect(next.pidMode).toBe('off');
+    expect(next.pidDecoderModel).toBeNull();
   });
 });
 

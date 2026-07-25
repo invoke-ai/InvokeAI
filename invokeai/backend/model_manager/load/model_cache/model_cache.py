@@ -943,6 +943,7 @@ class ModelCache:
             TorchDevice.empty_cache()
         return len(dropped)
 
+    @synchronized
     def offload_model_from_vram(self, model_key: str) -> int:
         """Move a model (and its submodels) from VRAM to RAM without dropping it from the cache.
 

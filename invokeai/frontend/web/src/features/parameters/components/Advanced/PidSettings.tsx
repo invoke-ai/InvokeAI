@@ -1,5 +1,5 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox, CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
@@ -7,10 +7,12 @@ import {
   gemma2EncoderModelSelected,
   pidDecoderModelSelected,
   pidModeChanged,
+  pidStepsChanged,
   selectGemma2EncoderModel,
   selectMainModelConfig,
   selectPidDecoderModel,
   selectPidMode,
+  selectPidSteps,
 } from 'features/controlLayers/store/paramsSlice';
 import type { PidMode } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -91,6 +93,22 @@ const ParamGemma2EncoderModelSelect = memo(() => {
 });
 ParamGemma2EncoderModelSelect.displayName = 'ParamGemma2EncoderModelSelect';
 
+const ParamPidSteps = memo(() => {
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+  const pidSteps = useAppSelector(selectPidSteps);
+  const onChange = useCallback((v: number) => dispatch(pidStepsChanged(v)), [dispatch]);
+  // The released PiD checkpoints are distilled for 4 steps; keep the range small around that.
+  return (
+    <FormControl gap={2}>
+      <FormLabel m={0}>{t('modelManager.pidSteps')}</FormLabel>
+      <CompositeSlider value={pidSteps} defaultValue={4} min={1} max={8} step={1} onChange={onChange} marks />
+      <CompositeNumberInput value={pidSteps} defaultValue={4} min={1} max={8} step={1} onChange={onChange} />
+    </FormControl>
+  );
+});
+ParamPidSteps.displayName = 'ParamPidSteps';
+
 const PidSettings = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -128,6 +146,7 @@ const PidSettings = () => {
         <>
           <ParamPidDecoderModelSelect />
           <ParamGemma2EncoderModelSelect />
+          <ParamPidSteps />
         </>
       )}
     </Flex>
