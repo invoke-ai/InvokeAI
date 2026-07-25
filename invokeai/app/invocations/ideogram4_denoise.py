@@ -134,7 +134,9 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
             try:
                 # packed_latents: (1, LATENT_DIM, grid_h, grid_w) -> VAE latent (1, 32, H/8, W/8).
                 vae_latent = unpatchify_and_denormalize(
-                    packed_latents.float(), latent_shift.to(packed_latents.device), latent_scale.to(packed_latents.device)
+                    packed_latents.float(),
+                    latent_shift.to(packed_latents.device),
+                    latent_scale.to(packed_latents.device),
                 )
                 preview = sample_to_lowres_estimated_image(
                     samples=vae_latent,

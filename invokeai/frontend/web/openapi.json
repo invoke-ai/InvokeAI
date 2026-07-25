@@ -20000,6 +20000,23 @@
             "orig_default": null,
             "orig_required": false
           },
+          "ideogram4_caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The structured JSON caption encoded for Ideogram 4 inference",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Ideogram4 Caption"
+          },
           "hrf_enabled": {
             "anyOf": [
               {
@@ -29669,6 +29686,9 @@
                   "$ref": "#/components/schemas/IdealSizeInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Ideogram4CaptionBuilderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
                 },
                 {
@@ -32530,6 +32550,91 @@
         "title": "IdealSizeOutput",
         "type": "object"
       },
+      "Ideogram4CaptionBuilderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Assembles the Ideogram 4 structured JSON caption at generation time.\n\nThe caption is built here (not in the graph builder) so the batch-injectable global `prompt` \u2014 which\ndynamic prompts and prompt batching vary \u2014 is folded into the encoded caption. The regions and color\npalette are fixed per generation and supplied as inputs. If the prompt is already a JSON object it is\npassed through verbatim; otherwise it is always wrapped in the structured JSON schema (never bare\nplain text \u2014 Ideogram's safety filter false-positives far more on plain text).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "default": "",
+            "description": "The global prompt (becomes `high_level_description`, or is used verbatim if it is already a JSON caption).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "regions": {
+            "default": [],
+            "description": "Regional descriptions and bounding boxes assembled from Canvas Regional Guidance layers.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/Ideogram4Region"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Regions",
+            "type": "array"
+          },
+          "color_palette": {
+            "default": [],
+            "description": "Optional color palette as hex colors (#RRGGBB).",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "type": "string"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Color Palette",
+            "type": "array"
+          },
+          "type": {
+            "const": "ideogram4_caption_builder",
+            "default": "ideogram4_caption_builder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "ideogram4"],
+        "title": "Caption Builder - Ideogram 4",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/StringOutput"
+        }
+      },
       "Ideogram4ConditioningField": {
         "description": "An Ideogram 4 conditioning tensor primitive value",
         "properties": {
@@ -32674,7 +32779,7 @@
             "anyOf": [
               {
                 "maximum": 100,
-                "minimum": 1,
+                "minimum": 2,
                 "type": "integer"
               },
               {
@@ -32682,7 +32787,7 @@
               }
             ],
             "default": null,
-            "description": "Override the preset's step count. Leave empty to use the preset.",
+            "description": "Override the preset's step count (minimum 2, so a polish and a main step both exist). Leave empty to use the preset.",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
@@ -32947,6 +33052,35 @@
         },
         "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "type", "type"],
         "title": "Ideogram4ModelLoaderOutput",
+        "type": "object"
+      },
+      "Ideogram4Region": {
+        "description": "A single region of an Ideogram 4 structured caption (description + optional bounding box).",
+        "properties": {
+          "prompt": {
+            "description": "The region's description (becomes the element's `desc`).",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Normalized bounding box [y_min, x_min, y_max, x_max] (0\u20131000), or null for a region with no drawn content.",
+            "title": "Bbox"
+          }
+        },
+        "required": ["prompt"],
+        "title": "Ideogram4Region",
         "type": "object"
       },
       "Ideogram4TextEncoderInvocation": {
@@ -37889,6 +38023,9 @@
                 "$ref": "#/components/schemas/IdealSizeInvocation"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4CaptionBuilderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
               },
               {
@@ -39063,6 +39200,9 @@
                 "$ref": "#/components/schemas/IdealSizeInvocation"
               },
               {
+                "$ref": "#/components/schemas/Ideogram4CaptionBuilderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
               },
               {
@@ -39890,6 +40030,9 @@
           "ideal_size": {
             "$ref": "#/components/schemas/IdealSizeOutput"
           },
+          "ideogram4_caption_builder": {
+            "$ref": "#/components/schemas/StringOutput"
+          },
           "ideogram4_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
@@ -40494,6 +40637,7 @@
           "heuristic_resize",
           "i2l",
           "ideal_size",
+          "ideogram4_caption_builder",
           "ideogram4_denoise",
           "ideogram4_l2i",
           "ideogram4_model_loader",
@@ -41021,6 +41165,9 @@
               },
               {
                 "$ref": "#/components/schemas/IdealSizeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4CaptionBuilderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"
@@ -41935,6 +42082,9 @@
               },
               {
                 "$ref": "#/components/schemas/IdealSizeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Ideogram4CaptionBuilderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Ideogram4DenoiseInvocation"

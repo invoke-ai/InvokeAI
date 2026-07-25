@@ -13759,7 +13759,8 @@ export type components = {
          *     The caption is built here (not in the graph builder) so the batch-injectable global `prompt` — which
          *     dynamic prompts and prompt batching vary — is folded into the encoded caption. The regions and color
          *     palette are fixed per generation and supplied as inputs. If the prompt is already a JSON object it is
-         *     passed through verbatim; with no regions or palette it falls back to the plain prompt.
+         *     passed through verbatim; otherwise it is always wrapped in the structured JSON schema (never bare
+         *     plain text — Ideogram's safety filter false-positives far more on plain text).
          */
         Ideogram4CaptionBuilderInvocation: {
             /**
@@ -13781,7 +13782,7 @@ export type components = {
             use_cache?: boolean;
             /**
              * Prompt
-             * @description The global prompt (becomes `high_level_description`, or is used verbatim if it is already a JSON caption, or as plain text).
+             * @description The global prompt (becomes `high_level_description`, or is used verbatim if it is already a JSON caption).
              * @default
              */
             prompt?: string;
