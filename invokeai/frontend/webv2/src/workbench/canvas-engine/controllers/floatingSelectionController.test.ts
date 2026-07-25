@@ -162,6 +162,63 @@ describe('FloatingSelectionController: lift', () => {
   });
 });
 
+describe('FloatingSelectionController: display effects', () => {
+  const controlLayer = (withTransparencyEffect: boolean): CanvasLayerContract => ({
+    adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+    blendMode: 'normal',
+    id: 'a',
+    isEnabled: true,
+    isLocked: false,
+    name: 'a',
+    opacity: 1,
+    source: { image: { height: 100, imageName: 'a', width: 100 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect,
+  });
+
+  it('bakes a display copy for a control layer with the transparency effect', () => {
+    // Without it the float would show the control map's raw, opaque black
+    // background — the effect the layer itself renders away.
+    const h = createHarness({ layer: controlLayer(true) });
+    h.controller.lift('a');
+
+    const float = h.controller.get()!;
+    expect(float.display).not.toBeNull();
+    expect(float.display).not.toBe(float.pixels.surface);
+    // Same extent as the lifted pixels, so it blits at the same rect.
+    expect({ height: float.display!.height, width: float.display!.width }).toEqual({
+      height: float.pixels.rect.height,
+      width: float.pixels.rect.width,
+    });
+  });
+
+  it('leaves the display copy null when the layer has no effect', () => {
+    const h = createHarness({ layer: controlLayer(false) });
+    h.controller.lift('a');
+    expect(h.controller.get()!.display).toBeNull();
+  });
+
+  it('bakes back the RAW pixels, never the display copy', () => {
+    // The effect is display-only; burning it into the document would darken the
+    // layer a little more on every move.
+    const h = createHarness({ layer: controlLayer(true) });
+    h.controller.lift('a');
+    const float = h.controller.get()!;
+    const raw = float.pixels.surface;
+
+    move(h.controller, 40, 0);
+    h.controller.commit();
+
+    const entry = h.layers.get('a')!;
+    const drawn = (entry.surface as unknown as { callLog: { op: string; args: unknown[] }[] }).callLog.filter(
+      (call) => call.op === 'drawImage'
+    );
+    expect(drawn.some((call) => call.args[0] === raw.canvas)).toBe(true);
+    expect(drawn.some((call) => call.args[0] === float.display!.canvas)).toBe(false);
+  });
+});
+
 describe('FloatingSelectionController: commit', () => {
   it('pushes exactly one undoable entry for the whole move, however many drags', () => {
     const h = createHarness();

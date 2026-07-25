@@ -29,7 +29,7 @@
  * Zero React, zero import-time side effects.
  */
 
-import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
+import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Mat2d, PlacedSurface, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
@@ -42,6 +42,15 @@ export interface FloatingSelection {
   readonly layerId: string;
   /** The lifted pixels, placed at their lift-time rect in LAYER-LOCAL space. */
   readonly pixels: PlacedSurface;
+  /**
+   * `pixels` with the layer's display-only effects baked in (control
+   * transparency / raster adjustments), or `null` when the layer has none. The
+   * compositor draws THIS; the bake writes back the untouched `pixels`, so the
+   * effect is never burned into the document. Computed once at lift: the effects
+   * are per-pixel, so the float's transform cannot change them, and a change to
+   * the layer's display properties cancels the float outright.
+   */
+  readonly display: RasterSurface | null;
   /** The layer cache's pre-lift pixels over the cut region, for cancel and the undo entry. */
   readonly before: { rect: Rect; data: ImageData };
   /** The selection mask at lift time, in DOCUMENT space — the ants follow it through the float's transform. */

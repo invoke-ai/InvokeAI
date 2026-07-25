@@ -11,6 +11,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import { isLayerPixelEditEligible } from '@workbench/canvas-engine/editing/controlPixelEdit';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
+import { renderLayerDisplayEffect } from '@workbench/canvas-engine/render/layerDisplayEffect';
 import {
   floatDocumentMatrix,
   liftSelectedPixels,
@@ -132,6 +133,10 @@ export class FloatingSelectionController {
 
     this.float = {
       before: { data: before, rect: region },
+      // Baked now, not per frame: floating a control map must show the same
+      // darkness-dropped-out pixels the layer itself shows, never its raw
+      // opaque background.
+      display: renderLayerDisplayEffect(this.deps.backend, layer, lifted.pixels.surface),
       layerId,
       mask: { rect: mask.rect, surface: mask.surface },
       pixels: lifted.pixels,

@@ -1007,7 +1007,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
             layerId: float.layerId,
             matrix,
             rect: float.pixels.rect,
-            surface: float.pixels.surface,
+            // The display copy when the layer has an effect; the raw pixels
+            // otherwise. Only the bake ever touches `pixels`.
+            surface: float.display ?? float.pixels.surface,
           },
         }
       : null;
