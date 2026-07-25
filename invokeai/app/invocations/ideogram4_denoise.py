@@ -12,8 +12,15 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.step_callback import (
+    FLUX2_LATENT_RGB_BIAS,
+    FLUX2_LATENT_RGB_FACTORS,
+    sample_to_lowres_estimated_image,
+)
 from invokeai.backend.ideogram4 import run_ideogram4_denoise
+from invokeai.backend.ideogram4.latent_norm import get_latent_norm
 from invokeai.backend.ideogram4.sampler_configs import PRESETS
+from invokeai.backend.ideogram4.sampling_utils import unpatchify_and_denormalize
 from invokeai.backend.ideogram4.transformer_pair import Ideogram4TransformerPair
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Ideogram4ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -115,8 +122,37 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         assert isinstance(info, Ideogram4ConditioningInfo)
         llm_features = info.prompt_embeds.to(device=device, dtype=torch.float32)
 
-        def step_callback(step: int, total: int, _latents: torch.Tensor) -> None:
-            context.util.signal_progress("Running Ideogram 4 denoising", step / total)
+        # Progress-preview setup: Ideogram uses a FLUX.2-style 32-channel VAE, so the FLUX.2
+        # latent->RGB factors give a usable (approximate) low-res preview of the forming image at each
+        # step, without a full VAE decode. Denormalization params come from get_latent_norm (no VAE).
+        latent_shift, latent_scale = get_latent_norm()
+        rgb_factors = torch.tensor(FLUX2_LATENT_RGB_FACTORS, dtype=torch.float32)
+        rgb_bias = torch.tensor(FLUX2_LATENT_RGB_BIAS, dtype=torch.float32)
+
+        def step_callback(step: int, total: int, packed_latents: torch.Tensor) -> None:
+            preview = None
+            try:
+                # packed_latents: (1, LATENT_DIM, grid_h, grid_w) -> VAE latent (1, 32, H/8, W/8).
+                vae_latent = unpatchify_and_denormalize(
+                    packed_latents.float(), latent_shift.to(packed_latents.device), latent_scale.to(packed_latents.device)
+                )
+                preview = sample_to_lowres_estimated_image(
+                    samples=vae_latent,
+                    latent_rgb_factors=rgb_factors.to(vae_latent.device),
+                    latent_rgb_bias=rgb_bias.to(vae_latent.device),
+                )
+            except Exception:
+                # A preview must never break generation — fall back to a plain progress signal.
+                preview = None
+            if preview is not None:
+                context.util.signal_progress(
+                    "Running Ideogram 4 denoising",
+                    step / total,
+                    preview,
+                    (preview.width * 8, preview.height * 8),
+                )
+            else:
+                context.util.signal_progress("Running Ideogram 4 denoising", step / total)
 
         transformer_info = context.models.load(self.transformer.transformer)
         with transformer_info.model_on_device() as (_, transformers):

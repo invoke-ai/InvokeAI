@@ -83,6 +83,12 @@ Ideogram 4 does not use a negative prompt — it has a dedicated unconditional b
 - **Sampler Preset** — the primary quality/speed control. `Quality (48 steps)`, `Default (20 steps)`, and `Turbo (12 steps)` each bundle a step count, a guidance schedule, and the schedule shift.
 - **Advanced** overrides (all optional, leave on *Auto* to use the preset's values): **Steps**, **Guidance Scale**, **Schedule Shift (mu)**, and a **Color Palette** that biases the generated colors.
 
+:::caution[Built-in safety filter]
+Ideogram 4 ships with a **content safety filter baked into the released model weights**. When it triggers, the model outputs a placeholder image reading *"Image blocked by safety filter"* instead of your image. This is the model's own filter — it is **not** Invoke's NSFW checker (it fires even with the NSFW checker off) and cannot be disabled from Invoke.
+
+The filter is known to **false-positive on completely benign prompts**, and the quantized builds can trigger it more readily. Invoke always sends the model a structured JSON prompt, which tends to trip the filter less than plain text; if you hit it, rephrasing or adjusting the prompt usually clears it.
+:::
+
 ## Editing model metadata
 
 Every model has an editable **Source URL** field alongside its name and description. Use it to record where a model came from — for example a Civitai or HuggingFace page — independent of how it was originally installed. The URL is editable from the model's **Edit** view and appears as a clickable link in the model header once set. Models without a URL simply hide the field.

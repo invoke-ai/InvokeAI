@@ -20,7 +20,9 @@ from invokeai.backend.ideogram4.sampling_utils import (
 )
 from invokeai.backend.ideogram4.scheduler import get_schedule_for_resolution, make_step_intervals
 
-# Called after each completed step with (step_index, total_steps, latents).
+# Called after each completed step with (step_index, total_steps, packed_latents), where
+# packed_latents is the current estimate in packed grid form ``(1, LATENT_DIM, grid_h, grid_w)`` —
+# ready for a preview (unpatchify + VAE decode / RGB approximation) without re-deriving the grid.
 StepCallback = Callable[[int, int, torch.Tensor], None]
 
 
@@ -118,6 +120,7 @@ def run_ideogram4_denoise(
         z = z + v * (s_val - t_val)
 
         if step_callback is not None:
-            step_callback(num_steps - i, num_steps, z)
+            # Hand the callback the current estimate in packed grid form so it can render a preview.
+            step_callback(num_steps - i, num_steps, pack_latents_to_grid(z, grid_h, grid_w))
 
     return pack_latents_to_grid(z, grid_h, grid_w)
