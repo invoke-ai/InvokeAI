@@ -35,7 +35,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
@@ -43,6 +43,7 @@ import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
 type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
+const STRIP_CONTAIN_CSS = { contain: 'inline-size' } as const;
 const AUTO_SWITCH_MODES: AutoSwitchMode[] = ['off', 'progress', 'latest'];
 const MENU_POSITIONING = { placement: 'top-end' } as const;
 
@@ -127,8 +128,15 @@ export const StagingBar = ({
   return (
     <Stack align="center" gap="2" w="full">
       {hasSlots ? (
+        // `contain: inline-size` zeroes the strip's intrinsic width, so a long
+        // run of staged candidates can never push the floating bar group wider
+        // than the canvas (the bottom overlay would just clip the overflow, and
+        // centering hides half of it). The strip instead tracks the width of the
+        // options bar below it and scrolls within it.
         <ScrollArea.Root
+          css={STRIP_CONTAIN_CSS}
           h={areThumbnailsVisible ? THUMBNAIL_STRIP_HEIGHT : '0'}
+          minW="0"
           opacity={areThumbnailsVisible ? 1 : 0}
           pointerEvents={areThumbnailsVisible ? 'auto' : 'none'}
           size="xs"
@@ -136,7 +144,13 @@ export const StagingBar = ({
           variant="hover"
           w="full"
         >
-          <ScrollArea.Viewport h="full" w="full">
+          <ScrollArea.Viewport h="full" scrollPaddingInline="2" w="full">
+            {/*
+             * Leave the content slot's width alone: its inline `min-width:
+             * fit-content` grows it to hold every thumbnail, so `justify` only
+             * centers when the strip fits and no thumbnail ever lands at a
+             * negative offset that scrolling cannot reach.
+             */}
             <ScrollArea.Content asChild>
               <HStack h="full" justify="center">
                 {slots.map((slot, index) => (
@@ -338,9 +352,21 @@ const StagingThumbnail = ({
   onSelect: () => void;
 }) => {
   const { t } = useTranslation();
+  // Ref callbacks re-run when `isSelected` changes, so cycling with the arrows
+  // (or an auto-switch) drags the strip along without an effect.
+  const scrollIntoView = useCallback(
+    (node: HTMLElement | null) => {
+      if (node && isSelected) {
+        node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    },
+    [isSelected]
+  );
 
   return (
     <Stack
+      ref={scrollIntoView}
+      aria-current={isSelected || undefined}
       aria-label={t('widgets.canvas.selectStagedCandidate', { number: index + 1 })}
       as="button"
       bg="bg.emphasized"
