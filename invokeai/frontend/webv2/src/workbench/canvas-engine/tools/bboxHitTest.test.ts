@@ -2,6 +2,8 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 import { describe, expect, it } from 'vitest';
 
+import type { ResizeBboxParams } from './bboxHitTest';
+
 import {
   BBOX_HANDLE_HIT_PX,
   bboxEquals,
@@ -16,6 +18,10 @@ import {
 } from './bboxHitTest';
 
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ height, width, x, y });
+
+/** `resizeBbox` with the anchored (non-mirrored) default, so cases opt into `symmetric`. */
+const resize = (p: Omit<ResizeBboxParams, 'symmetric'> & { symmetric?: boolean }): Rect =>
+  resizeBbox({ symmetric: false, ...p });
 
 describe('bboxHandlePoint', () => {
   it('places the eight handles on corners and edge midpoints', () => {
@@ -92,34 +98,34 @@ describe('resizeBbox — free (unconstrained)', () => {
   const start = rect(0, 0, 100, 100);
 
   it('grows the SE corner and snaps the moved edges to the grid', () => {
-    const out = resizeBbox({ constrain: false, dx: 10, dy: 10, grid: 8, handle: 'se', ratio: 1, snap: true, start });
+    const out = resize({ constrain: false, dx: 10, dy: 10, grid: 8, handle: 'se', ratio: 1, snap: true, start });
     // right = snap(110) = 112, bottom = snap(110) = 112, anchored at (0,0).
     expect(out).toEqual(rect(0, 0, 112, 112));
   });
 
   it('drags the NW corner (moves origin) and snaps', () => {
-    const out = resizeBbox({ constrain: false, dx: -10, dy: -10, grid: 8, handle: 'nw', ratio: 1, snap: true, start });
+    const out = resize({ constrain: false, dx: -10, dy: -10, grid: 8, handle: 'nw', ratio: 1, snap: true, start });
     // left = snap(-10) = -8, top = -8; right/bottom fixed at 100.
     expect(out).toEqual(rect(-8, -8, 108, 108));
   });
 
   it('resizes a single edge, leaving the perpendicular axis untouched', () => {
-    const out = resizeBbox({ constrain: false, dx: 13, dy: 0, grid: 8, handle: 'e', ratio: 1, snap: true, start });
+    const out = resize({ constrain: false, dx: 13, dy: 0, grid: 8, handle: 'e', ratio: 1, snap: true, start });
     expect(out).toEqual(rect(0, 0, 112, 100));
   });
 
   it('bypasses snapping when snap is false (alt held)', () => {
-    const out = resizeBbox({ constrain: false, dx: 13, dy: 0, grid: 8, handle: 'e', ratio: 1, snap: false, start });
+    const out = resize({ constrain: false, dx: 13, dy: 0, grid: 8, handle: 'e', ratio: 1, snap: false, start });
     expect(out).toEqual(rect(0, 0, 113, 100));
   });
 
   it('clamps to a minimum of one grid cell when collapsing an edge', () => {
-    const out = resizeBbox({ constrain: false, dx: -500, dy: 0, grid: 8, handle: 'e', ratio: 1, snap: true, start });
+    const out = resize({ constrain: false, dx: -500, dy: 0, grid: 8, handle: 'e', ratio: 1, snap: true, start });
     expect(out).toEqual(rect(0, 0, 8, 100));
   });
 
   it('never goes below 1px when the grid is sub-pixel', () => {
-    const out = resizeBbox({ constrain: false, dx: -500, dy: 0, grid: 0, handle: 'e', ratio: 1, snap: false, start });
+    const out = resize({ constrain: false, dx: -500, dy: 0, grid: 0, handle: 'e', ratio: 1, snap: false, start });
     expect(out.width).toBe(1);
   });
 });
@@ -128,22 +134,156 @@ describe('resizeBbox — aspect constrained', () => {
   const start = rect(0, 0, 100, 100);
 
   it('preserves the ratio on a corner drag (anchored at the opposite corner)', () => {
-    const out = resizeBbox({ constrain: true, dx: 100, dy: 0, grid: 8, handle: 'se', ratio: 2, snap: false, start });
+    const out = resize({ constrain: true, dx: 100, dy: 0, grid: 8, handle: 'se', ratio: 2, snap: false, start });
     // Pointer widens to 200; ratio 2:1 → height 100. Anchor NW stays at (0,0).
     expect(out).toEqual(rect(0, 0, 200, 100));
   });
 
   it('re-derives the free axis on an edge drag, keeping the center fixed', () => {
-    const out = resizeBbox({ constrain: true, dx: 100, dy: 0, grid: 8, handle: 'e', ratio: 2, snap: false, start });
+    const out = resize({ constrain: true, dx: 100, dy: 0, grid: 8, handle: 'e', ratio: 2, snap: false, start });
     // width 200 → height 100 (ratio 2), centered on the original vertical center (50).
     expect(out).toEqual(rect(0, 0, 200, 100));
   });
 
   it('grid-aligns the driven dimension while keeping the ratio exact', () => {
-    const out = resizeBbox({ constrain: true, dx: 13, dy: 13, grid: 8, handle: 'se', ratio: 1, snap: true, start });
+    const out = resize({ constrain: true, dx: 13, dy: 13, grid: 8, handle: 'se', ratio: 1, snap: true, start });
     // se raw ~113 → snap width 112, height = width/ratio = 112.
     expect(out.width).toBe(112);
     expect(out.height).toBe(112);
+  });
+});
+
+describe('resizeBbox — symmetric (mirrored across the center)', () => {
+  const start = rect(0, 0, 100, 100);
+
+  it('moves the opposite edge by the same amount, holding the center', () => {
+    const out = resize({
+      constrain: false,
+      dx: 10,
+      dy: 0,
+      grid: 8,
+      handle: 'e',
+      ratio: 1,
+      snap: false,
+      start,
+      symmetric: true,
+    });
+    // East edge follows the pointer to 110, west mirrors to -10; center stays at 50.
+    expect(out).toEqual(rect(-10, 0, 120, 100));
+    expect(out.x + out.width / 2).toBe(50);
+  });
+
+  it('mirrors a shrink as well as a grow', () => {
+    const out = resize({
+      constrain: false,
+      dx: -10,
+      dy: 0,
+      grid: 8,
+      handle: 'e',
+      ratio: 1,
+      snap: false,
+      start,
+      symmetric: true,
+    });
+    expect(out).toEqual(rect(10, 0, 80, 100));
+  });
+
+  it('mirrors both axes from a corner, and the grabbed corner still tracks the pointer', () => {
+    const out = resize({
+      constrain: false,
+      dx: 10,
+      dy: 20,
+      grid: 8,
+      handle: 'se',
+      ratio: 1,
+      snap: false,
+      start,
+      symmetric: true,
+    });
+    expect(out).toEqual(rect(-10, -20, 120, 140));
+    // The SE corner sits exactly where the pointer dragged it.
+    expect(bboxHandlePoint(out, 'se')).toEqual({ x: 110, y: 120 });
+  });
+
+  it('mirrors a NW drag the same way (direction-independent)', () => {
+    const out = resize({
+      constrain: false,
+      dx: -10,
+      dy: -10,
+      grid: 8,
+      handle: 'nw',
+      ratio: 1,
+      snap: false,
+      start,
+      symmetric: true,
+    });
+    expect(out).toEqual(rect(-10, -10, 120, 120));
+  });
+
+  it('keeps snapping the grabbed edge, so sizes stay grid-aligned', () => {
+    const out = resize({
+      constrain: false,
+      dx: 13,
+      dy: 0,
+      grid: 8,
+      handle: 'e',
+      ratio: 1,
+      snap: true,
+      start,
+      symmetric: true,
+    });
+    // Doubled delta snaps the east edge to 128; the west edge mirrors to -28.
+    expect(out.width).toBe(128);
+    expect(out.x + out.width / 2).toBe(50);
+  });
+
+  it('composes with the aspect constraint, keeping the center', () => {
+    const out = resize({
+      constrain: true,
+      dx: 50,
+      dy: 0,
+      grid: 8,
+      handle: 'se',
+      ratio: 2,
+      snap: false,
+      start,
+      symmetric: true,
+    });
+    expect(out.width / out.height).toBeCloseTo(2, 5);
+    expect(out.x + out.width / 2).toBeCloseTo(50, 5);
+    expect(out.y + out.height / 2).toBeCloseTo(50, 5);
+  });
+
+  it('clamps to the minimum size instead of inverting through the center', () => {
+    const out = resize({
+      constrain: false,
+      dx: -500,
+      dy: 0,
+      grid: 8,
+      handle: 'e',
+      ratio: 1,
+      snap: true,
+      start,
+      symmetric: true,
+    });
+    expect(out.width).toBe(8);
+    expect(out.x + out.width / 2).toBe(50);
+  });
+
+  it('leaves the perpendicular axis untouched on an edge drag', () => {
+    const out = resize({
+      constrain: false,
+      dx: 10,
+      dy: 99,
+      grid: 8,
+      handle: 'e',
+      ratio: 1,
+      snap: false,
+      start,
+      symmetric: true,
+    });
+    expect(out.height).toBe(100);
+    expect(out.y).toBe(0);
   });
 });
 
