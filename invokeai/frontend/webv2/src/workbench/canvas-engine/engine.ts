@@ -94,7 +94,7 @@ export type {
   CommitRasterFilterOptions,
   CommitRasterFilterResult,
 } from '@workbench/canvas-engine/controllers/filterResultController';
-import type { CanvasApplicationHost, SelectObjectStartContext } from '@workbench/canvas-engine/applicationHost';
+import type { CanvasApplicationHost } from '@workbench/canvas-engine/applicationHost';
 import type {
   CanvasImageRef,
   CanvasDocumentContractV2,
@@ -146,8 +146,8 @@ import {
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
-import { applyToPoint, fromTRS } from '@workbench/canvas-engine/math/mat2d';
-import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
+import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
+import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 import {
   type CompositeOptions,
   compositeDocument,
@@ -197,6 +197,7 @@ import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
+import { createSelectObjectBridge } from './selectObjectBridge';
 import { createStrokeCommit } from './strokeCommit';
 import { createViewTool } from './tools/viewTool';
 
@@ -2291,47 +2292,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
   };
 
-  const decodeSelectObjectPreview = async (
-    result: { image: CanvasImageRef; rect: Rect },
-    signal: AbortSignal
-  ): Promise<RasterSurface> => {
-    const validateDecoded = (width: number, height: number): void => {
-      const valid =
-        Number.isInteger(width) &&
-        width > 0 &&
-        Number.isInteger(height) &&
-        height > 0 &&
-        width === result.image.width &&
-        height === result.image.height &&
-        width === result.rect.width &&
-        height === result.rect.height;
-      if (!valid) {
-        throw Object.assign(
-          new Error(
-            `Decoded Select Object preview dimensions ${String(width)}x${String(height)} do not match SAM output ${result.image.width}x${result.image.height} and preview rect ${result.rect.width}x${result.rect.height}.`
-          ),
-          { samErrorCode: 'output-dimension' as const }
-        );
-      }
-    };
-    const decoded = await rasterController.decodeImage(result.image, {
-      scaleToImage: false,
-      signal,
-      validateDecoded,
-    });
-    if (decoded.status !== 'ok') {
-      throw new DOMException('Select Object preview decode was aborted.', 'AbortError');
-    }
-    const surface = decoded.surface;
-    surface.ctx.globalCompositeOperation = 'source-in';
-    surface.ctx.fillStyle = '#38bdf8';
-    surface.ctx.fillRect(0, 0, surface.width, surface.height);
-    surface.ctx.globalCompositeOperation = 'source-over';
-    if (signal.aborted) {
-      throw new DOMException('Select Object preview decode was aborted.', 'AbortError');
-    }
-    return surface;
-  };
+  const { decodeSelectObjectPreview, prepareSelectObjectStart } = createSelectObjectBridge({
+    captureGuard: (layerId) => captureCurrentLayerExportGuard(layerId),
+    decodeImage: (image, options) => rasterController.decodeImage(image, options),
+    getDocument: () => mirror.getDocument(),
+    layerCache,
+  });
 
   // ---- Public API ---------------------------------------------------------
 
@@ -3409,43 +3375,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     clearCaches,
     getDiagnostics: diagnostics.snapshot,
     logDebugInfo,
-  };
-
-  const prepareSelectObjectStart = (layerId: string): SelectObjectStartContext => {
-    const document = mirror.getDocument();
-    const layer = document?.layers.find((candidate) => candidate.id === layerId);
-    if (!document || !layer) {
-      return { status: 'missing' };
-    }
-    if (layer.type !== 'raster' && layer.type !== 'control') {
-      return { status: 'unsupported' };
-    }
-    if (!layer.isEnabled) {
-      return { status: 'disabled' };
-    }
-    if (layer.isLocked) {
-      return { status: 'locked' };
-    }
-    const guard = captureCurrentLayerExportGuard(layer.id);
-    const entry = layerCache.get(layer.id);
-    if (!guard || !entry) {
-      return { status: 'not-ready' };
-    }
-    const sourceRect = roundOut(
-      transformBounds(
-        fromTRS(
-          { x: layer.transform.x, y: layer.transform.y },
-          layer.transform.rotation,
-          layer.transform.scaleX,
-          layer.transform.scaleY
-        ),
-        entry.rect
-      )
-    );
-    if (isEmpty(sourceRect)) {
-      return { status: 'not-ready' };
-    }
-    return { guard, layerId, layerName: layer.name, layerType: layer.type, sourceRect, status: 'ready' };
   };
 
   const applicationHost: CanvasApplicationHost = {
