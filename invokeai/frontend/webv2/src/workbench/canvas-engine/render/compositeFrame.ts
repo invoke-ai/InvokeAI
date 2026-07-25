@@ -181,7 +181,11 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         // that actually changed; `null` repaints the whole viewport.
         damage: isolatedGuard ? null : damage,
         // Memoized adjusted surfaces for raster layers with brightness/contrast/
-        // saturation/curves (not recomputed per frame — see adjustedSurfaceCache).
+        // saturation/curves. Memoized on the layer's cache version, so an idle
+        // frame costs nothing — but a live stroke bumps that version every tick,
+        // and the memo misses. What keeps that affordable is that the miss then
+        // refreshes only the band the stroke reported writing, rather than
+        // re-deriving from the whole layer (see adjustedSurfaceCache).
         adjustedSurface: deps.getAdjustedSurface,
         // The raster backend + mask fill tile resolver drive the mask colorize
         // path (alpha stencil → source-in fill colour/pattern, above all layers).

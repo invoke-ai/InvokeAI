@@ -10,7 +10,16 @@ export interface DerivedSurfaceRequest {
   kind: DerivedSurfaceKind;
   paramsKey: string;
   source: RasterSurface;
-  create(target: RasterSurface | null): RasterSurface;
+  /**
+   * Builds the derived surface.
+   *
+   * `target` is the previous surface when it can be reused (same source), else
+   * `null`. `reusableFromVersion` is the source version `target` was built at,
+   * or `null` when there is nothing to refresh from — which is the signal that
+   * the build must be wholesale. Given both, an implementation may ask the
+   * layer cache what changed since that version and refresh only that region.
+   */
+  create(target: RasterSurface | null, reusableFromVersion: number | null): RasterSurface;
 }
 
 export interface DerivedSurfaceCache {
@@ -58,7 +67,11 @@ export const createDerivedSurfaceCache = (diagnostics?: CanvasDiagnostics): Deri
 
     diagnostics?.increment('derivedCacheMisses');
     const canReuse = existing?.source === request.source;
-    const surface = request.create(canReuse ? existing.surface : null);
+    // Only a reusable surface built with the SAME parameters can be refreshed in
+    // part; different parameters mean every pixel is wrong, not just the changed
+    // ones.
+    const reusableFromVersion = canReuse && existing.paramsKey === request.paramsKey ? existing.sourceVersion : null;
+    const surface = request.create(canReuse ? existing.surface : null, reusableFromVersion);
     if (!canReuse) {
       diagnostics?.add('allocatedDerivedBytes', surfaceBytes(surface));
     }

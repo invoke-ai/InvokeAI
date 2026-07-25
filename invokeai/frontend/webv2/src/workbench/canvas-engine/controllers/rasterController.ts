@@ -70,7 +70,9 @@ export class RasterController {
     this.getLayerImageName = options.getLayerImageName ?? (() => null);
     this.imageResolver = options.imageResolver ?? null;
     this.derived = createDerivedSurfaceCache(options.diagnostics);
-    this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived);
+    this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived, (layerId, version) =>
+      this.layers.damageSince(layerId, version)
+    );
   }
 
   async decodeImage(

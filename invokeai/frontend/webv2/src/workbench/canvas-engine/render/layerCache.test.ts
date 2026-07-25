@@ -302,3 +302,76 @@ describe('growToRect (paint caches grow with strokes)', () => {
     expect(log.some((e) => e.op === 'putImageData')).toBe(false);
   });
 });
+
+describe('damageSince', () => {
+  const seeded = () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    store.getOrCreate('a', 100, 100);
+    return store;
+  };
+  const rect = (x: number, y: number, size = 10) => ({ height: size, width: size, x, y });
+
+  it('unions the regions written since a version', () => {
+    const store = seeded();
+    const base = store.version('a');
+    store.publishPixels('a', rect(10, 10));
+    store.publishPixels('a', rect(50, 40));
+    expect(store.damageSince('a', base)).toEqual({ height: 40, width: 50, x: 10, y: 10 });
+  });
+
+  it('reports only what changed after the asked-for version', () => {
+    const store = seeded();
+    store.publishPixels('a', rect(10, 10));
+    const mid = store.version('a');
+    store.publishPixels('a', rect(60, 60));
+    expect(store.damageSince('a', mid)).toEqual(rect(60, 60));
+  });
+
+  it('gives up when any write in the span did not name its damage', () => {
+    // Skipping such a write would refresh a stale surface only where the OTHER
+    // writes landed, silently leaving the unreported region wrong.
+    const store = seeded();
+    const base = store.version('a');
+    store.publishPixels('a', rect(10, 10));
+    store.publishPixels('a', null);
+    store.publishPixels('a', rect(60, 60));
+    expect(store.damageSince('a', base)).toBeNull();
+  });
+
+  it('gives up when the trail no longer reaches back to the version', () => {
+    const store = seeded();
+    const base = store.version('a');
+    for (let i = 0; i < 40; i++) {
+      store.publishPixels('a', rect(i, i, 5));
+    }
+    expect(store.damageSince('a', base)).toBeNull();
+    // ...but a recent version is still answerable.
+    const recent = store.version('a') - 2;
+    expect(store.damageSince('a', recent)).not.toBeNull();
+  });
+
+  it('gives up after a reallocation moves the surface origin', () => {
+    const store = seeded();
+    store.publishPixels('a', rect(10, 10));
+    const before = store.version('a');
+    store.growToRect('a', { height: 200, width: 200, x: -50, y: -50 });
+    store.publishPixels('a', rect(0, 0));
+    expect(store.damageSince('a', before)).toBeNull();
+  });
+
+  it('gives up after an invalidate', () => {
+    const store = seeded();
+    store.publishPixels('a', rect(10, 10));
+    const before = store.version('a');
+    store.invalidate('a');
+    store.publishPixels('a', rect(20, 20));
+    expect(store.damageSince('a', before)).toBeNull();
+  });
+
+  it('returns null for an unknown layer or an already-current version', () => {
+    const store = seeded();
+    store.publishPixels('a', rect(10, 10));
+    expect(store.damageSince('missing', 0)).toBeNull();
+    expect(store.damageSince('a', store.version('a'))).toBeNull();
+  });
+});

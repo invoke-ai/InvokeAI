@@ -14,12 +14,30 @@
 
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { union } from '@workbench/canvas-engine/math/rect';
+
 import type { RasterBackend, RasterSurface } from './raster';
 
 /** Default cache budget: ~512 MB of surface pixels before hidden caches are evicted. */
 export const DEFAULT_CACHE_BUDGET_BYTES = 512 * 1024 * 1024;
 
 const BYTES_PER_PIXEL = 4;
+
+/**
+ * How many recent writes a layer's damage trail retains.
+ *
+ * A derived surface asks what changed since the version it was built at, so the
+ * trail only has to span the gap between two composites — normally one write.
+ * The cap keeps a long stroke from growing the trail without bound; overrunning
+ * it just means derived surfaces rebuild wholesale, which is the old behaviour.
+ */
+const DAMAGE_TRAIL_LIMIT = 16;
+
+/** One recorded write: the version it produced, and where it landed (`null` = everywhere). */
+interface DamageStep {
+  version: number;
+  rect: Rect | null;
+}
 const READBACK_SURFACE_OPTIONS = { willReadFrequently: true } as const;
 
 /** A single layer's cache entry. */
@@ -96,8 +114,23 @@ export interface LayerCacheStore {
   prepareReplacement(layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement;
   /** Publishes a detached replacement without allocating, resizing, or drawing. */
   installReplacement(prepared: PreparedLayerCacheReplacement): LayerCacheEntry;
-  /** Marks directly-written pixels current, bumps the version, and notifies observers. */
-  publishPixels(layerId: string): LayerCacheEntry | undefined;
+  /**
+   * Marks directly-written pixels current, bumps the version, and notifies
+   * observers.
+   *
+   * `damage` is the surface-local rect the write touched. Supplying it lets
+   * surfaces DERIVED from this cache (adjusted, mask-fill) refresh just that
+   * rect instead of rebuilding wholesale — see {@link damageSince}. Omitting it
+   * declares the whole surface changed, which is always safe.
+   */
+  publishPixels(layerId: string, damage?: Rect | null): LayerCacheEntry | undefined;
+  /**
+   * The union of the regions written to `layerId` since `version`, or `null` if
+   * that cannot be established — because some write did not name its damage,
+   * because the trail is older than the retained window, or because the surface
+   * was reallocated. `null` means "assume everything changed".
+   */
+  damageSince(layerId: string, version: number): Rect | null;
   /** Marks a layer's cache stale and bumps its `version`. */
   invalidate(layerId: string): void;
   /** Drops a layer's cache entry entirely. */
@@ -124,6 +157,22 @@ export const createLayerCacheStore = (
   options: LayerCacheStoreOptions = {}
 ): LayerCacheStore => {
   const entries = new Map<string, LayerCacheEntry>();
+  /** Per-layer trail of recent writes, oldest first. See {@link DAMAGE_TRAIL_LIMIT}. */
+  const damageTrails = new Map<string, DamageStep[]>();
+
+  /**
+   * Appends a write to a layer's damage trail. A `null` rect is recorded rather
+   * than dropped: it is what tells {@link damageSince} that a write of unknown
+   * extent happened, so a derived surface spanning it must rebuild in full.
+   */
+  const recordDamage = (entry: LayerCacheEntry, rect: Rect | null): void => {
+    const trail = damageTrails.get(entry.layerId) ?? [];
+    trail.push({ rect, version: entry.version });
+    if (trail.length > DAMAGE_TRAIL_LIMIT) {
+      trail.splice(0, trail.length - DAMAGE_TRAIL_LIMIT);
+    }
+    damageTrails.set(entry.layerId, trail);
+  };
   // Per-id version FLOOR: the highest version each layer id has ever reached,
   // retained across delete/recreate (delete, LRU eviction). A recreated entry
   // (undo→redo, transform bake, merge, evict→re-show) starts ABOVE this floor
@@ -181,6 +230,7 @@ export const createLayerCacheStore = (
       const hadPublishedPixels = existing.hasPublishedPixels;
       if (existing.surface.width !== width || existing.surface.height !== height) {
         existing.surface.resize(width, height);
+        damageTrails.delete(layerId);
         existing.hasPublishedPixels = false;
         existing.stale = true;
       }
@@ -276,6 +326,10 @@ export const createLayerCacheStore = (
     if (!curEmpty && cur.width > 0 && cur.height > 0) {
       snapshot = surface.ctx.getImageData(0, 0, cur.width, cur.height);
     }
+    // The surface origin moves with the grown rect, so every surface-local rect
+    // recorded so far is void. Dropping the trail makes derived surfaces rebuild
+    // wholesale for one frame rather than refresh the wrong pixels.
+    damageTrails.delete(layerId);
     surface.resize(newRect.width, newRect.height);
     if (snapshot) {
       surface.ctx.putImageData(snapshot, cur.x - newRect.x, cur.y - newRect.y);
@@ -321,12 +375,13 @@ export const createLayerCacheStore = (
       version: initialVersion(prepared.layerId) + 1,
     };
     touch(entry);
+    damageTrails.delete(prepared.layerId);
     entries.set(prepared.layerId, entry);
     notifyVersionChange(prepared.layerId);
     return entry;
   };
 
-  const publishPixels = (layerId: string): LayerCacheEntry | undefined => {
+  const publishPixels = (layerId: string, damage?: Rect | null): LayerCacheEntry | undefined => {
     const entry = entries.get(layerId);
     if (!entry) {
       return undefined;
@@ -334,13 +389,39 @@ export const createLayerCacheStore = (
     entry.hasPublishedPixels = true;
     entry.stale = false;
     entry.version += 1;
+    recordDamage(entry, damage ?? null);
     notifyVersionChange(layerId);
     return entry;
+  };
+
+  const damageSince = (layerId: string, version: number): Rect | null => {
+    const entry = entries.get(layerId);
+    if (!entry || version >= entry.version) {
+      return null;
+    }
+    const trail = damageTrails.get(layerId);
+    // The trail must reach back far enough to account for EVERY version since
+    // the caller's: a gap means an unrecorded write, so nothing can be assumed.
+    if (!trail || trail.length === 0 || trail[0]!.version > version + 1) {
+      return null;
+    }
+    let accumulated: Rect | null = null;
+    for (const step of trail) {
+      if (step.version <= version) {
+        continue;
+      }
+      if (!step.rect) {
+        return null;
+      }
+      accumulated = accumulated ? union(accumulated, step.rect) : step.rect;
+    }
+    return accumulated;
   };
 
   const invalidate = (layerId: string): void => {
     const entry = entries.get(layerId);
     if (entry) {
+      damageTrails.delete(layerId);
       entry.version += 1;
       entry.stale = true;
       notifyVersionChange(layerId);
@@ -352,6 +433,7 @@ export const createLayerCacheStore = (
     if (entry) {
       rememberFloor(entry);
       entries.delete(layerId);
+      damageTrails.delete(layerId);
       notifyVersionChange(layerId);
     }
   };
@@ -386,6 +468,7 @@ export const createLayerCacheStore = (
       // thumbnail caches would serve stale pixels keyed to the recycled version.
       rememberFloor(entry);
       entries.delete(entry.layerId);
+      damageTrails.delete(entry.layerId);
       evicted.push(entry.layerId);
       total -= surfaceBytes(entry.surface);
       notifyVersionChange(entry.layerId);
@@ -395,6 +478,7 @@ export const createLayerCacheStore = (
 
   const dispose = (): void => {
     entries.clear();
+    damageTrails.clear();
   };
 
   return {
@@ -407,6 +491,7 @@ export const createLayerCacheStore = (
     getOrCreateRect,
     growToRect,
     installReplacement,
+    damageSince,
     invalidate,
     peek,
     prepareReplacement,

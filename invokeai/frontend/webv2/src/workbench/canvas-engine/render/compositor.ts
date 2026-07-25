@@ -441,7 +441,10 @@ const drawCachedLayer = (
     ctx.drawImage(effect.canvas, origin.x, origin.y);
   } else {
     // Raster layers may carry non-destructive adjustments; the engine supplies a
-    // memoized adjusted surface (never recomputed per frame). Fall back to the raw
+    // memoized adjusted surface. The memo is keyed on the layer's cache version,
+    // so it holds across idle frames but is deliberately missed on every tick of
+    // a live stroke — that is what makes the stroke visible through the
+    // adjustments. The miss refreshes only the written band. Fall back to the raw
     // cache when there are no adjustments or no provider.
     const adjusted = layer.type === 'raster' && opts.adjustedSurface ? opts.adjustedSurface(layer, entry) : null;
     ctx.drawImage((adjusted ?? entry.surface).canvas, origin.x, origin.y);

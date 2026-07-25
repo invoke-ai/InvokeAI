@@ -453,14 +453,23 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     targetCtx.drawImage(scratch.canvas, region.x - ox, region.y - oy);
     targetCtx.restore();
 
-    // The cache pixels changed THIS frame — bump the version so a version-keyed
-    // dependent (the memoized adjusted-surface cache) recomputes over the live
-    // stroke. Without this the compositor would keep serving the pre-stroke
+    // The cache pixels changed THIS frame — bump the version, WITH the band they
+    // changed in, so a version-keyed dependent (the memoized adjusted-surface
+    // cache) recomputes over the live stroke without rebuilding from the whole
+    // layer. Without the bump the compositor would keep serving the pre-stroke
     // adjusted surface, and the live stroke would be invisible on an adjusted
-    // raster layer until pointer-up (and jump on rect growth). This does NOT
+    // raster layer until pointer-up (and jump on rect growth). The band is in
+    // SURFACE-local coordinates, the space a derived surface is built in. Note
+    // it is the derived surfaces that need this — the stroke's own scratch and
+    // cache writes are already bounded above. This does NOT
     // touch `thumbnailVersion` (only `notifyLayerPainted`/rasterize do), so
     // thumbnails don't churn mid-stroke.
-    layers.publishPixels(layerId);
+    layers.publishPixels(layerId, {
+      height: changed.height,
+      width: changed.width,
+      x: changed.x - ox,
+      y: changed.y - oy,
+    });
     // Report the region as damage so the frame repaints only these pixels
     // instead of re-resampling every doc-sized layer to screen scale — the cost
     // that grows with zoom. `region` is layer-local, which is exactly what the
@@ -483,7 +492,14 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
         // Bump the version so the adjusted-surface memo (which recomputed over the
         // live stroke) re-derives from the RESTORED pixels — otherwise an adjusted
         // raster layer would keep showing the cancelled stroke's adjusted preview.
-        layers.publishPixels(layerId);
+        // The restore spans everything the gesture touched, so this reports the
+        // whole accumulated rect rather than any one frame's band.
+        layers.publishPixels(layerId, {
+          height: accumRect.height,
+          width: accumRect.width,
+          x: accumRect.x - entry.rect.x,
+          y: accumRect.y - entry.rect.y,
+        });
         ctx.invalidate({ layers: [layerId] });
       }
     },
