@@ -232,7 +232,7 @@ async def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
     operation_id="get_models_dir",
     responses={200: {"description": "The absolute path of the models directory"}},
 )
-async def get_models_dir() -> str:
+async def get_models_dir(current_user: CurrentUserOrDefault) -> str:
     """Get the absolute path of the directory managed models are stored in.
 
     Model config `path` values are relative to this directory unless they are

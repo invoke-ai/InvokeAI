@@ -31,6 +31,7 @@ PROTECTED_ROUTES = [
     ("get", "/api/v2/models/scan_folder?scan_path=/etc"),
     ("get", "/api/v2/models/"),
     ("get", "/api/v2/models/missing"),
+    ("get", "/api/v2/models/models_dir"),
     ("get", "/api/v2/models/get_by_attrs?name=x&type=main&base=sd-1"),
     ("get", "/api/v2/models/get_by_hash?hash=x"),
     ("get", "/api/v2/models/i/some-key"),
@@ -230,6 +231,22 @@ def test_regular_user_can_still_list_models(
     response = client.get("/api/v2/models/", headers=_auth(user1_token))
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"models": []}
+
+
+def test_regular_user_can_read_models_dir(
+    enable_multiuser: Any,
+    client: TestClient,
+    user1_token: str,
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    """The shared model store needs this path when rendering model details for ordinary users."""
+    monkeypatch.setattr(InvokeAIAppConfig, "models_path", property(lambda _self: tmp_path))
+
+    response = client.get("/api/v2/models/models_dir", headers=_auth(user1_token))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == tmp_path.resolve().as_posix()
 
 
 def _sd1_checkpoint(key: str, path: str) -> Main_Checkpoint_SD1_Config:
