@@ -1,3 +1,4 @@
+import re
 from abc import ABC
 from pathlib import Path
 from typing import (
@@ -88,6 +89,34 @@ def _get_flux_lora_format(mod: ModelOnDisk) -> FluxLoRAFormat | None:
     state_dict = mod.load_state_dict()
     value = flux_format_from_state_dict(state_dict, mod.metadata())
     return value
+
+
+# Matches an SDXL UNet attention key in either kohya (underscore) or diffusers (dot)
+# naming, capturing the transformer_blocks index. Anchored on the UNet `attentions`
+# grouping so it won't match DiT-style transformers (FLUX/Qwen/Z-Image) that also use
+# `transformer_blocks` but without UNet down/up/mid blocks and `attentions`.
+_SDXL_UNET_ATTENTION_RE = re.compile(
+    r"(down_blocks|up_blocks|mid_block)[._].*attentions[._]\d+[._]transformer_blocks[._](\d+)"
+)
+
+
+def _state_dict_looks_like_sdxl_unet_lora(state_dict: dict[str | int, Any]) -> bool:
+    """Detect an SDXL UNet LoRA from its block structure alone.
+
+    SDXL's UNet uses a deep transformer stack (up to 10 transformer blocks) in its
+    lower-resolution attention blocks, so `transformer_blocks` indices reach >= 2.
+    SD1.x/SD2.x UNets only ever have a single transformer block (index 0) per
+    attention. This lets us identify SDXL from UNet-only LoRAs that lack the
+    cross-attention / text-encoder keys `lora_token_vector_length()` relies on
+    (e.g. self-attention-only "slider" LoRAs).
+    """
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        match = _SDXL_UNET_ATTENTION_RE.search(key)
+        if match is not None and int(match.group(2)) >= 2:
+            return True
+    return False
 
 
 # FLUX.2 Klein context_in_dim values: 3 * Qwen3 hidden_size
@@ -682,6 +711,11 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
             return BaseModelType.StableDiffusionXL  # recognizes format at https://civitai.com/models/224641
         elif token_vector_length == 2048:
             return BaseModelType.StableDiffusionXL
+        # Some SDXL LoRAs (e.g. self-attention-only "slider" LoRAs) target only the UNet
+        # and lack the cross-attention / text-encoder keys that lora_token_vector_length()
+        # needs. Fall back to detecting SDXL from the UNet's deep transformer-block structure.
+        elif _state_dict_looks_like_sdxl_unet_lora(state_dict):
+            return BaseModelType.StableDiffusionXL
         else:
             raise NotAMatchError(f"unrecognized token vector length {token_vector_length}")
 
@@ -1033,6 +1067,12 @@ class LoRA_Diffusers_Config_Base(LoRA_Config_Base):
             case 2048:
                 return BaseModelType.StableDiffusionXL
             case _:
+                # Some SDXL LoRAs (e.g. self-attention-only "slider" LoRAs) target only the
+                # UNet and lack the cross-attention / text-encoder keys that
+                # lora_token_vector_length() needs. Fall back to detecting SDXL from the
+                # UNet's deep transformer-block structure.
+                if _state_dict_looks_like_sdxl_unet_lora(state_dict):
+                    return BaseModelType.StableDiffusionXL
                 raise NotAMatchError(f"unrecognized token vector length {token_vector_length}")
 
     @classmethod
