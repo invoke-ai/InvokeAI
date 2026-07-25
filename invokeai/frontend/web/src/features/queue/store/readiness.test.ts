@@ -277,9 +277,30 @@ describe('FLUX.2 Klein readiness checks – canvas tab', () => {
 // silently becomes a smaller generation. FLUX/FLUX.2/Qwen already validated this; these tests cover the
 // three bases whose checks previously omitted it.
 
-const sd3Model = { key: 'sd3', hash: 'h', name: 'SD3', base: 'sd-3', type: 'main', format: 'diffusers' } as unknown as MainModelConfig;
-const sdxlModel = { key: 'sdxl', hash: 'h', name: 'SDXL', base: 'sdxl', type: 'main', format: 'diffusers' } as unknown as MainModelConfig;
-const zImageModel = { key: 'zimg', hash: 'h', name: 'Z-Image', base: 'z-image', type: 'main', format: 'diffusers' } as unknown as MainModelConfig;
+const sd3Model = {
+  key: 'sd3',
+  hash: 'h',
+  name: 'SD3',
+  base: 'sd-3',
+  type: 'main',
+  format: 'diffusers',
+} as unknown as MainModelConfig;
+const sdxlModel = {
+  key: 'sdxl',
+  hash: 'h',
+  name: 'SDXL',
+  base: 'sdxl',
+  type: 'main',
+  format: 'diffusers',
+} as unknown as MainModelConfig;
+const zImageModel = {
+  key: 'zimg',
+  hash: 'h',
+  name: 'Z-Image',
+  base: 'z-image',
+  type: 'main',
+  format: 'diffusers',
+} as unknown as MainModelConfig;
 
 const buildPidCanvasArg = (model: MainModelConfig, bboxSide: number) => ({
   isConnected: true,
@@ -319,7 +340,9 @@ const buildPidCanvasArg = (model: MainModelConfig, bboxSide: number) => ({
 });
 
 const hasBboxGridReason = (reasons: { content: string }[]) =>
-  reasons.some((r) => r.content.includes('modelIncompatibleBboxWidth') || r.content.includes('modelIncompatibleBboxHeight'));
+  reasons.some(
+    (r) => r.content.includes('modelIncompatibleBboxWidth') || r.content.includes('modelIncompatibleBboxHeight')
+  );
 
 describe('PiD Native scaled-grid readiness – canvas tab', () => {
   it.each([
