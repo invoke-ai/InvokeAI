@@ -102,6 +102,7 @@ import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RenderScheduler } from '@workbench/canvas-engine/render/scheduler';
 import type { SamVisualInput } from '@workbench/canvas-engine/samInteraction';
+import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
@@ -143,7 +144,6 @@ import {
 } from '@workbench/canvas-engine/exportRasterComposite';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
-import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 import {
   compositeDocument,
@@ -167,14 +167,13 @@ import { createEraserTool } from '@workbench/canvas-engine/tools/eraserTool';
 import { createGradientTool } from '@workbench/canvas-engine/tools/gradientTool';
 import { createLassoTool } from '@workbench/canvas-engine/tools/lassoTool';
 import { createMarqueeTool } from '@workbench/canvas-engine/tools/marqueeTool';
-import { hittableLayerRect, layerMatrix, layerOutlineCorners } from '@workbench/canvas-engine/tools/moveHitTest';
+import { layerMatrix } from '@workbench/canvas-engine/tools/moveHitTest';
 import { createMoveTool } from '@workbench/canvas-engine/tools/moveTool';
 import { stepBrushSize } from '@workbench/canvas-engine/tools/paintConstants';
 import { createSamTool } from '@workbench/canvas-engine/tools/samTool';
 import { createShapeTool } from '@workbench/canvas-engine/tools/shapeTool';
 import { createTextTool } from '@workbench/canvas-engine/tools/textTool';
 import { createTransformTool } from '@workbench/canvas-engine/tools/transformTool';
-import { type LayerTransform, transformOverlayGeometry } from '@workbench/canvas-engine/transform/transformMath';
 import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
 
 import type { ImagePatchApply } from './history/imagePatch';
@@ -189,6 +188,7 @@ import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
 import { floatingSelectionFrame } from './render/floatingSelectionFrame';
+import { createOverlayFrame } from './render/overlayFrame';
 import { createSelectObjectBridge } from './selectObjectBridge';
 import { createStrokeCommit } from './strokeCommit';
 import { createViewTool } from './tools/viewTool';
@@ -1170,66 +1170,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   // ---- Render loop --------------------------------------------------------
 
-  /**
-   * The selected-layer bounds outline for the move overlay, or `null`. Only the
-   * move tool draws it; a layer mid-drag (with a live override) is preferred over
-   * the committed selection so the marquee tracks the preview.
-   */
-  const moveOutlineCorners = (doc: CanvasDocumentContractV2): readonly { x: number; y: number }[] | null => {
-    if (interactionController.getActiveToolId() !== 'move') {
-      return null;
-    }
-    const overridden = doc.layers.find((layer) => transformOverrides.has(layer.id));
-    const target = overridden ?? doc.layers.find((layer) => layer.id === doc.selectedLayerId);
-    if (!target) {
-      return null;
-    }
-    return layerOutlineCorners(target, doc, transformOverrides.get(target.id) ?? null);
-  };
-
-  /** The transform-tool frame (rotated bounds + handles + rotation nub), or `null`. */
-  const transformFrameOverlay = (
-    doc: CanvasDocumentContractV2
-  ): {
-    corners: { x: number; y: number }[];
-    handles: { x: number; y: number }[];
-    center: { x: number; y: number };
-    rotationAnchor: { x: number; y: number };
-  } | null => {
-    if (interactionController.getActiveToolId() !== 'transform') {
-      return null;
-    }
-    const float = floatingSelection.get();
-    if (float) {
-      // The float frames its own pixels. Its rect and transform are LAYER-LOCAL,
-      // so the resulting geometry is projected out through the layer's matrix to
-      // reach the document space the overlay draws in.
-      const floatLayer = doc.layers.find((candidate) => candidate.id === float.layerId);
-      if (!floatLayer) {
-        return null;
-      }
-      const toDocument = layerMatrix(floatLayer.transform);
-      const geometry = transformOverlayGeometry(float.transform, float.pixels.rect);
-      return {
-        center: applyToPoint(toDocument, geometry.center),
-        corners: geometry.corners.map((point) => applyToPoint(toDocument, point)),
-        handles: geometry.handles.map((point) => applyToPoint(toDocument, point)),
-        rotationAnchor: applyToPoint(toDocument, geometry.rotationAnchor),
-      };
-    }
-    const session = stores.transformSession.get();
-    if (!session) {
-      return null;
-    }
-    const layer = doc.layers.find((candidate) => candidate.id === session.layerId);
-    // The layer's LOCAL content rect (off-origin aware): the frame must wrap the
-    // pixels where the compositor draws them, not an assumed origin-anchored box.
-    const rect = layer ? hittableLayerRect(layer, doc) : null;
-    if (!rect) {
-      return null;
-    }
-    return transformOverlayGeometry(session.transform, rect);
-  };
+  const overlayFrame = createOverlayFrame({
+    getActiveToolId: () => interactionController.getActiveToolId(),
+    getAntsPhase: () => antsPhase,
+    getFloatingSelection: () => floatingSelection.get(),
+    getOverlayCursor: () => overlayCursor,
+    selection,
+    stores,
+    transformOverrides,
+  });
 
   const render = (flags: RenderFlags): void => {
     const screen = renderController.getScreen();
@@ -1371,39 +1320,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // The overlay is cheap (a handful of screen-space strokes, independent of
     // zoom and document size) and shares the `view` transform with the composite,
     // so redraw it whenever any frame runs — including overlay-only frames.
-    // While the bbox tool drags, the transient preview stands in for the
-    // committed frame so the overlay (rect + handles) tracks the gesture.
-    const bboxPreview = stores.bboxPreview.get();
-    const samSession = stores.samInteraction.get();
-    renderOverlay(overlay, {
-      bbox: bboxPreview ?? doc.bbox,
-      bboxHandles: interactionController.getActiveToolId() === 'bbox',
-      cursor: overlayCursor,
-      // The grid spans the whole viewport at the bbox snap size when the setting
-      // is on (the document rect no longer bounds it).
-      gridSize: stores.bboxGrid.get(),
-      layerOutline: moveOutlineCorners(doc),
-      // The in-progress lasso path (transient) and the committed selection's
-      // animated marching ants. Both are overlay chrome; ants advance via the
-      // ants animator's overlay-only ticks.
-      gradientPreview: stores.gradientPreview.get(),
-      lassoPreview: stores.lassoPreview.get(),
-      marchingAnts: selection.hasSelection()
-        ? { matrix: floatRender?.ants ?? null, paths: selection.antsPaths(), phase: antsPhase }
-        : null,
-      marqueePreview: stores.marqueePreview.get(),
-      samInput: samSession?.input.type === 'visual' ? samSession.input : null,
-      samPreview: samPreview ? { opacity: 0.45, rect: samPreview.rect, surface: samPreview.data } : null,
-      bboxOverlay: stores.bboxOverlay.get(),
-      ruleOfThirds: stores.ruleOfThirds.get(),
-      shapePreview: stores.shapePreview.get(),
-      // The passive bbox frame follows the setting, but always renders while the
-      // bbox tool is active so its handles have a frame to attach to (editable).
-      showBbox: stores.showBbox.get() || interactionController.getActiveToolId() === 'bbox',
-      showGrid: stores.showGrid.get(),
-      transformFrame: transformFrameOverlay(doc),
-      view,
-    });
+    renderOverlay(overlay, overlayFrame.describe(doc, view, floatRender, samPreview));
   };
 
   const renderController = new RenderController({
