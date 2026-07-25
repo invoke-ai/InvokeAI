@@ -9,7 +9,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { IconButton, Row, ToggleDot } from '@platform/ui';
 import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
 import { EyeIcon, EyeOffIcon, LockIcon, LockOpenIcon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
@@ -19,6 +19,7 @@ import {
   LayerContextMenu,
   type LayerContextMenuEngine,
 } from './LayerContextMenu';
+import { shouldStartLayerKeyboardDrag } from './layerDndConfig';
 import { createLayerMenuTargetFromContextEvent } from './layerMenuState';
 import { applyStructural } from './layerOps';
 import { LayerPropertiesPopover, type LayerPropertiesEngine } from './LayerPropertiesPopover';
@@ -75,6 +76,7 @@ export const LayerListItem = ({
     disabled: interaction.sortableDisabled,
     id: layer.id,
   });
+  const rowRef = useRef<HTMLElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(layer.name);
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasLayerContextMenuTarget | null>(null);
@@ -160,11 +162,17 @@ export const LayerListItem = ({
 
   const handleNameKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      // Keep rename keystrokes from reaching canvas-level shortcuts.
-      event.stopPropagation();
+      // Stop ONLY the two keys the rename owns. A blanket stop would also stop
+      // the native event reaching the window, killing every global hotkey while
+      // renaming; the hotkey runtime already refuses to fire non-`allowInEditable`
+      // bindings for a focused input, so nothing else needs suppressing here.
+      // Escape does need it: the engine's own window listener would otherwise
+      // take it as a canvas deselect.
       if (event.key === 'Enter') {
+        event.stopPropagation();
         commitName();
       } else if (event.key === 'Escape') {
+        event.stopPropagation();
         setIsEditing(false);
       }
     },
@@ -185,11 +193,43 @@ export const LayerListItem = ({
 
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
 
+  // The row's own DOM node, so the drag activator can tell a keystroke made
+  // inside it from one that bubbled in through the React tree from a portal.
+  const setRowRef = useCallback(
+    (node: HTMLElement | null) => {
+      rowRef.current = node;
+      setNodeRef(node);
+    },
+    [setNodeRef]
+  );
+
+  /**
+   * dnd-kit starts a drag on Enter and inspects only the key code, so the
+   * activator is gated here — see {@link shouldStartLayerKeyboardDrag}. Without
+   * it, `mod+Enter` (Invoke) with a row focused starts an invisible drag that
+   * leaves the row at drag opacity, reading as a disabled layer.
+   */
+  const sortableListeners = useMemo(() => {
+    if (interaction.sortableDisabled || !listeners) {
+      return {};
+    }
+    const { onKeyDown, ...rest } = listeners;
+    return {
+      ...rest,
+      onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+        if (!shouldStartLayerKeyboardDrag(event, rowRef.current)) {
+          return;
+        }
+        onKeyDown?.(event);
+      },
+    };
+  }, [interaction.sortableDisabled, listeners]);
+
   return (
-    <Box ref={setNodeRef} style={dndStyle}>
+    <Box ref={setRowRef} style={dndStyle}>
       <Row
         {...(interaction.sortableDisabled ? {} : attributes)}
-        {...(interaction.sortableDisabled ? {} : listeners)}
+        {...sortableListeners}
         active={isSelected ? 'muted' : undefined}
         cursor={isDragging ? 'grabbing' : 'default'}
         display="flex"

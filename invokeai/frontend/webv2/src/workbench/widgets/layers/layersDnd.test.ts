@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { LAYER_KEYBOARD_SENSOR_OPTIONS } from './layerDndConfig';
+import { LAYER_KEYBOARD_SENSOR_OPTIONS, shouldStartLayerKeyboardDrag } from './layerDndConfig';
 import { moveItem } from './layersDnd';
 
 describe('layer keyboard drag configuration', () => {
@@ -31,5 +31,40 @@ describe('moveItem', () => {
     const input = ['a', 'b', 'c'];
     moveItem(input, 0, 2);
     expect(input).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('shouldStartLayerKeyboardDrag', () => {
+  const keyEvent = (
+    overrides: Partial<{
+      target: EventTarget | null;
+      altKey: boolean;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      shiftKey: boolean;
+    }> = {}
+  ) => ({
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    target: null,
+    ...overrides,
+  });
+
+  it('allows a plain Enter with no DOM context (the node-test path)', () => {
+    expect(shouldStartLayerKeyboardDrag(keyEvent(), null)).toBe(true);
+  });
+
+  it.each([['ctrlKey'], ['metaKey'], ['shiftKey'], ['altKey']] as const)(
+    'refuses a %s-modified Enter — those belong to commands, not reordering',
+    (modifier) => {
+      expect(shouldStartLayerKeyboardDrag(keyEvent({ [modifier]: true }), null)).toBe(false);
+    }
+  );
+
+  it('refuses mod+Enter specifically, the Invoke binding that left rows stuck at drag opacity', () => {
+    expect(shouldStartLayerKeyboardDrag(keyEvent({ ctrlKey: true }), null)).toBe(false);
+    expect(shouldStartLayerKeyboardDrag(keyEvent({ metaKey: true }), null)).toBe(false);
   });
 });

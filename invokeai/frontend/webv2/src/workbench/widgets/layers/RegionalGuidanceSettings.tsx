@@ -9,7 +9,7 @@ import type {
   RegionalGuidanceReferenceImageAsset,
 } from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
-import type { ChangeEvent, CSSProperties, FocusEvent, KeyboardEvent } from 'react';
+import type { ChangeEvent, CSSProperties, FocusEvent } from 'react';
 
 import { Box, createListCollection, HStack, IconButton, Input, Stack, Switch, Text } from '@chakra-ui/react';
 import { useDndMonitor, useDroppable } from '@dnd-kit/core';
@@ -159,8 +159,6 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     (event: ChangeEvent<HTMLTextAreaElement>) => setNegativePrompt(event.currentTarget.value),
     []
   );
-
-  const stopKeyboardPropagation = useCallback((event: KeyboardEvent) => event.stopPropagation(), []);
 
   const handleAutoNegative = useCallback(
     (details: { checked: boolean }) => {
@@ -338,7 +336,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const styleValue = useMemo(() => [fill.style], [fill.style]);
 
   return (
-    <Stack gap="2" onKeyDown={stopKeyboardPropagation}>
+    <Stack gap="2">
       {isFlux2 && (
         <Text color="fg.warning" fontSize="xs" role="alert">
           {t('widgets.layers.regionalGuidance.flux2PositiveOnly')}
