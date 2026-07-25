@@ -27,7 +27,7 @@
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d } from '@workbench/canvas-engine/types';
 
-import { getScale } from '@workbench/canvas-engine/math/mat2d';
+import { getScale, multiply } from '@workbench/canvas-engine/math/mat2d';
 
 /** Dash length in screen pixels; the offset advances by {@link ANTS_STEP_PX} per tick. */
 export const ANTS_DASH_PX = 4;
@@ -45,6 +45,13 @@ export interface MarchingAntsRender {
   paths: readonly Path2D[];
   /** Animated dash offset in screen pixels. */
   phase: number;
+  /**
+   * An extra DOCUMENT-space transform to draw the outlines through, or absent
+   * for none. A live floating selection sets it so the ants track the pixels in
+   * flight without rebuilding the paths every frame; on commit the selection is
+   * re-placed for real and this goes back to absent.
+   */
+  matrix?: Mat2d | null;
 }
 
 /**
@@ -55,13 +62,16 @@ export const drawMarchingAnts = (ctx: RasterSurface['ctx'], view: Mat2d, render:
   if (render.paths.length === 0) {
     return;
   }
+  const transform = render.matrix ? multiply(view, render.matrix) : view;
+  // Line width and dash stay screen-constant, so they follow the VIEW scale
+  // only — a float scaled up must not thicken its own outline.
   const scale = getScale(view) || 1;
   const dash = ANTS_DASH_PX / scale;
   const lineWidth = ANTS_LINE_WIDTH_PX / scale;
   const offset = render.phase / scale;
 
   ctx.save();
-  ctx.setTransform(view.a, view.b, view.c, view.d, view.e, view.f);
+  ctx.setTransform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f);
   ctx.lineWidth = lineWidth;
 
   // Dark base run: a continuous dashed outline.

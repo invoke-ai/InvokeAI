@@ -90,7 +90,7 @@ import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RenderScheduler } from '@workbench/canvas-engine/render/scheduler';
 import type { SamVisualInput } from '@workbench/canvas-engine/samInteraction';
-import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { Mat2d, Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
@@ -141,6 +141,7 @@ import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import {
+  type CompositeOptions,
   compositeDocument,
   createCheckerboardTile,
   shouldSmoothAtZoom,
@@ -154,6 +155,7 @@ import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbe
 import { textFontString } from '@workbench/canvas-engine/render/rasterizers/textRasterizer';
 import { enforceSurfaceBudget } from '@workbench/canvas-engine/render/surfaceBudget';
 import { getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
+import { documentDeltaToLocal, floatDocumentMatrix } from '@workbench/canvas-engine/selection/floatingSelection';
 import { ANTS_STEP_PX, createAntsAnimator, type AntsAnimator } from '@workbench/canvas-engine/selection/marchingAnts';
 import { createBboxTool } from '@workbench/canvas-engine/tools/bboxTool';
 import { createBrushTool } from '@workbench/canvas-engine/tools/brushTool';
@@ -162,14 +164,18 @@ import { createEraserTool } from '@workbench/canvas-engine/tools/eraserTool';
 import { createGradientTool } from '@workbench/canvas-engine/tools/gradientTool';
 import { createLassoTool } from '@workbench/canvas-engine/tools/lassoTool';
 import { createMarqueeTool } from '@workbench/canvas-engine/tools/marqueeTool';
-import { hittableLayerRect, layerOutlineCorners } from '@workbench/canvas-engine/tools/moveHitTest';
+import { hittableLayerRect, layerMatrix, layerOutlineCorners } from '@workbench/canvas-engine/tools/moveHitTest';
 import { createMoveTool } from '@workbench/canvas-engine/tools/moveTool';
 import { stepBrushSize } from '@workbench/canvas-engine/tools/paintConstants';
 import { createSamTool } from '@workbench/canvas-engine/tools/samTool';
 import { createShapeTool } from '@workbench/canvas-engine/tools/shapeTool';
 import { createTextTool } from '@workbench/canvas-engine/tools/textTool';
 import { createTransformTool } from '@workbench/canvas-engine/tools/transformTool';
-import { type LayerTransform, transformOverlayGeometry } from '@workbench/canvas-engine/transform/transformMath';
+import {
+  bakeMatrix,
+  type LayerTransform,
+  transformOverlayGeometry,
+} from '@workbench/canvas-engine/transform/transformMath';
 import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
 
 import type { HistoryEntry } from './history/history';
@@ -884,6 +890,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const editingController = new EditingController({
+    floatingSelection: {
+      applyImagePatch,
+      backend,
+      canEdit: () => canEditDocument(),
+      endBurst: () => endNudgeBurst(),
+      getDocument: () => mirror.getDocument(),
+      history,
+      invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
+      layers: layerCache,
+      markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
+      notifyPainted: notifyLayerPainted,
+    },
     getDocument: () => mirror.getDocument(),
     selection: {
       backend,
@@ -958,6 +976,35 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
   });
   const selection = editingController.selection;
+  const floatingSelection = editingController.floatingSelection;
+
+  /**
+   * The float's render inputs for the current frame: the compositor's
+   * layer-local placement, and the document-space matrix the ants ride through
+   * so the outline tracks the pixels in flight.
+   */
+  const floatingSelectionRender = (
+    doc: CanvasDocumentContractV2 | null
+  ): { composite: NonNullable<CompositeOptions['floatingSelection']>; ants: Mat2d } | null => {
+    const float = floatingSelection.get();
+    const layer = float && doc ? doc.layers.find((candidate) => candidate.id === float.layerId) : undefined;
+    if (!float || !layer) {
+      return null;
+    }
+    const matrix = bakeMatrix(float.transform);
+    const ants = floatDocumentMatrix(layerMatrix(layer.transform), matrix);
+    return ants
+      ? {
+          ants,
+          composite: {
+            layerId: float.layerId,
+            matrix,
+            rect: float.pixels.rect,
+            surface: float.pixels.surface,
+          },
+        }
+      : null;
+  };
 
   const antsAnimator: AntsAnimator = createAntsAnimator({
     cancelFrame: (handle) => globalThis.cancelAnimationFrame(handle),
@@ -987,8 +1034,23 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     beginTransformSession: (layerId) => beginTransformSession(layerId),
     cancelTextEdit: () => cancelTextEdit(),
     cancelTransform: () => cancelTransform(),
-    commitSelection: (commit) => selection.commit(commit),
+    cancelFloatingSelection: () => floatingSelection.cancel(),
+    commitFloatingSelection: () => floatingSelection.commit(),
+    commitSelection: (commit) => {
+      // A new selection supersedes the float's own; land the pixels first so the
+      // committed op applies to the document the user can see.
+      floatingSelection.commit();
+      selection.commit(commit);
+    },
     commitStructural: (label, forward, inverse) => commitStructural(label, forward, inverse),
+    documentDeltaToLayerLocal: (layerId, delta) => {
+      const layer = mirror.getDocument()?.layers.find((candidate) => candidate.id === layerId);
+      return layer ? documentDeltaToLocal(layerMatrix(layer.transform), delta) : delta;
+    },
+    getFloatingSelection: () => floatingSelection.get(),
+    isPointInSelection: (point) => selection.containsPoint(point),
+    liftFloatingSelection: (layerId) => floatingSelection.lift(layerId),
+    setFloatingTransform: (transform) => floatingSelection.setTransform(transform),
     createLayerId,
     createPath2D: createPath2DImpl,
     dispatch: (action) => dispatchCanvasMutation(action),
@@ -1686,6 +1748,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const stagedPreview = renderController.previews.getStaged();
     const samPreview = renderController.previews.getSam();
     const filterPreviews = renderController.previews.filterSnapshot();
+    // Resolved once: the composite draws the float's pixels, the overlay rides
+    // the ants through the matching document-space transform.
+    const floatRender = floatingSelectionRender(doc);
     if (needsComposite) {
       const stagedPlacement = stagedPreview?.placement;
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
@@ -1736,6 +1801,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
             ? new Map(Array.from(filterPreviews, ([id, preview]) => [id, preview]))
             : null,
         clipRect: isolatedGuard && samPreview ? samPreview.rect : null,
+        // Pixels in flight, drawn directly above the layer they were cut from.
+        floatingSelection: isolatedGuard ? null : (floatRender?.composite ?? null),
         // Feed the cached checkerboard tile only while the toggle is ON; passing
         // `null` renders transparent documents without a checkerboard.
         checkerboardTile: stores.checkerboard.get() ? getCheckerboardTile() : null,
@@ -1813,7 +1880,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // ants animator's overlay-only ticks.
       gradientPreview: stores.gradientPreview.get(),
       lassoPreview: stores.lassoPreview.get(),
-      marchingAnts: selection.hasSelection() ? { paths: selection.antsPaths(), phase: antsPhase } : null,
+      marchingAnts: selection.hasSelection()
+        ? { matrix: floatRender?.ants ?? null, paths: selection.antsPaths(), phase: antsPhase }
+        : null,
       marqueePreview: stores.marqueePreview.get(),
       samInput: samSession?.input.type === 'visual' ? samSession.input : null,
       samPreview: samPreview ? { opacity: 0.45, rect: samPreview.rect, surface: samPreview.data } : null,
@@ -1894,6 +1963,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       cleanup.run(clearAllFilterPreviews);
       // The selection is document-scoped interaction state: a swap drops it (and
       // any in-progress lasso preview), stopping the ants loop via onChange.
+      // A float belongs to the outgoing document's layer. Cancel (not commit):
+      // the layer it would bake into is about to be replaced.
+      cleanup.run(() => floatingSelection.cancel());
       cleanup.run(() => selection.clear());
       cleanup.run(() => stores.lassoPreview.set(null));
       cleanup.run(() => stores.marqueePreview.set(null));
@@ -1940,6 +2012,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     onLayersChanged: (ids, sourceChangedIds) => {
       const cleanup = createCleanupAccumulator();
+      const floatLayerId = floatingSelection.get()?.layerId;
+      if (floatLayerId && ids.includes(floatLayerId)) {
+        // The float's layer was replaced or removed. Drop the float rather than
+        // baking pixels into a layer whose content just changed underneath them;
+        // `cancel` is a no-op restore when the layer is already gone.
+        cleanup.run(() => floatingSelection.cancel());
+      }
       if (controlPixelController?.isOpenFor(ids)) {
         cleanup.run(() => pipeline.cancelActiveGesture());
         cleanup.run(cancelOpenControlPixelEdit);
@@ -2061,6 +2140,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
      */
     onSelectionChanged: (selectedLayerId) => {
       const cleanup = createCleanupAccumulator();
+      // A float belongs to exactly one layer; selecting another banks it rather
+      // than leaving pixels in flight over a layer the user is no longer on.
+      cleanup.run(() => floatingSelection.commit());
       const session = stores.transformSession.get();
       if (session && session.layerId !== selectedLayerId) {
         // The open session belongs to the layer that was just deselected; drop
@@ -2172,6 +2254,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const interactionController = new InteractionController({
     beforeSwitch: (from, to, switchOptions) => {
+      // A REAL tool switch banks a float — the pixels are already cut, and
+      // carrying them into an unrelated tool would strand them. A temporary
+      // modifier-hold switch (space → view to pan) must not: the user has not
+      // finished the move.
+      if (!switchOptions?.temporary) {
+        floatingSelection.commit();
+      }
       for (const listener of toolChangeListeners) {
         listener({ from, temporary: switchOptions?.temporary === true, to });
       }
@@ -2205,6 +2294,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     if (stores.transformSession.get()) {
       cancelTransform();
+      return;
+    }
+    if (floatingSelection.has()) {
+      // Escape ABANDONS a float: the lifted pixels go back where they came from
+      // and the selection stays, so the move can simply be redrawn. Committing
+      // instead is what Enter / deselect / a tool switch do.
+      floatingSelection.cancel();
       return;
     }
     if (applicationEscapeHandler?.(gestureWasActive)) {
@@ -2696,12 +2792,30 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * an empty canvas; any renderable layer beyond it is unioned in. The closest
    * coherent analogue of legacy's bounded canvas for the complement in `invert`.
    */
-  const selectAll = (): void => editingController.selectAll();
-  const deselect = (): void => editingController.deselect();
-  const invertSelection = (): void => editingController.invertSelection();
+  // Every selection-level operation banks a live float first: the pixels are
+  // already cut, and the op that follows must see the document the user does.
+  // (Escape is the one path that abandons instead — see `handleEscapePriority`.)
+  const selectAll = (): void => {
+    floatingSelection.commit();
+    editingController.selectAll();
+  };
+  const deselect = (): void => {
+    floatingSelection.commit();
+    editingController.deselect();
+  };
+  const invertSelection = (): void => {
+    floatingSelection.commit();
+    editingController.invertSelection();
+  };
 
-  const fillSelection = (): void => editingController.selectionPixels.run('fill');
-  const eraseSelection = (): void => editingController.selectionPixels.run('erase');
+  const fillSelection = (): void => {
+    floatingSelection.commit();
+    editingController.selectionPixels.run('fill');
+  };
+  const eraseSelection = (): void => {
+    floatingSelection.commit();
+    editingController.selectionPixels.run('erase');
+  };
 
   const clearMask = (layerId: string): boolean => layerController.mask.clear(layerId);
   const dispose = (): void => {
@@ -2822,8 +2936,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     !stores.textEditSession.get() &&
     mirror.getDocument() !== null;
 
-  const undo = (): void => historyController.undo();
-  const redo = (): void => historyController.redo();
+  // A live float holds pixels that no history entry knows about, so replaying an
+  // entry over them would write into a layer with a hole in it. Put them back
+  // first; the float is not itself undoable until it commits.
+  const undo = (): void => {
+    floatingSelection.cancel();
+    historyController.undo();
+  };
+  const redo = (): void => {
+    floatingSelection.cancel();
+    historyController.redo();
+  };
   const setBboxGrid = (size: number): void => stores.bboxGrid.set(size > 0 ? size : 1);
   const getViewport = (): Viewport => viewport;
   const getCompositeExecutorDeps = (): CanvasCompositeExecutorDeps => ({

@@ -21,6 +21,7 @@ import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRende
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { InvalidatePayload } from '@workbench/canvas-engine/render/scheduler';
 import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engine/samInteraction';
+import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -176,6 +177,27 @@ export interface ToolContext {
   getSelectionMask?(): PlacedSurface | null;
   /** Updates visual SAM input for the active engine-owned Select Object session. */
   updateSamInput?(input: SamVisualInput): void;
+  /**
+   * Cuts the current selection's pixels out of `layerId` into a floating
+   * selection, returning whether anything was lifted. Absent in minimal test
+   * harnesses.
+   */
+  liftFloatingSelection?(layerId: string): boolean;
+  /** The live floating selection, or `null`. */
+  getFloatingSelection?(): FloatingSelection | null;
+  /** Sets the float's live transform (LAYER-LOCAL space). */
+  setFloatingTransform?(transform: LayerTransform): void;
+  /** Bakes the float back into its layer as one undoable entry. */
+  commitFloatingSelection?(): void;
+  /** Puts the float's pixels back untouched, pushing no history. */
+  cancelFloatingSelection?(): void;
+  /**
+   * Converts a DOCUMENT-space delta into `layerId`'s LOCAL space, so a pointer
+   * drag moves a float correctly under a rotated/scaled layer.
+   */
+  documentDeltaToLayerLocal?(layerId: string, delta: Vec2): Vec2;
+  /** True if `point` (document space) falls inside the live selection. */
+  isPointInSelection?(point: Vec2): boolean;
 }
 
 /**

@@ -1,5 +1,7 @@
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
+import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
@@ -79,32 +81,75 @@ interface Harness {
   dispatched: CanvasProjectMutation[];
   commits: StructuralCommit[];
   overrides: { layerId: string; override: { x: number; y: number } | null }[];
+  /** The fake floating selection this harness hands the tool, if any. */
+  float: { current: FloatingSelection | null };
+  lifts: string[];
+  commitFloat: ReturnType<typeof vi.fn>;
+  transforms: LayerTransform[];
 }
 
-const createHarness = (doc: CanvasDocumentContractV2): Harness => {
+interface HarnessOptions {
+  /** Whether a live selection contains every point (the ants are "under" the cursor). */
+  selectionContainsPoint?: boolean;
+  /** Whether a lift succeeds when the tool asks for one. */
+  canLift?: boolean;
+  /** A float that is already in flight before the gesture starts. */
+  existingFloat?: boolean;
+}
+
+const IDENTITY: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
+
+/** A minimal stand-in for a lifted float — only the fields the move tool reads. */
+const fakeFloat = (layerId: string): FloatingSelection =>
+  ({ layerId, transform: { ...IDENTITY } }) as FloatingSelection;
+
+const createHarness = (doc: CanvasDocumentContractV2, options: HarnessOptions = {}): Harness => {
   const dispatched: CanvasProjectMutation[] = [];
   const commits: StructuralCommit[] = [];
   const overrides: { layerId: string; override: { x: number; y: number } | null }[] = [];
+  const transforms: LayerTransform[] = [];
+  const lifts: string[] = [];
+  const float: { current: FloatingSelection | null } = {
+    current: options.existingFloat ? fakeFloat(doc.selectedLayerId ?? 'a') : null,
+  };
+  const commitFloat = vi.fn();
   const ctx: ToolContext = {
     backend: null as never,
+    commitFloatingSelection: commitFloat,
     commitStructural: (label, forward, inverse) => commits.push({ forward, inverse, label }),
     createLayerId: () => 'x',
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
     emitStrokeCommitted: vi.fn(),
     getDocument: () => doc,
+    getFloatingSelection: () => float.current,
     invalidate: vi.fn(),
-    // A real (empty) layer cache so the move tool's live-cache-rect hit-test seam
-    // resolves; no test here relies on cached content, so entries stay absent.
+    isPointInSelection: () => options.selectionContainsPoint === true,
+    // A real (empty) layer cache so the tool's cache seam resolves; no test here
+    // relies on cached content, so entries stay absent.
     layers: createLayerCacheStore(createTestStubRasterBackend()),
+    liftFloatingSelection: (layerId) => {
+      if (options.canLift === false) {
+        return false;
+      }
+      lifts.push(layerId);
+      float.current = fakeFloat(layerId);
+      return true;
+    },
     notifyLayerPainted: vi.fn(),
+    setFloatingTransform: (transform) => {
+      transforms.push(transform);
+      if (float.current) {
+        float.current.transform = transform;
+      }
+    },
     setLayerTransformOverride: (layerId, override) => overrides.push({ layerId, override }),
     setOverlayCursor: vi.fn(),
     stores: createEngineStores(),
     updateCursor: vi.fn(),
     viewport: null as never,
   };
-  return { commits, ctx, dispatched, overrides };
+  return { commitFloat, commits, ctx, dispatched, float, lifts, overrides, transforms };
 };
 
 const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDown?.(ctx, i);
@@ -328,5 +373,134 @@ describe('move tool: cancel', () => {
     // A subsequent up (from the released pointer) does nothing.
     up(tool, h.ctx, pointer(40, 40));
     expect(h.commits).toHaveLength(0);
+  });
+});
+
+describe('move tool: dragging a floating selection', () => {
+  const doc = () => makeDoc([imageLayer('a', { x: 0, y: 0, width: 50, height: 50 })], 'a');
+
+  it('lifts the selected pixels when the press lands inside the ants', () => {
+    const h = createHarness(doc(), { selectionContainsPoint: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 25));
+    up(tool, h.ctx, pointer(30, 25));
+
+    expect(h.lifts).toEqual(['a']);
+    // The float moved, and the LAYER did not.
+    expect(h.transforms.at(-1)).toMatchObject({ x: 20, y: 15 });
+    expect(h.commits).toHaveLength(0);
+    expect(h.overrides).toHaveLength(0);
+  });
+
+  it('moves the layer when the press lands outside the ants', () => {
+    const h = createHarness(doc(), { selectionContainsPoint: false });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 25));
+    up(tool, h.ctx, pointer(30, 25));
+
+    expect(h.lifts).toHaveLength(0);
+    expect(h.commits).toHaveLength(1);
+    expect(h.commits[0]!.forward).toMatchObject({ id: 'a' });
+  });
+
+  it('moves the layer when there is no selection at all', () => {
+    const h = createHarness(doc());
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 25));
+    up(tool, h.ctx, pointer(30, 25));
+
+    expect(h.lifts).toHaveLength(0);
+    expect(h.commits).toHaveLength(1);
+  });
+
+  it('drags an existing float even when the press is outside the ants', () => {
+    // Once pixels are in flight they stay grabbable — the ants have moved with
+    // them, and re-targeting the layer mid-move would be a trap.
+    const h = createHarness(doc(), { existingFloat: true, selectionContainsPoint: false });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(40, 10));
+    up(tool, h.ctx, pointer(40, 10));
+
+    expect(h.lifts).toHaveLength(0);
+    expect(h.transforms.at(-1)).toMatchObject({ x: 30, y: 0 });
+    expect(h.commits).toHaveLength(0);
+  });
+
+  it('accumulates across drags, each starting from the float current position', () => {
+    const h = createHarness(doc(), { selectionContainsPoint: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 10));
+    up(tool, h.ctx, pointer(30, 10));
+    expect(h.transforms.at(-1)).toMatchObject({ x: 20, y: 0 });
+
+    down(tool, h.ctx, pointer(30, 10));
+    move(tool, h.ctx, pointer(45, 10));
+    up(tool, h.ctx, pointer(45, 10));
+    expect(h.transforms.at(-1)).toMatchObject({ x: 35, y: 0 });
+  });
+
+  it('falls back to moving the layer when the lift finds nothing to take', () => {
+    const h = createHarness(doc(), { canLift: false, selectionContainsPoint: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 25));
+    up(tool, h.ctx, pointer(30, 25));
+
+    expect(h.commits).toHaveLength(1);
+  });
+
+  it('constrains a float drag to the dominant axis under shift', () => {
+    const h = createHarness(doc(), { selectionContainsPoint: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(40, 15, { shift: true }));
+    up(tool, h.ctx, pointer(40, 15, { shift: true }));
+
+    expect(h.transforms.at(-1)).toMatchObject({ x: 30, y: 0 });
+  });
+
+  it('reverts only the current drag on pointercancel, keeping the float', () => {
+    const h = createHarness(doc(), { existingFloat: true });
+    const tool = createMoveTool();
+    h.float.current!.transform = { rotation: 0, scaleX: 1, scaleY: 1, x: 12, y: 4 };
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(40, 10));
+    cancel(tool, h.ctx);
+
+    expect(h.transforms.at(-1)).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 12, y: 4 });
+    expect(h.float.current).not.toBeNull();
+  });
+
+  it('banks the float on Enter', () => {
+    const h = createHarness(doc(), { existingFloat: true });
+    const tool = createMoveTool();
+
+    tool.onKeyCommand?.(h.ctx, 'apply');
+
+    expect(h.commitFloat).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores Enter mid-drag, so a held pointer is never torn out from under', () => {
+    const h = createHarness(doc(), { existingFloat: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(40, 10));
+    tool.onKeyCommand?.(h.ctx, 'apply');
+
+    expect(h.commitFloat).not.toHaveBeenCalled();
   });
 });
