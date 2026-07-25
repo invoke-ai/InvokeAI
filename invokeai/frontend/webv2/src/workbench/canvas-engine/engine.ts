@@ -145,18 +145,12 @@ import {
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
-import {
-  compositeDocument,
-  createCheckerboardTile,
-  shouldSmoothAtZoom,
-} from '@workbench/canvas-engine/render/compositor';
+import { createCheckerboardTile } from '@workbench/canvas-engine/render/compositor';
 import { createFontLoader, domFontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
-import { calculateActiveFrameLayerIds } from '@workbench/canvas-engine/render/frameDemand';
 import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill';
 import { renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
 import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
 import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
-import { enforceSurfaceBudget } from '@workbench/canvas-engine/render/surfaceBudget';
 import { getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
 import { documentDeltaToLocal, liftSelectedPixels } from '@workbench/canvas-engine/selection/floatingSelection';
 import { ANTS_STEP_PX, createAntsAnimator, type AntsAnimator } from '@workbench/canvas-engine/selection/marchingAnts';
@@ -187,6 +181,7 @@ import { createLayerExportGuards, isDeeplyEqual, isSupportedExportSource } from 
 import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
+import { createCompositeFrame } from './render/compositeFrame';
 import { floatingSelectionFrame } from './render/floatingSelectionFrame';
 import { createOverlayFrame } from './render/overlayFrame';
 import { createSelectObjectBridge } from './selectObjectBridge';
@@ -1036,32 +1031,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const captureDocumentEditPermit = (owner?: symbol): DocumentEditPermit | null => mutationContext.capturePermit(owner);
   const isDocumentEditPermitCurrent = (permit: DocumentEditPermit): boolean => mutationContext.isPermitCurrent(permit);
 
-  const ensureLayerCaches = (doc: CanvasDocumentContractV2, activeFrameLayerIds: ReadonlySet<string>): void => {
-    for (const layer of doc.layers) {
-      // The layer's rasterizable source: a raster/control `source`, or a mask
-      // layer's alpha bitmap viewed as a paint source (colorized at composite).
-      const source = renderableSourceOf(layer);
-      if (!layer.isEnabled || !source || !activeFrameLayerIds.has(layer.id)) {
-        continue;
-      }
-      if (!isRenderableLayer(layer)) {
-        continue;
-      }
-
-      // Ensure a cache entry exists WITHOUT resizing an existing one: a paint
-      // layer's live cache may have grown past its persisted content rect (fresh
-      // unflushed strokes), so we must never resize it down to the contract size
-      // here — that would destroy those pixels. The rasterizer (below, guarded by
-      // `stale`) owns sizing the surface + placing its content rect.
-      const entry = layerCache.getOrCreateRect(layer.id, getSourceContentRect(layer, doc));
-      if (!entry.stale) {
-        continue;
-      }
-
-      void getOrStartLayerRasterization(layer, doc);
-    }
-  };
-
   const rasterExportController = new RasterExportController({
     backend,
     captureGuard: captureLayerExportGuard,
@@ -1170,16 +1139,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   // ---- Render loop --------------------------------------------------------
 
-  const overlayFrame = createOverlayFrame({
-    getActiveToolId: () => interactionController.getActiveToolId(),
-    getAntsPhase: () => antsPhase,
-    getFloatingSelection: () => floatingSelection.get(),
-    getOverlayCursor: () => overlayCursor,
-    selection,
-    stores,
-    transformOverrides,
-  });
-
   const render = (flags: RenderFlags): void => {
     const screen = renderController.getScreen();
     const overlay = renderController.getOverlay();
@@ -1203,118 +1162,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // win — a full composite up-scales every doc-sized layer surface to fill the
     // screen, and that fill-rate grows with zoom, so recompositing on every hover
     // move at high zoom is exactly the reported "laggier the closer you zoom in".
-    const needsComposite = flags.all || flags.view || flags.layers.size > 0;
-    const stagedPreview = renderController.previews.getStaged();
     const samPreview = renderController.previews.getSam();
-    const filterPreviews = renderController.previews.filterSnapshot();
     // Resolved once: the composite draws the float's pixels, the overlay rides
     // the ants through the matching document-space transform.
     const floatRender = floatingSelectionFrame(floatingSelection.get(), doc);
-    if (needsComposite) {
-      const stagedPlacement = stagedPreview?.placement;
-      const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
-      const isolatedIds = isolatedGuard ? new Set([isolatedGuard.layerId]) : null;
-      const viewportSize = viewport.getViewportSize();
-      const dpr = viewport.getDpr();
-      const cssWidth = viewportSize.width > 0 ? viewportSize.width : screen.width / dpr;
-      const cssHeight = viewportSize.height > 0 ? viewportSize.height : screen.height / dpr;
-      const viewportTopLeft = viewport.screenToDocument({ x: 0, y: 0 });
-      const viewportBottomRight = viewport.screenToDocument({ x: cssWidth, y: cssHeight });
-      const liveCacheRects = new Map<string, Rect>();
-      for (const layer of doc.layers) {
-        const rect = layerCache.peek(layer.id)?.rect;
-        if (rect) {
-          liveCacheRects.set(layer.id, rect);
-        }
-      }
-      const activeFrameLayerIds = calculateActiveFrameLayerIds({
-        document: doc,
-        isolationLayerIds: isolatedIds ?? undefined,
-        liveCacheRects,
-        transformOverrides: !isolatedGuard ? transformOverrides : undefined,
-        viewport: {
-          height: Math.abs(viewportBottomRight.y - viewportTopLeft.y),
-          width: Math.abs(viewportBottomRight.x - viewportTopLeft.x),
-          x: Math.min(viewportTopLeft.x, viewportBottomRight.x),
-          y: Math.min(viewportTopLeft.y, viewportBottomRight.y),
-        },
-      });
-      ensureLayerCaches(doc, activeFrameLayerIds);
-      const compositeDoc = isolatedIds
-        ? { ...doc, layers: doc.layers.filter((layer) => isolatedIds.has(layer.id)) }
-        : doc;
-      compositeDocument(screen, compositeDoc, layerCache, view, {
-        // Memoized adjusted surfaces for raster layers with brightness/contrast/
-        // saturation/curves (not recomputed per frame — see adjustedSurfaceCache).
-        adjustedSurface: getAdjustedSurface,
-        derivedSurfaces: derivedSurfaceCache,
-        diagnostics,
-        // The raster backend + mask fill tile resolver drive the mask colorize
-        // path (alpha stencil → source-in fill colour/pattern, above all layers).
-        backend,
-        maskPatternTile: getMaskPatternTile,
-        // Non-destructive control-filter previews (drawn in place of the layer's
-        // committed pixels). Only allocated when a preview is actually active.
-        layerPreviews:
-          !isolatedGuard && filterPreviews.size > 0
-            ? new Map(Array.from(filterPreviews, ([id, preview]) => [id, preview]))
-            : null,
-        clipRect: isolatedGuard && samPreview ? samPreview.rect : null,
-        // Pixels in flight, drawn directly above the layer they were cut from.
-        floatingSelection: isolatedGuard ? null : (floatRender?.composite ?? null),
-        // Feed the cached checkerboard tile only while the toggle is ON; passing
-        // `null` renders transparent documents without a checkerboard.
-        checkerboardTile: stores.checkerboard.get() ? getCheckerboardTile() : null,
-        // Crisp + cheap when zoomed in (nearest-neighbor up-scale), smooth when
-        // shrinking (bilinear down-scale). See `shouldSmoothAtZoom`.
-        imageSmoothing: shouldSmoothAtZoom(viewport.getZoom()),
-        // Candidate-specific placement wins for final images. Progress frames
-        // and legacy image inputs continue to follow the CURRENT bbox origin.
-        stagedPreview:
-          !isolatedGuard && stagedPreview
-            ? {
-                opacity: stagedPlacement?.opacity ?? 1,
-                rect: stagedPlacement
-                  ? {
-                      height: stagedPlacement.height,
-                      width: stagedPlacement.width,
-                      x: stagedPlacement.x,
-                      y: stagedPlacement.y,
-                    }
-                  : { height: stagedPreview.height, width: stagedPreview.width, x: doc.bbox.x, y: doc.bbox.y },
-                surface: stagedPreview.surface,
-              }
-            : null,
-        // While a text-edit session is open on a layer, skip it in the composite —
-        // the contenteditable portal shows its live text instead (avoids double-draw).
-        skipLayerId: stores.textEditSession.get()?.layerId ?? null,
-        transformOverrides: !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null,
-      });
-
-      syncMemoryBaselines();
-      const protectedIds = new Set([...activeFrameLayerIds, ...rasterController.memory.pinnedLayerIds()]);
-      const memory = rasterController.memory.snapshot();
-      const surfaceBudgetBytes = Math.max(
-        0,
-        rasterController.memory.budgetBytes - memory.decodedBytes - memory.detachedBytes - memory.reservedBytes
-      );
-      const { evictedBaseLayerIds: evicted } = enforceSurfaceBudget(
-        layerCache,
-        derivedSurfaceCache,
-        protectedIds,
-        surfaceBudgetBytes,
-        diagnostics
-      );
-      syncMemoryBaselines();
-      // Prune version-keyed dependents for every evicted id (mirrors dropLayer):
-      // the evicted layer's surface is gone, so its adjusted-surface memo and
-      // thumbnail state must not linger keyed to a version the re-rasterized entry
-      // will exceed (the cache floor keeps versions monotonic across the recreate).
-      for (const id of evicted) {
-        deleteDerivedSurfaces(id);
-        stores.thumbnailVersion.delete(id);
-        stores.thumbnailStatus.delete(id);
-      }
+    if (flags.all || flags.view || flags.layers.size > 0) {
+      compositeFrame.draw(screen, doc, view, floatRender, samPreview);
     }
 
     // The overlay is cheap (a handful of screen-space strokes, independent of
@@ -1337,6 +1190,34 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     updateCursor: () => updateCursor(),
   });
   const scheduler: RenderScheduler = renderController.scheduler;
+
+  const compositeFrame = createCompositeFrame({
+    backend,
+    deleteDerivedSurfaces,
+    derivedSurfaceCache,
+    diagnostics,
+    getAdjustedSurface,
+    getCheckerboardTile,
+    getMaskPatternTile,
+    layerCache,
+    memory: rasterController.memory,
+    previews: renderController.previews,
+    rasterizeLayer: (layer, doc) => void getOrStartLayerRasterization(layer, doc),
+    stores,
+    syncMemoryBaselines,
+    transformOverrides,
+    viewport,
+  });
+
+  const overlayFrame = createOverlayFrame({
+    getActiveToolId: () => interactionController.getActiveToolId(),
+    getAntsPhase: () => antsPhase,
+    getFloatingSelection: () => floatingSelection.get(),
+    getOverlayCursor: () => overlayCursor,
+    selection,
+    stores,
+    transformOverrides,
+  });
   // Stay paused until attached: invalidations accumulate but never request a
   // (DOM) frame, keeping the engine node-safe before it has render targets.
   scheduler.pause();

@@ -60,6 +60,10 @@ export class PreviewStateController {
   getFilter(layerId: string): FilterPreviewState | undefined {
     return this.filters.get(layerId);
   }
+  /** How many layers carry a filter preview, so a caller can skip snapshotting when none do. */
+  filterCount(): number {
+    return this.filters.size;
+  }
   filterSnapshot(): Map<string, FilterPreviewState> {
     return new Map(this.filters);
   }
