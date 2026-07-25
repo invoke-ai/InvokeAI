@@ -10,16 +10,17 @@ import { createDraftProject } from '@workbench/workbenchState';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LassoOptions } from './LassoOptions';
+import { SelectionOptionsRow } from './SelectionOptionsRow';
 
 interface CapturedButton {
   children?: ReactNode;
   disabled?: boolean;
 }
 
-const { activeProject, buttons } = vi.hoisted(() => ({
+const { activeProject, buttons, hasSelection } = vi.hoisted(() => ({
   activeProject: { current: null as Project | null },
   buttons: new Map<string, CapturedButton>(),
+  hasSelection: { current: true },
 }));
 
 vi.mock('@platform/ui', () => ({
@@ -29,8 +30,7 @@ vi.mock('@platform/ui', () => ({
   },
 }));
 vi.mock('@workbench/widgets/canvas/engineStoreHooks', () => ({
-  useCanvasHasSelection: () => true,
-  useLassoOptions: () => ({ mode: 'replace' }),
+  useCanvasHasSelection: () => hasSelection.current,
 }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(activeProject.current!),
@@ -40,14 +40,15 @@ vi.mock('react-i18next', () => ({
 }));
 
 const engine = {
-  deselect: vi.fn(),
-  eraseSelection: vi.fn(),
-  fillSelection: vi.fn(),
-  invertSelection: vi.fn(),
-  stores: { lassoOptions: { set: vi.fn() } },
+  selection: {
+    deselect: vi.fn(),
+    eraseSelection: vi.fn(),
+    fillSelection: vi.fn(),
+    invertSelection: vi.fn(),
+  },
 } as unknown as CanvasEngine;
 
-const renderLassoOptions = (layer: CanvasLayerContract): Map<string, CapturedButton> => {
+const renderRow = (layer: CanvasLayerContract): Map<string, CapturedButton> => {
   const project = createDraftProject([]);
   project.canvas.document = {
     background: 'transparent',
@@ -61,7 +62,12 @@ const renderLassoOptions = (layer: CanvasLayerContract): Map<string, CapturedBut
   activeProject.current = project;
   renderToStaticMarkup(
     <ChakraProvider value={system}>
-      <LassoOptions engine={engine} />
+      <SelectionOptionsRow
+        engine={engine}
+        hintKey="widgets.canvas.toolOptions.lassoHint"
+        mode="replace"
+        onModeChange={vi.fn()}
+      />
     </ChakraProvider>
   );
   return new Map(buttons);
@@ -69,9 +75,10 @@ const renderLassoOptions = (layer: CanvasLayerContract): Map<string, CapturedBut
 
 beforeEach(() => {
   buttons.clear();
+  hasSelection.current = true;
 });
 
-describe('LassoOptions pixel target eligibility', () => {
+describe('SelectionOptionsRow pixel target eligibility', () => {
   const rasterPaint = createEmptyPaintLayer('Raster', 'raster');
   const controlPaint = createControlLayer('Control', 'control');
   const rasterImage: CanvasLayerContract = {
@@ -86,8 +93,22 @@ describe('LassoOptions pixel target eligibility', () => {
     { disabled: true, layer: { ...controlPaint, isEnabled: false }, scenario: 'disabled control' },
     { disabled: true, layer: rasterImage, scenario: 'raster image' },
   ])('sets Fill and Erase disabled=$disabled for $scenario', ({ disabled, layer }) => {
-    const rendered = renderLassoOptions(layer);
+    const rendered = renderRow(layer);
     expect(rendered.get('widgets.canvas.toolOptions.fillSelection')?.disabled).toBe(disabled);
     expect(rendered.get('widgets.canvas.toolOptions.eraseSelection')?.disabled).toBe(disabled);
+  });
+
+  it('disables every action with no live selection, even on an eligible layer', () => {
+    hasSelection.current = false;
+    const rendered = renderRow(rasterPaint);
+    for (const key of ['fillSelection', 'eraseSelection', 'invertSelection', 'deselect']) {
+      expect(rendered.get(`widgets.canvas.toolOptions.${key}`)?.disabled).toBe(true);
+    }
+  });
+
+  it('leaves invert and deselect enabled on an ineligible layer (they need only a selection)', () => {
+    const rendered = renderRow(rasterImage);
+    expect(rendered.get('widgets.canvas.toolOptions.invertSelection')?.disabled).toBe(false);
+    expect(rendered.get('widgets.canvas.toolOptions.deselect')?.disabled).toBe(false);
   });
 });

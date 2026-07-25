@@ -43,15 +43,18 @@ export interface EraserOptions {
   opacity: number;
 }
 
-/** Lasso (selection) tool options: the boolean op applied when a path commits. */
+/** Lasso (selection) tool options: how the path is drawn, and the op it applies. */
 export interface LassoToolOptions {
   /** The op a committed lasso path applies to the selection, when no modifier overrides it. */
   mode: SelectionOp;
+  /** `freehand` traces a drag; `polygon` places straight-edged vertices by click. */
+  shape: 'freehand' | 'polygon';
 }
 
-/** Default lasso options: a fresh path replaces the selection. */
+/** Default lasso options: a freehand path that replaces the selection. */
 export const DEFAULT_LASSO_OPTIONS: LassoToolOptions = {
   mode: 'replace',
+  shape: 'freehand',
 };
 
 /**
@@ -543,7 +546,8 @@ const checkerColorsEqual = (a: CheckerColors, b: CheckerColors): boolean => a.a 
 const bboxOptionsEqual = (a: BboxToolOptions, b: BboxToolOptions): boolean =>
   a.aspectLocked === b.aspectLocked && a.aspectRatio === b.aspectRatio;
 
-const lassoOptionsEqual = (a: LassoToolOptions, b: LassoToolOptions): boolean => a.mode === b.mode;
+const lassoOptionsEqual = (a: LassoToolOptions, b: LassoToolOptions): boolean =>
+  a.mode === b.mode && a.shape === b.shape;
 
 const marqueeOptionsEqual = (a: MarqueeToolOptions, b: MarqueeToolOptions): boolean =>
   a.kind === b.kind && a.mode === b.mode;

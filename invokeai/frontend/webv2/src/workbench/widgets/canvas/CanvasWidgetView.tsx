@@ -402,11 +402,21 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     } else if (commandId === 'canvas.tool.eraser') {
       engine?.tools.setTool('eraser');
     } else if (commandId === 'canvas.tool.lasso') {
-      engine?.tools.setTool('lasso');
+      if (engine) {
+        // Pressing the shortcut while already on the tool cycles its shape
+        // (Photoshop-style) rather than re-selecting the tool it is already on.
+        if (engine.interaction.get('activeTool') === 'lasso') {
+          const lasso = engine.interaction.get('lassoOptions');
+          engine.interaction.set('lassoOptions', {
+            ...lasso,
+            shape: lasso.shape === 'freehand' ? 'polygon' : 'freehand',
+          });
+        } else {
+          engine.tools.setTool('lasso');
+        }
+      }
     } else if (commandId === 'canvas.tool.marquee') {
       if (engine) {
-        // Pressing the shortcut while already on the marquee cycles its shape
-        // (Photoshop-style) rather than re-selecting the tool it is already on.
         if (engine.interaction.get('activeTool') === 'marquee') {
           const marquee = engine.interaction.get('marqueeOptions');
           engine.interaction.set('marqueeOptions', {
