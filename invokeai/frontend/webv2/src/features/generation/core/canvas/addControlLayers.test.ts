@@ -526,4 +526,32 @@ describe('getControlLayerRejectionReason', () => {
     expect(reason).toEqual(expect.any(String));
     expect(reason).toContain('FLUX Fill');
   });
+
+  it('rejects malformed adapter values with an explicit sentence', () => {
+    expect(getControlLayerRejectionReason({ ...validParams, weight: Number.NaN })).toBe(
+      'Control layer "My Layer" has invalid control adapter settings.'
+    );
+  });
+
+  it('rejects a second Control LoRA / Z-Image control via the index params', () => {
+    expect(
+      getControlLayerRejectionReason({
+        ...validParams,
+        adapterModel: { base: 'flux' },
+        controlLoraIndex: 1,
+        kind: 'control_lora',
+        mainBase: 'flux',
+      })
+    ).toBe('Only one Control LoRA can be used at a time.');
+
+    expect(
+      getControlLayerRejectionReason({
+        ...validParams,
+        adapterModel: { base: 'z-image', type: 'controlnet' },
+        kind: 'z_image_control',
+        mainBase: 'z-image',
+        zImageControlIndex: 1,
+      })
+    ).toBe('Only one Z-Image control layer can be used at a time.');
+  });
 });

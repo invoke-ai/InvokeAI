@@ -332,11 +332,12 @@ export const nextControlLayerName = (existingNames: readonly string[]): string =
 export const createControlLayer = (
   name: string,
   id: string = createLayerId(),
-  base?: string | null
+  base?: string | null,
+  model?: string | null
 ): CanvasControlLayerContract => {
   const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER;
   return {
-    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct] },
+    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct], model: model ?? null },
     blendMode: 'normal',
     id,
     isEnabled: true,
@@ -489,22 +490,17 @@ const pixelLayerToControl = (
   layer: PixelLayer,
   id: string,
   isCopy: boolean,
-  base?: string | null
+  base?: string | null,
+  model?: string | null
 ): CanvasControlLayerContract | null => {
   const source = clonePixelSource(layer);
   if (!source) {
     return null;
   }
+  const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER;
   return {
     ...destinationBase(layer, id, isCopy),
-    adapter: {
-      ...(base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER),
-      beginEndStepPct: [
-        ...(base === 'z-image'
-          ? CONTROL_ADAPTER_DEFAULTS.z_image_control.beginEndStepPct
-          : DEFAULT_CONTROL_ADAPTER.beginEndStepPct),
-      ],
-    },
+    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct], model: model ?? null },
     source,
     type: 'control',
     withTransparencyEffect: true,
@@ -542,8 +538,9 @@ const pixelLayerToRegionalGuidance = (
 export const copyRasterToControl = (
   layer: CanvasRasterLayerContractV2,
   id: string,
-  base?: string | null
-): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true, base);
+  base?: string | null,
+  model?: string | null
+): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true, base, model);
 
 export const copyRasterToInpaintMask = (
   layer: CanvasRasterLayerContractV2,
@@ -557,8 +554,9 @@ export const copyRasterToRegionalGuidance = (
 
 export const convertRasterToControl = (
   layer: CanvasRasterLayerContractV2,
-  base?: string | null
-): CanvasControlLayerContract | null => pixelLayerToControl(layer, layer.id, false, base);
+  base?: string | null,
+  model?: string | null
+): CanvasControlLayerContract | null => pixelLayerToControl(layer, layer.id, false, base, model);
 
 export const convertRasterToInpaintMask = (layer: CanvasRasterLayerContractV2): CanvasInpaintMaskLayerContract | null =>
   pixelLayerToInpaintMask(layer, layer.id, false);
@@ -616,13 +614,14 @@ export const copyRegionalGuidanceToInpaintMask = (
 export const convertRasterControlLayer = (
   layer: CanvasLayerContract,
   targetType: 'raster' | 'control',
-  base?: string | null
+  base?: string | null,
+  model?: string | null
 ): CanvasLayerContract | null => {
   if (layer.type === targetType || !canConvertRasterControl(layer)) {
     return null;
   }
   if (layer.type === 'raster' && targetType === 'control') {
-    return convertRasterToControl(layer, base);
+    return convertRasterToControl(layer, base, model);
   }
   if (layer.type === 'control' && targetType === 'raster') {
     const source = clonePixelSource(layer);

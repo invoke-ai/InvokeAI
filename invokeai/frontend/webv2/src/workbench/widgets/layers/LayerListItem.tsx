@@ -11,6 +11,7 @@ import { LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
 import {
   CanvasLayerContextMenu,
   type CanvasLayerContextMenuTarget,
@@ -201,9 +202,12 @@ export const LayerListItem = ({
                 {layer.name}
               </Text>
             )}
-            <Badge alignSelf="flex-start" colorPalette="gray" size="xs" variant="subtle">
-              {t(layerBadgeKey(layer))}
-            </Badge>
+            <HStack alignSelf="flex-start" gap="1">
+              <Badge colorPalette="gray" size="xs" variant="subtle">
+                {t(layerBadgeKey(layer))}
+              </Badge>
+              <ControlLayerWarningIcon layer={layer} />
+            </HStack>
           </Stack>
           <Box flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
             <ToggleDot

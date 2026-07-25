@@ -346,6 +346,12 @@ describe('createControlLayer', () => {
   it('uses Z-Image control defaults when created for a Z-Image main model', () => {
     expect(createControlLayer('Z Control', 'z1', 'z-image').adapter).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
   });
+
+  it('seeds the provided default control model and stays null without one', () => {
+    expect(createControlLayer('C', 'c1', 'sdxl', 'union-model').adapter.model).toBe('union-model');
+    expect(createControlLayer('C', 'c1', 'sdxl').adapter.model).toBeNull();
+    expect(createControlLayer('Z', 'z1', 'z-image', 'z-control').adapter.model).toBe('z-control');
+  });
 });
 
 describe('nextControlLayerName', () => {
@@ -521,6 +527,18 @@ describe('convertRasterControlLayer', () => {
   it('converts raster→control with Z-Image defaults for a Z-Image main model', () => {
     const converted = convertRasterControlLayer(paintLayer('r'), 'control', 'z-image');
     expect(converted?.type === 'control' ? converted.adapter : null).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
+  });
+
+  it('seeds the default control model through convert and copy paths', () => {
+    const converted = convertRasterControlLayer(paintLayer('r'), 'control', 'sdxl', 'union-model');
+    expect(converted?.type === 'control' ? converted.adapter.model : null).toBe('union-model');
+
+    const viaConvert = convertRasterToControl(createEmptyPaintLayer('r2', 'r2'), 'sdxl', 'union-model');
+    expect(viaConvert?.adapter.model).toBe('union-model');
+
+    const viaCopy = copyRasterToControl(createEmptyPaintLayer('r3', 'r3'), 'copy-id', 'sdxl', 'union-model');
+    expect(viaCopy?.adapter.model).toBe('union-model');
+    expect(copyRasterToControl(createEmptyPaintLayer('r4', 'r4'), 'copy-id-2', 'sdxl')?.adapter.model).toBeNull();
   });
 
   it('converts control→raster preserving the pixel source and round-trips', () => {

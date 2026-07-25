@@ -1592,6 +1592,7 @@
           "pidi_edge_detection": "PiDiNet",
           "spandrel_filter": "Spandrel"
         },
+        "invalidLayer": "Control layer \"{{name}}\": {{reason}}",
         "kind": "Adapter type",
         "kinds": {
           "control_lora": "Control LoRA",
@@ -1607,6 +1608,7 @@
           "more_prompt": "More prompt",
           "unbalanced": "Unbalanced"
         },
+        "needsAttention": "Control layer needs attention",
         "preview": "Preview filter",
         "selectModel": "Select a model",
         "stepRange": "Step range",

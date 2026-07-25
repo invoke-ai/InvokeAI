@@ -21,8 +21,6 @@ import { useModelsSelector } from '@features/models';
 import { Field, Select, Slider } from '@platform/ui';
 import { getCanvasOperations, resolveDefaultFilterForModel } from '@workbench/canvas-operations/api';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,6 +28,7 @@ import { getCompatibleControlModels } from './controlModelOptions';
 import { LayerFilterOperationButton } from './LayerFilterOperationButton';
 import { applyStructural, applyStructuralPreview, CONTROL_ADAPTER_DEFAULTS, CONTROL_WEIGHT_BOUNDS } from './layerOps';
 import { runLayerFilterOperation } from './layerPropertiesOperation';
+import { useSelectedMainModel } from './useSelectedMainModel';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
 
@@ -49,16 +48,8 @@ const CONTROL_MODES: readonly NonNullable<CanvasControlAdapterContract['controlM
 const formatUnitPercent = (value: number): string => `${Math.round(value * 100)}%`;
 const formatWeight = (value: number): string => value.toFixed(2);
 
-/** The main model's base, read from the generate widget values (drives adapter support). */
-const useSelectedMainModel = () => {
-  const modelKey = useActiveProjectSelector((project) => {
-    const values = getProjectWidgetValues(project, 'generate');
-    const model = values?.model;
-    return model && typeof model === 'object' && 'key' in model ? String((model as { key: unknown }).key) : null;
-  });
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  return useMemo(() => models.find((model) => model.key === modelKey) ?? null, [models, modelKey]);
-};
+/** Quiet warning tint for the model select while no control model is chosen. */
+const MISSING_MODEL_VALUE_TEXT_PROPS = { color: 'fg.warning' } as const;
 
 interface ControlLayerSettingsProps {
   engine:
@@ -327,7 +318,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           .findIndex((candidate) => candidate.id === layer.id) ?? 0)
       : 0;
   const validationReason =
-    layer.isEnabled && hasContent && mainModel
+    layer.isEnabled && mainModel
       ? getControlValidationReason({
           adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type } : null,
           beginEndStepPct: adapter.beginEndStepPct,
@@ -339,6 +330,10 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           zImageControlIndex: Math.max(0, zImageControlIndex),
         })
       : null;
+  // Content-dependent problems only matter once the layer has pixels, but a
+  // missing model deserves the warning even on a fresh empty layer.
+  const visibleValidationReason =
+    validationReason && (hasContent || validationReason === 'missing_model') ? validationReason : null;
   return (
     <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md">
       <HStack gap="2">
@@ -362,6 +357,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           size="xs"
           value={modelValue}
           valueText={selectedModelName ?? t('widgets.layers.control.selectModel')}
+          valueTextProps={adapter.model ? undefined : MISSING_MODEL_VALUE_TEXT_PROPS}
           onValueChange={handleModelChange}
         />
       </Field>
@@ -441,9 +437,9 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         onOperationStarted={onOperationStarted}
         operations={engine ? getCanvasOperations(engine) : null}
       />
-      {validationReason ? (
+      {visibleValidationReason ? (
         <Text color="fg.warning" fontSize="2xs" role="alert">
-          {t(`widgets.layers.control.validation.${validationReason}`)}
+          {t(`widgets.layers.control.validation.${visibleValidationReason}`)}
         </Text>
       ) : null}
     </Stack>

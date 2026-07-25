@@ -1,5 +1,6 @@
 import type { CommitRasterFilterOptions, CommitRasterFilterResult } from '@workbench/canvas-engine/capabilities';
 import type {
+  CanvasControlLayerContract,
   CanvasDocumentContractV2,
   CanvasImageRef,
   CanvasLayerContract,
@@ -36,6 +37,7 @@ export interface FilterResultControllerOptions {
     }
   ) => Promise<DecodeImageResult>;
   readonly discardPersisted: (layerId: string) => void;
+  readonly getDefaultControlModel: (base: string | null) => string | null;
   readonly getMainModelBase: () => string | null;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
 }
@@ -156,10 +158,16 @@ export class FilterResultController {
       const layerId = o.ctx.createLayerId();
       let copy: CanvasLayerContract;
       if (options.target === 'control') {
-        const base =
-          liveLayer.type === 'control'
-            ? structuredClone(liveLayer)
-            : createControlLayer(`${liveLayer.name} filtered`, layerId, o.getMainModelBase());
+        const buildControlBase = (): CanvasControlLayerContract => {
+          const mainBase = o.getMainModelBase();
+          return createControlLayer(
+            `${liveLayer.name} filtered`,
+            layerId,
+            mainBase,
+            o.getDefaultControlModel(mainBase)
+          );
+        };
+        const base = liveLayer.type === 'control' ? structuredClone(liveLayer) : buildControlBase();
         copy = {
           ...base,
           filter: options.filter,

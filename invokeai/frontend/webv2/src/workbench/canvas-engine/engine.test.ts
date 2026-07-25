@@ -9318,9 +9318,45 @@ describe('commitGeneratedImageResult', () => {
       }
       const created = engine.document.getDocument()!.layers.find((layer) => layer.id === result.layerId);
       expect(created?.type === 'control' ? created.adapter.kind : null).toBe(expectedKind);
+      // Without a getDefaultControlModel option the layer starts model-less.
+      expect(created?.type === 'control' ? created.adapter.model : 'wrong-type').toBeNull();
       engine.lifecycle.dispose();
     }
   );
+
+  it('seeds workflow Copy To Control layers with the injected default control model', async () => {
+    const source = workflowRaster();
+    const { projectId, store } = createReducerBackedStore(workflowDocument([source]), 'sd-1');
+    const getDefaultControlModel = vi.fn((base: string | null) => (base === 'sd-1' ? 'sd1-union' : null));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      getDefaultControlModel,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const exported = await engine.exports.exportLayerPixels(source.id);
+    if (exported.status !== 'ok') {
+      throw new Error('expected an exportable workflow source');
+    }
+
+    const result = await engine.layers.commitGeneratedImageResult({
+      guard: exported.guard,
+      image: generatedImage,
+      origin: generatedOrigin,
+      target: 'copy-control',
+    });
+
+    expect(result.status).toBe('committed');
+    if (result.status !== 'committed') {
+      throw new Error('expected a committed control copy');
+    }
+    expect(getDefaultControlModel).toHaveBeenCalledWith('sd-1');
+    const created = engine.document.getDocument()!.layers.find((layer) => layer.id === result.layerId);
+    expect(created?.type === 'control' ? created.adapter.model : null).toBe('sd1-union');
+    engine.lifecycle.dispose();
+  });
 
   it('replaces a raster at the generated origin and native size, clears baked adjustments, and replays exactly', async () => {
     const source = workflowRaster();

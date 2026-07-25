@@ -231,6 +231,30 @@ describe('importGalleryImagesToCanvas', () => {
     });
   });
 
+  it('seeds new control layers with the default control model for the selected base', async () => {
+    const { project, state } = withProject((value) => setModel(value, 'sd-1'));
+    const canvasEngine = engine(project.id);
+    const models = [
+      { base: 'sd-1', key: 'sd1-canny', name: 'Canny', type: 'controlnet' },
+      { base: 'sd-1', key: 'sd1-union', name: 'Union Pro', type: 'controlnet' },
+    ] as unknown as Parameters<typeof importGalleryImagesToCanvas>[0]['models'];
+
+    const result = await importGalleryImagesToCanvas({
+      destination: 'control',
+      applyCanvasMutation: vi.fn(),
+      engine: canvasEngine,
+      ...queriesFor(() => state),
+      images: [image('a.png')],
+      models,
+      project,
+    });
+
+    expect(result.status).toBe('imported');
+    const [, forward] = vi.mocked(canvasEngine.layers.commitStructural).mock.calls[0]!;
+    const layer = getForwardLayers(forward)[0]!;
+    expect(layer.type === 'control' ? layer.adapter.model : null).toBe('sd1-union');
+  });
+
   it('fetches and uploads each resized control once with optimal model dimensions and durable hidden policy', async () => {
     const { project, state } = withProject((value) => setModel(value, 'flux2'));
     const dispatch = vi.fn<(action: WorkbenchAction) => void>();

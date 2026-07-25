@@ -1,7 +1,9 @@
 import type { CanvasEngine, ImageResolver } from '@workbench/canvas-engine/api';
 
 import { galleryImageUrls } from '@features/gallery/utility';
+import { getModelsSnapshot } from '@features/models';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
+import { resolveDefaultControlModelForBase } from '@workbench/widgets/layers/controlModelOptions';
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
 import { useActiveProjectId, useWorkbenchCommands, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
 import { useMemo, useSyncExternalStore } from 'react';
@@ -62,6 +64,7 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
   const resource = useMemo(
     () =>
       createCanvasEngineResource(projectId, {
+        getDefaultControlModel: (base) => resolveDefaultControlModelForBase(getModelsSnapshot().models, base),
         getMainModelBase: () => {
           const project = store.getState().projects.find((candidate) => candidate.id === projectId);
           return project ? getSelectedModelBase(project) : null;

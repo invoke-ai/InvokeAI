@@ -88,6 +88,7 @@
     "canvasProjectMutations.ts": "workbench",
     "canvasStagingView.ts": "workbench",
     "controlAdapters.ts": "workbench",
+    "controlLayerChecks.ts": "workbench",
     "focusRegions.tsx": "workbench",
     "generationSettingsOrchestration.ts": "workbench",
     "graphPreviewInvocation.ts": "workbench",

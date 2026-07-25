@@ -293,6 +293,8 @@ export interface CanvasEngineOptions {
   uploadImage(blob: Blob): Promise<{ height: number; imageName: string; width: number }>;
   /** Supplies the currently selected model base for core-created control layer contracts. */
   getMainModelBase?: () => string | null;
+  /** Supplies the default control model key for core-created control layer contracts. */
+  getDefaultControlModel?: (base: string | null) => string | null;
   /** Reports structured engine failures without exposing the global workbench dispatcher. */
   reportError(report: CanvasEngineErrorReport): void;
   /** Raster surface/bitmap factory. Defaults to the DOM backend. */
@@ -2440,6 +2442,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const getMainModelBase = (): string | null => {
     return opts.getMainModelBase?.() ?? null;
   };
+  const getDefaultControlModel = (base: string | null): string | null => {
+    return opts.getDefaultControlModel?.(base) ?? null;
+  };
 
   const dispatchPreparedMutation = mutationContext.dispatchPrepared;
 
@@ -2549,6 +2554,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     decodeImage: (image, options) => rasterController.decodeImage(image, options),
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
+    getDefaultControlModel,
     getMainModelBase,
     needsPixelPersistence: layerNeedsPixelPersistence,
   });
@@ -2560,6 +2566,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     decodeImage: (image, options) => rasterController.decodeImage(image, options),
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
+    getDefaultControlModel,
     getMainModelBase,
     needsPixelPersistence: layerNeedsPixelPersistence,
   });

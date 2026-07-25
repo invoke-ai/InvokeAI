@@ -38,10 +38,13 @@ export interface SubmitResolvedInvocationDeps {
    * awaited); a canvas source never dispatches `submitResolvedInvocationSnapshot`.
    */
   prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => unknown;
+  /** Localizes a control-layer rejection notice; defaults to the English validation sentence. */
+  formatControlLayerError?: PrepareCanvasInvocationArgs['formatControlLayerError'];
 }
 
 export const submitResolvedInvocation = ({
   commands,
+  formatControlLayerError,
   models,
   prepareCanvasInvocation,
   project,
@@ -57,6 +60,7 @@ export const submitResolvedInvocation = ({
       compositing: readCanvasCompositingSettings(getProjectWidgetValues(project, 'canvas')),
       destination: route.destination,
       commands,
+      formatControlLayerError,
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
       projectId: project.id,
