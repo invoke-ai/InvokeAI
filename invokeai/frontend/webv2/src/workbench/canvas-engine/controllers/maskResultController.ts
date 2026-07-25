@@ -5,7 +5,7 @@ import type {
 } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 
 import {
   createInpaintMaskFromImage,

@@ -109,7 +109,6 @@ import type { RenderScheduler } from '@workbench/canvas-engine/render/scheduler'
 import type { SamVisualInput } from '@workbench/canvas-engine/samInteraction';
 import type { Mat2d, Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 import { ControlPixelController } from '@workbench/canvas-engine/controllers/controlPixelController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
@@ -192,6 +191,7 @@ import {
 import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
 
 import type { HistoryEntry } from './history/history';
+import type { CanvasProjectMutation } from './mutationContracts';
 import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';

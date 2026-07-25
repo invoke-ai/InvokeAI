@@ -6,7 +6,7 @@ import type {
   CanvasStateContractV2,
 } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { ProjectEvent } from '@workbench/projectContracts';
 
 import { getCanvasStagingCandidateFingerprint } from '@workbench/canvasStagingView';

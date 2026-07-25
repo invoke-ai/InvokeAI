@@ -16,6 +16,7 @@
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
@@ -26,7 +27,6 @@ import type { SelectionCommit } from '@workbench/canvas-engine/selection/selecti
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 /**
  * Emitted once per completed brush/eraser gesture. Persistence (Task P2.2) and

@@ -108,6 +108,7 @@
     "persistenceContracts.ts": "workbench",
     "persistenceRuntime.ts": "workbench",
     "projectContracts.ts": "workbench",
+    "projectEventContracts.ts": "workbench",
     "queueHistoryContracts.ts": "workbench",
     "queueHistoryNormalization.ts": "workbench",
     "useCanvasProjectMutationDispatch.ts": "workbench",
