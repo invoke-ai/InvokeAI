@@ -1168,7 +1168,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // the ants through the matching document-space transform.
     const floatRender = floatingSelectionFrame(floatingSelection.get(), doc);
     if (flags.all || flags.view || flags.layers.size > 0) {
-      compositeFrame.draw(screen, doc, view, floatRender, samPreview);
+      compositeFrame.draw(screen, doc, view, floatRender, samPreview, flags.damage);
     }
 
     // The overlay is cheap (a handful of screen-space strokes, independent of
@@ -1764,7 +1764,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // a flash/strobe. A same-task repaint lands before the browser paints, so the
     // canvas never shows empty. `all: true` forces the composite through the T22
     // dirty gate; `render` no-ops when detached (no surfaces).
-    render({ all: true, layers: new Set<string>(), overlay: true, view: true });
+    render({ all: true, damage: null, layers: new Set<string>(), overlay: true, view: true });
   };
 
   const fitToView = (): void => {

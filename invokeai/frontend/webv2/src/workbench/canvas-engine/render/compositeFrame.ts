@@ -9,7 +9,7 @@ import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { DerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
+import type { LayerDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
 import { getSourceContentRect, isRenderableLayer, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
@@ -46,7 +46,14 @@ export interface CompositeFrame {
     doc: CanvasDocumentContractV2,
     view: Mat2d,
     floatFrame: FloatingSelectionFrame | null,
-    samPreview: SamPreviewState | null
+    samPreview: SamPreviewState | null,
+    /**
+     * The regions this frame must repaint, in their layers' local spaces, or
+     * `null` to repaint everything. Supplied by the render scheduler, which only
+     * produces a non-null value when every invalidation in the frame named the
+     * region it changed.
+     */
+    damage?: LayerDamage[] | null
   ): void;
 }
 
@@ -144,7 +151,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   };
 
   return {
-    draw: (screen, doc, view, floatFrame, samPreview) => {
+    draw: (screen, doc, view, floatFrame, samPreview, damage) => {
       const stagedPreview = previews.getStaged();
       const stagedPlacement = stagedPreview?.placement;
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
@@ -170,6 +177,9 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         ? { ...doc, layers: doc.layers.filter((layer) => isolatedIds.has(layer.id)) }
         : doc;
       compositeDocument(screen, compositeDoc, layerCache, view, {
+        // Confines the clear, the checkerboard and every layer blit to the pixels
+        // that actually changed; `null` repaints the whole viewport.
+        damage: isolatedGuard ? null : damage,
         // Memoized adjusted surfaces for raster layers with brightness/contrast/
         // saturation/curves (not recomputed per frame — see adjustedSurfaceCache).
         adjustedSurface: deps.getAdjustedSurface,

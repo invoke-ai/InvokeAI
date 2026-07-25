@@ -19,11 +19,11 @@ import type {
   CanvasLayerContract,
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
-import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
+import type { LayerDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { isLayerHidden, LAYER_GROUP_COUNT, layerGroupRank } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-import { intersect, transformBounds } from '@workbench/canvas-engine/math/rect';
+import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 
 import type { DerivedSurfaceCache } from './derivedSurfaceCache';
 import type { LayerCacheEntry, LayerCacheStore } from './layerCache';
@@ -106,6 +106,17 @@ export interface CompositeOptions {
    * {@link shouldSmoothAtZoom} so zoomed-in frames composite crisp and cheap.
    */
   imageSmoothing?: boolean;
+  /**
+   * The regions this composite must repaint, each in its layer's local space.
+   * When present, the clear, the checkerboard and every layer blit are clipped
+   * to their union on screen and the rest of the target keeps the previous
+   * frame — which is the difference between resampling a whole doc-sized layer
+   * to screen scale and resampling a few hundred pixels of it.
+   *
+   * `undefined` or `null` repaints the whole target, which is what every caller
+   * that cannot name its damage gets.
+   */
+  damage?: LayerDamage[] | null;
   /**
    * Transient per-layer transform overrides (a live move/transform preview): a
    * layer with an entry here is drawn through the overridden transform instead of
@@ -247,7 +258,7 @@ export const createCheckerboardTile = (
  * the pattern to the stage — so it stays visually stable and never swims or
  * scales while panning/zooming.
  */
-const drawBackground = (ctx: Ctx, target: RasterSurface, tile: RasterSurface | null): void => {
+const drawBackground = (ctx: Ctx, tile: RasterSurface | null, bounds: Rect): void => {
   if (!tile) {
     // Checkerboard disabled: leave the cleared surface showing `bg.inset`.
     return;
@@ -257,7 +268,63 @@ const drawBackground = (ctx: Ctx, target: RasterSurface, tile: RasterSurface | n
     return;
   }
   ctx.fillStyle = pattern;
-  ctx.fillRect(0, 0, target.width, target.height);
+  ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+};
+
+/**
+ * Resolves {@link CompositeOptions.damage} to the screen-space rect a frame may
+ * confine itself to, or `null` for "repaint everything".
+ *
+ * Each region arrives in its layer's local space, so it is carried to the screen
+ * through the same `view × layerMatrix` the layer itself is drawn with — which
+ * keeps this correct for moved, scaled and rotated layers without the reporter
+ * needing to know any of that. A region naming a layer that is no longer in the
+ * document cannot be placed, so the frame falls back to a full repaint.
+ *
+ * The result is rounded outward and grown by a pixel: the layer blit is
+ * antialiased at the seam, and a clip that lands mid-pixel would leave a hairline
+ * of the previous frame behind.
+ */
+const resolveDamage = (
+  doc: CanvasDocumentContractV2,
+  view: Mat2d,
+  target: RasterSurface,
+  opts: CompositeOptions
+): Rect | null => {
+  const damage = opts.damage;
+  if (!damage || damage.length === 0) {
+    return null;
+  }
+  let accumulated: Rect | null = null;
+  for (const region of damage) {
+    const layer = doc.layers.find((candidate) => candidate.id === region.layerId);
+    if (!layer) {
+      return null;
+    }
+    const bounds = transformBounds(multiply(view, getEffectiveLayerMatrix(layer, opts)), region.rect);
+    accumulated = accumulated ? union(accumulated, bounds) : bounds;
+  }
+  if (!accumulated) {
+    return null;
+  }
+  const grown = roundOut({
+    height: accumulated.height + 2,
+    width: accumulated.width + 2,
+    x: accumulated.x - 1,
+    y: accumulated.y - 1,
+  });
+  // A degenerate matrix would put NaN in here, and a NaN rect compares false
+  // against every bound — which would quietly skip the frame's drawing rather
+  // than widen it. Repaint everything instead.
+  if (
+    !Number.isFinite(grown.x) ||
+    !Number.isFinite(grown.y) ||
+    !Number.isFinite(grown.width) ||
+    !Number.isFinite(grown.height)
+  ) {
+    return null;
+  }
+  return intersect(grown, { height: target.height, width: target.width, x: 0, y: 0 });
 };
 
 const isMaskLayer = (
@@ -424,13 +491,29 @@ export const compositeDocument = (
   // zoomed in keeps magnified pixels crisp and skips the costly bilinear upscale.
   ctx.imageSmoothingEnabled = opts.imageSmoothing ?? true;
 
-  // Clear the whole target in screen space, then lay the checkerboard across the
-  // entire viewport — the canvas is an unbounded plane, so the checker is the
-  // world, not a document backdrop. With the checkerboard off the cleared surface
-  // shows the widget's themed `bg.inset` through it.
+  // Clear the target in screen space, then lay the checkerboard across it — the
+  // canvas is an unbounded plane, so the checker is the world, not a document
+  // backdrop. With the checkerboard off the cleared surface shows the widget's
+  // themed `bg.inset` through it.
+  //
+  // When the frame declared its damage, both are confined to it and a clip keeps
+  // every layer blit below inside it too, so the untouched majority of the target
+  // simply keeps the previous frame's pixels. Damage that resolves to an empty
+  // rect means nothing visible changed: leave the target entirely alone.
   identityTransform(ctx);
-  ctx.clearRect(0, 0, target.width, target.height);
-  drawBackground(ctx, target, opts.checkerboardTile ?? null);
+  const damageScreen = resolveDamage(doc, view, target, opts);
+  if (damageScreen && isEmpty(damageScreen)) {
+    ctx.restore();
+    return;
+  }
+  const repaint: Rect = damageScreen ?? { height: target.height, width: target.width, x: 0, y: 0 };
+  if (damageScreen) {
+    ctx.beginPath();
+    ctx.rect(damageScreen.x, damageScreen.y, damageScreen.width, damageScreen.height);
+    ctx.clip();
+  }
+  ctx.clearRect(repaint.x, repaint.y, repaint.width, repaint.height);
+  drawBackground(ctx, opts.checkerboardTile ?? null, repaint);
 
   if (opts.clipRect) {
     ctx.save();
