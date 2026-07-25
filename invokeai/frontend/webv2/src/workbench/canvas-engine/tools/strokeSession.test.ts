@@ -359,3 +359,79 @@ describe('strokeSession: cache version bump (live adjusted-surface invalidation)
     expect(entry.version).toBeGreaterThan(vBeforeCancel);
   });
 });
+
+describe('incremental "before" snapshot', () => {
+  const makeSession = (size: number) => {
+    const { backend } = createCapturingBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('L', 0, 0);
+    const ctx = {
+      backend,
+      createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
+      emitStrokeCommitted: vi.fn(),
+      invalidate: vi.fn(),
+      layers,
+      notifyLayerPainted: vi.fn(),
+    } as unknown as ToolContext;
+    const session = createStrokeSession({
+      color: '#ff0000',
+      composite: 'source-over',
+      ctx,
+      layerId: 'L',
+      opacity: 1,
+      size,
+      thinning: 0,
+      tool: 'brush',
+    });
+    return { layers, session };
+  };
+
+  /** A long rightward drag, one sample per batch. */
+  const drag = (session: ReturnType<typeof makeSession>['session'], to: number, step: number): void => {
+    for (let x = 0; x <= to; x += step) {
+      session.addPoints([pointer(x, 0)]);
+    }
+  };
+
+  const surfaceOf = (layers: ReturnType<typeof createLayerCacheStore>) =>
+    layers.get('L')!.surface as unknown as StubRasterSurface;
+
+  it('reads only the strips the region gains, never the whole accumulated region', () => {
+    const { layers, session } = makeSession(100);
+    drag(session, 3000, 50);
+    const region = layers.get('L')!.rect;
+    // `growToRect` re-reads the surface when it reallocates (args are its own
+    // full extent from the origin); the session's own snapshot reads are the
+    // strips, and none of them may span the accumulated width.
+    const stripReads = surfaceOf(layers)
+      .callLog.filter((entry) => entry.op === 'getImageData')
+      .filter((entry) => Number(entry.args[0]) !== 0 || Number(entry.args[1]) !== 0);
+    expect(region.width).toBeGreaterThan(3000);
+    expect(stripReads.length).toBeGreaterThan(0);
+    for (const read of stripReads) {
+      expect(Number(read.args[2])).toBeLessThan(region.width / 2);
+    }
+  });
+
+  it('re-snapshots only when the region actually grows, not on every batch', () => {
+    const { layers, session } = makeSession(100);
+    // Many batches inside one chunk: the region never changes, so the retained
+    // snapshot is reused and nothing is read back at all.
+    session.addPoints([pointer(0, 0)]);
+    const baseline = surfaceOf(layers).callLog.filter((e) => e.op === 'getImageData').length;
+    for (let i = 0; i < 20; i++) {
+      session.addPoints([pointer(1, 1)]);
+    }
+    const after = surfaceOf(layers).callLog.filter((e) => e.op === 'getImageData').length;
+    expect(after).toBe(baseline);
+  });
+
+  it('reallocates less often for a wide brush than a fixed 64px grid would', () => {
+    // The growth grid scales with the brush, so a 1200px brush crossing 4000px
+    // of travel reallocates on a ~300px pitch rather than every 64px.
+    const { layers, session } = makeSession(1200);
+    drag(session, 4000, 100);
+    const resizes = surfaceOf(layers).callLog.filter((entry) => entry.op === 'resize').length;
+    expect(resizes).toBeLessThan(4000 / 200);
+  });
+});

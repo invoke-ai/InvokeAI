@@ -3742,15 +3742,16 @@ describe('engine-owned history: undo/redo guarded during an active gesture', () 
     // (The live session itself may draw, so snapshot the put count after it opens.)
     overlay.fire('pointerdown', pointerAt(50, 50));
     overlay.fire('pointermove', pointerAt(60, 60));
-    const putsMidGesture = putImageDataCalls(surfaces).length;
+    const putsMidGesture = putImageDataCalls(surfaces);
 
-    // Mid-gesture undo/redo must be no-ops: no history pop and no putImageData.
+    // Mid-gesture undo/redo must be no-ops: no history pop, and not a single
+    // additional putImageData. Comparing the whole log — rather than just its
+    // length, or scanning it for the first stroke's snapshot — keeps this honest
+    // whether or not the live session reuses one "before" snapshot across frames.
     engine.history.undo();
     engine.history.redo();
     expect(engine.stores.canUndo.get()).toBe(true);
-    expect(putImageDataCalls(surfaces).length).toBe(putsMidGesture);
-    // In particular, the first stroke's before pixels were never injected.
-    expect(putImageDataCalls(surfaces).some((call) => call.image === strokes[0]!.beforeImageData)).toBe(false);
+    expect(putImageDataCalls(surfaces)).toEqual(putsMidGesture);
 
     // End the gesture; now undo works and writes the newest stroke's before pixels.
     overlay.fire('pointerup', pointerAt(60, 60, { buttons: 0 }));
